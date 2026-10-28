@@ -377,6 +377,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       '[data-tid$=";WizrdMCF;ExprDataEditForm"]',
       ...['edtName','edtDisplayName','cbxDataType'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+'"]';return [owner,owner+' input'];}),
       ...['chbIntermediate','chbCached'].flatMap(name=>['',';InputEl',';DisplayEl'].map(part=>'[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+part+'"]')),
+      '[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
       ...wizardButtons.map(name=>'[data-tid$=";WizrdMCF;'+name+'"]')].join(',');
     if (requestedRoot || discoverRoots) {
       // Native fixed queries discover global blockers/context without walking
@@ -1575,6 +1576,31 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ?errorButtons[0].getAttribute('data-qtip'):null;
       wizard.calculator_validation=typeof errorText==='string'&&errorText.length>0&&errorText.length<=4096
         &&!sensitive(errorButtons[0])?{status:'observed',root_ref:wizard.root_ref,message:errorText,source:'loginom_wizard_error_tooltip'}:{status:'unobserved'};
+      wizard.calculator_preview={status:'absent'};
+      const previews=(tids.get(wizard.root_tid+';CalcPreviewForm')??[]).filter(visible);
+      if(previews.length) {
+        wizard.calculator_preview={status:'unverified'};
+        const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+        const model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const items=own(own(model,'FWizardItems'),'FItems'),page=(tids.get(base.slice(0,-1))??[])[0];
+        const view=page&&globalThis.Ext?.getCmp?.(page.id);
+        const matches=Array.isArray(items)&&items.length<=32?items.filter(i=>{
+          const pages=own(i,'FPages');return Array.isArray(pages)&&pages.length<=32&&pages.includes(view);
+        }):[];
+        const controller=matches.length===1?own(matches[0],'FWizard'):null,form=own(controller,'FPreviewForm');
+        const previewView=own(form,'FView'),store=own(own(form,'FCodeConsole'),'FConsoleStore');
+        const records=store?.getData?.()?.items;
+        if(preparedNodeId&&preparedNodeWizard&&previews.length===1&&view?.el?.dom===page
+          &&own(controller,'FWizardForm')===model&&controller?.constructor?.name==='CalcDataWizard'
+          &&previewView?.el?.dom===previews[0]&&previewView.Controller===form
+          &&globalThis.Ext?.getCmp?.(previews[0].id)===previewView&&!sensitive(previews[0])
+          &&Array.isArray(records)&&records.length<=128&&!store.isLoading?.()&&store.getCount?.()===records.length
+          &&Number.isInteger(globalThis.bg?.TBGCodeConsoleMessageType?.cmtError)
+          &&records.every(r=>r?.isModel&&typeof r.data?.Text==='string'&&r.data.Text.length<=4096&&Number.isInteger(r.data.MessageType))
+          &&records.reduce((n,r)=>n+r.data.Text.length,0)<=4096)
+          wizard.calculator_preview={status:'observed',root_ref:refOf(previews[0]),root_tid:getTid(previews[0]),
+            errors:records.filter(r=>r.data.MessageType===globalThis.bg?.TBGCodeConsoleMessageType?.cmtError).map(r=>r.data.Text)};
+      }
       const selected=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colExpressionName_') && visible(e) && !sensitive(e) && e.closest('table')?.classList.contains('x-grid-item-selected');});
       wizard.expression_selection={status:selected.length>1?'ambiguous':'unobserved'};
       if(selected.length===1) {
@@ -4248,6 +4274,36 @@ function readRenderedInputMapping(observation) {
           if(error?.code!=='UI_ROOT_STALE' || !effectPossible || !['click','double_click','right_click','press'].includes(task.action.verb))throw error;
           observed=await readUi(true);
           record('ui_root_closed_after_gesture',{verification_required:true});
+        }
+        if(task.action.verb==='click'&&current.prepared_node_context?.verified===true&&current.wizard.stage==='calculator'
+          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';CalcDataWizard;btnPreview') {
+          const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build===current.loginom_build
+            &&same(s.workflow_ref,current.workflow_ref)&&same(s.prepared_node_context,current.prepared_node_context)
+            &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.stage==='calculator'&&s.wizard.root_ref===current.wizard.root_ref;
+          const accepted=s=>s.wizard.calculator_preview?.status==='observed'&&s.ui.dialogs.length===1
+            &&s.ui.dialogs[0].ref===s.wizard.calculator_preview.root_ref
+            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===s.wizard.root_tid);
+          for(let attempt=0;attempt<60&&owned(observed)&&!accepted(observed);attempt++) {
+            const validation=observed.wizard.calculator_validation;
+            if(observed.ui.dialogs.length===0&&observed.ui.masks.length===0&&validation?.status==='observed') {
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              if(owned(fresh)&&!fresh.ui.dialogs.length&&!fresh.ui.masks.length&&same(fresh.wizard.calculator_validation,validation)) {
+                observed=fresh;record('wizard_calculator_validation_failed',validation);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+              }
+              observed=fresh;continue;
+            }
+            if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid))break;
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi();
+          }
+          if(!owned(observed)||!accepted(observed))fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Owned calculator preview did not settle after one click; inspect before retry');
+          record('wizard_calculator_preview_verified',{root_ref:observed.wizard.calculator_preview.root_ref,settings_applied:false});
+          if(observed.wizard.calculator_preview.errors.length) {
+            const validation={status:'observed',root_ref:observed.wizard.root_ref,
+              message:observed.wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
+            observed.wizard.calculator_validation=validation;record('wizard_calculator_validation_failed',validation);
+            fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+          }
         }
         if(task.action.verb==='confirm_wizard_close') {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;

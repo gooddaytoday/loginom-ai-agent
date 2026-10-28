@@ -118,6 +118,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
     &&dialog.identity?.anchor_tid===state.node_preview_schema.root_tid
     &&state.node_preview_schema.node_id===preparedNodeContext?.node.node_id;
+  const allowedCalculatorPreview=(dialog,state)=>state.prepared_node_context?.surface==='wizard'
+    &&state.wizard?.stage==='calculator'&&state.wizard.calculator_preview?.status==='observed'
+    &&dialog.ref===state.wizard.calculator_preview.root_ref
+    &&dialog.identity?.anchor_tid===state.wizard.root_tid+';CalcPreviewForm';
   const pendingPreviewDialog=(dialog,state)=>{
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
@@ -157,7 +161,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.node_clustering.kind==='normalization'&&state.node_clustering.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
-  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
