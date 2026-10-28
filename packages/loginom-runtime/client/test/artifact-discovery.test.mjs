@@ -353,3 +353,69 @@ test('generated discovery includes its readiness function without a module closu
  const code=makeArtifactDiscoveryDownloadCode(task,{download:async()=>{},reveal:async()=>{}});
  assert.equal(typeof vm.runInNewContext('('+code+')'),'function');assert.match(code,/DISCOVERY_READY_OWNER_CHANGED/);
 });
+
+function largeNativeFixture() {
+ const origin='https://test',prefix='MF;TF-2',size=2**32+1048576,name='own.csv',destination='/user/'+name;
+ const elements=new Map(),records=[],clicks=[];
+ const element=(tid,text='')=>{const e={id:tid,isConnected:true,textContent:text,getAttribute:k=>k==='data-tid'?tid:null,
+  getBoundingClientRect:()=>({width:400,height:30}),classList:{contains:()=>true},contains:()=>true,querySelector:()=>({})};elements.set(tid,e);return e;};
+ const grid=element(prefix+';FileStorageForm;pnlFileStorage;tbl'),tab=element('tab'),root=element(prefix+';FileStorageForm');
+ element(prefix+';FileStorageForm;btnRefresh');element(prefix+';FileStorageForm;btnDelete');
+ const row={Type:0,FileName:name,FilePath:destination,id:destination,Size:size,Time:'2026-10-28T00:00:00Z'};
+ const store={$className:'bg.filedialog.FileStore',loadCount:1,isLoading:()=>false,getRange:()=>records,getCount:()=>records.length,
+  getTotalCount:()=>records.length,getData:()=>({items:records})};
+ const component={el:{dom:grid},getStore:()=>store,getSelectionModel:()=>({getSelection:()=>records})};
+ class FileSenderManager{constructor(){this.CurrentDirectory='/user/';this.FActiveLoadersCount=0;this.FCurrentUploadFilePaths={};this.FUploadViewController={FFileLoaders:[]};}}
+ class FileStorageForm{constructor(){this.FFileInput={isConnected:true,files:[]};this.FFileSenderManager=new FileSenderManager();this.FView={el:{dom:root}};}}
+ const form=new FileStorageForm(),sender=form.FFileSenderManager,card={Controller:{FController:form}};
+ const doc={querySelectorAll:selector=>[...elements.entries()].filter(([tid])=>selector==='[data-tid='+JSON.stringify(tid)+']').map(([,el])=>el)};
+ const realm=vm.createContext({document:doc,location:{origin},getComputedStyle:()=>({display:'block',visibility:'visible'}),
+  bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}},FMapTree:{FServerConnection:{UserName:'operator'}}}}}}},Ext:{getCmp:()=>component}});
+ realm.__loginomDockPreparationV1={document:doc,id:'prep-doc'};
+ const page={evaluate:async(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args),locator:selector=>{
+  const entry=[...elements.entries()].find(([tid])=>selector==='[data-tid='+JSON.stringify(tid)+']');
+  return {count:async()=>entry?1:0,isVisible:async()=>true,isEnabled:async()=>true,click:async()=>{
+   const tid=entry[0];clicks.push(tid);
+   if(tid.endsWith('btnRefresh'))store.loadCount++;
+   if(tid==='toast;cancel'){sender.FActiveLoadersCount=0;sender.FCurrentUploadFilePaths={};sender.FUploadViewController.FFileLoaders=[];form.FFileInput.files=[];records.splice(0,records.length);}
+  }};
+ }};
+ const task={operation_id:'large',snapshot:{workflow_ref:{prefix,tab_tid:'tab'}},expected_origin:origin,expected_build:'7.4.2',
+  binding:{document_id:'prep-doc',loginom_account:'operator'},deadline_at:Date.now()+10000,
+  artifact:{artifact_id:'artifact',name,bytes:size,sha256:'a'.repeat(64),upload:{directory:'/user',destination,overwrite:'reject'}}};
+ return {task,page,sender,form,row,records,store,clicks,realm,
+  publish:()=>{records.push({data:row});store.loadCount++;},
+  start:()=>{const cancel=element('toast;cancel');sender.FActiveLoadersCount=1;sender.FCurrentUploadFilePaths={[destination]:true};
+   form.FFileInput.files=[{name,size}];sender.FUploadViewController.FFileLoaders=[{FullFilename:destination,File:{size},FStart:2**32,Container:{el:{dom:element('toast;container')},items:{items:[{}, {}, {},{el:{dom:cancel}}]}}}];},
+ };
+}
+
+test('native large upload observes safe progress and exact FileStore size without a download',async()=>{
+ const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');const f=largeNativeFixture();
+ const call=mode=>largeUploadNative(f.page,{...f.task,mode});
+ assert.equal((await call('bind')).bytes,0);f.start();
+ const progress=await call('poll');assert.equal(progress.active,1);assert.equal(progress.bytes,2**32);
+ f.sender.FActiveLoadersCount=0;f.sender.FCurrentUploadFilePaths={};f.form.FFileInput.files=[];f.sender.FUploadViewController.FFileLoaders=[];f.publish();
+ await call('refresh');const proof=await call('verify');assert.equal(proof.bytes,f.task.artifact.bytes);assert.equal(proof.row.Type,0);
+ f.row.Size--;assert.equal((await call('verify')).waiting,true);f.row.Size++;f.row.Type=1;assert.equal((await call('verify')).waiting,true);
+});
+
+for(const fault of ['receipt','digest','account','origin','time','type','directory'])test('native reuse requires trusted receipt and matching native metadata: '+fault,async()=>{
+ const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');const f=largeNativeFixture();f.publish();
+ const receipt={row:{...f.row},sha256:f.task.artifact.sha256,account:'operator',origin:'https://test',directory:'/user'};
+ if(fault==='digest')receipt.sha256='b'.repeat(64);if(fault==='account')receipt.account='other';if(fault==='origin')receipt.origin='https://other';
+ if(fault==='time')f.row.Time='other';if(fault==='type')f.row.Type=1;if(fault==='directory')receipt.directory='/other';
+ await assert.rejects(()=>largeUploadNative(f.page,{...f.task,mode:'bind',receipt:fault==='receipt'?undefined:receipt}),/UPLOAD_PATH_CONFLICT/);
+ assert.deepEqual(f.clicks,[]);
+});
+
+test('native receipt reuse sends no gesture, and cancellation clicks only the owned data-tid and confirms inventory',async()=>{
+ const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');
+ const reused=largeNativeFixture();reused.publish();
+ const receipt={row:{...reused.row},sha256:reused.task.artifact.sha256,account:'operator',origin:'https://test',directory:'/user'};
+ assert.equal((await largeUploadNative(reused.page,{...reused.task,mode:'bind',receipt})).reused,true);assert.deepEqual(reused.clicks,[]);
+ const f=largeNativeFixture(),call=mode=>largeUploadNative(f.page,{...f.task,mode});
+ await call('bind');f.start();f.publish();await call('cancel');assert.equal((await call('cancel')).quiet,true);
+ await call('refresh');assert.equal((await call('cleanup')).clean,true);
+ assert.deepEqual(f.clicks,['toast;cancel','MF;TF-2;FileStorageForm;btnRefresh']);
+});

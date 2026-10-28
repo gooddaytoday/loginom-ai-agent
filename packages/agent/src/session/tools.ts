@@ -583,12 +583,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     if (profile === "loginom-automation" && catalog.tools.some((item) => item.name === "dock_action_describe")) {
       const { loginomFileTools } = yield* Effect.promise(() => import("@/tool/loginom-file-profile"))
       Object.assign(tools, yield* loginomFileTools(context))
-      const { snapshotLoginomFile, localFilePermissionFailure } = yield* Effect.promise(
+      const { admitLoginomLocalFile, localFilePermissionFailure } = yield* Effect.promise(
         () => import("@/tool/loginom-local-file"),
       )
       tools.loginom_file_admit = tool({
         description:
-          "Register one local data file by its literal path (relative to the session directory or absolute), up to 16 MiB. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path.",
+          "Register one local data file by its literal path (relative to the session directory or absolute), including files of several GiB. Files over 16 MiB use a private streaming snapshot, without sending bytes through IPC. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path.",
         inputSchema: jsonSchema<{ path: string }>({
           type: "object",
           properties: { path: { type: "string" } },
@@ -611,24 +611,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                     localFilePermissionFailure(path.resolve(input.session.directory, args.path), cause, ctx),
                   ),
                 )
-              const source = yield* snapshotLoginomFile(args.path, ctx)
-              if (path.extname(source.file.name).toLowerCase() === ".lgp")
-                return yield* Effect.die(
-                  Error("Use loginom_dock_prepare with local_package_path for a local .lgp: " + source.sourcePath),
-                )
-              ctx.abort.throwIfAborted()
-              const artifacts = yield* Effect.promise(() =>
-                loginom
-                  .admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [source.file])
-                  .catch((error) => {
-                    throw Error(hostErrorText(error))
-                  }),
-              )
-              if (!Array.isArray(artifacts) || artifacts.length !== 1)
-                return yield* Effect.die(Error("LOGINOM_INPUT_INVALID: " + source.sourcePath))
+              const source = yield* admitLoginomLocalFile(args.path, ctx, loginom, task!.taskMessageID)
               const output = {
-                title: "Local file: " + source.file.name,
-                output: JSON.stringify({ source_path: source.sourcePath, artifact: artifacts[0] }),
+                title: "Local file: " + path.basename(source.sourcePath),
+                output: JSON.stringify({ source_path: source.sourcePath, artifact: source.artifact }),
                 metadata: { generation: loginom.generation, truncated: false },
               }
               yield* plugin.trigger(
