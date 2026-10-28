@@ -8,10 +8,10 @@ import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
-import { inspectReferenceFile, stageReferenceFile, type ReferenceSlot } from "../src/file-reference"
+import { inspectReferenceFile, type FileReference } from "../src/file-reference"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
-test("private IPC admits only a reserved original-input reference and retains its snapshot until runtime shutdown", async () => {
+test("private IPC admits only a reserved original-input reference and retains the original through runtime shutdown", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-reference-ipc-"))
@@ -40,7 +40,7 @@ test("private IPC admits only a reserved original-input reference and retains it
         process.send({id:m.id,result:admitted.get(r.grant)});
       }
       if(m.operation==='close'){
-        // Closing the child must precede snapshot deletion by the Host.
+        // The original remains present through runtime shutdown.
         if([...paths].some(path=>!existsSync(path))){process.send({id:m.id,error:'SNAPSHOT_REMOVED_BEFORE_BROWSER_CLOSE'});return;}
         process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       }
@@ -84,26 +84,27 @@ test("private IPC admits only a reserved original-input reference and retains it
     await expect(
       client.request("referenceReserve", { run: "run", userMessage: "msg_other", name: "data.csv" }),
     ).rejects.toThrow("LOGINOM_INPUT_INVALID")
-    const slot = (await client.request("referenceReserve", {
+    const source = join(directory, "data.csv")
+    await writeFile(source, "private input bytes\n")
+    const snapshot = { ...(await inspectReferenceFile(source)), sha256: null }
+    const reference = (await client.request("referenceReserve", {
       run: "run",
       userMessage: "msg_original",
       name: "data.csv",
-    })) as ReferenceSlot
-    const source = join(directory, "data.csv")
-    await writeFile(source, "private input bytes\n")
-    const reference = await stageReferenceFile(source, await inspectReferenceFile(source), slot)
+      snapshot,
+    })) as FileReference
     for (const changed of [
       { ...reference, chat: "other" },
       { ...reference, generation: 2 },
       { ...reference, userMessage: "msg_other" },
-      { ...reference, snapshot: { ...reference.snapshot, canonical_path: source } },
+      { ...reference, snapshot: { ...reference.snapshot, canonical_path: join(directory, "foreign.csv") } },
     ])
       await expect(client.request("referenceAdmit", { run: "run", reference: changed })).rejects.toThrow(
         "LOGINOM_INPUT_INVALID",
       )
     const result = await client.request("referenceAdmit", { run: "run", reference })
     expect(await client.request("referenceAdmit", { run: "run", reference })).toEqual(result)
-    await expect(client.request("referenceDiscard", { run: "run", grant: slot.grant })).rejects.toThrow(
+    await expect(client.request("referenceDiscard", { run: "run", grant: reference.grant })).rejects.toThrow(
       "LOGINOM_INPUT_IDENTITY_CONFLICT",
     )
     const received = (await readFile(incoming, "utf8"))
@@ -117,14 +118,16 @@ test("private IPC admits only a reserved original-input reference and retains it
     const unused = (await client.request("referenceReserve", {
       run: "run",
       userMessage: "msg_original",
-      name: "unused.csv",
-    })) as ReferenceSlot
+      name: "data.csv",
+      snapshot,
+    })) as FileReference
     expect(await client.request("referenceDiscard", { run: "run", grant: unused.grant })).toEqual({ discarded: true })
-    expect(await readFile(slot.path, "utf8")).toBe("private input bytes\n")
+    expect(await readFile(source, "utf8")).toBe("private input bytes\n")
     await client.request("release", { run: "run" })
     await port.close()
     await host.close()
-    expect(await readdir(join(root, "file-references"))).toEqual([])
+    expect(await readdir(root)).not.toContain("file-references")
+    expect(await readFile(source, "utf8")).toBe("private input bytes\n")
   } finally {
     client.close()
     await port.close()

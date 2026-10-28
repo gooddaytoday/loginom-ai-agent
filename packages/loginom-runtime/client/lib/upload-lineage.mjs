@@ -5,7 +5,8 @@ export function verifiedLocalDelivery(artifact,outcome) {
  const requireDelivery=(value,reason)=>need(value,'Upload bytes, digest, artifact or exact destination do not match the source: '+reason);
  const output=outcome?.output,download=output?.server_copy_verification,native=download===undefined;
  const proof=download??output?.native_size_verification;
- requireDelivery(Number.isSafeInteger(artifact?.bytes)&&artifact.bytes>=0&&typeof artifact.sha256==='string'&&/^[a-f0-9]{64}$/.test(artifact?.sha256??''),'admitted identity required');
+ requireDelivery(Number.isSafeInteger(artifact?.bytes)&&artifact.bytes>=0&&(/^[a-f0-9]{64}$/.test(artifact?.sha256??'')
+  ||native&&artifact.sha256===null&&proof?.source_unchanged_verified===true),'admitted identity required');
  requireDelivery(outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&outcome.action_key==='artifact.upload'
   &&output?.artifact_id===artifact.artifact_id&&proof?.status==='SUCCEEDED'&&proof.upload_completion_verified===true
   &&output.destination===proof.destination&&[output,proof].every(x=>x.bytes===artifact.bytes)
@@ -15,7 +16,7 @@ export function verifiedLocalDelivery(artifact,outcome) {
   &&proof.source_sha256===artifact.sha256,'native size/local digest receipt required');
  else requireDelivery(proof.bytes_verified===true&&proof.sha256===artifact.sha256&&typeof proof.verification_id==='string'&&proof.verification_id.length>0,'download digest receipt required');
  return {destination:proof.destination,bytes:artifact.bytes,sha256:artifact.sha256,
-  verification_id:native?outcome.operation_id:proof.verification_id,...(native?{verification_basis:'native_size_and_local_sha256'}:{})};
+  verification_id:native?outcome.operation_id:proof.verification_id,...(native?{verification_basis:artifact.sha256===null?'native_size_and_source_metadata':'native_size_and_local_sha256'}:{})};
 }
 // Private ordered executor history, including unsuccessful/uncertain writes.
 // A completed import may retain its version only if every later write is a
@@ -30,6 +31,8 @@ export function verifyUploadLineage(source,history,{executionSequence=Infinity}=
  const noEffect=r=>r.cleanup_confirmed===true&&!r.transport_uncertain&&(r.outcome?.status==='NOT_APPLIED'&&r.outcome.effect_possible===false
   ||r.outcome?.status==='FAILED'&&r.outcome.output?.conflict_rejected===true&&r.outcome.output.upload_submitted===false);
  const sameBytes=r=>{
+  // Without an exact digest, equal sizes do not prove a later write identical.
+  if(source.sha256===null&&r.operation_id!==source.upload_operation_id)return false;
   if(r.cleanup_confirmed!==true||r.transport_uncertain||r.outcome?.operation_id!==r.operation_id)return false;
   try{const proof=verifiedLocalDelivery(r.artifact,r.outcome);return proof.bytes===source.bytes&&proof.sha256===source.sha256&&proof.destination===source.destination;}catch{return false;}
  };

@@ -29,6 +29,7 @@ export async function createLoginomHost(options: {
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
   const references = fileReferences(join(root, "file-references"))
+  await references.cleanup()
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
   const generations = new Map<
     number,

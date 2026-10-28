@@ -22,3 +22,17 @@ test('proven no-effect refusal and unrelated paths do not invalidate completed i
  assert.equal(verifyUploadLineage(source,history(upload('A',0),denied,unrelated),{executionSequence:2}).verified_current_upload,'A');
  denied.transport_uncertain=true;assert.throws(()=>verifyUploadLineage(source,history(upload('A',0),denied),{executionSequence:2}));
 });
+
+test('native original-file receipt without SHA requires unchanged-source proof and never equates a later same-size write',()=>{
+ const artifact={artifact_id:'native',bytes:16*1024*1024+1,sha256:null};
+ const record={sequence:0,operation_id:'A',destination:source.destination,artifact,cleanup_confirmed:true,transport_uncertain:false,
+  outcome:{status:'SUCCEEDED',action_key:'artifact.upload',operation_id:'A',cleanup_complete:true,output:{...artifact,destination:source.destination,
+   native_size_verification:{status:'SUCCEEDED',artifact_id:'native',upload_operation_id:'A',destination:source.destination,bytes:artifact.bytes,
+    source_sha256:null,source_unchanged_verified:true,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true}}}};
+ const original={...source,bytes:artifact.bytes,sha256:null};
+ assert.equal(verifyUploadLineage(original,history(record)).verified_current_upload,'A');
+ const later=structuredClone(record);later.sequence=1;later.operation_id='B';later.outcome.operation_id='B';later.outcome.output.native_size_verification.upload_operation_id='B';
+ assert.throws(()=>verifyUploadLineage(original,history(record,later)),/superseded/);
+ delete record.outcome.output.native_size_verification.source_unchanged_verified;
+ assert.throws(()=>verifyUploadLineage(original,history(record)),/not a verified/);
+});

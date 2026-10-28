@@ -199,7 +199,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(s.file_storage?.directory===artifact.upload.directory,'Authorized destination mismatch');
    check();if(!job.packageUpload)runtime.preflightDeliveredArtifact(artifact,s);job.phase='upload';submitted=true;effectPossible=true;job.uploadStarted=true;
    if(job.largeUpload){
-    job.status='staging';await acknowledge(job,'large_upload_staging');
+    job.status='authorizing';await acknowledge(job,'large_upload_source_check');
     const completed=await runtime.uploadLargeArtifact({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,observationId:s.observation_id,operationId:job.uploadId,deliveryOperationId:job.id,deadline:job.deadline,signal,
      onProgress:progress=>{job.bytes=progress.bytes;job.status=progress.phase;}});
     requireValue(completed.status==='SUCCEEDED'&&completed.cleanup_complete===true&&completed.upload_completion_verified===true

@@ -415,10 +415,15 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               !("userMessage" in input) ||
               input.userMessage !== owner.userMessage ||
               !("name" in input) ||
-              typeof input.name !== "string"
+              typeof input.name !== "string" ||
+              !("snapshot" in input)
             )
               throw Error("LOGINOM_INPUT_INVALID")
-            const result = await service.references.reserve(owner, input.name)
+            const result = await service.references.reserve(
+              owner,
+              input.name,
+              input.snapshot as FileReference["snapshot"],
+            )
             reply({ id: data.id, result }, lease.generation)
             return
           }

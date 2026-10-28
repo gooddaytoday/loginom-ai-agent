@@ -6,7 +6,7 @@ import {join, resolve, isAbsolute} from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
 import {requireExportDestination,requireStorageDestination} from './storage-policy.mjs';
 import {protectWindowsDirectory} from './platform.mjs';
-import {verifyReferenceFile} from './file-reference.mjs';
+import {openReferenceFile,verifyReferenceFile} from './file-reference.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const fileCodes = new Set(['LOGINOM_FILE_TOO_LARGE','LOGINOM_FILE_NOT_FOUND','LOGINOM_FILE_NOT_REGULAR','LOGINOM_FILE_ACCESS_DENIED','LOGINOM_FILE_CHANGED','LOGINOM_UPLOAD_CANCELLED','LOGINOM_UPLOAD_UNCERTAIN']);
@@ -122,13 +122,13 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       if (!descriptor) throw new Error('Artifact was not admitted in this session');
       const reference=references.get(artifactId);
       if(reference&&!download) {
-        await verifyReferenceFile(reference.snapshot);
+        const file=await openReferenceFile(reference.snapshot);
         let released=false;
         const leaseDescriptor=structuredClone(descriptor);
         if(leaseDescriptor.upload)Object.freeze(leaseDescriptor.upload);
         const lease=Object.freeze({path:reference.snapshot.canonical_path,descriptor:Object.freeze(leaseDescriptor),
-          async verify(){if(released)throw Error('Artifact transfer was released');await verifyReferenceFile(reference.snapshot);return structuredClone(descriptor);},
-          async release(){released=true;transfers.delete(lease);},
+          async verify(){if(released)throw Error('Artifact transfer was released');await file.verify();return structuredClone(descriptor);},
+          async release(){if(released)return;await file.close();released=true;transfers.delete(lease);},
         });
         transfers.add(lease);return lease;
       }
@@ -228,7 +228,7 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
     async resolveOutput(artifactId){const item=outputs.get(artifactId);if(!item)throw Error('Unknown session output');await item.check();return {descriptor:structuredClone(item.descriptor),buffer:await readVerified(item.path,item.descriptor,maxBytes)};},
     get outputSessionId(){return sessionId;},
     // Managed private IPC only. Host has already checked its opaque reservation
-    // and generation; the runtime rechecks the exact immutable snapshot itself.
+    // and generation; the runtime rechecks original metadata without a copy/hash.
     async admitReference(reference,upload) {
       if(closing||!reference||Object.keys(reference).sort().join(',')!=='chat,generation,grant,name,snapshot,userMessage'
         ||!/^[a-f0-9]{64}$/.test(reference.grant??'')||!reference.chat||!reference.userMessage
@@ -237,8 +237,6 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       const authorization=validateUploadAuthorization(upload);
       if(authorization.overwrite!=='reject')throw Error('LOGINOM_INPUT_INVALID');
       if(storageDirectories)requireStorageDestination(authorization.directory,storageDirectories,'inputs',{directory:true});
-      const parent=await lstat(resolve(reference.snapshot.canonical_path,'..'));
-      if(!parent.isDirectory()||parent.isSymbolicLink()||process.platform!=='win32'&&(parent.mode&0o777)!==0o700)throw Error('LOGINOM_INPUT_INVALID');
       await verifyReferenceFile(reference.snapshot);
       const previous=referenceGrants.get(reference.grant);
       if(previous) {
@@ -293,6 +291,7 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       if (!descriptor) throw new Error('Artifact was not admitted in this session');
       const reference=references.get(artifactId);
       if(reference)await verifyReferenceFile(reference.snapshot);
+      if(descriptor.bytes>maxBytes)throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:descriptor.bytes,limit:maxBytes});
       const buffer=await readVerified(reference?.snapshot.canonical_path??join(root,artifactId),descriptor,maxBytes);
       // Private upload adapter gets the verified bytes, never a mutable source path.
       return {descriptor:structuredClone(descriptor),buffer};
