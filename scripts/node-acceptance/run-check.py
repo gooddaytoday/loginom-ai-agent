@@ -94,7 +94,10 @@ def scenario(name, case_root=None):
               src / ('prompt-demo.md' if (src / 'prompt-demo.md').exists() else 'prompt.md'))
     data = (base / 'data' if isinstance(base, Path) else
             scenario(base)['data'] if base and not (src / 'data').is_dir() else src / 'data')
-    return dict(source=src, prompt=prompt, data=data, base=base)
+    # These business requests prescribe CSV display labels; native names remain
+    # independent (in particular s8 binds its export by export_destination).
+    return dict(source=src, prompt=prompt, data=data, base=base,
+                csv_header='labels' if name in ['s8', 'q6', 'p24'] else 'names')
 
 
 def expected_for(case, package):
@@ -147,7 +150,7 @@ def summary(report):
             '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
-        rows.append('| ' + ' | '.join([r['scenario'], r.get('status', 'RUNNING'),
+        rows.append('| ' + ' | '.join([r['scenario'], 'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'),
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
@@ -157,6 +160,15 @@ def summary(report):
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
                         f"профиль: {r.get('profile')}")
+    timings = report.get('phase_timings', [])
+    if timings:
+        rows += ['\n| сценарий | фаза | queue, с | выполнение, с |', '|---|---|---|---|']
+        now = time.time()
+        for t in timings:
+            end = t.get('finished', now)
+            queue = t.get('queue_seconds', (t['started'] if t['started'] is not None else end) - t['queued'])
+            duration = t.get('duration_seconds', end - t['started'] if t['started'] is not None else 0)
+            rows.append(f"| {t['scenario'] or '—'} | {t['name']} | {queue:.1f} | {duration:.1f} |")
     return '\n'.join(rows) + '\n'
 
 
@@ -343,39 +355,51 @@ class Runner:
         journal.write_text(json.dumps(result, ensure_ascii=False) + '\n')
 
     def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None):
-        self.report['phase'] = name
+        timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
+                      queued=time.time(), started=None)
+        self.report.setdefault('phase_timings', []).append(timing)
+        self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
         self.save()
-        while not load_ready(os.getloadavg(), self.options['host_load_max']) or time.time() - self.last_start < self.options['spacing']:
-            if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
-            time.sleep(1)
-        self.last_start = time.time()
-        if self.current is not None:
-            self.current.setdefault('start_load', list(os.getloadavg()))
-        self.save()
-        with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
-            child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
-            self.report['child_pid'] = child.pid
+        try:
+            while True:
+                if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
+                if load_ready(os.getloadavg(), self.options['host_load_max']) and time.time() - self.last_start >= self.options['spacing']: break
+                time.sleep(1)
+            self.last_start = timing['started'] = time.time()
+            self.report['phase'] = name
+            if self.current is not None:
+                self.current.setdefault('started', timing['started'])
+                self.current.setdefault('start_load', list(os.getloadavg()))
             self.save()
-            if stdin:
-                child.stdin.write(stdin.encode())
-                child.stdin.close()
-            end = min(self.deadline, time.time() + timeout)
-            while child.poll() is None:
-                loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
-                loads.flush()
-                if time.time() >= end:
-                    daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                    assert child.pid != daemon['pid'], 'Cannot terminate daemon'
-                    os.killpg(child.pid, signal.SIGINT)
-                    try: child.wait(timeout=40)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(child.pid, signal.SIGKILL)
-                        child.wait()
-                    raise TimeoutError(name + ' deadline')
-                try: child.wait(timeout=1)
-                except subprocess.TimeoutExpired: pass
-            assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+            with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
+                child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+                self.report['child_pid'] = child.pid
+                self.save()
+                if stdin:
+                    child.stdin.write(stdin.encode())
+                    child.stdin.close()
+                end = min(self.deadline, time.time() + timeout)
+                while child.poll() is None:
+                    loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
+                    loads.flush()
+                    if time.time() >= end:
+                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
+                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
+                        os.killpg(child.pid, signal.SIGINT)
+                        try: child.wait(timeout=40)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(child.pid, signal.SIGKILL)
+                            child.wait()
+                        raise TimeoutError(name + ' deadline')
+                    try: child.wait(timeout=1)
+                    except subprocess.TimeoutExpired: pass
+                assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+        finally:
+            timing['finished'] = time.time()
+            timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
+            timing['duration_seconds'] = timing['finished'] - timing['started'] if timing['started'] is not None else 0
+            self.save()
 
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
@@ -538,7 +562,7 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
-        header = 'labels' if case in ['q6', 'p24'] else 'names'
+        header = spec.get('csv_header', 'names')
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
@@ -561,6 +585,10 @@ class Runner:
             login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
                 self.current = r
+                if time.time() >= self.deadline:
+                    r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
+                    self.save()
+                    continue
                 folder = self.out / r['scenario']
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
@@ -575,7 +603,8 @@ class Runner:
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    base = scenario(case, self.options.get('case_root'))['base']
+                    spec = scenario(case, self.options.get('case_root'))
+                    base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):
                         r.update(csv='—', save='—', cleanup='—')
@@ -585,14 +614,17 @@ class Runner:
                     if self.options['cold']:
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', 'labels' if case in ['q6', 'p24'] else 'names'], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         r.update(cold='PASS', cleanup='both PASS')
                     r['status'] = 'FAIL' if r.get('failure_class') else 'PASS'
                 except Exception as error:
-                    self.failure(r, error, folder)
+                    if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
+                        r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
+                    else:
+                        self.failure(r, error, folder)
                 finally:
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
@@ -621,7 +653,7 @@ def main():
                 print(summary(report), end='')
                 return 0 if all(r['status'] == 'PASS' for r in report['runs']) else 1
             if time.monotonic() >= end:
-                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN'] for r in report['runs'])
+                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2

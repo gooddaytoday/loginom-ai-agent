@@ -7,7 +7,7 @@ python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --t
 
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
-task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown batch, or 2
+task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
 for its own timeout. A timeout does not cancel the worker; repeat `wait`.
 The result directory is private (0700); `summary.md` and atomic `results.json`
 contain the report. Configs, profiles and raw logs stay private there.
@@ -31,6 +31,17 @@ between phase starts, 85 minutes total per batch including builds. `--spacing`,
 `--host-load-max`, `--out` and `--build` override these where exposed by help.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
 A supplied build must have matching SHA and `sourceDirty=false`.
+The total budget is shared by sequential scenarios. If it expires before a
+scenario starts (including its first load/spacing gate), that scenario is
+`NOT_RUN` with reason `BATCH_BUDGET_EXHAUSTED`, displayed as
+«не запущен (бюджет пакета)». No setup process is launched. A deadline reached
+during an already started scenario retains its failed/unknown phase result.
+`phase=gate:<name>` identifies load/spacing waiting; the phase name itself is
+published only after the gate passes. `results.json` stores `phase_timings`
+with queued/started/finished timestamps, `queue_seconds` and `duration_seconds`;
+`summary.md` shows queue and execution time separately for every phase. A phase
+that never starts has `started=null` and zero execution time. These durations
+do not assign build time or earlier scenarios to setup.
 The per-host cache is `~/.cache/loginom-run-check/HOST/SHA/`; concurrent first
 builds of the same SHA are unsupported. Later batches reuse its manifest.
 
@@ -54,6 +65,12 @@ Every export still passes the main CSV oracle. Cold independently reads all
 outputs in `expected.json`; the CSV supplies only export column order, not
 cell values. Using the last download also matches the existing `export_input`
 contract, whose `export_destination` is the last requested export.
+Main CSV and cold use the same `csv_header` mode from the scenario contract:
+s8, q6 and p24 prescribe CSV display labels and use `labels`; other exports use
+`names`. Native label metadata alone does not select the CSV mode (for example,
+p25 retains `names`). The s8 continuation binds Export by `export_destination` and
+matches «Регион/Категория/Выручка» against saved native labels while keeping
+technical names such as Region/Category/Revenue independent.
 Save, main close/logout and runtime-close ACK must all be confirmed.
 The table reports `port-read` and the observed path (`port`, `native`, or both).
 Every delivered port must satisfy its path:
