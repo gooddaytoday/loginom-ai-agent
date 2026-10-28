@@ -10,7 +10,7 @@ export const userResultSchema = {
     attempt: { type: 'integer', minimum: 1 }, state: { type: 'string', enum: ['running', 'settled'] },
     status: { type: 'string', enum: ['SUCCEEDED', 'FAILED', 'AMBIGUOUS', 'NOT_APPLIED'] },
     action_key: { type: 'string' }, phase: { type: 'string' }, cancel_requested: { type: 'boolean' },
-    server_stop_requested: { type: 'boolean' }, progress: { type: ['object', 'null'] },
+    server_stop_requested: { type: 'boolean' }, upload_status:{type:'string',enum:['authorizing','staging','uploading','verifying_size','ready','cancelling','cancelled','failed','uncertain']}, progress: { type: ['object', 'null'] },
     effect_possible: { type: 'boolean' }, cleanup_complete: { type: 'boolean' },
     node: { anyOf: [{ type: 'null' }, { type: 'object', required: ['document_id', 'workflow_id', 'node_id'], additionalProperties: false,
       properties: { document_id: { type: 'string' }, workflow_id: { type: 'string' }, node_id: { type: 'string' } } }] },
@@ -94,8 +94,9 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
       :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
   const reply={
+    ...(result.upload_operation_id&&result.status?{upload_status:result.status,progress:pick(result,['bytes','total_bytes','percent','elapsed_ms','deadline_at','poll_after_ms'])}:{}),
     result_version: 'user-v1', ...pick(result, ['operation_id', 'attempt', 'state', 'cancel_requested', 'server_stop_requested']),
-    ...(result.state === 'running'||result.outcome==null&&result.progress ? { progress: result.progress } : {}),
+    ...(result.progress&&(result.state === 'running'||result.outcome==null) ? { progress: result.progress } : {}),
     ...pick(outcome, ['status', 'action_key', 'phase', 'effect_possible', 'cleanup_complete']),
     ...pick(node, ['node', 'execution', 'package_saved', 'configuration', 'browser_recovery']), output,
     error: result.error ?? outcome?.error ?? null,

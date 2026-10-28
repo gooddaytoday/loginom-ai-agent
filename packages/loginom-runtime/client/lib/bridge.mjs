@@ -440,7 +440,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             };
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.
-            const local=['dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop','dock_artifact_delivery_status'].includes(request.params.name);
+            const local=['dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop','dock_artifact_delivery_status','dock_artifact_delivery_cancel'].includes(request.params.name);
             return await (local?invoke():dockGate(request.params.name,invoke));
           }
           if (request.params.name === 'dock_action_describe') {
@@ -628,9 +628,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
+      cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
+        await actionRuntime?.closeArtifactDeliveries();
         await recovery.close();
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         const prepared = session.metadata.workspacePreparation;

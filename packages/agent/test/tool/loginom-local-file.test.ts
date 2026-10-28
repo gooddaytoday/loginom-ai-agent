@@ -9,6 +9,7 @@ import { Agent } from "@/agent/agent"
 import { Session } from "@/session/session"
 import { MessageID } from "@/session/schema"
 import { admitLoginomFileReference, snapshotLoginomFile } from "@/tool/loginom-local-file"
+import { admitLoginomLocalFile } from "@/tool/loginom-local-file"
 import { fileReferences } from "@loginom-ai-agent/loginom-host/file-reference"
 import { Tool } from "@/tool/tool"
 import { TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
@@ -33,6 +34,51 @@ const context = Effect.gen(function* () {
     ask: () => Effect.void,
   } satisfies Tool.Context
 })
+
+for (const size of [16 * 1024 * 1024, 16 * 1024 * 1024 + 1])
+  it.instance(`public local admission selects the byte/reference boundary at ${size}`, () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const ctx = yield* context
+      const source = instance.directory + "/source.csv"
+      yield* Effect.promise(async () => {
+        const file = await open(source, "w")
+        try {
+          await file.truncate(size)
+        } finally {
+          await file.close()
+        }
+      })
+      const references = fileReferences(instance.directory + "/references")
+      const owner = { chat: ctx.sessionID, userMessage: "msg_original", generation: 1, run: "run" }
+      const ipc: unknown[] = []
+      const host = {
+        reserveReference: (userMessage: string, name: string) => references.reserve({ ...owner, userMessage }, name),
+        discardReference: (grant: string) => references.discard(owner, grant),
+        admitReference: async (reference: Parameters<typeof references.commit>[1]) => {
+          ipc.push(reference)
+          await references.commit(owner, reference)
+          return { artifact_id: "reference", bytes: reference.snapshot.size }
+        },
+        admit: async (_message: string, files: { name: string; data: string }[]) => {
+          expect(Buffer.from(files[0].data, "base64").length).toBe(size)
+          ipc.push("byte-admission")
+          return [{ artifact_id: "bytes", bytes: size }]
+        },
+      }
+      const result = yield* admitLoginomLocalFile(source, ctx, host, owner.userMessage)
+      expect(result.artifact).toMatchObject({
+        artifact_id: size > 16 * 1024 * 1024 ? "reference" : "bytes",
+        bytes: size,
+      })
+      if (size > 16 * 1024 * 1024) {
+        expect(JSON.stringify(ipc)).not.toMatch(/"(?:data|base64|buffer)":/)
+        expect(yield* admitLoginomLocalFile(source, ctx, host, owner.userMessage)).toEqual(result)
+        expect(ipc.length).toBe(1)
+      } else expect(ipc).toEqual(["byte-admission"])
+      yield* Effect.promise(() => references.close())
+    }),
+  )
 
 it.instance(
   "private reference admission authorizes before reserving, stages over the byte limit and sends only a descriptor",

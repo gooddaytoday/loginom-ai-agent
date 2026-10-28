@@ -1,4 +1,4 @@
-import {verifyUploadLineage} from './upload-lineage.mjs';
+import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
@@ -58,23 +58,13 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
     return verified({source:structuredClone(storageProof)});
   }
   const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),'Verified upload operation is missing or ambiguous');
-  const o=u.outcome,proof=o?.output?.server_copy_verification;
-  // Resolve integrity metadata from admitted local state, never from model text.
-  const bytes=u.artifact?.bytes,sha256=u.artifact?.sha256;
-  requireValue(Number.isSafeInteger(bytes) && bytes>=0
-    && typeof sha256==='string' && /^[a-f0-9]{64}$/.test(sha256), 'Verified artifact metadata is invalid');
-  requireValue(o?.status==='SUCCEEDED' && o.cleanup_complete===true && o.operation_id===s.upload_operation_id
-    && o.action_key==='artifact.upload' && o.output?.artifact_id===s.artifact_id
-    && u.artifact?.artifact_id===s.artifact_id && proof?.status==='SUCCEEDED'
-    && proof.bytes_verified===true && proof.upload_completion_verified===true
-    && typeof proof.verification_id==='string' && proof.verification_id.length>0
-    && proof.destination===(parameters.settings.source?.source_path??proof.destination)
-    && o.output.destination===proof.destination
-    && [o.output,proof].every(a=>a.bytes===bytes && a.sha256===sha256)
-    && (s.bytes===undefined || s.bytes===bytes) && (s.sha256===undefined || s.sha256===sha256),
-  'Upload bytes, digest, artifact or exact destination do not match the source');
+  const proof=verifiedLocalDelivery(u.artifact,u.outcome);
+  requireValue(u.outcome.operation_id===s.upload_operation_id&&u.artifact.artifact_id===s.artifact_id
+    &&proof.destination===(parameters.settings.source?.source_path??proof.destination)
+    &&(s.bytes===undefined||s.bytes===proof.bytes)&&(s.sha256===undefined||s.sha256===proof.sha256),
+    'Upload bytes, digest, artifact or exact destination do not match the source');
   validateTextImportPatch({source:{source_path:proof.destination}});
-  const source={...s,bytes,sha256,destination:proof.destination,verification_id:proof.verification_id};
+  const source={...s,...proof};
   if(uploadHistory)source.lineage=verifyUploadLineage(source,uploadHistory);
   return verified({source});
   } catch(error) {

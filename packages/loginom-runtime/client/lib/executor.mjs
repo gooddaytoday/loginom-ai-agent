@@ -2,7 +2,7 @@ import {browserFailureCategory} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
-import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady} from './artifact-discovery.mjs';
+import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -121,6 +121,7 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
     phase='submitting';effect=true;
     await input.setInputFiles(task.upload_path,{timeout:inputTimeout});
     phase='submitted';trace.push({event:'upload_input_submitted'});
+    if(task.large_upload)return outcome('AMBIGUOUS','UPLOAD_SERVER_VERIFICATION_REQUIRED',{upload_submitted:true,destination:task.artifact.upload.destination,bytes:task.artifact.bytes});
     if(task.decide_conflicts) {
       const decisionTask={operation_id:task.operation_id,overwrite:task.artifact.upload.overwrite,
         expected_origin:task.expected_origin,expected_build:task.expected_build,document:current.dom_epoch.document,prefix,
@@ -2088,7 +2089,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const operation = operations.get(operationId);
       if (!operation || pending !== operation && !exportRecoveryTrigger(operation))
         return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
-      if (running || nodeJobs.busy || delivery.busy || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
+      if (running || nodeJobs.busy || delivery.busy || delivery.blocksMutations || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
       if(operation.nodeApply?.pending?.phase==='workflow'){
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
@@ -2614,7 +2615,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return outcome;
       } finally { running = false; }
     },
-    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,deadline}={}) {
+    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,largeUpload=false,deadline}={}) {
       signal?.throwIfAborted();checkId(operationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact upload is available only in an authorized candidate session');
       const artifact=artifactStore.getUploadGrant(artifactId,grantId);
@@ -2638,15 +2639,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const lease=await artifactStore.stageUpload(artifactId);
         const operation={id:operationId,signature,uploadLease:lease,action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},
           deliveryOperationId,parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
-          checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:packageCompletion?deadline:now()+30000};
+          checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:packageCompletion||largeUpload?deadline:now()+30000};
         try {await lease.verify();signal?.throwIfAborted();await remember(operation,'prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         operations.set(operationId,operation);pending=operation;observations.clear();
         let outcome;
         try {
           const receipt=receiptOptions(operation,operationId,'artifact.upload',signature);
-          const code=makeArtifactUploadCode({operation_id:operationId,artifact,upload_path:lease.path,snapshot,decide_conflicts:decideConflicts,
-            expected_build:targetBuild,expected_origin:targetOrigin,...(packageCompletion?{deadline_at:deadline}:{})});
+          const code=makeArtifactUploadCode({operation_id:operationId,artifact,upload_path:lease.path,snapshot,decide_conflicts:decideConflicts,...(largeUpload?{large_upload:true}:{}),
+            expected_build:targetBuild,expected_origin:targetOrigin,...(packageCompletion||largeUpload?{deadline_at:deadline}:{})});
           const submission=withBrowserReceipt(`(${code})(page)`,receipt);
           const dispatched=packageCompletion
             ? `async page=>(${completePackageUpload.toString()})(page,${JSON.stringify({operation_id:operationId,artifact,snapshot,binding:packageBinding,
@@ -2669,6 +2670,88 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
         return structuredClone(outcome);
       } finally {running=false;}
+    },
+    async uploadLargeArtifact(options) {
+      const {artifactId,grantId,operationId,deadline,signal,onProgress}=options;
+      const artifact=artifactStore.getUploadGrant(artifactId,grantId),binding=getStorageBinding(),snapshot=observations.get(options.observationId);
+      if(!binding||!snapshot||artifact.bytes<=16*1024*1024||artifact.upload.overwrite!=='reject')throw Error('LOGINOM_INPUT_INVALID');
+      const task={operation_id:operationId,artifact,snapshot,binding,expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline};
+      const key=fingerprint('large-file-reuse',[binding.loginom_account,targetOrigin,artifact.upload.directory,artifact.name,artifact.bytes,artifact.sha256]);
+      const state={task,submitted:false,bound:false,settled:false,verified:false};largeTasks.set(operationId,state);
+      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      try {
+        signal?.throwIfAborted();
+        const bound=await native('bind',{receipt:largeReceipts.get(key)});state.bound=true;
+        if(bound.reused){
+          const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
+          const saved=await onRecord({phase:'large_upload_reused',operation_id:operationId,result});
+          if(saved?.phase!=='large_upload_reused'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+          const outcome={status:'SUCCEEDED',action_key:'artifact.upload',action_revision:'1',operation_id:operationId,phase:'completed',effect_possible:false,cleanup_complete:true,
+            output:{artifact_id:artifactId,destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256,upload_completion_verified:true,native_size_verification:result},error:null,trace:[]};
+          if(operations.has(operationId)||auxiliary.has(operationId))throw Error('Upload operation ID already used');
+          operations.set(operationId,{id:operationId,signature:fingerprint('artifact.upload.delivery',[artifactId,grantId,options.observationId]),
+            action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},deliveryOperationId:options.deliveryOperationId,
+            parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:options.observationId,destination:artifact.upload.destination,overwrite:'reject'},
+            checkpoint:{artifact,workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage},deadline,outcome,cleanupConfirmed:true});
+          state.settled=true;state.verified=true;return result;
+        }
+        signal?.throwIfAborted();state.submitted=true;
+        const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true});
+        if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        state.operation=operations.get(operationId);
+        while(now()<deadline){
+          signal?.throwIfAborted();
+          const progress=await native('poll');
+          onProgress?.({bytes:progress.bytes,phase:progress.quiet?'verifying_size':'uploading'});
+          if(progress.error)throw Error('LOGINOM_UPLOAD_FAILED');
+          if(progress.quiet){
+            await native('refresh');
+            let proof=await native('verify');
+            while(proof.waiting&&now()<deadline){signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,100));proof=await native('verify');}
+            if(proof.waiting)throw Error('LOGINOM_UPLOAD_DEADLINE');
+            await state.operation.uploadLease.verify();signal?.throwIfAborted();
+            if(now()>=deadline)throw Error('LOGINOM_UPLOAD_DEADLINE');
+            const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:proof.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
+            const saved=await onRecord({phase:'large_upload_completed',operation_id:operationId,result,native_row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory});
+            if(saved?.phase!=='large_upload_completed'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+            await state.operation.uploadLease.release();
+            state.operation.outcome={...state.operation.outcome,status:'SUCCEEDED',phase:'completed',cleanup_complete:true,error:null,output:{...state.operation.outcome.output,artifact_id:artifactId,destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256,upload_completion_verified:true,native_size_verification:result}};
+            state.operation.cleanupConfirmed=true;pending=null;observations.clear();state.settled=true;state.verified=true;
+            largeReceipts.set(key,{row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory,sha256:artifact.sha256});
+            return result;
+          }
+          await new Promise(resolve=>{const timer=setTimeout(done,1000);function done(){signal?.removeEventListener('abort',done);clearTimeout(timer);resolve();}signal?.addEventListener('abort',done,{once:true});});
+        }
+        throw Error('LOGINOM_UPLOAD_DEADLINE');
+      }catch(error){if(!state.bound&&!state.submitted){state.settled=true;}throw error;}
+    },
+    async cancelLargeArtifact({operationId,deadline}) {
+      const state=largeTasks.get(operationId);
+      if(!state)return false;
+      if(state.settled)return state.verified!==true;
+      if(!state.submitted){state.settled=true;return true;}
+      const task={...state.task,deadline_at:deadline};
+      const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      while(now()<deadline){
+        const progress=await native('cancel');
+        if(progress.quiet)break;
+        await new Promise(resolve=>setTimeout(resolve,200));
+      }
+      if(now()>=deadline)return false;
+      await native('refresh');
+      let cleanup=await native('cleanup');
+      while(cleanup.waiting&&now()<deadline){await new Promise(resolve=>setTimeout(resolve,100));cleanup=await native('cleanup');}
+      if(cleanup.gesture?.kind==='select'){
+        await native('delete');await native('confirm_delete');await native('refresh');
+        cleanup=await native('cleanup');
+        while(cleanup.waiting&&now()<deadline){await new Promise(resolve=>setTimeout(resolve,100));cleanup=await native('cleanup');}
+      }
+      if(!cleanup.clean||now()>=deadline)return false;
+      const operation=operations.get(operationId);
+      if(operation){await operation.uploadLease.release();operation.cleanupConfirmed=true;operation.outcome={...operation.outcome,status:'FAILED',cleanup_complete:true,error:{code:'LOGINOM_UPLOAD_CANCELLED',message:'Upload stopped and owned destination removed'}};if(pending===operation)pending=null;}
+      const saved=await onRecord({phase:'large_upload_cleanup',operation_id:operationId,cleanup_complete:true});
+      if(saved?.phase!=='large_upload_cleanup'||saved.operation_id!==operationId)return false;
+      state.settled=true;observations.clear();return true;
     },
     uploadPackageArtifact:options=>runtime.upload({...options,decideConflicts:true,packageCompletion:true}),
     async completePackageArtifact({operationId}={}) {
@@ -3067,6 +3150,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally { running = false; }
     },
   });
+  const largeReceipts=new Map();
+  const largeTasks=new Map();
   const delivery=createArtifactDelivery({runtime,artifactStore,record:onRecord,now,
     admit:(id,signature)=>{
       if(!allowCandidate||!artifactStore)throw Error('Artifact delivery requires an authorized candidate session');
@@ -3092,7 +3177,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     (...args)=>{
       if(leased&&!readOnly.has(name)){const error=Error('Browser recovery holds the page; finish or stop it before further Dock actions');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
-      if(delivery.busy){const error=Error('Artifact delivery is in progress');
+      if(delivery.busy||delivery.blocksMutations){const error=Error('Artifact delivery is in progress or uncertain');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if((nodeJobs.busy||sourceReads.busy||sourceReads.unsettled)&&!nodeControls.has(name)){const error=Error('A background node operation is running');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
@@ -3108,5 +3193,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
-    artifactDeliveryStatus:id=>delivery.status(id)});
+    artifactDeliveryStatus:id=>delivery.status(id),
+    cancelArtifactDelivery:id=>delivery.cancel(id),
+    cancelArtifactDeliveries:()=>delivery.interrupt(),
+    closeArtifactDeliveries:()=>delivery.close()});
 }

@@ -24,9 +24,7 @@ import { exactFileDigest } from "./loginom-file-profile-core"
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
 
-// Private foundation for asynchronous full-file delivery. Keep the public
-// loginom_file_admit byte route unchanged until native progress/cancel/cleanup
-// and FileStore size verification are wired together.
+// Large files cross private IPC only as immutable Host-reserved references.
 export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")(function* (
   path: string,
   ctx: Tool.Context,
@@ -36,8 +34,9 @@ export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")
     discardReference(grant: string): Promise<unknown>
   },
   userMessage: string,
+  authorized?: { sourcePath: string; canonicalPath: string },
 ) {
-  const source = yield* authorizeLoginomFile(path, ctx)
+  const source = authorized ?? (yield* authorizeLoginomFile(path, ctx))
   return yield* Effect.tryPromise({
     try: async (signal) => {
       const abort = AbortSignal.any([ctx.abort, signal])
@@ -65,6 +64,50 @@ export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")
     },
     catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
   })
+})
+
+type ReferenceHost = Parameters<typeof admitLoginomFileReference>[2]
+const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: string; artifact: unknown }>>()
+
+export const admitLoginomLocalFile = Effect.fn("Loginom.admitLocalFile")(function* (
+  path: string,
+  ctx: Tool.Context,
+  host: ReferenceHost & { admit(userMessage: string, files: { name: string; data: string }[]): Promise<unknown> },
+  userMessage: string,
+) {
+  const source = yield* authorizeLoginomFile(path, ctx)
+  if (source.canonicalPath.toLowerCase().endsWith(".lgp"))
+    return yield* Effect.die(
+      Error("Use loginom_dock_prepare with local_package_path for a local .lgp: " + source.sourcePath),
+    )
+  const identity = yield* Effect.tryPromise({
+    try: () => inspectReferenceFile(source.canonicalPath),
+    catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
+  })
+  if (identity.size > 16 * 1024 * 1024) {
+    const key = JSON.stringify([ctx.sessionID, userMessage, identity])
+    const cache = admittedReferences.get(host) ?? new Map()
+    admittedReferences.set(host, cache)
+    const previous = cache.get(key)
+    if (previous) return previous
+    const result = yield* admitLoginomFileReference(path, ctx, host, userMessage, source)
+    cache.set(key, result)
+    return result
+  }
+  const bytes = yield* Effect.tryPromise({
+    try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
+    catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
+  })
+  const artifacts = yield* Effect.tryPromise({
+    try: () =>
+      host.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [
+        { name: basename(source.canonicalPath), data: bytes.toString("base64") },
+      ]),
+    catch: (error) => Error(hostErrorText(error)),
+  })
+  if (!Array.isArray(artifacts) || artifacts.length !== 1)
+    return yield* Effect.die(Error("LOGINOM_INPUT_INVALID: " + source.sourcePath))
+  return { sourcePath: source.sourcePath, artifact: artifacts[0] as unknown }
 })
 
 export const snapshotLoginomFile = Effect.fn("Loginom.snapshotLocalFile")(function* (path: string, ctx: Tool.Context) {
