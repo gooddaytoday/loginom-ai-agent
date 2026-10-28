@@ -1,4 +1,4 @@
-// Run-check's owned fixture cleanup. All mutations are native DOM gestures.
+// Run-check's owned fixture cleanup: native file gestures and stock draft teardown.
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -14,14 +14,17 @@ const {findNativeStorageRow} = await load('client/lib/text-export-output.mjs');
 const {makeWorkspacePrepareCode} = await load('client/lib/workspace.mjs');
 const {makePackageCleanupCode} = await load('client/lib/package-cleanup.mjs');
 const resources = await verifyResources(root);
-const {login, name} = JSON.parse(await readFile(configPath, 'utf8'));
-if (!/^d87-[A-Za-z0-9_-]+-E[123]\.csv$/.test(name) && !/^d87-[A-Za-z0-9_-]+-X1\.xlsx$/.test(name)) throw Error('D87_NAME_INVALID');
+const config = JSON.parse(await readFile(configPath, 'utf8'));
+const {login} = config;
+const names = config.names ?? [config.name];
+if (!Array.isArray(names) || !names.length || names.some(name => typeof name !== 'string'
+    || !/^(?:[a-f0-9]{64}-(?:[0-9]+-)?)?d87-[A-Za-z0-9_-]+-(?:E[123]\.csv|X1\.xlsx)$/.test(name))) throw Error('D87_NAME_INVALID');
 const directory = login.package_directory.replace(/\/$/, '');
 if (!directory.startsWith('/') || directory.split('/').slice(1).some(p => !p || p === '.' || p === '..')) throw Error('D87_DIRECTORY_INVALID');
 await mkdir(output, {recursive: true, mode: 0o700});
 let context, page, prepared;
 const session = randomUUID();
-const report = {name, directory, removed: false, absent: false, logged_out: false};
+const report = {names, directory, removed: false, absent: false, logged_out: false, files: []};
 try {
   const authenticated = await loginBrowser({browserPath: resources.browserPath, profile: join(output, 'browser'),
     candidate: login, headless: true, keepOpen: true, onContextCreated: value => {context = value;}});
@@ -90,27 +93,30 @@ try {
     }, {prefix, directory, username: login.username});
   };
   await page.waitForFunction(() => ![...document.querySelectorAll('.x-mask')].some(e => e.getBoundingClientRect().width > 0));
-  const before = await ready(inventory, value => Array.isArray(value));
-  if (!before) throw Error('D87_STORAGE_UNCONFIRMED');
-  const own = before.filter(r => r.name === name || r.path === directory + '/' + name);
-  if (own.length > 1 || own.some(r => r.path !== directory + '/' + name || r.type !== 0)) throw Error('D87_SOURCE_AMBIGUOUS');
-  if (own.length) {
-    await reveal(name);
-    await row(name).click();
-    const selected = page.locator('[data-tid=' + JSON.stringify(prefix + ';FileStorageForm;pnlFileStorage;tbl') + '] .x-grid-item-selected [data-tid*=";colName_"]');
-    if (await selected.count() !== 1 || await selected.getAttribute('data-tid') !== prefix + ';FileStorageForm;colName_' + suffix(name)) throw Error('D87_SELECTION_CHANGED');
-    await at(prefix + ';FileStorageForm;btnDelete').click();
-    if ((await at('msgbox;cnt;cnt;cmp').innerText()).trim() !== 'Вы действительно хотите удалить выделенное?'
-        || (await at('msgbox;tlb;yes').innerText()).trim() !== 'Удалить') throw Error('D87_DELETE_DIALOG_CHANGED');
-    await at('msgbox;tlb;yes').click();
-    await row(name).waitFor({state: 'detached'});
-    report.removed = true;
+  for (const name of names) {
+    const before = await ready(inventory, value => Array.isArray(value));
+    if (!before) throw Error('D87_STORAGE_UNCONFIRMED');
+    const own = before.filter(r => r.name === name || r.path === directory + '/' + name);
+    if (own.length > 1 || own.some(r => r.path !== directory + '/' + name || r.type !== 0)) throw Error('D87_SOURCE_AMBIGUOUS');
+    if (own.length) {
+      await reveal(name);
+      await row(name).click();
+      const selected = page.locator('[data-tid=' + JSON.stringify(prefix + ';FileStorageForm;pnlFileStorage;tbl') + '] .x-grid-item-selected [data-tid*=";colName_"]');
+      if (await selected.count() !== 1 || await selected.getAttribute('data-tid') !== prefix + ';FileStorageForm;colName_' + suffix(name)) throw Error('D87_SELECTION_CHANGED');
+      await at(prefix + ';FileStorageForm;btnDelete').click();
+      if ((await at('msgbox;cnt;cnt;cmp').innerText()).trim() !== 'Вы действительно хотите удалить выделенное?'
+          || (await at('msgbox;tlb;yes').innerText()).trim() !== 'Удалить') throw Error('D87_DELETE_DIALOG_CHANGED');
+      await at('msgbox;tlb;yes').click();
+      await row(name).waitFor({state: 'detached'});
+      report.removed = true;
+    }
+    await at(prefix + ';FileStorageForm;btnRefresh').click();
+    await page.waitForFunction(() => ![...document.querySelectorAll('.x-mask')].some(e => e.getBoundingClientRect().width > 0));
+    const after = await ready(inventory, value => Array.isArray(value));
+    const others = rows => rows.filter(r => r.name !== name).map(r => JSON.stringify(r)).sort();
+    if (!after || after.some(r => r.name === name) || JSON.stringify(others(before)) !== JSON.stringify(others(after))) throw Error('D87_DELETE_UNCONFIRMED');
+    report.files.push({name, absent: true});
   }
-  await at(prefix + ';FileStorageForm;btnRefresh').click();
-  await page.waitForFunction(() => ![...document.querySelectorAll('.x-mask')].some(e => e.getBoundingClientRect().width > 0));
-  const after = await ready(inventory, value => Array.isArray(value));
-  const others = rows => rows.filter(r => r.name !== name).map(r => JSON.stringify(r)).sort();
-  if (!after || after.some(r => r.name === name) || JSON.stringify(others(before)) !== JSON.stringify(others(after))) throw Error('D87_DELETE_UNCONFIRMED');
   report.absent = true;
 } catch (error) {
   if (page) {

@@ -105,7 +105,10 @@ manifest. The model receives the business request, source path (or `--file`),
 format and field types; it never receives the manifest or expected values.
 Generation, model and cleanup respect the same load/spacing limits. After main
 and optional cold, also on failure, native Files UI deletes only this run's
-uniquely named source from the worker's authorized directory. The runner then
+uniquely named source from the worker's authorized directory. Actual server
+names (including product-added hash prefixes) come from completed admission/
+delivery receipts matched to the manifest byte count and owned source basename;
+unrecognized destinations fail closed. The runner then
 deletes its local input and large copies under its own result directory;
 manifest, small exported CSV and diagnostic evidence remain. `dataset-cleanup`
 reports storage/disk separately; failed storage cleanup makes the run FAIL.

@@ -3,6 +3,7 @@ from contextlib import redirect_stdout
 import csv
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -66,6 +67,28 @@ class RunCheckTests(unittest.TestCase):
                 self.assertNotIn('sums_minor', command[-1])
                 for row in expected['outputs'][0]['rows']:
                     self.assertNotIn(str(row['amount_sum']), command[-1])
+
+    def test_d87_cleanup_uses_prefixed_receipt_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'd87-123-E1.csv'
+            source.write_text('input')
+            (root / 'fixtures').mkdir()
+            runner.write(root / 'fixtures/manifest.json', {'bytes': 5})
+            stage = root / 'E1'
+            stage.mkdir()
+            name = 'a' * 64 + '-' + source.name
+            reply = {'artifact': {'bytes': 5, 'upload': {'destination': '/test/' + name}}}
+            (stage / 'model.stdout').write_text(json.dumps({'type': 'tool_use', 'part': {
+                'tool': 'loginom_file_admit', 'state': {'status': 'completed', 'output': json.dumps(reply)}}}) + '\n')
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.current = {'dataset': str(source)}
+            with patch.object(instance, 'phase', side_effect=InterruptedError):
+                with self.assertRaises(InterruptedError):
+                    instance.cleanup_d87(root, {'package_directory': '/test'}, root / 'build')
+            config = runner.read(root / 'dataset-cleanup-config.json')
+            self.assertIn(name, config['names'])
+            self.assertIn(source.name, config['names'])
 
     def test_d87_cleanup_removes_owned_inputs_even_on_storage_failure(self):
         with tempfile.TemporaryDirectory() as directory:

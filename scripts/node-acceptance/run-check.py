@@ -431,8 +431,31 @@ class Runner:
     def cleanup_d87(self, folder, login, build):
         source = Path(self.current['dataset'])
         try:
+            names = {source.name}
+            manifest = folder / 'fixtures/manifest.json'
+            size = read(manifest)['bytes'] if manifest.exists() else None
+            def destinations(value):
+                if isinstance(value, dict):
+                    upload = value.get('upload')
+                    destination = value.get('destination') or (upload.get('destination') if isinstance(upload, dict) else None)
+                    if value.get('bytes') == size and isinstance(destination, str):
+                        path = Path(destination)
+                        if str(path.parent) != login['package_directory'].rstrip('/') or not re.fullmatch(r'(?:[a-f0-9]{64}-(?:[0-9]+-)?)?' + re.escape(source.name), path.name):
+                            raise ValueError('D87 receipt destination is outside the owned source naming/directory')
+                        names.add(path.name)
+                    for item in value.values(): destinations(item)
+                if isinstance(value, list):
+                    for item in value: destinations(item)
+            for journal in folder.glob('*/model.stdout'):
+                for _, event in records(journal):
+                    part = event.get('part', {})
+                    state = part.get('state', {})
+                    if event.get('type') != 'tool_use' or state.get('status') != 'completed' or not part.get('tool', '').startswith('loginom_'): continue
+                    try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
+                    except (ValueError, TypeError): continue
+                    destinations(reply)
             config = folder / 'dataset-cleanup-config.json'
-            write(config, dict(login=login, name=source.name))
+            write(config, dict(login=login, names=sorted(names)))
             self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
                        REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
                        config, folder / 'dataset-cleanup'], folder, timeout=180)
