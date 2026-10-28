@@ -1091,9 +1091,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[4]&&hiddenPreparedAncestor(e)
-              &&getComputedStyle(found[0]).display!=='none'&&getComputedStyle(found[0]).visibility==='visible'
-              &&getComputedStyle(found[0]).opacity!=='0'&&!found[0].hasAttribute('hidden')&&!sensitive(found[0])
+            &&(inside(found[0],e)||hiddenPreparedAncestor(e)
               ||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1

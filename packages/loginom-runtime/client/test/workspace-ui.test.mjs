@@ -7520,3 +7520,41 @@ test('D70 blocking window diagnostics retain native visibility and geometry with
  assert.equal((await run()).windows[0].status,'incarnation_changed');
  assert.equal(page.events.filter(e=>e==='click').length,0);
 });
+
+// LAB-454 nav-preflight:2332-2342: Join input0 Close keeps nine exact
+// native breadcrumbs, but Scenario, node and input ancestry all overflow.
+test('D2 Join long native ancestry keeps typed Close for both input roles',async()=>{
+ for(const port of [0,1])for(const fault of ['none','visible_label','native','component','icon','mode','guid','opening']) {
+  const {page,binding}=await joinInputPortOverflowFixture('d52_valid',port);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='l454t_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c]of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Центры_и_число_точек');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Центры и число точек';
+   if(i>=4){c.style.display='none';c.box={x:0,y:0,width:0,height:0};for(const icon of c.children)icon.box={...c.box};}
+  }
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  page.add('span',null,'',crumbs[6].box,crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable','',undefined,wizard).attrs.class=fault==='mode'?'':'x-form-cb-checked';
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks','',undefined,wizard);
+  class ModelNodeTreeNode{};const native=new ModelNodeTreeNode();native.FGuid=fault==='native'?'foreign':'node';
+  page.app.ModelNodeTreeNode=ModelNodeTreeNode;
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:native}}}})}}}}};
+  crumbs[5].id='join-node';page.context.Ext={getCmp:id=>id===crumbs[5].id&&fault!=='component'?{el:{dom:crumbs[5]},_node:{data:{node:native}}}:null};
+  if(fault==='visible_label')crumbs[3].ownText='Другой модуль';
+  if(fault==='icon')crumbs[5].children[0].style.visibility='hidden';
+  if(fault==='guid')binding.input_port.port_guid='';
+  if(fault==='opening')binding.input_port.opening_operation_id='';
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const result=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  const yes=result.output.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,fault==='none',port+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
