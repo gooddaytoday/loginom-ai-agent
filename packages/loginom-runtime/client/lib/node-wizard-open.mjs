@@ -1,3 +1,5 @@
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
+
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 const question='Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет';
@@ -66,7 +68,13 @@ export function boundWizardDeactivationConfirmation(state,binding,requireControl
 }
 
 export async function openPreparedWizard(channel) {
- let s=await channel.observe({condition:'prepared node settings available',ready:s=>s.prepared_node_context?.surface==='graph'
+ let s=await channel.observe({condition:'prepared graph available for settings',ready:s=>s.prepared_node_context?.verified===true
+  &&s.prepared_node_context.surface==='graph'&&s.wizard?.status==='absent'&&s.ui.dialogs.length===0&&s.ui.masks.length===0});
+ // Closing the schema-inspection wizard clears Loginom's graph selection.
+ // Restore only the bound node, then observe its settings before opening once.
+ if(!s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard')))
+  await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings');
+ s=await channel.observe({condition:'prepared node settings available',ready:s=>s.prepared_node_context?.surface==='graph'
   &&s.wizard?.status==='absent'&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'))});
  const binding=wizardOpenBinding(s);
  await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
