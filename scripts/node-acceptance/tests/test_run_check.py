@@ -34,6 +34,10 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.scenario('../s-server-a', cases=root)
 
+    def test_flat_pair_preserves_the_assigned_account(self):
+        config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
+        self.assertEqual(runner.pair_login(config, 'worker.json'), config)
+
     def test_pair_directory_formats_and_unknown_key(self):
         for key in ['package_directory', 'personal_folder']:
             with self.subTest(key=key):

@@ -29,9 +29,10 @@ D87 = {
 
 def pair_login(config, source):
     directory = config.get('package_directory') or config.get('personal_folder')
-    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(config.get('loginom'), dict) or not config['loginom'].get('username'):
+    login = config.get('loginom', config)
+    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(login, dict) or not login.get('username'):
         raise ValueError(f'{source}: expected loginom.username and package_directory or personal_folder; keys: ' + ', '.join(sorted(config)))
-    return dict(config['loginom'], package_directory=directory)
+    return dict(login, package_directory=directory)
 
 
 def scenario_names(value, case_root=None):
