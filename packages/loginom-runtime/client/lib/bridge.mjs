@@ -377,12 +377,15 @@ export async function createBridge(config, session, { browserTransport: managedB
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
                   });
-                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-                    code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
+                  const geometryCode = makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
                       operation_id: state.operation_id, document_id: state.document_id,
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
-                      workflow_ref: state.workflow_ref }),
+                      workflow_ref: state.workflow_ref });
+                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                    // Capture the connected owner before local profiling can
+                    // leave the first delivery without a recovery baseline.
+                    code: config.storageDirectories ? withStorageIdentity(geometryCode,session.metadata.storageBinding) : geometryCode,
                   } }, undefined, { timeout: privatePackage?Math.min(15000,remaining()+1000):15000 });
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
