@@ -2728,17 +2728,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           await new Promise(resolve=>{const timer=setTimeout(done,1000);function done(){signal?.removeEventListener('abort',done);clearTimeout(timer);resolve();}signal?.addEventListener('abort',done,{once:true});});
         }
         throw Error('LOGINOM_UPLOAD_DEADLINE');
-      }catch(error){if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;}
+      }catch(error){state.sourceChanged=error.message==='LOGINOM_FILE_CHANGED';if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;}
     },
     async cancelLargeArtifact({operationId,deadline}) {
       const state=largeTasks.get(operationId);
       if(!state)return false;
       if(state.settled)return state.verified!==true;
       if(!state.submitted){await state.sourceLease?.release();state.settled=true;return true;}
-      const task={...state.task,deadline_at:deadline};
+      const task={...state.task,deadline_at:deadline,source_changed:state.sourceChanged===true};
       const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       while(now()<deadline){
         const progress=await native('cancel');
+        if(progress.gesture||progress.quiet)await onRecord({phase:'large_upload_cleanup_step',operation_id:operationId,
+          active:progress.active,quiet:progress.quiet,gesture:progress.gesture?.kind??null,server_delete_confirmed:progress.server_delete_confirmed===true});
         if(progress.quiet)break;
         await new Promise(resolve=>setTimeout(resolve,200));
       }
