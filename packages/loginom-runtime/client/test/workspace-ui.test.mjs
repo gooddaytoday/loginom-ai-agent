@@ -4778,6 +4778,38 @@ async function calculatorNodeOverflowFixture() {
   return {page,crumbs,nodeTree,component,wizard,binding};
 }
 
+test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
+ // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','component','visibility','opacity','duplicate','panel']){
+  const {page,crumbs,wizard,binding,nodeTree,component}=await calculatorNodeOverflowFixture();
+  delete binding.input_port;
+  const guid='d6677c45-99d0-46f2-889c-be24a51bff13',name='l443f_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(crumbs[2].ownText,name).replaceAll('amount_double','Число_точек_в_группах');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек в группах';binding.node_id=guid;nodeTree.FGuid=guid;
+  for(const c of crumbs.slice(6))c.remove();
+  for(const c of [...wizard.children])c.remove();
+  page.add('div','MF;TF-5;WizrdMCF;GroupDataWizard;grdUsedFields;tbl','',undefined,wizard);
+  const settings=page.add('a',crumbs[5].attrs['data-tid']+'>Настройка','Настройка',{x:1190,y:41,width:85,height:24},crumbs[5].parentElement);
+  page.add('span',null,'',{x:1191,y:42,width:16,height:16},settings).attrs.class='maptree-icon-wizard';
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='native')nodeTree.FGuid='foreign';
+  if(fault==='component')component.el.dom={};
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const r=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  assert.equal(r.output.wizard.stage,'grouping');
+  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='none',hidden+':'+fault);
+  if(fault==='none')assert.deepEqual(r.output.wizard.owner_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('Calculator input Done keeps the exact native node hidden by the admitted package breadcrumb',async()=>{
   const {page}=await calculatorNodeOverflowFixture(),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.input_port_context.status,'observed');

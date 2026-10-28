@@ -884,12 +884,17 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         // Long saved paths also overflow before input0 opens. Read hidden
         // ancestry only for the exact prepared path and verified native graph
         // node, or the retained input0 opening after Done. No hidden gestures.
+        // Opening that same native node's main wizard must retain the path too.
         const graphPath=preparedNodeId&&preparedGraphTid?.startsWith(graphPrefix)
           &&nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid&&nativeGraphControl(e)?.status==='non_script'
             &&nativeGraphControl(e).node_id===preparedNodeId).length===1;
         const pathCrumbs=all.filter(e=>panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix));
-        const returnPath=(preparedInputReturn||graphPath)&&wizard.status==='absent'&&preparedWorkflowPath?.length===5
-          &&pathCrumbs.length===5&&preparedWorkflowPath.every((c,i)=>c.tid===getTid(pathCrumbs[i])&&c.label===pathCrumbs[i].textContent.trim());
+        const returnPath=preparedWorkflowPath?.length===5&&pathCrumbs.length>=5
+          &&preparedWorkflowPath.every((c,i)=>c.tid===getTid(pathCrumbs[i])&&c.label===pathCrumbs[i].textContent.trim())
+          &&((preparedInputReturn||graphPath)&&wizard.status==='absent'&&pathCrumbs.length===5
+            ||preparedNodeWizard&&wizard.status==='observed'&&pathCrumbs.length===7
+              &&(visible(pathCrumbs[5])||nativeOverflowNode(pathCrumbs[5]))
+              &&pathCrumbs[6].querySelectorAll('.maptree-icon-wizard').length===1);
         const inputReturnAncestor=e=>returnPath&&preparedWorkflowPath.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
           &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
@@ -961,7 +966,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               node:{ref:parent.ref,tid:parent.tid,label:parent.label},port:{ref:node.ref,tid:node.tid,label:node.label},
               path:items.map(({ref,tid,label})=>({ref,tid,label}))};
           }
-          else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.vendor_icon && node.label && items.at(-3)?.workflow_icon) {
+          else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.vendor_icon && node.label && items.at(-3)?.workflow_icon
+            &&(!preparedWorkflowPath?.length||preparedWorkflowPath.length===items.length-2
+              &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label))) {
             ownerContext={status:'observed',opening_verified:false,panel_ref:refOf(panels[0]),
               node:{ref:node.ref,tid:node.tid,label:node.label},
               path:items.map(({ref,tid,label})=>({ref,tid,label}))};
@@ -3702,7 +3709,8 @@ function readRenderedInputMapping(observation) {
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&nodeContext.node_id===task.prepared_node_context?.node.node_id
+      &&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     timeout();
     if (observed?.ui_read_failure) {
