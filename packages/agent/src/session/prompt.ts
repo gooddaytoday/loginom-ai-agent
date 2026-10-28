@@ -856,7 +856,7 @@ const layer = Layer.effect(
                 ]
               }
               const receiptID = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
-              const infoStat = receiptID ? undefined : yield* Effect.promise(() => stat(filepath))
+              const infoStat = receiptID ? undefined : yield* Effect.promise(() => stat(filepath).catch(() => undefined))
               if (receiptID || (infoStat?.isFile() && infoStat.size > 16 * 1024 * 1024 && !url.search && !url.hash)) {
                 if (url.search || url.hash) return yield* Effect.die(Error("LOGINOM_INPUT_INVALID"))
                 const source = receiptID
