@@ -19,10 +19,10 @@ async function settled(registry,id='download') {
  while(registry.status(id).state==='running')await registry.wait(id,{timeoutMs:100});
  return registry.status(id);
 }
-test('production default refuses server cache before lookup or download and retains source tools',async t=>{
+test('explicitly disabled server cache refuses before lookup or download and retains source tools',async t=>{
  const f=await fixture(t),directory=join(f.root,'disabled-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
+  allowCandidate:true,serverSourceCache:false,cacheDirectory:directory,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
  const outcome=await r.serverDownload(f.request,'dock_storage_download_start');
  assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'SERVER_CACHE_DISABLED');
  assert.match(outcome.error.message,/для серверного файла точная сверка N недоступна/);
@@ -31,10 +31,10 @@ test('production default refuses server cache before lookup or download and reta
  assert.match(r.tools.find(tool=>tool.name==='dock_storage_download_start').description,/disabled/i);
  await assert.rejects(stat(directory),{code:'ENOENT'});await r.cleanupServerCache();
 });
-test('enabled server cache requires an observed native source before any browser download',async t=>{
+test('production server cache requires an observed native source before any browser download',async t=>{
  const f=await fixture(t),directory=join(f.root,'unobserved-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,serverSourceCache:true,execute:()=>assert.fail('An unobserved reference must not reach the browser')});
+  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('An unobserved reference must not reach the browser')});
  await r.serverDownload(f.request,'dock_storage_download_start');
  const outcome=await r.serverDownload({operation_id:'download',timeout_ms:100},'dock_storage_download_wait');
  assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'LOGINOM_DOWNLOAD_FAILED');
