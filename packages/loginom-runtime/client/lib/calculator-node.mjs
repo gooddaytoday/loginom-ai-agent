@@ -315,7 +315,20 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      const result=await implementation.beforeGraphExecute(options,ctx,configured,channel);
      if(result?.training){training=result.training;executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true});await executionDriver.prepare();}
     }
-    const graph=await channel.observe({condition:'calculator graph ready after port commit',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
+    // Closing the inspected LinReg apply draft asynchronously replaces its SVG
+    // body. Settle that selection by reading, before issuing the first click;
+    // retain the original observation/operation deadlines and gesture guards.
+    const settleApply=implementation?.type==='datamining.lin_regression'&&operation.nodeApply.request.mode==='apply';
+    const selection=s=>s.ui.elements.filter(e=>
+     (e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
+      ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
+     &&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed');
+    const graph=await channel.observe({condition:'calculator graph ready after port commit',
+     ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+      &&(!settleApply||s.prepared_node_context.locked===false
+       &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k])&&selection(s).length>0),
+     ...(settleApply?{confirmIdentity:s=>({node:s.prepared_node_context,
+      selection:selection(s).map(({ref,signature,bounding_box,interaction})=>({ref,signature,bounding_box,interaction}))})}:{})});
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
