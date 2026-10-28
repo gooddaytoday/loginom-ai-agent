@@ -967,7 +967,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               path:items.map(({ref,tid,label})=>({ref,tid,label}))};
           }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.vendor_icon && node.label && items.at(-3)?.workflow_icon
-            &&(!preparedWorkflowPath?.length||preparedWorkflowPath.length===items.length-2
+            &&(preparedWorkflowPath?.length!==5||preparedWorkflowPath.length===items.length-2
               &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label))) {
             ownerContext={status:'observed',opening_verified:false,panel_ref:refOf(panels[0]),
               node:{ref:node.ref,tid:node.tid,label:node.label},
