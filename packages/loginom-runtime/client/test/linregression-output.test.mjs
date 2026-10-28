@@ -1,48 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {linRegressionOutputColumns,configureLinRegressionOutputs} from '../lib/linregression-output.mjs';
+import {linRegressionOutputColumns,configureLinRegressionOutputs,readLinRegressionOutputs} from '../lib/linregression-output.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 const configuration={fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},{name:'Factor',label:'Фактор',type:'real',usage_type:3},{name:'Response',label:'Цель',type:'real',usage_type:4}]};
 
-test('repeated saved-model application only inspects and closes the coefficient mapping',async()=>{
- const mapping=configuredCoefficients(),before=structuredClone(mapping),actions=[];
+test('saved-model application defers intrinsic output schemas until execution without opening a wizard',async()=>{
+ const channel={openOutputPort:()=>assert.fail('apply must not open the inactive coefficient wizard'),
+  observe:()=>assert.fail('apply must not read an unmaterialized coefficient inventory'),perform:()=>assert.fail('apply must preserve output settings')};
+ const before=structuredClone(configuration);
  for(let i=0;i<2;i++){
-  let closed=false;
-  const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
-   wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
-   ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
-  const channel={async openOutputPort(port){assert.equal(port,1);},async observe(options){const s=state();assert.equal(options.ready(s),true,options.condition);return s;},
-   async perform(options){const s=state();assert.equal(options.ready(s),true);const action=options.resolve(s);assert.deepEqual(action,{verb:'click',ref:'close'});actions.push(action);closed=true;}};
-  const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('apply cannot commit outputs'));
-  assert.equal(result.verified,true);assert.equal(closed,true);assert.deepEqual(mapping,before);
+  const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit'));
+  assert.equal(result.verified,true);assert.equal(result.effect_possible,false);assert.equal(result.deferred_schema,true);
+  assert.deepEqual(result.ports,[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)})));
+  assert.deepEqual(configuration,before);
  }
- assert.equal(actions.length,2);
 });
 
-test('apply refuses a different coefficient selection after closing its untouched draft',async()=>{
- const mapping=configuredCoefficients();mapping.target_fields[1].name='Different';let closed=false;
- const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
-  wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
-  ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
- const channel={async openOutputPort(){},async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
-  async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
- await assert.rejects(configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit')),/saved coefficient selection differs/);
- assert.equal(closed,true);
-});
-
-test('apply accepts trained intrinsic coefficients with no source_fields, as observed in Loginom',async()=>{
- const mapping=configuredCoefficients();mapping.source_fields=[];
- mapping.target_fields.forEach(f=>{f.source=null;f.exclusion_source=null;});let closed=false;
- const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
-  wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
-  ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
- const channel={async openOutputPort(){},async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
-  async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
- const before=structuredClone(mapping);
- const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit'));
- assert.equal(result.verified,true);assert.equal(closed,true);assert.deepEqual(mapping,before);
+test('apply still refuses changed coefficient fields when reading the fresh executed output',async()=>{
+ const mapped={ports:[{port:1,schema:linRegressionOutputColumns(configuration,1)}]};
+ const actual={port:1,schema:[{name:'Name',label:'Имена входных полей',type:'string'},{name:'Different',label:'Цель|Коэффициенты',type:'real'}]};
+ const channel={readOutputPort:async()=>({output:actual})};
+ await assert.rejects(readLinRegressionOutputs(channel,{ports:[1],sample_rows:10,require_exact_numbers:true},
+  {portExecution:{},execution:{execution_id:'fresh'},receipt_id:'read'},mapped));
 });
 
 function configuredCoefficients(){
