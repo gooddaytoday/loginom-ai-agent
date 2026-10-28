@@ -3,7 +3,7 @@ const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'Exact .xlsx destination returned by verified artifact delivery; use the original workbook, never convert it to CSV.'},
- sheet_name:{...text(120),description:'Optional exact worksheet name. Omit for the first worksheet on initial import, or preserve the saved selection during source_switch. One sheet only; named ranges are unsupported.'},
+ sheet_name:{...text(120),description:'Exact worksheet name; omit for first sheet on initial import or to preserve it during source_switch. Named ranges unsupported.'},
  header_rows:{type:'integer',minimum:1,maximum:10,description:'Required for initial import: number of header rows, normally 1. Omit during source_switch to preserve.'},
  columns:{type:'array',minItems:1,maxItems:8,description:'Required for initial import; forbidden during source_switch. Every source column in original order, with explicit types. No automatic type detection. Preserve original names unless an explicit source_name identifies a header to rename.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
