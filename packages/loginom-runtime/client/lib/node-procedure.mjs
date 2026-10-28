@@ -793,7 +793,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
       if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
-        || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!==(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
+        || !(snapshotWizardConfirmation.kind==='close'&&!mappingConflict
+          ? /^msgbox(?:-1)?;tlb;yes$/.test(snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid??'')
+          : snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid===(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes'))))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;

@@ -30,7 +30,10 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
  const ui=state.ui,dialog=ui.dialogs[0];
  if(dialog.title!=='Подтвердить'||dialog.text!=='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет')return false;
  if(!requireControls)return true;
- return ['yes','no'].every(name=>ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name
+ const yes=ui.elements.filter(e=>/^msgbox(?:-1)?;tlb;yes$/.test(e.tid)
+  &&e.signature?.dialog_ref===dialog.ref);
+ if(yes.length!==1)return false;
+ return ['yes','no'].every(name=>ui.elements.filter(e=>e.tid===yes[0].tid.replace(/;yes$/,';'+name)
   &&e.signature?.dialog_ref===dialog.ref&&e.label===(name==='yes'?'Да':'Нет')
   &&e.allowed_actions?.includes('click')).length===1);
 }
@@ -79,7 +82,7 @@ export async function closePreparedWizard(channel,{initialObservation}={}) {
  if(confirmationRequired) {
   await channel.perform({condition:'confirm cancellation of this wizard draft',initialObservation:s,
    ready:s=>boundWizardCloseConfirmation(s,binding),identity:()=>binding,
-   resolve:s=>({verb:'confirm_wizard_close',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
+   resolve:s=>({verb:'confirm_wizard_close',ref:s.ui.elements.find(e=>/^msgbox(?:-1)?;tlb;yes$/.test(e.tid)&&e.signature?.dialog_ref===s.ui.dialogs[0].ref).ref})});
  }
  const after=await channel.observe({condition:'cancelled wizard returned to the same unlocked node',
   ready:s=>cancelledWizardReady(s,binding)});
