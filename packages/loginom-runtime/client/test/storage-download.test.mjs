@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readdir,stat,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,readdir,stat,rm,truncate} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
@@ -45,9 +45,34 @@ test('enabled server cache requires an observed native source before any browser
 });
 test('server download deadline is size-derived and capped without a global timeout change',()=>{
  assert.equal(serverDownloadBudget(0),120000);
- assert.equal(serverDownloadBudget(2*1024**3),802667);
+ assert.equal(serverDownloadBudget(2*1024**3),2168000);
  assert.equal(serverDownloadBudget(100*1024**3),7200000);
  for(const value of [-1,NaN,Infinity,1.5])assert.throws(()=>serverDownloadBudget(value));
+});
+test('growing Chromium bytes keep a slow download alive beyond the old fixed deadline',async t=>{
+ const f=await fixture(t);let clock=0;
+ const native={...source(),bytes:2*1024**3};
+ const registry=createServerDownloadRegistry({directory:join(f.root,'slow'),now:()=>clock,inspect:async()=>native,
+  download:async({path,onProgress})=>{
+   for(let n=1;n<=15;n++){clock=n*60000;onProgress(n*100*1024**2);}
+   await writeFile(path,'');await truncate(path,native.bytes);
+  }});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.progress.elapsed_ms,900000);
+ assert.equal(result.progress.bytes,native.bytes);await registry.cleanup();
+});
+test('unchanged byte reports cannot renew the no-progress deadline; late growth cannot revive it',async t=>{
+ for(const late of [false,true]){
+  const f=await fixture(t);let clock=0;
+  const registry=createServerDownloadRegistry({directory:join(f.root,'stalled'),now:()=>clock,inspect:async()=>({...source(),bytes:2*1024**3}),
+   download:async({path,onProgress,signal})=>{
+    await writeFile(path,'a');clock=60000;onProgress(1);clock=179999;onProgress(1);
+    clock=180000;onProgress(late?2:1);signal.throwIfAborted();
+   }});
+  registry.start(f.request);const result=await settled(registry);
+  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
+  assert.equal(result.cleanup_complete,true);assert.deepEqual(await readdir(join(f.root,'stalled')),[]);
+ }
 });
 test('download writes a private cache, binds its receipt to native identity and never uploads',async t=>{
  const f=await fixture(t);f.registry.start(f.request);

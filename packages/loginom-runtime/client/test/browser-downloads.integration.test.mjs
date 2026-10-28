@@ -11,6 +11,43 @@ import {createConnection} from '@playwright/mcp';
 import {createSession} from '../lib/session.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {browserProcessEnvironment} from '../lib/bridge.mjs';
+import {browserServerDownloadProgress} from '../lib/executor.mjs';
+import {chromium} from 'playwright-core';
+
+test('Chromium progress tracks only the owned page transfer before saveAs completes',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER,timeout:30000,
+},async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'server-byte-progress-'));
+ const responses=[];
+ const http=createServer((request,response)=>{
+  if(request.url==='/file'){
+   response.writeHead(200,{'Content-Disposition':'attachment; filename="source.csv"','Content-Length':1048576});
+   response.write(Buffer.alloc(524288,'a'));responses.push(response);return;
+  }
+  response.end('<a href="/file">download</a>');
+ });
+ await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
+ const origin=`http://127.0.0.1:${http.address().port}`;
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,
+  chromiumSandbox:true,downloadsPath:directory});
+ t.after(async()=>{await browser.close();http.closeAllConnections();await new Promise(resolve=>http.close(resolve));await rm(directory,{recursive:true,force:true});});
+ const context=await browser.newContext({acceptDownloads:true}),page=await context.newPage(),foreign=await context.newPage();
+ await page.goto(origin);await foreign.goto(origin);
+ const progress=await browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
+  server_source_binding:{bytes:1048576},browser_downloads_path:directory});
+ const other=foreign.waitForEvent('download');await foreign.locator('a').click();
+ const otherDownload=await other;responses[0].end(Buffer.alloc(524288,'b'));await otherDownload.path();
+ assert.equal(progress.guid,null);assert.equal(progress.bytes,0);
+ const event=page.waitForEvent('download');await page.locator('a').click();const download=await event;
+ const copy=download.saveAs(join(directory,'copy.csv'));
+ const until=Date.now()+10000;
+ while(progress.bytes===0&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,50));
+ assert.ok(progress.bytes>0&&progress.bytes<1048576,JSON.stringify(progress));
+ assert.equal(progress.failed,false);assert.equal(progress.url,download.url());
+ responses[1].end(Buffer.alloc(524288,'b'));await copy;
+ assert.equal(progress.bytes,1048576);assert.equal((await readFile(join(directory,'copy.csv'))).length,1048576);
+ await progress.close();
+});
 
 // No synthetic download event: a trusted click follows the native Blob link
 // selected by the first page script, inside the same Page that MCP owns.

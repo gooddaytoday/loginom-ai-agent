@@ -141,9 +141,9 @@ export function validateImportSource(source) {
 
 export function serverDownloadBudget(bytes) {
   if(!Number.isSafeInteger(bytes)||bytes<0)throw Error('Native server size is required');
-  // LAB-412: the isolated 1 GiB transfer and disk copy took 351.7 s.
-  // Keep the reserve and cap local to this job, including its disk copy.
-  return Math.min(7200000,120000+Math.ceil(bytes/(3*1024*1024)*1000));
+  // Local hard ceiling at 1 MiB/s, including validation and the disk copy.
+  // Actual Chromium byte growth renews the shorter no-progress allowance.
+  return Math.min(7200000,120000+Math.ceil(bytes/(1024*1024)*1000));
 }
 
 // The browser writes to disk; this registry transports only paths and metadata.
@@ -158,7 +158,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
     cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
     effect_possible:false,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
       elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
-      byte_progress:'completed_copy_only'},output:job.output??{},error:job.error??null});
+      byte_progress:'chromium_received_bytes'},output:job.output??{},error:job.error??null});
   const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
   return {
     get busy(){return [...jobs.values()].some(j=>j.state==='running');},
@@ -175,11 +175,18 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       jobs.set(request.operation_id,job);
       job.completion=(async()=>{
         let timer;
+        const arm=()=>{
+          clearTimeout(timer);
+          const deadline=Math.min(job.deadline,job.lastProgress+120000);
+          const code=job.deadline<=job.lastProgress+120000?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
+          if(now()>=deadline){job.controller.abort(Error(code));return;}
+          timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
+        };
         try {
           job.source=await inspect(request.server_source_ref,{signal:job.controller.signal});job.controller.signal.throwIfAborted();
           job.deadline=job.started+serverDownloadBudget(job.source.bytes);
           if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
-          timer=setTimeout(()=>job.controller.abort(Error('LOGINOM_DOWNLOAD_DEADLINE')),Math.max(1,job.deadline-now()));
+          job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
           if(!/\.(csv|tsv|txt|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
           await mkdir(directory,{recursive:true,mode:0o700});
           const root=await lstat(directory);
@@ -187,7 +194,13 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           job.directory=await mkdtemp(join(directory,'source-'));await chmod(job.directory,0o700);
           job.path=join(job.directory,basename(job.source.destination));job.phase='downloading';
           await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,
-            signal:job.controller.signal,deadline:job.deadline});
+            signal:job.controller.signal,deadline:job.deadline,onProgress:bytes=>{
+              // Check expiry before accepting growth: late or repeated status
+              // replies cannot revive a stalled transfer.
+              arm();job.controller.signal.throwIfAborted();
+              if(!Number.isSafeInteger(bytes)||bytes<0||bytes>job.source.bytes)throw Error('LOGINOM_DOWNLOAD_FAILED');
+              if(bytes>(job.bytes??0)){job.bytes=bytes;job.lastProgress=now();arm();}
+            }});
           job.controller.signal.throwIfAborted();job.phase='verifying';
           const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline}),copy=await lstat(job.path);
           if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
@@ -201,8 +214,8 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
             next_step:'loginom_file_profile on path, then loginom_file_scan and loginom_file_sample. Upload only the sample; switch back to the original storage ref.'};
         }catch(error){
           job.status='FAILED';job.phase='failed';
-          job.error={code:job.controller.signal.aborted?(job.controller.signal.reason?.message==='LOGINOM_DOWNLOAD_DEADLINE'
-            ?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
+          job.error={code:job.controller.signal.aborted?(['LOGINOM_DOWNLOAD_DEADLINE','LOGINOM_DOWNLOAD_NO_PROGRESS'].includes(job.controller.signal.reason?.message)
+            ?job.controller.signal.reason.message:'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
             message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
           if(['browser_start_refused','save_failed','browser_transfer_failed'].includes(error.details?.reason))
             job.error.details={reason:error.details.reason,...(/^[A-Z_]{1,80}$/.test(error.details.code??'')?{code:error.details.code}:{})};
@@ -258,7 +271,7 @@ const downloadId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.
 export const serverDownloadTools=[
   {name:'dock_storage_source',description:'Locate an existing CSV/TSV/TXT/XLSX by its exact path in the assigned inputs directory. Navigates the native Files UI and returns an opaque server_source_ref with native size/mtime. Does not upload or import. Use this before preview/download when the CLI starts on the workflow graph.',
     properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024}},required:['operation_id','path']},
-  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Byte progress is unknown until the browser finishes its disk copy.',
+  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Chromium received bytes renew a 120-second no-progress limit within a size-derived hard deadline; disk-copy completion is verified separately.',
     properties:{operation_id:downloadId,server_source_ref:downloadId},required:['operation_id','server_source_ref']},
   {name:'dock_storage_download_status',description:'Read the original server download progress and terminal cache path.',properties:{operation_id:downloadId},required:['operation_id']},
   {name:'dock_storage_download_wait',description:'Wait at most 60 seconds for the original download; a wait timeout does not cancel it.',properties:{operation_id:downloadId,timeout_ms:{type:'integer',minimum:0,maximum:60000}},required:['operation_id']},

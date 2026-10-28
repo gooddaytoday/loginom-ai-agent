@@ -11,6 +11,7 @@ import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
+import {join} from 'node:path';
 import { requireCapability } from './capability-registry.mjs';
 import { actionDescribeTool, actionRunTool, assertActionOutcome, validateActionParameters } from './action-catalog.mjs';
 import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspace-ui.mjs';
@@ -200,7 +201,34 @@ async function browserArtifactReveal(page,task,snapshot) {
   },{task:{file_ref:task.file_ref,artifact:{name:task.artifact.name}},snapshot});
 }
 
-async function browserArtifactDownload(page,task,observe,act,reveal) {
+// Listen on the existing authenticated context. Keep Playwright's configured
+// download directory and behavior; only enable CDP events for this listener.
+export async function browserServerDownloadProgress(page,task) {
+  const session=await page.context().newCDPSession(page);
+  try {
+    const {targetInfo}=await session.send('Target.getTargetInfo');
+    const {frameTree}=await session.send('Page.getFrameTree');
+    const progress={bytes:0,guid:null,url:null,failed:false,
+      close:()=>session.detach()};
+    session.on('Browser.downloadWillBegin',event=>{
+      if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
+      if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
+      if(progress.guid){progress.failed=true;return;}
+      progress.guid=event.guid;progress.url=event.url;
+    });
+    session.on('Browser.downloadProgress',event=>{
+      if(event.guid!==progress.guid||progress.failed)return;
+      if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<progress.bytes
+        ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
+      progress.bytes=event.receivedBytes;
+    });
+    await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
+      browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
+    return progress;
+  }catch(error){await session.detach();throw error;}
+}
+
+async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   let browserStep='preconditions';
   const failureEvidence=error=>{
     const causes=[];const seen=new Set();
@@ -212,7 +240,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     return {step:browserStep,causes,page_closed:typeof page.isClosed==='function'?page.isClosed():null};
   };
-  let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false;
+  let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false,progress,retained=false;
   const trace=[],destination=task.server_source_binding??task.output_binding??task.artifact.upload;
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
@@ -295,12 +323,22 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
+    if(task.server_source_binding&&task.browser_downloads_path){
+      progress=await track(page,task);
+      const job=page[Symbol.for('loginom-dock.server-downloads.v1')]?.get(task.operation_id);
+      if(job)job.progress=progress;
+    }
     let eventPending=true;
     // Large server files can emit the event after the small artifact window.
     // Consume the host job's existing deadline; do not start a new allowance.
     const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
     if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
-    event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{eventPending=false;return value;},error=>{
+    event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
+      eventPending=false;
+      const job=page[Symbol.for('loginom-dock.server-downloads.v1')]?.get(task.operation_id);
+      if(job){job.download=value;if(job.cancel_requested)value.cancel().catch(()=>{});}
+      return value;
+    },error=>{
       eventPending=false;
       trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
     });
@@ -381,13 +419,26 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       await download.cancel();completed=true;
       return result('AMBIGUOUS','DOWNLOAD_FILENAME_MISMATCH');
     }
+    if(progress&&(progress.failed||!progress.guid||progress.url!==url)){
+      await download.cancel();completed=true;
+      return result('AMBIGUOUS','DOWNLOAD_PROGRESS_BINDING_MISMATCH');
+    }
     phase='downloading';
     browserStep='download.saveAs';
     if(task.server_source_binding) {
       const key=Symbol.for('loginom-dock.server-downloads.v1');
       const jobs=page[key]??=(new Map());
-      if(jobs.has(task.operation_id))throw Error('Server download already started');
-      const entry={download,state:'running',failed:false};jobs.set(task.operation_id,entry);
+      const retainedJob=jobs.get(task.operation_id);
+      if(retainedJob?.accepted){
+        retained=true;
+        if(retainedJob.cancel_requested){await download.cancel();completed=true;return result('AMBIGUOUS','DOWNLOAD_CANCELLED');}
+        await download.saveAs(task.download_path);
+        completed=true;
+        if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        return result('SUCCEEDED',null,{download_completed:true});
+      }
+      if(retainedJob)throw Error('Server download already started');
+      const entry={download,state:'running',failed:false,progress};jobs.set(task.operation_id,entry);retained=true;
       // This promise belongs to the retained runtime job. It never carries bytes
       // over MCP; Chromium and saveAs stream the file to their disk destinations.
       // MCP's unsafe-code VM provides page, but no Node timer globals. The
@@ -396,7 +447,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
         try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
         catch(error){entry.failed=true;entry.failure={reason:'save_failed',
           ...( ['EACCES','EPERM','ENOSPC','ENOENT','EISDIR'].includes(error.code)?{code:error.code}:{})};}
-        finally{entry.state='settled';}
+        finally{
+          try{await progress?.close();}catch{entry.failed=true;}
+          entry.state='settled';
+        }
       })();
       completed=true;
       return result('SUCCEEDED',null,{download_started:true});
@@ -444,7 +498,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
     }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
-  }
+  }finally{if(progress&&!retained)await progress.close();}
 }
 
 // These controls retain Playwright's Download in its owning Page, never in
@@ -454,8 +508,12 @@ export async function browserServerDownloadControl(page,task) {
   const base={action_key:'storage.download',action_revision:'1',operation_id:task.operation_id,
     phase:'downloading',effect_possible:false,trace:[],cleanup_complete:true};
   if(!job)return {...base,status:'FAILED',output:{},error:{code:'LOGINOM_DOWNLOAD_MISSING',message:'Original browser download is missing'}};
-  if(task.mode==='cancel'){await job.download.cancel();await job.completion;}
-  const output={state:job.state,failed:job.failed,expired:job.expired===true,...(job.failure?{failure:job.failure}:{})};
+  if(task.mode==='cancel'){
+    job.cancel_requested=true;
+    if(job.download){await job.download.cancel();await job.completion;}
+  }
+  const output={state:job.state,failed:job.failed||job.progress?.failed===true,bytes:job.progress?.bytes??0,
+    expired:job.expired===true,...(job.failure?{failure:job.failure}:{}),...(job.outcome?{outcome:job.outcome}:{})};
   if(task.mode==='release'){
     if(job.state!=='settled')throw Error('Cannot release a running download');
     await job.download.delete();jobs.delete(task.operation_id);
@@ -477,7 +535,21 @@ export function makeServerSourceDownloadCode(options) {
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
   const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
-  return `async page=>(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
+  const transfer=`(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()},${browserServerDownloadProgress.toString()})`;
+  if(!options.browser_downloads_path)return `async page=>${transfer}`;
+  return `async page=>{
+    const jobs=page[Symbol.for('loginom-dock.server-downloads.v1')]??=new Map();
+    if(jobs.has(${JSON.stringify(options.operation_id)}))throw Error('Server download already started');
+    const job={accepted:true,state:'running',failed:false,download:null};
+    jobs.set(${JSON.stringify(options.operation_id)},job);
+    job.completion=(async()=>{
+      try{job.outcome=await ${transfer};job.failed=job.outcome.status!=='SUCCEEDED';}
+      catch{job.failed=true;}
+      finally{try{await job.progress?.close();}catch{job.failed=true;}job.state='settled';}
+    })();
+    return {status:'SUCCEEDED',action_key:'artifact.download',action_revision:'1',operation_id:${JSON.stringify(options.operation_id)},
+      phase:'requesting',effect_possible:true,cleanup_complete:false,output:{download_started:true},error:null,trace:[]};
+  }`;
 }
 
 // Host-owned native export only; shares the exact download gesture and cleanup.
@@ -1593,7 +1665,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
   };
   const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
-    download:async({source,path,operation_id,signal,deadline})=>{
+    download:async({source,path,operation_id,signal,deadline,onProgress})=>{
       const roots=await runtime.observe({scope:'roots',storageName:source.destination.slice(source.destination.lastIndexOf('/')+1)});
       const row=roots.output.ui.elements.find(e=>e.tid===roots.output.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(source.destination.slice(source.destination.lastIndexOf('/')+1)));
       if(!row)throw Error('LOGINOM_FILE_CHANGED');
@@ -1603,7 +1675,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!file)throw Error('LOGINOM_FILE_CHANGED');
       const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
         server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
-        download_path:path,deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
+        download_path:path,browser_downloads_path:join(cacheDirectory,'..','browser-downloads'),
+        deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
       let started;
@@ -1619,7 +1692,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           signal.throwIfAborted();
           const current=await controlServerDownload(operation_id,'status');
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
+          onProgress(current.output.bytes);
           if(current.output.state==='settled'){
+            if(current.output.outcome)await onRecord({phase:'storage_download_transfer',operation_id,outcome:current.output.outcome});
             if(current.output.failed||current.output.expired)throw Object.assign(Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED'),
               {details:current.output.failure??{reason:'browser_transfer_failed'}});
             break;

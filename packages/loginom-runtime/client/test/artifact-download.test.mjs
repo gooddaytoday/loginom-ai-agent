@@ -55,18 +55,27 @@ test('server event and RPC consume the original operation deadline instead of th
  const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
  f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
  let rpc,eventTimeout,rpcStarted;
+ const listeners=new Map();
+ const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),detach:async()=>{},
+  send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
  f.page.waitForEvent=async(type,options)=>{
   assert.equal(type,'download');eventTimeout=options.timeout;
   // LAB-386 server4/b:448: a successful gesture, then the native event
   // misses the old 15s window. The external Page owns this delayed event.
   if(options.timeout<20000)throw Object.assign(Error('event has not arrived yet'),{name:'TimeoutError'});
+  listeners.get('Browser.downloadWillBegin')?.({guid:'owned',frameId:'frame',suggestedFilename:'sales.csv',url:f.download.url()});
+  listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:3});
   return f.download;
  };
  f.download.saveAs=path=>writeFile(path,'abc');f.download.delete=async()=>{};
  const r=runtime(f.page,{cacheDirectory:join(root,'cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
   origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/test',packages:'/test',exports:'/test'}}),
   execute:async(code,options)=>{
-   if(code.includes('"download_path":')){rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;}
+   if(code.includes('"download_path":')){
+    rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
+    return structuredClone(await vm.runInContext(`(${code})`,f.page.context)(page));
+   }
    return f.page.execute(code);
   }});
  const roots=await r.observe({scope:'roots'}),file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);

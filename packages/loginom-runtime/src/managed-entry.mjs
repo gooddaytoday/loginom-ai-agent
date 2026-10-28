@@ -136,7 +136,7 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      const authenticated = await loginBrowser({ ...login, keepOpen: true,
+      const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:join(directory,'browser-downloads'),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
       const config = {
