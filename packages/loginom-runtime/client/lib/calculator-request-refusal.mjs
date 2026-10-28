@@ -21,7 +21,7 @@ const syntaxReceipt=r=>({action_key:r.action_key,operation_id:r.operation_id,sta
  output:{prepared_node_context:{verified:true,...identity(r.output)},wizard:{stage:r.output.wizard.stage,root_ref:r.output.wizard.root_ref,
   calculator_validation:structuredClone(r.output.wizard.calculator_validation),
   ...(r.output.wizard.calculator_preview?.status==='observed'?{calculator_preview:structuredClone(r.output.wizard.calculator_preview)}:{})}},
- trace:r.trace.filter(e=>e.event==='wizard_calculator_validation_failed').map(({event,root_ref,message})=>({event,root_ref,message}))});
+ trace:r.trace.filter(e=>['wizard_calculator_validation_failed','wizard_calculator_preview_error_dismissed'].includes(e.event)).map(({event,root_ref,message})=>({event,root_ref,message}))});
 export function verifiedCalculatorSyntaxFailure(error,baseline){
  const r=error?.receipt,w=r?.output?.wizard,n=r?.output?.prepared_node_context,v=w?.calculator_validation;
  return r?.action_key==='ui.act'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===true
@@ -30,7 +30,10 @@ export function verifiedCalculatorSyntaxFailure(error,baseline){
   &&w?.stage==='calculator'&&w.root_ref===baseline.wizard.root_ref&&v?.status==='observed'
   &&v.root_ref===w.root_ref&&v.message===r.error.message
   &&(v.source==='loginom_wizard_error_tooltip'||v.source==='loginom_calculator_preview_console'
-    &&w.calculator_preview?.status==='observed'&&w.calculator_preview.errors?.length>0&&w.calculator_preview.errors.join('\n')===v.message)
+    &&w.calculator_preview?.status==='observed'&&w.calculator_preview.errors?.length>0&&w.calculator_preview.errors.join('\n')===v.message
+    ||v.source==='loginom_calculator_preview_error_dialog'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v.field_name??'')
+      &&/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(v.message)?.[1]===v.field_name
+      &&r.trace?.filter(e=>e.event==='wizard_calculator_preview_error_dismissed'&&e.root_ref===w.root_ref&&e.message===v.message).length===1)
   &&r.trace?.filter(e=>e.event==='wizard_calculator_validation_failed'&&e.root_ref===w.root_ref&&e.message===v.message).length===1;
 }
 export function verifiedCalculatorRequestRefusal(refusal,node){
@@ -71,7 +74,9 @@ export async function rejectUnchangedCalculatorDraft(channel,baseline,error,{clo
   const current=await channel.observe({condition:'same calculator syntax refusal before rollback',readCalculator:true,
    ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
   need(same(identity(current),node)&&current.wizard.root_ref===baseline.wizard.root_ref
-   &&(error.receipt.output.wizard.calculator_validation.source==='loginom_calculator_preview_console'
+   &&(error.receipt.output.wizard.calculator_validation.source==='loginom_calculator_preview_error_dialog'
+    ?current.ui.dialogs.length===0&&current.wizard.calculator_preview?.status==='absent'
+    :error.receipt.output.wizard.calculator_validation.source==='loginom_calculator_preview_console'
     ?current.wizard.calculator_preview?.status==='absent'
     :same(current.wizard.calculator_validation,error.receipt.output.wizard.calculator_validation)),'Calculator validation refusal changed');
  }

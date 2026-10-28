@@ -497,7 +497,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(expressionEditors.length>1)throw Error('Calculator expression editor is ambiguous');
         // This is read-only root selection. The subsequent full read must prove
         // its native ownership before any dialog or mutation is admitted.
-        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref:undefined;
+        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref
+          :wizard?.stage==='calculator'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';CalcPreviewForm')?.ref:undefined;
         const filterDialogs=readFilter&&wizard?.stage==='row_filter'?(roots.output.ui?.elements??[]).filter(e=>
           [';ModalWindow_BetweenValuesEditor',';ModalWindow_ValueListEditor'].some(suffix=>e.tid===wizard.root_tid+suffix)):[];
         if(filterDialogs.length>1)throw Error('Filter dialog is ambiguous');
