@@ -35,7 +35,19 @@ def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
 
-def scenario(name):
+def scenario(name, case_root=None):
+    if case_root is not None:
+        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
+            raise ValueError('Invalid external case name')
+        src = Path(case_root).resolve() / name
+        config = read(src / 'case.json')
+        if set(config) != {'source_path', 'attachment'} or config['attachment'] not in ['path', 'file']:
+            raise ValueError('External case requires source_path and attachment path/file')
+        source = Path(config['source_path'])
+        if not source.is_absolute() or not source.is_file():
+            raise ValueError('External source must be an existing absolute file')
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    local_file=source, attachment=config['attachment'])
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -84,6 +96,7 @@ def arguments(argv=None):
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
     start.add_argument('--cold', action='store_true')
+    start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
     start.add_argument('--out', type=Path)
@@ -268,6 +281,27 @@ class Runner:
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
+    def memory(self, pid):
+        # Observe only descendants of the exact command we launched. Never keep
+        # argv (setup or prompt arguments can be private) in the memory journal.
+        pending, seen, totals = [pid], set(), dict(agent=0, host=0, runtime=0)
+        while pending:
+            current = pending.pop()
+            if current in seen: continue
+            seen.add(current)
+            try:
+                proc = Path('/proc') / str(current)
+                pending.extend(map(int, (proc / 'task' / str(current) / 'children').read_text().split()))
+                args = (proc / 'cmdline').read_bytes().split(b'\0')
+                role = ('agent' if current == pid else
+                        'host' if any(arg.endswith(b'/node-host.mjs') for arg in args) else
+                        'runtime' if any(arg.endswith(b'/managed-entry.mjs') for arg in args) else None)
+                if role:
+                    match = re.search(r'^VmRSS:\s+(\d+) kB$', (proc / 'status').read_text(), re.M)
+                    if match: totals[role] += int(match[1]) * 1024
+            except (OSError, ValueError): pass  # A child may exit between /proc reads.
+        return totals
+
     def save(self):
         write(self.out / 'results.json', self.report)
         (self.out / 'summary.md').write_text(summary(self.report))
@@ -298,7 +332,7 @@ class Runner:
                 child.stdin.close()
             end = min(self.deadline, time.time() + timeout)
             while child.poll() is None:
-                loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg()}) + '\n')
+                loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
                 loads.flush()
                 if time.time() >= end:
                     daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
@@ -336,12 +370,13 @@ class Runner:
 
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
         spec = (dict(source=case, prompt=case / 'task.md', data=case / 'data')
-                if isinstance(case, Path) else scenario(case))
+                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
         expected = expected_for(spec, package)
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
-        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()))
+        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
+                                     and name != (spec.get('local_file').name if spec.get('local_file') else None)))
         if not exports:
             count = 2 if src.parent.name == 'datamining-clustering' else 1
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
@@ -365,6 +400,9 @@ class Runner:
         if case == 'p14': files = [spec['data'] / 'exhibits.xlsx']
         if isinstance(case, Path) and src.parent.name == 'datamining-linregression':
             files = [spec['data'] / 'train.csv']
+        if spec.get('local_file'):
+            if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
+            files = []  # No multi-GiB workspace copy, and no --file for the path case.
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
@@ -431,7 +469,7 @@ class Runner:
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    base = scenario(case)['base']
+                    base = scenario(case, self.options.get('case_root'))['base']
                     session = None
                     for step in ([base, case] if base else [case]):
                         r.update(csv='—', save='—', cleanup='—')
@@ -479,9 +517,9 @@ def main():
     names = args.scenarios.split(',')
     assert len(names) == len(set(names)), 'Duplicate scenario'
     for name in names:
-        spec = scenario(name)
+        spec = scenario(name, args.case_root)
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
-        assert (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
+        assert args.case_root or (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
         expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
@@ -501,7 +539,7 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
-    request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
+    request = vars(args) | {'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None, 'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:

@@ -190,6 +190,10 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       if (!result) return
       try {
         for (const file of result.files) {
+          if ("kind" in file && file.kind === "local_reference") {
+            await onFile(file)
+            continue
+          }
           const selected = new File([await window.api.readPickedFile(result.token, file.path)], file.name)
           attachmentPaths.set(selected, file.path)
           await onFile(selected)
@@ -197,6 +201,13 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       } finally {
         await window.api.releasePickedFiles(result.token)
       }
+    },
+
+    async referenceAttachment(file) {
+      return window.api.referenceAttachment(attachmentPaths.get(file) ?? window.api.getPathForFile(file), {
+        size: file.size,
+        lastModified: file.lastModified,
+      })
     },
 
     getPathForFile(file) {

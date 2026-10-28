@@ -380,6 +380,12 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         }),
       readClipboardImage: platform.readClipboardImage,
       getPathForFile: platform.getPathForFile,
+      referenceAttachment: platform.referenceAttachment,
+      missingPath: () =>
+        showToast({
+          title: language.t("prompt.toast.pasteUnsupported.title"),
+          description: language.t("prompt.attachment.missingPath"),
+        }),
       store: platform.draftStore?.putBlob,
     },
     view: {

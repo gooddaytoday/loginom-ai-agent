@@ -9,6 +9,7 @@ import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
+import { fileReferences } from "./file-reference"
 
 export async function createLoginomHost(options: {
   root: string
@@ -27,6 +28,7 @@ export async function createLoginomHost(options: {
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
+  const references = fileReferences(join(root, "file-references"))
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
   const generations = new Map<
     number,
@@ -202,11 +204,13 @@ export async function createLoginomHost(options: {
   return {
     ...service,
     browserRecovery: options.browserRecovery === true,
+    references,
     async close() {
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.
       if (startupCleanup.failed || shutdown.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await references.close()
     },
     api: {
       ...service.api,

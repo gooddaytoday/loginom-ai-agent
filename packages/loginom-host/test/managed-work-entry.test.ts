@@ -1,8 +1,17 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
+import { MessageChannel } from "node:worker_threads"
+import { Schema } from "effect"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { supervise } from "../src/supervisor"
+import { createLoginomHost } from "../src/host"
+import { loginomHostPort } from "../src/host-port"
+import { LoginomHost } from "../src/adapter"
+import { HostTaskScope } from "../src/task-scope"
+import { connectionStore } from "../src/connection/connection-store"
+import { credentials } from "../src/connection/credentials"
+import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 test("actual managed entry reads live bridge work and dispatching over private IPC", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -44,14 +53,17 @@ test("actual managed entry reads live bridge work and dispatching over private I
     ),
     "runtime/client/lib/session.mjs": `
       import { readFileSync } from 'node:fs';
-      export async function createSession() {
-        return { browserConfig: ${JSON.stringify(work)}, metadata: {
+      import { createArtifactStore } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/artifacts.mjs", import.meta.url).href)};
+      export async function createSession(config, {managed}) {
+        return { artifactStore: await createArtifactStore({directory:managed.directory+'/artifacts'}),
+          browserConfig: ${JSON.stringify(work)}, metadata: {
           clientRevision: 'fixture',
           get workspaceReady() { return JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8')).prepared === true; }
         } };
       }`,
-    "runtime/client/lib/artifacts.mjs":
-      'export async function admitStartupArtifacts() { throw Error("unexpected admission") }',
+    "runtime/client/lib/artifacts.mjs": `const artifacts=await import(${JSON.stringify(new URL("../../loginom-runtime/client/lib/artifacts.mjs", import.meta.url).href)});
+       export const admitStartupArtifacts=artifacts.admitStartupArtifacts;
+       export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
@@ -71,6 +83,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
         async connect() {} async close() {}
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
+          if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
           if (!input.arguments.hold) return { content: [] };
           await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
         }
@@ -136,6 +149,114 @@ test("actual managed entry reads live bridge work and dispatching over private I
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
+  }
+  // All error-producing admission, managed entry, supervision, HostPort,
+  // transport and adapter code is production code. Only browser/Help are fixtures.
+  await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true }))
+  await stageKnowledgeFixture(directory)
+  await mkdir(join(directory, "bin"))
+  await symlink(node, join(directory, "bin/node"))
+  await Bun.write(join(directory, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+  const root = join(directory, "host")
+  const codec = credentials("linux")
+  const store = connectionStore(join(root, "connection"), codec)
+  await store.stage({
+    generation: 1,
+    revision: 1,
+    url: "http://example.test",
+    username: "user",
+    apiKey: "secret-key",
+    password: "secret-password",
+  })
+  await store.activate(1)
+  const host = await createLoginomHost({ root, resources: directory, codec, environment: {} })
+  const channel = new MessageChannel()
+  const port = loginomHostPort(
+    {
+      postMessage: (data) => channel.port1.postMessage(data),
+      on: (event, listener) => channel.port1.on(event, event === "message" ? (data) => listener({ data }) : listener),
+      start: () => channel.port1.start(),
+    },
+    host,
+  )
+  LoginomHost.connect({
+    postMessage: (data) => channel.port2.postMessage(data),
+    on: (_event, listener) => channel.port2.on("message", (data) => listener({ data })),
+    start: () => channel.port2.start(),
+  })
+  const original = host.inputs
+  const fault = { name: "" }
+  // Deterministically reproduce a source disappearing/changing after the Host
+  // snapshot and before runtime readVerified. Never replace its error logic.
+  host.inputs = async (...args) => {
+    const files = await original(...args)
+    const path = files[0].sourcePath
+    if (fault.name === "missing") await unlink(path)
+    if (fault.name === "directory") {
+      await unlink(path)
+      await mkdir(path)
+    }
+    if (fault.name === "denied") await chmod(path, 0)
+    if (fault.name === "changed") await Bun.write(path, "changed")
+    if (fault.name === "unknown") throw Error("unexpected secret-password /private/path")
+    return files
+  }
+  try {
+    await waitForKnowledge(host)
+    const run = await LoginomHost.acquire("file-errors")
+    if (!run) throw Error("Adapter unavailable")
+    await run.scope(
+      "bind",
+      Schema.decodeUnknownSync(HostTaskScope.Info)({ taskMessageID: "msg_original", profile: "loginom-automation" }),
+    )
+    await run.call("dock_prepare", {}, "msg_original")
+    await run.tools()
+    for (const [name, code] of [
+      ["missing", "LOGINOM_FILE_NOT_FOUND"],
+      ["directory", "LOGINOM_FILE_NOT_REGULAR"],
+      ["denied", "LOGINOM_FILE_ACCESS_DENIED"],
+      ["changed", "LOGINOM_FILE_CHANGED"],
+      ["oversize", "LOGINOM_FILE_TOO_LARGE"],
+      ["unknown", "LOGINOM_HOST_REQUEST_FAILED"],
+    ]) {
+      fault.name = name
+      const files = [
+        { name: "data.csv", data: Buffer.alloc(name === "oversize" ? 16 * 1024 * 1024 + 1 : 3, 65).toString("base64") },
+      ]
+      const error = await run.admit("msg_" + name, files).then(
+        () => {
+          throw Error("Expected refusal")
+        },
+        (error: unknown) => error,
+      )
+      expect(error).toMatchObject({ message: code })
+      if (name === "oversize")
+        expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
+      const text = error instanceof Error ? error.message + JSON.stringify(Reflect.get(error, "details")) : String(error)
+      expect(text).toContain(code)
+      expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
+      expect(host.journal.pending()).toEqual([])
+      // The same known admission error in a scenario call also precedes
+      // journal admission and must retain its cause, never CALL_UNCERTAIN.
+      const callError = await run
+        .call("fixture", {}, "msg_original", undefined, [{ userMessage: "msg_call_" + name, files }])
+        .catch((error: unknown) => error)
+      expect(callError).toMatchObject({ message: code })
+    }
+    // Once dispatch has started, a thrown file-shaped error cannot certify
+    // no effect and must still become CALL_UNCERTAIN.
+    fault.name = ""
+    const uncertain = await run
+      .call("fixture", { failAfterDispatch: true }, "msg_original")
+      .catch((error: unknown) => error)
+    expect(uncertain).toMatchObject({ message: "LOGINOM_CALL_UNCERTAIN" })
+    await run.release()
+  } finally {
+    LoginomHost.disconnect()
+    await port.close()
+    await host.close()
+    channel.port1.close()
+    channel.port2.close()
     await rm(directory, { recursive: true, force: true })
   }
-})
+}, 30_000)

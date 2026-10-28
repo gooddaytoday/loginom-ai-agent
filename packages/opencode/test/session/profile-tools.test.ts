@@ -107,6 +107,55 @@ it.instance("automation registers exact local bytes after preparation without se
   }),
 )
 
+for (const change of ["disappears", "changes", "is replaced", "symlink is redirected"] as const) {
+  const code = change === "disappears" ? "LOGINOM_FILE_NOT_FOUND" : "LOGINOM_FILE_CHANGED"
+  it.instance(`profile tools preserve ${code} when the original file ${change} before reauthorization`, () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const instance = yield* TestInstance
+      const path = instance.directory + "/profile-source.csv"
+      if (change === "symlink is redirected") {
+        yield* fs.writeFileString(path + ".target", "region;amount\nNorth;1,25\n")
+        yield* fs.symlink(path + ".target", path)
+      } else yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
+      const resolved = yield* resolveProfile(
+        "loginom-automation",
+        preparedLoginom(async () => []),
+      )
+      const profile = resolved.tools.loginom_file_profile?.execute
+      const scan = resolved.tools.loginom_file_scan?.execute
+      const sample = resolved.tools.loginom_file_sample?.execute
+      if (!profile || !scan || !sample) throw Error("File tools are missing")
+      const result = yield* Effect.promise(() =>
+        profile({ path }, { toolCallId: "profile-source", abortSignal: new AbortController().signal, messages: [] }),
+      )
+      if (!isRecord(result) || typeof result.output !== "string") throw Error("Profile output missing")
+      const id = JSON.parse(result.output).profile_id
+      if (change === "disappears") yield* fs.remove(path)
+      if (change === "changes") yield* fs.writeFileString(path, "region;amount\nNorth;1,25\nSouth;2,5\n")
+      if (change === "is replaced") {
+        yield* fs.rename(path, path + ".old")
+        yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
+      }
+      if (change === "symlink is redirected") {
+        yield* fs.writeFileString(path + ".new", "region;amount\nNorth;1,25\n")
+        yield* fs.remove(path)
+        yield* fs.symlink(path + ".new", path)
+      }
+      for (const execute of [scan, sample]) {
+        const failure = yield* Effect.promise(() =>
+          execute(
+            { profile_id: id },
+            { toolCallId: "reauthorized-source", abortSignal: new AbortController().signal, messages: [] },
+          ),
+        ).pipe(Effect.exit)
+        expect(Exit.isFailure(failure)).toBe(true)
+        if (Exit.isFailure(failure)) expect(String(Cause.squash(failure.cause))).toContain(code)
+      }
+    }),
+  )
+}
+
 it.instance("local package prepare snapshots bytes into its private input and strips the OS path", () =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -273,6 +322,7 @@ it.instance("local file tool permission failures retain path, typed marker and t
               : PermissionV1.DeniedError,
         )
         expect(String(error)).toContain(path)
+        expect(String(error)).toContain("LOGINOM_FILE_ACCESS_DENIED")
         expect(String(error).includes("--file")).toBe(action !== "deny")
         if (action === "feedback") expect(String(error)).toContain("Do not read this file")
       }
@@ -525,6 +575,15 @@ codeMode.instance("code mode keeps the verified Host Help catalog available in d
       async tools() {
         return { tools: [{ name: "find", inputSchema: { type: "object", properties: {} } }] }
       },
+      async reserveReference() {
+        throw Error("Unexpected reference reservation")
+      },
+      async admitReference() {
+        throw Error("Unexpected reference admission")
+      },
+      async discardReference() {
+        throw Error("Unexpected reference discard")
+      },
       async admit() {
         throw Error("Unexpected eager admission")
       },
@@ -622,6 +681,15 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
             ),
           }
         },
+        async reserveReference() {
+          throw Error("Unexpected reference reservation")
+        },
+        async admitReference() {
+          throw Error("Unexpected reference admission")
+        },
+        async discardReference() {
+          throw Error("Unexpected reference discard")
+        },
         async admit() {
           throw Error("Unexpected eager admission")
         },
@@ -637,6 +705,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       expect(!!tools.loginom_dock_prepare).toBe(profile === "loginom-automation")
       expect(!!tools.loginom_browser_click).toBe(profile === "loginom-automation")
       expect(!!tools.loginom_file_admit).toBe(profile === "loginom-automation")
+      for (const name of ["loginom_file_profile", "loginom_file_scan", "loginom_file_sample"])
+        expect(!!tools[name]).toBe(profile === "loginom-automation")
       expect(!!tools.package_docs_run).toBe(profile === "package-docs")
       expect(!!tools.task).toBe(profile === "default")
       expect(!!tools.bash).toBe(profile !== "package-docs")
@@ -664,6 +734,15 @@ for (const image of [false, true])
             ),
           }
         },
+        async reserveReference() {
+          throw Error("Unexpected reference reservation")
+        },
+        async admitReference() {
+          throw Error("Unexpected reference admission")
+        },
+        async discardReference() {
+          throw Error("Unexpected reference discard")
+        },
         async admit() {
           throw Error("Unexpected eager admission")
         },
@@ -674,6 +753,7 @@ for (const image of [false, true])
       }
       const { tools } = yield* resolveProfile("loginom-automation", loginom, image)
       expect(tools.loginom_file_admit).toBeUndefined()
+      expect(tools.loginom_file_profile).toBeUndefined()
       expect(tools.loginom_dock_browser_recovery).toBeDefined()
       expect(tools.loginom_browser_snapshot).toBeDefined()
       expect(!!tools.loginom_browser_take_screenshot).toBe(image)
@@ -691,6 +771,15 @@ function preparedLoginom(
     async tools() {
       return { tools: [{ name: "dock_action_describe", inputSchema: { type: "object", properties: {} } }] }
     },
+    async reserveReference() {
+      throw Error("Unexpected reference reservation")
+    },
+    async admitReference() {
+      throw Error("Unexpected reference admission")
+    },
+    async discardReference() {
+      throw Error("Unexpected reference discard")
+    },
     admit,
     async call() {
       throw Error("Unexpected browser dispatch")
@@ -704,6 +793,7 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>,
   image?: boolean,
   permission: PermissionV1.Ruleset = [{ permission: "*", pattern: "*", action: "allow" }],
+  attachment?: Pick<SessionV1.FilePart, "url" | "mime" | "filename" | "source">,
 ) {
   const sessions = yield* Session.Service
   const agents = yield* Agent.Service
@@ -758,6 +848,14 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
         time: { start: 2, end: 2 },
       },
     })
+  if (attachment)
+    yield* sessions.updatePart({
+      ...attachment,
+      id: PartID.ascending(),
+      type: "file",
+      messageID: user,
+      sessionID: session.id,
+    })
   const history = yield* sessions.messages({ sessionID: session.id })
   const tools = yield* SessionTools.resolve({
     loginom,
@@ -788,3 +886,42 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   })
   return { tools, session, user, history, assistant }
 })
+
+it.instance("Dock calls exclude local reference attachments from repeated byte admission", () =>
+  Effect.gen(function* () {
+    const calls: unknown[][] = []
+    const loginom = {
+      ...preparedLoginom(async () => {
+        throw Error("Must not read reference bytes")
+      }),
+      async call(...args: Parameters<NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>["call"]>) {
+        calls.push(args)
+        return { content: [] }
+      },
+    }
+    const { tools } = yield* resolveProfile(
+      "loginom-automation",
+      loginom,
+      undefined,
+      [{ permission: "*", pattern: "*", action: "allow" }],
+      {
+        mime: "text/plain",
+        filename: "large.csv",
+        url: "file:///tmp/large.csv",
+        source: {
+          type: "file",
+          path: "/tmp/large.csv",
+          text: { value: "loginom-attachment:" + "a".repeat(64), start: 0, end: 0 },
+        },
+      },
+    )
+    const execute = tools.loginom_dock_action_describe?.execute
+    if (!execute) throw Error("Dock tool missing")
+    for (const id of ["first", "second"])
+      yield* Effect.promise(() =>
+        execute({}, { toolCallId: id, abortSignal: new AbortController().signal, messages: [] }),
+      )
+    expect(calls).toHaveLength(2)
+    expect(calls.every((call) => Array.isArray(call[4]) && call[4].length === 0)).toBe(true)
+  }),
+)

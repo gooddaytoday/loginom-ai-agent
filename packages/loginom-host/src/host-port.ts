@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
-import { hostError } from "./errors"
+import type { FileReference } from "./file-reference"
+import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
@@ -295,11 +296,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         typeof input.name === "string" &&
         !knowledgeTools.has(input.name) &&
         input.name !== diagnosticTool.name
+      const referenceCall = ["referenceReserve", "referenceAdmit", "referenceDiscard"].includes(data.method)
       if (
-        (data.method === "admit" || browserCall) &&
+        (data.method === "admit" || referenceCall || browserCall) &&
         (run.applyingScope ||
           run.scope?.profile !== "loginom-automation" ||
-          (data.method === "admit" && !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
+          ((data.method === "admit" || referenceCall) && !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
           (browserCall &&
             "name" in input &&
             typeof input.name === "string" &&
@@ -309,12 +311,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
-      if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
-      if (data.method === "call") run.dispatching = true
+      if ((data.method === "call" || referenceCall) && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
+      if (data.method === "call" || referenceCall) run.dispatching = true
       if (packageInput) run.packagePreparation = new AbortController()
       const packageAborted = () =>
         packageInput && (state.closed || run.released || run.packagePreparation?.signal.aborted)
-      if (browserCall) run.browserDispatching = true
+      if (browserCall || referenceCall) run.browserDispatching = true
       run.calls++
       try {
         if (data.method === "tools") {
@@ -392,6 +394,41 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             },
             lease.generation,
           )
+          return
+        }
+        if (referenceCall) {
+          const lease = await connectionLease(input.run, run)
+          const owner = {
+            run: input.run,
+            chat: run.chat,
+            userMessage: run.scope!.taskMessageID,
+            generation: lease.generation,
+          }
+          if (data.method === "referenceDiscard") {
+            if (!("grant" in input) || typeof input.grant !== "string") throw Error("LOGINOM_INPUT_INVALID")
+            await service.references.discard(owner, input.grant)
+            reply({ id: data.id, result: { discarded: true } }, lease.generation)
+            return
+          }
+          if (data.method === "referenceReserve") {
+            if (
+              !("userMessage" in input) ||
+              input.userMessage !== owner.userMessage ||
+              !("name" in input) ||
+              typeof input.name !== "string"
+            )
+              throw Error("LOGINOM_INPUT_INVALID")
+            const result = await service.references.reserve(owner, input.name)
+            reply({ id: data.id, result }, lease.generation)
+            return
+          }
+          if (!("reference" in input) || !input.reference || typeof input.reference !== "object")
+            throw Error("LOGINOM_INPUT_INVALID")
+          const reference = await service.references.commit(owner, input.reference as FileReference)
+          if (state.closed || run.released) throw Error("LOGINOM_HOST_CLOSED")
+          const runtime = await service.runtime(lease.generation, run.chat)
+          const result = await runtime.request("admitReference", { reference })
+          reply({ id: data.id, result }, lease.generation)
           return
         }
         if (data.method === "interrupt") {
@@ -500,6 +537,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               name: input.name,
               arguments: "args" in input ? input.args : undefined,
               ...(packageArtifact ? { packageArtifact } : {}),
+              ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
           )
@@ -531,24 +569,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
-          if (!recovery.id) throw new Error(hostError(error))
+          if (!recovery.id) throw hostException(error)
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
-        if (data.method === "call") {
+        if (data.method === "call" || referenceCall) {
           run.dispatching = false
           run.packagePreparation = undefined
         }
-        if (browserCall) run.browserDispatching = false
+        if (browserCall || referenceCall) run.browserDispatching = false
         run.calls--
         if (run.released && !run.calls) {
           await release(input.run, run)
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) }, runs.get(input.run)?.lease?.generation)
+      reply({ id: data.id, ...hostFailure(error) }, runs.get(input.run)?.lease?.generation)
     }
   }
   port.on("message", ({ data }) => {

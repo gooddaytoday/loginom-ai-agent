@@ -1,4 +1,5 @@
 import {excelSettingsSchema} from './imports-excel-parameters.mjs';
+import {importSourceSchema} from './storage-policy.mjs';
 import {restRequestParametersSchema} from './rest-request-parameters.mjs';
 import {DATE_TIME_OPERATIONS} from './date-time-parameters.mjs';
 import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
@@ -11,7 +12,7 @@ import {javascriptContextInitialSchema,javascriptContextReceiptSchema,validateJa
 
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const text=(maxLength=128)=>({type:'string',minLength:1,maxLength});
-const fieldName={...text(128),pattern:'^[A-Za-z_][A-Za-z0-9_]{0,127}$',description:'Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.'};
+const fieldName={...text(128),pattern:'^[A-Za-z_][A-Za-z0-9_]{0,127}$',description:'Technical field name: ASCII letters, digits, underscore; first letter/underscore. Human-readable or Russian names use label.'};
 const id={...text(),pattern:'^[A-Za-z0-9_.:-]+$'};
 const integer=(minimum,maximum)=>({type:'integer',minimum,maximum});
 const choice=(...values)=>({type:'string',enum:values});
@@ -91,7 +92,8 @@ export const nodeApplyInputSchema=object({
   position:{...object({x:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000},y:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000}}),description:'Optional model-space coordinates, each 64..10000. The margin keeps node labels and ports away from the top/left canvas edge. Omit for automatic free placement; explicit coordinates are never silently changed.'}},['kind','type']),
  inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99)}),15),
  mode:choice('xlsx','request','enter','k_means','pivot','unpivot','impute','calendar','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact','script'),parameters:object({excel:excelSettingsSchema,...restRequestParametersSchema.properties,target_field:linRegressionParametersSchema.properties.target_field,...clusteringParametersSchema.properties,...crossTableParametersSchema.properties,...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
-  source:object({artifact_id:id,upload_operation_id:id,bytes:integer(0,16777216),sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$'}},['artifact_id','upload_operation_id']),
+  source:importSourceSchema,
+  source_switch:object({profile_id:id,save_operation_id:id}),
   settings:object({source:sourceSettings,format,columns:array(column,1000,1)},[]),
   fields:{anyOf:[dateTimeParametersSchema.properties.fields,missingValuesParametersSchema.properties.fields]},max_nulls_percent:missingValuesParametersSchema.properties.max_nulls_percent,ordered:missingValuesParametersSchema.properties.ordered,rules:replacementParametersSchema.properties.rules,output_mode:replacementParametersSchema.properties.output_mode,prefixes:unionParametersSchema.properties.prefixes,tables:unionParametersSchema.properties.tables,expressions:array(calculatorExpressionSchema,128),order:array(text(128),128,1),group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1),keys:array({anyOf:[sortingKeySchema,joinKeySchema]},1000,1),case_sensitive:boolean,include_joined_keys:boolean,compare_with_locale:boolean,changes:array(reformChangeSchema,128),groups:filterParametersSchema.properties.groups,
   ...javascriptParametersSchema.properties,
@@ -110,8 +112,9 @@ export const nodeApplyInputSchema=object({
 // Discovery uses the same public parameter shapes. Requirements depending on
 // target.kind remain in the installed handler, before any browser mutation.
 export const textImportParametersSchema=object({
+ source_switch:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source_switch),description:'Only for an existing text import: after an exact full scan and package.save_checkpoint, switch settings.source.source_path alone, preserve/reopen-check all columns and output mapping, execute once and verify full output-0 row count. Only profile_id is supplied: backend binds an exact scan receipt to the delivered source digest. Missing receipt yields N not verified with a reason, never successful count verification. Never supply expected_records. No column, format or mapping changes allowed. Timeout: inspect the SAME operation, never execute again.'},
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
-  description:'Required for new imports and configuration changes: use artifact_id and upload_operation_id from the completed, verified artifact delivery. Optional bytes and sha256 must match that receipt. Omit source only to execute an unchanged existing Import: settings:{}, inputs:[], mappings:[], finish:execute and read.ports:[0]. This uses the saved native configuration without uploading again; an old upload ID is not a current receipt.'},
+  description:'Required for new imports and configuration changes: kind:storage with server_source_ref from a native Files observation selects an existing server file WITHOUT upload; or kind:verified_delivery with artifact_id and upload_operation_id from completed verified delivery (legacy delivery IDs remain accepted). Optional bytes and sha256 must match that receipt. Omit source only to execute an unchanged existing Import: settings:{}, inputs:[], mappings:[], finish:execute and read.ports:[0]. This uses the saved native configuration without uploading again; an old upload ID is not a current receipt.'},
  settings:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.settings),
   description:'Optional settings.format.multiple_delimiters is boolean; date_format is an explicit dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, dd/mm/yy, mm/dd/yy or yy/mm/dd order and date_separator is ., /, backslash or -. Omission preserves native settings, including on partial existing-node patches; no automatic encoding or date substitution. For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name.'},
 },['settings']);
@@ -158,7 +161,8 @@ export const nodeApiTools=Object.freeze([
  tool('dock_node_stop','Request native stop only for an identified server execution currently awaited by this node operation. Poll the same worker for confirmed outcome.',operation),
 ]);
 export const deliveryApiTools=Object.freeze([
- tool('dock_artifact_deliver','Candidate delivery of an authorized artifact to its grant destination, including path conflict policy and byte verification. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
+ tool('dock_artifact_deliver','Deliver an authorized artifact. Files over 16 MiB start asynchronously and return operation_id; poll dock_artifact_delivery_status no more often than every 5 seconds until ready, cancelled, failed or uncertain. Large files use exact native FileStore size, without download. Smaller files retain byte verification. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
+ tool('dock_artifact_delivery_cancel','Request native cancellation of the SAME large-file operation. Poll status until cancelled or uncertain. Only confirmed sender stop and removal of the owned partial file count as cancelled.',operation),
  tool('dock_artifact_delivery_status','Read the retained delivery job without browser calls. A failed tool wait does not prove transfer termination.',operation,true),
  tool('dock_artifact_delivery_resume','Explicitly resume the SAME known delivery job after inspecting status. Uses the original upload receipt; never repeats an unresolved download. Requires the original live runtime and unchanged grant.',resumeDelivery),
 ]);
@@ -181,7 +185,7 @@ export function validateNodeApplyEnvelope(args) {
  }
  return args;
 }
-export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
+export async function dispatchNodeApi(runtime,name,args,{signal,scanReceipt}={}) {
  const definition=runtime.tools.find(tool=>tool.name===name);
  if(!definition||!isNodeApiTool(name))throw Error('Node operation tool is unavailable in this session');
  if(name==='dock_node_read'){
@@ -193,7 +197,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
  signal?.throwIfAborted();
  switch(name){
   case 'dock_node_read':return runtime.startNodeRead(args,{signal});
-  case 'dock_node_apply':return runtime.startNodeApply(args);
+  case 'dock_node_apply':return runtime.startNodeApply(args,{scanReceipt});
   case 'dock_node_resume':
    if(Object.keys(args).length>1)validateActionParameters(nodeApplyInputSchema,args);
    return runtime.startNodeApply(args,{resume:true});
@@ -202,6 +206,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
   case 'dock_node_cancel':return runtime.cancelNodeApply(args.operation_id);
   case 'dock_node_stop':return runtime.stopNodeApply(args.operation_id);
   case 'dock_artifact_deliver':return runtime.deliverArtifact(args,{signal});
+  case 'dock_artifact_delivery_cancel':return runtime.cancelArtifactDelivery(args.operation_id);
   case 'dock_artifact_delivery_status':return runtime.artifactDeliveryStatus(args.operation_id);
   case 'dock_artifact_delivery_resume':return runtime.resumeArtifactDelivery(args,{signal});
  }

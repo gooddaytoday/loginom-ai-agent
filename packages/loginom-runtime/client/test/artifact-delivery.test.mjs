@@ -544,3 +544,48 @@ for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files 
  assert.equal(runtime.hasUnsettledWork(),false);assert.equal(runtime.hasActiveWork(),false);
  assert.doesNotThrow(()=>runtime.assertPreparationAllowed());assert.equal(page.events.includes('click'),false);
 });
+
+
+test('large delivery starts asynchronously, reports progress and never downloads its bytes',async()=>{
+ const f=fixture();f.artifact.bytes=2**32+1048576;f.artifact.upload.overwrite='reject';
+ let done;const gate=new Promise(resolve=>{done=resolve;});
+ f.runtime.uploadLargeArtifact=async options=>{await gate;options.onProgress({bytes:f.artifact.bytes,phase:'verifying_size'});return {status:'SUCCEEDED',destination:f.artifact.upload.destination,bytes:f.artifact.bytes,source_sha256:f.artifact.sha256,cleanup_complete:true,upload_completion_verified:true};};
+ const first=await f.service.deliver(request);assert.equal(first.state,'running');assert.equal(first.status,'authorizing');
+ assert.equal((await f.service.deliver(request)).operation_id,first.operation_id);
+ done();await f.service.drain();const ready=f.service.status(request.operation_id);
+ assert.equal(ready.status,'ready');assert.equal(ready.percent,100);assert.equal(ready.bytes,f.artifact.bytes);
+ assert.ok(!f.calls.includes('verify'));assert.ok(!f.calls.includes('upload'));
+});
+
+for(const confirmed of [true,false])test('large cancellation retains ID, confirmed cleanup and uncertainty: '+confirmed,async()=>{
+ const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';
+ let entered;const started=new Promise(resolve=>{entered=resolve;});let sends=0,cancels=0;
+ f.runtime.uploadLargeArtifact=async options=>{sends++;entered();await new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true}));options.signal.throwIfAborted();};
+ f.runtime.cancelLargeArtifact=async()=>{cancels++;return confirmed;};
+ const first=await f.service.deliver(request);await started;
+ assert.equal(f.service.cancel(first.operation_id).status,'cancelling');
+ await f.service.drain();const settled=f.service.status(first.operation_id);
+ assert.equal(settled.status,confirmed?'cancelled':'uncertain');assert.equal(settled.error.code,confirmed?'LOGINOM_UPLOAD_CANCELLED':'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(settled.outcome.cleanup_complete,confirmed);assert.equal(f.service.unsettled,!confirmed);
+ assert.equal((await f.service.deliver(request)).status,settled.status);assert.equal(sends,1);assert.equal(cancels,1);
+ if(!confirmed)assert.throws(()=>f.service.deliver({...request,operation_id:'another'}),/uncertain/);
+});
+
+test('large-file shutdown cancels the worker and awaits native cleanup',async()=>{
+ const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';
+ let entered,clean;const started=new Promise(resolve=>{entered=resolve;}),cleanup=new Promise(resolve=>{clean=resolve;});
+ f.runtime.uploadLargeArtifact=async options=>{entered();await new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true}));throw Error('cancelled');};
+ f.runtime.cancelLargeArtifact=async()=>{await cleanup;return true;};
+ await f.service.deliver(request);await started;
+ let closed=false;const close=f.service.close().then(()=>{closed=true;});
+ await Promise.resolve();assert.equal(closed,false);clean();await close;assert.equal(closed,true);
+ assert.equal(f.service.status(request.operation_id).status,'cancelled');
+});
+
+test('large-file deadline is derived from safe size arithmetic, independently of legacy request budget',async()=>{
+ const f=fixture(undefined,'/',{now:()=>20000});f.artifact.bytes=2**32+1048576;
+ f.runtime.uploadLargeArtifact=async()=>{throw Error('LOGINOM_FILE_CHANGED');};f.runtime.cancelLargeArtifact=async()=>true;
+ const started=await f.service.deliver({...request,budget_ms:1000});
+ assert.equal(started.deadline_at,20000+120000+Math.ceil(f.artifact.bytes/5242880)*1000);
+ await f.service.drain();assert.equal(f.service.status(request.operation_id).error.code,'LOGINOM_FILE_CHANGED');
+});

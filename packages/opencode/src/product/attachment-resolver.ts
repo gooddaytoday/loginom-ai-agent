@@ -1,3 +1,10 @@
+import {
+  attachmentReceiptID,
+  attachmentReceiptSource,
+  bindAttachmentReceipt,
+  createAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import { stat } from "node:fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { Effect } from "effect"
@@ -27,6 +34,31 @@ export const attachmentResolver = {
       { ...part, mime: PACKAGE_MIME, filename: part.filename ?? path.basename(filepath), ...owner },
     ]
   },
+
+  // Large local files reach the model as a bounded reference; no file bytes enter the provider request.
+  referenceParts: Effect.fnUntraced(function* (part: FileDraft, filepath: string, url: URL, owner: Owner) {
+    const receiptID = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
+    const info = receiptID ? undefined : yield* Effect.promise(() => stat(filepath).catch(() => undefined))
+    if (!receiptID && !(info?.isFile() && info.size > 16 * 1024 * 1024 && !url.search && !url.hash)) return undefined
+    if (url.search || url.hash) return yield* Effect.die(Error("LOGINOM_INPUT_INVALID"))
+    const source = receiptID
+      ? part.source
+      : attachmentReceiptSource(yield* Effect.promise(() => createAttachmentReceipt(filepath)))
+    const id = attachmentReceiptID(source?.type === "file" ? source.text.value : undefined)!
+    yield* Effect.promise(() => bindAttachmentReceipt(id, filepath, { session: owner.sessionID, message: owner.messageID }))
+    const parts: Draft<SessionV1.Part>[] = [
+      {
+        ...owner,
+        type: "text",
+        synthetic: true,
+        text: `Attached local data reference: ${filepath}. Use loginom_file_profile before reading or admission; then scan, sample and validate the scenario on the sample before delivering the full file. No file bytes are included in this message.`,
+      },
+      // References are represented to the provider by the bounded text above.
+      // Keep CSV/XLSX paths out of provider file/download handling.
+      { ...part, mime: "text/plain", source, ...owner },
+    ]
+    return parts
+  }),
 
   dataContext: (url: string, fsys: FSUtil.Interface) =>
     attachmentContext(decodeDataUrl(url)).pipe(Effect.provideService(FSUtil.Service, fsys)),

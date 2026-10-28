@@ -51,6 +51,7 @@ function setup(options: {
     history: [],
     task,
     profile: options.profile,
+    plugin: { trigger: () => Effect.void },
   } as unknown as ContributeInput
   return { tools, status, requested, run: () => Effect.runPromise(toolContributor.contribute(input)) }
 }
@@ -78,6 +79,9 @@ describe("toolContributor", () => {
     expect(Object.keys(automation.tools).toSorted()).toEqual([
       "loginom_dock_action_describe",
       "loginom_file_admit",
+      "loginom_file_profile",
+      "loginom_file_sample",
+      "loginom_file_scan",
       "loginom_find",
     ])
     const without = setup({ profile: "loginom-automation" })

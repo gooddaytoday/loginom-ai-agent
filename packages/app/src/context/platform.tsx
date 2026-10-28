@@ -1,3 +1,4 @@
+import type { LocalAttachmentReference } from "@/utils/local-attachment"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
@@ -56,11 +57,12 @@ type PlatformBase = {
   /** Open a native attachment picker and read selected files sequentially (desktop only) */
   openAttachmentPickerDialog?(
     opts: OpenAttachmentPickerOptions,
-    onFile: (file: File) => Promise<unknown>,
+    onFile: (file: File | LocalAttachmentReference) => Promise<unknown>,
   ): Promise<void>
 
   /** Resolve the native source path for a desktop File. */
   getPathForFile?(file: File): string
+  referenceAttachment?(file: File): Promise<LocalAttachmentReference>
 
   /** Open a native save file picker dialog (desktop only) */
   saveFilePickerDialog?(opts?: SaveFilePickerOptions): Promise<string | null>

@@ -824,6 +824,11 @@ const layer = Layer.effect(
                 sessionID: input.sessionID,
               })
               if (loginomPackage) return loginomPackage
+              const reference = yield* attachmentResolver.referenceParts(part, filepath, url, {
+                messageID: info.id,
+                sessionID: input.sessionID,
+              })
+              if (reference) return reference
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime
 
               const { read } = yield* registry.named()

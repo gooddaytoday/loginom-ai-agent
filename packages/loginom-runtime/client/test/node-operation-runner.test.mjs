@@ -70,3 +70,15 @@ for(const phase of ['execute','materialization_execute'])test('native Stop can a
  execution_id='own-execution';assert.equal(runner.stop('stop-one').server_stop_requested,true);
  assert.equal(observedSignal.aborted,true);release();await runner.wait('stop-one');
 });
+
+test('trusted scan receipt survives wait/resume and cannot be replaced by request parameters',async()=>{
+ const seen=[];
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
+   run:async(r,{scanReceipt})=>{seen.push(structuredClone(scanReceipt));return {status:'AMBIGUOUS'};}});
+ const receipt={profile_id:'p',records:17};
+ runner.start({operation_id:'scan',parameters:{scanReceipt:{records:999}}},{scanReceipt:receipt});
+ receipt.records=999;await runner.wait('scan');
+ runner.start({operation_id:'scan'},{resume:true,scanReceipt:{records:999}});await runner.wait('scan');
+ assert.deepEqual(seen,[{profile_id:'p',records:17},{profile_id:'p',records:17}]);
+ assert.equal(runner.status('scan').scanReceipt,undefined);
+});

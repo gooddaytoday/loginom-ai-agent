@@ -168,3 +168,13 @@ test('compact ordinary output preserves source freshness and typed values withou
  assert.equal(Object.hasOwn(compact.output,'workflow_returned'),false);
  assert.deepEqual(compact.output.ports[0].sample,port.sample);assert.deepEqual(original,before);
 });
+
+test('compact large-file status preserves bytes, percent, elapsed time and ready identity',()=>{
+ const progress={operation_id:'large',upload_operation_id:'large:upload',state:'running',phase:'upload',status:'uploading',
+  bytes:2**32,total_bytes:2**32+1048576,percent:99.975,elapsed_ms:20000,deadline_at:999999,poll_after_ms:5000,outcome:null,error:null};
+ const running=compactNodeResult(progress);assert.equal(running.upload_status,'uploading');assert.equal(running.progress.bytes,2**32);
+ assert.equal(running.progress.poll_after_ms,5000);assert.equal(validate(running).valid,true);
+ const ready=compactNodeResult({...progress,state:'settled',status:'ready',outcome:{status:'SUCCEEDED',destination:'/user/file.csv',
+  upload_operation_id:'large:upload',bytes:progress.total_bytes,source_sha256:'a'.repeat(64),bytes_source:'native_file_store',cleanup_complete:true,upload_completion_verified:true}});
+ assert.equal(ready.upload_status,'ready');assert.equal(ready.output.destination,'/user/file.csv');assert.equal(ready.output.bytes_source,'native_file_store');assert.equal(validate(ready).valid,true);
+});

@@ -1,4 +1,5 @@
 import type { InputFile } from "./inputs"
+import type { FileReference, ReferenceSlot } from "./file-reference"
 export * as LoginomHost from "./adapter"
 
 import { randomUUID } from "node:crypto"
@@ -55,6 +56,19 @@ export async function acquire(session: string) {
     async admit(userMessage: string, files: InputFile[]) {
       return queued(() => connection.request("admit", { run, userMessage, files }, undefined, observe))
     },
+    // Private backend API: never advertise grants or OS paths as MCP arguments.
+    async reserveReference(userMessage: string, name: string): Promise<ReferenceSlot> {
+      return queued(async () => {
+        const value = await connection.request("referenceReserve", { run, userMessage, name }, undefined, observe)
+        return value as ReferenceSlot
+      })
+    },
+    async admitReference(reference: FileReference) {
+      return queued(() => connection.request("referenceAdmit", { run, reference }, undefined, observe))
+    },
+    async discardReference(grant: string) {
+      return queued(() => connection.request("referenceDiscard", { run, grant }, undefined, observe))
+    },
     async scope(mode: HostTaskScope.Request["mode"], scope: HostTaskScope.Info, signal?: AbortSignal) {
       return queued(async () => {
         if (signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
@@ -73,6 +87,7 @@ export async function acquire(session: string) {
       signal?: AbortSignal,
       admissions?: { userMessage: string; files: InputFile[] }[],
       packageInput?: { admissionID: string; file: InputFile },
+      scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
     ) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
@@ -85,7 +100,7 @@ export async function acquire(session: string) {
           signal?.addEventListener("abort", abort, { once: true })
           return await connection.request(
             "call",
-            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}) },
+            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
           )

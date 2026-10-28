@@ -70,3 +70,13 @@ for(const [name,change] of [
  ['intervening successful import',f=>{const changed=structuredClone(f.history[0]);changed.request.operation_id='changed';changed.sequence=2;f.history.splice(1,0,changed);}],
  ['intervening unfinished import',f=>{const changed=structuredClone(f.history[0]);changed.outcome.status='AMBIGUOUS';f.history.splice(1,0,changed);}]
 ])test('readonly source cannot retain bytes after '+name,()=>{const f=readonlyFixture();change(f);assert.throws(()=>completedStaticImports(f.history,f.uploads,ctx,f.uploadHistory));});
+
+test('native size/local SHA lineage never claims downloaded server bytes',()=>{
+ const f=fixture(),u=f.uploads[0],bytes=2**32+1048576;
+ u.artifact.bytes=bytes;u.outcome.output.bytes=bytes;delete u.outcome.output.server_copy_verification;
+ u.outcome.output.native_size_verification={status:'SUCCEEDED',artifact_id:'a',upload_operation_id:'up',bytes,source_sha256:u.artifact.sha256,
+  destination:u.outcome.output.destination,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
+ const result=completedStaticImports(f.history,f.uploads,ctx,f.uploadHistory)[0];
+ assert.equal(result.source.verification_basis,'native_size_and_local_sha256');assert.equal(result.source.bytes_verified,false);
+ assert.equal(result.source.lineage.selected_upload,'up');
+});
