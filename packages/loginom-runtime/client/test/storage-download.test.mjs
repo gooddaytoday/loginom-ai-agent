@@ -49,6 +49,32 @@ test('public server source discovery refuses foreign roots and unsupported files
   await assert.rejects(r.serverDownload({operation_id:'source',path},'dock_storage_source'));
  assert.equal(r.hasActiveWork(),false);await r.cleanupServerCache();
 });
+
+test('source discovery waits through the old graph tab before reading the new Files navigation root',async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot();
+ const nav='ui-navigation',old='ui-old-navigation',file='ui-file',table='ui-table';let roots=0;
+ const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
+ const files={...base,observation_kind:'roots',active_tab_ref:'files',ui:{...base.ui,elements:[
+  element(nav,page.prefix+';NavigationBar;NavigationPanel'),element(table,page.prefix+';FileStorageForm;pnlFileStorage;tbl'),
+  element(file,page.prefix+';FileStorageForm;colName_full.csv')]}};
+ const graph={...base,observation_kind:'roots',ui:{...base.ui,elements:[element(old,page.prefix+';NavigationBar;NavigationPanel')]}};
+ const evaluate=page.evaluate.bind(page);
+ page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  if(arg.discoverRoots)return structuredClone(++roots===2?graph:files);
+  if(arg.rootRef===old)throw Error('Detached graph navigation root must not be read');
+  const state=structuredClone(files);delete state.observation_kind;
+  state.file_storage={status:'observed',directory:'/worker'};
+  if(arg.rootRef===file)state.ui.elements=[{...element(file,page.prefix+';FileStorageForm;colName_full.csv'),label:'full.csv',
+   storage_entry:{kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'}}];
+  return state;
+ };
+ const r=runtime(page,{cacheDirectory:join(f.root,'navigation-cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const result=await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source');
+ assert.equal(result.status,'SUCCEEDED');assert.ok(result.output.source.server_source_ref);
+ assert.equal(page.events.filter(e=>e==='mouse_click').length,0);
+});
 test('changed native size/mtime or wrong copy size invalidates download and removes partials',async t=>{
  for(const kind of ['size','mtime','copy']){
   const f=await fixture(t,async({path})=>{await writeFile(path,kind==='copy'?'abcd':'abc');
@@ -92,4 +118,18 @@ test('unknown browser cleanup retains the lease and partial until actual recover
  assert.throws(()=>registry.start({...f.request,operation_id:'other'}),/cleanup/);
  await registry.cleanup('download');assert.equal(recovered,true);assert.equal(registry.unsettled,false);
  assert.deepEqual(await readdir(join(f.root,'unknown')),[]);
+});
+
+test('aborting a long status wait releases the caller without cancelling the retained download',async t=>{
+ let active;
+ const f=await fixture(t,async({path,signal})=>{
+  await writeFile(path,'a');active=true;
+  await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();
+ });
+ f.registry.start(f.request);while(!active)await new Promise(resolve=>setTimeout(resolve,1));
+ const controller=new AbortController();
+ const waiting=f.registry.wait('download',{timeoutMs:60000,signal:controller.signal});
+ controller.abort(Error('owner interrupted'));
+ await assert.rejects(waiting,/owner interrupted/);assert.equal(f.registry.busy,true);
+ await f.registry.cleanup();assert.equal(f.registry.unsettled,false);
 });

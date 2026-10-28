@@ -612,7 +612,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           const reply=actionReply(failure,{userProfile});
           // A rejected request is not a job snapshot. Preserve its recovery data
           // as an MCP error; outputSchema applies to successful tool responses.
-          if(isNodeApiTool(request.params.name))reply.isError=true;
+          if(isNodeApiTool(request.params.name)||isServerDownloadTool(request.params.name))reply.isError=true;
           return reply;
         }
         return { isError: true, content: [{ type: 'text', text: message }] };

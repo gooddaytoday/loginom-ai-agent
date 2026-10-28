@@ -2434,7 +2434,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const read=async options=>{
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
-          if(result.status!=='SUCCEEDED')throw Error('Server storage observation failed');
+          if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
             if(page>=32)throw Error('Server storage observation page limit');
@@ -2460,8 +2460,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           throw Error('Server storage UI is not ready');
         };
         const directory=expected=>ready(async()=>{
-          const s=await roots(),bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
-          return bars.length===1?detail(s,bars[0]):null;
+          const s=await roots();
+          // The confirmed Files click can precede its tab/region mounting.
+          // Reading the previous graph's NavigationPanel races its detach.
+          if(!s.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;')))return null;
+          const bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
+          if(bars.length!==1)return null;
+          try{return await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
         },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
         try{
           const initial=await roots();
@@ -2492,6 +2497,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref));
           const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
+        }catch(error){
+          await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
+          throw error;
         }finally{storageNavigating=false;}
       })();
       if(name==='dock_storage_download_start'){
@@ -2505,7 +2513,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return result;
       }
       if(name==='dock_storage_download_status')return serverDownloads.status(request.operation_id);
-      if(name==='dock_storage_download_wait')return serverDownloads.wait(request.operation_id,{timeoutMs:request.timeout_ms??1000});
+      if(name==='dock_storage_download_wait')return serverDownloads.wait(request.operation_id,{timeoutMs:request.timeout_ms??1000,signal});
       if(name==='dock_storage_download_cancel')return serverDownloads.cancel(request.operation_id);
       if(name==='dock_storage_download_cleanup')return serverDownloads.cleanup(request.operation_id);
       throw Error('Unknown server download tool');
