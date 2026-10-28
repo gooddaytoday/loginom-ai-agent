@@ -3112,6 +3112,8 @@ function readRenderedInputMapping(observation) {
       const graphExecution=graphExecutionOf(element);
       const openNodeViews=wizard.status==='absent' && graphNodeOf(element)?.part==='visualizers';
       const openWizard=wizard.status==='absent' && navigationContext.status==='observed' && graphNodeOf(element)?.part==='settings'
+        &&(!preparedWorkflowPath?.length||preparedWorkflowPath.length===navigationContext.path.length
+          &&preparedWorkflowPath.every((c,i)=>c.tid===navigationContext.path[i].tid&&c.label===navigationContext.path[i].label))
         ? {node:graphNodeOf(element),workflow_path:navigationContext.path}:null;
       const inputPortFinishReady=wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
         &&wizard.input_port_context.node?.ref&&wizard.input_port_context.port_ref && (preparedInputPort?.direction==='input'&&wizard.output_columns?.auto_sync?.status==='observed'
