@@ -1531,6 +1531,101 @@ function wizardStepFixture(page,direction='next') {
   return {base,form,marker,button,advance};
 }
 
+test('calculator Preview rejects a native formula error before Next or Done',async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+ page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+ const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+  async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+ const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+  page.add('button',c.base+';btnError','Error',undefined,c.form).attrs['data-qtip']='Ошибка в выражении Revenue: неожиданное завершение выражения';};
+ page.waitForTimeout=async ms=>page.clock.advance(ms);
+ const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+ assert.equal(result.error?.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+ assert.match(result.error.message,/Revenue/);
+ assert.ok(result.trace.some(e=>e.event==='wizard_calculator_validation_failed'));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(result.output.wizard.stage,'calculator');
+});
+
+test('calculator Preview accepts only its native modal and closes with an observed ref',async()=>{
+ for(const fault of ['none','console_error','foreign_form','foreign_owner','loading','incomplete']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard';c.marker.id='calc-page';
+  page.add('button',c.base+';CalcDataWizard;btnAddExpr','',undefined,c.marker);
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.marker);
+  const model={},view={el:{dom:c.marker}},components={'calc-page':view};
+  class CalcDataWizard{};
+  const controller=Object.assign(new CalcDataWizard(),{FWizardForm:model});
+  model.FWizardItems={FItems:[{FPages:[view],FWizard:controller}]};
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}};
+  page.context.Ext={getCmp:id=>components[id]};
+  page.context.bg.TBGCodeConsoleMessageType={cmtError:2};
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+  let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+   if(popup){popup.remove();return;}
+   popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
+   page.add('div',c.base+';CalcPreviewForm;p.h;close','',{x:650,y:110,width:30,height:30},popup).attrs.class='x-tool';
+   const records=fault==='console_error'?[{isModel:true,data:{Text:'Revenue: неверный аргумент',MessageType:2}}]:[];
+   const previewView={el:{dom:popup}},store={isLoading:()=>fault==='loading',getData:()=>({items:records}),getCount:()=>fault==='incomplete'?1:records.length};
+   const form={FView:previewView,FCodeConsole:{FConsoleStore:store}};previewView.Controller=form;
+   controller.FPreviewForm=form;components.preview=previewView;
+   if(fault==='foreign_form')previewView.Controller={};
+   if(fault==='foreign_owner')controller.FWizardForm={};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault==='console_error') {
+   assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+   assert.equal(result.output.wizard.calculator_validation.source,'loginom_calculator_preview_console');
+  }
+  if(fault!=='none')continue;
+  const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
+  const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
+  assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));
+  assert.equal(closed.output.wizard.calculator_preview.status,'absent');
+ }
+});
+
+test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+ for(const fault of ['none','foreign_message','other_field']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+  const message='Loginom '+build+' Настройка прервана. Ошибка разбора выражения "Twice". Неправильное выражение: "VALUE+". OK';
+  const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output;
+  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'Twice'}]};
+  const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);
+   if(dialog){dialog.remove();return;}
+   dialog=page.add('div','msgbox','',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('div',null,message,undefined,dialog);
+   page.add('a','msgbox;tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=box;
+   page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.error.code,fault==='none'?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
+  if(fault==='none') {
+   assert.equal(result.output.wizard.calculator_validation.field_name,'Twice');
+   assert.equal(result.output.wizard.calculator_validation.message,message);
+   assert.equal(result.output.ui.dialogs.length,0);
+  }
+ }
+});
+
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {
     const page=new Page(),c=wizardStepFixture(page,direction),snapshot=await page.observe();
@@ -4739,6 +4834,73 @@ test('Calculator input Done keeps the exact native node hidden by the admitted p
   assert.deepEqual(page.events,[]);
 });
 
+test('D84 calculator token caption is metadata only for the exact native breadcrumb owner',async()=>{
+ for(const fault of ['none','guid','dom','missing_opening','foreign_navigation','secret_attribute','editable','link']) {
+  const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace('amount_double','Точные_токены_товаров');
+  crumbs[5].ownText='Точные токены товаров';
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.input_port.opening_operation_id;
+  if(fault==='foreign_navigation')binding.navigation_node.label+=' foreign';
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='editable')crumbs[5].attrs.contenteditable='true';
+  if(fault==='link')crumbs[5].attrs.href='https://example.test/';
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.input_port_context.status==='observed',fault==='none',fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D84 Calculator token caption retains the native default output socket owner',async()=>{
+ for(const caption of ['Выходной набор данных','Результат'])for(const fault of ['none','guid','dom','missing_opening','secret_attribute','foreign_caption']) {
+  const {page,crumbs,nodeTree,component,wizard,binding}=await calculatorNodeOverflowFixture();
+  for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+   .replace('amount_double','Полные_токены_и_индикаторы_корзин')
+   .replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных',caption.replaceAll(' ','_'))
+   .replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  crumbs[5].ownText='Полные токены и индикаторы корзин';crumbs[6].ownText='Выходные порты';crumbs[7].ownText=caption;
+  crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].children.at(-1).attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  binding.output_port={...binding.input_port,direction:'output'};delete binding.input_port;
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.output_port.opening_operation_id;
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='foreign_caption')for(const c of crumbs.slice(7)) {
+   c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),'Foreign');if(c===crumbs[7])c.ownText='Foreign';
+  }
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.port_context.status==='observed',fault==='none',caption+':'+fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',caption+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D84 Calculator token graph caption stays visible only for its exact prepared native owner',async()=>{
+ for(const fault of ['none','guid','icon','foreign_dom','secret_attribute','unbound','duplicate']) {
+  const page=new Page(),tid='MF;TF-1;Graph;Точные_токены_Bread_и_Milk';
+  const body=page.add('g',tid,'',{x:100,y:200,width:150,height:80});
+  page.add('span',tid+';Label;Label','Точные токены Bread и Milk',{x:110,y:220,width:120,height:30},body);
+  page.add('g',tid+';Input_Data-0','',{x:90,y:220,width:10,height:10},body);
+  const f=page.graphModels.get(body.parentElement),owner=f.byTid.get(tid);
+  owner.FGuid='node';owner.FIconCls='bg-vendor-icon-calcdata';
+  if(fault==='guid')owner.FGuid='foreign';if(fault==='icon')owner.FIconCls='bg-vendor-icon-importtext';
+  if(fault==='foreign_dom')f.states.set(owner.FCell,{shape:{node:page.document.body}});
+  if(fault==='secret_attribute')body.attrs['aria-label']='password';
+  if(fault==='duplicate')page.add('g',tid,'',body.box,body.parentElement);
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}})},
+   async()=>({verified:true,node_id:'node',surface:'graph',tid}));
+  assert.equal(result.status,'SUCCEEDED',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid&&e.graph_node?.part==='body'),fault==='none',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid+';Label;Label'),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
   for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css','unknown_mode','both_modes','foreign_path','foreign_label','missing_navigation','missing_guid','missing_opening']) {
     const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
@@ -5733,6 +5895,22 @@ test('D47b hidden JS output0 node keeps its owned socket context and typed Close
   assert.equal(!!yes?.wizard_close_confirmation?.output_port,mode==='valid',mode);
   assert.deepEqual(page.events,[]);
  }
+});
+
+test('the observed second native cancellation dialog offers typed Close after a Preview error',async()=>{
+ const {page}=outputPortFinishFixture();
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node',output_port:{direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'}})));
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+ page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox-1;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox-1;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ const snapshot=(await page.observe()),yes=snapshot.ui.elements.find(e=>e.tid==='msgbox-1;tlb;yes');
+ assert.ok(yes.wizard_close_confirmation);
+ assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+ assert.deepEqual(page.events,[]);
 });
 
 test('typed output-port finish confirms one gesture and quiet return to the exact graph',async()=>{

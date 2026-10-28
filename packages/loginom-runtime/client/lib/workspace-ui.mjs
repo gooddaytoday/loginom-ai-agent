@@ -95,6 +95,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
+  let calculatorDialogFailure;
   let cancellationSurfaceReads=0;
   let finishSurfaceReads=0;
   let openingSurfaceReads=0;
@@ -377,6 +378,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       '[data-tid$=";WizrdMCF;ExprDataEditForm"]',
       ...['edtName','edtDisplayName','cbxDataType'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+'"]';return [owner,owner+' input'];}),
       ...['chbIntermediate','chbCached'].flatMap(name=>['',';InputEl',';DisplayEl'].map(part=>'[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+part+'"]')),
+      '[data-tid$=";WizrdMCF;CalcDataWizard"]','[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
       ...wizardButtons.map(name=>'[data-tid$=";WizrdMCF;'+name+'"]')].join(',');
     if (requestedRoot || discoverRoots) {
       // Native fixed queries discover global blockers/context without walking
@@ -508,6 +510,44 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
+      // Input Done returns to the graph. Its caption remains node metadata,
+      // bound to the prepared GUID and native Calculator shape after repaint.
+      if(preparedNodeId&&preparedGraphTid?.startsWith(definitionPrefix+';Graph;')
+        &&/token|токен/i.test(preparedGraphTid)
+        &&(tid===preparedGraphTid||tid.startsWith(preparedGraphTid+';')
+          &&/^(?:Label;Label|Setting|Visualizers|(?:Input|Output)_(?:Data|Var)-[0-9]+)$/.test(tid.slice(preparedGraphTid.length+1)))) {
+        const app=globalThis.bg?.app,model=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const diagram=model?.FDiagram,graph=diagram?.FmxGraph,nodes=diagram?.FNodes?.FCollection;
+        const owners=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===preparedNodeId):[];
+        const owner=owners.length===1?owners[0]:null,body=owner&&graph?.view?.getState?.(owner.FCell)?.shape?.node;
+        if(app?.ModelForm&&model instanceof app.ModelForm&&owner?.FIconCls==='bg-vendor-icon-calcdata'
+          &&body&&getTid(body)===preparedGraphTid&&(tids.get(preparedGraphTid)??[]).length===1
+          &&graph.container?.contains(body)&&graph.container.contains(element)&&(tids.get(tid)??[]).length===1
+          &&!element.isContentEditable&&!element.closest('[contenteditable="true"],a[href]'))
+          return definitionPrefix+';Graph;'+preparedGraphTid.slice((definitionPrefix+';Graph;').length).replace(/token|токен/gi,'caption')+tid.slice(preparedGraphTid.length);
+      }
+      // D84: "Точные токены товаров" is a node caption in data-tid, not
+      // an authentication control. Exempt only its token word, with the exact
+      // native Calculator and its opened port/settings still bound.
+      const stem=definitionPrefix+';cnrNaviMode;b.s_',parts=tid.startsWith(stem)?tid.slice(stem.length).split('>'):[];
+      if(preparedNodeId&&parts.length>=6&&parts.length<=9&&/token|токен/i.test(parts[5])) {
+        const nodeTid=stem+parts.slice(0,6).join('>'),nodes=tids.get(nodeTid)??[];
+        const node=nodes.length===1?nodes[0]:null,component=node&&globalThis.Ext?.getCmp?.(node.id);
+        const native=component?._node?.data?.node,app=globalThis.bg?.app,suffix=parts.slice(6).join('>');
+        const port=preparedInputPort??preparedOutputPort;
+        const portPaths=port?.direction==='input'?['Входные_порты>Входной_источник_данных']
+          :['Выходные_порты>Результат','Выходные_порты>Выходной_набор_данных'];
+        const bound=port?port.port===0&&port.native_index===0&&port.node_icon_class==='bg-vendor-icon-calcdata'
+          &&typeof port.port_guid==='string'&&!!port.port_guid&&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id
+          &&portPaths.some(path=>[path.split('>')[0],path,path+'>Настройка',''].includes(suffix))
+          &&(port.direction!=='input'||preparedNavigationNode?.tid===nodeTid&&preparedNavigationNode.label===node?.textContent.trim())
+          :preparedNodeWizard&&['','Настройка'].includes(suffix);
+        if(bound&&app?.ModelNodeTreeNode&&native instanceof app.ModelNodeTreeNode&&native.FGuid===preparedNodeId
+          &&component.el?.dom===node&&node.querySelectorAll('.bg-vendor-icon-calcdata').length===1
+          &&parts[5]===node.textContent.trim().replace(/\s/g,'_').replace(/,/g,'')
+          &&!node.isContentEditable&&!node.closest('[contenteditable="true"],a[href]'))
+          return stem+[...parts.slice(0,5),parts[5].replace(/token|токен/gi,'caption'),...parts.slice(6)].join('>');
+      }
       const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
@@ -1554,6 +1594,34 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ?errorButtons[0].getAttribute('data-qtip'):null;
       wizard.calculator_validation=typeof errorText==='string'&&errorText.length>0&&errorText.length<=4096
         &&!sensitive(errorButtons[0])?{status:'observed',root_ref:wizard.root_ref,message:errorText,source:'loginom_wizard_error_tooltip'}:{status:'unobserved'};
+      wizard.calculator_preview={status:'absent'};
+      const previews=(tids.get(wizard.root_tid+';CalcPreviewForm')??[]).filter(visible);
+      if(previews.length) {
+        wizard.calculator_preview={status:'unverified'};
+        const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+        const model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const items=own(own(model,'FWizardItems'),'FItems'),page=(tids.get(base.slice(0,-1))??[])[0];
+        const view=page&&globalThis.Ext?.getCmp?.(page.id);
+        const matches=Array.isArray(items)&&items.length<=32?items.filter(i=>{
+          const pages=own(i,'FPages');return Array.isArray(pages)&&pages.length<=32&&pages.includes(view);
+        }):[];
+        const controller=matches.length===1?own(matches[0],'FWizard'):null,form=own(controller,'FPreviewForm');
+        const previewView=own(form,'FView'),store=own(own(form,'FCodeConsole'),'FConsoleStore');
+        const records=store?.getData?.()?.items;
+        if(preparedNodeId&&preparedNodeWizard&&previews.length===1&&view?.el?.dom===page
+          &&own(controller,'FWizardForm')===model&&controller?.constructor?.name==='CalcDataWizard'
+          &&previewView?.el?.dom===previews[0]&&previewView.Controller===form
+          &&globalThis.Ext?.getCmp?.(previews[0].id)===previewView&&!sensitive(previews[0])
+          &&Array.isArray(records)&&records.length<=128&&!store.isLoading?.()&&store.getCount?.()===records.length
+          &&Number.isInteger(globalThis.bg?.TBGCodeConsoleMessageType?.cmtError)
+          &&records.every(r=>r?.isModel&&typeof r.data?.Text==='string'&&r.data.Text.length<=4096&&Number.isInteger(r.data.MessageType))
+          &&records.reduce((n,r)=>n+r.data.Text.length,0)<=4096)
+          wizard.calculator_preview={status:'observed',root_ref:refOf(previews[0]),root_tid:getTid(previews[0]),
+            errors:records.filter(r=>r.data.MessageType===globalThis.bg?.TBGCodeConsoleMessageType?.cmtError).map(r=>r.data.Text)};
+        if(wizard.calculator_preview.status==='observed'&&wizard.calculator_preview.errors.length)
+          wizard.calculator_validation={status:'observed',root_ref:wizard.root_ref,
+            message:wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
+      }
       const selected=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colExpressionName_') && visible(e) && !sensitive(e) && e.closest('table')?.classList.contains('x-grid-item-selected');});
       wizard.expression_selection={status:selected.length>1?'ambiguous':'unobserved'};
       if(selected.length===1) {
@@ -2813,6 +2881,7 @@ function readRenderedInputMapping(observation) {
       &&visible(storageRootCandidates[0])&&!sensitive(storageRootCandidates[0])
       &&textOf(storageRootCandidates[0],true)==='Файлы'?storageRootCandidates[0]:null;
     const interesting = element => wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+      || wizard.calculator_preview?.status==='observed'&&getTid(element)===wizard.calculator_preview.root_tid+';p.h;close'
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
@@ -3102,7 +3171,7 @@ function readRenderedInputMapping(observation) {
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
-      const closeConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
+      const closeConfirmation=/^msgbox(?:-1)?;tlb;yes$/.test(tid) && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element) && dialogs[0].title==='Подтвердить'
         && dialogs[0].text==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'
         ? {root_ref:wizard.root_ref,root_tid:wizard.root_tid,stage:wizard.stage,
@@ -4228,6 +4297,74 @@ function readRenderedInputMapping(observation) {
           observed=await readUi(true);
           record('ui_root_closed_after_gesture',{verification_required:true});
         }
+        if(task.action.verb==='click'&&current.prepared_node_context?.verified===true&&current.wizard.stage==='calculator'
+          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';CalcDataWizard;btnPreview') {
+          const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build===current.loginom_build
+            &&same(s.workflow_ref,current.workflow_ref)&&same(s.prepared_node_context,current.prepared_node_context)
+            &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.stage==='calculator'&&s.wizard.root_ref===current.wizard.root_ref;
+          const accepted=s=>s.wizard.calculator_preview?.status==='observed'&&s.ui.dialogs.length===1
+            &&s.ui.dialogs[0].ref===s.wizard.calculator_preview.root_ref
+            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===s.wizard.root_tid);
+          for(let attempt=0;attempt<60&&owned(observed)&&!accepted(observed);attempt++) {
+            if(observed.ui.dialogs.length===1&&observed.ui.dialogs[0].identity?.anchor_tid==='msgbox') {
+              const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+              postActionRoot=dialog.ref;
+              try {
+                const popup=await readUi(),buttons=popup.ui.elements.filter(e=>e.tid==='msgbox;tlb;ok'
+                  &&e.label==='OK'&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click'));
+                const readError=()=>page.evaluate(()=>{
+                  const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+                  const instance=own(globalThis.bg?.ext?.errormessage?.ErrorMsg,'FInstance'),box=own(instance,'FMessageBox');
+                  const root=own(own(box,'el'),'dom'),roots=document.querySelectorAll('[data-tid="msgbox"]');
+                  if(roots.length!==1||roots[0]!==root||globalThis.Ext?.getCmp?.(root.id)!==box)return null;
+                  const text=root.innerText;
+                  return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
+                });
+                const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
+                if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
+                  ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1
+                  ||task.snapshot.node_calculator?.verified!==true||!task.snapshot.node_calculator.expressions.some(e=>e.name===field))break;
+                const checked=await readUi();
+                if(!owned(checked)||checked.ui.masks.length||!same(checked.ui.dialogs,popup.ui.dialogs)
+                  ||!same(checked.dom_epoch,popup.dom_epoch)||await readError()!==message)break;
+                const target=await checkedHandle(buttons[0],checked.ui.elements.find(e=>e.ref===buttons[0].ref),'click');
+                if(!same(await boundNode(),current.prepared_node_context))break;
+                const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                  state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+                if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Calculator preview error changed before OK');
+                timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:field,source:'loginom_calculator_preview_error_dialog'};
+                record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
+              } finally {postActionRoot=wizardRoot;}
+              if(calculatorDialogFailure) {
+                observed=await readUi();
+                if(!owned(observed)||observed.ui.dialogs.length||observed.ui.masks.length)
+                  fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Calculator did not return from its error dialog');
+                record('wizard_calculator_validation_failed',calculatorDialogFailure);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',calculatorDialogFailure.message);
+              }
+            }
+            const validation=observed.wizard.calculator_validation;
+            if(observed.ui.dialogs.length===0&&observed.ui.masks.length===0&&validation?.status==='observed') {
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              if(owned(fresh)&&!fresh.ui.dialogs.length&&!fresh.ui.masks.length&&same(fresh.wizard.calculator_validation,validation)) {
+                observed=fresh;record('wizard_calculator_validation_failed',validation);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+              }
+              observed=fresh;continue;
+            }
+            if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid))break;
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi();
+          }
+          if(!owned(observed)||!accepted(observed))fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Owned calculator preview did not settle after one click; inspect before retry');
+          record('wizard_calculator_preview_verified',{root_ref:observed.wizard.calculator_preview.root_ref,settings_applied:false});
+          if(observed.wizard.calculator_preview.errors.length) {
+            const validation={status:'observed',root_ref:observed.wizard.root_ref,
+              message:observed.wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
+            observed.wizard.calculator_validation=validation;record('wizard_calculator_validation_failed',validation);
+            fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+          }
+        }
         if(task.action.verb==='confirm_wizard_close') {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;
           const path=(confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
@@ -4674,6 +4811,10 @@ function readRenderedInputMapping(observation) {
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };
       else try { observed = await readUi(); } catch { /* Never replace uncertainty with a fabricated observation. */ }
+      if(error?.code==='WIZARD_CALCULATOR_VALIDATION_FAILED'&&calculatorDialogFailure
+        &&observed.prepared_node_context?.verified===true&&observed.wizard?.stage==='calculator'
+        &&observed.wizard.root_ref===calculatorDialogFailure.root_ref&&!observed.ui.dialogs.length&&!observed.ui.masks.length)
+        observed.wizard.calculator_validation=calculatorDialogFailure;
       outcome = result(effectPossible ? 'AMBIGUOUS' : 'NOT_APPLIED', observed,
         { code: error?.code ?? 'UI_BROWSER_CALL_FAILED', message: error?.code ? error.message : 'The browser did not confirm the UI operation; inspect the workspace before recovery' });
     } finally {

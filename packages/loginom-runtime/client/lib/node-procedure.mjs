@@ -118,6 +118,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
     &&dialog.identity?.anchor_tid===state.node_preview_schema.root_tid
     &&state.node_preview_schema.node_id===preparedNodeContext?.node.node_id;
+  const allowedCalculatorPreview=(dialog,state)=>state.prepared_node_context?.surface==='wizard'
+    &&state.wizard?.stage==='calculator'&&state.wizard.calculator_preview?.status==='observed'
+    &&dialog.ref===state.wizard.calculator_preview.root_ref
+    &&dialog.identity?.anchor_tid===state.wizard.root_tid+';CalcPreviewForm';
   const pendingPreviewDialog=(dialog,state)=>{
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
@@ -157,7 +161,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.node_clustering.kind==='normalization'&&state.node_clustering.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
-  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -493,7 +497,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(expressionEditors.length>1)throw Error('Calculator expression editor is ambiguous');
         // This is read-only root selection. The subsequent full read must prove
         // its native ownership before any dialog or mutation is admitted.
-        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref:undefined;
+        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref
+          :wizard?.stage==='calculator'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';CalcPreviewForm')?.ref:undefined;
         const filterDialogs=readFilter&&wizard?.stage==='row_filter'?(roots.output.ui?.elements??[]).filter(e=>
           [';ModalWindow_BetweenValuesEditor',';ModalWindow_ValueListEditor'].some(suffix=>e.tid===wizard.root_tid+suffix)):[];
         if(filterDialogs.length>1)throw Error('Filter dialog is ambiguous');
@@ -788,7 +793,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
       if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
-        || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!==(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
+        || !(snapshotWizardConfirmation.kind==='close'&&!mappingConflict
+          ? /^msgbox(?:-1)?;tlb;yes$/.test(snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid??'')
+          : snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid===(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes'))))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
