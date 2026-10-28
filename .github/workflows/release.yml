@@ -175,6 +175,9 @@ jobs:
     name: tests
     needs: verify
     uses: ./.github/workflows/test.yml
+    # The repository variable LOGINOM_RELEASE_SKIP_MACOS=true releases without macOS when no macOS runner is available.
+    with:
+      macos: ${{ vars.LOGINOM_RELEASE_SKIP_MACOS != 'true' }}
     secrets: inherit
     permissions:
       contents: read
@@ -352,6 +355,7 @@ jobs:
   macos:
     name: build (macos)
     needs: verify
+    if: vars.LOGINOM_RELEASE_SKIP_MACOS != 'true'
     runs-on: macos-14
     timeout-minutes: 120
     env:
@@ -444,7 +448,7 @@ jobs:
     name: release
     # Every platform must pass before a complete draft release can be created.
     needs: [verify, tests, typecheck, build, linux-matrix, windows, macos]
-    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && (needs.macos.result == 'success' || (vars.LOGINOM_RELEASE_SKIP_MACOS == 'true' && needs.macos.result == 'skipped'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -477,7 +481,7 @@ jobs:
           set -euo pipefail
           # Only linux-matrix.json from the matrix artifact is published; its logs stay in the workflow artifact.
           find "$RUNNER_TEMP/assets" -name '*.log' -delete
-          bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
+          LOGINOM_RELEASE_SKIP_MACOS="${{ vars.LOGINOM_RELEASE_SKIP_MACOS }}" bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
 
       - name: Create draft release
         run: |
