@@ -452,6 +452,107 @@ class RunCheckTests(unittest.TestCase):
         reply['cleanup_complete'] = False
         self.assertEqual(runner.port_failure([(44, reply)], 'model.stdout'), 'model.stdout:44')
 
+    def test_inspect_uses_the_nested_port_receipt(self):
+        # Reduced shape from LAB-416 fail-logs/l416-c-jscombined/jscombined/model.stdout:265.
+        # inspect.output.outcome is the public action; its output is the read receipt.
+        receipt = {'cleanup_complete': True, 'output': {'ports': [{
+            'port': 0, 'schema': [], 'sample': [],
+            'freshness_basis': 'completed_execution_port_source'}]}}
+        reply = {'status': 'SUCCEEDED', 'action_key': 'operation.inspect', 'output': {
+            'cleanup_confirmed': True, 'outcome': {'status': 'SUCCEEDED',
+                'action_key': 'node.apply', 'cleanup_complete': True, 'output': receipt}}}
+        self.assertIsNone(runner.port_failure([(265, reply)], 'model.stdout'))
+        reads = list(runner.ports(reply))
+        self.assertEqual([runner.port_path(owner, port) for owner, port in reads], ['port'])
+        for cleanup in [False, None]:
+            receipt['cleanup_complete'] = cleanup
+            with self.subTest(cleanup=cleanup):
+                self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+        # A successful sibling or outer wrapper cannot attest this read's cleanup.
+        reply['cleanup_complete'] = True
+        reply['output']['sibling'] = self.native_reply()
+        self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+        receipt.clear()
+        receipt.update(self.native_reply())
+        self.assertIsNone(runner.port_failure([(265, reply)], 'model.stdout'))
+        self.assertEqual({runner.port_path(owner, port) for owner, port in runner.ports(reply)}, {'native'})
+        receipt['execution']['execution_id'] = 'other'
+        self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+
+    def test_cold_receives_the_last_checked_export_and_its_delimiter(self):
+        # LAB-414 repeat/cold.stderr:5: actual.csv was absent; the downloads
+        # were actual-1.csv (assignments) and actual-2.csv (centers).
+        for count, corrupt in [(1, None), (2, None), (2, 0), (2, 1)]:
+            with self.subTest(exports=count, corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'points.csv'
+                source.write_text('X,Y,RowID\n0,20,1\n')
+                case = root / 'cases/repeat'
+                (case / 'data').mkdir(parents=True)
+                names = ['assignments.csv', 'centers.csv'][:count]
+                (case / 'task.md').write_text('Выгрузи ' + ' и '.join(names))
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                columns = [
+                    [{'name': name, 'type': 'real'} for name in ['Cluster', 'Distance', 'RowID', 'X', 'Y']],
+                    [{'name': name, 'type': 'real'} for name in ['Cluster', 'X', 'Y']]][:count]
+                rows = [{'Cluster': 2, 'Distance': 0.14142135623730953, 'RowID': 1, 'X': -0.1, 'Y': -0.1},
+                        {'Cluster': 0, 'X': 0, 'Y': 20}][:count]
+                runner.write(case / 'expected.json', {'package_path': '/test/result.lgp', 'nodes': [],
+                    'outputs': [{'output_node_type': 'datamining.clustering', 'output_port': i,
+                        'columns': cols, 'rows': [rows[i]]} for i, cols in enumerate(columns)]})
+                out = root / 'run'
+                out.mkdir()
+                runner.write(out / 'request.json', {'case_root': str(root / 'cases'), 'pair': str(root / 'pair'), 'cold': True})
+                (root / 'pair').mkdir()
+                runner.write(root / 'pair/worker.json', {'package_directory': '/test', 'loginom': {
+                    'username': 'test', 'password': 'test', 'url': 'https://example.test', 'api_key': 'test'}})
+                runner.write(out / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
+                    'started': 1, 'runs': [{'scenario': 'repeat', 'status': 'PENDING'}]})
+                instance = runner.Runner(out)
+                cold_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    instance.report['phase'] = name
+                    profile = out / 'repeat/profile'
+                    if name == 'setup':
+                        (profile / 'data').mkdir(parents=True)
+                        (profile / 'config').mkdir()
+                        runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                    if name == 'model':
+                        # Replace the process boundary; model still parses events
+                        # and validates every downloaded CSV itself.
+                        events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                            'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                            {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                            {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                                'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                        (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                        runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                        runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                        for i, cols in enumerate(columns):
+                            delimiter = ',' if i == 0 else ';'
+                            (profile / ('run-repeat-' + names[i])).write_text(
+                                delimiter.join(c['name'] for c in cols) + '\n' +
+                                delimiter.join('999' if i == corrupt and j == 0 else str(rows[i][col['name']])
+                                               for j, col in enumerate(cols)) + '\n')
+                    if name == 'cold':
+                        command = list(map(str, command))
+                        actual = Path(command[command.index('--csv') + 1])
+                        cold_calls.append(actual.name)
+                        self.assertTrue(actual.is_file(), str(actual))
+                        self.assertEqual(actual.name, 'actual.csv' if count == 1 else 'actual-2.csv')
+                        self.assertEqual(command[command.index('--csv-delimiter') + 1], ',' if count == 1 else ';')
+                        self.assertEqual(len(runner.read(Path(command[command.index('--expected') + 1]))['outputs']), count)
+                        (folder / 'cold').mkdir()
+                        runner.write(folder / 'cold/result.json', {'status': 'PASS', 'settingsReapplied': False,
+                            'cleanup': {'package_closed': True, 'logged_out': True}})
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                    instance.run()
+                result = runner.read(out / 'results.json')['runs'][0]
+                self.assertEqual(result['status'], 'PASS' if corrupt is None else 'FAIL', result)
+                self.assertEqual(len(cold_calls), 1 if corrupt is None else 0)
+
     def native_reply(self):
         # Public shape observed in smoke-4/q7/s5/model.stdout:48 on v0.3.3.
         return {'cleanup_complete': True, 'node': {'document_id': 'doc', 'workflow_id': 'flow', 'node_id': 'node'},
