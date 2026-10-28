@@ -1531,6 +1531,65 @@ function wizardStepFixture(page,direction='next') {
   return {base,form,marker,button,advance};
 }
 
+test('calculator Preview rejects a native formula error before Next or Done',async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+ page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+ const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+  async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+ const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+  page.add('button',c.base+';btnError','Error',undefined,c.form).attrs['data-qtip']='Ошибка в выражении Revenue: неожиданное завершение выражения';};
+ page.waitForTimeout=async ms=>page.clock.advance(ms);
+ const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+ assert.equal(result.error?.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+ assert.match(result.error.message,/Revenue/);
+ assert.ok(result.trace.some(e=>e.event==='wizard_calculator_validation_failed'));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(result.output.wizard.stage,'calculator');
+});
+
+test('calculator Preview accepts only its native modal and closes with an observed ref',async()=>{
+ for(const fault of ['none','console_error','foreign_form','foreign_owner','loading','incomplete']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard';c.marker.id='calc-page';
+  page.add('button',c.base+';CalcDataWizard;btnAddExpr','',undefined,c.marker);
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.marker);
+  const model={},view={el:{dom:c.marker}},components={'calc-page':view};
+  class CalcDataWizard{};
+  const controller=Object.assign(new CalcDataWizard(),{FWizardForm:model});
+  model.FWizardItems={FItems:[{FPages:[view],FWizard:controller}]};
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}};
+  page.context.Ext={getCmp:id=>components[id]};
+  page.context.bg.TBGCodeConsoleMessageType={cmtError:2};
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+  let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+   if(popup){popup.remove();return;}
+   popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
+   page.add('button',c.base+';CalcPreviewForm;p.h;close','Закрыть',{x:650,y:110,width:30,height:30},popup);
+   const records=fault==='console_error'?[{isModel:true,data:{Text:'Revenue: неверный аргумент',MessageType:2}}]:[];
+   const previewView={el:{dom:popup}},store={isLoading:()=>fault==='loading',getData:()=>({items:records}),getCount:()=>fault==='incomplete'?1:records.length};
+   const form={FView:previewView,FCodeConsole:{FConsoleStore:store}};previewView.Controller=form;
+   controller.FPreviewForm=form;components.preview=previewView;
+   if(fault==='foreign_form')previewView.Controller={};
+   if(fault==='foreign_owner')controller.FWizardForm={};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault==='console_error')assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+  if(fault!=='none')continue;
+  const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
+  const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
+  assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));
+  assert.equal(closed.output.wizard.calculator_preview.status,'absent');
+ }
+});
+
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {
     const page=new Page(),c=wizardStepFixture(page,direction),snapshot=await page.observe();

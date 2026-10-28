@@ -45,6 +45,22 @@ test('syntax refusal requires native error, unchanged restored settings and unch
   const r=structuredClone(f.error.nodePhaseRefusal);mutate(r.proof);assert.equal(verifiedCalculatorRequestRefusal(r,node),false);
  }
 });
+
+test('native preview console refusal closes the owned modal before restoring the draft',async()=>{
+ const f=syntaxFixture(),w=f.error.receipt.output.wizard;
+ w.calculator_validation.source='loginom_calculator_preview_console';
+ w.calculator_preview={status:'observed',root_ref:'preview',root_tid:'MF;TF;WizrdMCF;CalcPreviewForm',errors:[w.calculator_validation.message]};
+ const retained=f.channel.observe;let opened=true;
+ f.channel.observe=async()=>{
+  if(opened)return {...state(),wizard:structuredClone(w),ui:{elements:[{tid:w.calculator_preview.root_tid+';p.h;close',ref:'close',allowed_actions:['click']}]}};
+  const s=await retained();s.wizard.calculator_preview={status:'absent'};return s;
+ };
+ f.channel.perform=async({resolve})=>{assert.deepEqual(resolve(await f.channel.observe()),{verb:'click',ref:'close'});f.calls.push('preview_close');opened=false;};
+ assert.equal(verifiedCalculatorSyntaxFailure(f.error,f.baseline),true);
+ await assert.rejects(rejectUnchangedCalculatorDraft(f.channel,f.baseline,f.error,f.ops),e=>e===f.error);
+ assert.equal(verifiedCalculatorRequestRefusal(f.error.nodePhaseRefusal,node),true);
+ assert.equal(f.calls[0],'preview_close');
+});
 test('syntax phase proof excludes unrelated UI strings altered by journal normalization',async()=>{
  const f=syntaxFixture();f.error.receipt.output.origin='http://10.200.11.224';
  f.error.receipt.output.ui={elements:[{label:'{ "unrelated": true }'}]};

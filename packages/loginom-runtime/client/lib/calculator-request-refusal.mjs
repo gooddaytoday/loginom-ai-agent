@@ -19,7 +19,8 @@ const closedFor=(c,node)=>c?.verified===true&&c.cleanup_complete===true&&c.draft
 const syntaxReceipt=r=>({action_key:r.action_key,operation_id:r.operation_id,status:r.status,effect_possible:r.effect_possible,
  cleanup_complete:r.cleanup_complete,error:{code:r.error.code,message:r.error.message},
  output:{prepared_node_context:{verified:true,...identity(r.output)},wizard:{stage:r.output.wizard.stage,root_ref:r.output.wizard.root_ref,
-  calculator_validation:structuredClone(r.output.wizard.calculator_validation)}},
+  calculator_validation:structuredClone(r.output.wizard.calculator_validation),
+  ...(r.output.wizard.calculator_preview?.status==='observed'?{calculator_preview:structuredClone(r.output.wizard.calculator_preview)}:{})}},
  trace:r.trace.filter(e=>e.event==='wizard_calculator_validation_failed').map(({event,root_ref,message})=>({event,root_ref,message}))});
 export function verifiedCalculatorSyntaxFailure(error,baseline){
  const r=error?.receipt,w=r?.output?.wizard,n=r?.output?.prepared_node_context,v=w?.calculator_validation;
@@ -27,7 +28,9 @@ export function verifiedCalculatorSyntaxFailure(error,baseline){
   &&r.error?.code==='WIZARD_CALCULATOR_VALIDATION_FAILED'&&typeof r.operation_id==='string'
   &&n?.verified===true&&same(identity(baseline),Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,n[k]])))
   &&w?.stage==='calculator'&&w.root_ref===baseline.wizard.root_ref&&v?.status==='observed'
-  &&v.root_ref===w.root_ref&&v.source==='loginom_wizard_error_tooltip'&&v.message===r.error.message
+  &&v.root_ref===w.root_ref&&v.message===r.error.message
+  &&(v.source==='loginom_wizard_error_tooltip'||v.source==='loginom_calculator_preview_console'
+    &&w.calculator_preview?.status==='observed'&&w.calculator_preview.errors?.length>0&&w.calculator_preview.errors.join('\n')===v.message)
   &&r.trace?.filter(e=>e.event==='wizard_calculator_validation_failed'&&e.root_ref===w.root_ref&&e.message===v.message).length===1;
 }
 export function verifiedCalculatorRequestRefusal(refusal,node){
@@ -53,10 +56,24 @@ export async function rejectUnchangedCalculatorDraft(channel,baseline,error,{clo
  need(Object.values(node).every(v=>typeof v==='string'&&v.length),'Exact calculator identity required');
  if(syntax){
   need(verifiedCalculatorSyntaxFailure(error,baseline)&&graphBefore&&typeof readGraph==='function','Verified syntax refusal and graph baseline required');
+  if(error.receipt.output.wizard.calculator_validation.source==='loginom_calculator_preview_console') {
+   const preview=await channel.observe({condition:'same calculator preview refusal before rollback',
+    ready:s=>s.wizard?.stage==='calculator'&&s.wizard.calculator_preview?.status==='observed'});
+   need(same(identity(preview),node)&&preview.wizard.root_ref===baseline.wizard.root_ref
+    &&same(preview.wizard.calculator_preview,error.receipt.output.wizard.calculator_preview),'Calculator preview refusal changed');
+   await channel.perform({condition:'close rejected calculator preview',initialObservation:preview,
+    ready:s=>same(s.wizard?.calculator_preview,preview.wizard.calculator_preview),identity:identity,
+    resolve:s=>{
+     const controls=s.ui.elements.filter(e=>e.tid===s.wizard.calculator_preview.root_tid+';p.h;close'&&e.allowed_actions.includes('click'));
+     need(controls.length===1,'Unique rejected calculator preview close required');return {verb:'click',ref:controls[0].ref};
+    }});
+  }
   const current=await channel.observe({condition:'same calculator syntax refusal before rollback',readCalculator:true,
    ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
   need(same(identity(current),node)&&current.wizard.root_ref===baseline.wizard.root_ref
-   &&same(current.wizard.calculator_validation,error.receipt.output.wizard.calculator_validation),'Calculator validation refusal changed');
+   &&(error.receipt.output.wizard.calculator_validation.source==='loginom_calculator_preview_console'
+    ?current.wizard.calculator_preview?.status==='absent'
+    :same(current.wizard.calculator_validation,error.receipt.output.wizard.calculator_validation)),'Calculator validation refusal changed');
  }
  const first_close=await close(channel);need(closedFor(first_close,node),'Calculator cancellation unconfirmed');
  await select(channel);
