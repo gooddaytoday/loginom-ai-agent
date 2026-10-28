@@ -4,9 +4,28 @@ import {createServerSourceRegistry} from '../lib/storage-policy.mjs';
 import {verifyTextImportSource,verifyImportRowCount,verifyFullImportCount,importSchemaSnapshot,verifyImportSchema,validateTextImportNodeParameters,createTextImportNodeSupport} from '../lib/text-import-node.mjs';
 import {importSourceSchema} from '../lib/storage-policy.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 
 const binding=()=>({session_id:'session',document_id:'doc',origin:'https://app.loginom.ai',loginom_build:'7.4.2',loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}});
 const observed=()=>({status:'SUCCEEDED',output:{file_storage:{status:'observed',directory:'/worker'},ui:{elements:[{storage_entry:{kind:'file',path:'/worker/full.csv',bytes:2148532259,bytes_source:'native_file_store',mtime:'2026-10-28T00:00:00.000Z'}}]}}});
+test('server source phase survives the actual redacted journal ACK without changing its witness',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'source-journal-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const registry=createServerSourceRegistry({getBinding:binding}),state=observed();registry.retain(state);
+ const ref=state.output.ui.elements[0].storage_entry.server_source_ref;
+ const p={source:{kind:'storage',server_source_ref:ref},settings:{source:{source_path:'/worker/full.csv'}},preview_only:true};
+ const driver=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation:{parameters:{parameters:p}},
+  resolveStorageSource:async()=>registry.resolve(ref,observed()),execute:async()=>assert.fail('source phase must only read')});
+ const value=await driver.verifySource(p),event={operation_id:'preview',phase:'node_phase_completed',receipt:{phase:'source',value}};
+ const record=createExecutionJournal({directory,metadata:{sessionId:'session'}});
+ const saved=await record(event);
+ assert.deepEqual(saved.receipt,event.receipt);
+ assert.equal(saved.receipt.value.source.bytes,2148532259);
+ assert.equal(saved.receipt.value.source.server_source_ref,ref);
+ assert.equal(registry.peek(ref).binding.origin,'https://app.loginom.ai');
+});
 test('storage source is opaque, account bound and contains native size/time, never an upload ID',()=>{
  const current=binding();const registry=createServerSourceRegistry({getBinding:()=>current});const state=observed();
  registry.retain(state);const ref=state.output.ui.elements[0].storage_entry.server_source_ref;

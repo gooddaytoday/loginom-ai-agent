@@ -113,7 +113,9 @@ export function createServerSourceRegistry({getBinding}) {
       if(matches.length!==1||JSON.stringify(identity(matches[0]))!==JSON.stringify(identity(source)))
         throw Error('LOGINOM_FILE_CHANGED: native storage size/mtime or path changed; observe the file again');
       return {verified:true,kind:'storage',server_source_ref:ref,destination:source.path,bytes:source.bytes,mtime:source.mtime,
-        origin:binding.origin,account:binding.loginom_account,document_id:binding.document_id,coverage:'preview'};
+        // The durable journal serializes URL witnesses as href. Keep this
+        // receipt stable across its ACK; the private binding retains origin.
+        origin:new URL(binding.origin).href,account:binding.loginom_account,document_id:binding.document_id,coverage:'preview'};
     },
   };
 }
