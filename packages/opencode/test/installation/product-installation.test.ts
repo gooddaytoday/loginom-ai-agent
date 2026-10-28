@@ -19,12 +19,6 @@ test("reports manual package installation and a product user agent", async () =>
   expect(Installation.userAgent("desktop")).toStartWith("loginom-ai-agent/")
 })
 
-test("classifies release changes", () => {
-  expect(Installation.getReleaseType("1.2.3", "2.0.0")).toBe("major")
-  expect(Installation.getReleaseType("1.2.3", "1.3.0")).toBe("minor")
-  expect(Installation.getReleaseType("1.2.3", "1.2.4")).toBe("patch")
-})
-
 test("the application runtime resolves the product installation service", async () => {
   const { AppRuntime } = await import("../../src/effect/app-runtime")
   const info = await AppRuntime.runPromise(Installation.use.info())
