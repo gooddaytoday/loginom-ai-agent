@@ -3,6 +3,7 @@ from contextlib import redirect_stdout
 import csv
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -32,6 +33,103 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(list(case['data'].iterdir()), [])
             with self.assertRaises(ValueError):
                 runner.scenario('../s-server-a', cases=root)
+
+    def test_pair_directory_formats_and_unknown_key(self):
+        for key in ['package_directory', 'personal_folder']:
+            with self.subTest(key=key):
+                login = runner.pair_login({'loginom': {'username': 'test'}, key: '/test'}, 'worker.json')
+                self.assertEqual(login['package_directory'], '/test')
+        with self.assertRaisesRegex(ValueError, 'worker.json.*package_directory.*personal_folder.*mystery'):
+            runner.pair_login({'loginom': {'username': 'test'}, 'mystery': '/test'}, 'worker.json')
+
+    def test_d87_catalog_and_default_excludes_heavy(self):
+        self.assertEqual(runner.scenario_names('D87'), ['E1', 'E2'])
+        self.assertEqual(runner.scenario_names('E3'), ['E3'])
+        self.assertEqual(runner.scenario_names('X1', '/external-cases'), ['X1'])
+        for name in ['E1', 'E2', 'E3', 'X1']:
+            case = runner.scenario(name)
+            self.assertEqual(case['heavy'], name in ['E3', 'X1'])
+        with self.assertRaisesRegex(ValueError, 'LAB-413'):
+            runner.scenario_names('X1')
+
+    def test_d87_real_generator_manifest_oracle_and_model_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def generate(phase, command, folder):
+                subprocess.run(list(map(str, command)), check=True, capture_output=True)
+            with patch.dict(runner.D87['E1'], generator=['--rows', '233']):
+                with patch.object(instance, 'phase', side_effect=generate):
+                    instance.prepared_case = instance.prepare_d87('E1', root)
+            spec = instance.prepared_case
+            manifest = runner.read(spec['source'] / 'manifest.json')
+            expected = runner.expected_for(spec, '/test/result.lgp')
+            self.assertEqual(sum(r['row_count'] for r in expected['outputs'][0]['rows']), 233)
+            self.assertEqual({r['region']: round(r['amount_sum'] * 100) for r in expected['outputs'][0]['rows']}, manifest['sums_minor_by_region'])
+            for mode in ['E1', 'E2']:
+                workspace, folder = root / (mode + '-workspace'), root / (mode + '-model')
+                workspace.mkdir(); folder.mkdir()
+                instance.prepared_case = dict(spec, attachment=runner.D87[mode]['attachment'])
+                with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                    with self.assertRaises(InterruptedError):
+                        instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
+                                       {'package_directory': '/test'}, root / 'build')
+                command = list(map(str, phase.call_args.args[1]))
+                attached = [command[i+1] for i, v in enumerate(command) if v == '--file']
+                self.assertEqual(attached, [str(spec['local_file'])] if mode == 'E2' else [])
+                self.assertEqual(list(workspace.iterdir()), [])
+                self.assertNotIn('sums_minor', command[-1])
+                for row in expected['outputs'][0]['rows']:
+                    self.assertNotIn(str(row['amount_sum']), command[-1])
+
+    def test_d87_cleanup_uses_prefixed_receipt_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'd87-123-E1.csv'
+            source.write_text('input')
+            (root / 'fixtures').mkdir()
+            runner.write(root / 'fixtures/manifest.json', {'bytes': 5})
+            stage = root / 'E1'
+            stage.mkdir()
+            name = 'a' * 64 + '-' + source.name
+            reply = {'artifact': {'bytes': 5, 'upload': {'destination': '/test/' + name}}}
+            (stage / 'model.stdout').write_text(json.dumps({'type': 'tool_use', 'part': {
+                'tool': 'loginom_file_admit', 'state': {'status': 'completed', 'output': json.dumps(reply)}}}) + '\n')
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.current = {'dataset': str(source)}
+            with patch.object(instance, 'phase', side_effect=InterruptedError):
+                with self.assertRaises(InterruptedError):
+                    instance.cleanup_d87(root, {'package_directory': '/test'}, root / 'build')
+            config = runner.read(root / 'dataset-cleanup-config.json')
+            self.assertIn(name, config['names'])
+            self.assertIn(source.name, config['names'])
+
+    def test_d87_cleanup_removes_owned_inputs_even_on_storage_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'd87-test-E1.csv'
+            source.write_text('input')
+            manifest = root / 'manifest.json'
+            manifest.write_text('{}')
+            profile = root / 'profile'
+            profile.mkdir()
+            large = profile / 'opaque-attachment'
+            with large.open('wb') as f: f.truncate(1000000001)
+            outside = root.parent / (root.name + '-unrelated.csv')
+            outside.write_text('keep')
+            try:
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.current = {'dataset': str(source)}
+                with patch.object(instance, 'phase', side_effect=RuntimeError('storage failed')):
+                    with self.assertRaisesRegex(RuntimeError, 'storage failed'):
+                        instance.cleanup_d87(root, {'package_directory': '/test'}, root / 'build')
+                self.assertFalse(source.exists())
+                self.assertFalse(large.exists())
+                self.assertTrue(outside.exists())
+                self.assertTrue(manifest.exists())
+                self.assertEqual(instance.current['dataset-cleanup'], 'storage FAIL; disk PASS')
+            finally: outside.unlink()
 
     def test_all_87_model_commands_attach_initial_data_and_not_repeat_inputs(self):
         names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
@@ -82,10 +180,10 @@ class RunCheckTests(unittest.TestCase):
             expected = {'nodes': [], 'outputs': [{'output_node_type': 'export_input',
                 'ordered': False, 'columns': [{'name': 'region', 'type': 'string'}, {'name': 'amount', 'type': 'real'}],
                 'rows': [{'region': 'North', 'amount': 123456789}]}]}
-            for mode in ['path', 'file']:
+            for mode in ['path', 'file', 'E1']:
                 case = root / mode
                 (case / 'data').mkdir(parents=True)
-                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': mode})
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path' if mode == 'E1' else mode})
                 runner.write(case / 'expected.json', expected)
                 (case / 'task.md').write_text('В файле ' + str(source) + ' продажи. Построй сумму продаж по регионам')
                 instance = runner.Runner.__new__(runner.Runner)
@@ -460,7 +558,7 @@ class RunCheckTests(unittest.TestCase):
                 pair = path / 'pair'
                 pair.mkdir()
                 for role in ['worker', 'reviewer']:
-                    runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, 'package_directory': '/test'})
+                    runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, ('package_directory' if exists else 'personal_folder'): '/test'})
                 out = path / ('results' if exists else '.cache/loginom-runs/123')
                 argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 's1', '--pair', str(pair), '--spacing', '0', '--host-load-max', '1000000']
                 if exists: argv += ['--out', str(out)]

@@ -13,7 +13,7 @@ export function watchAttemptIncidents(directory: string, onIncident: (code: stri
     const retry = captured.some((text, index) => text.split("\n").some(line => {
       try {
         const event = JSON.parse(line)
-        return event?.type === "session.status" && event.status?.type === "retry" || index >= 2 && ["error", "turn.failed"].includes(event?.type)
+        return index >= 2 && ["error", "turn.failed"].includes(event?.type)
       }
       catch { return false }
     }))

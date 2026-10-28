@@ -70,7 +70,42 @@ type Container = {
   NetworkSettings: { Networks: Record<string, { IPAddress: string; NetworkID: string; Aliases: string[] | null }> }
 }
 
+type PairConfiguration = {
+  server: SlotFile["server"]; serverImage: string; studioImage: string
+  serverHost: Record<string, unknown>; studioHost: Record<string, unknown>
+  serverNetworks: Record<string, Record<string, unknown>>; studioNetworks: Record<string, Record<string, unknown>>
+  components: string; initial: string; served: string; proxy: string
+}
+
+export function stablePairConfiguration(input: PairConfiguration) {
+  const networks = (value: PairConfiguration["serverNetworks"]) => Object.fromEntries(Object.entries(value).map(([name, endpoint]) =>
+    [name, Object.fromEntries(Object.entries(endpoint).filter(([key]) => !["EndpointID", "IPAddress", "IPPrefixLen", "Gateway",
+      "GlobalIPv6Address", "GlobalIPv6PrefixLen", "IPv6Gateway", "MacAddress"].includes(key))
+      .map(([key, item]) => [key, key === "Aliases" && Array.isArray(item) ? [...item].sort() : item]))]))
+  return { version: 1 as const, hash: new Bun.CryptoHasher("sha256").update(JSON.stringify(canonicalConfiguration({ version: 1, ...input,
+    serverNetworks: networks(input.serverNetworks), studioNetworks: networks(input.studioNetworks) }))).digest("hex") }
+}
+
+export function compatibleStablePairHashes(input: PairConfiguration) {
+  // Docker serializes an unset DNS override as null or []; keep both historical v1 proofs valid.
+  const hosts = (host: Record<string, unknown>) => host.Dns === null || Array.isArray(host.Dns) && host.Dns.length === 0
+    ? [{ ...host, Dns: null }, { ...host, Dns: [] }] : [host]
+  return [...new Set(hosts(input.serverHost).flatMap(serverHost => hosts(input.studioHost)
+    .map(studioHost => stablePairConfiguration({ ...input, serverHost, studioHost }).hash)))]
+}
+
+function canonicalConfiguration(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalConfiguration)
+  if (!value || typeof value !== "object") return value
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([key, item]) => [key, canonicalConfiguration(item)]))
+}
+
 export async function readServerIdentity(file: SlotFile): Promise<ServerIdentity> {
+  return (await readServerObservation(file)).identity
+}
+
+export async function readServerObservation(file: SlotFile) {
   const server = await inspectContainer(file.server.container)
   const studio = await inspectContainer(file.server.studioContainer)
   if (!server.State.Running || !studio.State.Running) throw new EvalFailure("SERVER_IDENTITY_UNVERIFIED", 2)
@@ -86,12 +121,14 @@ export async function readServerIdentity(file: SlotFile): Promise<ServerIdentity
   const currentStudio = await inspectContainer(studio.Id)
   if (!current.State.Running || !currentStudio.State.Running || current.State.StartedAt !== server.State.StartedAt ||
     currentStudio.State.StartedAt !== studio.State.StartedAt) throw new EvalFailure("SERVER_IDENTITY_CHANGED", 2)
-  return { containerId: server.Id, startedAt: server.State.StartedAt, studioContainerId: studio.Id, studioStartedAt: studio.State.StartedAt,
+  const configuration = { server: file.server, serverImage: server.Image, studioImage: studio.Image,
+    serverHost: server.HostConfig, studioHost: studio.HostConfig,
+    serverNetworks: server.NetworkSettings.Networks, studioNetworks: studio.NetworkSettings.Networks, components, initial, served, proxy }
+  return { identity: { containerId: server.Id, startedAt: server.State.StartedAt, studioContainerId: studio.Id, studioStartedAt: studio.State.StartedAt,
     serverEpoch: serverEpoch({ containerId: server.Id, startedAt: server.State.StartedAt,
       hostBootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), daemonExe: daemonExe.trim(), daemonCmdline, daemonStat }),
-    configurationHash: new Bun.CryptoHasher("sha256").update(JSON.stringify({ version: 1, server: file.server,
-      serverImage: server.Image, studioImage: studio.Image, serverHost: server.HostConfig, studioHost: studio.HostConfig,
-      serverNetworks: server.NetworkSettings.Networks, studioNetworks: studio.NetworkSettings.Networks, components, initial, served, proxy })).digest("hex") }
+    configurationHash: new Bun.CryptoHasher("sha256").update(JSON.stringify({ version: 1, ...configuration })).digest("hex") },
+    stableConfiguration: stablePairConfiguration(configuration), compatibleStableHashes: compatibleStablePairHashes(configuration) }
 }
 
 type PairCreated = { version: number; status: "infrastructure-ready"; purpose: PairOptions["purpose"]; nonce: string;
@@ -315,7 +352,9 @@ async function usePair(file: SlotFile, options: PairOptions, action: "create" | 
   }) as PairJournal | undefined
   if (saved && (saved.version !== 2 || saved.kind !== "pair-provision" || !ownerNonce.test(saved.nonce) || saved.purpose !== options.purpose ||
     saved.daemonId !== daemonId || JSON.stringify(saved.server) !== JSON.stringify(file.server) || JSON.stringify(saved.images) !== JSON.stringify(pairImages) ||
-    !saved.resources || !["provisioning", "configured", "ready", "destroying", "destroyed"].includes(saved.phase))) throw new EvalFailure("PAIR_OWNERSHIP", 2)
+    !saved.resources || !["provisioning", "configured", "ready", "destroying", "destroyed"].includes(saved.phase) ||
+    saved.phase === "ready" && (Object.keys(saved.resources).length !== 3 ||
+      (["network", "server", "studio"] as const).some(role => !/^[a-f0-9]{64}$/.test(saved.resources[role] ?? ""))))) throw new EvalFailure("PAIR_OWNERSHIP", 2)
   if (action === "destroy" && !saved) throw new EvalFailure("PAIR_OWNERSHIP", 2)
   if (action === "create" && saved?.phase === "destroyed") throw new EvalFailure("PAIR_DESTROYED", 2)
   const journal: PairJournal = saved ? structuredClone(saved) : { version: 2, kind: "pair-provision", nonce: crypto.randomUUID(), purpose: options.purpose,
@@ -468,14 +507,12 @@ async function usePair(file: SlotFile, options: PairOptions, action: "create" | 
       delete journal.intent
       await writeLeaseReceipt(pairFile, journal)
     }
-    if (journal.phase !== "ready") {
-      for (const id of [serverId, studioId]) {
-        if ((await inspectContainer(id)).State.Running) continue
-        if (saved?.intent?.operation === "start" && saved.intent.target === id) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
-        await intent("start", id)
-        await docker(["start", id])
-        if (!(await inspectContainer(id)).State.Running) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
-      }
+    for (const id of [serverId, studioId]) {
+      if ((await inspectContainer(id)).State.Running) continue
+      if (saved?.intent?.operation === "start" && saved.intent.target === id) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
+      await intent("start", id)
+      await docker(["start", id])
+      if (!(await inspectContainer(id)).State.Running) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
     }
     const identity = await verifyPair(file, journal)
     journal.phase = "ready"

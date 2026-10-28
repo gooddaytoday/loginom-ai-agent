@@ -148,6 +148,12 @@
 31. Существующие статусы результатов/сводки сохраняются. До dispatch ошибка
     окружения возвращает exit 2 без measured summary; после dispatch ошибки
     и карантин видны в summary/exit 1. `slot_id` связывает попытку с её архивом.
+    Prepared run сохраняет пустой массив admissions до подготовки, каждое
+    допущенное preflight/measurement — атомарно до исполнения. Старое начальное
+    представление без массива подтверждает ноль только при точных command/run/slot
+    и совпавшем завершившемся unit invocation; null и неизвестные данные остаются
+    отказом. Неподтверждённый batch не считается учтённым; resume повторно сверяет
+    admissions после такого отказа, затем требует прежнюю fresh cleanup verification.
 32. После успешного N=2 одним проходом удаляются неиспользуемые механизмы и
     их тесты по согласованному перечню, затем выполняются unit checks/typecheck.
     До этого заморожены эпохи, user-lock, process inventories/telemetry,
@@ -158,3 +164,28 @@
     решаются самостоятельно. Вопрос владельцу нужен только когда необходимы
     его данные, полномочия или изменение требований. Обязательные гарантии,
     ограничения удаления и отдельное утверждение бюджета N=2 сохраняются.
+
+### Terminal cancellation of unused verification
+
+`run-campaign.ts --operation cancel-unused-verify --repairer <existing repairer>` is limited to a published partial campaign with its matching owner and inactive batch units, under the campaign lock. It accepts only the first single-slot `verify` quarantined with `USER_PREPARATION_CONFLICT`, still unactivated and without a management directory, after native CAS reopening proves the producer exited. The matching producer's admin cleanup must be confirmed. Historical preparation/ownership is read only to identify the owned account and nonce; it is never qualified as current benchmark preparation.
+
+Fresh fenced identity, account, empty owned storage, clean idle profile, absent user sessions, empty backup and closed server files are required. The new admin must dispose with confirmed process cleanup. Terminal slot evidence sets `storageDeletionAllowed=false` and `nextAdmissionAllowed=false`; it permits reservation closure only. Normal preparation/benchmark admission remains unchanged. A published campaign may record late `cleanupVerified` and release its matching owner only after verifying all resource release proofs. Original report/archive and measurements remain unchanged; the operator publishes and reads back a separate cleanup supplement.
+
+Terminal cancellation keeps its new admin attempts in the command-specific private
+`terminal-<commandId>-admins` directory, bound to campaign/command/server identity
+before starting an admin. Re-entry requires confirmed disposal, disconnect and
+supervisor cleanup for every prior attempt; missing or incomplete evidence fails
+closed without moving historical admin receipts. A published partial with durable
+`cleanupVerified=true` completes matching-owner release on re-entry and preserves
+any different owner.
+
+Terminal cancellation is scoped to surrendering the campaign's own resources.
+The historical creation→storage receipt chain and fresh pair/nonce/empty-storage
+observation establish resource ownership. Current exact username/userKind scope
+inventory only; proxy-object-ID equality across epochs is not an account-continuity
+proof. Terminal evidence records both observations and explicitly declares
+`releaseScope=owned-resources-only`, `accountIdentityContinuity=false` and
+`accountMutationAllowed=false`, alongside the existing deletion/admission bans.
+No preparation, account mutation, or storage deletion guard changes. Qualification
+uses an owned research pair restart, old preparation rejection, wrong-nonce and
+foreign-pair refusals; it does not recover historical account continuity for LAB-134.

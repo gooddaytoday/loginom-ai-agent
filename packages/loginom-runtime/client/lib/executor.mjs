@@ -1,4 +1,4 @@
-import {browserFailureCategory} from './browser-failure.mjs';
+import {browserFailureCategory,browserFailureDetails} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -1555,7 +1555,10 @@ export function withBrowserReceipt(body, options) {
 }
 
 export function parseCapabilityResult(response) {
-  if (response?.isError) throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']');
+  if (response?.isError) {
+    const details=browserFailureDetails(response);
+    throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''));
+  }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const match = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);
@@ -2920,7 +2923,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return outcome;
       } finally { running = false; }
     },
-    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,largeUpload=false,deadline}={}) {
+    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,largeUpload=false,deadline,uploadLease}={}) {
       signal?.throwIfAborted();checkId(operationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact upload is available only in an authorized candidate session');
       const artifact=artifactStore.getUploadGrant(artifactId,grantId);
@@ -2941,7 +2944,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         throw new Error('Observe the exact authorized Loginom storage directory before uploading. Open the main Файлы (Files) workspace and enter the directory from the upload grant; require file_storage.status=observed and an exact directory match. The import file-selection dialog cannot receive this upload: cancel that dialog through its observed control, then open Files and observe again. No file was staged or submitted.');
       running=true;
       try {
-        const lease=await artifactStore.stageUpload(artifactId);
+        const lease=uploadLease??await artifactStore.stageUpload(artifactId);
         const operation={id:operationId,signature,uploadLease:lease,action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},
           deliveryOperationId,parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
           checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:packageCompletion||largeUpload?deadline:now()+30000};
@@ -2986,9 +2989,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       try {
         signal?.throwIfAborted();
-        const bound=await native('bind',{receipt:largeReceipts.get(key)});state.bound=true;
+        state.sourceLease=await artifactStore.stageUpload(artifactId);
+        await state.sourceLease.verify();
+        const bound=await native('bind',{receipt:artifact.sha256===null?undefined:largeReceipts.get(key)});state.bound=true;
         if(bound.reused){
-          const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
+          await state.sourceLease.verify();signal?.throwIfAborted();
+          const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,source_unchanged_verified:true,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
           const saved=await onRecord({phase:'large_upload_reused',operation_id:operationId,result});
           if(saved?.phase!=='large_upload_reused'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
           const outcome={status:'SUCCEEDED',action_key:'artifact.upload',action_revision:'1',operation_id:operationId,phase:'completed',effect_possible:false,cleanup_complete:true,
@@ -2998,14 +3004,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},deliveryOperationId:options.deliveryOperationId,
             parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:options.observationId,destination:artifact.upload.destination,overwrite:'reject'},
             checkpoint:{artifact,workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage},deadline,outcome,cleanupConfirmed:true});
-          state.settled=true;state.verified=true;return result;
+          await state.sourceLease.release();state.settled=true;state.verified=true;return result;
         }
         signal?.throwIfAborted();state.submitted=true;
-        const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true});
+        const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true,uploadLease:state.sourceLease});
+        await state.sourceLease.verify();
         if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
         state.operation=operations.get(operationId);
         while(now()<deadline){
           signal?.throwIfAborted();
+          await state.sourceLease.verify();
           const progress=await native('poll');
           onProgress?.({bytes:progress.bytes,phase:progress.quiet?'verifying_size':'uploading'});
           if(progress.error)throw Error('LOGINOM_UPLOAD_FAILED');
@@ -3016,7 +3024,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(proof.waiting)throw Error('LOGINOM_UPLOAD_DEADLINE');
             await state.operation.uploadLease.verify();signal?.throwIfAborted();
             if(now()>=deadline)throw Error('LOGINOM_UPLOAD_DEADLINE');
-            const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:proof.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
+            const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:proof.bytes,source_sha256:artifact.sha256,source_unchanged_verified:true,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
             const saved=await onRecord({phase:'large_upload_completed',operation_id:operationId,result,native_row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory});
             if(saved?.phase!=='large_upload_completed'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
             await state.operation.uploadLease.release();
@@ -3028,17 +3036,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           await new Promise(resolve=>{const timer=setTimeout(done,1000);function done(){signal?.removeEventListener('abort',done);clearTimeout(timer);resolve();}signal?.addEventListener('abort',done,{once:true});});
         }
         throw Error('LOGINOM_UPLOAD_DEADLINE');
-      }catch(error){if(!state.bound&&!state.submitted){state.settled=true;}throw error;}
+      }catch(error){state.sourceChanged=error.message==='LOGINOM_FILE_CHANGED';if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;}
     },
     async cancelLargeArtifact({operationId,deadline}) {
       const state=largeTasks.get(operationId);
       if(!state)return false;
       if(state.settled)return state.verified!==true;
-      if(!state.submitted){state.settled=true;return true;}
-      const task={...state.task,deadline_at:deadline};
+      if(!state.submitted){await state.sourceLease?.release();state.settled=true;return true;}
+      const task={...state.task,deadline_at:deadline,source_changed:state.sourceChanged===true};
       const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       while(now()<deadline){
         const progress=await native('cancel');
+        if(progress.gesture||progress.quiet)await onRecord({phase:'large_upload_cleanup_step',operation_id:operationId,
+          active:progress.active,quiet:progress.quiet,gesture:progress.gesture?.kind??null,server_delete_confirmed:progress.server_delete_confirmed===true});
         if(progress.quiet)break;
         await new Promise(resolve=>setTimeout(resolve,200));
       }
@@ -3054,6 +3064,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!cleanup.clean||now()>=deadline)return false;
       const operation=operations.get(operationId);
       if(operation){await operation.uploadLease.release();operation.cleanupConfirmed=true;operation.outcome={...operation.outcome,status:'FAILED',cleanup_complete:true,error:{code:'LOGINOM_UPLOAD_CANCELLED',message:'Upload stopped and owned destination removed'}};if(pending===operation)pending=null;}
+      else await state.sourceLease?.release();
       const saved=await onRecord({phase:'large_upload_cleanup',operation_id:operationId,cleanup_complete:true});
       if(saved?.phase!=='large_upload_cleanup'||saved.operation_id!==operationId)return false;
       state.settled=true;observations.clear();return true;

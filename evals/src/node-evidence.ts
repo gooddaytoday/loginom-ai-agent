@@ -16,6 +16,10 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
   const events = readNodeEvents(await raw.text()), operations = operationReceipts(events)
   failures.push(...operations.failures)
   const { imports, cross, exports } = checkNodeXml(xml, id, required)
+  // AutoSync persists unchanged row keys implicitly; explicit names and sources take precedence.
+  const outputColumns = [...(cross?.output_columns ?? []), ...(cross?.output_autosync ? cross.columns
+    .filter(c => c.UsageType === "utActive" && !cross.output_columns?.some(o => o.Name === c.Name || o.source === c.Name))
+    .map(c => ({ Name: c.Name, DataType: c.DataType, source: c.Name ?? null })) : [])]
   if (required.has("input")) {
     const imp = imports[0]
     const scalarTypes: Record<string, string> = { string: "dtString", real: "dtFloat", integer: "dtInteger" }
@@ -34,8 +38,8 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
         const input = request.input, r = receipt.output, src = input.parameters?.source, rb = r.configuration?.readback
         return delivery && input.target?.type === "imports.text" && r.node?.node_id === imp?.id && r.execution?.status === "completed" &&
           src?.upload_operation_id === delivery.output.output.upload_operation_id &&
-          (src.bytes === source.length || contract.native && src.bytes === undefined) &&
-          (src.sha256 === hash || contract.native && src.sha256 === undefined) &&
+          (src.bytes === source.length || src.bytes === undefined) &&
+          (src.sha256 === hash || src.sha256 === undefined) &&
           rb?.source?.source_path === delivery.output.output.destination && rb?.source?.first_line_as_title === true && (rb?.format?.delimiter === "," || contract.native && rb?.format?.delimiter === "Запятая") &&
           (!contract.native || input.document_id === r.node.document_id && input.workflow_ref?.workflow_id === r.node.workflow_id &&
             (index === 0 ? input.target.kind === "new" : input.target.kind === "existing" &&
@@ -114,12 +118,12 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
         const detailed = contract.facts.length > 1 || contract.facts.some(f => f.functions.length > 1)
         const valid = mapping?.verified === true && mapping.inventory_complete === true && mapping.source_identity_verified === true &&
           mapping.node_context?.verified === true && mapping.node_context.output_port?.port === 0 && sameOwner(mapping.node_context, c?.node) &&
-          sources?.length === fields.length && targets?.length === fields.length && cross?.output_columns?.length === fields.length &&
+          sources?.length === fields.length && targets?.length === fields.length && outputColumns.length === fields.length &&
           new Set(sources.map((s: Record<string, any>) => s.record_id)).size === fields.length && new Set(targets.map((t: Record<string, any>) => t.source?.record_id)).size === fields.length &&
           fields.every(f => {
             const ts = targets.filter((t: Record<string, any>) => t.name === f.name), t = ts[0], s = t?.source
             const source = sources?.filter((v: Record<string, any>) => v.required === true && ["record_id", "name", "label", "type"].every(k => v[k] === s?.[k]))
-            const column = cross?.output_columns?.find(col => col.Name === f.name)
+            const column = outputColumns.find(col => col.Name === f.name)
             const label = f.name === "Region" ? "Region" : [...f.categories, ...(detailed ? [f.fact, labels[f.fn]] : [])].join(c!.options.separator)
             const technical = f.name === "Region" ? /^Region$/ : detailed ? new RegExp(`_(?:${f.fact})_${suffixes[f.fn]}(?:_[1-9][0-9]*)?$`) : /^[A-Za-z_][A-Za-z0-9_]*$/
             return ts.length === 1 && t.excluded === false && t.type === f.type && source?.length === 1 && s.type === f.type && s.label === label && technical.test(s.name) &&
@@ -147,12 +151,12 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
         new Set(targets.map((t:Record<string,any>)=>t.source?.record_id)).size===5 && expected.every(name=>{
           const ts=targets.filter((t:Record<string,any>)=>t.name===name), t=ts[0], source=t?.source
           const sourceMatches=sources.filter((s:Record<string,any>)=>s.required===true && ["record_id","name","label","type"].every(k=>s[k]===source?.[k]))
-          const column=cross?.output_columns?.find(col=>col.Name===name)
+          const column=outputColumns.find(col=>col.Name===name)
           const parts=name.split("_"), key=name==="Region", fn=parts[1], label=fn==="min"?"Минимум":"Максимум"
           return ts.length===1 && !t.excluded && t.type===(key?"string":"real") && sourceMatches.length===1 && source.type===t.type &&
             (key ? source.name==="Region" && source.label==="Region" : source.label===`${parts[0]}${c!.options.separator}Amount${c!.options.separator}${label}` && new RegExp(`_Amount_${fn==="min"?"Min":"Max"}(?:_[1-9][0-9]*)?$`).test(source.name)) &&
             column && column.source===source.name && column.DataType===(key?"dtString":"dtFloat")
-        }) && cross?.output_columns?.length===5
+        }) && outputColumns.length===5
       if (!valid) failures.push("crosstable: complete owned native output mapping and XML sources required")
     }
     if (required.has("export")) {

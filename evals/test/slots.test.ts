@@ -332,7 +332,7 @@ async function releaseFixtureServer(item: Awaited<ReturnType<typeof interruptedS
   } finally { await reopened.server.close() }
 }
 
-async function interruptedSlotRelease() {
+async function interruptedSlotRelease(terminal = false) {
   const item = await fixture(), file = parseSlots(item.value, 1), lockRoot = path.join(item.root, "locks")
   const journal = path.join(file.controller.stateDir, "prepare-command.json")
   const cleanup = path.join(file.controller.stateDir, "slot-cleanup.json")
@@ -343,7 +343,8 @@ async function interruptedSlotRelease() {
     const environment=await acquireEnvironmentLeases(${JSON.stringify(file)},1,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(lockRoot)});
     const slot=environment.slots[0], retained=await readLeaseReceipt(slot.receipt);
     await writeLeaseReceipt(${JSON.stringify(cleanup)},{status:"confirmed",slotId:slot.slot.id,leaseToken:slot.token,serverEpoch:slot.identity.serverEpoch,
-      processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true});
+      processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true,
+      ...${JSON.stringify(terminal ? { version: 2, kind: "unused-verify-cancellation", commandId: "interrupted-release", archive: "unchanged-clean", storageDeletionAllowed: false, nextAdmissionAllowed: false, terminalOnly: true, profileClean: true, ownedStorageEmpty: true, serverFilesClosed: true, backupEmpty: true, adminDisposed: true } : {})}});
     await slot.release(${JSON.stringify(cleanup)});
     // Restore the last slot snapshot durable before a crash between resource.release and the final slot write.
     await writeLeaseReceipt(slot.receipt,retained);
@@ -354,3 +355,40 @@ async function interruptedSlotRelease() {
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
   return { ...item, file, lockRoot, journal, cleanup, receipt: (JSON.parse(stdout) as { receipt: string }).receipt }
 }
+
+test("terminal verify cancellation releases a slot without benchmark readiness", async () => {
+  const item = await fixture(), locks = path.join(item.root, "locks")
+  const file = parseSlots(item.value, 1), journal = path.join(file.controller.stateDir, "verify-command-terminal.json")
+  try {
+    await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "terminal", identity, phase: "unactivated", slotIds: ["a"] })
+    const env = await acquireEnvironmentLeases(file, 1, identity, journal, locks)
+    const lease = env.slots[0]!, proof = path.join(file.controller.stateDir, "terminal-a.json")
+    const evidence = { version: 2, kind: "unused-verify-cancellation", status: "confirmed", commandId: "terminal",
+      slotId: "a", leaseToken: lease.token, serverEpoch: identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed",
+      archive: "unchanged-clean", storageDeletionAllowed: false, nextAdmissionAllowed: false,
+      terminalOnly: true, profileClean: true, ownedStorageEmpty: true, serverFilesClosed: true, backupEmpty: true, adminDisposed: true }
+    try {
+      for (const invalid of [{ ...evidence, commandId: "foreign" }, { ...evidence, ownedStorageEmpty: false },
+        { ...evidence, nextAdmissionAllowed: true }, { ...evidence, storageDeletionAllowed: true }, { ...evidence, adminDisposed: false }]) {
+        await writeLeaseReceipt(proof, invalid)
+        await expect(lease.release(proof)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
+      }
+      await writeLeaseReceipt(proof, evidence)
+      await lease.release(proof)
+      expect((await readResourceReservation({ key: `profile:${lease.slot.profileDir}`, lockRoot: locks }))?.state).toBe("released")
+      expect(await readLeaseReceipt(proof)).toEqual(evidence)
+    } finally { await lease.close(); await env.server.close() }
+  } finally { await rm(item.root, { recursive: true }) }
+})
+
+test("admission finishes interrupted terminal release but does not change its readiness flags", async () => {
+  const item = await interruptedSlotRelease(true)
+  try {
+    await releaseFixtureServer(item)
+    const before = await Bun.file(item.cleanup).text()
+    const env = await acquireEnvironmentLeases(item.file, 1, identity, item.journal, item.lockRoot)
+    try { expect((await readLeaseReceipt(item.receipt) as { state: string }).state).toBe("released") }
+    finally { await env.slots[0]!.close(); await env.server.close() }
+    expect(await Bun.file(item.cleanup).text()).toBe(before)
+  } finally { await rm(item.root, { recursive: true }) }
+})

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {parseCapabilityResult} from '../lib/executor.mjs';
 import {withStorageIdentity,createStorageBinding} from '../lib/storage-policy.mjs';
 
 function fixture(){
@@ -53,4 +54,13 @@ test('caller failure is never replayed by connection guard',async()=>{
  const f=fixture();await f.run();f.c.Connected=false;
  f.page.effect=()=>{f.state.effects++;throw Error('uncertain original gesture');};
  await assert.rejects(f.run(),/uncertain original gesture/);assert.equal(f.state.effects,2);assert.equal(f.state.clicks,1);
+});
+
+test('serialized connection guard refusal keeps its cause through the browser error boundary',async()=>{
+ const f=fixture();await f.run();f.c.Connected=false;f.c.FSession={};
+ let response;
+ try{await f.run();}catch(error){response={isError:true,content:[{type:'text',text:String(error)}]};}
+ assert.ok(response);
+ assert.throws(()=>parseCapabilityResult(response),{message:'Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)'});
+ assert.equal(f.state.effects,1);assert.equal(f.state.clicks,0);
 });

@@ -98,6 +98,15 @@ test("statusFor: известный сбой старта до сессии от
   expect(statusFor({ ...startup, counters: { toolCalls: 1 } }, false)).toEqual({ status: "failed", stop: false })
 })
 
+test("statusFor: terminal connection error after lazy browser startup is infrastructure", () => {
+  const run = { exitCode: 1, timedOut: false, interrupted: false, sessionId: "session",
+    tokens: { input: 120, output: 30, reasoning: 10 }, counters: { toolCalls: 2 },
+    errors: ["LOGINOM_CONNECTION_NOT_READY"], stderrHead: "" }
+  expect(statusFor(run, false)).toEqual({ status: "infra_error", stop: false })
+  expect(statusFor({ ...run, errors: ["ToolError"] }, false)).toEqual({ status: "failed", stop: false })
+  expect(statusFor({ ...run, exitCode: 0 }, true)).toEqual({ status: "completed", stop: false })
+})
+
 const attempt = (over: Partial<AttemptResult>): AttemptResult => ({
   task_id: "t",
   attempt: 1,

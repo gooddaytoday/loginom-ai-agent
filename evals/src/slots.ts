@@ -197,7 +197,7 @@ async function requireFinalizedSlotRelease(previous: Reservation | undefined) {
     if (composite.resources.length !== 1 || previous.key !== `profile:${slot.profileDir}` ||
       cleanup.status !== "confirmed" || cleanup.slotId !== slot.id || cleanup.leaseToken !== composite.token ||
       cleanup.serverEpoch !== previous.identity?.serverEpoch || cleanup.processes !== "confirmed" || cleanup.serverSessions !== "confirmed" ||
-      cleanup.archive !== "committed" || cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true)
+      !slotCleanupAllowed(cleanup, String(composite.commandId)))
       throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
     // Admission holds every resource guard; only the final slot write was interrupted.
     await writeLeaseReceipt(proof.slotReceipt, { ...composite, state: "released", cleanupReceipt: proof.cleanupReceipt })
@@ -218,8 +218,7 @@ function slotLease(receipt: string, manifest: { version: number; token: string; 
     await assertHeld()
     const evidence = record(await readLeaseReceipt(cleanupReceipt))
     if (evidence.status !== "confirmed" || evidence.slotId !== manifest.slot.id || evidence.leaseToken !== manifest.token || evidence.serverEpoch !== manifest.identity.serverEpoch ||
-      evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
-      evidence.storageDeletionAllowed !== true || evidence.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+      evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || !slotCleanupAllowed(evidence, manifest.commandId)) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
     for (const resource of resources) {
       const proof = `${receipt}.${new Bun.CryptoHasher("sha256").update(resource.reservation.key).digest("hex")}.released.json`
       await writeLeaseReceipt(proof, { version: 2, kind: "slot-resource-release", status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
@@ -298,4 +297,13 @@ async function canonicalSlots(input: SlotFile): Promise<SlotFile> {
       profileDir: await canonicalPath(slot.profileDir), workspaceRoot: await canonicalPath(slot.workspaceRoot), historyDir: await canonicalPath(slot.historyDir),
     }))),
   }
+}
+
+function slotCleanupAllowed(proof: Record<string, unknown>, commandId: string) {
+  if (proof.kind !== "unused-verify-cancellation")
+    return proof.archive === "committed" && proof.storageDeletionAllowed === true && proof.nextAdmissionAllowed === true
+  return proof.version === 2 && proof.commandId === commandId && proof.terminalOnly === true &&
+    proof.archive === "unchanged-clean" && proof.storageDeletionAllowed === false && proof.nextAdmissionAllowed === false &&
+    proof.profileClean === true && proof.ownedStorageEmpty === true && proof.serverFilesClosed === true &&
+    proof.backupEmpty === true && proof.adminDisposed === true
 }

@@ -18,6 +18,28 @@ import time
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
+D87 = {
+    'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
+    'E2': dict(attachment='file', generator=['--min-bytes', '1000000000'], heavy=False),
+    'E3': dict(attachment='path', generator=['--boundary', '32'], heavy=True),
+    'X1': dict(attachment='path', generator=['--format', 'xlsx', '--rows', '500000'], heavy=True,
+               pending='ожидает LAB-413: XLSX-переключение'),
+}
+
+
+def pair_login(config, source):
+    directory = config.get('package_directory') or config.get('personal_folder')
+    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(config.get('loginom'), dict) or not config['loginom'].get('username'):
+        raise ValueError(f'{source}: expected loginom.username and package_directory or personal_folder; keys: ' + ', '.join(sorted(config)))
+    return dict(config['loginom'], package_directory=directory)
+
+
+def scenario_names(value, case_root=None):
+    names = [case for name in value.split(',') for case in (['E1', 'E2'] if name == 'D87' and not case_root else [name])]
+    if len(names) != len(set(names)): raise ValueError('Duplicate scenario')
+    for name in names:
+        if not case_root and D87.get(name, {}).get('pending'): raise ValueError(D87[name]['pending'])
+    return names
 
 
 def read(path):
@@ -55,6 +77,8 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'])
+    if name in D87:
+        return dict(D87[name], base=None, generated=True)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -135,6 +159,8 @@ def summary(report):
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
+        if r.get('dataset-cleanup'):
+            rows.append('\nD87 ' + r['scenario'] + ': ' + r['dataset-cleanup'])
         if r.get('status') == 'FAIL':
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
@@ -376,8 +402,82 @@ class Runner:
         self.save()
         return build
 
+    def prepare_d87(self, name, folder):
+        spec = scenario(name)
+        fixtures = folder / 'fixtures'
+        fixtures.mkdir()
+        (fixtures / 'data').mkdir()
+        source = fixtures / ('d87-' + str(time.time_ns()) + '-' + name + ('.xlsx' if name == 'X1' else '.csv'))
+        # Register ownership before generation, so interrupted generation is cleaned too.
+        self.current['dataset'] = str(source)
+        self.phase('generate', ['nice', '-n', '19', sys.executable, '-B',
+                   REPO / 'scripts/node-acceptance/large-dataset-gen.py', '--output', source,
+                   '--manifest', fixtures / 'manifest.json', *spec['generator']], folder)
+        manifest = read(fixtures / 'manifest.json')
+        write(fixtures / 'expected.json', {
+            'nodes': [], 'outputs': [{'output_node_type': 'export_input', 'ordered': False,
+            'columns': [{'name': 'region', 'label_any': True, 'type': 'string'},
+                        {'name': 'amount_sum', 'name_any': True, 'label_any': True, 'type': 'real', 'tolerance': {'abs': .01}},
+                        {'name': 'row_count', 'name_any': True, 'label_any': True, 'type': 'integer'}],
+            'rows': [{'region': region, 'amount_sum': total / 100,
+                      'row_count': manifest['records_by_region'][region]}
+                     for region, total in manifest['sums_minor_by_region'].items()]}]})
+        prompt = ('В файле ' + str(source) + ' продажи по регионам. '
+                  'Загрузи исходный файл в свою личную папку без переименования. '
+                  'Построй группировку по region: сумма amount и количество всех строк (считай непустой region). '
+                  'В итоге нужны ровно три поля: region, сумма и количество; имена двух мер свободные. '
+                  'Не заменяй исходные данные агрегатами и не обрабатывай их внешним кодом. ')
+        if name == 'X1':
+            prompt += 'Excel XLSX, лист Sales, одна строка заголовка; типы: region строка, amount вещественный, date дата/время, note строка. '
+        else:
+            prompt += ('CSV UTF-8, разделитель точка с запятой, десятичный разделитель запятая, '
+                       'кавычка двойная, маркер пропуска NULL, первая строка заголовок. '
+                       'Типы: region строка, amount вещественный, note строка. ')
+        (fixtures / 'task.md').write_text(prompt + 'Выгрузи и скачай результат в result.csv.\n')
+        return dict(spec, source=fixtures, prompt=fixtures / 'task.md', data=fixtures / 'data', local_file=source)
+
+    def cleanup_d87(self, folder, login, build):
+        source = Path(self.current['dataset'])
+        try:
+            names = {source.name}
+            manifest = folder / 'fixtures/manifest.json'
+            size = read(manifest)['bytes'] if manifest.exists() else None
+            def destinations(value):
+                if isinstance(value, dict):
+                    upload = value.get('upload')
+                    destination = value.get('destination') or (upload.get('destination') if isinstance(upload, dict) else None)
+                    if value.get('bytes') == size and isinstance(destination, str):
+                        path = Path(destination)
+                        if str(path.parent) != login['package_directory'].rstrip('/') or not re.fullmatch(r'(?:[a-f0-9]{64}-(?:[0-9]+-)?)?' + re.escape(source.name), path.name):
+                            raise ValueError('D87 receipt destination is outside the owned source naming/directory')
+                        names.add(path.name)
+                    for item in value.values(): destinations(item)
+                if isinstance(value, list):
+                    for item in value: destinations(item)
+            for journal in folder.glob('*/model.stdout'):
+                for _, event in records(journal):
+                    part = event.get('part', {})
+                    state = part.get('state', {})
+                    if event.get('type') != 'tool_use' or state.get('status') != 'completed' or not part.get('tool', '').startswith('loginom_'): continue
+                    try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
+                    except (ValueError, TypeError): continue
+                    destinations(reply)
+            config = folder / 'dataset-cleanup-config.json'
+            write(config, dict(login=login, names=sorted(names)))
+            self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
+                       REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
+                       config, folder / 'dataset-cleanup'], folder, timeout=180)
+            self.current['dataset-cleanup'] = 'storage PASS'
+        finally:
+            # Only files owned by this run; preserve private manifest and fail logs.
+            for file in folder.rglob('*'):
+                if file.is_file() and not file.is_symlink() and (file == source or file.stat().st_size >= 1000000000):
+                    file.unlink()
+            self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
+
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
-        spec = (dict(source=case, prompt=case / 'task.md', data=case / 'data')
+        spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
+                dict(source=case, prompt=case / 'task.md', data=case / 'data')
                 if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
@@ -467,7 +567,7 @@ class Runner:
         try:
             build = self.build()
             account = read(Path(self.options['pair']) / 'worker.json')
-            login = dict(account['loginom'], package_directory=account['package_directory'])
+            login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
                 self.current = r
                 folder = self.out / r['scenario']
@@ -477,6 +577,8 @@ class Runner:
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp')
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
+                    if r['scenario'] in D87 and not self.options.get('case_root'):
+                        self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'], apiKey=login['api_key'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
@@ -500,6 +602,13 @@ class Runner:
                     r['status'] = 'FAIL' if r.get('failure_class') else 'PASS'
                 except Exception as error:
                     self.failure(r, error, folder)
+                finally:
+                    if r.get('dataset'):
+                        try: self.cleanup_d87(folder, login, build)
+                        except Exception as error:
+                            # Retain the original model failure if cleanup also fails.
+                            r['dataset_cleanup_error'] = str(error)
+                            if r.get('status') != 'FAIL': self.failure(r, error, folder)
                 self.save()
         except Exception as error:
             for r in self.report['runs']:
@@ -527,17 +636,16 @@ def main():
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
-    names = args.scenarios.split(',')
-    assert len(names) == len(set(names)), 'Duplicate scenario'
+    names = scenario_names(args.scenarios, args.case_root)
     for name in names:
         spec = scenario(name, args.case_root, cases=args.cases)
+        if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert args.case_root or (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
         expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
-        config = read(pair / (role + '.json'))
-        assert config['loginom']['username'] and config['package_directory'], 'Invalid pair configuration'
+        pair_login(read(pair / (role + '.json')), role + '.json')
     build = args.build.expanduser().resolve() if args.build else None
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
@@ -545,6 +653,8 @@ def main():
     # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
     # default short enough even when the checkout is in a deep task directory.
     out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
+    if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
+        raise ValueError('D87 result directory and generated data must be outside Git checkout')
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()

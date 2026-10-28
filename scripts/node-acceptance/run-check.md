@@ -17,7 +17,10 @@ task-owned `CODEX_*` settings are not inherited. On Linux, keep an explicit
 `--out` path short: Chromium creates a Unix singleton socket under `tmp/`.
 
 The pair must contain `worker.json` and `reviewer.json` with the established
-`loginom` and `package_directory` fields. Runs use the worker account. OAuth is
+`loginom` and either `package_directory` or `personal_folder` fields (when both
+exist, `package_directory` wins). Unknown formats fail before detach and name
+the file, required fields and supplied keys; credential values are never printed.
+Runs use the worker account. OAuth is
 linked from `~/.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json`, never
 copied. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
@@ -88,10 +91,63 @@ the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
+D87 large-file regression, one foreground command (from the repository root):
+
+```sh
+result=$(python3 scripts/node-acceptance/run-check.py start --head HEAD --scenarios D87 --pair "$PAIR" --cold) && python3 scripts/node-acceptance/run-check.py wait "$result" --timeout 5400
+```
+
+| Name | Input | Admission | Default D87 set |
+|---|---|---|---|
+| E1 | CSV ≥1,000,000,000 bytes | absolute path | yes |
+| E2 | CSV ≥1,000,000,000 bytes | `--file` | yes |
+| E3 | CSV ≥2³² + 1 MiB, complete final record | absolute path | **heavy; explicit `--scenarios E3` only** |
+| X1 | XLSX 500,000 data rows, Sales sheet | absolute path | **heavy; ожидает LAB-413**, refused before detach |
+
+`--scenarios E1` runs just E1. No heavy case is expanded by `D87`.
+An explicit `--case-root` takes precedence over built-in names, preserving
+existing external E1/X1 fixtures and their own input/cleanup ownership.
+`large-dataset-gen.py` generates each input and its private manifest under the
+result directory, outside Git. Grouping sums and counts come only from that
+manifest. The model receives the business request, source path (or `--file`),
+format and field types; it never receives the manifest or expected values.
+Generation, model and cleanup respect the same load/spacing limits. After main
+and optional cold, also on failure, native Files UI deletes only this run's
+uniquely named source from the worker's authorized directory. Actual server
+names (including product-added hash prefixes) come from completed admission/
+delivery receipts matched to the manifest byte count and owned source basename;
+unrecognized destinations fail closed. The runner then
+deletes its local input and large copies under its own result directory;
+manifest, small exported CSV and diagnostic evidence remain. `dataset-cleanup`
+reports storage/disk separately; failed storage cleanup makes the run FAIL.
+Storage cleanup prepares its own empty draft before opening Files (the native
+Home toolbar lacks a NodeIndex), then closes that untouched draft and logs out
+with the existing stock cleanup primitive, without discard. Failure DOM stays
+private beside its cleanup result.
+The saved package remains for inspection; after source cleanup its original
+large import cannot be rerun without regenerating that source.
+X1 already has the generator/oracle/task template; remove its `pending` marker
+in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
+
+To add a scenario for a new node:
+
+1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
+   `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
+   column types, rows and order policy. Keep oracle values out of the prompt.
+2. Register its name/source/base in `scenario()` and update this catalog.
+   Use an existing name range only when it is free; extend the range otherwise.
+   If CSV has a separate oracle, also provide its cold `expected.json` and
+   register that branch in `expected_for()`/`model()` as existing n13–n20 do.
+3. Add a regression that resolves the fixture and checks command inputs/oracle;
+   run `node --test scripts/node-acceptance/tests/*.test.mjs`, then
+   `start --head <SHA> --scenarios <name> --pair "$PAIR" --cold` and foreground `wait`.
+   Add its file patterns/scenario hint to `required-checks.py`; for an additive
+   contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
+
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check -v`.
 
-CSV specification audit (all 87 supported names, including variants):
+CSV specification audit (the original 87 fixture names, including variants; D87 uses its generated manifest):
 
 | Field | Names using it | CSV behavior / stock cold responsibility |
 |---|---:|---|

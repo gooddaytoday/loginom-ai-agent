@@ -1,6 +1,17 @@
 import { expect, test } from "bun:test"
 import { buildJobs, runSlotQueue } from "../src/scheduler"
 
+test("a refused admission remains unassigned and creates no result", async () => {
+  const admitted: number[] = [], executed: number[] = []
+  const run = await runSlotQueue({ jobs: buildJobs(["task"], 3), slots: ["slot"], signal: new AbortController().signal,
+    async admit(_slot, job) { if (job.index !== 0) return false; admitted.push(job.index); return true },
+    async execute(_slot, job) { executed.push(job.index); return { result: job.index, quarantine: false } } })
+  expect(admitted).toEqual([0])
+  expect(executed).toEqual([0])
+  expect(run.results.map(row => row.result)).toEqual([0])
+  expect(run.unassigned.map(job => job.index)).toEqual([1, 2])
+})
+
 test("slot queue: jobs retain the exact round-major order", () => {
   expect(buildJobs(["slow", "fast"], 2)).toEqual([
     { index: 0, taskId: "slow", attempt: 1 },

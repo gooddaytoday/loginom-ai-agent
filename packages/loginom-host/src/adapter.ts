@@ -1,5 +1,5 @@
 import type { InputFile } from "./inputs"
-import type { FileReference, ReferenceSlot } from "./file-reference"
+import type { FileReference, ReferenceSnapshot } from "./file-reference"
 export * as LoginomHost from "./adapter"
 
 import { randomUUID } from "node:crypto"
@@ -57,10 +57,15 @@ export async function acquire(session: string) {
       return queued(() => connection.request("admit", { run, userMessage, files }, undefined, observe))
     },
     // Private backend API: never advertise grants or OS paths as MCP arguments.
-    async reserveReference(userMessage: string, name: string): Promise<ReferenceSlot> {
+    async reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference> {
       return queued(async () => {
-        const value = await connection.request("referenceReserve", { run, userMessage, name }, undefined, observe)
-        return value as ReferenceSlot
+        const value = await connection.request(
+          "referenceReserve",
+          { run, userMessage, name, snapshot },
+          undefined,
+          observe,
+        )
+        return value as FileReference
       })
     },
     async admitReference(reference: FileReference) {

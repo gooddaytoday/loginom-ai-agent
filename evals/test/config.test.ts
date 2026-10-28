@@ -11,6 +11,28 @@ const full = {
   JUDGE_MODEL: "gpt-6-astra",
 }
 
+test("loadConfig: campaign admission state is explicit and complete", () => {
+  const env = { EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "2", EVAL_CAMPAIGN_ERROR_LIMIT: "3", EVAL_CAMPAIGN_LAST_PROGRESS_AT: "1000", EVAL_CAMPAIGN_NO_PROGRESS_MS: "86400000" }
+  expect(loadConfig([], full).campaign).toBeUndefined()
+  expect(loadConfig([], { ...full, ...env }).campaign).toEqual({ consecutiveErrors: 2, errorLimit: 3, lastProgressAt: 1000, noProgressMs: 86400000 })
+  expect(loadConfig([], { ...full, ...env, EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "0" }).campaign?.consecutiveErrors).toBe(0)
+  for (const name of Object.keys(env)) expect(() => loadConfig([], { ...full, ...env, [name]: undefined })).toThrow("EVAL_CAMPAIGN_STATE")
+  for (const [name, value] of Object.entries({ ...env, EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "-1", EVAL_CAMPAIGN_ERROR_LIMIT: "0", EVAL_CAMPAIGN_LAST_PROGRESS_AT: "NaN", EVAL_CAMPAIGN_NO_PROGRESS_MS: "9007199254740992" })) {
+    expect(() => loadConfig([], { ...full, ...env, [name]: value })).toThrow(name)
+  }
+})
+
+test("loadConfig: campaign control requires all absolute sources, a manifest hash and admission state", () => {
+  const state = { EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "0", EVAL_CAMPAIGN_ERROR_LIMIT: "3", EVAL_CAMPAIGN_LAST_PROGRESS_AT: "1000", EVAL_CAMPAIGN_NO_PROGRESS_MS: "86400000" }
+  const control = { EVAL_CAMPAIGN_JOURNAL: "/private/journal.json", EVAL_CAMPAIGN_LOCK: "/private/controller.lock", EVAL_CAMPAIGN_MANIFEST_HASH: "a".repeat(64) }
+  expect(loadConfig([], { ...full, ...state, ...control }).campaign?.control)
+    .toEqual({ journalFile: control.EVAL_CAMPAIGN_JOURNAL, lockFile: control.EVAL_CAMPAIGN_LOCK, manifestHash: control.EVAL_CAMPAIGN_MANIFEST_HASH })
+  expect(() => loadConfig([], { ...full, ...control })).toThrow("EVAL_CAMPAIGN_CONTROL")
+  for (const name of Object.keys(control)) expect(() => loadConfig([], { ...full, ...state, ...control, [name]: undefined })).toThrow("EVAL_CAMPAIGN_CONTROL")
+  for (const [name, value] of [["EVAL_CAMPAIGN_JOURNAL", "relative/journal"], ["EVAL_CAMPAIGN_LOCK", ""], ["EVAL_CAMPAIGN_MANIFEST_HASH", "not-a-hash"]])
+    expect(() => loadConfig([], { ...full, ...state, ...control, [name!]: value })).toThrow("EVAL_CAMPAIGN_CONTROL")
+})
+
 test("loadConfig: parallel selects slots v2 and defaults to legacy singleton", () => {
   expect(loadConfig([], full)).toMatchObject({ parallel: 1, slotsFile: undefined })
   expect(loadConfig(["--parallel", "2"], { ...full, EVAL_SLOTS_FILE: "/private/slots.json" })).toMatchObject({ parallel: 2, slotsFile: "/private/slots.json" })

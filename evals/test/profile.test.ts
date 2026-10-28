@@ -7,7 +7,7 @@ import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, verifyProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, setupProfile, verifyProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
@@ -548,6 +548,33 @@ test("ensureProfile v2: matching ready profile is reused without setup or genera
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
+test("setupProfile rebinds username before ensureProfile", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-next", password: "new-password-canary" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: "eval-previous" }))
+    await Bun.write(path.join(context.profileDir, "data/loginom-ai-agent.db"), "preserve-history")
+    await Bun.write(path.join(context.profileDir, "data/auth.json"), '{"preserve":"auth"}')
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    await setupProfile(config, command)
+    const observed = await management(command, ["loginom", "status", "--format", "json"])
+    expect(observed.exitCode).toBe(0)
+    expect(observed.processCleanup.status).toBe("confirmed")
+    expect(JSON.parse(observed.stdout)).toMatchObject({ url: config.loginom.url, username: config.loginom.username, hasApiKey: true })
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await Bun.file(path.join(context.profileDir, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+    expect(await Bun.file(path.join(context.profileDir, "data/auth.json")).text()).toBe('{"preserve":"auth"}')
+    const commands = await Bun.file(calls).text()
+    expect(commands.trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status", "status", "status"])
+    expect(commands).not.toContain(config.loginom.password)
+    expect(commands).not.toContain(config.dock.apiKey)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
 test("verifyProfile checks a starting standalone host without setup or recovery", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a" } }
@@ -1008,5 +1035,81 @@ test("management: missing writer owner is diagnostic after confirmed process cle
     expect(result.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, unknownProcesses: [] })
     expect(result.processCleanup.writerRefusal).toBeDefined()
     await expect(stat(path.join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test.each([
+  { receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } }, exitCode: 0, valid: true },
+  { receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } }, exitCode: 3, valid: false },
+  { receipt: null, exitCode: 0, valid: false },
+  { receipt: { ok: "secret-canary", code: "secret-canary", help: { state: "secret-canary" } }, exitCode: 0, valid: false },
+  { receipt: { ok: false, code: "LOGINOM_CONNECTION_VALID", help: { state: "starting" } }, exitCode: 0, valid: false },
+])("management check outcome: safe durable predicates $exitCode $valid", async value => {
+  const check = await stateFile(value)
+  const context = await fakeProfile({ EVAL_FAKE_CHECK_FILE: check })
+  const command = { ...context.command, cleanupDir: path.join(context.profileDir, "evidence") }
+  try {
+    const result = await management(command, ["loginom", "check", "--format", "json"])
+    const text = await Bun.file(path.join(result.evidenceDir!, "connection-check-outcome.json")).text()
+    const outcome = JSON.parse(text)
+    expect(outcome.version).toBe(1)
+    expect(outcome.kind).toBe("connection-check-outcome")
+    expect(outcome.exitCode).toBe(value.exitCode)
+    expect(outcome.predicates.exitCodeZero).toBe(value.exitCode === 0)
+    expect(outcome.predicates.okTrue).toBe(value.receipt?.ok === true)
+    expect(outcome.predicates.connectionValid).toBe(value.receipt?.code === "LOGINOM_CONNECTION_VALID")
+    expect(outcome.predicates.helpReady).toBe(value.receipt?.help.state === "ready")
+    expect(Object.values(outcome.predicates).every(Boolean)).toBe(value.valid)
+    expect(text).not.toContain("secret-canary")
+    expect((await Bun.file(path.join(result.evidenceDir!, "cleanup.json")).json()).processes.status).toBe("confirmed")
+    expect(await Bun.file(path.join(result.evidenceDir!, "connection-check.json")).exists()).toBe(false)
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
+})
+
+test.each([
+  { output: "not-json-secret", shape: "invalid" },
+  { output: '{"ok":true,"code":"LOGINOM_CONNECTION_VALID","help":{"state":"ready"}}\ntrailing-secret', shape: "invalid" },
+  { output: '"secret-canary"', shape: "string" },
+  { output: '[]', shape: "array" },
+  { output: '{}', shape: "object" },
+])("management check outcome: last line and shape $shape", async value => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-check-outcome-"))
+  try {
+    const driver = path.join(root, "driver.ts")
+    await Bun.write(driver, `console.log(${JSON.stringify(value.output)}); console.error("stderr-secret")`)
+    const result = await management({ mode: "fake", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, cleanupDir: path.join(root, "evidence") }, ["loginom", "check"])
+    const text = await Bun.file(path.join(result.evidenceDir!, "connection-check-outcome.json")).text()
+    const outcome = JSON.parse(text)
+    expect(outcome.jsonShape).toBe(value.shape)
+    expect(outcome.predicates.connectionValid).toBe(false)
+    expect(outcome.predicates.helpReady).toBe(false)
+    expect(outcome.stderrLength).toBeGreaterThan(0)
+    expect(text).not.toContain("secret")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test.each(["timeout", "interrupted"])("management check outcome: %s remains explicit", async kind => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-check-outcome-"))
+  try {
+    const driver = path.join(root, "driver.ts")
+    await Bun.write(driver, 'setInterval(() => {}, 1000)')
+    const pending = management({ mode: "fake", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, cleanupDir: path.join(root, "evidence") }, ["loginom", "check"],
+      undefined, kind === "timeout" ? 100 : 1000, kind === "interrupted" ? AbortSignal.abort() : undefined)
+    if (kind === "interrupted") await expect(pending).rejects.toThrow("Management cleanup failed")
+    else await pending
+    const [directory] = await readdir(path.join(root, "evidence"))
+    const evidence = path.join(root, "evidence", directory!)
+    expect(await Bun.file(path.join(evidence, "cleanup.json")).exists()).toBe(true)
+    const outcome = await Bun.file(path.join(evidence, "connection-check-outcome.json")).json()
+    expect(outcome.timedOut).toBe(kind === "timeout")
+    expect(outcome.interrupted).toBe(kind === "interrupted")
+    expect(outcome.predicates.withinTimeout).toBe(kind !== "timeout")
+    expect(outcome.predicates.uninterrupted).toBe(kind !== "interrupted")
   } finally { await rm(root, { recursive: true, force: true }) }
 })

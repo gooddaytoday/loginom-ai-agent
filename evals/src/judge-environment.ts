@@ -4,12 +4,16 @@ import type { EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
 import { acquireJudgeLease, globalLockRoot, writeLeaseReceipt } from "./lease"
 import { loadJudgeEnvironment } from "./slots"
-import { rejudge, requireRejudgeRunDirectory } from "./rejudge"
+import { finishPendingJudge, readPendingJudge, rejudge, requireRejudgeRunDirectory } from "./rejudge"
 import { calibrate } from "./calibrate"
 
-export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockRoot) {
+export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockRoot, pendingResult?: string) {
   if (!config.slotsFile || (config.judgeOnly === undefined && !config.calibrate))
     throw new EvalFailure("OFFLINE_JUDGE_MODE", 2)
+  if (pendingResult) {
+    const pending = await readPendingJudge(config, pendingResult)
+    if (pending.complete) return { code: pending.result.judge_cleanup_unconfirmed ? 1 : 0, runDir: pending.runDir, judgeCleanupConfirmed: !pending.result.judge_cleanup_unconfirmed }
+  }
   const environment = await loadJudgeEnvironment(config.slotsFile)
   if (path.basename(config.judge.command[0] ?? "") === "codex") {
     const auth = path.join(environment.codexHome, "auth.json")
@@ -21,7 +25,7 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
     if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600)
       throw new EvalFailure("JUDGE_AUTH_PRIVATE", 2)
   }
-  if (config.judgeOnly !== undefined) await requireRejudgeRunDirectory(config.resultsDir, config.judgeOnly)
+  if (config.judgeOnly !== undefined && !pendingResult) await requireRejudgeRunDirectory(config.resultsDir, config.judgeOnly)
   const directory = await mkdtemp(path.join(environment.stateDir, "judge-command-"))
   const commandId = crypto.randomUUID()
   const journal = path.join(directory, "journal.json")
@@ -38,7 +42,8 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
     await writeLeaseReceipt(journal, { ...record, state: "running", runDir })
   }
   try {
-    const result = scoped.judgeOnly === undefined ? await calibrate(scoped, undefined, recordRunDirectory) : await rejudge(scoped, scoped.judgeOnly, recordRunDirectory)
+    const result = pendingResult ? await finishPendingJudge(scoped, pendingResult, recordRunDirectory)
+      : scoped.judgeOnly === undefined ? await calibrate(scoped, undefined, recordRunDirectory) : await rejudge(scoped, scoped.judgeOnly, recordRunDirectory)
     runDir = result.runDir
     if (!result.judgeCleanupConfirmed) {
       await writeLeaseReceipt(journal, { ...record, state: "quarantined", runDir: result.runDir })

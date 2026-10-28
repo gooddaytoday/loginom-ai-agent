@@ -20,11 +20,15 @@ export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: s
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type RegistrationIdentity = { device: number; inode: number; uid: number; mode: number; bytes: string; mtimeNs: string; ctimeNs: string }
 export type OwnedRegistration = { profile: string; acquiredAt: string; original: ProcessCleanup; marker: RegistrationIdentity }
+export type UnitBinding = {
+  unit: string; manager: "user" | "system"; invocation: string; bootId: string; cgroup: string
+  producer: { pid: number; starttime: string; uid: number }
+}
 export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
-  observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement"
+  observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement" | "systemd_post_exit"
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
   observations?: { count: number; max_duration_ms: number; max_start_delay_ms?: number; max_gap_ms?: number }
@@ -49,6 +53,107 @@ const message = (error: unknown) => error instanceof Error ? error.message : Str
 const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
+
+async function unitProperties(binding: Pick<UnitBinding, "unit" | "manager">) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.@:\\-]*\.service$/.test(binding.unit) || !["user", "system"].includes(binding.manager)) throw Error("SYSTEMD_UNIT_UNVERIFIED")
+  const child = Bun.spawn(["systemctl", ...(binding.manager === "user" ? ["--user"] : []), "show", binding.unit,
+    "--property=Id,ActiveState,InvocationID,Delegate,MainPID,ControlGroup"], { stdout: "pipe", stderr: "ignore", timeout: 5000 })
+  const [code, output] = await Promise.all([child.exited, new Response(child.stdout).text()])
+  if (code !== 0) throw Error("SYSTEMD_UNIT_UNVERIFIED")
+  return Object.fromEntries(output.trim().split("\n").map(line => line.split("=")))
+}
+
+export async function captureUnitBinding(): Promise<UnitBinding | undefined> {
+  const cgroup = (await readFile("/proc/self/cgroup", "utf8")).split("\n").find(line => line.startsWith("0::"))?.slice(3)
+  if (!cgroup || !path.basename(cgroup).endsWith(".service") || !process.env.INVOCATION_ID) return
+  const binding = { unit: path.basename(cgroup), manager: cgroup.startsWith("/user.slice/") ? "user" as const : "system" as const }
+  const observed = await unitProperties(binding)
+  // Other callers retain continuous cleanup without claiming this post-exit fallback.
+  if (observed.Delegate !== "no") return
+  const producer = await processView(process.pid)
+  if (!producer || observed.Id !== binding.unit || !["active", "activating"].includes(observed.ActiveState ?? "") ||
+    observed.ControlGroup !== cgroup || observed.InvocationID !== process.env.INVOCATION_ID || !/^[a-f0-9]{32}$/.test(observed.InvocationID))
+    throw Error("SYSTEMD_UNIT_BINDING_UNCONFIRMED")
+  return { ...binding, cgroup, invocation: observed.InvocationID, bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(),
+    producer: { pid: producer.pid, starttime: producer.starttime, uid: producer.uid } }
+}
+
+export type UnitExitProof = {
+  version: 1; kind: "systemd-unit-exit"; source: { file: string; sha256: string }; profile: string; binding: UnitBinding
+  registration: RegistrationIdentity; processes: ProcessCleanup
+  passes: { observed_at: string; inspected: number; owned_remaining: number; cgroup_remaining: number }[]
+}
+
+/** Read-only supplement for a known proc refusal; never grants signal authority. */
+export async function observeUnitExit(input: {
+  sourceFile: string; profile: string; binding: UnitBinding; owner: UnitBinding["producer"] & { bootId: string }
+}): Promise<UnitExitProof> {
+  const { readLeaseReceipt } = await import("./lease")
+  const receipt = await readLeaseReceipt(input.sourceFile) as { processes?: ProcessCleanup }
+  const bytes = await readFile(input.sourceFile)
+  if (JSON.stringify(JSON.parse(bytes.toString())) !== JSON.stringify(receipt)) throw Error("UNIT_EXIT_SOURCE_CHANGED")
+  const sha256 = new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
+  const original = receipt.processes, binding = input.binding, owner = input.owner
+  const errorPid = original?.error?.match(/^Cannot inspect process identity PID ([1-9]\d*): (?:Process UID changed \(|EACCES\b|EPERM\b)/)?.[1]
+    ?? original?.error?.match(/^ENOENT: no such file or directory, open '\/proc\/([1-9]\d*)\/stat'$/)?.[1]
+  if (!original || original.status !== "failed" || !errorPid || !Number.isSafeInteger(Number(errorPid)) || original.capture_complete !== true ||
+    original.observation_mode !== "continuous" || !Array.isArray(original.unknownProcesses) || original.unknownProcesses.length ||
+    !original.launcher?.ready || !original.processes?.some(process => process.pid === original.launcher!.pid) ||
+    original.processes.some(process => process.uid !== owner.uid || !Number.isSafeInteger(process.pid) || process.pid < 1 || !/^\d+$/.test(process.starttime)) ||
+    original.lifetime?.producer_pid !== owner.pid || binding.producer.pid !== owner.pid || binding.producer.starttime !== owner.starttime || binding.producer.uid !== owner.uid ||
+    binding.bootId !== owner.bootId || binding.bootId !== (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim() ||
+    !path.posix.isAbsolute(binding.cgroup) || path.posix.normalize(binding.cgroup) !== binding.cgroup || path.posix.basename(binding.cgroup) !== binding.unit)
+    throw Error("UNIT_EXIT_SOURCE_INELIGIBLE")
+  const previous = await readLeaseReceipt(`${input.sourceFile}.unit-exit.json`).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  }) as UnitExitProof | undefined
+  if (previous && (previous.version !== 1 || previous.kind !== "systemd-unit-exit" || previous.source?.file !== input.sourceFile || previous.source.sha256 !== sha256 ||
+    previous.profile !== input.profile || JSON.stringify(previous.binding) !== JSON.stringify(binding) || previous.processes?.status !== "confirmed" ||
+    previous.processes.observation_mode !== "systemd_post_exit" || previous.processes.verification?.length !== 2 || previous.processes.verification.some(pass => pass.owned_remaining !== 0)))
+    throw Error("UNIT_EXIT_PREVIOUS_PROOF_MISMATCH")
+  const registration = await registrationIdentity(input.profile).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT" && error.path === `${input.profile}.process-group` && previous) return previous.registration
+    throw error
+  })
+  if (!registration || registration.bytes !== String(original.launcher.pid) || registration.uid !== owner.uid || (registration.mode & 0o777) !== 0o600 ||
+    previous && JSON.stringify(registration) !== JSON.stringify(previous.registration)) throw Error("UNIT_EXIT_REGISTRATION_CHANGED")
+  if (await realpath("/sys/fs/cgroup") !== "/sys/fs/cgroup") throw Error("UNIT_EXIT_CGROUP_UNVERIFIED")
+  const passes: UnitExitProof["passes"] = []
+  for (let pass = 0; pass < 2; pass++) {
+    const unit = await unitProperties(binding)
+    if (unit.Id !== binding.unit || unit.InvocationID !== binding.invocation || unit.Delegate !== "no" || unit.MainPID !== "0" || unit.ControlGroup !== "" ||
+      !["failed", "inactive"].includes(unit.ActiveState ?? "")) throw Error("UNIT_EXIT_NOT_CONFIRMED")
+    if (await lstat(path.join("/sys/fs/cgroup", binding.cgroup)).catch(error => { if (gone(error)) return undefined; throw error })) throw Error("UNIT_EXIT_CGROUP_BUSY")
+    let inspected = 0
+    for (const pid of (await readdir("/proc")).filter(name => /^\d+$/.test(name))) {
+      const groups = await readFile(`/proc/${pid}/cgroup`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+      if (groups === null) continue
+      inspected++
+      if (groups.trim().split("\n").some(line => {
+        const group = line.split(":").slice(2).join(":")
+        return group === binding.cgroup || group.startsWith(binding.cgroup + "/")
+      })) throw Error("UNIT_EXIT_CGROUP_BUSY")
+    }
+    for (const process of [...original.processes, owner]) {
+      const raw = await readFile(`/proc/${process.pid}/stat`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+      if (raw !== null && raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19] === process.starttime) throw Error("UNIT_EXIT_PROCESS_BUSY")
+    }
+    if (await lstat(`/proc/${errorPid}`).catch(error => { if (gone(error)) return undefined; throw error }) || await writerIdentity(input.profile))
+      throw Error("UNIT_EXIT_PROCESS_BUSY")
+    const current = await registrationIdentity(input.profile).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT" && error.path === `${input.profile}.process-group` && previous) return previous.registration
+      throw error
+    })
+    if (JSON.stringify(current) !== JSON.stringify(registration)) throw Error("UNIT_EXIT_REGISTRATION_CHANGED")
+    passes.push({ observed_at: new Date().toISOString(), inspected, owned_remaining: 0, cgroup_remaining: 0 })
+    if (!pass) await Bun.sleep(150)
+  }
+  if (!(await readFile(input.sourceFile)).equals(bytes)) throw Error("UNIT_EXIT_SOURCE_CHANGED")
+  return { version: 1, kind: "systemd-unit-exit", source: { file: input.sourceFile, sha256 }, profile: input.profile, binding, registration, passes,
+    processes: { ...original, status: "confirmed", error: null, writer: null, observation_mode: "systemd_post_exit",
+      verification: passes.map(pass => ({ observed_at: pass.observed_at, owned_remaining: 0 })) } }
+}
 
 class WriterUnavailable extends Error {
   readonly refusal
@@ -197,30 +302,38 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
 /** Read only kernel ancestry; foreign executable/env permissions cannot confer ownership. */
 export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity, "pid" | "starttime">[]) {
   if (!Number.isSafeInteger(pid) || pid < 1) throw Error("Invalid process identity")
-  const seen = new Set<number>()
-  let current = pid
-  while (current) {
-    if (seen.has(current)) throw Error("Process parent chain changed")
-    seen.add(current)
-    const raw = await readFile(`/proc/${current}/stat`, "utf8").catch(async error => {
+  let birth: string | undefined, retries = 2
+  while (true) {
+    try {
+      const seen = new Set<number>()
+      let current = pid
+      while (current) {
+        if (seen.has(current)) throw Error("Process parent chain changed")
+        seen.add(current)
+        const raw = await readFile(`/proc/${current}/stat`, "utf8")
+        const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+        if (current === pid) {
+          if (["Z", "X"].includes(fields[0] ?? "")) return false
+          if (birth !== undefined && birth !== fields[19]) throw Error("Process birth changed during ancestry read")
+          birth = fields[19]
+        }
+        const parent = Number(fields[1])
+        if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
+        if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
+        current = parent
+      }
+      return false
+    } catch (error) {
       if (!gone(error)) throw error
       const candidate = await stat(`/proc/${pid}`).catch(error => {
         if (gone(error)) return undefined
         throw error
       })
-      // A vanished ancestor is still a refusal while the original candidate lives.
-      if (candidate) throw error
-      return undefined
-    })
-    if (raw === undefined) return false
-    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
-    if (current === pid && ["Z", "X"].includes(fields[0] ?? "")) return false
-    const parent = Number(fields[1])
-    if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
-    if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
-    current = parent
+      if (!candidate) return false
+      // Reparenting can remove an ancestor between reads; prove the fresh chain, never reuse it.
+      if (!retries--) throw error
+    }
   }
-  return false
 }
 
 async function snapshot(owners: ProcessIdentity[] = [], strictNative = false) {
@@ -544,8 +657,8 @@ export async function superviseProcess(input: {
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   const scan = async () => {
     const registered = [...liveSupervisors.values()]
-    const live = await snapshot(registered.flatMap(supervisor => [...supervisor.entries.values()]
-      .filter(entry => entry.origin).map(entry => entry.process)))
+    // Only this owner's ancestry can turn an unreadable process into a refusal.
+    const live = await snapshot([...ledger.values()].filter(entry => entry.origin).map(entry => entry.process))
     const peers = registered.filter(supervisor => supervisor.entries !== ledger && supervisor.cleanup.launcher?.ready &&
       live.some(current => sameIdentity(current, supervisor.launcher)))
     cleanup.peerProcesses = peers.flatMap(supervisor => [...supervisor.entries.values()]
@@ -910,4 +1023,43 @@ export async function superviseProcess(input: {
   })
   if (root && cleanup.status === "confirmed") liveSupervisors.delete(key(root))
   return result
+}
+
+/** Current closure of a native nondelegated preparation unit; no continuous trace is invented. */
+export async function observeTerminalPreparationUnit(binding: UnitBinding, owner: UnitBinding["producer"] & { bootId: string }) {
+  if (!binding || !owner || binding.producer.pid !== owner.pid || binding.producer.starttime !== owner.starttime ||
+    binding.producer.uid !== owner.uid || owner.uid !== process.getuid?.() || !Number.isSafeInteger(owner.pid) || owner.pid < 1 ||
+    !/^\d+$/.test(owner.starttime) || !/^[a-f0-9]{32}$/.test(binding.invocation) || binding.bootId !== owner.bootId ||
+    binding.bootId !== (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim() ||
+    !path.posix.isAbsolute(binding.cgroup) || path.posix.normalize(binding.cgroup) !== binding.cgroup ||
+    path.posix.basename(binding.cgroup) !== binding.unit || await realpath("/sys/fs/cgroup") !== "/sys/fs/cgroup")
+    throw Error("TERMINAL_PREPARATION_BINDING")
+  const passes: { observedAt: string; inspected: number; cgroupRemaining: number; producerRemaining: number }[] = []
+  for (let pass = 0; pass < 2; pass++) {
+    const unit = await unitProperties(binding)
+    if (unit.Id !== binding.unit || unit.InvocationID !== binding.invocation || unit.Delegate !== "no" ||
+      unit.MainPID !== "0" || unit.ControlGroup !== "" || !["inactive", "failed"].includes(unit.ActiveState ?? ""))
+      throw Error("TERMINAL_PREPARATION_UNIT_BUSY")
+    if (await lstat(path.join("/sys/fs/cgroup", binding.cgroup)).catch(error => { if (gone(error)) return; throw error }))
+      throw Error("TERMINAL_PREPARATION_CGROUP_BUSY")
+    let inspected = 0
+    for (const pid of (await readdir("/proc")).filter(name => /^\d+$/.test(name))) {
+      const groups = await readFile(`/proc/${pid}/cgroup`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+      if (groups === null) continue
+      if (!groups.trim() || groups.trim().split("\n").some(row => !/^\d+:[^:]*:\//.test(row))) throw Error("TERMINAL_PREPARATION_SCAN_INCOMPLETE")
+      inspected++
+      if (groups.trim().split("\n").some(row => {
+        const group = row.split(":").slice(2).join(":")
+        return group === binding.cgroup || group.startsWith(binding.cgroup + "/")
+      })) throw Error("TERMINAL_PREPARATION_CGROUP_BUSY")
+    }
+    const raw = await readFile(`/proc/${owner.pid}/stat`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+    if (raw !== null) {
+      const starttime = raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]
+      if (!starttime || !/^\d+$/.test(starttime) || starttime === owner.starttime) throw Error("TERMINAL_PREPARATION_PRODUCER_BUSY")
+    }
+    passes.push({ observedAt: new Date().toISOString(), inspected, cgroupRemaining: 0, producerRemaining: 0 })
+    if (!pass) await Bun.sleep(150)
+  }
+  return passes
 }
