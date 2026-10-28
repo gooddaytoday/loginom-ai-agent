@@ -136,6 +136,23 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
 });
 
+test('new unsaved draft requires its verified creation and native clean state',async()=>{
+ for(const fault of [null,'dirty','unknown','not-created','unverified','other-session','other-intent','other-inventory','saved','race-saved']){
+  const f=fixture({path:fault==='saved'?options.packagePath:null,modified:fault==='dirty'?true:fault==='unknown'?undefined:false,
+    ...(fault==='race-saved'?{racePath:options.packagePath}:{})});
+  const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+  const prepared=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+  Object.assign(prepared,{request:JSON.stringify({session:options.sessionId,intent:fault==='other-intent'?'existing_workflow':'new_draft'}),
+    phase:fault==='unverified'?'effect_possible':'verified',packageInventoryBefore:fault==='other-inventory'?1:0,
+    openConnection:m.FServerConnection,openServerSession:fault==='other-session'?{}:m.FServerConnection.Session,openAccount:options.account});
+  if(fault==='not-created')prepared.packageInventoryBefore=undefined;
+  const result=await f.run({packagePath:null,unsavedDraft:true});
+  assert.equal(result.status,fault?'BLOCKED':'SUCCEEDED',fault);
+  assert.equal(result.unsaved_changes_discarded,false,fault);
+  assert.equal(f.events.includes('close'),!fault,fault);assert.equal(f.events.includes('discard'),false,fault);
+ }
+});
+
 for(const mode of ['saved','readonly','diagnostic discard'])for(const changedAt of ['native Close','logout account readback'])
 test('cleanup refuses a replacement server session after '+changedAt+' for '+mode,async()=>{
  const f=fixture({readonly:mode==='readonly',modified:mode==='diagnostic discard'});

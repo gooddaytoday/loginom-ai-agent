@@ -91,6 +91,61 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Invalid external case name'):
                 runner.scenario('../path', root)
 
+    def test_upload_only_external_request_does_not_add_save_or_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'input.csv'
+            source.write_text('a\n1\n')
+            case = root / 'upload'
+            (case / 'data').mkdir(parents=True)
+            runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path', 'upload_only': True})
+            runner.write(case / 'expected.json', {'nodes': [], 'outputs': []})
+            prompt = 'Загрузи ' + str(source) + ' в Loginom'
+            (case / 'task.md').write_text(prompt)
+            workspace, folder = root / 'workspace', root / 'run'
+            workspace.mkdir(); folder.mkdir()
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options = root, {}, {'case_root': str(root)}
+            with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                with self.assertRaises(InterruptedError):
+                    instance.model('upload', folder, root / 'profile', workspace, '/test/result.lgp',
+                                   {'package_directory': '/test'}, root / 'build')
+            command = list(map(str, phase.call_args.args[1]))
+            self.assertEqual(command[-1], prompt)
+            self.assertNotIn('--file', command)
+            self.assertEqual(list(workspace.iterdir()), [])
+            # Observed user-v1 CLI delivery envelope, not the internal job snapshot.
+            profile = root / 'profile'
+            profile.mkdir()
+            cleanup = {'package_closed': True, 'logged_out': True, 'package_path': None,
+                       'save_operation_id': None, 'unsaved_changes_discarded': False}
+            runner.write(profile / 'saved-package-cleanup.json', cleanup)
+            runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+            reply = {'upload_status': 'ready', 'state': 'settled', 'status': 'SUCCEEDED',
+                     'cleanup_complete': True, 'output': {'bytes': source.stat().st_size,
+                     'upload_completion_verified': True}}
+            for fault in [None, 'wrong-size', 'not-ready', 'unconfirmed', 'unsettled']:
+                with self.subTest(fault=fault):
+                    sample = copy.deepcopy(reply)
+                    if fault == 'wrong-size': sample['output']['bytes'] += 1
+                    if fault == 'not-ready': sample['upload_status'] = 'uploading'
+                    if fault == 'unconfirmed': sample['cleanup_complete'] = False
+                    if fault == 'unsettled': sample['state'] = 'running'
+                    def output(*args, **kwargs):
+                        (folder / 'model.stdout').write_text(runner.json.dumps({'type': 'tool_use', 'sessionID': 'own-session',
+                            'part': {'state': {'status': 'completed', 'output': runner.json.dumps(sample)}}}) + '\n')
+                    instance.current = {}
+                    with patch.object(instance, 'phase', side_effect=output):
+                        if fault:
+                            with self.assertRaisesRegex(AssertionError, 'UPLOAD_NOT_READY'):
+                                instance.model('upload', folder, profile, workspace, '/test/result.lgp',
+                                               {'package_directory': '/test'}, root / 'build')
+                        else:
+                            instance.model('upload', folder, profile, workspace, '/test/result.lgp',
+                                           {'package_directory': '/test'}, root / 'build')
+                            self.assertEqual(instance.current['cleanup'], 'main PASS')
+                            self.assertEqual(instance.current['save'], 'not requested')
+
     def test_memory_observation_is_scoped_to_its_exact_process(self):
         instance = runner.Runner.__new__(runner.Runner)
         usage = instance.memory(os.getpid())

@@ -31,7 +31,8 @@ class ExternalClient {
     const code=request.arguments.code;
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null}};
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null},
+      ...(this.f.scenario.startsWith('draft-')?{ownership_verified:true,package_ref:{path:null,persisted:false}}:{})};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -48,10 +49,11 @@ class ExternalClient {
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      if(this.f.scenario==='draft-foreign-document')value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'DOCUMENT_IDENTITY_CHANGED'};
       if(this.f.scenario==='foreign-path')value.package_path=secondPath;
       if(this.f.scenario==='foreign-account')value.account='foreign';
       if(this.f.scenario==='discard-receipt')value.unsaved_changes_discarded=true;
-      if(['mutated-after-save','opened-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
+      if(['mutated-after-save','opened-dirty','draft-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
     } else throw Error('Unexpected browser code');
     return {content:[{type:'text',text:JSON.stringify(value)}]};
   }
@@ -118,6 +120,40 @@ for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','ope
       assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,false);
       assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.tabTid,'own-tab');
     }
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });
+
+for(const scenario of ['draft-clean','draft-dirty','draft-unsettled','draft-busy','draft-not-created','draft-persisted','draft-foreign-document'])
+ test('normal shutdown of an unsaved new draft: '+scenario,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,events:[],busy:false,saves:0,path:null,receipts:new Map(),catalog};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'draft-cleanup',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}});
+    const state=session.metadata.workspacePreparation.state;
+    state.package_ref.persisted=scenario==='draft-persisted';
+    if(scenario==='draft-not-created')state.created_draft=false;
+    if(scenario==='draft-foreign-document')state.document_id='foreign-doc';
+    f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
+    const result=await bridge.close();
+    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+    assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
+    assert.equal(cleanup.package_path,null);assert.equal(cleanup.save_operation_id,null);
+    assert.equal(cleanup.status,scenario==='draft-clean'?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-dirty','draft-foreign-document'].includes(scenario));
+    if(scenario==='draft-clean'){
+      assert.equal(cleanup.policy,'pristine_new_draft');assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+      assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.diagnosticDiscard,false);
+    }
+    if(scenario==='draft-dirty')assert.equal(cleanup.reason,'UNSAVED_CHANGES');
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 

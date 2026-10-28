@@ -75,6 +75,7 @@ n14–n17 previously lacked that fixture. Their new fixtures use the independent
 n17 Due is a local date at midnight; the CSV oracle still requires ISO dates.
 p24 uses expected-demo.json and CSV labels, as documented in the dataset README.
 CSV comparison honors declared column-order freedom and checks every value.
+External cases may set `upload_only: true` in `case.json`: the request stays unchanged, Save/export are not added, and readiness, exact byte count, no Save, close/logout and runtime ACK are required. Stock cold is skipped for that pathless draft.
 Unknown names are refused before detach. No automatic retries or account switching. Failed and UNKNOWN
 profiles/packages are retained; main cleanup never discards changes. Cold uses
 its stock diagnostic cleanup. Archive evidence before deleting run directories;

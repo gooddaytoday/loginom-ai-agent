@@ -5,17 +5,18 @@ import {withBrowserReceipt} from './executor.mjs';
 // Loginom's own close guard remains
 // enabled: CloseAllPackages(true, false) from E2E would bypass that guard.
 export function makePackageCleanupCode(options) {
-  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false} = options;
+  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, unsavedDraft = false, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false} = options;
   if (![sessionId, documentId, account, tabTid].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)
-      || typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
-      || packagePath.split('/').some(p => p === '.' || p === '..') || loginomBuild !== '7.4.2'
+      || !(unsavedDraft && packagePath === null) && (typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
+      || packagePath.split('/').some(p => p === '.' || p === '..')) || loginomBuild !== '7.4.2'
+      || typeof unsavedDraft !== 'boolean' || unsavedDraft && (packagePath !== null || diagnosticDiscard || diagnosticReadOnly || diagnosticWaitForIdle)
       || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean'
       || typeof diagnosticWaitForIdle !== 'boolean' || diagnosticWaitForIdle && !diagnosticDiscard
       || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
   // Match the existing bridge cleanup call's 30000 ms budget, including dispatch.
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle})},${Date.now()+30000})`;
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, unsavedDraft, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle})},${Date.now()+30000})`;
 }
 
 // Cold-only reconciliation of an unsuccessful Open. It never promotes prepare
@@ -220,6 +221,16 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
+      // A pathless package is eligible only when this session created it from
+      // an empty inventory. Native dirty-state and BeforeClose remain mandatory.
+      const draftOwnerBound=()=>{
+        if(!o.unsavedDraft)return true;
+        let request;try{request=JSON.parse(prepared.request);}catch{return false;}
+        return request.session===o.sessionId && request.intent==='new_draft' && prepared.phase==='verified'
+          && prepared.packageInventoryBefore===0 && prepared.openAccount===o.account
+          && prepared.openConnection===m.FServerConnection && prepared.openServerSession===m.FServerConnection.Session;
+      };
+      if(!draftOwnerBound())return {reason:'DRAFT_CREATION_UNCONFIRMED'};
       if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
         ||state.open_error_dismiss_started)) {
         if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
@@ -316,6 +327,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
           || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
       if(!openOwnerBound())return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+      if(!draftOwnerBound())return {reason:'DRAFT_CREATION_UNCONFIRMED'};
       if (o.diagnosticWaitForIdle) {
         if (Date.now() >= deadline) return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
         if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
