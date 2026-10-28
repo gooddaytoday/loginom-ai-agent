@@ -42,7 +42,20 @@ function missing(filePath: string, input: Record<string, unknown> = {}) {
   return result
 }
 
-test.each(["message", "next-message"])("a corrected missing read clears its failure in %s", (messageID) => {
+test.each([
+  "/data/poitns.csv",
+  "/data/poins.csv",
+  "/data/POINTS.csv",
+  "/data/orders.csv",
+])("a successful read repairs the missing filename %s", (filePath) => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing(filePath))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test.each(["message", "next-message"])("a missing read is repaired in %s", (messageID) => {
   const outcome = runToolOutcome()
   outcome.observe(missing("/data/poitns.csv"))
   expect(outcome.failed()).toBe(true)
@@ -51,7 +64,6 @@ test.each(["message", "next-message"])("a corrected missing read clears its fail
 })
 
 test.each([
-  { filePath: "/data/orders.csv" },
   { filePath: "/other/points.csv" },
   { filePath: "/data/points.txt" },
   { filePath: "/data/points.csv", offset: 20 },
@@ -80,11 +92,19 @@ test("only a successful read can repair the missing read", () => {
 test("a corrected read preserves other unresolved failures", () => {
   const outcome = runToolOutcome()
   outcome.observe(missing("/data/poitns.csv"))
-  outcome.observe(missing("/data/orders.csv"))
+  outcome.observe(missing("/other/orders.csv"))
   outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
   expect(outcome.failed()).toBe(true)
-  outcome.observe(part("read", { filePath: "/data/orders.csv" }, false))
+  outcome.observe(part("read", { filePath: "/other/orders.csv" }, false))
   expect(outcome.failed()).toBe(false)
+})
+
+test("a missing read without a successful read remains unresolved", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("glob", { pattern: "*.csv" }, false))
+  expect(outcome.failed()).toBe(true)
 })
 
 test("a corrected path cannot repair a different read error", () => {

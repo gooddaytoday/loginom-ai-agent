@@ -59,18 +59,12 @@ function correctedRead(failure: ToolPart, success: ToolPart) {
   if (typeof before !== "string" || typeof after !== "string") return false
   if (!failure.state.error.startsWith(`File not found: ${before}`) || failure.state.metadata?.permissionDenied) return false
   if (path.dirname(before) !== path.dirname(after) || path.extname(before) !== path.extname(after)) return false
-  if (
-    JSON.stringify(canonical({ ...failure.state.input, filePath: undefined })) !==
+  // A later successful read repairs missing-file errors in this directory and
+  // extension only when all other arguments match; filename similarity is irrelevant.
+  return (
+    JSON.stringify(canonical({ ...failure.state.input, filePath: undefined })) ===
     JSON.stringify(canonical({ ...success.state.input, filePath: undefined }))
   )
-    return false
-  // Only an adjacent filename transposition is evidence of this corrected typo.
-  // Other files, read errors and tool operations retain exact-argument correlation.
-  const a = path.basename(before)
-  const b = path.basename(after)
-  if (a.length !== b.length) return false
-  const index = a.split("").findIndex((char, index) => char !== b[index])
-  return index >= 0 && a[index] === b[index + 1] && a[index + 1] === b[index] && a.slice(index + 2) === b.slice(index + 2)
 }
 
 function canonical(value: unknown): unknown {
