@@ -142,9 +142,9 @@ export function serverDownloadBudget(bytes) {
 
 // The browser writes to disk; this registry transports only paths and metadata.
 // Cache identity is private authority for the backend exact-scan receipt.
-export function createServerDownloadRegistry({directory,inspect,download,now=Date.now}) {
+export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now}) {
   const jobs=new Map();
-  const native=s=>JSON.stringify([s.server_source_ref,s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
+  const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
   const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
   const find=id=>{const job=jobs.get(id);if(!job)throw Error('Unknown server download operation');return job;};
   const snapshot=job=>({result_version:'user-v1',operation_id:job.request.operation_id,state:job.state,
@@ -156,13 +156,14 @@ export function createServerDownloadRegistry({directory,inspect,download,now=Dat
   const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
   return {
     get busy(){return [...jobs.values()].some(j=>j.state==='running');},
+    get unsettled(){return [...jobs.values()].some(j=>j.state==='running'||j.cleanup===false);},
     start(request) {
       if(!request||Object.keys(request).some(k=>!['operation_id','server_source_ref'].includes(k))
         ||![request.operation_id,request.server_source_ref].every(v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(v)))
         throw Error('Server download requires operation_id and server_source_ref only');
       const old=jobs.get(request.operation_id);
       if(old){if(old.request.server_source_ref!==request.server_source_ref)throw Error('Download ID has different parameters');return snapshot(old);}
-      if(this.busy)throw Error('Another server download is running');
+      if(this.unsettled)throw Error('Another server download is running or its cleanup is unconfirmed');
       if(jobs.size>=128)throw Error('Server download capacity reached');
       const job={request:structuredClone(request),state:'running',phase:'validating',controller:new AbortController(),started:now()};
       jobs.set(request.operation_id,job);
@@ -196,7 +197,9 @@ export function createServerDownloadRegistry({directory,inspect,download,now=Dat
           job.error={code:job.controller.signal.aborted?(job.controller.signal.reason?.message==='LOGINOM_DOWNLOAD_DEADLINE'
             ?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
             message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
-          try{await remove(job);}catch{job.cleanup=false;job.error={code:'LOGINOM_DOWNLOAD_CLEANUP_FAILED',message:'Partial cache cleanup failed'};}
+          if(error.cleanupUnconfirmed)job.browserUnsettled=true;
+          try{if(job.browserUnsettled)throw Error('Browser transfer is unsettled');await remove(job);}
+          catch{job.cleanup=false;job.error={code:'LOGINOM_DOWNLOAD_CLEANUP_FAILED',message:'Partial cache cleanup failed or browser transfer is unsettled'};}
         }finally{clearTimeout(timer);job.state='settled';}
       })();
       return snapshot(job);
@@ -221,7 +224,7 @@ export function createServerDownloadRegistry({directory,inspect,download,now=Dat
         const copy=await lstat(job.path).catch(()=>null);
         if(!copy||copy.isSymbolicLink()||!copy.isFile()||JSON.stringify(local(copy))!==JSON.stringify(job.identity))return source;
         return {...source,sha256:receipt.sha256,cache_binding:{server_source_ref:source.server_source_ref,
-          native_size:source.bytes,native_mtime:source.mtime,copy_bytes:copy.size,identity:receipt.identity}};
+          download_source_ref:job.source.server_source_ref,native_size:source.bytes,native_mtime:source.mtime,copy_bytes:copy.size,identity:receipt.identity}};
       }
       return source;
     },
@@ -229,7 +232,10 @@ export function createServerDownloadRegistry({directory,inspect,download,now=Dat
       const selected=id?[find(id)]:[...jobs.values()];
       for(const job of selected)if(job.state==='running')job.controller.abort(Error('LOGINOM_DOWNLOAD_CANCELLED'));
       await Promise.all(selected.map(j=>j.completion));
-      for(const job of selected){await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=true;}
+      for(const job of selected){
+        if(job.browserUnsettled){if(!recover)throw Error('Original browser download cleanup is unconfirmed');await recover(job.request.operation_id);job.browserUnsettled=false;}
+        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=true;
+      }
       return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:'SUCCEEDED',cleanup_complete:true,output:{cache_removed:true}};
     },
   };
@@ -241,7 +247,9 @@ function localIdentity(identity) {
 
 const downloadId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.:-]+$'};
 export const serverDownloadTools=[
-  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Byte progress is unknown until the browser finishes its disk copy.',
+  {name:'dock_storage_source',description:'Locate an existing CSV/TSV/TXT/XLSX by its exact path in the assigned inputs directory. Navigates the native Files UI and returns an opaque server_source_ref with native size/mtime. Does not upload or import. Use this before preview/download when the CLI starts on the workflow graph.',
+    properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024}},required:['operation_id','path']},
+  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Byte progress is unknown until the browser finishes its disk copy.',
     properties:{operation_id:downloadId,server_source_ref:downloadId},required:['operation_id','server_source_ref']},
   {name:'dock_storage_download_status',description:'Read the original server download progress and terminal cache path.',properties:{operation_id:downloadId},required:['operation_id']},
   {name:'dock_storage_download_wait',description:'Wait at most 60 seconds for the original download; a wait timeout does not cancel it.',properties:{operation_id:downloadId,timeout_ms:{type:'integer',minimum:0,maximum:60000}},required:['operation_id']},

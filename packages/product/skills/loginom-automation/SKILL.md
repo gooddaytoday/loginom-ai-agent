@@ -115,8 +115,11 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 полный расчёт.
 
 Если исходный файл уже в разрешённом хранилище Loginom, не загружай его повторно.
-В разделе «Файлы» найди точный файл и получи `storage_entry.server_source_ref`
-через наблюдение его строки (native size/mtime). Для импорта передай
+Вызови `loginom_dock_storage_source` с точным `path` и новым `operation_id`:
+он открывает «Файлы», находит файл в разрешённом каталоге и возвращает
+`output.source.server_source_ref` из наблюдения его строки (native size/mtime).
+Если раздел «Файлы» уже открыт, ссылка также доступна в `storage_entry.server_source_ref`.
+Для импорта передай
 `source:{kind:"storage",server_source_ref:"<полученная ссылка>"}` и точный
 `settings.source.source_path`. Произвольный путь или придуманные artifact/upload IDs
 не доказывают происхождение. Структура и preview мастера имеют `coverage=preview`:
@@ -134,8 +137,12 @@ Preview — до 25 отображённых строк, с явной непо�
 успешный `loginom_file_scan` без ошибок типов. Для серверного источника вызови
 `loginom_dock_storage_download_start` с исходным `server_source_ref` и новым
 `operation_id`, затем `loginom_dock_storage_download_wait` на том же ID до
-`status:SUCCEEDED`. Скачивание браузером идёт на диск в закрытый cache; байты
-прогресса до завершения копирования неизвестны. Не начинай другую браузерную
+`status:SUCCEEDED`. Скачивание браузером идёт на диск в закрытый cache.
+Перед скачиванием после Close/preview снова вызови `loginom_dock_storage_source`:
+он возвращает Files в нужный каталог. Перед финальным `source_switch` также
+снова найди исходный путь через этот инструмент. Обновлённый ref допустим только
+при неизменных stand/account/document/path/native size/mtime скачанного cache.
+Байты прогресса до завершения копирования неизвестны. Не начинай другую браузерную
 операцию во время скачивания. При отмене используй `loginom_dock_storage_download_cancel`
 и дождись `cleanup_complete:true`. Возвращённый локальный `path` передай
 `loginom_file_profile`, затем `loginom_file_scan` и `loginom_file_sample`.

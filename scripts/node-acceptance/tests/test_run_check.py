@@ -18,6 +18,21 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 's-server-a'
+            source.mkdir()
+            (source / 'task.md').write_text('Сумма продаж по регионам')
+            (source / 'data').mkdir()
+            case = runner.scenario('s-server-a', root)
+            self.assertEqual(case['prompt'], source / 'task.md')
+            self.assertIsNone(case['base'])
+            self.assertTrue(case['external'])
+            self.assertEqual(list(case['data'].iterdir()), [])
+            with self.assertRaises(ValueError):
+                runner.scenario('../s-server-a', root)
+
     def test_all_87_model_commands_attach_initial_data_and_not_repeat_inputs(self):
         names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
                   for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])

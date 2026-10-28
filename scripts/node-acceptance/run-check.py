@@ -35,7 +35,14 @@ def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
 
-def scenario(name):
+def scenario(name, cases=None):
+    # Operator fixtures (including private large-file oracles) stay outside Git.
+    # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
+    if cases and re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name):
+        src = Path(cases).resolve() / name
+        if (src / 'task.md').is_file():
+            assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
+            return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -83,6 +90,7 @@ def arguments(argv=None):
     start.add_argument('--scenarios', required=True)
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
+    start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
@@ -336,12 +344,16 @@ class Runner:
 
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
         spec = (dict(source=case, prompt=case / 'task.md', data=case / 'data')
-                if isinstance(case, Path) else scenario(case))
+                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
         expected = expected_for(spec, package)
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
-        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()))
+        exports = ([Path(output['export_destination']).name for output in expected['outputs']]
+                   if spec.get('external') else
+                   list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists())))
+        if spec.get('external'):
+            assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
         if not exports:
             count = 2 if src.parent.name == 'datamining-clustering' else 1
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
@@ -431,7 +443,7 @@ class Runner:
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    base = scenario(case)['base']
+                    base = scenario(case, self.options.get('cases'))['base']
                     session = None
                     for step in ([base, case] if base else [case]):
                         r.update(csv='—', save='—', cleanup='—')
@@ -479,7 +491,7 @@ def main():
     names = args.scenarios.split(',')
     assert len(names) == len(set(names)), 'Duplicate scenario'
     for name in names:
-        spec = scenario(name)
+        spec = scenario(name, args.cases)
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
         expected_for(spec, '/preflight/package.lgp')
@@ -501,7 +513,8 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
-    request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
+    request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
+                            'cases': str(args.cases.expanduser().resolve()) if args.cases else None}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:

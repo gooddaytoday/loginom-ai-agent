@@ -4,6 +4,7 @@ import {mkdtemp,writeFile,readdir,stat,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
+import {Page,runtime} from './support/executor-fixture.mjs';
 
 const source=()=>({verified:true,kind:'storage',server_source_ref:'storage-one',destination:'/worker/full.csv',
  bytes:3,mtime:'2026-10-28T00:00:00Z',origin:'https://app.loginom.ai',account:'worker',document_id:'doc'});
@@ -32,9 +33,21 @@ test('download writes a private cache, binds its receipt to native identity and 
   identity:{canonical_path:path,size:3,file_id:`${(await stat(path)).dev}:${(await stat(path)).ino}`,
    mtime:(await stat(path)).mtimeMs,ctime:(await stat(path)).ctimeMs}};
  assert.equal((await f.registry.bind(source(),receipt)).sha256,receipt.sha256);
+ assert.equal((await f.registry.bind({...source(),server_source_ref:'refreshed-native-ref'},receipt)).sha256,receipt.sha256);
+ assert.equal((await f.registry.bind({...source(),account:'foreign'},receipt)).sha256,undefined);
  assert.equal((await f.registry.bind(source(),{...receipt,identity:{...receipt.identity,canonical_path:'/foreign'}})).sha256,undefined);
  assert.equal((await f.registry.bind({...source(),mtime:'changed'},receipt)).sha256,undefined);
  await f.registry.cleanup();assert.deepEqual(await readdir(join(f.root,'cache')),[]);
+});
+
+test('public server source discovery refuses foreign roots and unsupported files before browser navigation',async t=>{
+ const f=await fixture(t),page=new Page();
+ page.execute=()=>assert.fail('Invalid source must not invoke the browser');
+ const r=runtime(page,{cacheDirectory:join(f.root,'runtime-cache'),getStorageBinding:()=>({directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ assert.ok(r.tools.some(t=>t.name==='dock_storage_source'));
+ for(const path of ['/foreign/full.csv','/worker/../foreign.csv','/worker/full.lgp'])
+  await assert.rejects(r.serverDownload({operation_id:'source',path},'dock_storage_source'));
+ assert.equal(r.hasActiveWork(),false);await r.cleanupServerCache();
 });
 test('changed native size/mtime or wrong copy size invalidates download and removes partials',async t=>{
  for(const kind of ['size','mtime','copy']){
@@ -56,4 +69,27 @@ test('cancel drains the actual transfer before deleting partials; IDs cannot rep
  assert.equal(result.status,'FAILED');assert.equal(result.cancel_requested,true);assert.equal(result.cleanup_complete,true);
  assert.deepEqual(await readdir(join(f.root,'cache')),[]);
  await f.registry.cleanup();
+});
+
+test('a transfer finishing beyond its original deadline is invalid and removed',async t=>{
+ let clock=0;
+ const f=await fixture(t);
+ const registry=createServerDownloadRegistry({directory:join(f.root,'timed'),now:()=>clock,inspect:async()=>source(),
+  download:async({path,deadline})=>{await writeFile(path,'abc');clock=deadline+1;}});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_DEADLINE');
+ assert.deepEqual(await readdir(join(f.root,'timed')),[]);
+});
+
+test('unknown browser cleanup retains the lease and partial until actual recovery',async t=>{
+ const f=await fixture(t);let recovered=false;
+ const registry=createServerDownloadRegistry({directory:join(f.root,'unknown'),inspect:async()=>source(),
+  download:async({path})=>{await writeFile(path,'a');throw Object.assign(Error('transport lost'),{cleanupUnconfirmed:true});},
+  recover:async id=>{assert.equal(id,'download');recovered=true;}});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.cleanup_complete,false);assert.equal(registry.unsettled,true);
+ assert.equal((await readdir(join(f.root,'unknown'))).length,1);
+ assert.throws(()=>registry.start({...f.request,operation_id:'other'}),/cleanup/);
+ await registry.cleanup('download');assert.equal(recovered,true);assert.equal(registry.unsettled,false);
+ assert.deepEqual(await readdir(join(f.root,'unknown')),[]);
 });

@@ -430,7 +430,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             requirePreparedWorkspace(session.metadata);
             const args=request.params.arguments??{};
             validateActionParameters(actionRuntime.tools.find(t=>t.name===request.params.name).inputSchema,args);
-            const result=await actionRuntime.serverDownload(args,request.params.name);
+            const result=await actionRuntime.serverDownload(args,request.params.name,{signal:extra.signal});
             await logResult(request.params.name,result);
             return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
           }

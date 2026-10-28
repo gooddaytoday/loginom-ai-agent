@@ -4,6 +4,7 @@ import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
+import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
@@ -1544,9 +1545,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const auxiliary = new Map();
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
+  let storageNavigating=false;
   const inspectServerSource=ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
     expected_origin:targetOrigin,expected_build:targetBuild,...options})));
-  const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,
+  const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
+  const drainServerDownload=async id=>{
+    const cancelled=await controlServerDownload(id,'cancel');
+    if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
+    const released=await controlServerDownload(id,'release');
+    if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
+  };
+  const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
     download:async({source,path,operation_id,signal,deadline})=>{
       const roots=await runtime.observe({scope:'roots',storageName:source.destination.slice(source.destination.lastIndexOf('/')+1)});
       const row=roots.output.ui.elements.find(e=>e.tid===roots.output.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(source.destination.slice(source.destination.lastIndexOf('/')+1)));
@@ -1559,13 +1568,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
         download_path:path,deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
       signal.throwIfAborted();
-      const started=await execute(makeServerSourceDownloadCode(options));
-      if(started.status!=='SUCCEEDED'||started.output?.download_started!==true)throw Error('LOGINOM_DOWNLOAD_FAILED');
-      const control=mode=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
+      const code=makeServerSourceDownloadCode(options);
+      let started;
+      try{started=await execute(code);}
+      catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
+        const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;throw error;
+      }
       try {
         while(true) {
           signal.throwIfAborted();
-          const current=await control('status');
+          const current=await controlServerDownload(operation_id,'status');
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           if(current.output.state==='settled'){
             if(current.output.failed||current.output.expired)throw Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED');
@@ -1573,7 +1586,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           await new Promise(resolve=>setTimeout(resolve,250));
         }
-      }finally{await control('cancel');await control('release');}
+      }finally{try{await drainServerDownload(operation_id);}catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}}
     } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
@@ -2401,10 +2414,88 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name) {
+    serverDownload(request,name,{signal}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
+      if(name==='dock_storage_source')return (async()=>{
+        if(storageNavigating||serverDownloads.unsettled||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+          throw Error('Resolve the pending Dock operation before locating a server source');
+        checkId(request.operation_id);
+        const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
+        if(!/\.(csv|tsv|txt|xlsx)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX');
+        const id=request.operation_id,signature='storage.source:'+path;
+        if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
+        if(auxiliary.has(id)){
+          const previous=auxiliary.get(id);
+          if(previous.signature!==signature||!previous.outcome)throw Error('Original storage navigation requires inspection; do not repeat');
+          return structuredClone(previous.outcome);
+        }
+        auxiliary.set(id,{signature});storageNavigating=true;
+        const deadline=now()+120000;let step=0;
+        const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
+        const read=async options=>{
+          guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
+          if(result.status!=='SUCCEEDED')throw Error('Server storage observation failed');
+          const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
+          for(let page=0;cursor;page++){
+            if(page>=32)throw Error('Server storage observation page limit');
+            const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
+            if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
+            output.ui.elements.push(...next.output.ui.elements);cursor=next.output.page?.next_cursor;
+          }
+          return output;
+        };
+        const roots=()=>read({scope:'roots'});
+        const one=entries=>{if(entries.length!==1)throw Error('Server storage control is missing or ambiguous');return entries[0];};
+        const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
+        const act=async(s,e,verb='click',extra={})=>{
+          guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+          if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
+        };
+        const ready=async(probe,predicate)=>{
+          const end=Math.min(deadline,now()+15000);
+          for(let attempt=0;attempt<100&&now()<end;attempt++){
+            const state=await probe();if(state&&predicate(state)&&!(state.ui.masks??[]).length&&!(state.ui.dialogs??[]).length)return state;
+            await new Promise(resolve=>setTimeout(resolve,100));
+          }
+          throw Error('Server storage UI is not ready');
+        };
+        const directory=expected=>ready(async()=>{
+          const s=await roots(),bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
+          return bars.length===1?detail(s,bars[0]):null;
+        },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
+        try{
+          const initial=await roots();
+          if(!initial.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))){
+            const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar')));
+            await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage')));
+          }
+          let current=await directory();const destination=path.slice(0,path.lastIndexOf('/'));
+          if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
+            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+            current=await directory('/');
+          }
+          const row=async name=>{
+            const parent=current;let last;
+            return findNativeStorageRow({name,guard,roots:async()=>{last=await roots();return last;},
+              read:async options=>{
+                const state=options.root_ref?await read({rootRef:options.root_ref,observationId:last.observation_id}):await read({scope:'roots',storageName:options.storage_name});
+                if(state.dom_epoch.document!==parent.dom_epoch.document||JSON.stringify(state.workflow_ref)!==JSON.stringify(parent.workflow_ref))throw Error('Server storage owner changed');
+                last=state;return state;
+              },ready:(probe,predicate)=>ready(probe,predicate),act});
+          };
+          for(const part of destination.slice(current.file_storage.directory==='/'?0:current.file_storage.directory.length).split('/').filter(Boolean)){
+            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')));
+            await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
+          }
+          if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          const state=await row(path.slice(path.lastIndexOf('/')+1));
+          const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref));
+          const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
+          auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
+        }finally{storageNavigating=false;}
+      })();
       if(name==='dock_storage_download_start'){
-        if(running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+        if(storageNavigating||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before downloading');
         if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)&&auxiliary.get(request.operation_id).signature!=='storage.download:'+request.server_source_ref
           ||nodeJobs.has(request.operation_id)||sourceReads.has(request.operation_id))
@@ -3196,7 +3287,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
-      if(serverDownloads?.busy&&!['serverDownload','cleanupServerCache'].includes(name)){
+      if((storageNavigating||serverDownloads?.unsettled)&&!['serverDownload','cleanupServerCache'].includes(name)){
         const error=Error('Server download retains the browser; use download status/wait/cancel');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;
       }
@@ -3213,8 +3304,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(serverDownloads?.busy||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
-    hasUnsettledWork:()=>!!(serverDownloads?.busy||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasActiveWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
