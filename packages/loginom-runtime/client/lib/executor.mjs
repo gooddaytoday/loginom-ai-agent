@@ -1,4 +1,4 @@
-import {browserFailureCategory} from './browser-failure.mjs';
+import {browserFailureCategory,browserFailureDetails} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -1471,7 +1471,10 @@ export function withBrowserReceipt(body, options) {
 }
 
 export function parseCapabilityResult(response) {
-  if (response?.isError) throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']');
+  if (response?.isError) {
+    const details=browserFailureDetails(response);
+    throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''));
+  }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const match = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);

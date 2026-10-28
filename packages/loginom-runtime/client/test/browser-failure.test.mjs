@@ -15,3 +15,12 @@ for(const [message,category] of [
   assert.equal(error.message,'Pinned browser capability call failed ['+category+']');return true;
  });
 });
+
+for(const reason of ['owner','dialog','attempted','capacity','awaiting_original_attempt'])
+ test('connection guard refusal retains only its fixed reason: '+reason,()=>{
+  assert.throws(()=>parseCapabilityResult({isError:true,content:[{type:'text',text:
+   'Error: Loginom connection is disconnected; original session recovery unverified ('+reason+'); inspect the pending operation before continuing\npassword=PRIVATE'}]}),error=>{
+    assert.equal(error.message,'Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason='+reason+')');
+    return true;
+  });
+ });
