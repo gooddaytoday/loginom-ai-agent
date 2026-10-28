@@ -241,6 +241,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),
           p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined);
         if(sourceSwitch){
+          if(p.source.kind==='storage'){
+            requireValue(scanReceipt?.basis==='backend_exact_scan'&&scanReceipt.profile_id===sourceSwitch.profile_id,
+              'LOGINOM_EXACT_SCAN_REQUIRED: full server source switch requires the downloaded copy exact scan; execution refused');
+            const source=sourceReceipt.source,binding=source.cache_binding;
+            requireValue(binding&&binding.server_source_ref===source.server_source_ref&&binding.native_size===source.bytes
+              &&binding.native_mtime===source.mtime&&binding.copy_bytes===scanReceipt.bytes
+              &&source.bytes===scanReceipt.bytes&&source.sha256===scanReceipt.sha256
+              &&JSON.stringify(binding.identity)===JSON.stringify(scanReceipt.identity),
+              'LOGINOM_FILE_CHANGED: server source no longer matches the unchanged downloaded cache (native size/mtime, copy size and exact scan); execution refused before source switch');
+          }
           requireValue(typeof verifySourceSwitchSave==='function','Full source switch requires a verified package save');
           saveReceipt=verifySourceSwitchSave(sourceSwitch.save_operation_id);
         }

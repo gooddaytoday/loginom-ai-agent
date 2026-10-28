@@ -124,3 +124,22 @@ test('server full N accepts only the cache binding to the same native storage re
  for(const patch of [{server_source_ref:'other'},{native_size:4},{native_mtime:'changed'},{copy_bytes:4},{identity:{...identity,file_id:'1:3'}}])
   assert.equal(verifyFullImportCount('p',receipt,{...source,cache_binding:{...source.cache_binding,...patch}},output,execution).status,'not_verified');
 });
+
+test('server source switch refuses a refreshed changed file before opening or executing the import',async()=>{
+ const parameters={source:{kind:'storage',server_source_ref:'new-ref'},settings:{source:{source_path:'/worker/full.csv'}},
+  source_switch:{profile_id:'p',save_operation_id:'saved'}};
+ const receipt={basis:'backend_exact_scan',profile_id:'p',records:17,bytes:3,sha256:'a'.repeat(64),
+  identity:{canonical_path:'/private/cache/full.csv',size:3,file_id:'1:2'}};
+ const proof={verified:true,kind:'storage',server_source_ref:'new-ref',destination:'/worker/full.csv',bytes:4,mtime:'changed',coverage:'preview'};
+ const support=createTextImportNodeSupport({});
+ const driver=support.nodeApplyDriverFactory({operation:{parameters:{parameters}},scanReceipt:receipt,
+  resolveStorageSource:async()=>proof,verifySourceSwitchSave:()=>({verified:true}),
+  execute:async()=>assert.fail('Changed storage source must refuse before any wizard or Execute call')});
+ await assert.rejects(driver.verifySource(parameters),/unchanged|changed|cache/i);
+ Object.assign(proof,{bytes:3,mtime:'original',sha256:receipt.sha256,cache_binding:{server_source_ref:'new-ref',
+  native_size:3,native_mtime:'original',copy_bytes:3,identity:receipt.identity}});
+ assert.equal((await driver.verifySource(parameters)).source.sha256,receipt.sha256);
+ const missing=support.nodeApplyDriverFactory({operation:{parameters:{parameters}},resolveStorageSource:async()=>proof,
+  verifySourceSwitchSave:()=>({verified:true}),execute:async()=>assert.fail('No scan means no browser mutation')});
+ await assert.rejects(missing.verifySource(parameters),/EXACT_SCAN_REQUIRED/);
+});
