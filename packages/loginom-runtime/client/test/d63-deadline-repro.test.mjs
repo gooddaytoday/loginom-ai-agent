@@ -29,7 +29,7 @@ test(`independent D63 absolute deadline: toast ready ${readyAt}, transport ${tra
  }
  page.add('button',base+'WizrdMCF;btnExecute','Execute',{x:500,y:300,width:100,height:30},wizard);
  const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
- const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:page.tab.getAttribute('data-tid'),navigation_path:[{tid:"scenario",label:"Scenario"}]};
+ const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:page.tab.getAttribute('data-tid'),navigation_path:crumbs.slice(0,5).map(c=>({tid:c.getAttribute('data-tid'),label:c.textContent.trim()}))};
  const binding={document_id:'doc',workflow_ref,node};
  const reader=async()=>{
   if(dispatched&&(lateRead==='before'&&!clicked||lateRead==='after'&&clicked))elapsed=65000;
