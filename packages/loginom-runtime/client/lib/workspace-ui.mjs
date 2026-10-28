@@ -174,7 +174,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false, scanRetried = false, settleMasks = true) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
+    const previousNode=task.snapshot?.prepared_node_context,previousInput=previousNode?.input_port;
+    const preparedInputReturn=effectPossible&&task.action?.verb==='finish_wizard'
+      &&previousNode?.verified===true&&previousNode.surface==='wizard'&&nodeContext?.surface==='graph'
+      &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
+      &&previousInput?.direction==='input'&&previousInput.port===0&&previousInput.native_index===0
+      &&typeof previousInput.port_guid==='string'&&previousInput.port_guid.length>0
+      &&typeof previousInput.opening_operation_id==='string'&&previousInput.opening_operation_id.length>0;
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedInputReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -874,6 +881,15 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       let portContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       if(panels.length===1) {
         const prefix=workflow.prefix+';cnrNaviMode;b.s_';
+        // Done can return to the same graph while the long package still
+        // hides its workflow crumb. Retain the original native input opening.
+        const returnPath=preparedInputReturn&&wizard.status==='absent'&&preparedWorkflowPath?.length===5
+          &&all.filter(e=>panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix)).length===5;
+        const inputReturnAncestor=e=>returnPath&&preparedWorkflowPath.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
+          &&[...e.querySelectorAll('.maptree-icon-workflow')].every(icon=>getComputedStyle(icon).display!=='none'
+            &&getComputedStyle(icon).visibility==='visible'&&getComputedStyle(icon).opacity!=='0'&&!icon.hasAttribute('hidden')&&!sensitive(icon));
         // A long breadcrumb toolbar hides the output socket as well as Settings.
         // Only a current native opening receipt may supply this overflow context;
         // the visible wizard, full ancestry and actionable Done remain required.
@@ -901,11 +917,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
             &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||inputReturnAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:inputReturnAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -3679,7 +3695,7 @@ function readRenderedInputMapping(observation) {
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     timeout();
     if (observed?.ui_read_failure) {

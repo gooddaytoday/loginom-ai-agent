@@ -5281,8 +5281,33 @@ async function inputPortFinishFixture(mode='valid') {
   if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
     async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
-  return {...f,done,waits:()=>waits};
+  return {...f,done,crumbs,waits:()=>waits};
 }
+
+test('D52b input0 Done retains its exact hidden workflow ancestor through one native graph return',async()=>{
+ for(const fault of ['none','node','workflow','visibility','icon','guid','opening']){
+  const {page,owner,crumbs}=await inputPortFinishFixture();
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};crumbs[4].children[0].box={x:0,y:0,width:0,height:0};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:!owner.isConnected&&fault==='node'?'foreign':'node',surface:owner.isConnected?'wizard':'graph',tid:owner.isConnected?'MF;TF-5;WizrdMCF':'MF;TF-5;Graph;Revenue',
+    ...(owner.isConnected?{input_port:{direction:'input',port:0,native_index:0,port_guid:fault==='guid'?'':'input-0',opening_operation_id:fault==='opening'?'':'open-input',node_icon_class:'bg-vendor-icon-calcdata'},navigation_node:{tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()}}:{})})));
+  const snapshot=await page.observe(),done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  if(['guid','opening'].includes(fault)){assert.equal(done,undefined,fault);continue;}
+  assert.ok(done,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(fault==='workflow')crumbs[4].ownText='Другой сценарий';
+   if(fault==='visibility')crumbs[4].style.visibility='hidden';
+   if(fault==='icon')crumbs[4].children[0].style.visibility='hidden';
+  };
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(r.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(r.trace.some(e=>e.event==='input_port_finish_verified'),fault==='none',fault);
+ }
+});
 
 test('typed input-port finish is offered only with full mapping and exact owner evidence',async()=>{
   for(const mode of ['valid','missing_context','missing_mapping','duplicate_done']){
