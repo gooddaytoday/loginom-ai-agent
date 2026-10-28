@@ -31,7 +31,7 @@ $bun = Join-Path $stage.FullName 'bun.exe'
 Copy-Item -LiteralPath (Get-Command -Name $BunPath -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source -Destination $bun
 # Bundle the actual test and its product sources into the public staging folder.
 # The standard user must not gain access to the runner's private checkout/token.
-& $bun build (Join-Path $repo 'packages/agent/test/cli/profile-windows.test.ts') --target bun --outfile (Join-Path $stage.FullName 'profile-windows.test.js')
+& $bun build (Join-Path $repo 'packages/opencode/test/cli/profile-windows.test.ts') --target bun --outfile (Join-Path $stage.FullName 'profile-windows.test.js')
 if ($LASTEXITCODE -ne 0) { throw 'Native profile test bundle failed' }
 $launcher = Join-Path $stage.FullName 'test-windows-profile.ps1'
 Copy-Item -LiteralPath $PSCommandPath -Destination $launcher

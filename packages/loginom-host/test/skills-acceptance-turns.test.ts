@@ -9,7 +9,7 @@ test.each([
 ])("$id keeps the edit fixture after schema decode and across genuine task profiles", async (expected) => {
   const { decodeAcceptanceCorpus } = await import("../script/skills-acceptance/corpus")
   const { acceptanceTurns } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = decodeAcceptanceCorpus(await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json())
+  const corpus = decodeAcceptanceCorpus(await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json())
   const testcase = corpus.cases.find(item => item.id === expected.id)!
   expect(testcase).toBeDefined()
   expect(testcase.fixture).toBe("edit_lgp")
@@ -25,11 +25,11 @@ test.each([
 
 test("both adapters stage the selected external package and preserve the old default bytes", async () => {
   const { acceptanceTurns, prepareAcceptanceInputs } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
+  const corpus = await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
   const fixtures: Record<string, string> = Object.fromEntries(Object.entries(corpus.fixtures).map(([key, file]) => [key, resolve(import.meta.dir, "../../..", file as string)]))
   expect(fixtures.edit_lgp, "confirmed edit fixture must be registered in cases.json").toBeDefined()
   expect(new Bun.CryptoHasher("sha256").update(await Bun.file(fixtures.edit_lgp!).bytes()).digest("hex")).toBe(
-    (await Bun.file(new URL("../../agent/test/cli/package-docs-routing/fixtures/edit-source.provenance.json", import.meta.url)).json()).sha256,
+    (await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/fixtures/edit-source.provenance.json", import.meta.url)).json()).sha256,
   )
   const root = await mkdtemp(join(tmpdir(), "loginom-routing-input-"))
   try {
@@ -50,7 +50,7 @@ test("both adapters stage the selected external package and preserve the old def
 
 test("path turns bind their real source and scope CLI allow only to non-scenario new cases", async () => {
   const { acceptanceTurns, acceptanceInputPath, acceptanceCliPermission } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
+  const corpus = await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
   const paths = { csv: "/input/sales.csv", text: "/input/read.txt", lgp: "/input/source.lgp", created: "/workspace/changed.lgp" }
   for (const [id, expected] of [["scenario-create-path", [paths.csv]], ["text-read", [paths.text]],
     ["edit-after-docs", [paths.lgp, paths.lgp]], ["docs-after-edit", [paths.lgp, paths.created]],
@@ -102,7 +102,7 @@ test.each([
   { id: "text-read", input: "text-path", profile: "default", scenario: false },
 ])("$id routes a text-only path through its expected profile", async (expected) => {
   const { acceptanceTurns } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
+  const corpus = await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
   const testcase = corpus.cases.find((item: { id: string }) => item.id === expected.id)
   expect(testcase).toBeDefined()
   expect(acceptanceTurns(testcase)).toMatchObject([{ input: expected.input, scenario: expected.scenario,
@@ -111,7 +111,7 @@ test.each([
 
 test("a modification uses the saved package on the second turn, without attaching CSV again", async () => {
   const { acceptanceTurns } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
+  const corpus = await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
   const testcase = corpus.cases.find((item: { id: string }) => item.id === "scenario-modify")
   const turns = acceptanceTurns(testcase)
   expect(turns).toHaveLength(2)
@@ -125,7 +125,7 @@ test("a modification uses the saved package on the second turn, without attachin
 
 test("execution reuses the saved source on a separate automation turn", async () => {
   const { acceptanceTurns } = await import("../script/skills-acceptance/turns.mjs")
-  const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
+  const corpus = await Bun.file(new URL("../../opencode/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
   const testcase = corpus.cases.find((item: { id: string }) => item.id === "scenario-execute-save")
   const turns = acceptanceTurns(testcase)
   expect(turns).toHaveLength(2)

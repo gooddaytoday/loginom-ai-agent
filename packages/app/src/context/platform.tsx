@@ -1,6 +1,6 @@
 import type { LocalAttachmentReference } from "@/utils/local-attachment"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
-import { createSimpleContext } from "@loginom-ai-agent/ui/context"
+import type { Loginom } from "@opencode-ai/schema/loginom"
+import { createSimpleContext } from "@opencode-ai/ui/context"
 import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
 import type { Accessor } from "solid-js"
 import type { DesktopMenuAction } from "../desktop-menu"

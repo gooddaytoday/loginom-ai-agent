@@ -158,7 +158,7 @@ REC-01/CON-07 выполняются на одноразовом тестово�
 - Общий [release.yml](../../../.github/workflows/release.yml) собирает Desktop/CLI всех трёх платформ; [test.yml](../../../.github/workflows/test.yml) проверяет исходники. См. [CI runbook](ci-release.md).
 - [Desktop entry](../../../packages/desktop/src/main/index.ts), [sidecar](../../../packages/desktop/src/main/sidecar.ts), [logging](../../../packages/desktop/src/main/logging.ts): точки выбора backend, пути профиля и экспорт логов.
 
-Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. В Linux-реализации backend уже перемещён из `packages/opencode` в `packages/agent`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.
+Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. В Linux-реализации backend уже перемещён из `packages/opencode` в `packages/opencode`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.
 
 ## Уточнения после Linux-реализации
 

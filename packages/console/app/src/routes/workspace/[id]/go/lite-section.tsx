@@ -2,18 +2,18 @@ import { action, useParams, useAction, useSubmission, json, query, createAsync }
 import { createStore } from "solid-js/store"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Modal } from "~/component/modal"
-import { Billing } from "@loginom-ai-agent/console-core/billing.js"
-import { Database, eq, and, gte, isNull, sql } from "@loginom-ai-agent/console-core/drizzle/index.js"
-import { BillingTable, LiteTable, UsageTable } from "@loginom-ai-agent/console-core/schema/billing.sql.js"
-import { KeyTable } from "@loginom-ai-agent/console-core/schema/key.sql.js"
-import { WorkspaceTable } from "@loginom-ai-agent/console-core/schema/workspace.sql.js"
-import { Actor } from "@loginom-ai-agent/console-core/actor.js"
-import { Workspace } from "@loginom-ai-agent/console-core/workspace.js"
-import { Subscription } from "@loginom-ai-agent/console-core/subscription.js"
-import { LiteData } from "@loginom-ai-agent/console-core/lite.js"
-import { ZenData } from "@loginom-ai-agent/console-core/model.js"
-import { getMonthlyBounds, getWeekBounds } from "@loginom-ai-agent/console-core/util/date.js"
-import { centsToMicroCents } from "@loginom-ai-agent/console-core/util/price.js"
+import { Billing } from "@opencode-ai/console-core/billing.js"
+import { Database, eq, and, gte, isNull, sql } from "@opencode-ai/console-core/drizzle/index.js"
+import { BillingTable, LiteTable, UsageTable } from "@opencode-ai/console-core/schema/billing.sql.js"
+import { KeyTable } from "@opencode-ai/console-core/schema/key.sql.js"
+import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
+import { Actor } from "@opencode-ai/console-core/actor.js"
+import { Workspace } from "@opencode-ai/console-core/workspace.js"
+import { Subscription } from "@opencode-ai/console-core/subscription.js"
+import { LiteData } from "@opencode-ai/console-core/lite.js"
+import { ZenData } from "@opencode-ai/console-core/model.js"
+import { getMonthlyBounds, getWeekBounds } from "@opencode-ai/console-core/util/date.js"
+import { centsToMicroCents } from "@opencode-ai/console-core/util/price.js"
 import { withActor } from "~/context/auth.withActor"
 import { queryBillingInfo } from "../../common"
 import styles from "./lite-section.module.css"
@@ -640,8 +640,13 @@ export function LiteSection(props: { lite: LiteSubscription | undefined }) {
           </p>
           <h3 data-slot="promo-models-title">{i18n.t("workspace.lite.promo.modelsTitle")}</h3>
           <ul data-slot="promo-models">
+            <li>Space Bunny</li>
+            <li>Step 5 Preview Free</li>
+            <li>Grok 4.7</li>
             <li>Grok 4.6</li>
+            <li>GPT 6 Luna</li>
             <li>GPT 5.6 Luna</li>
+            <li>Claude Haiku 5.5</li>
             <li>GLM-5.3-Flash</li>
             <li>GLM-5.3</li>
             <li>GLM-5.2</li>
@@ -659,16 +664,17 @@ export function LiteSection(props: { lite: LiteSubscription | undefined }) {
             <li>Qwen3.7 Max</li>
             <li>Qwen3.7 Plus</li>
             <li>Qwen3.6 Plus</li>
-            <li>DeepSeek V4.1 Flash — {i18n.t("go.graph.bonus", { count: 4 })}</li>
+            <li>DeepSeek V4.1 Flash</li>
             <li>DeepSeek V4 Pro</li>
             <li>DeepSeek V4 Flash</li>
             <li>DeepSeek V4 Flash Vision Exp</li>
+            <li>MiMo-V2.6-Flash</li>
+            <li>MiMo-V2.6-Pro</li>
             <li>MiMo-V2.5</li>
             <li>MiMo-V2.5-Pro</li>
             <li>Hy4 preview</li>
             <li>Hy3</li>
           </ul>
-          <p data-slot="promo-description">{i18n.t("go.promo.deepseek")}</p>
           <p data-slot="promo-description">{i18n.t("workspace.lite.promo.footer")}</p>
           <div data-slot="subscribe-actions">
             <button

@@ -570,7 +570,7 @@ test("Node extraction matches the saved Python structure of a Cyrillic two-node 
 })
 
 test("native Calculator expressions retain their name, data type and exact formula", async () => {
-  const structure = await extractPackage(join(import.meta.dir, "../../agent/test/cli/package-docs-routing/fixtures/edit-source.lgp"))
+  const structure = await extractPackage(join(import.meta.dir, "../../opencode/test/cli/package-docs-routing/fixtures/edit-source.lgp"))
   const calculator = structure.modules[0].workflow_nodes.find((node) => node.guid === "9cfc49f4-987a-43bf-920f-5f2b81f0b893")
   expect(calculator?.settings_main.Expressions).toBe(JSON.stringify([
     { Name: "amount_double", DataType: "dtFloat", Expression: "amount * 2" },

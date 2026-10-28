@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@loginom-ai-agent/tui",
-  "version": "1.18.31",
+  "name": "@opencode-ai/tui",
+  "version": "1.19.5",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -48,11 +48,11 @@
     "./component/register-spinner": "./src/component/register-spinner.ts"
   },
   "dependencies": {
-    "@loginom-ai-agent/core": "workspace:*",
+    "@opencode-ai/core": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
-    "@loginom-ai-agent/plugin": "workspace:*",
-    "@loginom-ai-agent/sdk": "workspace:*",
-    "@loginom-ai-agent/ui": "workspace:*",
+    "@opencode-ai/plugin": "workspace:*",
+    "@opencode-ai/sdk": "workspace:*",
+    "@opencode-ai/ui": "workspace:*",
     "@opentui/core": "catalog:",
     "@opentui/keymap": "catalog:",
     "@opentui/solid": "catalog:",
@@ -60,7 +60,6 @@
     "diff": "catalog:",
     "effect": "catalog:",
     "fuzzysort": "catalog:",
-    "open": "10.1.2",
     "opentui-spinner": "catalog:",
     "remeda": "catalog:",
     "strip-ansi": "7.1.2",

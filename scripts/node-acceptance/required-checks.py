@@ -13,7 +13,7 @@ RULES = (
     (('packages/loginom-runtime/src/**',), ('host-unit',), ()),
     (('packages/loginom-runtime/client/**',), ('client-full',), ()),
     (('scripts/node-acceptance/**',), ('acceptance-tests',), ()),
-    (('packages/agent/**', 'packages/protocol/**', 'packages/schema/**',
+    (('packages/opencode/**', 'packages/protocol/**', 'packages/schema/**',
       'packages/loginom-host/src/host-port.ts', 'packages/loginom-runtime/executor/schemas/**',
       'packages/client/src/generated*/**', C + 'node-contracts.*', C + 'effect-contracts.mjs',
       C + 'node-read-contract.mjs', C + 'node-result-schema.mjs'), ('main-chat-approval',), ()),

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { Product } from "@loginom-ai-agent/product"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
+import type { Loginom } from "@opencode-ai/schema/loginom"
 import {
   createLoginomSettings,
   loginomBrowserMessage,

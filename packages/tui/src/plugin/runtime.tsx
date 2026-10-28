@@ -3,7 +3,7 @@ import type {
   TuiPluginInstallOptions,
   TuiPluginInstallResult,
   TuiPluginStatus,
-} from "@loginom-ai-agent/plugin/tui"
+} from "@opencode-ai/plugin/tui"
 import type { TuiConfig } from "../config"
 import { createContext, createSignal, useContext, type JSX, type ParentProps } from "solid-js"
 import { createPluginRoutes } from "./api"

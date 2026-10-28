@@ -7,7 +7,7 @@ import {
   SystemPart,
   isContextOverflowFailure,
   type ProviderErrorEvent,
-} from "@loginom-ai-agent/llm"
+} from "@opencode-ai/llm"
 import { Cause, DateTime, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
@@ -59,7 +59,7 @@ import { llmClient } from "../../effect/app-node-platform"
  *
  * - One provider turn
  *   - [x] Translate every projected V2 Session message variant into canonical
- *     `@loginom-ai-agent/llm` messages.
+ *     `@opencode-ai/llm` messages.
  *   - [ ] Resolve policy-filtered built-in, MCP, plugin, and structured-output tool definitions.
  *   - [x] Stream exactly one `llm.stream(request)` provider turn.
  *   - [x] Persist assistant text and usage events incrementally as they arrive.
@@ -206,6 +206,8 @@ const layer = Layer.effect(
         model,
         http: {
           headers: {
+            "x-opencode-session-id": session.id,
+            ...(session.parentID ? { "x-opencode-parent-session-id": session.parentID } : {}),
             "x-session-affinity": session.id,
             "X-Session-Id": session.id,
             ...(session.parentID ? { "x-parent-session-id": session.parentID } : {}),

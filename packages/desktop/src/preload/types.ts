@@ -1,10 +1,10 @@
 import type { LocalAttachmentReference } from "@loginom-ai-agent/loginom-host/attachment-receipt"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
-import type { DesktopMenuAction } from "@loginom-ai-agent/app/desktop-menu"
-import type { WslServersPlatform } from "@loginom-ai-agent/app/wsl/types"
-import type { UpdaterState } from "@loginom-ai-agent/app/updater"
-import type { DesktopNativeBundle } from "@loginom-ai-agent/app/i18n/desktop-native"
-import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
+import type { Loginom } from "@opencode-ai/schema/loginom"
+import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
+import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
+import type { UpdaterState } from "@opencode-ai/app/updater"
+import type { DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -17,7 +17,7 @@ export type {
   WslServerRuntime,
   WslServersEvent,
   WslServersState,
-} from "@loginom-ai-agent/app/wsl/types"
+} from "@opencode-ai/app/wsl/types"
 
 export type ServerReadyData = {
   url: string

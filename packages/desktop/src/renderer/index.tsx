@@ -15,8 +15,8 @@ import {
   useCommand,
   useWslServers,
   useLanguage,
-} from "@loginom-ai-agent/app"
-import type { UpdaterState } from "@loginom-ai-agent/app/updater"
+} from "@opencode-ai/app"
+import type { UpdaterState } from "@opencode-ai/app/updater"
 import * as Sentry from "@sentry/solid"
 import type { AsyncStorage } from "@solid-primitives/storage"
 import { createMemoryHistory, MemoryRouter, type BaseRouterProps } from "@solidjs/router"
@@ -30,8 +30,8 @@ import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./
 import { windowFullscreen } from "./window-fullscreen"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import "./styles.css"
-import { Splash } from "@loginom-ai-agent/ui/logo"
-import { useTheme } from "@loginom-ai-agent/ui/theme/context"
+import { Splash } from "@opencode-ai/ui/logo"
+import { useTheme } from "@opencode-ai/ui/theme/context"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {

@@ -1,1 +1,1 @@
-export type { LocalAttachmentReference } from "@loginom-ai-agent/session-ui/v2/prompt-input/types"
+export type { LocalAttachmentReference } from "@opencode-ai/session-ui/v2/prompt-input/types"

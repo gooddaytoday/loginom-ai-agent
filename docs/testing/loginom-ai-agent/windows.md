@@ -137,7 +137,7 @@ bun run package:win --x64 --publish never
 
 Выход текущей сборки — `packages/desktop/dist/`. `prebuild` запускается как lifecycle script и строит Node backend; в dev возможна загрузка существующего upstream CLI. `package:win` определён как electron-builder; `--publish never` запрещает публикацию. Не запускать существующий `.github/workflows/publish.yml` как готовый релиз Loginom: в нём пока upstream owner/channel/signing.
 
-После изменения renderer дополнительно выполнить `bun typecheck` из `packages/app`; после backend — из текущего `packages/opencode`, а **после согласованного переименования — из `packages/agent`**. Нужные тесты запускать только из своего package directory; конкретные новые Loginom test paths должны быть указаны в manifest/плане реализации, их здесь ещё нет. Тесты из корня запрещены, `tsc` напрямую не запускать.
+После изменения renderer дополнительно выполнить `bun typecheck` из `packages/app`; после backend — из текущего `packages/opencode`, а **после согласованного переименования — из `packages/opencode`**. Нужные тесты запускать только из своего package directory; конкретные новые Loginom test paths должны быть указаны в manifest/плане реализации, их здесь ещё нет. Тесты из корня запрещены, `tsc` напрямую не запускать.
 
 В текущем checkout отсутствует `packages/desktop/native`, хотя packaging config его упоминает. Это наблюдение исходников, не результат сборки: при соответствующем отказе нужно восстановить объявленную dependency/build stage либо исправить состав пакета. Не создавать пустую папку ради зелёной сборки.
 

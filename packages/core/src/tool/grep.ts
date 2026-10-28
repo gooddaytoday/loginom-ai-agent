@@ -1,6 +1,6 @@
 export * as GrepTool from "./grep"
 
-import { ToolFailure } from "@loginom-ai-agent/llm"
+import { ToolFailure } from "@opencode-ai/llm"
 import { Effect, Layer, Schema } from "effect"
 import path from "path"
 import { makeLocationNode } from "../effect/app-node"

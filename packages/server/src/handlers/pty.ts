@@ -1,19 +1,19 @@
-import { Pty } from "@loginom-ai-agent/core/pty"
-import { PtyProtocol } from "@loginom-ai-agent/core/pty/protocol"
-import { PtyTicket } from "@loginom-ai-agent/core/pty/ticket"
-import { Location } from "@loginom-ai-agent/core/location"
+import { Pty } from "@opencode-ai/core/pty"
+import { PtyProtocol } from "@opencode-ai/core/pty/protocol"
+import { PtyTicket } from "@opencode-ai/core/pty/ticket"
+import { Location } from "@opencode-ai/core/location"
 import { Effect, Queue } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import * as Socket from "effect/unstable/socket/Socket"
 import { Api } from "../api"
 import { CorsConfig, isAllowedRequestOrigin } from "../cors"
-import { ForbiddenError, PtyNotFoundError } from "@loginom-ai-agent/protocol/errors"
+import { ForbiddenError, PtyNotFoundError } from "@opencode-ai/protocol/errors"
 import {
   PTY_CONNECT_TICKET_QUERY,
   PTY_CONNECT_TOKEN_HEADER,
   PTY_CONNECT_TOKEN_HEADER_VALUE,
-} from "@loginom-ai-agent/protocol/groups/pty"
+} from "@opencode-ai/protocol/groups/pty"
 import { response } from "../location"
 import { PtyEnvironment } from "../pty-environment"
 
@@ -140,6 +140,14 @@ export const PtyHandler = HttpApiBuilder.group(Api, "server.pty", (handlers) =>
       .handleRaw(
         "pty.connect",
         Effect.fn("PtyHandler.connect")(function* (ctx) {
+          if (!isAllowedRequestOrigin(ctx.request.headers.origin, ctx.request.headers.host, cors))
+            return HttpServerResponse.empty({ status: 403 })
+
+          const url = new URL(ctx.request.url, "http://localhost")
+          const ticket = url.searchParams.get(PTY_CONNECT_TICKET_QUERY)
+          if (ticket && !(yield* tickets.consume({ ticket, ptyID: ctx.params.ptyID, ...(yield* ticketScope) })))
+            return HttpServerResponse.empty({ status: 403 })
+
           const pty = yield* Pty.Service
           const exists = yield* pty.get(ctx.params.ptyID).pipe(
             Effect.as(true),
@@ -147,14 +155,6 @@ export const PtyHandler = HttpApiBuilder.group(Api, "server.pty", (handlers) =>
           )
           if (!exists) return HttpServerResponse.empty({ status: 404 })
 
-          const url = new URL(ctx.request.url, "http://localhost")
-          const ticket = url.searchParams.get(PTY_CONNECT_TICKET_QUERY)
-          if (ticket) {
-            const valid = isAllowedRequestOrigin(ctx.request.headers.origin, ctx.request.headers.host, cors)
-              ? yield* tickets.consume({ ticket, ptyID: ctx.params.ptyID, ...(yield* ticketScope) })
-              : false
-            if (!valid) return HttpServerResponse.empty({ status: 403 })
-          }
           const parsedCursor = url.searchParams.get("cursor")
           const cursorNumber = parsedCursor === null ? undefined : Number(parsedCursor)
           const cursor =

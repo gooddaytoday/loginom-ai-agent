@@ -7,13 +7,18 @@ on:
   workflow_dispatch:
   # release.yml runs this workflow as a release gate.
   workflow_call:
+    inputs:
+      macos:
+        description: "Include the macos-14 matrix entries; release.yml turns them off with LOGINOM_RELEASE_SKIP_MACOS"
+        type: boolean
+        default: true
 
 concurrency:
-  # Keep every run on dev so cancelled checks do not pollute the default branch
+  # Keep every run on v1 so cancelled checks do not pollute the release branch
   # commit history. PRs and other branches still share a group and cancel stale runs.
   # The `tests-` prefix keeps the group apart from callers such as release.yml
   # (group `release-<ref>`); sharing a group with the caller would cancel it.
-  group: tests-${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
+  group: tests-${{ case(github.ref == 'refs/heads/v1', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
   cancel-in-progress: true
 
 # Callers may pass no more than `contents: read`; nothing here needs more.
@@ -59,7 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        # Push and pull_request runs have no inputs, so macOS stays in unless a caller passes macos: false.
+        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04"]' || '["ubuntu-24.04","macos-14"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
@@ -83,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14]
+        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-14"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -217,6 +223,19 @@ jobs:
       - name: Prepare isolated Linux test display
         run: sudo apt-get update && sudo apt-get install -y xvfb xauth x11-utils
 
+      # Runner images from 20261025 no longer ship rg, and the tests then try to
+      # download it from inside their sandbox. Install the version pinned in
+      # packages/core/src/ripgrep/binary.ts so lookup finds it on PATH.
+      - name: Install pinned ripgrep
+        run: |
+          archive=ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz
+          curl -fsSLO --retry 3 "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/$archive"
+          echo "1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599  $archive" | sha256sum -c -
+          tar -xzf "$archive"
+          sudo install -m 0755 ripgrep-15.1.0-x86_64-unknown-linux-musl/rg /usr/local/bin/rg
+          rm -rf "$archive" ripgrep-15.1.0-x86_64-unknown-linux-musl
+          rg --version
+
       - name: Run unit tests
         timeout-minutes: 30
         # The resume acceptance driver observes its owned X11 windows even when
@@ -228,7 +247,7 @@ jobs:
         run: bun run check:generated
 
       - name: Run HttpApi exerciser gates
-        working-directory: packages/agent
+        working-directory: packages/opencode
         # A rare hang inside the effect run otherwise holds the job until its 60-minute limit.
         timeout-minutes: 10
         run: bun run test:httpapi

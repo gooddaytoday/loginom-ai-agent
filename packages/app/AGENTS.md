@@ -11,7 +11,7 @@
 
 - `opencode dev web` proxies `https://app.opencode.ai`, so local UI/CSS changes will not show there.
 - For local UI changes, run the backend and app dev servers separately.
-- Backend (from `packages/agent`): `bun run ./src/index.ts serve --port 4096`
+- Backend (from `packages/opencode`): `bun run ./src/index.ts serve --port 4096`
 - App (from `packages/app`): `bun dev -- --port 4444`
 - Open `http://localhost:4444` to verify UI changes (it targets the backend at `http://localhost:4096`).
 
@@ -55,7 +55,7 @@ Core workflow:
 - `src/components/settings-loginom.tsx` is the shared first-run/settings form; `loginom-button.tsx` keeps access prominent. Desktop operations go through the platform/preload contract.
 - Ask API key, URL, username and password only. Default URL/username come from Product; password is empty and has no placeholder. Never add a folder input or folder availability check; use `/<username>` in runtime. Keep provider/model connection in the existing settings flow.
 - Never render stored secrets back from main. Connection changes may be pending until the active generation is released; display the actual state rather than treating save as immediate activation.
-- New-chat branding comes from `@loginom-ai-agent/ui/v2/wordmark-v2`, used by `src/pages/new-session/new-session-view.tsx`. The requested text is `Loginom AI`; changing the legacy Logo alone does not update this screen.
+- New-chat branding comes from `@opencode-ai/ui/v2/wordmark-v2`, used by `src/pages/new-session/new-session-view.tsx`. The requested text is `Loginom AI`; changing the legacy Logo alone does not update this screen.
 - Validate UI in an isolated test application/profile, preserving the user's running session. See [desktop checks](../desktop/AGENTS.md) and [connection ownership](../desktop/src/main/loginom/AGENTS.md).
 - Loginom settings use `settings-loginom-state.ts`: check never saves; save validates, waits for immediate activation, then closes. Deferred activation is announced separately and monitored after closing. The key mask is a placeholder based only on the stored-key flag; never submit it as a credential. Close, Escape and the overlay share a dialog close guard for dirty drafts. Keep the general reload action absent; offer refresh only for a revision conflict. Regression: `test-browser/settings-loginom.test.ts` and Desktop `test/loginom/settings-ux.mjs` / `settings-live.mjs`.
 - Display Help readiness and browser `unknown/verified/failed` independently. Successful Help validation may carry a browser warning and still save. Keep the checked draft's browser result separate from the active view; edits retire that result. Account mismatch warnings must not claim that saving failed. Deferred activation notifications use the new generation's browser status. Existing English values remain unchanged; new copy uses typed EN/RU i18n keys. Installed GUI/wizard acceptance remains a separate gate from controller tests and typecheck.

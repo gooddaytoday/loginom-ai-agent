@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { SessionV1 } from "@loginom-ai-agent/schema/v1/session"
+import { SessionV1 } from "@opencode-ai/schema/v1/session"
 import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises"

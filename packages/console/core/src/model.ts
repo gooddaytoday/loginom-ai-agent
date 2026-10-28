@@ -5,10 +5,10 @@ import { ModelTable } from "./schema/model.sql"
 import { Identifier } from "./identifier"
 import { fn } from "./util/fn"
 import { Actor } from "./actor"
-import { Resource } from "@loginom-ai-agent/console-resource"
+import { Resource } from "@opencode-ai/console-resource"
 
 export namespace ZenData {
-  const FormatSchema = z.enum(["anthropic", "google", "openai", "oa-compat"])
+  const FormatSchema = z.enum(["anthropic", "google", "openai", "oa-compat", "systemone"])
   export type Format = z.infer<typeof FormatSchema>
 
   const ModelCostSchema = z.object({

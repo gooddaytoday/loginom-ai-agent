@@ -1,6 +1,6 @@
-import { getFilename } from "@loginom-ai-agent/core/util/path"
+import { getFilename } from "@opencode-ai/core/util/path"
 import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
-import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@loginom-ai-agent/sdk/v2/client"
+import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@opencode-ai/sdk/v2/client"
 import type { FileSelection } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
 import type { AgentPart, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
