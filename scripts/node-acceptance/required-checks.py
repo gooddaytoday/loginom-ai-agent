@@ -8,6 +8,8 @@ import subprocess
 import sys
 
 C = 'packages/loginom-runtime/client/lib/'
+CONTRACTS = (C + 'node-contracts.*', C + 'effect-contracts.mjs',
+             C + 'node-read-contract.mjs', C + 'node-result-schema.mjs')
 # The only path-rule table: glob(s), stable check IDs, suggested run-check cases.
 RULES = (
     (('packages/loginom-runtime/src/**',), ('host-unit',), ()),
@@ -60,15 +62,132 @@ def select(paths):
     return checks, sorted(cases) or ['s1', 's3', 's5', 'n18', 'n19', 'n20']
 
 
+def entries(text):
+    """Split a declarative list, never evaluate JavaScript from the diff."""
+    tokens = re.findall(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|[A-Za-z_$][\w$]*|\s+|.", text, re.S)
+    parts, part, stack = [], '', []
+    for token in tokens:
+        if token in '([{': stack.append(token)
+        if token in ')]}':
+            if not stack or stack.pop() != {')': '(', ']': '[', '}': '{'}[token]:
+                raise ValueError('Unbalanced declaration')
+        if token == ',' and not stack:
+            if part.strip(): parts.append(part.strip())
+            part = ''
+        else: part += token
+    if stack: raise ValueError('Unbalanced declaration')
+    if part.strip(): parts.append(part.strip())
+    return parts
+
+
+def declarative_value(value):
+    code = re.sub(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"", '""', value)
+    if re.search(r'[=;`]|\+\+|--|\b(?:new|function|await|import|delete)\b', code): return False
+    return all(call in ['object', 'array', 'nullable', 'values', 'Object.freeze']
+               for call in re.findall(r'([\w.]+)\s*\(', code))
+
+
+def added_entries(before, after, key):
+    old, new = entries(before), entries(after)
+    keys = [key(item) for item in new]
+    if any(k in [None, '__proto__', 'constructor', 'prototype'] for k in keys) or len(keys) != len(set(keys)): return False
+    old_keys = {key(v) for v in old}
+    return (len(new) > len(old) and [item for item in new if key(item) in old_keys] == old
+            and all(declarative_value(item) for item in new if key(item) not in old_keys))
+
+
+def additive_contract(before, after):
+    # Only known declarative registration points may grow. Everything outside
+    # them, including validators, old schema fields and helper code, stays exact.
+    declaration = re.compile(r'(?m)^(?:export )?const ([A-Za-z_$][\w$]*)\s*=.*?;(?=\s*(?:\n|$))', re.S)
+    old = {m[1]: m[0] for m in declaration.finditer(before)}
+    new = {m[1]: m[0] for m in declaration.finditer(after)}
+    if len(old) != len(list(declaration.finditer(before))) or len(new) != len(list(declaration.finditer(after))): return False
+    added = set(new) - set(old)
+    if not set(old) <= set(new): return False
+    changed = False
+    for name, value in new.items():
+        previous = old.get(name)
+        if previous == value: continue
+        changed = True
+        body = value.split('=', 1)[1].strip().removesuffix(';').strip()
+        if previous is None:
+            if not re.search(r'(?:Schema|Readback)$', name): return False
+            if not body.startswith(('object(', '{', 'Object.freeze(')): return False
+            # Data/schema constructors only, no executable handlers or mutation.
+            if not declarative_value(body): return False
+            entries(body)
+            continue
+        previous_body = previous.split('=', 1)[1].strip().removesuffix(';').strip()
+        if name == 'definitions' and body.startswith('[') and body.endswith(']') and previous_body.startswith('[') and previous_body.endswith(']'):
+            key = lambda item: (m[1] if (m := re.match(r"\[\s*['\"]([^'\"]+)['\"]\s*,", item)) else None)
+            if added_entries(previous_body[1:-1], body[1:-1], key): continue
+        if name in ['NODE_TYPES', 'EFFECT_CONTRACTS']:
+            pattern = r'(?:Object\.freeze\()?\{(.*)\}\)?'
+            a, b = re.fullmatch(pattern, previous_body, re.S), re.fullmatch(pattern, body, re.S)
+            key = lambda item: (m[1] if (m := re.match(r"['\"]?([\w.]+)['\"]?\s*:", item)) else None)
+            if a and b and added_entries(a[1], b[1], key): continue
+        if name == 'configurationReadback':
+            a = re.fullmatch(r'\{anyOf:\[(.*)\]\}', previous_body, re.S)
+            b = re.fullmatch(r'\{anyOf:\[(.*)\]\}', body, re.S)
+            if a and b and added_entries(a[1], b[1], lambda item: item if re.fullmatch(r'\w+', item) else None):
+                if set(entries(b[1])) - set(entries(a[1])) <= added: continue
+        return False
+    # Strip only accepted declarations; source between them must be identical.
+    before_rest = declaration.sub(lambda m: '@' + m[1] + '@', before)
+    after_rest = declaration.sub(lambda m: '' if m[1] in added else '@' + m[1] + '@', after)
+    # A new TS interface is a new schema; edits to old interfaces stay in rest.
+    for match in reversed(list(re.finditer(r'(?m)^export interface (\w+)[^{\n]*\{', after_rest))):
+        if re.search(r'\b(?:interface|type|const)\s+' + re.escape(match[1]) + r'\b', before): continue
+        depth, end = 1, None
+        for token in re.finditer(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|[{}]", after_rest[match.end():]):
+            if token[0] == '{': depth += 1
+            if token[0] == '}': depth -= 1
+            if depth == 0:
+                end = match.end() + token.end()
+                break
+        if end is None: return False
+        after_rest = after_rest[:match.start()] + after_rest[end:]
+        changed = True
+    # NodeType is the one existing TypeScript union whose members are node keys.
+    union = re.compile(r"export type NodeType\s*=\s*([^;]+);")
+    a, b = union.search(before_rest), union.search(after_rest)
+    if a and b and a[0] != b[0]:
+        values = lambda s: [v.strip() for v in s.split('|')]
+        aa, bb = values(a[1]), values(b[1])
+        if not all(re.fullmatch(r"'[^']+'", v) for v in bb) or len(set(bb)) != len(bb): return False
+        if [v for v in bb if v in aa] != aa or len(bb) <= len(aa): return False
+        before_rest, after_rest = union.sub('@NodeType@', before_rest), union.sub('@NodeType@', after_rest)
+        changed = True
+    return changed and [v for v in before_rest.splitlines() if v.strip()] == [v for v in after_rest.splitlines() if v.strip()]
+
+
+def additive_paths(paths, base, head):
+    result = set()
+    for path in paths:
+        if not any(fnmatchcase(path, pattern) for pattern in CONTRACTS): continue
+        try:
+            before, after = git('show', base + ':' + path), git('show', head + ':' + path)
+            if additive_contract(before, after): result.add(path)
+        except (subprocess.CalledProcessError, ValueError): pass  # Unknown/deleted syntax keeps the stop.
+    return result
+
+
 def obligations(base, head):
     base = git('rev-parse', '--verify', '--end-of-options', base + '^{commit}').strip()
     head = git('rev-parse', '--verify', '--end-of-options', head + '^{commit}').strip()
     ancestor = git('merge-base', base, head).strip()
     paths = changed(ancestor, head)
     checks, cases = select(paths)
+    additions = additive_paths(paths, ancestor, head)
+    if additions:
+        checks.get('main-chat-approval', set()).difference_update(additions)
+        if not checks.get('main-chat-approval'): checks.pop('main-chat-approval', None)
+        for key in ['client-full', 'acceptance-tests', 'live-ui']:
+            checks.setdefault(key, set()).update(additions)
     # start alone only detaches: the required command includes foreground wait.
     live = ('result=$(python3 scripts/node-acceptance/run-check.py start --head ' + head
-            + ' --scenarios ' + ','.join(cases) + ' --pair "$PAIR" --cold)'
+            + ' --scenarios ' + ('"${NODE_SCENARIOS:?set run-check scenarios for the new node}"' if additions else ','.join(cases)) + ' --pair "$PAIR" --cold)'
             + ' && python3 scripts/node-acceptance/run-check.py wait "$result" --timeout 5400')
     specs = dict(UNITS, **{
         'live-ui': (live, 'D79: живые сценарии обязательны; офлайн-replay не заменяет; сценарии по типу узла из run-check.md'),
