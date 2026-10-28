@@ -64,9 +64,10 @@ import { Truncate } from "@/tool/truncate"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Format } from "../../src/format"
-import { TestInstance } from "../fixture/fixture"
+import { provideTmpdirInstance, TestInstance } from "../fixture/fixture"
+import { SessionRetry } from "../../src/session/retry"
 import { awaitWithTimeout, pollWithTimeout, testEffect } from "../lib/effect"
-import { reply, TestLLMServer } from "../lib/llm-server"
+import { raw, reply, TestLLMServer } from "../lib/llm-server"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -3078,6 +3079,136 @@ it.instance("records aborted errors when prompt is cancelled mid-stream", () =>
     if (last?.info.role === "assistant") {
       expect(last.info.error?.name).toBe("MessageAbortedError")
     }
+  }),
+)
+
+noLLMServer.live(
+  "interrupted SSE exhausts retries and accepts the next prompt",
+  () =>
+    Effect.gen(function* () {
+      let healthy = false
+      const times: number[] = []
+      using server = Bun.serve({
+        port: 0,
+        hostname: "127.0.0.1",
+        fetch() {
+          times.push(Date.now())
+          // Bound the pre-fix failure too: the session used to loop without backoff.
+          if (!healthy && times.length > SessionRetry.RETRY_MAX_RETRIES + 1)
+            return Response.json({ error: { message: "SSE test request limit" } }, { status: 400 })
+          const chunk = (delta: object, finish_reason?: string) =>
+            `data: ${JSON.stringify({ id: "chatcmpl-cut", object: "chat.completion.chunk", choices: [{ index: 0, delta, finish_reason }] })}\n\n`
+          // Close HTTP after visible text, without the provider's terminal chunk.
+          return new Response(
+            chunk({ role: "assistant", content: healthy ? "pong" : "ob" }) +
+              (healthy ? chunk({}, "stop") + "data: [DONE]\n\n" : ""),
+            { headers: { "content-type": "text/event-stream" } },
+          )
+        },
+      })
+      yield* provideTmpdirInstance(
+        () =>
+          Effect.gen(function* () {
+            const prompt = yield* SessionPrompt.Service
+            const sessions = yield* Session.Service
+            const status = yield* SessionStatus.Service
+            const events = yield* EventV2Bridge.Service
+            const chat = yield* sessions.create({ title: "Interrupted SSE recovery" })
+            const retries: number[] = []
+            const errors: unknown[] = []
+            const off = yield* events.listen((event) => {
+              if (event.type === SessionStatus.Event.Status.type) {
+                const data = event.data as typeof SessionStatus.Event.Status.data.Type
+                if (data.sessionID === chat.id && data.status.type === "retry") retries.push(data.status.attempt)
+              }
+              if (event.type === Session.Event.Error.type) errors.push(event.data)
+              return Effect.void
+            })
+            const failed = yield* prompt.prompt({
+              sessionID: chat.id,
+              agent: "build",
+              model: ref,
+              parts: [{ type: "text", text: "ping" }],
+            })
+            console.log("interrupted SSE", { calls: times.length, retries, info: failed.info })
+            expect(times).toHaveLength(SessionRetry.RETRY_MAX_RETRIES + 1)
+            expect(retries).toEqual([1, 2, 3, 4, 5])
+            expect(errors).toHaveLength(1)
+            expect(failed.info.role).toBe("assistant")
+            if (failed.info.role === "assistant")
+              expect(failed.info.error).toMatchObject({
+                name: "APIError",
+                data: { message: expect.stringContaining("Соединение с моделью прервано") },
+              })
+            for (let index = 1; index < times.length; index++) {
+              expect(times[index] - times[index - 1]).toBeGreaterThanOrEqual(
+                Math.min(2000 * 2 ** (index - 1), 30000) - 50,
+              )
+            }
+            expect(yield* status.get(chat.id)).toEqual({ type: "idle" })
+            healthy = true
+            const next = yield* prompt.prompt({
+              sessionID: chat.id,
+              agent: "build",
+              model: ref,
+              parts: [{ type: "text", text: "ping again" }],
+            })
+            expect(times).toHaveLength(SessionRetry.RETRY_MAX_RETRIES + 2)
+            expect(next.info.role).toBe("assistant")
+            if (next.info.role === "assistant") expect(next.info.error).toBeUndefined()
+            expect(next.parts.some((part) => part.type === "text" && part.text === "pong")).toBe(true)
+            expect(yield* status.get(chat.id)).toEqual({ type: "idle" })
+            yield* off
+          }),
+        { config: providerCfg(server.url.origin + "/v1") },
+      )
+    }),
+  120_000,
+)
+
+it.instance("cancels interrupted SSE during backoff and accepts the next prompt", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const status = yield* SessionStatus.Service
+    const chat = yield* sessions.create({ title: "Interrupted SSE cancellation" })
+    yield* llm.push(
+      raw({
+        chunks: [
+          {
+            id: "chatcmpl-cut",
+            object: "chat.completion.chunk",
+            choices: [{ index: 0, delta: { role: "assistant", content: "ob" } }],
+          },
+        ],
+      }),
+    )
+    const run = yield* prompt
+      .prompt({
+        sessionID: chat.id,
+        agent: "build",
+        parts: [{ type: "text", text: "ping" }],
+      })
+      .pipe(Effect.forkChild)
+    yield* pollWithTimeout(
+      status.get(chat.id).pipe(Effect.map((value) => (value.type === "retry" ? true : undefined))),
+      "interrupted stream did not enter backoff",
+    )
+    yield* prompt.cancel(chat.id)
+    yield* Fiber.await(run)
+    expect(yield* status.get(chat.id)).toEqual({ type: "idle" })
+    expect(yield* llm.calls).toBe(1)
+    yield* llm.text("pong")
+    const next = yield* prompt.prompt({
+      sessionID: chat.id,
+      agent: "build",
+      parts: [{ type: "text", text: "ping again" }],
+    })
+    expect(yield* llm.calls).toBe(2)
+    expect(next.info.role).toBe("assistant")
+    if (next.info.role === "assistant") expect(next.info.error).toBeUndefined()
+    expect(next.parts.some((part) => part.type === "text" && part.text === "pong")).toBe(true)
   }),
 )
 
