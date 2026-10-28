@@ -4780,7 +4780,7 @@ async function calculatorNodeOverflowFixture() {
 
 test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
  // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.
- for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','component','visibility','opacity','duplicate','panel']){
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','binding','component','visibility','opacity','duplicate','panel']){
   const {page,crumbs,wizard,binding,nodeTree,component}=await calculatorNodeOverflowFixture();
   delete binding.input_port;
   const guid='d6677c45-99d0-46f2-889c-be24a51bff13',name='l443f_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
@@ -4797,6 +4797,7 @@ test('D52b opened native node wizard retains its complete long workflow ancestry
   if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
   if(fault==='path')path[hidden].tid+='-foreign';
   if(fault==='native')nodeTree.FGuid='foreign';
+  if(fault==='binding')binding.node_id='foreign';
   if(fault==='component')component.el.dom={};
   if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
   if(fault==='opacity')crumbs[hidden].style.opacity='0';

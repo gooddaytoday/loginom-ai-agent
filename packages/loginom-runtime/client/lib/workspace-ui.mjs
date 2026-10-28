@@ -181,7 +181,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&previousInput?.direction==='input'&&previousInput.port===0&&previousInput.native_index===0
       &&typeof previousInput.port_guid==='string'&&previousInput.port_guid.length>0
       &&typeof previousInput.opening_operation_id==='string'&&previousInput.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedInputReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedInputReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -892,7 +892,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const returnPath=preparedWorkflowPath?.length===5&&pathCrumbs.length>=5
           &&preparedWorkflowPath.every((c,i)=>c.tid===getTid(pathCrumbs[i])&&c.label===pathCrumbs[i].textContent.trim())
           &&((preparedInputReturn||graphPath)&&wizard.status==='absent'&&pathCrumbs.length===5
-            ||preparedNodeWizard&&wizard.status==='observed'&&pathCrumbs.length===7
+            ||preparedNodeWizard&&preparedNativeNodeId===preparedNodeId&&wizard.status==='observed'&&pathCrumbs.length===7
               &&(visible(pathCrumbs[5])||nativeOverflowNode(pathCrumbs[5]))
               &&pathCrumbs[6].querySelectorAll('.maptree-icon-wizard').length===1);
         const inputReturnAncestor=e=>returnPath&&preparedWorkflowPath.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
@@ -3705,12 +3705,12 @@ function readRenderedInputMapping(observation) {
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
+    preparedNativeNodeId:nodeContext?.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&nodeContext.node_id===task.prepared_node_context?.node.node_id
-      &&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     timeout();
     if (observed?.ui_read_failure) {
