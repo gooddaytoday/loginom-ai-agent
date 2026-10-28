@@ -86,9 +86,15 @@ test('source discovery reacquires invalidated read pages without replaying any g
  const evaluate=page.evaluate.bind(page);
  page.evaluate=async(fn,arg)=>{
   if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
-  const state=structuredClone(files);state.dom_epoch.revision=++reads===1?0:1;
+  // LAB-374 s-server-a:8-9 and last-a:8-10: tab replacement followed by
+  // several DOM revisions. None of these no-effect reads authorizes a click.
+  const state=structuredClone(files),sequence=[0,21,341,455,1387,1417,1598,2681];
+  state.dom_epoch.revision=sequence[Math.min(reads++,sequence.length-1)];
+  if(reads===1){state.workflow_ref={prefix:'MF;TF-1',tab_tid:'tb-1'};}
+  else {state.workflow_ref={prefix:'MF;TF-2',tab_tid:'tb-2'};
+   for(const e of state.ui.elements){e.tid=e.tid.replace(page.prefix,'MF;TF-2');e.identity.anchor_tid=e.tid;}}
   if(!arg.discoverRoots){delete state.observation_kind;state.file_storage={status:'observed',directory:'/worker'};
-   if(arg.rootRef==='ui-file')state.ui.elements=[{...element('ui-file',page.prefix+';FileStorageForm;colName_full.csv'),label:'full.csv',
+   if(arg.rootRef==='ui-file')state.ui.elements=[{...element('ui-file',state.workflow_ref.prefix+';FileStorageForm;colName_full.csv'),label:'full.csv',
     storage_entry:{kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'}}];
   }
   return state;
@@ -146,6 +152,8 @@ test('unknown browser cleanup retains the lease and partial until actual recover
   recover:async id=>{assert.equal(id,'download');recovered=true;}});
  registry.start(f.request);const result=await settled(registry);
  assert.equal(result.cleanup_complete,false);assert.equal(registry.unsettled,true);
+ assert.equal(result.error.code,'LOGINOM_DOWNLOAD_FAILED');
+ assert.equal(result.output.cleanup_error.code,'LOGINOM_DOWNLOAD_CLEANUP_FAILED');
  assert.equal((await readdir(join(f.root,'unknown'))).length,1);
  assert.throws(()=>registry.start({...f.request,operation_id:'other'}),/cleanup/);
  await registry.cleanup('download');assert.equal(recovered,true);assert.equal(registry.unsettled,false);

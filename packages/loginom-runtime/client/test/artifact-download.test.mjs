@@ -25,7 +25,8 @@ function fixture(name = 'sales.csv') {
 
 test('server-only browser download retains its native Download, drains cancellation and never sends bytes',async()=>{
  const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
- await f.page.execute('async page=>null');Object.assign(f.page.context,{setTimeout,clearTimeout});
+ // The real MCP unsafe-code VM exposes page only, with no Node timer globals.
+ await f.page.execute('async page=>null');
  const native={kind:'file',path:'/test/sales.csv',bytes:2147483648,bytes_source:'native_file_store',mtime:'native-time'};
  f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
  f.options.snapshot=f.page.uiSnapshot();delete f.options.artifact.upload;
@@ -38,7 +39,7 @@ test('server-only browser download retains its native Download, drains cancellat
  const started=await f.page.execute(makeServerSourceDownloadCode(f.options));
  assert.equal(started.status,'SUCCEEDED');assert.equal(started.output.download_started,true);
  assert.deepEqual(f.calls,['listen','click','save']);
- const control=mode=>browserServerDownloadControl(f.page,{operation_id:f.options.operation_id,mode});
+ const control=mode=>{f.page.context=null;return f.page.execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id:f.options.operation_id,mode})})`);};
  assert.equal((await control('status')).output.state,'running');
  assert.equal((await control('cancel')).output.state,'settled');
  await control('release');assert.deepEqual(f.calls,['listen','click','save','cancel','delete']);

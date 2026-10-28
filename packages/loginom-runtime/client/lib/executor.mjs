@@ -385,11 +385,13 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       const entry={download,state:'running',failed:false};jobs.set(task.operation_id,entry);
       // This promise belongs to the retained runtime job. It never carries bytes
       // over MCP; Chromium and saveAs stream the file to their disk destinations.
-      const timer=setTimeout(()=>{entry.expired=true;void download.cancel().catch(()=>{entry.failed=true;});},Math.max(1,task.deadline_at-Date.now()));
+      // MCP's unsafe-code VM provides page, but no Node timer globals. The
+      // host registry owns the original deadline and drains this job on abort.
       entry.completion=(async()=>{
         try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
-        catch{entry.failed=true;}
-        finally{clearTimeout(timer);entry.state='settled';}
+        catch(error){entry.failed=true;entry.failure={reason:'save_failed',
+          ...( ['EACCES','EPERM','ENOSPC','ENOENT','EISDIR'].includes(error.code)?{code:error.code}:{})};}
+        finally{entry.state='settled';}
       })();
       completed=true;
       return result('SUCCEEDED',null,{download_started:true});
@@ -426,7 +428,7 @@ export async function browserServerDownloadControl(page,task) {
     phase:'downloading',effect_possible:false,trace:[],cleanup_complete:true};
   if(!job)return {...base,status:'FAILED',output:{},error:{code:'LOGINOM_DOWNLOAD_MISSING',message:'Original browser download is missing'}};
   if(task.mode==='cancel'){await job.download.cancel();await job.completion;}
-  const output={state:job.state,failed:job.failed,expired:job.expired===true};
+  const output={state:job.state,failed:job.failed,expired:job.expired===true,...(job.failure?{failure:job.failure}:{})};
   if(task.mode==='release'){
     if(job.state!=='settled')throw Error('Cannot release a running download');
     await job.download.delete();jobs.delete(task.operation_id);
@@ -1577,8 +1579,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       let started;
       try{started=await execute(code);}
       catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      await onRecord({phase:'storage_download_started',operation_id,outcome:started});
       if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
-        const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;throw error;
+        const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
+        error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
       }
       try {
         while(true) {
@@ -1586,7 +1590,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const current=await controlServerDownload(operation_id,'status');
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           if(current.output.state==='settled'){
-            if(current.output.failed||current.output.expired)throw Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED');
+            if(current.output.failed||current.output.expired)throw Object.assign(Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED'),
+              {details:current.output.failure??{reason:'browser_transfer_failed'}});
             break;
           }
           await new Promise(resolve=>setTimeout(resolve,250));
@@ -2450,14 +2455,25 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return output;
         };
         const read=async options=>{
-          for(let attempt=0;attempt<3;attempt++){
+          const original=options.rootRef?observations.get(options.observationId):null;
+          const root=original?.ui.elements.find(e=>e.ref===options.rootRef);
+          for(let attempt=0;;attempt++){
+            guard();
+            if(attempt&&root){
+              const fresh=await read({scope:'roots',...(options.storageName?{storageName:options.storageName}:{})});
+              const matches=fresh.ui.elements.filter(e=>e.tid===root.tid);
+              if(fresh.dom_epoch.document!==original.dom_epoch.document
+                ||JSON.stringify(fresh.workflow_ref)!==JSON.stringify(original.workflow_ref)||matches.length!==1)
+                throw Object.assign(Error('Server storage observation root changed'),{code:'UI_ROOT_STALE'});
+              options={...options,rootRef:matches[0].ref,observationId:fresh.observation_id};
+            }
             try{return await readPages(options);}catch(error){
-              if(attempt===2||!String(error.message).startsWith('Workspace changed between observation pages;'))throw error;
+              if(!String(error.message).startsWith('Workspace changed between observation pages;'))throw error;
               guard();await new Promise(resolve=>setTimeout(resolve,100));
             }
           }
         };
-        const roots=()=>read({scope:'roots'});
+        const roots=()=>read({scope:'roots',storageName:path.slice(path.lastIndexOf('/')+1)});
         const one=entries=>{if(entries.length!==1)throw Error('Server storage control is missing or ambiguous');return entries[0];};
         const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
         const act=async(s,e,verb='click',extra={})=>{
@@ -2512,7 +2528,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
           await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
-          throw error;
+          // Keep a bounded diagnostic in the tool result. Throwing through the
+          // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
+          const reason=error.code==='UI_ROOT_STALE'?'observation_root_changed'
+            :String(error.message).startsWith('Workspace changed between observation pages;')?'observation_changed'
+            :String(error.message).includes('deadline')?'navigation_deadline'
+            :String(error.message).startsWith('Server storage navigation requires inspection:')?'navigation_unconfirmed'
+            :'storage_observation_refused';
+          const unsettled=!!pending||running;
+          const result={result_version:'user-v1',operation_id:id,status:unsettled?'AMBIGUOUS':'FAILED',
+            action_key:'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
+            output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason}}};
+          auxiliary.get(id).outcome=structuredClone(result);return result;
         }finally{storageNavigating=false;}
       })();
       if(name==='dock_storage_download_start'){

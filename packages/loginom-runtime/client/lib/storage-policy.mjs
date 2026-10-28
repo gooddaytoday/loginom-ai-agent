@@ -200,9 +200,11 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           job.error={code:job.controller.signal.aborted?(job.controller.signal.reason?.message==='LOGINOM_DOWNLOAD_DEADLINE'
             ?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
             message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
+          if(['browser_start_refused','save_failed','browser_transfer_failed'].includes(error.details?.reason))
+            job.error.details={reason:error.details.reason,...(/^[A-Z_]{1,80}$/.test(error.details.code??'')?{code:error.details.code}:{})};
           if(error.cleanupUnconfirmed)job.browserUnsettled=true;
           try{if(job.browserUnsettled)throw Error('Browser transfer is unsettled');await remove(job);}
-          catch{job.cleanup=false;job.error={code:'LOGINOM_DOWNLOAD_CLEANUP_FAILED',message:'Partial cache cleanup failed or browser transfer is unsettled'};}
+          catch{job.cleanup=false;job.output={cleanup_error:{code:'LOGINOM_DOWNLOAD_CLEANUP_FAILED',message:'Partial cache cleanup failed or browser transfer is unsettled'}};}
         }finally{clearTimeout(timer);job.state='settled';}
       })();
       return snapshot(job);
