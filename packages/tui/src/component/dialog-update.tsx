@@ -1,5 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { createEffect, createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js"
+import { Product } from "@loginom-ai-agent/product"
 import { useTheme } from "../context/theme"
 import { isVersionGreater, type UpdateState, type UpdateTarget } from "../context/update-notification"
 import { useDialog } from "../ui/dialog"
@@ -90,7 +91,7 @@ export function DialogUpdate(props: {
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {state().type === "installing"
-            ? "Updating OpenCode"
+            ? `Updating ${Product.name}`
             : state().type === "available" || state().type === "failed"
               ? "Update available"
               : "Update"}
@@ -108,12 +109,12 @@ export function DialogUpdate(props: {
               </Match>
               <Match when={current.type === "available"}>
                 <text fg={theme.textMuted} wrapMode="word">
-                  An update is available. After installing, you'll be prompted to restart OpenCode.
+                  An update is available. After installing, you'll be prompted to restart {Product.name}.
                 </text>
               </Match>
               <Match when={current.type === "installing" && current} keyed>
                 {(installing) => (
-                  <Spinner color={theme.text}>{`Installing OpenCode ${installing.target.version}…`}</Spinner>
+                  <Spinner color={theme.text}>{`Installing ${Product.name} ${installing.target.version}…`}</Spinner>
                 )}
               </Match>
               <Match when={current.type === "installed"}>
