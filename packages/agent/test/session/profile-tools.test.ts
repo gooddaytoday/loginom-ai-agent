@@ -793,6 +793,7 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>,
   image?: boolean,
   permission: PermissionV1.Ruleset = [{ permission: "*", pattern: "*", action: "allow" }],
+  attachment?: Pick<SessionV1.FilePart, "url" | "mime" | "filename" | "source">,
 ) {
   const sessions = yield* Session.Service
   const agents = yield* Agent.Service
@@ -847,6 +848,14 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
         time: { start: 2, end: 2 },
       },
     })
+  if (attachment)
+    yield* sessions.updatePart({
+      ...attachment,
+      id: PartID.ascending(),
+      type: "file",
+      messageID: user,
+      sessionID: session.id,
+    })
   const history = yield* sessions.messages({ sessionID: session.id })
   const tools = yield* SessionTools.resolve({
     loginom,
@@ -877,3 +886,42 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   })
   return { tools, session, user, history, assistant }
 })
+
+it.instance("Dock calls exclude local reference attachments from repeated byte admission", () =>
+  Effect.gen(function* () {
+    const calls: unknown[][] = []
+    const loginom = {
+      ...preparedLoginom(async () => {
+        throw Error("Must not read reference bytes")
+      }),
+      async call(...args: Parameters<NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>["call"]>) {
+        calls.push(args)
+        return { content: [] }
+      },
+    }
+    const { tools } = yield* resolveProfile(
+      "loginom-automation",
+      loginom,
+      undefined,
+      [{ permission: "*", pattern: "*", action: "allow" }],
+      {
+        mime: "text/plain",
+        filename: "large.csv",
+        url: "file:///tmp/large.csv",
+        source: {
+          type: "file",
+          path: "/tmp/large.csv",
+          text: { value: "loginom-attachment:" + "a".repeat(64), start: 0, end: 0 },
+        },
+      },
+    )
+    const execute = tools.loginom_dock_action_describe?.execute
+    if (!execute) throw Error("Dock tool missing")
+    for (const id of ["first", "second"])
+      yield* Effect.promise(() =>
+        execute({}, { toolCallId: id, abortSignal: new AbortController().signal, messages: [] }),
+      )
+    expect(calls).toHaveLength(2)
+    expect(calls.every((call) => Array.isArray(call[4]) && call[4].length === 0)).toBe(true)
+  }),
+)

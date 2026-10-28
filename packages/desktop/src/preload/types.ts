@@ -1,3 +1,4 @@
+import type { LocalAttachmentReference } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import type { Loginom } from "@loginom-ai-agent/schema/loginom"
 import type { DesktopMenuAction } from "@loginom-ai-agent/app/desktop-menu"
 import type { WslServersPlatform } from "@loginom-ai-agent/app/wsl/types"
@@ -89,7 +90,17 @@ export type ElectronAPI = {
     title?: string
     defaultPath?: string
     extensions?: string[]
-  }) => Promise<{ token: string; files: { path: string; name: string; size: number }[] } | null>
+  }) => Promise<{
+    token: string
+    files: (
+      | { path: string; name: string; size: number }
+      | (LocalAttachmentReference & { path: string; name: string })
+    )[]
+  } | null>
+  referenceAttachment: (
+    path: string,
+    expected: { size: number; lastModified: number },
+  ) => Promise<LocalAttachmentReference>
   readPickedFile: (token: string, path: string) => Promise<ArrayBuffer>
   releasePickedFiles: (token: string) => Promise<void>
   getPathForFile: (file: File) => string

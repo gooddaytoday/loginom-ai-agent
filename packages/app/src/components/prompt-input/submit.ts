@@ -61,7 +61,10 @@ async function buildCommandAttachments(text: string, images: ImageAttachmentPart
     await Promise.all(
       images.map(async (attachment) => ({
         ...attachment,
-        dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
+        dataUrl:
+          attachment.reference || attachment.mime === LOGINOM_PACKAGE_MIME
+            ? ""
+            : await blobDataUrl(attachment.blob, attachment.mime),
       })),
     ),
   )
@@ -125,7 +128,10 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const encodedImages = await Promise.all(
     images.map(async (attachment) => ({
       ...attachment,
-      dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
+      dataUrl:
+        attachment.reference || attachment.mime === LOGINOM_PACKAGE_MIME
+          ? ""
+          : await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
   const { requestParts, optimisticParts } = buildRequestParts({

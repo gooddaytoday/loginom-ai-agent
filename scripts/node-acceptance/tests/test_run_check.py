@@ -25,13 +25,13 @@ class RunCheckTests(unittest.TestCase):
             source.mkdir()
             (source / 'task.md').write_text('Сумма продаж по регионам')
             (source / 'data').mkdir()
-            case = runner.scenario('s-server-a', root)
+            case = runner.scenario('s-server-a', cases=root)
             self.assertEqual(case['prompt'], source / 'task.md')
             self.assertIsNone(case['base'])
             self.assertTrue(case['external'])
             self.assertEqual(list(case['data'].iterdir()), [])
             with self.assertRaises(ValueError):
-                runner.scenario('../s-server-a', root)
+                runner.scenario('../s-server-a', cases=root)
 
     def test_all_87_model_commands_attach_initial_data_and_not_repeat_inputs(self):
         names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
@@ -73,6 +73,45 @@ class RunCheckTests(unittest.TestCase):
                     self.assertEqual(sorted(p.name for p in workspace.iterdir()),
                                      sorted(set(p.name for p in inputs) | (set(previous) if index else set())))
                     previous = [p.name for p in workspace.iterdir()]
+
+    def test_external_path_and_file_cases_keep_the_original_source_and_private_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'sales.csv'
+            source.write_text('region;amount\nNorth;10\n')
+            expected = {'nodes': [], 'outputs': [{'output_node_type': 'export_input',
+                'ordered': False, 'columns': [{'name': 'region', 'type': 'string'}, {'name': 'amount', 'type': 'real'}],
+                'rows': [{'region': 'North', 'amount': 123456789}]}]}
+            for mode in ['path', 'file']:
+                case = root / mode
+                (case / 'data').mkdir(parents=True)
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': mode})
+                runner.write(case / 'expected.json', expected)
+                (case / 'task.md').write_text('В файле ' + str(source) + ' продажи. Построй сумму продаж по регионам')
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options = root, {}, {'case_root': str(root)}
+                workspace, folder = root / (mode + '-workspace'), root / (mode + '-run')
+                workspace.mkdir(); folder.mkdir()
+                with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                    with self.assertRaises(InterruptedError):
+                        instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
+                                       {'package_directory': '/test'}, root / 'build')
+                command = list(map(str, phase.call_args.args[1]))
+                attached = [command[i + 1] for i, value in enumerate(command) if value == '--file']
+                self.assertEqual(attached, [str(source)] if mode == 'file' else [])
+                self.assertEqual(list(workspace.iterdir()), [])
+                self.assertIn(str(source), command[-1])
+                self.assertNotIn('123456789', command[-1])
+                self.assertEqual(runner.read(folder / 'expected.json')['outputs'][0]['rows'][0]['amount'], 123456789)
+            with self.assertRaisesRegex(ValueError, 'Invalid external case name'):
+                runner.scenario('../path', root)
+
+    def test_memory_observation_is_scoped_to_its_exact_process(self):
+        instance = runner.Runner.__new__(runner.Runner)
+        usage = instance.memory(os.getpid())
+        self.assertGreater(usage['agent'], 0)
+        self.assertEqual(usage['host'], 0)
+        self.assertEqual(usage['runtime'], 0)
 
     def test_all_regression_names_resolve_real_inputs(self):
         names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 26)]

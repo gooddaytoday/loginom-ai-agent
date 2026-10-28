@@ -111,3 +111,41 @@ test("does not let delayed blob migration overwrite a newer draft", async () => 
 
   expect(documents.get("prompt")).toContain("latest")
 })
+
+test("restores a native reference descriptor without blob storage or re-reading the file", async () => {
+  const documents = new Map<string, string>()
+  const store = createDraftStore({
+    get: async (key) => documents.get(key) ?? null,
+    set: async (key, value) => void documents.set(key, value),
+    remove: async () => undefined,
+    putBlob: async () => {
+      throw Error("reference must not become a blob")
+    },
+    getBlob: async () => null,
+  })
+  const reference = {
+    kind: "local_reference",
+    sourcePath: "/tmp/данные %#.csv",
+    filename: "данные %#.csv",
+    size: 5 * 1024 ** 3,
+    lastModified: 123,
+    mime: "text/plain",
+    receipt: "c".repeat(64),
+  }
+  const prompt = [
+    {
+      type: "image",
+      id: "native",
+      filename: reference.filename,
+      mime: reference.mime,
+      sourcePath: reference.sourcePath,
+      reference,
+      blob: { id: "reference:" + reference.receipt, url: "" },
+    },
+  ]
+  await store.setItem("native", JSON.stringify({ prompt }))
+  const restored = JSON.parse((await store.getItem("native"))!).prompt[0]
+  expect(restored.reference).toEqual(reference)
+  expect(JSON.stringify(restored)).not.toMatch(/data:|base64/)
+  expect(restored.blob.id).toBe("reference:" + reference.receipt)
+})

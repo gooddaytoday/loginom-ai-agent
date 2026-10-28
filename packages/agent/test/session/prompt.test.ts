@@ -1,3 +1,8 @@
+import {
+  createAttachmentReceipt,
+  attachmentReceiptSource,
+  verifyAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { ConfigV1 } from "@loginom-ai-agent/core/v1/config/config"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
 import { Database } from "@loginom-ai-agent/core/database/database"
@@ -3612,10 +3617,66 @@ it.instance("an active browser recovery gets one persisted reminder before the l
     const history = yield* sessions.messages({ sessionID: chat.id })
     const reminders = history.flatMap((message) =>
       message.parts.filter(
-        (part) => part.type === "text" && part.synthetic === true && part.metadata?.browser_recovery_reminder === "start-1",
+        (part) =>
+          part.type === "text" && part.synthetic === true && part.metadata?.browser_recovery_reminder === "start-1",
       ),
     )
     expect(reminders).toHaveLength(1)
     expect(BrowserRecovery.active(history)).toEqual({ operationID: "op-1", attempt: "start-1", reminded: true })
   }),
+)
+
+noLLMServer.instance(
+  "native references persist as file URLs, bind the original message and never decode as text",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const file = path.join(instance.directory, "данные %#.xlsx")
+      yield* writeText(file, "MUST_NOT_DECODE_WORKBOOK")
+      const reference = yield* Effect.promise(() => createAttachmentReceipt(file))
+      const message = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [
+          {
+            type: "file",
+            mime: reference.mime,
+            filename: reference.filename,
+            url: pathToFileURL(file).href,
+            source: attachmentReceiptSource(reference),
+          },
+        ],
+      })
+      const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+      expect(stored.parts.filter((part) => part.type === "file")).toMatchObject([
+        {
+          url: pathToFileURL(file).href,
+          mime: "text/plain",
+          source: attachmentReceiptSource(reference),
+        },
+      ])
+      const text = stored.parts
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n")
+      expect(text).toContain("loginom_file_profile")
+      expect(text).not.toContain("MUST_NOT_DECODE_WORKBOOK")
+      expect(JSON.stringify(stored.parts)).not.toMatch(/data:|base64/)
+      yield* Effect.promise(() =>
+        verifyAttachmentReceipt(reference.receipt, file, { session: session.id, message: message.info.id }),
+      )
+      // A subsequent load uses the original fingerprint, including after restoring history.
+      yield* writeText(file, "CHANGED_WORKBOOK")
+      const check = yield* Effect.tryPromise({
+        try: () => verifyAttachmentReceipt(reference.receipt, file, { session: session.id, message: message.info.id }),
+        catch: (error) => error,
+      }).pipe(Effect.exit)
+      expect(Exit.isFailure(check)).toBe(true)
+      if (Exit.isFailure(check)) expect(String(Cause.squash(check.cause))).toContain("LOGINOM_FILE_CHANGED")
+    }),
+  { config: cfg },
 )

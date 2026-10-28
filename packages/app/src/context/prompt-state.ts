@@ -38,6 +38,7 @@ export interface ImageAttachmentPart {
   id: string
   filename: string
   sourcePath?: string
+  reference?: import("@/utils/local-attachment").LocalAttachmentReference
   mime: string
   blob: BlobReference
 }

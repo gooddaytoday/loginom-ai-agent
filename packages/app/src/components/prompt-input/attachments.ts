@@ -1,3 +1,4 @@
+import type { LocalAttachmentReference } from "@/utils/local-attachment"
 import { onMount } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { showToast } from "@/utils/toast"
@@ -20,6 +21,8 @@ type PromptAttachmentsCoreInput = {
   focusEditor?: () => void
   addPart?: (part: ContentPart) => boolean
   warn?: () => void
+  missingPath?: () => void
+  referenceAttachment?: (file: File) => Promise<LocalAttachmentReference>
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
   draftStore?: DraftStore
@@ -44,8 +47,31 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
     return { prompt, cursor: prompt.cursor() ?? getCursorPosition(editor) }
   }
 
-  const add = async (file: File, toast = true, target = capture()) => {
+  const add = async (file: File | LocalAttachmentReference, toast = true, target = capture()) => {
     if (!target) return false
+    if ("kind" in file || (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))) {
+      if (!("kind" in file) && (!input.getPathForFile?.(file) || !input.referenceAttachment)) {
+        input.missingPath?.()
+        return false
+      }
+      const reference = "kind" in file ? file : await input.referenceAttachment!(file)
+      target.prompt.set(
+        [
+          ...target.prompt.current(),
+          {
+            type: "image",
+            id: uuid(),
+            filename: reference.filename,
+            sourcePath: reference.sourcePath,
+            mime: reference.mime,
+            reference,
+            blob: { id: "reference:" + reference.receipt, url: "" },
+          },
+        ],
+        target.cursor,
+      )
+      return true
+    }
     const mime = await attachmentMime(file)
     if (!mime) {
       if (toast) input.warn?.()
@@ -70,7 +96,7 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
     return true
   }
 
-  const addAttachment = (file: File) => add(file)
+  const addAttachment = (file: File | LocalAttachmentReference) => add(file)
 
   const addAttachments = async (files: File[], toast = true, target = capture()) => {
     let found = false
@@ -80,7 +106,13 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       if (ok) found = true
     }
 
-    if (!found && files.length > 0 && toast) input.warn?.()
+    if (
+      !found &&
+      files.length > 0 &&
+      toast &&
+      !files.some((file) => file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))
+    )
+      input.warn?.()
     return found
   }
 
@@ -160,6 +192,12 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
   const attachments = createPromptAttachmentsCore({
     ...input,
     draftStore: platform.draftStore,
+    referenceAttachment: platform.referenceAttachment,
+    missingPath: () =>
+      showToast({
+        title: language.t("prompt.toast.pasteUnsupported.title"),
+        description: language.t("prompt.attachment.missingPath"),
+      }),
     capture: input.prompt.capture,
     warn: () => {
       showToast({

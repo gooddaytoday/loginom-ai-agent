@@ -1,3 +1,8 @@
+import {
+  attachmentReceiptID,
+  readAttachmentReceipt,
+  verifyAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { Cause, Effect } from "effect"
 import { basename, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -34,10 +39,10 @@ export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")
     discardReference(grant: string): Promise<unknown>
   },
   userMessage: string,
-  authorized?: { sourcePath: string; canonicalPath: string },
+  authorized?: { sourcePath: string; canonicalPath: string; verifyAttachment?: () => Effect.Effect<unknown, Error> },
 ) {
   const source = authorized ?? (yield* authorizeLoginomFile(path, ctx))
-  return yield* Effect.tryPromise({
+  const result = yield* Effect.tryPromise({
     try: async (signal) => {
       const abort = AbortSignal.any([ctx.abort, signal])
       const identity = await inspectReferenceFile(source.sourcePath)
@@ -64,6 +69,8 @@ export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")
     },
     catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
   })
+  if (source.verifyAttachment) yield* source.verifyAttachment()
+  return result
 })
 
 type ReferenceHost = Parameters<typeof admitLoginomFileReference>[2]
@@ -98,6 +105,7 @@ export const admitLoginomLocalFile = Effect.fn("Loginom.admitLocalFile")(functio
     try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
     catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
   })
+  yield* source.verifyAttachment()
   const artifacts = yield* Effect.tryPromise({
     try: () =>
       host.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [
@@ -168,10 +176,32 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
   const attached = yield* Effect.forEach(attachments, (part) =>
     Effect.gen(function* () {
       const url = URL.parse(part.url)
-      if (!url || url.protocol !== "file:" || url.search || url.hash) return false
-      return (yield* fs.realPath(fileURLToPath(url)).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
+      if (!url || url.protocol !== "file:" || url.search || url.hash) return
+      const attachedPath = fileURLToPath(url)
+      const id = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
+      if (!id)
+        return (yield* fs.realPath(attachedPath).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
+          ? { verify: () => Effect.void }
+          : undefined
+      const owner = { session: ctx.sessionID, message: part.messageID }
+      const receipt = yield* Effect.tryPromise({
+        try: () => readAttachmentReceipt(id, attachedPath, owner),
+        catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+      })
+      if (attachedPath !== sourcePath && receipt.identity.canonical_path !== canonicalPath) return
+      yield* checkDeny(attachedPath)
+      yield* checkDeny(receipt.identity.canonical_path)
+      return {
+        verify: () =>
+          Effect.tryPromise({
+            try: () => verifyAttachmentReceipt(id, attachedPath, owner),
+            catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+          }),
+      }
     }),
   )
+  const verifyAttachment = () => Effect.forEach(attached, (entry) => (entry ? entry.verify() : Effect.void))
+  yield* verifyAttachment()
   if (!attached.some(Boolean))
     yield* Effect.gen(function* () {
       yield* assertExternalDirectoryEffect(ctx, canonicalPath)
@@ -182,7 +212,8 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
         metadata: { filepath: canonicalPath },
       })
     }).pipe(Effect.catchCause((cause) => localFilePermissionFailure(sourcePath, cause, ctx)))
-  return { sourcePath, canonicalPath }
+
+  return { sourcePath, canonicalPath, verifyAttachment }
 })
 
 export function localFilePermissionFailure(path: string, cause: Cause.Cause<unknown>, ctx: Tool.Context) {
