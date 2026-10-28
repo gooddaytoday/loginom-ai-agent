@@ -246,14 +246,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.javascript_wizard_refusal=structuredClone(refusal.proof);
       }
       const importClosed=refusal?.proof?.closed;
-      if(request.target.type==='imports.text'&&request.parameters.source_switch&&refusal?.phase===name
+      if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source_switch&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&(refusal.verification==='text_import_source_switch_schema_refused'&&['configure','output_mapping','finish'].includes(name)
+        &&(refusal.verification===(request.target.type==='imports.excel'?'excel_import_source_switch_schema_refused':'text_import_source_switch_schema_refused')&&['configure','output_mapping','finish'].includes(name)
           &&refusal.execution_started===false&&importClosed?.verified===true&&importClosed.cleanup_complete===true
           &&importClosed.draft_discarded===true&&importClosed.execution_started===false
           &&importClosed.node_context?.surface==='graph'&&importClosed.node_context?.verified===true
           &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])
-          ||refusal.verification==='text_import_full_count_refused'&&name==='read'&&state.execution.status==='completed'
+          ||refusal.verification===(request.target.type==='imports.excel'?'excel_import_full_count_refused':'text_import_full_count_refused')&&name==='read'&&state.execution.status==='completed'
           &&refusal.execution_id===state.execution.execution_id&&Number.isSafeInteger(refusal.expected_records)&&refusal.expected_records>=0
           &&Number.isSafeInteger(refusal.actual_records)&&refusal.actual_records>=0&&refusal.port===0
           &&refusal.freshness_basis==='completed_execution_port_source')){

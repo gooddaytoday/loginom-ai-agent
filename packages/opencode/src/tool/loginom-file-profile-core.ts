@@ -51,6 +51,10 @@ export type ProfileOptions = XlsxOptions & {
 type Identity = { canonical_path: string; size: number; mtime: number; ctime: number; file_id: string }
 type Stored = {
   format?: "csv" | "xlsx"
+  sheet?: { name: string }
+  sheets?: { name: string }[]
+  header_rows?: number
+  blank_rows?: "import" | "skip"
   profile_id: string
   source: string
   identity: Identity
@@ -143,7 +147,9 @@ export async function exactScanReceipt(id: string, dir: string) {
   if (p.scan?.status !== "exact" || p.scan.first_violation || !Number.isSafeInteger(p.scan.records)
     || p.scan.records! < 0 || !/^[a-f0-9]{64}$/.test(p.scan.sha256 ?? "")) return undefined
   return { profile_id: p.profile_id, records: p.scan.records!, sha256: p.scan.sha256!,
-    bytes: p.identity.size, identity: p.identity, basis: "backend_exact_scan" as const }
+    bytes: p.identity.size, identity: p.identity, basis: "backend_exact_scan" as const,
+    ...(p.format === "xlsx" ? { xlsx: { sheet_name: p.sheet!.name, sheet_index: p.sheets!.findIndex(s => s.name === p.sheet!.name) + 1,
+      header_rows: p.header_rows!, blank_rows: p.blank_rows! } } : {}) }
 }
 
 // Only exact scans for this original identity constrain full-file staging.
