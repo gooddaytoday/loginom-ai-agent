@@ -349,6 +349,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(typeof request.resume_id==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(request.resume_id),'Bounded resume ID required');
    requireValue(Number.isInteger(request.budget_ms)&&request.budget_ms>=1000&&request.budget_ms<=1800000,'Delivery resume budget must be 1000..1800000 ms');
    const job=jobs.get(request.operation_id);requireValue(job,'Unknown delivery operation in this session');
+   requireValue(!job.largeUpload,'Large uploads use status/cancel; unresolved bytes cannot be resent');
    const signature=hash(request),prior=job.resumeRequests.get(request.resume_id);
    if(prior){requireValue(prior.signature===signature,'Resume ID has different parameters');return prior.promise;}
    requireValue(!active,'Another delivery or resume is in progress');signal?.throwIfAborted();
@@ -364,6 +365,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   },
   status(id){const job=jobs.get(id);requireValue(job,'Unknown delivery operation');return snapshot(job);},
   cancel(id){const job=jobs.get(id);requireValue(job?.largeUpload,'Unknown asynchronous upload');if(job.state==='running'){job.status='cancelling';job.controller.abort();}return snapshot(job);},
+  interrupt(){for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}},
   async drain(){await Promise.all([...jobs.values()].map(job=>job.promise));},
   async close(){for(const job of jobs.values())if(job.largeUpload&&job.state==='running'){job.status='cancelling';job.controller.abort();}await Promise.all([...jobs.values()].map(job=>job.promise));requireValue(![...jobs.values()].some(job=>job.largeUpload&&job.status==='uncertain'),'LOGINOM_UPLOAD_UNCERTAIN');},
  });

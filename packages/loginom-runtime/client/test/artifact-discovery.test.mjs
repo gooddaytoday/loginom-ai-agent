@@ -374,11 +374,11 @@ function largeNativeFixture() {
  realm.__loginomDockPreparationV1={document:doc,id:'prep-doc'};
  const page={evaluate:async(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args),locator:selector=>{
   const entry=[...elements.entries()].find(([tid])=>selector==='[data-tid='+JSON.stringify(tid)+']');
-  return {count:async()=>entry?1:0,isVisible:async()=>true,isEnabled:async()=>true,click:async()=>{
+  const click=async()=>{
    const tid=entry[0];clicks.push(tid);
    if(tid.endsWith('btnRefresh'))store.loadCount++;
    if(tid==='toast;cancel'){sender.FActiveLoadersCount=0;sender.FCurrentUploadFilePaths={};sender.FUploadViewController.FFileLoaders=[];form.FFileInput.files=[];records.splice(0,records.length);}
-  }};
+  };return {count:async()=>entry?1:0,isVisible:async()=>true,isEnabled:async()=>true,elementHandle:async()=>({evaluate:async(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(entry[1],args),click,dispose:async()=>{}})};
  }};
  const task={operation_id:'large',snapshot:{workflow_ref:{prefix,tab_tid:'tab'}},expected_origin:origin,expected_build:'7.4.2',
   binding:{document_id:'prep-doc',loginom_account:'operator'},deadline_at:Date.now()+10000,
@@ -418,4 +418,13 @@ test('native receipt reuse sends no gesture, and cancellation clicks only the ow
  await call('bind');f.start();f.publish();await call('cancel');assert.equal((await call('cancel')).quiet,true);
  await call('refresh');assert.equal((await call('cleanup')).clean,true);
  assert.deepEqual(f.clicks,['toast;cancel','MF;TF-2;FileStorageForm;btnRefresh']);
+});
+
+test('large native steps cross the production typed browser parser',async()=>{
+ const {makeLargeUploadCode}=await import('../lib/artifact-discovery.mjs');
+ const {parseCapabilityResult}=await import('../lib/executor.mjs');
+ const f=largeNativeFixture();
+ const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
+ const reply=parseCapabilityResult({content:[{type:'text',text:'### Result\n'+JSON.stringify(raw)}]});
+ assert.equal(reply.status,'SUCCEEDED');assert.equal(reply.action_key,'artifact.large.native');assert.equal(reply.output.reused,false);assert.equal(reply.output.bytes,0);
 });

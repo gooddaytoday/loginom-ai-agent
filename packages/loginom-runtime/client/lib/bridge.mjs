@@ -625,6 +625,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
+      cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {

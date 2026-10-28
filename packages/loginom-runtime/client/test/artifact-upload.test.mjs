@@ -302,3 +302,34 @@ test('delivery-owned recovery names public delivery continuation instead of hidd
  const resume=inspected.output.next_steps.find(s=>s.tool==='dock_artifact_delivery_resume');
  assert.equal(resume.arguments.operation_id,'delivery');
 });
+
+for(const reused of [false,true])test('large runtime completion retains trusted native receipt and never downloads: '+reused,async()=>{
+ const f=fixture();f.artifact.bytes=2**32+1048576;f.artifact.upload.overwrite='reject';f.native();
+ const events=[],nativeModes=[];let uploads=0;
+ const row={Type:0,FileName:f.artifact.name,FilePath:f.artifact.upload.destination,id:f.artifact.upload.destination,Size:f.artifact.bytes,Time:'native-time'};
+ const rt=runtime(f.page,{artifactStore:f.store,getStorageBinding:()=>({document_id:'prep',loginom_account:'operator'}),
+  onRecord:async e=>{events.push(e);return e;},execute:async code=>{
+   if(code.includes('largeUploadNative')){
+    const native=output=>({status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',phase:code.match(/"mode":"([^"]+)/)?.[1],operation_id:code.includes('large-2')?'large-2':'large-1',output});
+    if(code.includes('"mode":"bind"')){nativeModes.push('bind');return native({reused:uploads>0||reused,row});}
+    if(code.includes('"mode":"poll"')){nativeModes.push('poll');return native({quiet:true,bytes:f.artifact.bytes});}
+    if(code.includes('"mode":"refresh"')){nativeModes.push('refresh');return native({});}
+    if(code.includes('"mode":"verify"')){nativeModes.push('verify');return native({bytes:f.artifact.bytes,row});}
+    throw Error('Unexpected native lifecycle step');
+   }
+   if(code.includes('browserArtifactUpload'))uploads++;
+   return f.page.execute(code);
+  }});
+ const options={artifactId:f.artifact.artifact_id,grantId:f.artifact.upload.grant_id,observationId:(await rt.observe()).output.observation_id,
+  operationId:'large-1',deliveryOperationId:'delivery',signal:new AbortController().signal,deadline:f.page.clock+60000};
+ const result=await rt.uploadLargeArtifact(options);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.bytes,f.artifact.bytes);assert.equal(result.bytes_source,'native_file_store');
+ assert.equal(result.source_sha256,f.artifact.sha256);assert.equal(result.reused===true,reused);
+ assert.equal(f.counts().submitted,reused?0:1);assert.equal(rt.hasUnsettledWork(),false);
+ assert.ok(!events.some(e=>String(e.phase).includes('download')));
+ if(!reused){
+  const next=await rt.uploadLargeArtifact({...options,operationId:'large-2',observationId:(await rt.observe()).output.observation_id});
+  assert.equal(next.reused,true);assert.equal(f.counts().submitted,1);
+  assert.ok(events.some(e=>e.phase==='large_upload_completed'));assert.ok(events.some(e=>e.phase==='large_upload_reused'));
+ }
+});

@@ -438,6 +438,7 @@ export async function largeUploadNative(page, task) {
   if(!Number.isSafeInteger(bytes)||bytes<0||bytes>t.artifact.bytes)fail();
   const errors=[...document.querySelectorAll('.bg-error-messages')].filter(visible).concat([...document.querySelectorAll('[data-tid$=";p.h;p.t"]')].filter(e=>/^msgbox(?:-\d+)?;p\.h;p\.t$/.test(e.getAttribute('data-tid')??'')&&visible(e)));
   const quiet=sender.FActiveLoadersCount===0&&paths.length===0&&b.input.files?.length===0&&sender.FLastConflictResult===undefined;
+  const gesture=(tid,kind)=>{const elements=all(tid);if(elements.length!==1)fail();b.gesture={tid,element:elements[0]};return {tid,kind};};
   if(t.mode==='poll')return {active:sender.FActiveLoadersCount,bytes,quiet,error:errors.length>0};
   if(t.mode==='cancel'&&quiet)return {active:0,bytes,quiet:true};
   if(t.mode==='cancel'&&!quiet){
@@ -446,13 +447,13 @@ export async function largeUploadNative(page, task) {
    const container=loader.Container,items=container.items?.items,button=items?.[3],el=button?.el?.dom,tid=el?.getAttribute('data-tid');
    if(!Array.isArray(items)||items.length!==4||!container.el.dom.contains(el)||!visible(el)||!tid||all(tid).length!==1||button.disabled
       ||!el.querySelector('.bg-icon-cancel-negative'))fail();
-   b.cancelClicked=true;return {active:sender.FActiveLoadersCount,bytes,quiet:false,gesture:{tid,kind:'cancel'}};
+   b.cancelClicked=true;return {active:sender.FActiveLoadersCount,bytes,quiet:false,gesture:gesture(tid,'cancel')};
   }
   if(!quiet)fail();
   if(t.mode==='refresh'){
    const tid=prefix+';FileStorageForm;btnRefresh',els=all(tid);
    if(els.length!==1||!visible(els[0]))fail();b.refreshCount=store.loadCount;
-   return {gesture:{tid,kind:'refresh'}};
+   return {gesture:gesture(tid,'refresh')};
   }
   if(t.mode==='verify'){
    if(errors.length||!Number.isSafeInteger(store.loadCount))fail();
@@ -471,13 +472,13 @@ export async function largeUploadNative(page, task) {
    if(b.deleteClicked)fail();
    const tid=prefix+';FileStorageForm;colName_'+t.artifact.name.replace(/\s/g,'_').replace(/,/g,''),els=all(tid);
    if(els.length!==1||!visible(els[0])||!b.grid.contains(els[0]))fail();
-   return {clean:false,gesture:{tid,kind:'select'}};
+   return {clean:false,gesture:gesture(tid,'select')};
   }
   if(t.mode==='delete'){
    const selected=component.getSelectionModel?.().getSelection?.();
    if(!Array.isArray(selected)||selected.length!==1||!matches(selected[0].data)||selected[0].data.Type!==0||b.deleteClicked)fail();
    const tid=prefix+';FileStorageForm;btnDelete',els=all(tid);if(els.length!==1||!visible(els[0]))fail();
-   b.deleteClicked=true;return {gesture:{tid,kind:'delete'}};
+   b.deleteClicked=true;return {gesture:gesture(tid,'delete')};
   }
   if(t.mode==='confirm_delete'){
    if(!b.deleteClicked||b.confirmClicked)fail();
@@ -485,18 +486,22 @@ export async function largeUploadNative(page, task) {
    if(messages.length!==1||messages[0].textContent.trim()!=='Вы действительно хотите удалить выделенное?')fail();
    const root=messages[0].getAttribute('data-tid').slice(0,-12),tid=root+';tlb;yes',els=all(tid);
    if(els.length!==1||!visible(els[0])||els[0].textContent.trim()!=='Удалить')fail();
-   b.confirmClicked=true;return {gesture:{tid,kind:'confirm_delete'}};
+   b.confirmClicked=true;return {gesture:gesture(tid,'confirm_delete')};
   }
   fail();
  },task);
  if(read.gesture){
   const target=page.locator('[data-tid='+JSON.stringify(read.gesture.tid)+']');
   if(await target.count()!==1||!await target.isVisible()||!await target.isEnabled())throw Error('LOGINOM_UPLOAD_UNCERTAIN');
-  await target.click({timeout:Math.max(1,Math.min(5000,task.deadline_at-Date.now()))});
+  const handle=await target.elementHandle();
+  try{
+   if(!handle||!await handle.evaluate((el,t)=>{const b=globalThis[Symbol.for('loginom-dock.large-upload.v1')]?.get(t.id);const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;return b&&document===b.document&&form===b.form&&form.FFileSenderManager===b.sender&&form.FFileInput===b.input&&b.gesture?.element===el&&b.gesture.tid===t.tid&&el.isConnected&&el.getAttribute('data-tid')===t.tid;},{id:task.operation_id,tid:read.gesture.tid}))throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+   await handle.click({timeout:Math.max(1,Math.min(5000,task.deadline_at-Date.now()))});
+  }finally{await handle?.dispose();}
  }
  return read;
 }
 
 export function makeLargeUploadCode(task) {
- return `async page=>(${largeUploadNative.toString()})(page,${JSON.stringify(task)})`;
+ return `async page=>{const task=${JSON.stringify(task)};try{const output=await (${largeUploadNative.toString()})(page,task);return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!!output.gesture,cleanup_complete:true,output,error:null,trace:[]};}catch(error){const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error.message)?error.message:'LARGE_UPLOAD_NATIVE_REFUSED';return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!['bind','poll','verify'].includes(task.mode),cleanup_complete:false,output:{},error:{code,message:code},trace:[]};}}`;
 }
