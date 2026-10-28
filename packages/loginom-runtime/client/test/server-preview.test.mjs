@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {serverPreviewProfile,validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
+import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 const fields=values=>({fields:Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{status:'observed',value}]))});
+test('server preview without declared columns uses the existing bounded schema-read allowance',()=>{
+ const parameters={source:{kind:'storage',server_source_ref:'storage-one'},preview_only:true,
+  settings:{source:{source_path:'/worker/full.csv'}}};
+ const request={target:{kind:'new'},parameters,finish:'close',inputs:[],mappings:[],read:{ports:[]}};
+ validateTextImportNodeParameters(parameters,'delimited',request);
+ assert.equal(textImportStepBudget(request),textImportStepBudget({...request,target:{kind:'existing'}}));
+});
 test('server preview has no digest, exact N or rare-type claim and survives the user reply projection',()=>{
  const profile=serverPreviewProfile({source:fields({encoding:'Windows 1251',source_path:'/worker/full.csv'}),
   format:fields({delimiter:'Точка с запятой',decimal_separator:','}),
