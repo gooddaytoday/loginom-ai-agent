@@ -74,6 +74,19 @@ test('unchanged byte reports cannot renew the no-progress deadline; late growth 
   assert.equal(result.cleanup_complete,true);assert.deepEqual(await readdir(join(f.root,'stalled')),[]);
  }
 });
+test('no-progress timer cancels and drains a stalled transfer even without status reports',async t=>{
+ const f=await fixture(t);t.mock.timers.enable({apis:['Date','setTimeout'],now:0});
+ let started=false;
+ const registry=createServerDownloadRegistry({directory:join(f.root,'silent'),inspect:async()=>({...source(),bytes:2*1024**3}),
+  download:async({path,signal})=>{await writeFile(path,'a');started=true;
+   await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();}});
+ registry.start(f.request);while(!started)await new Promise(resolve=>setImmediate(resolve));
+ t.mock.timers.tick(120000);await registry.cleanup();
+ const result=registry.status('download');
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
+ assert.equal(result.cancel_requested,true);assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(await readdir(join(f.root,'silent')),[]);
+});
 test('download writes a private cache, binds its receipt to native identity and never uploads',async t=>{
  const f=await fixture(t);f.registry.start(f.request);
  const result=await settled(f.registry);assert.equal(result.status,'SUCCEEDED');

@@ -516,7 +516,7 @@ export async function browserServerDownloadControl(page,task) {
     expired:job.expired===true,...(job.failure?{failure:job.failure}:{}),...(job.outcome?{outcome:job.outcome}:{})};
   if(task.mode==='release'){
     if(job.state!=='settled')throw Error('Cannot release a running download');
-    await job.download.delete();jobs.delete(task.operation_id);
+    await job.download?.delete();jobs.delete(task.operation_id);
   }
   return {...base,status:'SUCCEEDED',output,error:null};
 }

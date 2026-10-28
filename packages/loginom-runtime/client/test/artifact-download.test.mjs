@@ -49,6 +49,25 @@ test('server-only browser download retains its native Download, drains cancellat
  assert.equal((await control('status')).status,'FAILED');
 });
 
+test('retained server precondition refusal releases without a nonexistent Download',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ f.options.snapshot=f.page.uiSnapshot();delete f.options.artifact.upload;
+ f.options.server_source_binding={directory:'/test',destination:native.path,bytes:3,mtime:native.mtime};
+ f.options.deadline_at=Date.now()+10000;f.options.browser_downloads_path='/private/browser-downloads';
+ const code=makeServerSourceDownloadCode(f.options);native.mtime='changed';
+ const start=await f.page.execute(code);assert.equal(start.output.download_started,true);
+ const control=mode=>f.page.execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id:f.options.operation_id,mode})})`);
+ let status=await control('status');
+ while(status.output.state==='running'){await new Promise(resolve=>setImmediate(resolve));status=await control('status');}
+ assert.equal(status.output.failed,true);assert.equal(status.output.outcome.effect_possible,false);
+ assert.equal(status.output.outcome.cleanup_complete,true);assert.deepEqual(f.calls,[]);
+ assert.equal((await control('cancel')).output.state,'settled');
+ assert.equal((await control('release')).status,'SUCCEEDED');
+ assert.equal((await control('status')).error.code,'LOGINOM_DOWNLOAD_MISSING');
+});
+
 test('server event and RPC consume the original operation deadline instead of the small artifact timeout',async t=>{
  const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),root=await mkdtemp(join(tmpdir(),'server-event-'));
  t.after(()=>rm(root,{recursive:true,force:true}));f.page.clock=Date.now();
