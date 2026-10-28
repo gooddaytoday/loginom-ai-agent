@@ -5850,6 +5850,22 @@ test('D47b hidden JS output0 node keeps its owned socket context and typed Close
  }
 });
 
+test('the observed second native cancellation dialog offers typed Close after a Preview error',async()=>{
+ const {page}=outputPortFinishFixture();
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node',output_port:{direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'}})));
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+ page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox-1;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox-1;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ const snapshot=(await page.observe()),yes=snapshot.ui.elements.find(e=>e.tid==='msgbox-1;tlb;yes');
+ assert.ok(yes.wizard_close_confirmation);
+ assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+ assert.deepEqual(page.events,[]);
+});
+
 test('typed output-port finish confirms one gesture and quiet return to the exact graph',async()=>{
   for(const mode of ['valid','wrong_workflow','wrong_node','still_open','mask','churn']){
     const {page}=outputPortFinishFixture(mode),s=await page.observe(),done=s.ui.elements.find(e=>e.wizard_finish?.mode==='output_port');assert.ok(done,mode);

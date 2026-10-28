@@ -3154,7 +3154,7 @@ function readRenderedInputMapping(observation) {
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
-      const closeConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
+      const closeConfirmation=/^msgbox(?:-1)?;tlb;yes$/.test(tid) && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element) && dialogs[0].title==='Подтвердить'
         && dialogs[0].text==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'
         ? {root_ref:wizard.root_ref,root_tid:wizard.root_tid,stage:wizard.stage,
