@@ -59,6 +59,37 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
+
+test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{
+ const {createLinRegressionNodeSupport}=await import('../lib/linregression-node.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';p.parameters={input_fields:['X'],target_field:'Y'};
+ f.handlers.set(p.target.type,createLinRegressionNodeSupport({}).nodeApplyHandlers.get(p.target.type));
+ f.drivers.configureCalculator=async()=>({verified:true,cleanup_complete:true,configuration:{verified:true,mode:'apply',node_context:node,
+  fields:[{name:'X',usage_type:3},{name:'Y',usage_type:4}],target_field:'Y',intercept:true},validation:{status:'accepted_by_loginom_next'}});
+ f.drivers.finish=async mode=>{assert.equal(mode,'done');return {verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false};};
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:false,execution_id:'execution1'});
+ const result=await f.run(p);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(result.configuration.readback.mode,'apply');assert.equal(result.configuration.readback.training.status,'not_requested');
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'done',settings_applied:true,execution_started:false});
+ const bad=fixture();bad.handlers=f.handlers;
+ const rejected=await applyNode({request:p,operation:bad.operation,handlers:f.handlers,drivers:f.drivers,record:async e=>e,now:()=>1});
+ assert.equal(rejected.status,'AMBIGUOUS');assert.match(rejected.error.message,/must discard/);
+});
+
+for(const phase of ['configure','output_mapping'])test('known LinRegression apply refusal keeps the same graph usable: '+phase,async()=>{
+ const {linRegressionApplyRefusal}=await import('../lib/linregression-procedure.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';
+ const refusal=()=>{throw linRegressionApplyRefusal('saved model unavailable',{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:{...node,verified:true}},phase);};
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',
+  configure:phase==='configure'?refusal:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=()=>assert.fail('refused apply cannot execute');
+ if(phase==='output_mapping')f.drivers.mapPorts=async(_,ctx)=>ctx.receipt_id.endsWith(':output_mapping')?refusal():{verified:true,cleanup_complete:true};
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(f.operation.nodeApply.pending,null);
+ assert.ok(!f.calls.includes('execute'));
+});
 for(const expired of [false,true])test('host configuration beyond five minutes retains the original shared total deadline '+expired,async()=>{
  const f=fixture(),bindings=createUserWorkflowBindings(),p=request();
  bindings.remember({document_id:p.document_id,workflow_ref:p.workflow_ref});delete p.budgets;

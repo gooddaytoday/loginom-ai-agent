@@ -6,6 +6,32 @@ import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 const configuration={fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},{name:'Factor',label:'Фактор',type:'real',usage_type:3},{name:'Response',label:'Цель',type:'real',usage_type:4}]};
 
+test('repeated saved-model application only inspects and closes the coefficient mapping',async()=>{
+ const mapping=configuredCoefficients(),before=structuredClone(mapping),actions=[];
+ for(let i=0;i<2;i++){
+  let closed=false;
+  const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
+   wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
+   ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
+  const channel={async openOutputPort(port){assert.equal(port,1);},async observe(options){const s=state();assert.equal(options.ready(s),true,options.condition);return s;},
+   async perform(options){const s=state();assert.equal(options.ready(s),true);const action=options.resolve(s);assert.deepEqual(action,{verb:'click',ref:'close'});actions.push(action);closed=true;}};
+  const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('apply cannot commit outputs'));
+  assert.equal(result.verified,true);assert.equal(closed,true);assert.deepEqual(mapping,before);
+ }
+ assert.equal(actions.length,2);
+});
+
+test('apply refuses an unmaterialized coefficient output after closing its untouched draft',async()=>{
+ const mapping=configuredCoefficients();mapping.source_fields=[];let closed=false;
+ const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
+  wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
+  ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
+ const channel={async openOutputPort(){},async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
+  async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
+ await assert.rejects(configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit')),/already trained model/);
+ assert.equal(closed,true);
+});
+
 function configuredCoefficients(){
  const columns=[['Name','Имена входных полей','string'],['DisplayName','Метки входных полей','string'],['UniqueValues','Уникальные значения','string'],['Response_coefficients','Цель|Коэффициенты','real'],...['stdError','TStat','PValue','lowerBound','upperBound'].map(s=>['Response_'+s,'Цель|'+s,'real'])];
  const source_fields=columns.map(([name,label,type],index)=>({record_id:'source-'+index,field_id:String(index),index,name,label,type,required:false}));

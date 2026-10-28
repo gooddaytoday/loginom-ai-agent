@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureLinRegression} from '../lib/linregression-procedure.mjs';
+import {configureLinRegression,configureLinRegressionRoles} from '../lib/linregression-procedure.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
+
+test('apply rejects changed or missing predictor roles without opening any role editor',async()=>{
+ for(const p of [{input_fields:['Y'],target_field:'X'},{input_fields:['Missing'],target_field:'Y'}]){
+  let closed=false;
+  const fields=['X','Y'].map((name,i)=>({name,type:'real',data_kind:'Непрерывный',usage_type:i===0?3:4}));
+  const state=()=>({node_linregression:{verified:true,fields},
+   prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
+   wizard:closed?{status:'absent'}:{status:'observed',stage:'input_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
+   ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
+  const channel={async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
+   async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
+  await assert.rejects(configureLinRegressionRoles(channel,p,null,{preserve:true}),/roles differ from the saved model/);
+  assert.equal(closed,true);assert.deepEqual(fields.map(f=>f.usage_type),[3,4]);
+ }
+});
 
 for(const mode of ['native_order','duplicate','missing','extra','wrong_index','wrong_type','wrong_label','normalized'])
 test('regression normalizer matches role identities rather than source order: '+mode,async()=>{

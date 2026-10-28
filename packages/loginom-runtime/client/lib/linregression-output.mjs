@@ -1,5 +1,7 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {linRegressionApplyRefusal} from './linregression-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('Linear regression output: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function linRegressionOutputColumns(configuration,port){
@@ -9,6 +11,18 @@ export function linRegressionOutputColumns(configuration,port){
 }
 export async function configureLinRegressionOutputs(channel,configuration,p,mappings,finishWizard){
  need(mappings.length===0,'mapping overrides are outside stage 1');
+ if(configuration.mode==='apply'){
+  await channel.openOutputPort(1);
+  const state=await channel.observe({condition:'saved regression coefficient schema',readMappings:true,
+   ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard'});
+  const mapping=state.node_mapping,expected=linRegressionOutputColumns(configuration,1),active=mapping.target_fields.filter(f=>!f.excluded);
+  const closed=await closePreparedWizard(channel);
+  if(!(mapping.source_fields.length>0&&active.length===expected.length&&active.every((f,i)=>
+   ['name','label','type'].every(k=>f[k]===expected[i][k])&&f.source&&mapping.source_fields.some(s=>same(s,f.source)))))
+   throw linRegressionApplyRefusal('apply requires an already trained model with saved coefficients; train with enter first',closed,'output_mapping');
+  return {verified:true,cleanup_complete:true,effect_possible:true,deferred_schema:true,coefficient_mapping:mapping,
+   ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
+ }
  await channel.openOutputPort(1);
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
  const observe=condition=>channel.observe({condition,readMappings:true,ready});

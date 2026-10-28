@@ -91,6 +91,8 @@ JS-узлы не удаляй автоматически; их наличие н
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
+Для прогноза LinReg на новых данных используй `mode:"apply"` на уже обученном узле с сохранёнными `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; `enter` обучает или переобучает модель.
+
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
 `{"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}`.

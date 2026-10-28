@@ -1,15 +1,28 @@
 import {resolveLinRegressionRoles} from './linregression-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('Linear regression: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-export async function configureLinRegressionRoles(channel,p,inputMapping){
+export function linRegressionApplyRefusal(message,closed,phase){
+ const error=Error('Linear regression apply: '+message+'; no settings changed and no training requested');
+ error.nodePhaseRefusal={phase,status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+  verification:'linregression_apply_preserved',proof:{closed}};
+ return error;
+}
+export async function configureLinRegressionRoles(channel,p,inputMapping,{preserve=false}={}){
  const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_linregression?.verified===true;
  const observe=condition=>channel.observe({condition,readLinRegression:true,ready});
- const bind=s=>bindReformInput(s.node_linregression,inputMapping);
+ const bind=s=>preserve?s.node_linregression:bindReformInput(s.node_linregression,inputMapping);
  const baseline=bind(await observe('complete regression roles'));
- need(baseline.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'role schema differs from incoming fields');
+ if(!preserve)need(baseline.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'role schema differs from incoming fields');
+ if(preserve){
+  const matches=baseline.fields.every(f=>f.usage_type===(p.input_fields.includes(f.name)?3:f.name===p.target_field?4:0))
+   &&[...p.input_fields,p.target_field].every(name=>baseline.fields.some(f=>f.name===name&&['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный'));
+  if(!matches)throw linRegressionApplyRefusal('requested roles differ from the saved model',await closePreparedWizard(channel),'configure');
+  return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,settings_applied:false};
+ }
  const expected=resolveLinRegressionRoles(p,baseline.fields);let current=baseline.fields,edits=0;
  for(const wanted of expected){
   const original=current.find(f=>f.record_id===wanted.record_id);if(original.usage_type===wanted.usage_type)continue;
@@ -44,7 +57,8 @@ export async function configureLinRegressionRoles(channel,p,inputMapping){
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const roles=await configureLinRegressionRoles(channel,p,inputMapping);
+ const preserve=request.mode==='apply';
+ const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
@@ -57,7 +71,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
   &&normalization.fields.every(f=>f.norm_type===0&&used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1),
   'only unnormalized continuous predictors and target are supported');
- if(normalization.source_status==='Не активировано'){
+ if(!preserve&&normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected regression input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'regression input activated',readLinRegression:true,ready:s=>ready('normalization')(s)&&s.node_linregression.source_status!=='Не активировано'});
@@ -71,6 +85,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  const control=(s,key,verb)=>one(s,e=>e.tid===s.wizard.root_tid+';LinRegressionWizard;'+key&&e.allowed_actions.includes(verb),'Regression control unavailable: '+key);
  const act=async(s,condition,key,action)=>channel.perform({condition,initialObservation:s,ready:ready('parameters'),identity:s=>({node:s.prepared_node_context,parameters:s.node_linregression}),resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
  need(Object.values(state.node_linregression.switches).every(v=>v===false),'variable-driven regression settings are outside stage 1');
+ if(preserve)need(state.node_linregression.values.pedAutoMethod===false&&state.node_linregression.values.pedRegressionMethod===0&&state.node_linregression.values.pedDenormalize===true&&state.node_linregression.values.pedUseDetailedSettings===true,'apply requires the saved Enter model with intercept; settings will not be changed');
  if(state.node_linregression.values.pedAutoMethod){await act(state,'disable automatic regression method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual regression method enabled');}
  if(state.node_linregression.values.pedRegressionMethod!==0){
   await act(state,'open regression methods','pedRegressionMethod;ValueControl;trg_picker',{verb:'click'});
@@ -87,5 +102,5 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  const details=state.node_linregression;
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
