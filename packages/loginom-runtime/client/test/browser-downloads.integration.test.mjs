@@ -11,6 +11,73 @@ import {createConnection} from '@playwright/mcp';
 import {createSession} from '../lib/session.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {browserProcessEnvironment} from '../lib/bridge.mjs';
+import {browserServerDownloadProgress} from '../lib/executor.mjs';
+import {chromium} from 'playwright-core';
+
+test('Chromium progress tracks only the owned page transfer before saveAs completes',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER,timeout:30000,
+},async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'server-byte-progress-'));
+ const responses=[];
+ const http=createServer((request,response)=>{
+  if(request.url==='/file'){
+   response.writeHead(200,{'Content-Disposition':'attachment; filename="source.csv"','Content-Length':1048576});
+   response.write(Buffer.alloc(524288,'a'));responses.push(response);return;
+  }
+  response.end('<a href="/file">download</a>');
+ });
+ await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
+ const origin=`http://127.0.0.1:${http.address().port}`;
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,
+  chromiumSandbox:true,downloadsPath:directory});
+ t.after(async()=>{await browser.close();http.closeAllConnections();await new Promise(resolve=>http.close(resolve));await rm(directory,{recursive:true,force:true});});
+ const context=await browser.newContext({acceptDownloads:true}),page=await context.newPage(),foreign=await context.newPage();
+ await page.goto(origin);await foreign.goto(origin);
+ await page.evaluate(()=>{
+  const manager={FDownloadViewController:{FFileLoaders:[]}};
+  globalThis.bg={app:{Application:{FInstance:{FMainForm:{
+   FMapTree:{FServerConnection:{UserName:'worker'}},
+   Items:{Workspace:{getActiveTab:()=>({Controller:{FController:globalThis.testController}})}}
+  }}}}};
+  globalThis.testController={FFileSenderManager:manager};
+ });
+ const progress=await browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
+  server_source_binding:{bytes:1048576,account:'worker',directory:'/worker',destination:'/worker/source.csv'},browser_downloads_path:directory});
+ const other=foreign.waitForEvent('download');await foreign.locator('a').click();
+ const otherDownload=await other;responses[0].end(Buffer.alloc(524288,'b'));await otherDownload.path();
+ assert.equal(progress.guid,null);assert.equal(progress.bytes,0);
+ // LAB-457: real Loginom receives native WebSocket Blob chunks before a
+ // browser Download exists. A foreign path must never renew its allowance.
+ await page.evaluate(()=>testController.FFileSenderManager.FDownloadViewController.FFileLoaders.push({
+  FFullFileName:'/worker/foreign.csv',FFileName:'foreign.csv',FFileDirectory:'/worker/',
+  FFileSize:1048576,FFileBlobs:[new Blob([new Uint8Array(1048576)])]
+ }));
+ await progress.sample();assert.equal(progress.bytes,0);
+ await page.evaluate(()=>testController.FFileSenderManager.FDownloadViewController.FFileLoaders.push({
+  FFullFileName:'/worker/source.csv',FFileName:'source.csv',FFileDirectory:'/worker/',
+  FFileSize:1048576,FFileBlobs:[new Blob([new Uint8Array(524288)])]
+ }));
+ await progress.sample();assert.equal(progress.bytes,524288);assert.equal(progress.guid,null);
+ await progress.sample();assert.equal(progress.bytes,524288);
+ const event=page.waitForEvent('download');await page.locator('a').click();const download=await event;
+ const copy=download.saveAs(join(directory,'copy.csv'));
+ const until=Date.now()+10000;
+ while(progress.bytes===0&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,50));
+ assert.ok(progress.bytes>0&&progress.bytes<1048576,JSON.stringify(progress));
+ assert.equal(progress.failed,false);assert.equal(progress.url,download.url());
+ responses[1].end(Buffer.alloc(524288,'b'));await copy;
+ assert.equal(progress.bytes,1048576);assert.equal((await readFile(join(directory,'copy.csv'))).length,1048576);
+ await page.evaluate(()=>{
+  const loaders=testController.FFileSenderManager.FDownloadViewController.FFileLoaders;
+  loaders[1]={...loaders[1]};
+ });
+ await progress.sample();assert.equal(progress.failed,true);
+ await progress.close();
+ await progress.close();
+ // An already running exact-path receiver cannot be adopted by a new job.
+ await assert.rejects(browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
+  server_source_binding:{bytes:1048576,account:'worker',directory:'/worker',destination:'/worker/source.csv'},browser_downloads_path:directory}),/already has a native receiver/);
+});
 
 // No synthetic download event: a trusted click follows the native Blob link
 // selected by the first page script, inside the same Page that MCP owns.

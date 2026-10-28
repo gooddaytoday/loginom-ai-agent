@@ -170,7 +170,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated,
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
   deadline = Date.now() + 150_000, onRetry }) {
   signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
@@ -186,6 +186,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
+      ...(downloadsPath?{downloadsPath}:{}),
       timeout: Math.max(1, Math.min(30_000, deadline - Date.now())),
       headless,
       chromiumSandbox: true,

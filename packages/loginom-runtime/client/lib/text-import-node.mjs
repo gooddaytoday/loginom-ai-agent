@@ -22,7 +22,37 @@ const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
 
+export function serverPreviewProfile({source,format,columns,preview}) {
+  const values=group=>Object.fromEntries(Object.entries(group.fields).filter(([,f])=>f.status==='observed'&&!f.truncated)
+    .map(([name,f])=>[name,f.value]));
+  const settings=values(source),dialect=values(format);
+  const profile={format:'csv',coverage:'preview',status:'partial',encoding:{name:settings.encoding,basis:'wizard_display'},
+    dialect,columns:columns.slice(0,8).map(c=>({index:c.index,name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:c.used})),
+    column_count:columns.length,columns_omitted:Math.max(0,columns.length-8),
+    preview:{...preview,rows:preview.rows.slice(0,25).map(row=>row.slice(0,8))},
+    limitations:['wizard_preview_only','rendered_display_values','no_full_count','no_sha256','rare_types_not_validated']};
+  // Leave room for the compact control receipt and both MCP JSON copies.
+  while(Buffer.byteLength(JSON.stringify(profile),'utf8')>2200){
+    if(profile.preview.rows.length){profile.preview.rows.pop();continue;}
+    if(profile.columns.length){profile.columns.pop();profile.columns_omitted++;continue;}
+    throw Error('Server preview metadata exceeds the profile budget');
+  }
+  profile.preview.observed_records=profile.preview.rows.length;
+  profile.preview.complete=false;
+  return profile;
+}
+
 export function validateTextImportNodeParameters(p,mode,request) {
+  if(p?.preview_only===true){
+    requireValue(mode==='delimited'&&p.source?.kind==='storage'&&request.finish==='close'
+      &&request.inputs?.length===0&&request.mappings?.length===0&&request.read?.ports?.length===0
+      &&Object.keys(p).sort().join(',')==='preview_only,settings,source'
+      &&Object.keys(p.settings??{}).join(',')==='source'&&Object.hasOwn(p.settings.source??{},'source_path')
+      &&Object.keys(p.settings.source).every(k=>['source_path','encoding'].includes(k)),
+      'Server preview requires storage source, source_path only and Close without execution or mappings');
+    validateImportSource(p.source);validateTextImportPatch(p.settings);
+    if(p.settings.source.encoding!==undefined)resolveTextImportEncoding(p.settings.source.encoding);return;
+  }
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
@@ -89,7 +119,11 @@ export function verifyImportRowCount(expected,output,execution) {
 export function verifyFullImportCount(profileId,receipt,source,output,execution) {
   const reason = !receipt ? 'Trusted exact scan receipt is absent'
     : receipt.basis!=='backend_exact_scan'||receipt.profile_id!==profileId ? 'Exact scan profile identity does not match'
-    : source.kind==='storage' ? 'Storage preview has no trusted digest binding to the local exact scan'
+    : source.kind==='storage'&&(!source.cache_binding||source.cache_binding.server_source_ref!==source.server_source_ref
+      ||source.cache_binding.native_size!==source.bytes||source.cache_binding.copy_bytes!==receipt.bytes
+      ||source.cache_binding.native_mtime!==source.mtime
+      ||JSON.stringify(source.cache_binding.identity)!==JSON.stringify(receipt.identity))
+      ? 'Storage preview has no trusted digest binding to the local exact scan'
     : !/^[a-f0-9]{64}$/.test(receipt.sha256??'')||source.sha256!==receipt.sha256||source.bytes!==receipt.bytes
       ? 'Exact scan source digest or byte identity does not match verified delivery'
     : !receipt.identity?.canonical_path||receipt.identity.size!==receipt.bytes||!receipt.identity.file_id
@@ -199,6 +233,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),
           p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined);
         if(sourceSwitch){
+          if(p.source.kind==='storage'){
+            requireValue(scanReceipt?.basis==='backend_exact_scan'&&scanReceipt.profile_id===sourceSwitch.profile_id,
+              'LOGINOM_EXACT_SCAN_REQUIRED: full server source switch requires the downloaded copy exact scan; execution refused');
+            const source=sourceReceipt.source,binding=source.cache_binding;
+            requireValue(binding&&binding.server_source_ref===source.server_source_ref&&binding.native_size===source.bytes
+              &&binding.native_mtime===source.mtime&&binding.copy_bytes===scanReceipt.bytes
+              &&source.bytes===scanReceipt.bytes&&source.sha256===scanReceipt.sha256
+              &&JSON.stringify(binding.identity)===JSON.stringify(scanReceipt.identity),
+              'LOGINOM_FILE_CHANGED: server source no longer matches the unchanged downloaded cache (native size/mtime, copy size and exact scan); execution refused before source switch');
+          }
           requireValue(typeof verifySourceSwitchSave==='function','Full source switch requires a verified package save');
           saveReceipt=verifySourceSwitchSave(sourceSwitch.save_operation_id);
         }
@@ -212,7 +256,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           await executionDriver.prepare();
         }
         let s=await channel.observe({condition:'prepared import graph ready',ready:s=>s.prepared_node_context?.surface==='graph' && s.wizard?.status==='absent'});
-        await selectPreparedGraphNode(channel,s,'bound import graph selection available');
+        await selectPreparedGraphNode(channel,s,'bound import graph selection available',{settleGraph:true});
         if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
@@ -235,6 +279,50 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       async configureTextImport(ctx,p) {
         enter(ctx);requireValue(owner,'Import was not opened by this operation');
         try {
+          if(p.preview_only){
+            const source=await read('text_import_file','server preview source ready',isTextImportSourceReady);
+            const field=source.wizard.import_source.fields.source_path;
+            if(field.value!==sourceReceipt.source.destination){
+              await channel.act({verb:'fill',ref:field.input_ref,text:sourceReceipt.source.destination});
+              const fresh=await read('text_import_file','server preview source path entered');
+              await channel.act({verb:'press',ref:fresh.wizard.import_source.fields.source_path.input_ref,key:'Tab'});
+            }
+            if(p.settings.source.encoding!==undefined){
+              const encoding=resolveTextImportEncoding(p.settings.source.encoding),s=await read('text_import_file','server preview code page ready',isTextImportSourceReady);
+              if(s.wizard.import_source.fields.encoding.value!==encoding.label){
+                const owns=e=>e.wizard_combo?.field?.scope==='import_source'&&e.wizard_combo.field.name==='encoding'
+                  &&e.wizard_combo.field.root_ref===s.wizard.root_ref
+                  &&e.wizard_combo.field.owner_ref===s.wizard.import_source.fields.encoding.owner_ref;
+                await channel.perform({condition:'server preview code page picker',initialObservation:s,refreshWizardBusy:true,
+                  ready:s=>s.wizard?.stage==='text_import_file',identity:s=>s.wizard.owner_context,
+                  resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='picker'),'Preview code page picker required').ref})});
+                const options=await read('text_import_file','server preview code page option',s=>s.ui.elements.some(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===encoding.label));
+                await channel.perform({condition:'server preview exact code page',initialObservation:options,
+                  ready:s=>s.wizard?.stage==='text_import_file',identity:s=>s.wizard.owner_context,
+                  resolve:s=>({verb:'select_wizard_option',ref:one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===encoding.label),'Preview code page option required').ref})});
+                await read('text_import_file','server preview code page readback',s=>s.wizard.import_source.fields.encoding.value===encoding.label);
+              }
+            }
+            const observedSource=(await read('text_import_file','server preview exact source selected',s=>
+              isTextImportSourceReady(s)&&s.wizard.import_source.fields.source_path.value===sourceReceipt.source.destination)).wizard.import_source;
+            await next('text_import_file','text_import_format');
+            const definitions=await readImportDefinitionPages(channel);
+            const format=(await read('text_import_format','server preview format readback')).wizard.settings;
+            const preview=await execute(`async page=>page.evaluate(({rootTid})=>{
+              const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(rootTid)+']')];
+              if(roots.length!==1||!roots[0].isConnected)throw Error('Server preview wizard changed');
+              const base=rootTid+';ImportTextFileParamsWizard;ColumnDefsTuning;';
+              const grids=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(base+'grdData;grd-1;tbl')+']')];
+              const limits=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(base+'seReadRowCount')+'] input')];
+              const rows=grids.length===1?[...grids[0].querySelectorAll('table.x-grid-item')].slice(0,25).map(row=>
+                [...row.querySelectorAll('td.x-grid-cell .x-grid-cell-inner')].map(cell=>String(cell.textContent??'').slice(0,256))):[];
+              return {rows,requested_records:25,configured_limit:limits.length===1?String(limits[0].value):null,rendered_only:true};
+            },${JSON.stringify({rootTid:source.wizard.root_tid})})`);
+            await read('text_import_format','server preview owner remains bound');
+            configured={verified:true,cleanup_complete:true,effect_possible:true,source:observedSource,format,columns:definitions.fields,
+              server_profile:serverPreviewProfile({source:observedSource,format,columns:definitions.fields,preview})};
+            return configured;
+          }
           configured=operation.nodeApply.request.target.kind==='existing'
             ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
             :await configureTextImportFields(channel,p.settings,owner);
@@ -264,6 +352,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       async mapPorts(mappings,ctx) {
         if(ctx.receipt_id===operation.id+':input_mapping'){requireValue(mappings.length===0,'Import input mappings are not installed');return verified({mappings:[],not_applicable:true});}
         enter(ctx);requireValue(configured,'Configured import schema unavailable');
+        if(configured.server_profile)return verified({preview_only:true});
         await next('text_import_format','output_mapping');
         const outputFields=configured.columns.filter(c=>c.used);
         const nativeReady=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
@@ -297,7 +386,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       },
       async finish(mode,ctx) {
         requireValue(['done','execute','close'].includes(mode),'Unsupported finish mode');enter(ctx);
-        if(mode==='close')return closePreparedWizard(channel);
+        if(mode==='close')return {...await closePreparedWizard(channel),...(configured?.server_profile?{server_profile:configured.server_profile}:{})};
         const executeRequested=mode==='execute'&&!sourceSwitch,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
         requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));

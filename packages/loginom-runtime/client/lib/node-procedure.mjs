@@ -873,7 +873,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -985,6 +985,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
+          const graphBusyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&typeof refreshGraphBusy==='function'&&refreshGraphBusy({receipt:r,observation:observed,action})===true;
           const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
           const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
           // An opting-in picker may wait for its own late loading mask only
@@ -1005,7 +1007,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
             &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
           if(busyRefusal)assertContext(masked,true);
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal&&!graphBusyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -1018,6 +1020,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
             ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
             ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
+            ...(graphBusyRefusal?{reason:'owned_graph_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

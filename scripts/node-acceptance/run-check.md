@@ -108,6 +108,14 @@ profiles/packages are retained; main cleanup never discards changes. Cold uses
 its stock diagnostic cleanup. Archive evidence before deleting run directories;
 never share a whole profile or `cold-config.json` (they contain credentials).
 
+Private large/server-file fixtures can use `--cases /absolute/private/cases`
+with named subdirectories passed in `--scenarios`. Each contains `task.md`,
+`expected.json`, `oracle.py` and `data/` (empty for a server-only request).
+Each expected output declares its CSV `export_destination`; its basename is
+the export filename in the task. This keeps server-source filenames out of the
+export replacement list. Only `task.md` and files in `data/` reach the model;
+oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
+
 D87 large-file regression, one foreground command (from the repository root):
 
 ```sh

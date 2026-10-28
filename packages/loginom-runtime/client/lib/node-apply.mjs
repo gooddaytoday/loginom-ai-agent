@@ -461,6 +461,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       state.output=output;
     }
     check();
+    if(request.target.type==='imports.text'&&request.parameters.preview_only===true&&request.finish==='close'&&finish.server_profile)
+      state.output={status:'partial',evidence_ref:operation.id+':finish',ports:[],server_profile:finish.server_profile};
     const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,
       warnings:request.target.type==='imports.text'&&typeof finish.node_label==='string'

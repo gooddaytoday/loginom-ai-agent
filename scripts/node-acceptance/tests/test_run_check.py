@@ -20,6 +20,24 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 's-server-a'
+            source.mkdir()
+            (source / 'task.md').write_text('Сумма продаж по регионам')
+            (source / 'data').mkdir()
+            case = runner.scenario('s-server-a', cases=root)
+            self.assertEqual(case['prompt'], source / 'task.md')
+            self.assertIsNone(case['base'])
+            self.assertTrue(case['external'])
+            self.assertEqual(list(case['data'].iterdir()), [])
+            with self.assertRaises(ValueError):
+                runner.scenario('../s-server-a', cases=root)
+
+    def test_flat_pair_preserves_the_assigned_account(self):
+        config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
+        self.assertEqual(runner.pair_login(config, 'worker.json'), config)
     def make_runner(self, root, names=('s1',)):
         runner.write(root / 'request.json', {'pair': str(root / 'pair'), 'cold': True,
                                            'host_load_max': 8, 'spacing': 60})
@@ -172,6 +190,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
                 instance.run()
             self.assertEqual(instance.report['runs'][0]['status'], 'PASS', instance.report['runs'][0])
+
 
     def test_pair_directory_formats_and_unknown_key(self):
         for key in ['package_directory', 'personal_folder']:
