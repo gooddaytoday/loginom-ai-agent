@@ -397,31 +397,44 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
         return {document,element,classes:element.className};
       });
       const inspect=()=>page.evaluate(function inspectDownloadToast(b){
-        if(!b||document!==b.document)return 'changed';
+        const changed=predicate=>({state:'changed',predicate});
+        if(!b)return changed('binding_present');
+        if(document!==b.document)return changed('same_document');
         const matches=document.querySelectorAll('[data-tid="toast"]');
-        if(!b.element.isConnected&&matches.length===0)return 'closed';
-        if(matches.length!==1||matches[0]!==b.element||b.element.className!==b.classes
-          ||b.element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return 'changed';
+        if(!b.element.isConnected&&matches.length===0)return {state:'closed'};
+        if(matches.length!==1)return changed('unique_toast');
+        if(matches[0]!==b.element)return changed('same_element');
+        if(b.element.className!==b.classes)return changed('same_classes');
+        if(b.element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return changed('download_text');
         const box=b.element.getBoundingClientRect(),style=getComputedStyle(b.element);
-        return box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none'?'closed':'waiting';
+        return {state:box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none'?'closed':'waiting'};
       },binding);
+      const refused=(guard,predicate,observed)=>trace.push({event:'download_toast_guard_refused',guard,predicate,observed});
       try{
-        if(await inspect()==='waiting'){
+        const initial=await inspect();
+        if(initial.state==='waiting'||initial.state==='closed'){
           toastRefused=true;
           const ref=after.output.ui.dialogs[0].ref;
           trace.push({event:'download_toast_wait_started',tid:'toast',deadline_at:task.deadline_at});
           while(Date.now()<task.deadline_at){
             await page.waitForTimeout(Math.min(100,task.deadline_at-Date.now()));
             after=await observe(page);
-            if(Date.now()>task.deadline_at||after.status!=='SUCCEEDED'||!settledContext(after.output))break;
+            if(Date.now()>task.deadline_at){refused('deadline','within_original_deadline',false);break;}
+            if(after.status!=='SUCCEEDED'){refused('observation','observation_succeeded',false);break;}
+            if(!settledContext(after.output)){refused('context','same_context_without_dialogs',false);break;}
             const state=await inspect();
-            if(after.output.ui.dialogs.length===0&&state==='closed'){
+            if(after.output.ui.dialogs.length===0&&state.state==='closed'){
               toastRefused=false;
               trace.push({event:'download_toast_settled',tid:'toast'});break;
             }
-            if(!downloadToast(after.output)||after.output.ui.dialogs[0].ref!==ref||state!=='waiting')break;
+            if(!downloadToast(after.output)){refused('dialogs','only_owned_download_toast',false);break;}
+            if(after.output.ui.dialogs[0].ref!==ref){refused('dialog_reference','same_dialog_ref',false);break;}
+            // The bound native toast can close after observe captured it.
+            // Keep reading until both reads confirm closure; its disappearance
+            // is settlement, while replacement or another dialog still refuses.
+            if(state.state==='changed'){refused('native_toast',state.predicate,state.state);break;}
           }
-        }
+        }else refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
       }finally{await binding.dispose();}
     }
     if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
