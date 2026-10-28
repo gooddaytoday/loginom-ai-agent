@@ -297,6 +297,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
+    if(mode==='execute'&&!implementation){
+     // Preview creates native process groups. Capture them after the wizard
+     // and port commits, before attributing the one final graph launch.
+     executionDriver=createNodeExecutionProcedure(channel,ctx.node);
+     await executionDriver.prepare();
+    }
     if(mode==='execute'&&implementation?.keepExecutionConsoleOpen===true){
      // REST progress repaints the toolbar while HTTP is running. Prepare the
      // existing pinned console before launch, rather than opening it afterward.
