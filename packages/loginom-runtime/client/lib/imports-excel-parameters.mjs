@@ -1,3 +1,4 @@
+import {importSourceSchema,validateImportSource} from './storage-policy.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
@@ -11,13 +12,14 @@ export const excelSettingsSchema=object({
  },['name','label','type'])},
 },['source_path','header_rows','columns']);
 export const excelParametersSchema=object({
- source:object({artifact_id:text(128),upload_operation_id:text(128)},['artifact_id','upload_operation_id']),
+ source:importSourceSchema,
  excel:excelSettingsSchema,
 });
 export function validateExcelParameters(p,mode,r){
  const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
+ need(p?.source_switch===undefined,'LOGINOM_IMPORT_SCHEMA_CHANGED: schema-preserving Excel source switching is not installed; keep the sample and do not execute a full replacement');
  need(mode==='xlsx'&&p&&Object.keys(p).sort().join(',')==='excel,source','source and excel settings are required, mode xlsx');
- need(p.source&&Object.keys(p.source).sort().join(',')==='artifact_id,upload_operation_id'&&Object.values(p.source).every(v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(v)),'verified delivery IDs are required');
+ validateImportSource(p.source);
  const e=p.excel;
  need(e&&Object.keys(e).every(k=>Object.hasOwn(excelSettingsSchema.properties,k)),'unsupported Excel setting');
  need(typeof e.source_path==='string'&&e.source_path.length<=2048&&/^\/(?!\/)/.test(e.source_path)&&/\.xlsx$/i.test(e.source_path)

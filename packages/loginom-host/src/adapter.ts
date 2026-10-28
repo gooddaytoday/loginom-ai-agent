@@ -87,6 +87,7 @@ export async function acquire(session: string) {
       signal?: AbortSignal,
       admissions?: { userMessage: string; files: InputFile[] }[],
       packageInput?: { admissionID: string; file: InputFile },
+      scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
     ) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
@@ -99,7 +100,7 @@ export async function acquire(session: string) {
           signal?.addEventListener("abort", abort, { once: true })
           return await connection.request(
             "call",
-            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}) },
+            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
           )

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Page,runtime} from './support/executor-fixture.mjs';
+import {verifyTextImportSource,verifyFullImportCount} from '../lib/text-import-node.mjs';
 import {makeArtifactUploadCode} from '../lib/executor.mjs';
 
 function fixture(name='data.csv') {
@@ -327,9 +328,32 @@ for(const reused of [false,true])test('large runtime completion retains trusted 
  assert.equal(result.source_sha256,f.artifact.sha256);assert.equal(result.reused===true,reused);
  assert.equal(f.counts().submitted,reused?0:1);assert.equal(rt.hasUnsettledWork(),false);
  assert.ok(!events.some(e=>String(e.phase).includes('download')));
+ const checkSource=async id=>{
+  const inspected=await rt.inspect({operationId:id}),outcome=inspected.output.outcome;
+  const record={sequence:0,operation_id:id,destination:f.artifact.upload.destination,artifact:f.artifact,outcome,cleanup_confirmed:true,transport_uncertain:false};
+  const source=verifyTextImportSource({source:{kind:'verified_delivery',artifact_id:f.artifact.artifact_id,upload_operation_id:id},settings:{source:{source_path:f.artifact.upload.destination}}},[record],{complete:true,records:[record]}).source;
+  assert.equal(source.sha256,f.artifact.sha256);assert.equal(source.bytes,f.artifact.bytes);
+  assert.equal(source.verification_basis,'native_size_and_local_sha256');assert.equal(outcome.output.server_copy_verification,undefined);
+  assert.equal(verifyFullImportCount('profile',{basis:'backend_exact_scan',profile_id:'profile',records:17,bytes:source.bytes,sha256:source.sha256,
+   identity:{canonical_path:'/private/input.csv',size:source.bytes,file_id:'1:2'}},source,
+   {port:0,fresh:true,execution_id:'full',freshness_basis:'completed_execution_port_source',row_count:17},
+   {verified:true,owner_verified:true,status:'completed',execution_id:'full'}).status,'verified');
+
+  for(const mutate of [o=>o.output.native_size_verification.source_sha256='b'.repeat(64),o=>o.output.native_size_verification.bytes++,
+   o=>o.output.native_size_verification.upload_operation_id='foreign',o=>o.output.native_size_verification.cleanup_complete=false,
+   o=>o.output.native_size_verification.upload_completion_verified=false,o=>delete o.output.native_size_verification]){
+   const changed=structuredClone(record);mutate(changed.outcome);
+   assert.throws(()=>verifyTextImportSource({source:{artifact_id:f.artifact.artifact_id,upload_operation_id:id},settings:{}},[changed]));
+  }
+  const uncertain={...structuredClone(record),sequence:1,operation_id:'later',transport_uncertain:true};
+  assert.throws(()=>verifyTextImportSource({source:{artifact_id:f.artifact.artifact_id,upload_operation_id:id},settings:{}},[record],{complete:true,records:[record,uncertain]}),/superseded/);
+
+ };
+ await checkSource('large-1');
+
  if(!reused){
   const next=await rt.uploadLargeArtifact({...options,operationId:'large-2',observationId:(await rt.observe()).output.observation_id});
-  assert.equal(next.reused,true);assert.equal(f.counts().submitted,1);
+  assert.equal(next.reused,true);assert.equal(f.counts().submitted,1);await checkSource('large-2');
   assert.ok(events.some(e=>e.phase==='large_upload_completed'));assert.ok(events.some(e=>e.phase==='large_upload_reused'));
  }
 });

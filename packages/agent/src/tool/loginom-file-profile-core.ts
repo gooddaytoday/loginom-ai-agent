@@ -136,6 +136,16 @@ export async function loadProfile(id: string, dir: string): Promise<Stored> {
   return JSON.parse(await readFile(profilePath(dir, id), "utf8"))
 }
 
+// Private backend receipt: the model supplies only an ID, never a row count.
+export async function exactScanReceipt(id: string, dir: string) {
+  const p = await loadProfile(id, dir)
+  await unchanged(p)
+  if (p.scan?.status !== "exact" || p.scan.first_violation || !Number.isSafeInteger(p.scan.records)
+    || p.scan.records! < 0 || !/^[a-f0-9]{64}$/.test(p.scan.sha256 ?? "")) return undefined
+  return { profile_id: p.profile_id, records: p.scan.records!, sha256: p.scan.sha256!,
+    bytes: p.identity.size, identity: p.identity, basis: "backend_exact_scan" as const }
+}
+
 // Only exact scans for this original identity constrain full-file staging.
 // Neither the model nor a quick profile can supply a trusted full-file digest.
 export async function exactFileDigest(expected: Identity, dir: string) {

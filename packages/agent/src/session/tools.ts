@@ -32,6 +32,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import type { Skill } from "@/skill"
 import type { MessageID } from "./schema"
 import path from "node:path"
+import { Global } from "@loginom-ai-agent/core/global"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -739,6 +740,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                         }
                       })
                     : undefined
+                const scanReceipt = definition.name === "dock_node_apply" && isRecord(args.parameters)
+                  && isRecord(args.parameters.source_switch) && typeof args.parameters.source_switch.profile_id === "string"
+                  ? yield* Effect.promise(async () => {
+                      const { exactScanReceipt } = await import("@/tool/loginom-file-profile-core")
+                      return exactScanReceipt(args.parameters.source_switch.profile_id as string,
+                        path.join(Global.Path.data, "file-profiles", ctx.sessionID)).catch(() => undefined)
+                    })
+                  : undefined
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
                     await loginom
@@ -749,6 +758,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                         options.abortSignal,
                         LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
                         packageInput,
+                        scanReceipt,
                       )
                       .catch((error) => {
                         throw Error(hostErrorText(error))

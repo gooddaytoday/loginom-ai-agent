@@ -1,5 +1,5 @@
 import {browserFailureCategory} from './browser-failure.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode} from './artifact-discovery.mjs';
@@ -1490,6 +1490,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const operations = new Map();
   const auxiliary = new Map();
   const observations = createObservationPages();
+  const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
   let recoverySequence = 0;
@@ -2509,6 +2510,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         outcome.trace.push({event:'observation_scope_fallback',requested_scope:scope??'all',
           delivered_scope:'roots',reason:'UI_SCAN_LIMIT'});
       }
+      serverSources.retain(outcome);
       await onRecord({operation_id:observationOperationId,phase:'observation_completed',outcome:structuredClone(outcome)});
       outcome.output.operation = view(pending).output;
       return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope }) : observations.next(cursor, outcome);
@@ -2684,7 +2686,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
           const saved=await onRecord({phase:'large_upload_reused',operation_id:operationId,result});
           if(saved?.phase!=='large_upload_reused'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
-          state.settled=true;return result;
+          const outcome={status:'SUCCEEDED',action_key:'artifact.upload',action_revision:'1',operation_id:operationId,phase:'completed',effect_possible:false,cleanup_complete:true,
+            output:{artifact_id:artifactId,destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256,upload_completion_verified:true,native_size_verification:result},error:null,trace:[]};
+          if(operations.has(operationId)||auxiliary.has(operationId))throw Error('Upload operation ID already used');
+          operations.set(operationId,{id:operationId,signature:fingerprint('artifact.upload.delivery',[artifactId,grantId,options.observationId]),
+            action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},deliveryOperationId:options.deliveryOperationId,
+            parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:options.observationId,destination:artifact.upload.destination,overwrite:'reject'},
+            checkpoint:{artifact,workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage},deadline,outcome,cleanupConfirmed:true});
+          state.settled=true;state.verified=true;return result;
         }
         signal?.throwIfAborted();state.submitted=true;
         const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true});
@@ -2706,7 +2715,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const saved=await onRecord({phase:'large_upload_completed',operation_id:operationId,result,native_row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory});
             if(saved?.phase!=='large_upload_completed'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
             await state.operation.uploadLease.release();
-            state.operation.outcome={...state.operation.outcome,status:'SUCCEEDED',output:{...state.operation.outcome.output,native_size_verification:result}};
+            state.operation.outcome={...state.operation.outcome,status:'SUCCEEDED',phase:'completed',cleanup_complete:true,error:null,output:{...state.operation.outcome.output,artifact_id:artifactId,destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256,upload_completion_verified:true,native_size_verification:result}};
             state.operation.cleanupConfirmed=true;pending=null;observations.clear();state.settled=true;state.verified=true;
             largeReceipts.set(key,{row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory,sha256:artifact.sha256});
             return result;
@@ -2869,7 +2878,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     // Host-only until the complete real drivers pass admission. All child
     // phases own the same runtime gate; they cannot re-enter public run/act.
-    async runNodeApply(request,{signal,stopSignal,resume=false}={}) {
+    async runNodeApply(request,{signal,stopSignal,resume=false,scanReceipt}={}) {
       request=structuredClone(request);
       signal?.throwIfAborted();checkId(request.operation_id);
       const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
@@ -2927,7 +2936,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
-          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,
+          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
+            resolveStorageSource:ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
+              ...options,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000})),
+            verifySourceSwitchSave:id=>{
+              const saved=operations.get(id),outcome=saved?.outcome;
+              if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
+                ||saved.cleanupConfirmed!==true||outcome.output?.save_completed!==true
+                ||!outcome.output.workflow_continuations?.some(c=>c.document_id===operation.parameters.document_id
+                  &&c.workflow_ref.workflow_id===operation.parameters.workflow_ref.workflow_id))
+                throw Error('Full source switch requires a completed package.save_checkpoint receipt for this prepared workflow');
+              return {operation_id:id,package_path:outcome.output.package_ref.path};
+            },
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
             nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
