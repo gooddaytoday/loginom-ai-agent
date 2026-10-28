@@ -1546,8 +1546,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   let storageNavigating=false;
-  const inspectServerSource=ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-    expected_origin:targetOrigin,expected_build:targetBuild,...options})));
+  const inspectServerSource=(ref,{signal,deadline}={})=>serverSources.inspect(ref,options=>{
+    signal?.throwIfAborted();const timeout=Math.min(35000,deadline===undefined?35000:deadline-now());
+    if(timeout<=0)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+    return execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
+      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout});
+  });
   const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
   const drainServerDownload=async id=>{
     const cancelled=await controlServerDownload(id,'cancel');
@@ -3066,7 +3070,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:async ref=>{
-              const source=await inspectServerSource(ref);
+              const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
             },
             verifySourceSwitchSave:id=>{

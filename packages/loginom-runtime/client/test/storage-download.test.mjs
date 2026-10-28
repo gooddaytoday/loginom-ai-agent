@@ -130,6 +130,15 @@ test('a transfer finishing beyond its original deadline is invalid and removed',
  assert.deepEqual(await readdir(join(f.root,'timed')),[]);
 });
 
+test('native validation time consumes the original download deadline',async t=>{
+ const f=await fixture(t);let clock=0;
+ const registry=createServerDownloadRegistry({directory:join(f.root,'expired-before-transfer'),now:()=>clock,
+  inspect:async()=>{clock=serverDownloadBudget(3)+1;return source();},
+  download:async()=>assert.fail('No browser gesture after the original deadline')});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_DEADLINE');
+});
+
 test('unknown browser cleanup retains the lease and partial until actual recovery',async t=>{
  const f=await fixture(t);let recovered=false;
  const registry=createServerDownloadRegistry({directory:join(f.root,'unknown'),inspect:async()=>source(),

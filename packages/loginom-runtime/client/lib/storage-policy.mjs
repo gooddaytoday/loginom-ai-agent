@@ -172,8 +172,9 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
       job.completion=(async()=>{
         let timer;
         try {
-          job.source=await inspect(request.server_source_ref);job.controller.signal.throwIfAborted();
-          job.deadline=now()+serverDownloadBudget(job.source.bytes);
+          job.source=await inspect(request.server_source_ref,{signal:job.controller.signal});job.controller.signal.throwIfAborted();
+          job.deadline=job.started+serverDownloadBudget(job.source.bytes);
+          if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
           timer=setTimeout(()=>job.controller.abort(Error('LOGINOM_DOWNLOAD_DEADLINE')),Math.max(1,job.deadline-now()));
           if(!/\.(csv|tsv|txt|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
           await mkdir(directory,{recursive:true,mode:0o700});
@@ -184,7 +185,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,
             signal:job.controller.signal,deadline:job.deadline});
           job.controller.signal.throwIfAborted();job.phase='verifying';
-          const after=await inspect(request.server_source_ref),copy=await lstat(job.path);
+          const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline}),copy=await lstat(job.path);
           if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
             throw Error('LOGINOM_FILE_CHANGED');
           await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
