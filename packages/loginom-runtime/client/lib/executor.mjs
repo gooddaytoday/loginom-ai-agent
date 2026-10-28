@@ -2473,8 +2473,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }
           }
         };
-        const roots=()=>read({scope:'roots',storageName:path.slice(path.lastIndexOf('/')+1)});
-        const one=entries=>{if(entries.length!==1)throw Error('Server storage control is missing or ambiguous');return entries[0];};
+        const roots=()=>read({scope:'roots'});
+        const one=(entries,control='storage_control')=>{if(entries.length!==1)throw Object.assign(Error('Server storage control is missing or ambiguous'),
+          {code:'STORAGE_CONTROL_UNAVAILABLE',storageControl:control});return entries[0];};
         const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
         const act=async(s,e,verb='click',extra={})=>{
           guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
@@ -2500,12 +2501,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{
           const initial=await roots();
           if(!initial.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))){
-            const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar')));
-            await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage')));
+            const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
+            await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
           }
           let current=await directory();const destination=path.slice(0,path.lastIndexOf('/'));
           if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
-            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
             current=await directory('/');
           }
           const row=async name=>{
@@ -2518,12 +2519,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               },ready:(probe,predicate)=>ready(probe,predicate),act});
           };
           for(const part of destination.slice(current.file_storage.directory==='/'?0:current.file_storage.directory.length).split('/').filter(Boolean)){
-            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')));
+            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
             await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
           const state=await row(path.slice(path.lastIndexOf('/')+1));
-          const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref));
+          const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
           const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
@@ -2538,7 +2539,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const unsettled=!!pending||running;
           const result={result_version:'user-v1',operation_id:id,status:unsettled?'AMBIGUOUS':'FAILED',
             action_key:'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
-            output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason}}};
+            output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason,
+              ...(/^[A-Z_]{1,80}$/.test(error.code??'')?{code:error.code}:{}),
+              ...(['main_toolbar','files_button','files_root','folder','source_file','storage_control'].includes(error.storageControl)?{control:error.storageControl}:{})}}};
           auxiliary.get(id).outcome=structuredClone(result);return result;
         }finally{storageNavigating=false;}
       })();

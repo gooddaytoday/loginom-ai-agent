@@ -61,7 +61,13 @@ test('source discovery waits through the old graph tab before reading the new Fi
  const evaluate=page.evaluate.bind(page);
  page.evaluate=async(fn,arg)=>{
   if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
-  if(arg.discoverRoots)return structuredClone(++roots===2?graph:files);
+  if(arg.discoverRoots){
+   const state=structuredClone(++roots===2?graph:files);
+   // Real workspace-ui storage_name selects only matching file rows, omitting
+   // NavigationPanel and the global toolbar (LAB-386 server-a/0.jsonl:2-3).
+   if(arg.storageName)state.ui.elements=state.ui.elements.filter(e=>e.tid.endsWith(';colName_'+arg.storageName));
+   page.clock+=1000;return state;
+  }
   if(arg.rootRef===old)throw Error('Detached graph navigation root must not be read');
   const state=structuredClone(files);delete state.observation_kind;
   state.file_storage={status:'observed',directory:'/worker'};
