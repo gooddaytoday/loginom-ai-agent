@@ -296,7 +296,7 @@ function linkPage() { const page = new Page(); page.graph = { scrollLeft: 12, sc
 function linkParameters(page, kind = 'add') { return { source_node: page.ref('Источник'), target_node: page.ref('Приёмник'), source_port: { kind: 'data' }, target_port: { kind } }; }
 const run = (page, key, parameters, options = {}) => page.execute(makeCapabilityCode(actions.get(key), selectors, parameters, {
   expected_build: build, ...(page.storageBinding ? { storage_binding: page.storageBinding } : {}), ...options }));
-function runtime(page, options = {}) { return createActionRuntime({ pinned: { actions, selectors, pins: {}, compatibility: { loginom_build: build } }, allowCandidate: true,
+function runtime(page, options = {}) { return createActionRuntime({ pinned: { actions, selectors, pins: {}, compatibility: { loginom_build: build } }, allowCandidate: true,serverSourceCache:true,
   execute: code => page.execute(code), now: () => page.clock, targetOrigin: 'https://loginom.invalid', ...options }); }
 
 

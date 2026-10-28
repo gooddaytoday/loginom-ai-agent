@@ -4,7 +4,8 @@ import {mkdtemp,writeFile,readdir,stat,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
-import {Page,runtime} from './support/executor-fixture.mjs';
+import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
+import {createActionRuntime} from '../lib/executor.mjs';
 
 const source=()=>({verified:true,kind:'storage',server_source_ref:'storage-one',destination:'/worker/full.csv',
  bytes:3,mtime:'2026-10-28T00:00:00Z',origin:'https://app.loginom.ai',account:'worker',document_id:'doc'});
@@ -18,6 +19,18 @@ async function settled(registry,id='download') {
  while(registry.status(id).state==='running')await registry.wait(id,{timeoutMs:100});
  return registry.status(id);
 }
+test('production default refuses server cache before lookup or download and retains source tools',async t=>{
+ const f=await fixture(t),directory=join(f.root,'disabled-cache');
+ const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
+  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
+ const outcome=await r.serverDownload(f.request,'dock_storage_download_start');
+ assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'SERVER_CACHE_DISABLED');
+ assert.match(outcome.error.message,/для серверного файла точная сверка N недоступна/);
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);assert.equal(r.hasActiveWork(),false);
+ assert.ok(r.tools.some(tool=>tool.name==='dock_storage_source'));
+ assert.match(r.tools.find(tool=>tool.name==='dock_storage_download_start').description,/disabled/i);
+ await assert.rejects(stat(directory),{code:'ENOENT'});await r.cleanupServerCache();
+});
 test('server download deadline is size-derived and capped without a global timeout change',()=>{
  assert.equal(serverDownloadBudget(0),120000);
  assert.equal(serverDownloadBudget(2*1024**3),529600);
@@ -75,7 +88,7 @@ test('source discovery waits through the old graph tab before reading the new Fi
    storage_entry:{kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'}}];
   return state;
  };
- const r=runtime(page,{cacheDirectory:join(f.root,'navigation-cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+ const r=runtime(page,{serverSourceCache:false,cacheDirectory:join(f.root,'navigation-cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
   origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
  const result=await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source');
  assert.equal(result.status,'SUCCEEDED');assert.ok(result.output.source.server_source_ref);
