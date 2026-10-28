@@ -535,10 +535,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const node=nodes.length===1?nodes[0]:null,component=node&&globalThis.Ext?.getCmp?.(node.id);
         const native=component?._node?.data?.node,app=globalThis.bg?.app,suffix=parts.slice(6).join('>');
         const port=preparedInputPort??preparedOutputPort;
-        const portPath=port?.direction==='input'?'Входные_порты>Входной_источник_данных':'Выходные_порты>Результат';
+        const portPaths=port?.direction==='input'?['Входные_порты>Входной_источник_данных']
+          :['Выходные_порты>Результат','Выходные_порты>Выходной_набор_данных'];
         const bound=port?port.port===0&&port.native_index===0&&port.node_icon_class==='bg-vendor-icon-calcdata'
           &&typeof port.port_guid==='string'&&!!port.port_guid&&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id
-          &&[portPath.split('>')[0],portPath,portPath+'>Настройка',''].includes(suffix)
+          &&portPaths.some(path=>[path.split('>')[0],path,path+'>Настройка',''].includes(suffix))
           &&(port.direction!=='input'||preparedNavigationNode?.tid===nodeTid&&preparedNavigationNode.label===node?.textContent.trim())
           :preparedNodeWizard&&['','Настройка'].includes(suffix);
         if(bound&&app?.ModelNodeTreeNode&&native instanceof app.ModelNodeTreeNode&&native.FGuid===preparedNodeId

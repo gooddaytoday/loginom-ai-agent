@@ -4854,6 +4854,31 @@ test('D84 calculator token caption is metadata only for the exact native breadcr
  }
 });
 
+test('D84 Calculator token caption retains the native default output socket owner',async()=>{
+ for(const caption of ['Выходной набор данных','Результат'])for(const fault of ['none','guid','dom','missing_opening','secret_attribute','foreign_caption']) {
+  const {page,crumbs,nodeTree,component,wizard,binding}=await calculatorNodeOverflowFixture();
+  for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+   .replace('amount_double','Полные_токены_и_индикаторы_корзин')
+   .replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных',caption.replaceAll(' ','_'))
+   .replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  crumbs[5].ownText='Полные токены и индикаторы корзин';crumbs[6].ownText='Выходные порты';crumbs[7].ownText=caption;
+  crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].children.at(-1).attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  binding.output_port={...binding.input_port,direction:'output'};delete binding.input_port;
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.output_port.opening_operation_id;
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='foreign_caption')for(const c of crumbs.slice(7)) {
+   c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),'Foreign');if(c===crumbs[7])c.ownText='Foreign';
+  }
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.port_context.status==='observed',fault==='none',caption+':'+fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',caption+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D84 Calculator token graph caption stays visible only for its exact prepared native owner',async()=>{
  for(const fault of ['none','guid','icon','foreign_dom','secret_attribute','unbound','duplicate']) {
   const page=new Page(),tid='MF;TF-1;Graph;Точные_токены_Bread_и_Milk';
