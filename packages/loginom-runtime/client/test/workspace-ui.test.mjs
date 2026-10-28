@@ -4865,6 +4865,45 @@ test('Calculator output Done keeps its exact overflow node and output folder own
   assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));assert.deepEqual(page.events,[]);
 });
 
+test('D52b output0 retains long saved ancestry through Done only with a verified native owner',async()=>{
+ // l443h-d52b2/execution-events.jsonl:1066-1069,1335: Group output0 is
+ // native verified, but overflow loses port_context and calculator Done times out.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','unverified','foreign_node','visibility','opacity','duplicate','panel']) {
+  const {page,crumbs,wizard,nodeTree}=await calculatorNodeOverflowFixture();
+  const name='l443h_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  const old=crumbs[2].ownText;
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(old,name).replaceAll('amount_double','Число_точек_по_группам');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек по группам';crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  for(const e of [wizard,...wizard.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  for(const c of crumbs.slice(6))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных','Результат');
+  crumbs[6].ownText='Выходные порты';crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].ownText='Результат';crumbs[7].children[0].attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='foreign_node')nodeTree.FGuid='foreign';
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const port={direction:'output',port:0,native_index:0,port_guid:'output0',opening_operation_id:'count-points:output0',node_icon_class:'bg-vendor-icon-groupdata'};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:fault!=='unverified',surface:'wizard',node_id:'node',output_port:port})));
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output?.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,fault==='none',hidden+':'+fault);
+  if(fault==='none') {
+   assert.equal(r.output.wizard.port_context.status,'observed');
+   assert.deepEqual(r.output.wizard.port_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+   const narrow=await page.execute({mode:'observe',root_ref:r.output.wizard.root_ref,output_column_page:{offset:0,limit:8}});
+   assert.deepEqual(narrow.output.wizard.port_context,r.output.wizard.port_context);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
  for(const port of [1,2])for(const mode of ['valid','union_wrong_number','wrong_icon','missing_native_port','unverified_owner']) {
   const {page}=await joinInputPortOverflowFixture(mode,port,'union');

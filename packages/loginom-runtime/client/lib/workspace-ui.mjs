@@ -174,14 +174,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false, scanRetried = false, settleMasks = true) => {
     const nodeContext=await boundNode();
-    const previousNode=task.snapshot?.prepared_node_context,previousInput=previousNode?.input_port;
-    const preparedInputReturn=effectPossible&&task.action?.verb==='finish_wizard'
+    const previousNode=task.snapshot?.prepared_node_context;
+    const previousPort=previousNode?.input_port??previousNode?.output_port;
+    const preparedPortReturn=effectPossible&&task.action?.verb==='finish_wizard'
       &&previousNode?.verified===true&&previousNode.surface==='wizard'&&nodeContext?.surface==='graph'
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
-      &&previousInput?.direction==='input'&&previousInput.port===0&&previousInput.native_index===0
-      &&typeof previousInput.port_guid==='string'&&previousInput.port_guid.length>0
-      &&typeof previousInput.opening_operation_id==='string'&&previousInput.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedInputReturn}) => {
+      &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
+      &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -820,6 +820,27 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       }
       return false;
     };
+    const preparedPathMatches=!preparedWorkflowPath?.length||preparedWorkflowPath.every(c=>{
+      const elements=tids.get(c.tid)??[];
+      return elements.length===1&&elements[0].textContent.trim()===c.label;
+    });
+    // Toolbar overflow is context only, for every native-verified surface.
+    // Match the complete prepared ancestry, including visible captions; retain
+    // the ordinary visibility requirement for all gestures and descendants.
+    const ancestorPort=preparedInputPort??preparedOutputPort;
+    const nativeAncestry=preparedNodeId&&preparedNativeNodeId===preparedNodeId
+      &&(!ancestorPort||typeof ancestorPort.port_guid==='string'&&ancestorPort.port_guid.length>0
+        &&typeof ancestorPort.opening_operation_id==='string'&&ancestorPort.opening_operation_id.length>0)
+      &&(!preparedGraphTid||preparedPortReturn||nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid
+        &&nativeGraphControl(e)?.status==='non_script'&&nativeGraphControl(e).node_id===preparedNodeId).length===1);
+    const hiddenPreparedAncestor=memoRead(e=>nativeAncestry
+      &&preparedPathMatches&&preparedWorkflowPath?.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
+      &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)&&visibleAncestors(e.parentElement)
+      &&[...e.querySelectorAll('.maptree-icon-workflow')].every(icon=>getComputedStyle(icon).display!=='none'
+        &&getComputedStyle(icon).visibility==='visible'&&getComputedStyle(icon).opacity!=='0'&&!icon.hasAttribute('hidden')&&!sensitive(icon)));
+    const preparedAncestryObserved=preparedPathMatches&&(!preparedWorkflowPath?.length
+      ||preparedWorkflowPath.every(c=>{const e=(tids.get(c.tid)??[])[0];return visible(e)||hiddenPreparedAncestor(e);}));
     // Source validation is data from this exact visible wizard field. Do not
     // infer it from global alerts, tooltip HTML or a hidden wizard card.
     if(wizard.status==='observed' && wizard.stage==='text_import_file') {
@@ -881,25 +902,6 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       let portContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       if(panels.length===1) {
         const prefix=workflow.prefix+';cnrNaviMode;b.s_';
-        // Long saved paths also overflow before input0 opens. Read hidden
-        // ancestry only for the exact prepared path and verified native graph
-        // node, or the retained input0 opening after Done. No hidden gestures.
-        // Opening that same native node's main wizard must retain the path too.
-        const graphPath=preparedNodeId&&preparedGraphTid?.startsWith(graphPrefix)
-          &&nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid&&nativeGraphControl(e)?.status==='non_script'
-            &&nativeGraphControl(e).node_id===preparedNodeId).length===1;
-        const pathCrumbs=all.filter(e=>panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix));
-        const returnPath=preparedWorkflowPath?.length===5&&pathCrumbs.length>=5
-          &&preparedWorkflowPath.every((c,i)=>c.tid===getTid(pathCrumbs[i])&&c.label===pathCrumbs[i].textContent.trim())
-          &&((preparedInputReturn||graphPath)&&wizard.status==='absent'&&pathCrumbs.length===5
-            ||preparedNodeWizard&&preparedNativeNodeId===preparedNodeId&&wizard.status==='observed'&&pathCrumbs.length===7
-              &&(visible(pathCrumbs[5])||nativeOverflowNode(pathCrumbs[5]))
-              &&pathCrumbs[6].querySelectorAll('.maptree-icon-wizard').length===1);
-        const inputReturnAncestor=e=>returnPath&&preparedWorkflowPath.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
-          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
-          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
-          &&[...e.querySelectorAll('.maptree-icon-workflow')].every(icon=>getComputedStyle(icon).display!=='none'
-            &&getComputedStyle(icon).visibility==='visible'&&getComputedStyle(icon).opacity!=='0'&&!icon.hasAttribute('hidden')&&!sensitive(icon));
         // A long breadcrumb toolbar hides the output socket as well as Settings.
         // Only a current native opening receipt may supply this overflow context;
         // the visible wizard, full ancestry and actionable Done remain required.
@@ -926,12 +928,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
             &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
-        const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||inputReturnAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+        const crumbs=all.filter(e=>{charge();return preparedAncestryObserved && (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
+          && (visible(e)||hiddenPreparedAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:inputReturnAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenPreparedAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -993,8 +995,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)nodeContext.status='bounded';
-        else if(crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)?short(e.textContent):textOf(e,true)}));
+        else if(preparedAncestryObserved&&crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||hiddenPreparedAncestor(e)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||hiddenPreparedAncestor(e)?short(e.textContent):textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -1005,7 +1007,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
             &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
               ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
-          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e));};
+          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||hiddenPreparedAncestor(e)||e===crumbs[5]&&hiddenExportNode(e));};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
           else if(!unique||!chain)nodeContext.status='ambiguous';
@@ -1047,18 +1049,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
           &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
-        // A long saved package path may overflow early ancestors too. Read
-        // their captions only under the exact native input0 opening and the
-        // prepared workflow path; hidden breadcrumbs never become actionable.
-        const inputAncestorOverflow=singleInputOverflow&&inputOverflowOwner(crumbs[5])
-          &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length===5
-          &&preparedWorkflowPath.every((c,i)=>c.tid===getTid(crumbs[i])&&c.label===crumbs[i].textContent.trim())
-          &&preparedNavigationNode.tid.startsWith(preparedWorkflowPath[4].tid+'>');
-        const hiddenInputAncestor=(e,i)=>inputAncestorOverflow&&i<5
-          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
-          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||hiddenInputAncestor(e,i)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(preparedAncestryObserved&&crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||hiddenPreparedAncestor(e)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
@@ -1082,7 +1074,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               ||(preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица'
                 ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port)
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
-          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenInputAncestor(e,i)||hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
+          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenPreparedAncestor(e)||hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -1093,7 +1085,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[4]&&hiddenInputAncestor(e,4)
+            &&(inside(found[0],e)||e===crumbs[4]&&hiddenPreparedAncestor(e)
               &&getComputedStyle(found[0]).display!=='none'&&getComputedStyle(found[0]).visibility==='visible'
               &&getComputedStyle(found[0]).opacity!=='0'&&!found[0].hasAttribute('hidden')&&!sensitive(found[0])
               ||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
@@ -3710,7 +3702,7 @@ function readRenderedInputMapping(observation) {
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedInputReturn,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedPortReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     timeout();
     if (observed?.ui_read_failure) {
