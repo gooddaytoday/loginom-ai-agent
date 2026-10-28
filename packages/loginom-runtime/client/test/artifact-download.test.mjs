@@ -119,6 +119,9 @@ test('missing event and post-download context change cannot claim a verified cop
   changed.download.saveAs=async path=>{await save(path);changed.page.directory='/other';};
   const result=await changed.run();assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED');
   assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.download_completed,undefined);
+  const refused=result.trace.find(e=>e.event==='download_post_context_refused');
+  assert.equal(refused.checks.storage,false);assert.equal(refused.checks.document,true);
+  assert.ok(Object.values(refused.checks).every(v=>typeof v==='boolean'));
 });
 
 function revealFixture(mode='success') {

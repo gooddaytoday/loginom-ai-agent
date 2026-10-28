@@ -379,7 +379,19 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     browserStep='post_download_observation';
     const after=await observe(page);
     if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
-      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
+      const current=after.output??{};
+      trace.push({event:'download_post_context_refused',observation_status:after.status,
+        observation_error:/^[A-Z][A-Z0-9_]{1,100}$/.test(after.error?.code??'')?after.error.code:null,
+        checks:{authenticated:current.authenticated===true,origin:current.origin===task.expected_origin,
+          build:current.loginom_build===task.expected_build,workflow:same(current.workflow_ref,task.snapshot.workflow_ref),
+          document:current.dom_epoch?.document===task.snapshot.dom_epoch?.document,tab:current.active_tab_ref===task.snapshot.active_tab_ref,
+          package:same(current.package_identity,task.snapshot.package_identity),
+          storage:current.file_storage?.status==='observed'&&current.file_storage.directory===destination.directory,
+          dialogs:current.ui?.dialogs?.length===0,masks:current.ui?.masks?.length===0,
+          output_bytes:!task.output_binding||Array.isArray(current.ui?.elements)&&target(current)?.storage_entry?.bytes===task.expected_bytes}});
+      return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    }
     phase='downloaded';
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
