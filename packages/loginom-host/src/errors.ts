@@ -51,6 +51,8 @@ const codes = new Set([
   "LOGINOM_FILE_NOT_REGULAR",
   "LOGINOM_FILE_ACCESS_DENIED",
   "LOGINOM_FILE_CHANGED",
+  "LOGINOM_UPLOAD_CANCELLED",
+  "LOGINOM_UPLOAD_UNCERTAIN",
 ])
 
 export function hostError(value: unknown) {
@@ -69,6 +71,8 @@ const reasons: Record<string, string> = {
   LOGINOM_FILE_NOT_REGULAR: "Нужен обычный файл, а не каталог или специальный файл.",
   LOGINOM_FILE_ACCESS_DENIED: "Доступ к файлу запрещён. Не повторяйте чтение обходным путём.",
   LOGINOM_FILE_CHANGED: "Файл изменился. Заново выберите и подтвердите актуальный файл.",
+  LOGINOM_UPLOAD_CANCELLED: "Загрузка отменена.",
+  LOGINOM_UPLOAD_UNCERTAIN: "Остановка или уборка загрузки не подтверждена. Не отправляйте файл повторно.",
 }
 
 // Private IPC carries only these fields. Never forward an exception's message,

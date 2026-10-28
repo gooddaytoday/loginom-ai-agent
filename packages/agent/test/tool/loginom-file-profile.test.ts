@@ -2,7 +2,14 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile, appendFile, symlink, unlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { profileFile, scanFile, sampleFile, profilePage } from "../../src/tool/loginom-file-profile-core"
+import {
+  profileFile,
+  scanFile,
+  sampleFile,
+  profilePage,
+  exactFileDigest,
+} from "../../src/tool/loginom-file-profile-core"
+import { inspectReferenceFile } from "@loginom-ai-agent/loginom-host/file-reference"
 
 async function csvProfile(...args: Parameters<typeof profileFile>) {
   const p = await profileFile(...args)
@@ -25,6 +32,23 @@ async function fixture(bytes: Buffer | string, run: (path: string, dir: string) 
     await rm(dir, { recursive: true, force: true })
   }
 }
+
+test("staging digest comes only from an exact scan of the same identity, not a quick or partial profile", async () => {
+  await fixture("region;amount\nNorth;25\nSouth;50\n", async (path, dir) => {
+    const profile = await profileFile(path, dir, { first_line_as_title: true })
+    const identity = await inspectReferenceFile(path)
+    expect(await exactFileDigest(identity, dir)).toBeUndefined()
+    const scan = await scanFile(profile.profile_id, dir)
+    expect(await exactFileDigest(identity, dir)).toBe(scan.sha256)
+    expect(await exactFileDigest({ ...identity, file_id: "0:0" }, dir)).toBeUndefined()
+    // Two contradictory exact receipts for the same identity fail closed.
+    const stored = JSON.parse(await readFile(join(dir, profile.profile_id + ".json"), "utf8"))
+    stored.profile_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    stored.scan.sha256 = "0".repeat(64)
+    await writeFile(join(dir, stored.profile_id + ".json"), JSON.stringify(stored))
+    await expect(exactFileDigest(identity, dir)).rejects.toThrow("LOGINOM_FILE_CHANGED")
+  })
+})
 
 test("quoted records across blocks, CRLF, decimal comma, skip and exact count", async () => {
   const input = 'preamble\r\nregion;amount;note\r\nNorth;12,50;"one\r\ntwo ""quoted"""\r\nSouth;3,25;NULL\r\n'

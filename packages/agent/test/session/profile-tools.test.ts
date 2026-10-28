@@ -575,6 +575,15 @@ codeMode.instance("code mode keeps the verified Host Help catalog available in d
       async tools() {
         return { tools: [{ name: "find", inputSchema: { type: "object", properties: {} } }] }
       },
+      async reserveReference() {
+        throw Error("Unexpected reference reservation")
+      },
+      async admitReference() {
+        throw Error("Unexpected reference admission")
+      },
+      async discardReference() {
+        throw Error("Unexpected reference discard")
+      },
       async admit() {
         throw Error("Unexpected eager admission")
       },
@@ -672,6 +681,15 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
             ),
           }
         },
+        async reserveReference() {
+          throw Error("Unexpected reference reservation")
+        },
+        async admitReference() {
+          throw Error("Unexpected reference admission")
+        },
+        async discardReference() {
+          throw Error("Unexpected reference discard")
+        },
         async admit() {
           throw Error("Unexpected eager admission")
         },
@@ -716,6 +734,15 @@ for (const image of [false, true])
             ),
           }
         },
+        async reserveReference() {
+          throw Error("Unexpected reference reservation")
+        },
+        async admitReference() {
+          throw Error("Unexpected reference admission")
+        },
+        async discardReference() {
+          throw Error("Unexpected reference discard")
+        },
         async admit() {
           throw Error("Unexpected eager admission")
         },
@@ -743,6 +770,15 @@ function preparedLoginom(
     },
     async tools() {
       return { tools: [{ name: "dock_action_describe", inputSchema: { type: "object", properties: {} } }] }
+    },
+    async reserveReference() {
+      throw Error("Unexpected reference reservation")
+    },
+    async admitReference() {
+      throw Error("Unexpected reference admission")
+    },
+    async discardReference() {
+      throw Error("Unexpected reference discard")
     },
     admit,
     async call() {

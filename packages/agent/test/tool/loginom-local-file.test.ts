@@ -8,7 +8,8 @@ import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
 import { Agent } from "@/agent/agent"
 import { Session } from "@/session/session"
 import { MessageID } from "@/session/schema"
-import { snapshotLoginomFile } from "@/tool/loginom-local-file"
+import { admitLoginomFileReference, snapshotLoginomFile } from "@/tool/loginom-local-file"
+import { fileReferences } from "@loginom-ai-agent/loginom-host/file-reference"
 import { Tool } from "@/tool/tool"
 import { TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -32,6 +33,75 @@ const context = Effect.gen(function* () {
     ask: () => Effect.void,
   } satisfies Tool.Context
 })
+
+it.instance(
+  "private reference admission authorizes before reserving, stages over the byte limit and sends only a descriptor",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const ctx = yield* context
+      const source = instance.directory + "/large.csv"
+      yield* Effect.promise(async () => {
+        const file = await open(source, "w")
+        try {
+          await file.truncate(16 * 1024 * 1024 + 1)
+        } finally {
+          await file.close()
+        }
+      })
+      const references = fileReferences(instance.directory + "/references")
+      const owner = { chat: ctx.sessionID, userMessage: "msg_original", generation: 1, run: "run" }
+      const captured: unknown[] = []
+      const result = yield* admitLoginomFileReference(
+        source,
+        ctx,
+        {
+          reserveReference: (userMessage, name) => references.reserve({ ...owner, userMessage }, name),
+          discardReference: (grant) => references.discard(owner, grant),
+          admitReference: (reference) => {
+            captured.push(JSON.parse(JSON.stringify(reference)))
+            return references
+              .commit(owner, reference)
+              .then((value) => ({ bytes: value.snapshot.size, sha256: value.snapshot.sha256 }))
+          },
+        },
+        owner.userMessage,
+      )
+      expect(result.artifact).toMatchObject({ bytes: 16 * 1024 * 1024 + 1 })
+      expect(JSON.stringify(captured)).not.toMatch(/"(?:data|base64|buffer)":/)
+      yield* Effect.promise(() => references.close())
+    }),
+)
+
+it.instance("denied local paths never obtain a private reference reservation", () =>
+  Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const ctx = yield* context
+    const instance = yield* TestInstance
+    yield* sessions.setPermission({
+      sessionID: ctx.sessionID,
+      permission: [{ permission: "read", pattern: "*", action: "deny" }],
+    })
+    const result = yield* admitLoginomFileReference(
+      instance.directory + "/private.csv",
+      ctx,
+      {
+        reserveReference: async () => {
+          throw Error("Must not reserve before authorization")
+        },
+        admitReference: async () => {
+          throw Error("Must not admit a denied path")
+        },
+        discardReference: async () => {
+          throw Error("Must not discard a denied path")
+        },
+      },
+      "msg_original",
+    ).pipe(Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_ACCESS_DENIED")
+  }),
+)
 
 it.instance("snapshots the authorized realpath when a symlink changes during a permission request", () =>
   Effect.gen(function* () {
