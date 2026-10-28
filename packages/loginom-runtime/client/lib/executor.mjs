@@ -377,9 +377,81 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
     browserStep='post_download_observation';
-    const after=await observe(page);
-    if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
-      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    let after=await observe(page),toastRefused=false;
+    const downloadToast=current=>current.ui?.dialogs?.length===1
+      &&same(current.ui.dialogs[0].identity,{anchor_tid:'toast',path:[]});
+    const settledContext=current=>contextMatches({...current,ui:{...current.ui,dialogs:[]}})
+      &&(!task.output_binding||target(current)?.storage_entry?.bytes===task.expected_bytes);
+    if(after.status==='SUCCEEDED'&&downloadToast(after.output)&&settledContext(after.output)
+      &&Number.isFinite(task.deadline_at)&&Date.now()<task.deadline_at){
+      // Loginom's completed-download notification is an Ext window, so the
+      // global dialog guard still sees it until its own close timer fires.
+      // Bind that exact native toast; never dismiss it or repeat the download.
+      const binding=await page.evaluateHandle(function bindDownloadToast(){
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=matches[0];
+        if(matches.length!==1||!element.isConnected||typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c))
+          ||element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return null;
+        const box=element.getBoundingClientRect(),style=getComputedStyle(element);
+        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return null;
+        return {document,element,classes:element.className};
+      });
+      const inspect=()=>page.evaluate(function inspectDownloadToast(b){
+        const changed=predicate=>({state:'changed',predicate});
+        if(!b)return changed('binding_present');
+        if(document!==b.document)return changed('same_document');
+        const matches=document.querySelectorAll('[data-tid="toast"]');
+        if(!b.element.isConnected&&matches.length===0)return {state:'closed'};
+        if(matches.length!==1)return changed('unique_toast');
+        if(matches[0]!==b.element)return changed('same_element');
+        if(b.element.className!==b.classes)return changed('same_classes');
+        if(b.element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return changed('download_text');
+        const box=b.element.getBoundingClientRect(),style=getComputedStyle(b.element);
+        return {state:box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none'?'closed':'waiting'};
+      },binding);
+      const refused=(guard,predicate,observed)=>trace.push({event:'download_toast_guard_refused',guard,predicate,observed});
+      try{
+        const initial=await inspect();
+        if(initial.state==='waiting'||initial.state==='closed'){
+          toastRefused=true;
+          const ref=after.output.ui.dialogs[0].ref;
+          trace.push({event:'download_toast_wait_started',tid:'toast',deadline_at:task.deadline_at});
+          while(Date.now()<task.deadline_at){
+            await page.waitForTimeout(Math.min(100,task.deadline_at-Date.now()));
+            after=await observe(page);
+            if(Date.now()>task.deadline_at){refused('deadline','within_original_deadline',false);break;}
+            if(after.status!=='SUCCEEDED'){refused('observation','observation_succeeded',false);break;}
+            if(!settledContext(after.output)){refused('context','same_context_without_dialogs',false);break;}
+            const state=await inspect();
+            if(after.output.ui.dialogs.length===0&&state.state==='closed'){
+              toastRefused=false;
+              trace.push({event:'download_toast_settled',tid:'toast'});break;
+            }
+            if(!downloadToast(after.output)){refused('dialogs','only_owned_download_toast',false);break;}
+            if(after.output.ui.dialogs[0].ref!==ref){refused('dialog_reference','same_dialog_ref',false);break;}
+            // The bound native toast can close after observe captured it.
+            // Keep reading until both reads confirm closure; its disappearance
+            // is settlement, while replacement or another dialog still refuses.
+            if(state.state==='changed'){refused('native_toast',state.predicate,state.state);break;}
+          }
+        }else refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+      }finally{await binding.dispose();}
+    }
+    if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
+    if(toastRefused || after.status!=='SUCCEEDED' || !contextMatches(after.output)
+      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
+      const current=after.output??{};
+      trace.push({event:'download_post_context_refused',observation_status:after.status,
+        observation_error:/^[A-Z][A-Z0-9_]{1,100}$/.test(after.error?.code??'')?after.error.code:null,
+        checks:{authenticated:current.authenticated===true,origin:current.origin===task.expected_origin,
+          build:current.loginom_build===task.expected_build,workflow:same(current.workflow_ref,task.snapshot.workflow_ref),
+          document:current.dom_epoch?.document===task.snapshot.dom_epoch?.document,tab:current.active_tab_ref===task.snapshot.active_tab_ref,
+          package:same(current.package_identity,task.snapshot.package_identity),
+          storage:current.file_storage?.status==='observed'&&current.file_storage.directory===destination.directory,
+          dialogs:current.ui?.dialogs?.length===0,masks:current.ui?.masks?.length===0,
+          output_bytes:!task.output_binding||Array.isArray(current.ui?.elements)&&target(current)?.storage_entry?.bytes===task.expected_bytes}});
+      return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    }
     phase='downloaded';
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
@@ -2833,7 +2905,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
-        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
+        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path,deadline_at:attempt.deadline});}
         catch(error){await lease.release();throw error;}
         operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
