@@ -226,7 +226,7 @@ export async function browserServerDownloadProgress(page,task) {
     const {frameTree}=await session.send('Page.getFrameTree');
     const progress={bytes:0,guid:null,url:null,failed:false,
       sample:async()=>{
-        if(!native||progress.failed)return;
+        if(closed||!native||progress.failed)return;
         try{
           const bytes=await native.evaluate((owner,task)=>{
             if(!owner)return 0;
@@ -257,7 +257,7 @@ export async function browserServerDownloadProgress(page,task) {
             owner.bytes=bytes;return bytes;
           },task);
           progress.bytes=Math.max(progress.bytes,bytes);
-        }catch{progress.failed=true;}
+        }catch{if(!closed)progress.failed=true;}
       },
       close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
     session.on('Browser.downloadWillBegin',event=>{
