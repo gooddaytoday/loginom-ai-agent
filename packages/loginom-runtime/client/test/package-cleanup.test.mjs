@@ -858,3 +858,21 @@ test('D81 diagnostic retains fixed safe control IDs',async()=>{
   assert.equal(r.logout_menu_readback.avatar[0].tid,tid);
   assert.equal(r.logout_menu_readback.avatar[0].hit_tid,tid);
 });
+
+for(const mode of ['clean','dirty','foreign-intent','persisted','foreign-tab','running'])
+ test('unsaved prepared draft cleanup retains native guards: '+mode,async()=>{
+  const f=fixture({path:mode==='persisted'?options.packagePath:null,modified:mode==='dirty',running:mode==='running'});
+  const r=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+  r.request=JSON.stringify({session:options.sessionId,intent:mode==='foreign-intent'?'existing_workflow':'new_draft'});
+  r.phase='verified';r.packageInventoryBefore=0;
+  if(mode==='foreign-tab')f.state.tab=false;
+  const result=await f.run({packagePath:null,unsavedDraft:true});
+  assert.equal(result.status,mode==='clean'?'SUCCEEDED':'BLOCKED');
+  assert.equal(f.events.includes('close'),mode==='clean');
+  assert.equal(result.unsaved_changes_discarded,false);
+  if(mode==='clean'){
+   assert.equal(result.package_path,null);assert.equal(result.logged_out,true);
+   parsePackageCleanupResult({content:[{type:'text',text:JSON.stringify(result)}]},
+    {sessionId:options.sessionId,documentId:options.documentId,account:options.account,packagePath:null});
+  }
+ });
