@@ -170,7 +170,7 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
 // The new phase ends at the configured format page. Mapping, finish and run
 // belong to the enclosing node operation; no wizard reopen occurs here.
 export const configureTextImportFields=(channel,parameters,owner)=>configureImport(channel,parameters,owner,true);
-export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath)=>configureImport(channel,parameters,owner,true,{verifiedSourcePath});
+export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema});
 export const configureTextImportDraft=(channel,parameters,owner)=>configureImport(channel,parameters,owner,false);
 
 export function bindImportSourceColumns(requested,observed) {
@@ -310,6 +310,9 @@ export function setImportFormatField(channel,initial,name,text) {
 }
 
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
+  if(patch?.preserveSchema)requireValue(Object.keys(parameters).join(',')==='source'
+    &&Object.keys(parameters.source??{}).join(',')==='source_path',
+    'Full source switch changes source_path only; column and format edits are forbidden');
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
   if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[]};
@@ -359,6 +362,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
   if(patch&&sourceBaseline.fields.source_path.value==='') {
+    requireValue(!patch.preserveSchema,'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch requires a saved configured import');
     validateInitialExistingImportSettings(parameters,patch.verifiedSourcePath);
     return configureImport(channel,parameters,owner,true);
   }
@@ -461,7 +465,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     const after=(await read('text_import_format')).wizard.settings;
     requireValue(Object.keys(formatBaseline.fields).filter(k=>!Object.hasOwn(parameters.format,k))
       .every(k=>after.fields[k]?.value===formatBaseline.fields[k].value),'Unrequested format parameter changed');
-    if(sourcePathChanged) {
+    if(sourcePathChanged&&!patch.preserveSchema) {
       // With automatic columns disabled, changing the file keeps the old
       // configured definitions. Refresh only this explicitly replaced source;
       // reconcile below restores retained settings by name, not old position.
@@ -490,6 +494,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         'Source schema refresh changed parsing settings');
     }
     const parsedSchema=await readImportDefinitionPages(channel,{ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
+    if(patch.preserveSchema)requireValue(parsedSchema.fields.length===columnBaseline.fields.length
+      &&parsedSchema.fields.every((c,i)=>['name','label','type','data_kind','used','index'].every(k=>c[k]===columnBaseline.fields[i][k])),
+      'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch changed column definitions; execution refused');
     parsedColumns=parsedSchema.fields;
     parameters.columns=reconcileImportColumnPatch(columnBaseline.fields,parsedSchema.fields,parameters.columns,{schemaChangeRequested:
       Object.keys(parameters.source).length>0||Object.keys(parameters.format).length>0});
@@ -663,7 +670,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
       'Configured import definitions differ');
     return {verified:true,cleanup_complete:true,effect_possible:true,source:sourceReadback,
       format:formatted.wizard.settings,columns:schema.fields,schema_id:schema.schema_id,
-      ...(patch?{preservation:{source_before:sourceBaseline,format_before:formatBaseline,columns_before:columnBaseline.fields,source_schema_refreshed:sourcePathChanged}}:{}),
+      ...(patch?{preservation:{source_before:sourceBaseline,format_before:formatBaseline,columns_before:columnBaseline.fields,source_schema_refreshed:sourcePathChanged&&!patch.preserveSchema}}:{}),
       settings_applied:false,reopen_performed:false,next_stage:'output_mapping',package_saved:false,execution_started:false};
   }
   const mapping = await next('text_import_format', 'output_mapping');

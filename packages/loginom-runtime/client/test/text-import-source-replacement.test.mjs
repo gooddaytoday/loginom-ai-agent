@@ -133,6 +133,24 @@ test('changed existing source refreshes stale native definitions and reconciles 
  assert.deepEqual(r.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),[f.retained[1],f.retained[0],f.extra]);
  assert.deepEqual(r.preservation.columns_before.map(c=>c.name),['Id','Title']);
 });
+
+test('sample to full changes only source_path and never refreshes definitions',async()=>{
+ const f=fixture();
+ const result=await configureTextImportPatch(f.channel,{source:{source_path:'/test/new.csv'}},f.owner,'/test/new.csv',{preserveSchema:true});
+ assert.equal(result.verified,true);assert.equal(f.refreshes,0);
+ assert.deepEqual(result.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),f.retained);
+ assert.equal(result.preservation.source_schema_refreshed,false);
+});
+test('sample to full refuses a regenerated definition before any refresh or column edit',async()=>{
+ const f=fixture(),act=f.channel.act;
+ f.channel.act=async action=>{await act(action);if(action.verb==='fill'){
+  const observe=f.channel.observe;
+  f.channel.observe=async options=>{const state=await observe({...options,ready:()=>true});
+   state.wizard.import_columns.fields[0].label='Regenerated';options.ready(state);return state;};
+ }};
+ await assert.rejects(configureTextImportPatch(f.channel,{source:{source_path:'/test/new.csv'}},f.owner,'/test/new.csv',{preserveSchema:true}),/LOGINOM_IMPORT_SCHEMA_CHANGED/);
+ assert.equal(f.refreshes,0);
+});
 for(const options of [{samePath:true},{emptyPatch:true}])test('same source and empty patch preserve definitions without refresh '+JSON.stringify(options),async()=>{
  const f=fixture(options);const r=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/old.csv');
  assert.equal(r.verified,true);assert.equal(f.refreshes,0);assert.equal(r.preservation.source_schema_refreshed,false);

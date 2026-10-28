@@ -1,5 +1,5 @@
 import {browserFailureCategory} from './browser-failure.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady} from './artifact-discovery.mjs';
@@ -1489,6 +1489,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const operations = new Map();
   const auxiliary = new Map();
   const observations = createObservationPages();
+  const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
   let recoverySequence = 0;
@@ -2508,6 +2509,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         outcome.trace.push({event:'observation_scope_fallback',requested_scope:scope??'all',
           delivered_scope:'roots',reason:'UI_SCAN_LIMIT'});
       }
+      serverSources.retain(outcome);
       await onRecord({operation_id:observationOperationId,phase:'observation_completed',outcome:structuredClone(outcome)});
       outcome.output.operation = view(pending).output;
       return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope }) : observations.next(cursor, outcome);
@@ -2852,6 +2854,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,
+            resolveStorageSource:ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
+              ...options,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000})),
+            verifySourceSwitchSave:id=>{
+              const saved=operations.get(id),outcome=saved?.outcome;
+              if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
+                ||saved.cleanupConfirmed!==true||outcome.output?.save_completed!==true
+                ||!outcome.output.workflow_continuations?.some(c=>c.document_id===operation.parameters.document_id
+                  &&c.workflow_ref.workflow_id===operation.parameters.workflow_ref.workflow_id))
+                throw Error('Full source switch requires a completed package.save_checkpoint receipt for this prepared workflow');
+              return {operation_id:id,package_path:outcome.output.package_ref.path};
+            },
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
             nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')

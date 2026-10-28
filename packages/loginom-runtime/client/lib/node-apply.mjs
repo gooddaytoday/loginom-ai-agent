@@ -246,6 +246,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.javascript_wizard_refusal=structuredClone(refusal.proof);
       }
       const importClosed=refusal?.proof?.closed;
+      if(request.target.type==='imports.text'&&request.parameters.source_switch&&refusal?.phase===name
+        &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
+        &&(refusal.verification==='text_import_source_switch_schema_refused'&&['configure','output_mapping','finish'].includes(name)
+          &&refusal.execution_started===false&&importClosed?.verified===true&&importClosed.cleanup_complete===true
+          &&importClosed.draft_discarded===true&&importClosed.execution_started===false
+          &&importClosed.node_context?.surface==='graph'&&importClosed.node_context?.verified===true
+          &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])
+          ||refusal.verification==='text_import_full_count_refused'&&name==='read'&&state.execution.status==='completed'
+          &&refusal.execution_id===state.execution.execution_id&&refusal.expected_records===request.parameters.source_switch.expected_records
+          &&Number.isSafeInteger(refusal.actual_records)&&refusal.actual_records>=0&&refusal.port===0
+          &&refusal.freshness_basis==='completed_execution_port_source')){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+      }
       if(name==='configure'&&request.target.type==='imports.text'
         &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded','text_import_refresh_draft_discarded','text_import_initial_settings_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
@@ -482,7 +496,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:/^(LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
