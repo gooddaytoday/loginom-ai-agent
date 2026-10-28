@@ -69,7 +69,7 @@
     {
       "path": "packages/opencode/package.json",
       "rule": "CAT-01",
-      "reason": "версия 0.1.0 — fork-owned (CAT-01 version); остальное объединено Разрешение LAB-378; конфликт v1.19.5 только в `version` (1.19.4 → 1.19.5 upstream), версия 0.1.0 форка сохранена."
+      "reason": "версия 0.1.0 — fork-owned (CAT-01 version); остальное объединено Разрешение LAB-378; конфликт v1.19.5 в `version` (1.19.4 → 1.19.5 upstream), версия 0.1.0 форка сохранена. Поправка после слияния (LAB-392 F1): разрешение LAB-378 взято без бесконфликтного изменения upstream v1.19.5 `gitlab-ai-provider` 6.19.0 → 6.23.1 (#58998); восстановлено отдельным коммитом поверх слияния, `bun.lock` пересобран Bun 1.3.14, `--frozen-lockfile` код 0."
     },
     {
       "path": "packages/desktop/package.json",
