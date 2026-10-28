@@ -24,3 +24,14 @@ for(const reason of ['owner','dialog','attempted','capacity','awaiting_original_
     return true;
   });
  });
+
+for(const exception of ['ReferenceError','TypeError','SyntaxError','RangeError'])
+ test('script exception retains a fixed name without page values: '+exception,()=>{
+  assert.throws(()=>parseCapabilityResult({isError:true,content:[{type:'text',text:exception+': PRIVATE secret bytes https://private.invalid/'}]}),
+   {message:'Pinned browser capability call failed [BROWSER_SCRIPT_ERROR] (exception='+exception+')'});
+ });
+test('unrecognized connection reason is never echoed',()=>{
+ assert.throws(()=>parseCapabilityResult({isError:true,content:[{type:'text',text:
+  'Loginom connection is disconnected; original session recovery unverified (PRIVATE)'}]}),
+  {message:'Pinned browser capability call failed [LOGINOM_DISCONNECTED]'});
+});
