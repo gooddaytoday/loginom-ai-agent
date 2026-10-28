@@ -4739,6 +4739,26 @@ test('Calculator input Done keeps the exact native node hidden by the admitted p
   assert.deepEqual(page.events,[]);
 });
 
+test('D84 calculator token caption is metadata only for the exact native breadcrumb owner',async()=>{
+ for(const fault of ['none','guid','dom','missing_opening','foreign_navigation','secret_attribute','editable','link']) {
+  const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace('amount_double','Точные_токены_товаров');
+  crumbs[5].ownText='Точные токены товаров';
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.input_port.opening_operation_id;
+  if(fault==='foreign_navigation')binding.navigation_node.label+=' foreign';
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='editable')crumbs[5].attrs.contenteditable='true';
+  if(fault==='link')crumbs[5].attrs.href='https://example.test/';
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.input_port_context.status==='observed',fault==='none',fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
   for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css','unknown_mode','both_modes','foreign_path','foreign_label','missing_navigation','missing_guid','missing_opening']) {
     const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();

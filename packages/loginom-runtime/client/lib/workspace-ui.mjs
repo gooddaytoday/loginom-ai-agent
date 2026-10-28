@@ -508,6 +508,27 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
+      // D84: "Точные токены товаров" is a node caption in data-tid, not
+      // an authentication control. Exempt only its token word, with the exact
+      // native Calculator and its opened port/settings still bound.
+      const stem=definitionPrefix+';cnrNaviMode;b.s_',parts=tid.startsWith(stem)?tid.slice(stem.length).split('>'):[];
+      if(preparedNodeId&&parts.length>=6&&parts.length<=9&&/token|токен/i.test(parts[5])) {
+        const nodeTid=stem+parts.slice(0,6).join('>'),nodes=tids.get(nodeTid)??[];
+        const node=nodes.length===1?nodes[0]:null,component=node&&globalThis.Ext?.getCmp?.(node.id);
+        const native=component?._node?.data?.node,app=globalThis.bg?.app,suffix=parts.slice(6).join('>');
+        const port=preparedInputPort??preparedOutputPort;
+        const portPath=port?.direction==='input'?'Входные_порты>Входной_источник_данных':'Выходные_порты>Результат';
+        const bound=port?port.port===0&&port.native_index===0&&port.node_icon_class==='bg-vendor-icon-calcdata'
+          &&typeof port.port_guid==='string'&&!!port.port_guid&&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id
+          &&[portPath.split('>')[0],portPath,portPath+'>Настройка',''].includes(suffix)
+          &&(port.direction!=='input'||preparedNavigationNode?.tid===nodeTid&&preparedNavigationNode.label===node?.textContent.trim())
+          :preparedNodeWizard&&['','Настройка'].includes(suffix);
+        if(bound&&app?.ModelNodeTreeNode&&native instanceof app.ModelNodeTreeNode&&native.FGuid===preparedNodeId
+          &&component.el?.dom===node&&node.querySelectorAll('.bg-vendor-icon-calcdata').length===1
+          &&parts[5]===node.textContent.trim().replace(/\s/g,'_').replace(/,/g,'')
+          &&!node.isContentEditable&&!node.closest('[contenteditable="true"],a[href]'))
+          return stem+[...parts.slice(0,5),parts[5].replace(/token|токен/gi,'caption'),...parts.slice(6)].join('>');
+      }
       const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
