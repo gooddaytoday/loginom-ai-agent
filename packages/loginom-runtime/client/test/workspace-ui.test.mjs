@@ -5284,6 +5284,47 @@ async function inputPortFinishFixture(mode='valid') {
   return {...f,done,crumbs,waits:()=>waits};
 }
 
+test('D52b2/b3 native graph keeps the long workflow path before opening input0',async()=>{
+ // l427f-d52b2:903 and l427f-d52b3:949 precede the input0 opening.
+ // Native graph/node are verified; the journal does not include crumb geometry.
+ for(const run of ['d52b2','d52b3'])for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','duplicate','visibility','opacity','attribute','icon','panel','native','node','unbound']){
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1',guid='9f9356ac-f499-4b3d-b4f0-512d723ff69a';
+  const panel=page.add('div',prefix+';NavigationBar;NavigationPanel','',{x:0,y:30,width:1000,height:40});
+  const labels=['Сервер','Пакеты','l427f_'+run+'_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох','Модуль1','Сценарий'];
+  const crumbs=labels.map((label,i)=>page.add('a',prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),label,{x:10+i*100,y:40,width:90,height:20},panel));
+  const icon=page.add('span',null,'',{x:415,y:41,width:16,height:16},crumbs[4]);icon.attrs.class='maptree-icon-workflow';
+  const path=crumbs.map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  const body=page.add('g',prefix+';Graph;Количество_точек_в_группе','',{x:100,y:200,width:60,height:60});
+  page.add('span',body.attrs['data-tid']+';Label;Label','Количество точек в группе',{x:90,y:170,width:100,height:20},body);
+  page.add('g',body.attrs['data-tid']+';Setting','',{x:130,y:205,width:20,height:20},body.parentElement);
+  const model=page.graphModels.get(body.parentElement),native=model.byTid.get(body.attrs['data-tid']);native.FGuid=guid;native.FIconCls='bg-vendor-icon-groupdata';
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,panel);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='icon'){crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};icon.style.visibility='hidden';}
+  if(fault==='panel')panel.style.display='none';
+  if(fault==='native')model.model.FDiagram.FmxGraph.container={};
+  const options={expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix,navigation_path:path}}})};
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,options,
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:fault==='node'?'foreign':guid,surface:'graph',tid:body.attrs['data-tid']})));
+  const accepted=fault==='none';
+  assert.equal(result.output.workflow_navigation?.status==='observed',accepted,run+':'+hidden+':'+fault);
+  assert.equal(JSON.stringify(result.output.navigation_context?.path)===JSON.stringify(path),accepted,run+':'+hidden+':'+fault);
+  if(accepted){
+   assert.ok(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting').allowed_actions.includes('open_wizard'),JSON.stringify(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting')));
+   assert.ok(result.output.ui.elements.filter(e=>e.tid===crumbs[hidden].attrs['data-tid']).every(e=>!e.allowed_actions.length));
+   const narrow=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{...options,root_ref:result.output.graph_identity.container_ref},
+    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:guid,surface:'graph',tid:body.attrs['data-tid']})));
+   assert.deepEqual(narrow.output.navigation_context.path,path);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D52b input0 Done retains its exact hidden workflow ancestor through one native graph return',async()=>{
  for(const fault of ['none','node','workflow','visibility','icon','guid','opening']){
   const {page,owner,crumbs}=await inputPortFinishFixture();
