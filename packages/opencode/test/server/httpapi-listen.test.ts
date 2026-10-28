@@ -293,8 +293,9 @@ describe("HttpApi Server.listen", () => {
       return true
     }) as typeof process.stderr.write
     try {
-      const response = await Server.Default().app.request("/status")
+      const response = await Server.Default().app.request("/global/health")
       expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ healthy: true })
     } finally {
       process.stderr.write = original
     }
