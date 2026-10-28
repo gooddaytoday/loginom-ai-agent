@@ -1,5 +1,5 @@
 import {browserFailureCategory} from './browser-failure.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady} from './artifact-discovery.mjs';
@@ -211,7 +211,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     return {step:browserStep,causes,page_closed:typeof page.isClosed==='function'?page.isClosed():null};
   };
   let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false;
-  const trace=[],destination=task.output_binding??task.artifact.upload;
+  const trace=[],destination=task.server_source_binding??task.output_binding??task.artifact.upload;
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
     error:code?{code,message:code}:null,trace});
@@ -238,6 +238,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     const original=task.snapshot.ui.elements.find(e=>e.ref===task.file_ref);
     const target=current=>current.ui.elements.find(e=>e.ref===task.file_ref && e.tid===original.tid && e.label===task.artifact.name);
+    if(task.server_source_binding){
+      const entry=target(before.output)?.storage_entry;
+      if(entry?.bytes_source!=='native_file_store'||entry.path!==destination.destination
+        ||entry.bytes!==destination.bytes||entry.mtime!==destination.mtime)return result('NOT_APPLIED','LOGINOM_FILE_CHANGED');
+    }
     if(['outside_viewport','point_not_observed'].includes(original.interaction?.state)) {
       if(!original.scroll?.ref)return result('NOT_APPLIED','DOWNLOAD_REVEAL_OWNER_MISSING');
       const fresh=target(before.output);
@@ -371,6 +376,22 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     phase='downloading';
     browserStep='download.saveAs';
+    if(task.server_source_binding) {
+      const key=Symbol.for('loginom-dock.server-downloads.v1');
+      const jobs=page[key]??=(new Map());
+      if(jobs.has(task.operation_id))throw Error('Server download already started');
+      const entry={download,state:'running',failed:false};jobs.set(task.operation_id,entry);
+      // This promise belongs to the retained runtime job. It never carries bytes
+      // over MCP; Chromium and saveAs stream the file to their disk destinations.
+      const timer=setTimeout(()=>{entry.expired=true;void download.cancel().catch(()=>{entry.failed=true;});},Math.max(1,task.deadline_at-Date.now()));
+      entry.completion=(async()=>{
+        try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
+        catch{entry.failed=true;}
+        finally{clearTimeout(timer);entry.state='settled';}
+      })();
+      completed=true;
+      return result('SUCCEEDED',null,{download_started:true});
+    }
     await download.saveAs(task.download_path);
     browserStep='download.failure';
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
@@ -393,6 +414,39 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
   }
+}
+
+// These controls retain Playwright's Download in its owning Page, never in
+// Loginom JS. Cancellation drains saveAs before the local partial is removed.
+export async function browserServerDownloadControl(page,task) {
+  const jobs=page[Symbol.for('loginom-dock.server-downloads.v1')],job=jobs?.get(task.operation_id);
+  const base={action_key:'storage.download',action_revision:'1',operation_id:task.operation_id,
+    phase:'downloading',effect_possible:false,trace:[],cleanup_complete:true};
+  if(!job)return {...base,status:'FAILED',output:{},error:{code:'LOGINOM_DOWNLOAD_MISSING',message:'Original browser download is missing'}};
+  if(task.mode==='cancel'){await job.download.cancel();await job.completion;}
+  const output={state:job.state,failed:job.failed,expired:job.expired===true};
+  if(task.mode==='release'){
+    if(job.state!=='settled')throw Error('Cannot release a running download');
+    await job.download.delete();jobs.delete(task.operation_id);
+  }
+  return {...base,status:'SUCCEEDED',output,error:null};
+}
+
+export function makeServerSourceDownloadCode(options) {
+  const b=options.server_source_binding,s=options.snapshot,m=s?.ui?.elements?.filter(e=>e.ref===options.file_ref)??[];
+  const name=options.artifact?.name;
+  if(!b||!Number.isSafeInteger(b.bytes)||b.bytes<0||typeof b.mtime!=='string'||!b.mtime
+    ||!Number.isSafeInteger(options.deadline_at)||options.deadline_at<=Date.now()
+    ||!name||!/\.(csv|tsv|txt|xlsx)$/i.test(name)||b.destination!==b.directory+'/'+name
+    ||s.file_storage?.directory!==b.directory||m.length!==1||m[0].label!==name
+    ||m[0].tid!==s.workflow_ref?.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)
+    ||m[0].storage_entry?.bytes!==b.bytes||m[0].storage_entry?.mtime!==b.mtime
+    ||m[0].storage_entry?.path!==b.destination||m[0].storage_entry?.bytes_source!=='native_file_store')
+    throw Error('Server download requires its exact native file row');
+  const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
+  return `async page=>(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }
 
 // Host-owned native export only; shares the exact download gesture and cleanup.
@@ -1482,7 +1536,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -1490,6 +1544,37 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const auxiliary = new Map();
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
+  const inspectServerSource=ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
+    expected_origin:targetOrigin,expected_build:targetBuild,...options})));
+  const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,
+    download:async({source,path,operation_id,signal,deadline})=>{
+      const roots=await runtime.observe({scope:'roots',storageName:source.destination.slice(source.destination.lastIndexOf('/')+1)});
+      const row=roots.output.ui.elements.find(e=>e.tid===roots.output.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(source.destination.slice(source.destination.lastIndexOf('/')+1)));
+      if(!row)throw Error('LOGINOM_FILE_CHANGED');
+      const observed=await runtime.observe({rootRef:row.ref,observationId:roots.output.observation_id});
+      const snapshot=observations.get(observed.output.observation_id);
+      const file=snapshot?.ui?.elements?.find(e=>e.storage_entry?.path===source.destination);
+      if(!file)throw Error('LOGINOM_FILE_CHANGED');
+      const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
+        server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
+        download_path:path,deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
+      signal.throwIfAborted();
+      const started=await execute(makeServerSourceDownloadCode(options));
+      if(started.status!=='SUCCEEDED'||started.output?.download_started!==true)throw Error('LOGINOM_DOWNLOAD_FAILED');
+      const control=mode=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
+      try {
+        while(true) {
+          signal.throwIfAborted();
+          const current=await control('status');
+          if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
+          if(current.output.state==='settled'){
+            if(current.output.failed||current.output.expired)throw Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED');
+            break;
+          }
+          await new Promise(resolve=>setTimeout(resolve,250));
+        }
+      }finally{await control('cancel');await control('release');}
+    } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
   let recoverySequence = 0;
@@ -2316,6 +2401,25 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
+    serverDownload(request,name) {
+      if(!serverDownloads)throw Error('Server download cache is unavailable');
+      if(name==='dock_storage_download_start'){
+        if(running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+          throw Error('Resolve the pending Dock operation before downloading');
+        if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)&&auxiliary.get(request.operation_id).signature!=='storage.download:'+request.server_source_ref
+          ||nodeJobs.has(request.operation_id)||sourceReads.has(request.operation_id))
+          throw Error('Server download ID conflicts with another operation');
+        const result=serverDownloads.start(request);
+        auxiliary.set(request.operation_id,{signature:'storage.download:'+request.server_source_ref});
+        return result;
+      }
+      if(name==='dock_storage_download_status')return serverDownloads.status(request.operation_id);
+      if(name==='dock_storage_download_wait')return serverDownloads.wait(request.operation_id,{timeoutMs:request.timeout_ms??1000});
+      if(name==='dock_storage_download_cancel')return serverDownloads.cancel(request.operation_id);
+      if(name==='dock_storage_download_cleanup')return serverDownloads.cleanup(request.operation_id);
+      throw Error('Unknown server download tool');
+    },
+    cleanupServerCache:()=>serverDownloads?.cleanup(),
     startNodeApply:(request,options)=>{
       if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
       if(sourceReads.has(request.operation_id))throw Error('Operation ID belongs to a JavaScript read');
@@ -2341,7 +2445,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
-    tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
+    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools:[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
       if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
@@ -2854,8 +2958,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
-            resolveStorageSource:ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-              ...options,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000})),
+            resolveStorageSource:async ref=>{
+              const source=await inspectServerSource(ref);
+              return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
+            },
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3090,6 +3196,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
+      if(serverDownloads?.busy&&!['serverDownload','cleanupServerCache'].includes(name)){
+        const error=Error('Server download retains the browser; use download status/wait/cancel');
+        if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;
+      }
       if(leased&&!readOnly.has(name)){const error=Error('Browser recovery holds the page; finish or stop it before further Dock actions');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if(delivery.busy){const error=Error('Artifact delivery is in progress');
@@ -3103,8 +3213,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
-    hasUnsettledWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasActiveWork:()=>!!(serverDownloads?.busy||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(serverDownloads?.busy||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),

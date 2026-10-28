@@ -112,3 +112,15 @@ test('full N uses only a private exact scan bound to verified source bytes and d
  assert.equal(verifyFullImportCount('p',receipt,{kind:'storage',bytes:100},output,execution).status,'not_verified');
  assert.throws(()=>verifyFullImportCount('p',receipt,source,{...output,row_count:18},execution),/ROW_COUNT_MISMATCH/);
 });
+
+test('server full N accepts only the cache binding to the same native storage ref and exact copy',()=>{
+ const identity={canonical_path:'/private/cache/full.csv',size:3,file_id:'1:2'};
+ const receipt={basis:'backend_exact_scan',profile_id:'p',records:17,bytes:3,sha256:'a'.repeat(64),identity};
+ const source={kind:'storage',server_source_ref:'storage-one',bytes:3,mtime:'native-time',sha256:receipt.sha256,
+  cache_binding:{server_source_ref:'storage-one',native_size:3,native_mtime:'native-time',copy_bytes:3,identity}};
+ const execution={verified:true,owner_verified:true,status:'completed',execution_id:'full'};
+ const output={port:0,fresh:true,execution_id:'full',freshness_basis:'completed_execution_port_source',row_count:17};
+ assert.equal(verifyFullImportCount('p',receipt,source,output,execution).status,'verified');
+ for(const patch of [{server_source_ref:'other'},{native_size:4},{native_mtime:'changed'},{copy_bytes:4},{identity:{...identity,file_id:'1:3'}}])
+  assert.equal(verifyFullImportCount('p',receipt,{...source,cache_binding:{...source.cache_binding,...patch}},output,execution).status,'not_verified');
+});

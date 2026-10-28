@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {Page,build} from './support/executor-fixture.mjs';
-import {makeArtifactDownloadCode,makeNativeOutputDownloadCode} from '../lib/executor.mjs';
+import {makeArtifactDownloadCode,makeNativeOutputDownloadCode,makeServerSourceDownloadCode,browserServerDownloadControl} from '../lib/executor.mjs';
 
 function fixture(name = 'sales.csv') {
   const page=new Page(),elements=page.elements.bind(page),snapshot=page.uiSnapshot.bind(page);
@@ -22,6 +22,28 @@ function fixture(name = 'sales.csv') {
   page.mouse.click=async(...args)=>{calls.push('click');await click(...args);resolveDownload?.(download);};
   return {page,options,download,calls,run:()=>page.execute(makeArtifactDownloadCode(options))};
 }
+
+test('server-only browser download retains its native Download, drains cancellation and never sends bytes',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ await f.page.execute('async page=>null');Object.assign(f.page.context,{setTimeout,clearTimeout});
+ const native={kind:'file',path:'/test/sales.csv',bytes:2147483648,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ f.options.snapshot=f.page.uiSnapshot();delete f.options.artifact.upload;
+ f.options.server_source_binding={directory:'/test',destination:native.path,bytes:native.bytes,mtime:native.mtime};
+ f.options.deadline_at=Date.now()+10000;
+ let finish;
+ f.download.saveAs=async()=>{f.calls.push('save');await new Promise(resolve=>{finish=resolve;});};
+ f.download.cancel=async()=>{f.calls.push('cancel');finish?.();};
+ f.download.delete=async()=>{f.calls.push('delete');};
+ const started=await f.page.execute(makeServerSourceDownloadCode(f.options));
+ assert.equal(started.status,'SUCCEEDED');assert.equal(started.output.download_started,true);
+ assert.deepEqual(f.calls,['listen','click','save']);
+ const control=mode=>browserServerDownloadControl(f.page,{operation_id:f.options.operation_id,mode});
+ assert.equal((await control('status')).output.state,'running');
+ assert.equal((await control('cancel')).output.state,'settled');
+ await control('release');assert.deepEqual(f.calls,['listen','click','save','cancel','delete']);
+ assert.equal((await control('status')).status,'FAILED');
+});
 
 test('download binds the checked file gesture to its page event and exact private save destination',async()=>{
   const f=fixture(),result=await f.run();
