@@ -73,3 +73,43 @@ test("release notes require all platforms, matching provenance, checksums and pa
     await rm(dir, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("a release without a macOS runner is allowed only by LOGINOM_RELEASE_SKIP_MACOS and says so", async () => {
+  const root = resolve(import.meta.dir, "../../../..")
+  const dir = await mkdtemp(join(tmpdir(), "loginom-release-notes-"))
+  const commit = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+  const assets = [
+    "loginom-ai-agent-linux-amd64.deb",
+    "loginom-ai-agent-linux-x86_64.AppImage",
+    "loginom-ai-agent-cli-HEAD-linux-x64.tar.gz",
+    "loginom-ai-agent-win-x64.exe",
+    "loginom-ai-agent-cli-HEAD-win32-x64.zip",
+    "loginom-ai-agent-HEAD-source.tar.gz",
+    "loginom-ai-agent-HEAD-windows-source.tar.gz",
+  ]
+  const digest = new Bun.CryptoHasher("sha256").update("fixture").digest("hex")
+  const manifest = { version: "HEAD", source: { commit, dirty: false }, artifacts: assets.map((file) => ({ file, sha256: digest })) }
+  const write = (name: string, value: unknown) => Bun.write(join(dir, name), JSON.stringify(value))
+  const run = (skip: string) =>
+    $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag HEAD --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
+      .cwd(root)
+      .env({ ...process.env, LOGINOM_RELEASE_SKIP_MACOS: skip })
+      .quiet()
+      .nothrow()
+  try {
+    for (const name of assets) await Bun.write(join(dir, name), "fixture")
+    for (const name of ["release-manifest.json", "windows-release-manifest.json"]) await write(name, manifest)
+    for (const name of ["static-deb.json", "static-appimage.json", "static-nsis.json"]) await write(name, { status: "PASS" })
+    await write("linux-matrix.json", {
+      artifactHash: digest,
+      reports: ["ubuntu22", "ubuntu24", "ubuntu26", "debian12", "debian13"].map((name) => ({ name, status: "PASS" })),
+    })
+    expect((await run("")).exitCode).not.toBe(0)
+    expect((await run("true")).exitCode).toBe(0)
+    const notes = await Bun.file(join(dir, "notes.md")).text()
+    expect(notes).toContain("macOS: not built for this release")
+    expect(notes).not.toContain("mac-arm64.dmg")
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}, 30_000)
