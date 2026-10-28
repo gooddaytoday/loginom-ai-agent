@@ -124,6 +124,57 @@ test('missing event and post-download context change cannot claim a verified cop
   assert.ok(Object.values(refused.checks).every(v=>typeof v==='boolean'));
 });
 
+function downloadToastFixture(mode='closes') {
+  const f=fixture('sample.xlsx'),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
+  let saved=false,reads=0;
+  const toast=()=>({isConnected:true,className:'x-window bg-notify-msg-color-info x-layer',
+    textContent:mode==='unknown_text'?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
+    getAttribute:key=>key==='data-tid'?'toast':null,
+    getBoundingClientRect:()=>({width:100,height:50})});
+  let element=toast();
+  const document={querySelectorAll:()=>element.isConnected?[element]:[]};
+  const sandbox={document,getComputedStyle:()=>({visibility:'visible',display:'block'})};
+  const save=f.download.saveAs;
+  f.download.saveAs=async path=>{await save(path);saved=true;};
+  f.page.uiSnapshot=()=>{
+    const s=snapshot();
+    if(saved){
+      const visible=mode==='closes'?reads++<2:mode==='replaced_hidden'?reads++<1:true;
+      element.isConnected=visible;
+      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:'[outside selected root]'}]:[];
+      if(mode==='mask')s.ui.masks=[{ref:'foreign-mask'}];
+    }
+    return s;
+  };
+  f.page.evaluateHandle=async fn=>({value:vm.runInNewContext('('+fn.toString()+')',sandbox)(),dispose:async()=>{}});
+  f.page.evaluate=async(fn,arg)=>fn.name.includes('DownloadToast')||!fn.toString().includes('workspace-ui.identity.v1')&&fn.toString().includes('[role="dialog"],.x-window,.bg-dialog')
+    ?vm.runInNewContext('('+fn.toString()+')',sandbox)(arg?.value??arg):evaluate(fn,arg);
+  const wait=f.page.waitForTimeout.bind(f.page);
+  f.page.waitForTimeout=async ms=>{await wait(ms);if(mode==='directory')f.page.directory='/other';if(mode.startsWith('replaced'))element=toast();};
+  f.options.deadline_at=f.page.clock+300;
+  return f;
+}
+
+test('completed XLSX download waits read-only for the owned Loginom download toast to close',async()=>{
+  const f=downloadToastFixture(),result=await f.run();
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.cleanup_complete,true);
+  assert.deepEqual(f.calls,['listen','click','save']);
+  assert.ok(result.trace.some(e=>e.event==='download_toast_settled'));
+  assert.ok(f.page.clock<=f.options.deadline_at);
+});
+
+test('download toast settlement refuses foreign dialogs, owner changes and the original deadline',async()=>{
+  for(const mode of ['unknown_text','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline']) {
+    const f=downloadToastFixture(mode);
+    if(mode==='no_deadline')delete f.options.deadline_at;
+    const result=await f.run();
+    assert.equal(result.status,'AMBIGUOUS',mode);assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED',mode);
+    assert.equal(result.output.download_completed,undefined,mode);assert.equal(result.cleanup_complete,true,mode);
+    assert.deepEqual(f.calls,['listen','click','save'],mode);
+    assert.ok(f.page.clock<=1300,mode);
+  }
+});
+
 function revealFixture(mode='success') {
   const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),ownerRef='observed-owner';
   let waits=0;

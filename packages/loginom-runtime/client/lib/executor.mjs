@@ -377,15 +377,57 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
     browserStep='post_download_observation';
-    const after=await observe(page);
-    if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
+    let after=await observe(page),toastRefused=false;
+    const downloadToast=current=>current.ui?.dialogs?.length===1
+      &&same(current.ui.dialogs[0].identity,{anchor_tid:'toast',path:[]});
+    const settledContext=current=>contextMatches({...current,ui:{...current.ui,dialogs:[]}})
+      &&(!task.output_binding||target(current)?.storage_entry?.bytes===task.expected_bytes);
+    if(after.status==='SUCCEEDED'&&downloadToast(after.output)&&settledContext(after.output)
+      &&Number.isFinite(task.deadline_at)&&Date.now()<task.deadline_at){
+      // Loginom's completed-download notification is an Ext window, so the
+      // global dialog guard still sees it until its own close timer fires.
+      // Bind that exact native toast; never dismiss it or repeat the download.
+      const binding=await page.evaluateHandle(function bindDownloadToast(){
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=matches[0];
+        if(matches.length!==1||!element.isConnected||typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c))
+          ||element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return null;
+        const box=element.getBoundingClientRect(),style=getComputedStyle(element);
+        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return null;
+        return {document,element,classes:element.className};
+      });
+      const inspect=()=>page.evaluate(function inspectDownloadToast(b){
+        if(!b||document!==b.document)return 'changed';
+        const matches=document.querySelectorAll('[data-tid="toast"]');
+        if(!b.element.isConnected&&matches.length===0)return 'closed';
+        if(matches.length!==1||matches[0]!==b.element||b.element.className!==b.classes
+          ||b.element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return 'changed';
+        const box=b.element.getBoundingClientRect(),style=getComputedStyle(b.element);
+        return box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none'?'closed':'waiting';
+      },binding);
+      try{
+        if(await inspect()==='waiting'){
+          toastRefused=true;
+          const ref=after.output.ui.dialogs[0].ref;
+          trace.push({event:'download_toast_wait_started',tid:'toast',deadline_at:task.deadline_at});
+          while(Date.now()<task.deadline_at){
+            await page.waitForTimeout(Math.min(100,task.deadline_at-Date.now()));
+            after=await observe(page);
+            if(Date.now()>task.deadline_at||after.status!=='SUCCEEDED'||!settledContext(after.output))break;
+            const state=await inspect();
+            if(after.output.ui.dialogs.length===0&&state==='closed'){
+              toastRefused=false;
+              trace.push({event:'download_toast_settled',tid:'toast'});break;
+            }
+            if(!downloadToast(after.output)||after.output.ui.dialogs[0].ref!==ref||state!=='waiting')break;
+          }
+        }
+      }finally{await binding.dispose();}
+    }
+    if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
+    if(toastRefused || after.status!=='SUCCEEDED' || !contextMatches(after.output)
       ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
       const current=after.output??{};
-      if(current.ui?.dialogs?.length)trace.push({event:'download_post_dialogs',
-        observed:current.ui.dialogs.slice(0,8).map(d=>({identity:d.identity,title:d.title,text:d.text})),
-        native:await page.evaluate(()=>Array.from(document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog'))
-          .filter(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden')
-          .slice(0,8).map(e=>({tid:e.getAttribute('data-tid'),classes:e.className,role:e.getAttribute('role'),text:(e.textContent??'').slice(0,2000)})))});
       trace.push({event:'download_post_context_refused',observation_status:after.status,
         observation_error:/^[A-Z][A-Z0-9_]{1,100}$/.test(after.error?.code??'')?after.error.code:null,
         checks:{authenticated:current.authenticated===true,origin:current.origin===task.expected_origin,
@@ -2842,7 +2884,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
-        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
+        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path,deadline_at:attempt.deadline});}
         catch(error){await lease.release();throw error;}
         operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
