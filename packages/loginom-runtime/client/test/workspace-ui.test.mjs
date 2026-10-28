@@ -4665,6 +4665,51 @@ test('tabular input0 keeps Done and close bound to the native node icon when its
  }
 });
 
+test('D52b long saved path keeps input0 Done only with exact native opening and ancestor context',async()=>{
+ // LAB-415 D2/execution-events.jsonl:842: Group input0 remains native-bound
+ // after the long Save, but owner context and finish_wizard are absent.
+ // The journal has no ancestor rectangles: exercise each early overflow slot.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','unbound','d52_no_navigation','d52_foreign_path','d52_no_guid','d52_no_opening','d52_other_port','d52_other_index','wrong_native_icon','path','label','duplicate','visibility','opacity','attribute','clipped','workflow_icon','panel','mode']) {
+  const {page,binding}=await joinInputPortOverflowFixture(fault==='none'?'d52_valid':fault,0,'group');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='d2_d52long2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c] of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Число_точек_в_группе');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Число точек в группе';
+  }
+  if(binding.navigation_node)binding.navigation_node={tid:crumbs[5].attrs['data-tid']+(fault==='d52_foreign_path'?'-foreign':''),label:crumbs[5].textContent.trim()};
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  for(const i of [hidden,5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0],c=mappingCoverageFixture(page,5);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]){
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='label')crumbs[hidden].ownText+=' foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='clipped'){crumbs[hidden].style.display='block';crumbs[hidden].box={x:1300,y:41,width:100,height:24};}
+  if(fault==='workflow_icon')crumbs[4].children[0].attrs.class='maptree-icon-modelinputports';
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  if(fault==='mode')c.tableMode.attrs.class='';
+  const r=await page.execute({mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}}),output_column_page:{offset:0,limit:8}});
+  const allowed=r.output?.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true;
+  assert.equal(allowed,fault==='none',hidden+':'+fault);
+  if(fault==='none'){
+   assert.equal(r.output.wizard.input_port_context.status,'observed');
+   assert.deepEqual(clone(r.output.wizard.input_port_context.node_path.slice(0,5).map(({tid,label})=>({tid,label}))),path);
+   assert.ok(r.output.ui.elements.filter(e=>crumbs.some(c=>c.attrs['data-tid']===e.tid)&&!e.visible).every(e=>e.allowed_actions.length===0));
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D52 hidden tabular node requires exact native opening and known mode',async()=>{
  for(const vendor of ['group','clustering','linregression'])for(const mode of ['d52_valid','d52_foreign_node','d52_foreign_path','d52_no_opening','d52_no_guid','d52_other_port','d52_other_index','d52_unknown_mode','d52_both_modes','d52_missing_chain']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,vendor);

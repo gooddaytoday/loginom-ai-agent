@@ -1019,8 +1019,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
           &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
+        // A long saved package path may overflow early ancestors too. Read
+        // their captions only under the exact native input0 opening and the
+        // prepared workflow path; hidden breadcrumbs never become actionable.
+        const inputAncestorOverflow=singleInputOverflow&&inputOverflowOwner(crumbs[5])
+          &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length===5
+          &&preparedWorkflowPath.every((c,i)=>c.tid===getTid(crumbs[i])&&c.label===crumbs[i].textContent.trim())
+          &&preparedNavigationNode.tid.startsWith(preparedWorkflowPath[4].tid+'>');
+        const hiddenInputAncestor=(e,i)=>inputAncestorOverflow&&i<5
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||hiddenInputAncestor(e,i)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
@@ -1044,7 +1054,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               ||(preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица'
                 ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port)
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
-          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
+          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenInputAncestor(e,i)||hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -1055,7 +1065,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[4]&&hiddenInputAncestor(e,4)
+              &&getComputedStyle(found[0]).display!=='none'&&getComputedStyle(found[0]).visibility==='visible'
+              &&getComputedStyle(found[0]).opacity!=='0'&&!found[0].hasAttribute('hidden')&&!sensitive(found[0])
+              ||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
