@@ -449,3 +449,34 @@ describe("buildRequestParts", () => {
     }
   })
 })
+
+test("large native references retain escaped paths and receipts without inline bytes", () => {
+  const reference = {
+    kind: "local_reference" as const,
+    sourcePath: "/tmp/данные %#.csv",
+    filename: "данные %#.csv",
+    size: 5 * 1024 ** 3,
+    lastModified: 1,
+    mime: "text/plain",
+    receipt: "a".repeat(64),
+  }
+  const result = buildRequestParts({
+    prompt: [],
+    context: [],
+    images: [{ type: "image", id: "ref", filename: reference.filename, mime: reference.mime, reference, dataUrl: "" }],
+    text: "",
+    messageID: "m",
+    sessionID: "s",
+    sessionDirectory: "/tmp",
+  })
+  const part = result.requestParts[0]
+  expect(part.type).toBe("file")
+  if (part.type !== "file") return
+  const url = new URL(part.url)
+  expect(url.search).toBe("")
+  expect(url.hash).toBe("")
+  expect(decodeURIComponent(url.pathname)).toBe(reference.sourcePath)
+  expect(part.source?.type === "file" && part.source.text.value).toBe("loginom-attachment:" + reference.receipt)
+  expect(JSON.stringify(result)).not.toMatch(/data:|base64/)
+  expect(result.optimisticParts[0]).toMatchObject({ url: part.url, source: part.source })
+})

@@ -81,7 +81,7 @@ export const PromptImageAttachments: Component<PromptImageAttachmentsProps> = (p
           </Show>
           <For each={props.attachments}>
             {(attachment) => {
-              const image = attachment.mime.startsWith("image/")
+              const image = !attachment.reference && attachment.mime.startsWith("image/")
               const media = () => (
                 <Show
                   when={image}

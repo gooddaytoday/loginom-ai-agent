@@ -3,6 +3,8 @@ import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 // English is the designer-written source. Missing locales reuse these strings
 // byte-for-byte as the established fallback; do not invent translations.
 export const LOGINOM_ENGLISH = {
+  "prompt.attachment.missingPath":
+    "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
   "loginom.saveClose": "Save and close",
   "loginom.saving": "Saving settings…",
   "loginom.applying": "Applying settings…",

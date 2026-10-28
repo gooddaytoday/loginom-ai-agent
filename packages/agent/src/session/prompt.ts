@@ -1,3 +1,10 @@
+import {
+  attachmentReceiptID,
+  attachmentReceiptSource,
+  bindAttachmentReceipt,
+  createAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import { stat } from "node:fs/promises"
 import { attachmentContext, attachmentPreview } from "@/util/attachment-preview"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
@@ -846,6 +853,30 @@ const layer = Layer.effect(
                     messageID: info.id,
                     sessionID: input.sessionID,
                   },
+                ]
+              }
+              const receiptID = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
+              const infoStat = receiptID ? undefined : yield* Effect.promise(() => stat(filepath).catch(() => undefined))
+              if (receiptID || (infoStat?.isFile() && infoStat.size > 16 * 1024 * 1024 && !url.search && !url.hash)) {
+                if (url.search || url.hash) return yield* Effect.die(Error("LOGINOM_INPUT_INVALID"))
+                const source = receiptID
+                  ? part.source
+                  : attachmentReceiptSource(yield* Effect.promise(() => createAttachmentReceipt(filepath)))
+                const id = attachmentReceiptID(source?.type === "file" ? source.text.value : undefined)!
+                yield* Effect.promise(() =>
+                  bindAttachmentReceipt(id, filepath, { session: input.sessionID, message: info.id }),
+                )
+                return [
+                  {
+                    type: "text",
+                    synthetic: true,
+                    sessionID: input.sessionID,
+                    messageID: info.id,
+                    text: `Attached local data reference: ${filepath}. Use loginom_file_profile before reading or admission; then scan, sample and validate the scenario on the sample before delivering the full file. No file bytes are included in this message.`,
+                  },
+                  // References are represented to the provider by the bounded text above.
+                  // Keep CSV/XLSX paths out of provider file/download handling.
+                  { ...part, mime: "text/plain", source, sessionID: input.sessionID, messageID: info.id },
                 ]
               }
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime

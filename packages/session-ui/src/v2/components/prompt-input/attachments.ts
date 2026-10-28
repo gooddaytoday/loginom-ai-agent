@@ -1,6 +1,6 @@
 import { onMount } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
-import type { PromptInputV2Attachment, PromptInputV2Prompt } from "./types"
+import type { LocalAttachmentReference, PromptInputV2Attachment, PromptInputV2Prompt } from "./types"
 
 export const acceptedFileTypes = [
   "image/png",
@@ -72,7 +72,7 @@ type PromptTarget = {
 export type PromptInputV2AttachmentConfig = {
   picker?: (
     options: { defaultPath?: string; multiple?: boolean; accept?: string[] },
-    onFile: (file: File) => Promise<unknown>,
+    onFile: (file: File | LocalAttachmentReference) => Promise<unknown>,
   ) => Promise<void>
   directory: () => string
   isDialogActive: () => boolean
@@ -81,6 +81,8 @@ export type PromptInputV2AttachmentConfig = {
   onError: (error: unknown) => void
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
+  referenceAttachment?: (file: File) => Promise<LocalAttachmentReference>
+  missingPath?: () => void
   store?: (file: File) => Promise<{ id: string; url: string }>
 }
 
@@ -99,8 +101,31 @@ export function createPromptInputV2Attachments(
     if (!editor) return
     return { prompt, cursor: prompt.cursor() ?? cursorPosition(editor) }
   }
-  const add = async (file: File, toast = true, target = capture(), clipboard = false) => {
+  const add = async (file: File | LocalAttachmentReference, toast = true, target = capture(), clipboard = false) => {
     if (!target) return false
+    if ("kind" in file || (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))) {
+      if (!("kind" in file) && (!input.getPathForFile?.(file) || !input.referenceAttachment)) {
+        input.missingPath?.()
+        return false
+      }
+      const reference = "kind" in file ? file : await input.referenceAttachment!(file)
+      target.prompt.set(
+        [
+          ...target.prompt.current(),
+          {
+            type: "image",
+            id: globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16).slice(2),
+            filename: reference.filename,
+            sourcePath: reference.sourcePath,
+            mime: reference.mime,
+            reference,
+            blob: { id: "reference:" + reference.receipt, url: "" },
+          },
+        ],
+        target.cursor,
+      )
+      return true
+    }
     const mime = await attachmentMime(file)
     if (!mime) {
       if (toast) input.warn()
@@ -140,12 +165,20 @@ export function createPromptInputV2Attachments(
     target.prompt.set([...target.prompt.current(), attachment], target.cursor)
     return true
   }
-  const addAttachments = async (files: File[], toast = true, target = capture()) => {
+  const addAttachments = async (files: (File | LocalAttachmentReference)[], toast = true, target = capture()) => {
     const found = await files.reduce(async (result, file) => {
       const previous = await result
       return (await add(file, false, target)) || previous
     }, Promise.resolve(false))
-    if (!found && files.length > 0 && toast) input.warn()
+    if (
+      !found &&
+      files.length > 0 &&
+      toast &&
+      !files.some(
+        (file) => "kind" in file || (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp")),
+      )
+    )
+      input.warn()
     return found
   }
   const handlePaste = async (event: ClipboardEvent) => {

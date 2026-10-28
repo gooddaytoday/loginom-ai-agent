@@ -34,7 +34,7 @@ describe("attachmentMime", () => {
 describe("pickAttachmentFiles", () => {
   test("reads the current project directory for every native picker invocation", async () => {
     const paths: string[] = []
-    const files: File[] = []
+    const files: (File | import("@/utils/local-attachment").LocalAttachmentReference)[] = []
     const file = new File(["hello"], "hello.txt", { type: "text/plain" })
     let directory = "C:\\Projects\\LoremIpsum"
     const picker = async (options?: { defaultPath?: string }, onFile?: (file: File) => Promise<unknown>) => {

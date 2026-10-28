@@ -1,3 +1,11 @@
+import {
+  createAttachmentReceipt,
+  bindAttachmentReceipt,
+  attachmentReceiptSource,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import { pathToFileURL } from "node:url"
+import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { expect } from "bun:test"
 import { open } from "node:fs/promises"
 import { Cause, Effect, Exit, Layer } from "effect"
@@ -7,8 +15,8 @@ import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
 import { Agent } from "@/agent/agent"
 import { Session } from "@/session/session"
-import { MessageID } from "@/session/schema"
-import { admitLoginomFileReference, snapshotLoginomFile } from "@/tool/loginom-local-file"
+import { MessageID, PartID } from "@/session/schema"
+import { admitLoginomFileReference, authorizeLoginomFile, snapshotLoginomFile } from "@/tool/loginom-local-file"
 import { admitLoginomLocalFile } from "@/tool/loginom-local-file"
 import { fileReferences } from "@loginom-ai-agent/loginom-host/file-reference"
 import { Tool } from "@/tool/tool"
@@ -264,3 +272,68 @@ it.instance(
     }),
   { git: true },
 )
+
+for (const mode of ["stable", "changed", "deleted", "deny"] as const) {
+  it.instance(`attachment receipt authorization: ${mode}`, () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const sessions = yield* Session.Service
+      const fs = yield* FSUtil.Service
+      const ctx = yield* context
+      const path = instance.directory + "/данные %#.csv"
+      yield* fs.writeFileString(path, "amount\n10\n")
+      const reference = yield* Effect.promise(() => createAttachmentReceipt(path))
+      yield* Effect.promise(() =>
+        bindAttachmentReceipt(reference.receipt, path, { session: ctx.sessionID, message: ctx.messageID }),
+      )
+      yield* sessions.updateMessage({
+        id: ctx.messageID,
+        sessionID: ctx.sessionID,
+        role: "user",
+        agent: "build",
+        model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+        time: { created: Date.now() },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        sessionID: ctx.sessionID,
+        messageID: ctx.messageID,
+        type: "file",
+        mime: "text/plain",
+        filename: reference.filename,
+        url: pathToFileURL(path).href,
+        source: attachmentReceiptSource(reference),
+      })
+      if (mode === "changed") yield* fs.writeFileString(path, "amount\n999\n")
+      if (mode === "deleted") yield* fs.remove(path)
+      if (mode === "deny")
+        yield* sessions.setPermission({
+          sessionID: ctx.sessionID,
+          permission: [{ permission: "read", pattern: "*", action: "deny" }],
+        })
+      const result = yield* authorizeLoginomFile(path, {
+        ...ctx,
+        ask: () => Effect.die("Attached input must not ask again"),
+      }).pipe(Effect.exit)
+      if (mode === "stable") {
+        expect(Exit.isSuccess(result)).toBe(true)
+        if (Exit.isSuccess(result)) {
+          yield* fs.writeFileString(path, "after authorization")
+          const after = yield* result.value.verifyAttachment().pipe(Effect.exit)
+          expect(Exit.isFailure(after)).toBe(true)
+          if (Exit.isFailure(after)) expect(String(Cause.squash(after.cause))).toContain("LOGINOM_FILE_CHANGED")
+        }
+        return
+      }
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result))
+        expect(String(Cause.squash(result.cause))).toContain(
+          {
+            changed: "LOGINOM_FILE_CHANGED",
+            deleted: "LOGINOM_FILE_NOT_FOUND",
+            deny: "LOGINOM_FILE_ACCESS_DENIED",
+          }[mode],
+        )
+    }),
+  )
+}

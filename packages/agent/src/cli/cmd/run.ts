@@ -1,3 +1,4 @@
+import { createAttachmentReceipt, attachmentReceiptSource } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { standaloneCancellation } from "../standalone-cancellation"
 import { exitCli } from "../exit"
 import { runToolOutcome } from "../run-outcome"
@@ -58,6 +59,7 @@ function resolveRunInput(value?: string, piped?: string): string | undefined {
 
 type FilePart = {
   type: "file"
+  source?: ReturnType<typeof attachmentReceiptSource>
   url: string
   filename: string
   mime: string
@@ -421,6 +423,22 @@ export const RunCommand = effectCmd({
               url: pathToFileURL(resolvedPath).href,
               filename: path.basename(resolvedPath),
               mime: detected,
+            })
+            continue
+          }
+
+          if (info.isFile() && info.size > 10 * 1024 * 1024) {
+            if (args.attach) {
+              UI.error("Large local attachments require a local backend with a shared filesystem")
+              exitCli(1)
+            }
+            const reference = await createAttachmentReceipt(resolvedPath)
+            files.push({
+              type: "file",
+              url: pathToFileURL(resolvedPath).href,
+              filename: path.basename(resolvedPath),
+              mime: detected,
+              source: attachmentReceiptSource(reference),
             })
             continue
           }

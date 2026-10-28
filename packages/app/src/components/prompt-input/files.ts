@@ -1,3 +1,4 @@
+import type { LocalAttachmentReference } from "@/utils/local-attachment"
 import { ACCEPTED_FILE_TYPES, ACCEPTED_IMAGE_TYPES, LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 
 export { ACCEPTED_FILE_TYPES }
@@ -8,14 +9,14 @@ type AttachmentPicker = (
     multiple?: boolean
     accept?: string[]
   },
-  onFile: (file: File) => Promise<unknown>,
+  onFile: (file: File | LocalAttachmentReference) => Promise<unknown>,
 ) => Promise<void>
 
 export function pickAttachmentFiles(input: {
   picker?: AttachmentPicker
   directory: () => string
   fallback: () => void
-  onFile: (file: File) => Promise<unknown>
+  onFile: (file: File | LocalAttachmentReference) => Promise<unknown>
   onError: (error: unknown) => void
 }) {
   if (!input.picker) {

@@ -32,6 +32,7 @@ const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string
 const sentPrompts: string[] = []
 const promptInputs: unknown[] = []
 const sentCommands: unknown[] = []
+let onPrompt: (() => void) | undefined
 const commands: Array<{ name: string }> = []
 let serverSessionSyncs = 0
 
@@ -96,6 +97,7 @@ const clientFor = (directory: string) => {
         prompt: async (input: unknown) => {
           sentPrompts.push(directory)
           promptInputs.push(input)
+          onPrompt?.()
           return { data: undefined }
         },
         command: async (input: unknown) => {
@@ -302,6 +304,7 @@ beforeEach(() => {
   permissionServer = "server-a"
   createSessionGate = undefined
   serverSessionSyncs = 0
+  onPrompt = undefined
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
 
@@ -636,6 +639,82 @@ describe("prompt submit worktree selection", () => {
         }
       },
     )
+  }
+
+  for (const delivery of ["initial", "followup", "command"] as const) {
+    test(`${delivery} sends local references without resolving a blob URL`, async () => {
+      const sent = Promise.withResolvers<void>()
+      onPrompt = sent.resolve
+      params = { id: "session-1" }
+      if (delivery === "command") commands.push({ name: "review" })
+      const reference = {
+        kind: "local_reference" as const,
+        sourcePath: "/tmp/данные %#.csv",
+        filename: "данные %#.csv",
+        size: 5 * 1024 ** 3,
+        lastModified: 123,
+        mime: "text/plain",
+        receipt: "d".repeat(64),
+      }
+      const images: Extract<Prompt[number], { type: "image" }>[] = [
+        {
+          type: "image",
+          id: "native",
+          filename: reference.filename,
+          mime: reference.mime,
+          sourcePath: reference.sourcePath,
+          reference,
+          // Resolving this URL would fail: a reference has no retrievable blob.
+          blob: { id: "reference:" + reference.receipt, url: "blob:must-not-fetch" },
+        },
+      ]
+      promptValue = [
+        { type: "text", content: delivery === "command" ? "/review sales" : "sales", start: 0, end: 5 },
+        ...images,
+      ]
+      if (delivery !== "initial")
+        await sendFollowupDraft({
+          api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+          serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+          sync: {
+            data: { command: commands },
+            session: { optimistic: { add: () => undefined, remove: () => undefined } },
+          } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+          draft: {
+            sessionID: "session-1",
+            sessionDirectory: "/repo/main",
+            prompt: promptValue,
+            context: [],
+            agent: "agent",
+            model: { providerID: "provider", modelID: "model" },
+          },
+        })
+      if (delivery === "initial") {
+        const submit = createPromptSubmit({
+          prompt,
+          info: () => ({ id: "session-1" }),
+          imageAttachments: () => images,
+          commentCount: () => 0,
+          autoAccept: () => false,
+          mode: () => "normal",
+          working: () => false,
+          editor: () => undefined,
+          queueScroll: () => undefined,
+          promptLength: () => 5,
+          addToHistory: () => undefined,
+          resetHistoryNavigation: () => undefined,
+          setMode: () => undefined,
+          setPopover: () => undefined,
+        })
+        await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+      }
+      if (delivery !== "command") await sent.promise
+      const serialized = JSON.stringify(delivery === "command" ? sentCommands : promptInputs)
+      expect(serialized).toContain("file:///tmp/")
+      expect(serialized).toContain(reference.receipt)
+      expect(serialized).not.toContain("blob:must-not-fetch")
+      expect(serialized).not.toMatch(/data:|base64/)
+    })
   }
 
   test("uses an injected model selection", async () => {
