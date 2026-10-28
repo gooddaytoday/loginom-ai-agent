@@ -1,4 +1,4 @@
-import {browserFailureCategory,browserFailureDetails} from './browser-failure.mjs';
+import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -2664,7 +2664,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }else outcome=raw;
           if(outcome.operation_id!==operationId || outcome.action_key!=='artifact.upload' || outcome.action_revision!=='1')
             throw new Error('Upload receipt identity mismatch');
-        } catch {operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
+        } catch(error) {
+          try{await onRecord({phase:'artifact_upload_transport_failed',operation_id:operationId,cause:operationFailureDiagnostic(error)});}catch{}
+          operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');
+        }
         operation.cleanupConfirmed=!operation.transportUncertain && outcome.cleanup_complete===true;
         operation.outcome=outcome;
         await remember(operation,'completed',outcome);
@@ -2704,7 +2707,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         signal?.throwIfAborted();state.submitted=true;
         const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true,uploadLease:state.sourceLease});
         await state.sourceLease.verify();
-        if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true){
+          try{await onRecord({phase:'large_upload_submission_refused',operation_id:operationId,status:upload.status,
+            upload_submitted:upload.output?.upload_submitted===true,cleanup_complete:upload.cleanup_complete===true,
+            cause:operationFailureDiagnostic({code:upload.error?.code})});}catch{}
+          throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        }
         state.operation=operations.get(operationId);
         while(now()<deadline){
           signal?.throwIfAborted();

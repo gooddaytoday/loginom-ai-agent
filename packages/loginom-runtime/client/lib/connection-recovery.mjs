@@ -1,6 +1,24 @@
 // Restore only the original native session, through its observed 7.4.2 UI.
 // Native references stay in the prepared document; none enter logs or receipts.
 // This guard never retries the caller's code or clears an operation checkpoint.
+// Passive diagnostics: reading cached flags does not call Loginom or keep its
+// server session alive. Browser teardown owns the interval's lifetime.
+export function connectionTimelineScript(url) {
+ return `(${function(origin){
+  if(location.origin!==origin||globalThis.__loginomConnectionTimelineV1)return;
+  const timeline=globalThis.__loginomConnectionTimelineV1={samples:[],dropped:0};let previous;
+  const sample=()=>{
+   const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm,c=form?.FMapTree?.FServerConnection;
+   const flags={connected:typeof c?.Connected==='boolean'?c.Connected:null,reconnecting:form?.FReconnecting===true,
+    remote_session:!!c?.FRemoteSession,local_session:!!c?.FSession,
+    restore_prompt:document.querySelector('[data-tid="msgbox;p.h;p.t"]')?.textContent?.trim()==='Восстановление сессии'};
+   const signature=JSON.stringify(flags);if(signature===previous)return;previous=signature;
+   if(timeline.samples.length<128)timeline.samples.push({at:Date.now(),...flags});else timeline.dropped++;
+  };
+  sample();setInterval(sample,1000);
+ }.toString()})(${JSON.stringify(new URL(url).origin)})`;
+}
+
 export async function guardLoginomConnection(page, binding) {
  const inspect=mode=>page.evaluate(({b,mode})=>{
   const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;

@@ -637,6 +637,24 @@ export async function createBridge(config, session, { browserTransport: managedB
       closing ??= (async () => {
         await actionRuntime?.closeArtifactDeliveries();
         await recovery.close();
+        if(config.storageDirectories&&actionRuntime){
+          // Diagnostics are read without the connection guard, including after
+          // a disconnect. They never certify package or transport cleanup.
+          try{
+            const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+              code:`async page=>page.evaluate(()=>{
+                const timeline=globalThis.__loginomConnectionTimelineV1;
+                if(!Array.isArray(timeline?.samples))return null;
+                return {resolution_ms:1000,dropped:Number.isSafeInteger(timeline.dropped)?timeline.dropped:0,
+                  samples:timeline.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
+                    at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
+                    remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
+                  }))};
+              })`,
+            }},undefined,{timeout:1000});
+            await recordExecution({phase:'native_connection_timeline',timeline:parseCapabilityResult(response)});
+          }catch{ /* Diagnostic availability cannot change shutdown. */ }
+        }
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         const prepared = session.metadata.workspacePreparation;
         const preparationRequest = prepared?.identity ? JSON.parse(prepared.identity) : null;
