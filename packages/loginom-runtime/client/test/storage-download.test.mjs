@@ -19,10 +19,10 @@ async function settled(registry,id='download') {
  while(registry.status(id).state==='running')await registry.wait(id,{timeoutMs:100});
  return registry.status(id);
 }
-test('production default refuses server cache before lookup or download and retains source tools',async t=>{
+test('explicit disable refuses server cache before lookup or download and retains source tools',async t=>{
  const f=await fixture(t),directory=join(f.root,'disabled-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
+  allowCandidate:true,cacheDirectory:directory,serverSourceCache:false,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
  const outcome=await r.serverDownload(f.request,'dock_storage_download_start');
  assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'SERVER_CACHE_DISABLED');
  assert.match(outcome.error.message,/для серверного файла точная сверка N недоступна/);
