@@ -47,9 +47,11 @@ export function validateTextImportNodeParameters(p,mode,request) {
     requireValue(mode==='delimited'&&p.source?.kind==='storage'&&request.finish==='close'
       &&request.inputs?.length===0&&request.mappings?.length===0&&request.read?.ports?.length===0
       &&Object.keys(p).sort().join(',')==='preview_only,settings,source'
-      &&Object.keys(p.settings??{}).join(',')==='source'&&Object.keys(p.settings.source??{}).join(',')==='source_path',
+      &&Object.keys(p.settings??{}).join(',')==='source'&&Object.hasOwn(p.settings.source??{},'source_path')
+      &&Object.keys(p.settings.source).every(k=>['source_path','encoding'].includes(k)),
       'Server preview requires storage source, source_path only and Close without execution or mappings');
-    validateImportSource(p.source);validateTextImportPatch(p.settings);return;
+    validateImportSource(p.source);validateTextImportPatch(p.settings);
+    if(p.settings.source.encoding!==undefined)resolveTextImportEncoding(p.settings.source.encoding);return;
   }
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source','Exact import source and settings required');
@@ -254,7 +256,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           await executionDriver.prepare();
         }
         let s=await channel.observe({condition:'prepared import graph ready',ready:s=>s.prepared_node_context?.surface==='graph' && s.wizard?.status==='absent'});
-        await selectPreparedGraphNode(channel,s,'bound import graph selection available');
+        await selectPreparedGraphNode(channel,s,'bound import graph selection available',{settleGraph:true});
         if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
@@ -284,6 +286,22 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
               await channel.act({verb:'fill',ref:field.input_ref,text:sourceReceipt.source.destination});
               const fresh=await read('text_import_file','server preview source path entered');
               await channel.act({verb:'press',ref:fresh.wizard.import_source.fields.source_path.input_ref,key:'Tab'});
+            }
+            if(p.settings.source.encoding!==undefined){
+              const encoding=resolveTextImportEncoding(p.settings.source.encoding),s=await read('text_import_file','server preview code page ready',isTextImportSourceReady);
+              if(s.wizard.import_source.fields.encoding.value!==encoding.label){
+                const owns=e=>e.wizard_combo?.field?.scope==='import_source'&&e.wizard_combo.field.name==='encoding'
+                  &&e.wizard_combo.field.root_ref===s.wizard.root_ref
+                  &&e.wizard_combo.field.owner_ref===s.wizard.import_source.fields.encoding.owner_ref;
+                await channel.perform({condition:'server preview code page picker',initialObservation:s,refreshWizardBusy:true,
+                  ready:s=>s.wizard?.stage==='text_import_file',identity:s=>s.wizard.owner_context,
+                  resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='picker'),'Preview code page picker required').ref})});
+                const options=await read('text_import_file','server preview code page option',s=>s.ui.elements.some(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===encoding.label));
+                await channel.perform({condition:'server preview exact code page',initialObservation:options,
+                  ready:s=>s.wizard?.stage==='text_import_file',identity:s=>s.wizard.owner_context,
+                  resolve:s=>({verb:'select_wizard_option',ref:one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===encoding.label),'Preview code page option required').ref})});
+                await read('text_import_file','server preview code page readback',s=>s.wizard.import_source.fields.encoding.value===encoding.label);
+              }
             }
             const observedSource=(await read('text_import_file','server preview exact source selected',s=>
               isTextImportSourceReady(s)&&s.wizard.import_source.fields.source_path.value===sourceReceipt.source.destination)).wizard.import_source;

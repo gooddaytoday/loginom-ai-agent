@@ -41,3 +41,11 @@ test('server preview refuses execution, output reads, mappings, caller counts an
  assert.throws(()=>validateTextImportNodeParameters({...p,records:17},'delimited',r));
  assert.throws(()=>validateTextImportNodeParameters({...p,source:{kind:'verified_delivery',artifact_id:'a',upload_operation_id:'u'}},'delimited',r));
 });
+
+test('server preview accepts an explicit existing source encoding without column edits',()=>{
+ const p={source:{kind:'storage',server_source_ref:'storage-one'},settings:{source:{source_path:'/worker/full.csv',encoding:'CP1251'}},preview_only:true};
+ const r={target:{kind:'new'},finish:'close',inputs:[],mappings:[],read:{ports:[]}};
+ assert.doesNotThrow(()=>validateTextImportNodeParameters(p,'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({...p,settings:{source:{...p.settings.source,encoding:'guess'}}},'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({...p,settings:{source:{...p.settings.source,rows_to_skip:1}}},'delimited',r));
+});

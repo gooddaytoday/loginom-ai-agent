@@ -407,7 +407,18 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     browserStep='post_download_observation';
     const after=await observe(page);
     if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
-      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
+      const current=after.output??{};
+      trace.push({event:'download_post_context_refused',checks:{observation:after.status==='SUCCEEDED',authenticated:current.authenticated===true,
+        origin:current.origin===task.expected_origin,build:current.loginom_build===task.expected_build,
+        document:current.dom_epoch?.document===task.snapshot.dom_epoch?.document,workflow:same(current.workflow_ref,task.snapshot.workflow_ref),
+        tab:current.active_tab_ref===task.snapshot.active_tab_ref,package:same(current.package_identity,task.snapshot.package_identity),
+        storage:current.file_storage?.status==='observed'&&current.file_storage.directory===destination.directory,
+        dialogs:current.ui?.dialogs?.length===0,masks:current.ui?.masks?.length===0},
+        masks:(current.ui?.masks??[]).map(m=>({kind:m.kind,target_tid:m.target_tid})),
+        ...(after.error?.code?{code:after.error.code}:{})});
+      return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    }
     phase='downloaded';
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
@@ -2482,8 +2493,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           {code:'STORAGE_CONTROL_UNAVAILABLE',storageControl:control});return entries[0];};
         const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
         const act=async(s,e,verb='click',extra={})=>{
-          guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
-          if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
+          const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+          const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
+          const original=binding(s);let quiet=null;
+          for(let attempt=0;attempt<3;attempt++){
+            let previous=null;
+            s=await ready(async()=>{
+              const fresh=await read({rootRef:e.ref,observationId:s.observation_id});
+              const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+              if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
+              const item=matches[0],stamp=[fresh.dom_epoch,item.bounding_box,item.interaction];
+              quiet=item.interaction?.state==='point_observed'&&same(stamp,previous);previous=stamp;
+              return fresh;
+            },()=>quiet===true);
+            e=one(s.ui.elements.filter(item=>item.tid===e.tid));
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            if(result.status==='SUCCEEDED'&&result.cleanup_complete===true)return;
+            if(result.status!=='NOT_APPLIED'||result.phase!=='preconditions'||result.effect_possible!==false
+              ||result.cleanup_complete!==true||result.error?.code!=='UI_EPOCH_CHANGED'||attempt===2
+              ||!Array.isArray(result.trace)||result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event)))
+              throw Error('Server storage navigation requires inspection: '+result.operation_id);
+          }
         };
         const ready=async(probe,predicate)=>{
           const end=Math.min(deadline,now()+15000);
