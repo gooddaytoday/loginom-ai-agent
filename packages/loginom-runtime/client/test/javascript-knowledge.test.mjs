@@ -133,7 +133,7 @@ test('code schema DataType guidance reaches compact preparation and full node de
   assert.notEqual(card.knowledge_sha256,previous.knowledge_sha256);
 });
 
-test('full node envelope admits JavaScript fields without changing import source shape',()=>{
+test('full node envelope admits JavaScript fields and discriminated import sources',()=>{
   assert.ok(nodeApplyInputSchema.properties.target.properties.type.enum.includes('programming.javascript'));
   assert.ok(nodeApplyInputSchema.properties.mode.enum.includes('script'));
   for(const key of Object.keys(javascriptParametersSchema.properties).filter(key=>key!=='columns'))
@@ -142,7 +142,8 @@ test('full node envelope admits JavaScript fields without changing import source
     [crossTableParametersSchema.properties.columns,javascriptParametersSchema.properties.columns]);
   const javascript=nodeApplyInputSchema.allOf.find(rule=>rule.if?.properties?.target?.properties?.type?.const==='programming.javascript');
   assert.deepEqual(javascript.then.properties.parameters,javascriptParametersSchema);
-  assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.source.required,['artifact_id','upload_operation_id']);
+  assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.source.oneOf[1].required,['artifact_id','upload_operation_id']);
+  assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.source.oneOf[0].required,['kind','server_source_ref']);
   assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema.properties.parameters,{
     source_text:'import {InputTable} from "builtIn/Data";\n',schema_mode:'code'}));
   assert.throws(()=>validateActionParameters(nodeApplyInputSchema.properties.parameters,{source:'text'}));

@@ -537,6 +537,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               name: input.name,
               arguments: "args" in input ? input.args : undefined,
               ...(packageArtifact ? { packageArtifact } : {}),
+              ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
           )

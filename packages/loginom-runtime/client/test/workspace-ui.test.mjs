@@ -3032,7 +3032,7 @@ test('storage byte identity uses the same cached native file record regardless o
     const cell=page.add('td',base+'colName_'+name,name,undefined,row);
     page.add('td',base+'colFileType_'+name,'Текстовый файл',undefined,row);
     const size=page.add('td',base+'colSize_'+name,'1,702',undefined,row);
-    const record={isModel:true,data:{id:'/worker/'+name,FileName:name,FilePath:'/worker/'+name,Type:0,Size:1702}};
+    const record={isModel:true,data:{id:'/worker/'+name,FileName:name,FilePath:'/worker/'+name,Type:0,Size:1702,Time:'2026-10-28T00:00:00.000Z'}};
     const data=record.data;
     if(mode==='folder')data.Type=1;
     if(mode==='wrong_name')data.FileName='other.csv';
@@ -3053,7 +3053,8 @@ test('storage byte identity uses the same cached native file record regardless o
     assert.equal(entry.kind,mode==='valid'?'file':'unknown',mode);
     if(mode==='valid') {
       assert.equal(entry.bytes_source,'native_file_store');
-      for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576]) {
+      assert.equal(entry.path,'/worker/'+name);assert.equal(entry.mtime,'2026-10-28T00:00:00.000Z');
+      for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576,2148532259,4296015909]) {
         data.Size=bytes;size.ownText='rounded KiB';assert.equal((await read()).bytes,bytes);
       }
       delete page.context.Ext;size.ownText='1702';assert.equal((await read()).bytes,undefined);

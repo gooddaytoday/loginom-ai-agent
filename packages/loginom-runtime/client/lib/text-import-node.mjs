@@ -1,4 +1,5 @@
 import {verifyUploadLineage} from './upload-lineage.mjs';
+import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
@@ -23,17 +24,19 @@ const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possib
 
 export function validateTextImportNodeParameters(p,mode,request) {
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
-  requireValue(p && Object.keys(p).sort().join(',')==='settings,source','Exact import source and settings required');
+  requireValue(p && Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
   if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
     'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
-  const s=p.source;
-  requireValue(s && Object.keys(s).every(k=>['artifact_id','upload_operation_id','bytes','sha256'].includes(k))
-    && ['artifact_id','upload_operation_id'].every(k=>typeof s[k]==='string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(s[k]))
-    && (s.bytes===undefined || Number.isSafeInteger(s.bytes) && s.bytes>=0 && s.bytes<=16*1024*1024)
-    && (s.sha256===undefined || typeof s.sha256==='string' && /^[a-f0-9]{64}$/.test(s.sha256)),'Verified source identity required');
+  validateImportSource(p.source);
+  if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0
+    &&request.mappings.length===0&&Object.keys(p.settings).join(',')==='source'
+    &&Object.keys(p.settings.source??{}).join(',')==='source_path'
+    &&Object.keys(p.source_switch).sort().join(',')==='profile_id,save_operation_id'
+    &&['profile_id','save_operation_id'].every(k=>typeof p.source_switch[k]==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(p.source_switch[k])),
+    'Full source switch requires existing import, source_path only, profile_id (no model-supplied count), saved package receipt and output 0; no column or mapping edits');
   // Explicit admission boundary for the private Done increment. Both definition
   // readers require complete native schemas, including every offscreen field.
   requireValue(mode==='delimited' && ['done','execute','close'].includes(request.finish) && (request.read.ports.length===0||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
@@ -43,14 +46,22 @@ export function validateTextImportNodeParameters(p,mode,request) {
   'Private import node currently supports Done/Execute/Close with optional executed output 0 and configured output fields with at least one used field; input mappings and output exclusion are not installed');
 }
 
-export function verifyTextImportSource(parameters,uploads,uploadHistory) {
+export function verifyTextImportSource(parameters,uploads,uploadHistory,storageProof) {
   try {
   const s=parameters.source;
+  validateImportSource(s);
+  if(s.kind==='storage') {
+    requireValue(storageProof?.verified===true&&storageProof.kind==='storage'&&storageProof.server_source_ref===s.server_source_ref,
+      'Verified storage source reference is missing');
+    requireValue(parameters.settings.source?.source_path===storageProof.destination,'Storage source exact destination differs');
+    validateTextImportPatch({source:{source_path:storageProof.destination}});
+    return verified({source:structuredClone(storageProof)});
+  }
   const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),'Verified upload operation is missing or ambiguous');
   const o=u.outcome,proof=o?.output?.server_copy_verification;
   // Resolve integrity metadata from admitted local state, never from model text.
   const bytes=u.artifact?.bytes,sha256=u.artifact?.sha256;
-  requireValue(Number.isSafeInteger(bytes) && bytes>=0 && bytes<=16*1024*1024
+  requireValue(Number.isSafeInteger(bytes) && bytes>=0
     && typeof sha256==='string' && /^[a-f0-9]{64}$/.test(sha256), 'Verified artifact metadata is invalid');
   requireValue(o?.status==='SUCCEEDED' && o.cleanup_complete===true && o.operation_id===s.upload_operation_id
     && o.action_key==='artifact.upload' && o.output?.artifact_id===s.artifact_id
@@ -72,6 +83,50 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory) {
     error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
     throw error;
   }
+}
+
+export function verifyImportRowCount(expected,output,execution) {
+  requireValue(Number.isSafeInteger(expected)&&expected>=0&&execution?.verified===true&&execution.owner_verified===true
+    &&execution.status==='completed'&&output?.port===0&&output.fresh===true
+    &&output.execution_id===execution.execution_id&&output.freshness_basis==='completed_execution_port_source'
+    &&Number.isSafeInteger(output.row_count)&&output.row_count>=0,
+    'LOGINOM_ROW_COUNT_UNAVAILABLE: completed import output port metadata is required; grid/buffer/group counts cannot establish full N');
+  requireValue(output.row_count===expected,'LOGINOM_ROW_COUNT_MISMATCH: expected '+expected+', actual '+output.row_count);
+  return {expected_records:expected,actual_records:output.row_count,execution_id:execution.execution_id,
+    count_source:'completed_execution_port_source'};
+}
+
+export function verifyFullImportCount(profileId,receipt,source,output,execution) {
+  const reason = !receipt ? 'Trusted exact scan receipt is absent'
+    : receipt.basis!=='backend_exact_scan'||receipt.profile_id!==profileId ? 'Exact scan profile identity does not match'
+    : source.kind==='storage' ? 'Storage preview has no trusted digest binding to the local exact scan'
+    : !/^[a-f0-9]{64}$/.test(receipt.sha256??'')||source.sha256!==receipt.sha256||source.bytes!==receipt.bytes
+      ? 'Exact scan source digest or byte identity does not match verified delivery'
+    : !receipt.identity?.canonical_path||receipt.identity.size!==receipt.bytes||!receipt.identity.file_id
+      ||!Number.isSafeInteger(receipt.records)||receipt.records<0 ? 'Exact scan receipt is incomplete' : null;
+  if(reason)return {status:'not_verified',message:'N не сверено',reason,profile_id:profileId,actual_records:output.row_count};
+  return {status:'verified',...verifyImportRowCount(receipt.records,output,execution),profile_id:profileId,
+    profile_identity_basis:'backend_exact_scan_sha256',source_identity:receipt.identity};
+}
+
+export function importSchemaSnapshot({source,format,columns,mapping}) {
+  const values=(group,skip=[])=>Object.fromEntries(Object.entries(group?.fields??{}).filter(([k])=>!skip.includes(k)).map(([k,v])=>{
+    requireValue(v.status==='observed'&&v.truncated!==true,'LOGINOM_IMPORT_SCHEMA_CHANGED: incomplete parsing settings');return [k,v.value];
+  }));
+  requireValue(Array.isArray(columns)&&columns.length>0&&mapping?.verified===true&&mapping.inventory_complete===true
+    &&mapping.source_identity_verified===true&&typeof mapping.autosync==='boolean'
+    &&Array.isArray(mapping.source_fields)&&Array.isArray(mapping.target_fields),
+    'LOGINOM_IMPORT_SCHEMA_CHANGED: complete definitions and output mapping are required');
+  const field=f=>Object.fromEntries(['index','name','label','type','data_kind','used','excluded','inherited'].filter(k=>Object.hasOwn(f,k)).map(k=>[k,f[k]]));
+  return {source:values(source,['source_path']),format:values(format),columns:columns.map(field),
+    mapping:{autosync:mapping.autosync,source_fields:mapping.source_fields.map(field),
+      target_fields:mapping.target_fields.map(f=>({...field(f),source:field(f.source??{})}))}};
+}
+
+export function verifyImportSchema(before,after) {
+  requireValue(JSON.stringify(before)===JSON.stringify(after),
+    'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch changed definitions, parsing settings or output mapping; execution refused');
+  return true;
 }
 
 export function bindIdentityOutputColumns(configured,actual) {
@@ -106,8 +161,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory})=>{
-    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal;
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,verifySourceSwitchSave,scanReceipt})=>{
+    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt;
+    const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{
       activeSignal=ctx.signal;
@@ -129,8 +185,36 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         identity:s=>({node:s.prepared_node_context,from,to})});
       return read(to,'import '+to+' ready');
     };
+    const captureSwitchSchema=async()=>{
+      const source=(await read('text_import_file','full source switch readback',isTextImportSourceReady)).wizard.import_source;
+      const format=(await next('text_import_file','text_import_format')).wizard.settings;
+      const columns=await readImportDefinitionPages(channel);
+      await next('text_import_format','output_mapping');
+      const mapping=(await channel.observe({condition:'source switch complete output mapping',readMappings:true,
+        ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true})).node_mapping;
+      return {source_path:source.fields.source_path.value,schema:importSchemaSnapshot({source,format,columns:columns.fields,mapping})};
+    };
+    const refuseSwitchSchema=async(error,phase)=>{
+      if(sourceSwitch&&String(error.message).startsWith('LOGINOM_IMPORT_SCHEMA_CHANGED:')&&!operation.transportUncertain){
+        const closed=await closePreparedWizard(channel);
+        error.nodePhaseRefusal={phase,status:'FAILED',effect_possible:true,cleanup_complete:true,
+          verification:'text_import_source_switch_schema_refused',execution_started:false,
+          settings_unchanged:phase!=='finish',proof:{closed}};
+      }
+      throw error;
+    };
     return {
-      verifySource:async p=>(sourceReceipt=verifyTextImportSource(p,verifiedUploads(),uploadHistory?.())),
+      verifySource:async p=>{
+        try{
+        sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),
+          p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined);
+        if(sourceSwitch){
+          requireValue(typeof verifySourceSwitchSave==='function','Full source switch requires a verified package save');
+          saveReceipt=verifySourceSwitchSave(sourceSwitch.save_operation_id);
+        }
+        return sourceReceipt;
+        }catch(error){error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+      },
       async openWizard(ctx) {
         enter(ctx);
         if(operation.nodeApply.request.finish==='execute') {
@@ -150,17 +234,24 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         }
         s=await read('text_import_file','prepared import source wizard initialized',isTextImportSourceReady);owner=s.wizard.owner_context;
         requireValue(owner?.status==='observed','Import owner unavailable');
+        if(sourceSwitch){
+          schemaBefore=(await captureSwitchSchema()).schema;
+          await closePreparedWizard(channel);
+          await openPreparedWizard(channel);
+          await read('text_import_file','saved sample import reopened',isTextImportSourceReady);
+        }
         return verified({effect_possible:true,node_context:s.prepared_node_context});
       },
       async configureTextImport(ctx,p) {
         enter(ctx);requireValue(owner,'Import was not opened by this operation');
         try {
           configured=operation.nodeApply.request.target.kind==='existing'
-            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination)
+            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
             :await configureTextImportFields(channel,p.settings,owner);
           requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
           return configured;
         } catch(error) {
+          if(sourceSwitch&&String(error.message).startsWith('LOGINOM_IMPORT_SCHEMA_CHANGED:'))return refuseSwitchSchema(error,'configure');
           // Binding rejects after completed observations, before editing any
           // column. Close only this operation's draft; never hide transport loss.
           // Таймаут готовности — чтение без мутаций после подтверждённых жестов;
@@ -206,6 +297,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         requireValue(JSON.stringify(semantic(finalNative))===JSON.stringify(semantic(native)),
           'Native output mapping changed during paged inspection');
         native=finalNative;
+        if(sourceSwitch)try{verifyImportSchema(schemaBefore,importSchemaSnapshot({...configured,mapping:native}));}
+          catch(error){return refuseSwitchSchema(error,'output_mapping');}
         // Existing output aliases/order remain valid when no mapping is asked.
         // The source association is proved by native records, never label alone.
         outputColumns=bindConfiguredOutputColumns(configured.columns,actual,native);
@@ -215,8 +308,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       async finish(mode,ctx) {
         requireValue(['done','execute','close'].includes(mode),'Unsupported finish mode');enter(ctx);
         if(mode==='close')return closePreparedWizard(channel);
-        const executeRequested=mode==='execute',verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
-        requireValue(!executeRequested||executionDriver,'Execution baseline was not prepared');
+        const executeRequested=mode==='execute'&&!sourceSwitch,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
+        requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));
         await channel.perform({condition:'bound import '+mode+' available',initialObservation:s,
           ready:s=>s.wizard?.stage==='done' && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)),
@@ -226,6 +319,22 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         const label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
           &&e.graph_node?.part==='label'),'Configured Import caption is unavailable').graph_node.label_text;
         requireValue(typeof label==='string'&&label.length>0,'Configured Import caption is empty');
+        if(sourceSwitch){
+          await openPreparedWizard(channel);
+          const reopened=await captureSwitchSchema();schemaAfter=reopened.schema;
+          requireValue(reopened.source_path===sourceReceipt.source.destination,'LOGINOM_FILE_CHANGED: committed full source path differs');
+          try{verifyImportSchema(schemaBefore,schemaAfter);}catch(error){return refuseSwitchSchema(error,'finish');}
+          await closePreparedWizard(channel);
+          // Done and independent reopen precede the only launch. A timeout is
+          // retained by the existing execution journal/inspect path, never retried.
+          await executionDriver.launchGraph();
+          const execution=await executionDriver.identify();
+          const continuationSurface=finishedImportSurface(await channel.observe({condition:'full import execution continuity',readProcesses:true,readOutputs:true,
+            ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true}));
+          return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,
+            execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,
+            package_saved:false,reopen_performed:true,schema_before:schemaBefore,schema_after:schemaAfter});
+        }
         const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
@@ -259,6 +368,15 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         requireValue(output.schema.every((field,index)=>field.name===outputColumns[index]?.name),'Import output field order differs from the configured output');
         const aligned=alignReadSchema(output.schema,outputColumns);
         output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+        if(sourceSwitch){
+          try{output.full_import_verification={...verifyFullImportCount(sourceSwitch.profile_id,scanReceipt,sourceReceipt.source,output,executionReceipt),
+            source:sourceReceipt.source,
+            saved_before_switch:saveReceipt,schema_before:schemaBefore,schema_after:schemaAfter};}
+          catch(error){error.nodePhaseRefusal={phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,
+            verification:'text_import_full_count_refused',execution_id:executionReceipt.execution_id,
+            expected_records:scanReceipt?.records,actual_records:output.row_count,port:output.port,
+            freshness_basis:output.freshness_basis};throw error;}
+        }
         return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});
       },
       async releasePending(state,{signal}={}) {
