@@ -62,6 +62,8 @@ describe("workspace packages", () => {
       for (const match of read(path).matchAll(/--filter[ =]+['"]?([^\s'"`)]+)/g)) {
         const name = match[1]!.replace(/^!/, "")
         if (name.includes("${") || name.includes("*") || name.startsWith("$")) continue
+        // git clone and fetch take object filters (blob:none, tree:0); they are not workspace names.
+        if (/^(blob|tree|object|sparse|combine):/.test(name)) continue
         if (name.startsWith("./")) {
           if (!isDir(join(root, name))) dangling.push(`${path}: --filter ${name}`)
           continue
@@ -95,9 +97,13 @@ describe("CI triggers", () => {
   test("working-directory points at existing directories", () => {
     const missing: string[] = []
     for (const path of workflows) {
-      for (const match of read(path).matchAll(/working-directory:\s*([^\s#]+)/g)) {
+      const text = read(path)
+      // A checkout step with `path:` creates that directory at run time.
+      const checkouts = new Set([...text.matchAll(/^\s*path:\s*([^\s#]+)/gm)].map((m) => m[1]!.replace(/^["']|["']$/g, "")))
+      for (const match of text.matchAll(/working-directory:\s*([^\s#]+)/g)) {
         const dir = match[1]!.replace(/^["']|["']$/g, "")
         if (dir.includes("${{") || dir === ".") continue
+        if ([...checkouts].some((root) => dir === root || dir.startsWith(root + "/"))) continue
         if (!isDir(join(root, dir))) missing.push(`${path}: ${dir}`)
       }
     }
