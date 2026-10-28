@@ -4,7 +4,7 @@ import { constants } from 'node:fs';
 import { chmod, lstat, open, realpath, unlink } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 
-const blockBytes = 256 * 1024;
+const blockBytes = 8 * 1024 * 1024;
 const fail = code => { throw Error(code); };
 const identity = (canonical_path, s) => ({ canonical_path, size:s.size, mtime:s.mtimeMs, ctime:s.ctimeMs, file_id:`${s.dev}:${s.ino}` });
 const same = (a,b) => ['canonical_path','size','mtime','ctime','file_id'].every(k=>a[k]===b[k]);

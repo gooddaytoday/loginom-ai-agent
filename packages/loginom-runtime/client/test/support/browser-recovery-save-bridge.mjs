@@ -45,7 +45,7 @@ mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>({
-  tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},
+  tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
   run:async(key,parameters,{operationId})=>({status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}}),
   browserRecoveryBasis(){throw Error('No browser recovery trigger for this operation');},
 })}});

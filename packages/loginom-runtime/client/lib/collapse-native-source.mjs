@@ -43,7 +43,7 @@ export function completedStaticImports(history,uploads,ctx,uploadHistory) {
   const verified=verifyTextImportSource(r.parameters,uploads).source;
   if(c.source.source_path!==verified.destination)continue;
   need(Number.isSafeInteger(item.sequence),'Private import execution order required');
-  verified.bytes_verified=true;verified.upload_completion_verified=true;
+  verified.bytes_verified=verified.verification_basis!=='native_size_and_local_sha256';verified.upload_completion_verified=true;
   verified.lineage=verifyUploadLineage(verified,uploadHistory,{executionSequence:reread?.sequence??item.sequence});
   accepted.push({node_id:ref.node_id,execution_id:(reread?.outcome.output??n).execution.execution_id,import_operation_id:r.operation_id,
    ...(reread?{readonly_reexecution_operation_id:reread.request.operation_id}:{}),

@@ -163,7 +163,8 @@ export const nodeApiTools=Object.freeze([
  tool('dock_node_stop','Request native stop only for an identified server execution currently awaited by this node operation. Poll the same worker for confirmed outcome.',operation),
 ]);
 export const deliveryApiTools=Object.freeze([
- tool('dock_artifact_deliver','Candidate delivery of an authorized artifact to its grant destination, including path conflict policy and byte verification. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
+ tool('dock_artifact_deliver','Deliver an authorized artifact. Files over 16 MiB start asynchronously and return operation_id; poll dock_artifact_delivery_status no more often than every 5 seconds until ready, cancelled, failed or uncertain. Large files use exact native FileStore size, without download. Smaller files retain byte verification. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
+ tool('dock_artifact_delivery_cancel','Request native cancellation of the SAME large-file operation. Poll status until cancelled or uncertain. Only confirmed sender stop and removal of the owned partial file count as cancelled.',operation),
  tool('dock_artifact_delivery_status','Read the retained delivery job without browser calls. A failed tool wait does not prove transfer termination.',operation,true),
  tool('dock_artifact_delivery_resume','Explicitly resume the SAME known delivery job after inspecting status. Uses the original upload receipt; never repeats an unresolved download. Requires the original live runtime and unchanged grant.',resumeDelivery),
 ]);
@@ -207,6 +208,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal,scanReceipt}={})
   case 'dock_node_cancel':return runtime.cancelNodeApply(args.operation_id);
   case 'dock_node_stop':return runtime.stopNodeApply(args.operation_id);
   case 'dock_artifact_deliver':return runtime.deliverArtifact(args,{signal});
+  case 'dock_artifact_delivery_cancel':return runtime.cancelArtifactDelivery(args.operation_id);
   case 'dock_artifact_delivery_status':return runtime.artifactDeliveryStatus(args.operation_id);
   case 'dock_artifact_delivery_resume':return runtime.resumeArtifactDelivery(args,{signal});
  }
