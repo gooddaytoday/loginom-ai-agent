@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -130,4 +130,66 @@ test('live/cold/full-client reports preserve complete commands and multiple IDs'
  const missing=r.run('verify','--base','base','--report',report);
  assert.equal(missing.status,1);assert.match(missing.stdout,/live-ui/);
  assert.equal(r.run('verify','--base','base','--report','absent-report.md').status,2);
+});
+
+const contract = 'packages/loginom-runtime/client/lib/';
+for (const [name, before, after] of [
+ ['node-contracts.mjs', "const definitions = [\n ['imports.text','Text'],\n];\n", "const definitions = [\n ['imports.text','Text'],\n ['transform.new_node','New'],\n];\n"],
+ ['effect-contracts.mjs', "export const EFFECT_CONTRACTS = Object.freeze({inspect: {ownership:'none'}});\n", "export const EFFECT_CONTRACTS = Object.freeze({inspect: {ownership:'none'}, new_node: {ownership:'owned'}});\n"],
+ ['node-result-schema.mjs', "const oldSchema=object({kind:values('old')});\nconst configurationReadback={anyOf:[oldSchema]};\n", "const oldSchema=object({kind:values('old')});\nconst newSchema=object({kind:values('new')});\nconst configurationReadback={anyOf:[oldSchema,newSchema]};\n"],
+ ['node-read-contract.mjs', "export const MODE='read';\n", "export const MODE='read';\nconst newSchema=object({kind:values('new')});\n"],
+ ['node-contracts.d.ts', "export type NodeType = 'imports.text';\n", "export type NodeType = 'imports.text' | 'transform.new_node';\n"],
+]) test(`additive registration by diff: ${name}`, t => {
+ const r=repo(t);r.commit(contract+name,before);r.git('branch','-f','base','HEAD');
+ r.commit(contract+name,after);const text=r.list();
+ assert.ok(!ids(text).includes('main-chat-approval'),text);
+ for(const id of ['client-full','acceptance-tests','live-ui']) assert.ok(ids(text).includes(id),text);
+ assert.match(text,/NODE_SCENARIOS/);
+ // Editing or deleting any old entry still stops, even alongside additions.
+ r.commit(contract+name,after.replace(/imports.text|ownership:'none'|kind:values\('old'\)|MODE='read'/, 'CHANGED'));
+ assert.ok(ids(r.list()).includes('main-chat-approval'));
+ r.commit(contract+name,'');assert.ok(ids(r.list()).includes('main-chat-approval'));
+});
+
+test('adding a property to an existing entry is not a new registration',t=>{
+ const r=repo(t),path=contract+'effect-contracts.mjs';
+ r.commit(path,"export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'}});\n");
+ r.git('branch','-f','base','HEAD');
+ r.commit(path,"export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none',changed:true}});\n");
+ assert.ok(ids(r.list()).includes('main-chat-approval'));
+});
+
+test('real production contracts permit new registrations and preserve old validators',t=>{
+ for(const name of ['node-contracts.mjs','effect-contracts.mjs','node-result-schema.mjs','node-read-contract.mjs','node-contracts.d.ts']) {
+  const r=repo(t),path=contract+name;
+  const before=readFileSync(fileURLToPath(new URL('../../../'+path,import.meta.url)),'utf8');
+  r.commit(path,before);r.git('branch','-f','base','HEAD');
+  const after=name==='node-contracts.mjs'?before.replace('const definitions = [',"const definitions = [\n ['transform.new_node','New','new',1,1,false,['new'],'new.md'],"):
+   name==='effect-contracts.mjs'?before.replace('Object.freeze({',"Object.freeze({\n new_node: Object.freeze({ownership:'owned'}),"):
+   name==='node-result-schema.mjs'?before.replace('const configurationReadback={anyOf:[',"const newNodeSchema=object({kind:values('new_node')});\nconst configurationReadback={anyOf:[newNodeSchema,"):
+   name==='node-read-contract.mjs'?before+"\nconst newNodeSchema=object({kind:values('new_node')});\n":
+   before.replace('export type NodeType = ',"export type NodeType = 'transform.new_node' | ")+"\nexport interface NewNodeReadback { kind: 'new_node'; fields: {name: string}[] }\n";
+  r.commit(path,after);assert.ok(!ids(r.list()).includes('main-chat-approval'), name);
+  r.commit(path,after.replace(/NODE_POSITION_MIN = 64|resource !== 'package'|const str=|const need=|interface WorkflowRef/, 'CHANGED'));
+  assert.ok(ids(r.list()).includes('main-chat-approval'),name);
+ }
+});
+
+for(const after of [
+ "export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'},inspect:{ownership:'other'}});\n",
+ "export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'},__proto__:{ownership:'other'}});\n",
+ "export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'changed'},new_node:{ownership:'other'}});\n",
+]) test('duplicate/prototype/mixed edits preserve stop: '+after,t=>{
+ const r=repo(t),path=contract+'effect-contracts.mjs';
+ r.commit(path,"export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'}});\n");
+ r.git('branch','-f','base','HEAD');r.commit(path,after);
+ assert.ok(ids(r.list()).includes('main-chat-approval'));
+});
+
+test('a new key cannot execute a mutation of existing contracts',t=>{
+ const r=repo(t),path=contract+'effect-contracts.mjs';
+ r.commit(path,"export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'}});\n");
+ r.git('branch','-f','base','HEAD');
+ r.commit(path,"export const EFFECT_CONTRACTS=Object.freeze({inspect:{ownership:'none'},new_node:(existingSchema.changed=true)});\n");
+ assert.ok(ids(r.list()).includes('main-chat-approval'));
 });
