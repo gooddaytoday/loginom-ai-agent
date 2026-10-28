@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs"
 import { mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { resolveTextImportEncoding } from "../../../loginom-runtime/client/lib/text-import-encoding.mjs"
+import type { XlsxOptions } from "./loginom-file-xlsx"
 
 const MiB = 1024 * 1024
 const MAX_BYTES = 8 * MiB
@@ -36,7 +37,7 @@ type Column = {
   first_mismatch?: Violation
   nulls: number
 }
-export type ProfileOptions = {
+export type ProfileOptions = XlsxOptions & {
   encoding?: string
   delimiter?: string
   text_qualifier?: string
@@ -49,6 +50,7 @@ export type ProfileOptions = {
 }
 type Identity = { canonical_path: string; size: number; mtime: number; ctime: number; file_id: string }
 type Stored = {
+  format?: "csv" | "xlsx"
   profile_id: string
   source: string
   identity: Identity
@@ -487,6 +489,23 @@ async function* boundaries(path: string) {
 }
 
 export async function profileFile(path: string, dir: string, options: ProfileOptions = {}) {
+  const detected = await identity(resolve(path))
+  if (options.authorized_path && options.authorized_path !== detected.canonical_path)
+    failure("LOGINOM_FILE_CHANGED", path)
+  const magic = await open(detected.canonical_path, "r")
+  try {
+    await checkHandle(magic, detected)
+    const bytes = Buffer.alloc(4)
+    await magic.read(bytes, 0, 4, 0)
+    if ([0x04034b50, 0x06054b50, 0x08074b50].includes(bytes.readUInt32LE(0))) {
+      const { profileXlsx } = await import("./loginom-file-xlsx")
+      return await profileXlsx(path, dir, options)
+    }
+    if (bytes.equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0])))
+      failure("LOGINOM_FILE_XLSX_UNSUPPORTED", "encrypted XLSX / legacy OLE workbook")
+  } finally {
+    await magic.close()
+  }
   const started = performance.now()
   const source = resolve(path)
   const original = await identity(source)
@@ -655,6 +674,7 @@ function reply(p: Stored, cursor = 0) {
   const ratio = p.identity.size / Math.max(1, p.coverage.confirmed_bytes)
   const estimate = Math.round(observed * ratio)
   const result = {
+    format: "csv" as const,
     profile_id: p.profile_id,
     identity: p.identity,
     status: p.scan?.status ?? (p.coverage.confirmed_bytes === p.identity.size ? "sampled" : "partial"),
@@ -731,6 +751,10 @@ function reply(p: Stored, cursor = 0) {
 
 export async function profilePage(id: string, dir: string, continuation = "0") {
   const p = await loadProfile(id, dir)
+  if (p.format === "xlsx") {
+    const { pageXlsx } = await import("./loginom-file-xlsx")
+    return pageXlsx(id, dir, continuation)
+  }
   await unchanged(p)
   if (!/^\d+$/.test(continuation) || Number(continuation) >= p.columns.length)
     failure("LOGINOM_FILE_FORMAT_AMBIGUOUS", "invalid continuation")
@@ -739,6 +763,10 @@ export async function profilePage(id: string, dir: string, continuation = "0") {
 
 export async function scanFile(id: string, dir: string, options: { signal?: AbortSignal; chunk_bytes?: number } = {}) {
   const p = await loadProfile(id, dir)
+  if (p.format === "xlsx") {
+    const { scanXlsx } = await import("./loginom-file-xlsx")
+    return scanXlsx(id, dir, options)
+  }
   await unchanged(p)
   const lock = await open(join(dir, `${id}.lock`), "wx", 0o600)
   const started = performance.now()
@@ -810,6 +838,10 @@ export async function sampleFile(
   options: { seed?: number; max_records?: number; max_bytes?: number; signal?: AbortSignal } = {},
 ) {
   const p = await loadProfile(id, dir)
+  if (p.format === "xlsx") {
+    const { sampleXlsx } = await import("./loginom-file-xlsx")
+    return sampleXlsx(id, dir, options)
+  }
   await unchanged(p)
   const maxRecords = Math.max(1, Math.min(100000, options.max_records ?? 1000))
   const limit = Math.max(1, Math.min(MAX_BYTES, options.max_bytes ?? MAX_BYTES))
