@@ -75,6 +75,29 @@ test('source discovery waits through the old graph tab before reading the new Fi
  assert.equal(result.status,'SUCCEEDED');assert.ok(result.output.source.server_source_ref);
  assert.equal(page.events.filter(e=>e==='mouse_click').length,0);
 });
+
+test('source discovery reacquires invalidated read pages without replaying any gesture',async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot();let reads=0;
+ const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
+ const files={...base,observation_kind:'roots',active_tab_ref:'files',ui:{...base.ui,elements:[
+  element('ui-navigation',page.prefix+';NavigationBar;NavigationPanel'),element('ui-table',page.prefix+';FileStorageForm;pnlFileStorage;tbl'),
+  element('ui-file',page.prefix+';FileStorageForm;colName_full.csv'),
+  ...Array.from({length:40},(_,i)=>element('ui-extra-'+i,page.prefix+';FileStorageForm;extra'+i))]}};
+ const evaluate=page.evaluate.bind(page);
+ page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(files);state.dom_epoch.revision=++reads===1?0:1;
+  if(!arg.discoverRoots){delete state.observation_kind;state.file_storage={status:'observed',directory:'/worker'};
+   if(arg.rootRef==='ui-file')state.ui.elements=[{...element('ui-file',page.prefix+';FileStorageForm;colName_full.csv'),label:'full.csv',
+    storage_entry:{kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'}}];
+  }
+  return state;
+ };
+ const r=runtime(page,{cacheDirectory:join(f.root,'pages-cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ assert.equal((await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source')).status,'SUCCEEDED');
+ assert.equal(page.events.filter(e=>e==='mouse_click').length,0);
+});
 test('changed native size/mtime or wrong copy size invalidates download and removes partials',async t=>{
  for(const kind of ['size','mtime','copy']){
   const f=await fixture(t,async({path})=>{await writeFile(path,kind==='copy'?'abcd':'abc');

@@ -29,6 +29,14 @@ test('storage source refuses invented refs, paths, native size/time drift and wr
  const outside=observed();outside.output.ui.elements[0].storage_entry.path='/foreign/full.csv';registry.retain(outside);
  assert.equal(outside.output.ui.elements[0].storage_entry.server_source_ref,undefined);
 });
+
+test('unchanged native source keeps its opaque ref across observation page refreshes',()=>{
+ const registry=createServerSourceRegistry({getBinding:binding}),first=observed(),fresh=observed();
+ registry.retain(first);registry.retain(fresh);
+ assert.equal(fresh.output.ui.elements[0].storage_entry.server_source_ref,first.output.ui.elements[0].storage_entry.server_source_ref);
+ fresh.output.ui.elements[0].storage_entry.mtime='changed';registry.retain(fresh);
+ assert.notEqual(fresh.output.ui.elements[0].storage_entry.server_source_ref,first.output.ui.elements[0].storage_entry.server_source_ref);
+});
 test('storage revalidation discovers roots then reads the exact native row, since roots contain no FileStore proof',async()=>{
  const registry=createServerSourceRegistry({getBinding:binding}),state=observed();registry.retain(state);
  const ref=state.output.ui.elements[0].storage_entry.server_source_ref,calls=[];

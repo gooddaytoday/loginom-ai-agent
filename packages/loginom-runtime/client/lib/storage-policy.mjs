@@ -70,7 +70,7 @@ export function requireExportDestination(value, directories = null) {
 // References are minted only from native, row-bound FileStore observations in
 // this prepared session. A model-supplied path/size/time is never a receipt.
 export function createServerSourceRegistry({getBinding}) {
-  const sources=new Map();
+  const sources=new Map(),index=new Map();
   const entries=outcome=>outcome?.status==='SUCCEEDED'&&outcome.output?.file_storage?.status==='observed'
     ?(outcome.output.ui?.elements??[]).map(e=>e.storage_entry).filter(e=>e?.kind==='file'
       &&e.bytes_source==='native_file_store'&&Number.isSafeInteger(e.bytes)&&e.bytes>=0
@@ -82,9 +82,11 @@ export function createServerSourceRegistry({getBinding}) {
       const binding=getBinding();if(!binding)return;
       for(const entry of entries(outcome)) {
         try{requireStorageDestination(entry.path,binding.directories,'inputs');}catch{continue;}
-        const ref='storage-'+randomUUID();
-        sources.set(ref,{binding:structuredClone(binding),...identity(entry)});
-        if(sources.size>10000)sources.delete(sources.keys().next().value);
+        // Pagination reobserves the same native row. A freshly minted token
+        // would itself change the snapshot revision and invalidate every page.
+        const key=JSON.stringify([binding,identity(entry)]),ref=index.get(key)??'storage-'+randomUUID();
+        if(!sources.has(ref)){sources.set(ref,{binding:structuredClone(binding),...identity(entry),key});index.set(key,ref);}
+        if(sources.size>10000){const oldest=sources.keys().next().value;index.delete(sources.get(oldest).key);sources.delete(oldest);}
         entry.server_source_ref=ref;
       }
     },

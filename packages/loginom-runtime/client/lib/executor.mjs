@@ -2432,7 +2432,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         auxiliary.set(id,{signature});storageNavigating=true;
         const deadline=now()+120000;let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
-        const read=async options=>{
+        const readPages=async options=>{
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
@@ -2443,6 +2443,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             output.ui.elements.push(...next.output.ui.elements);cursor=next.output.page?.next_cursor;
           }
           return output;
+        };
+        const read=async options=>{
+          for(let attempt=0;attempt<3;attempt++){
+            try{return await readPages(options);}catch(error){
+              if(attempt===2||!String(error.message).startsWith('Workspace changed between observation pages;'))throw error;
+              guard();await new Promise(resolve=>setTimeout(resolve,100));
+            }
+          }
         };
         const roots=()=>read({scope:'roots'});
         const one=entries=>{if(entries.length!==1)throw Error('Server storage control is missing or ambiguous');return entries[0];};
