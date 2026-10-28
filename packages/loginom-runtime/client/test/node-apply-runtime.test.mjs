@@ -824,3 +824,19 @@ for(const fault of [null,'cleanup','foreign','execution','inbound','transport','
   assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.verification==='native_full_bound_refused'));
  }
 });
+
+test('terminal readback refusal releases the runtime gate and remains stable through inspect and replay',async()=>{
+ const f=fixture(),r=request();
+ f.handler.configurationReadback=()=>{throw Error('Sorting readback: derived source coverage');};
+ f.runtime.startNodeApply(r);
+ const job=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assert.equal(job.state,'settled');assert.equal(job.outcome.status,'FAILED');
+ assert.equal(job.outcome.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+ const calls=[...f.calls],inspected=await f.runtime.inspect({operationId:r.operation_id});
+ assert.deepEqual(inspected.output.outcome,job.outcome);assert.equal(inspected.output.state,'resolved');assert.deepEqual(f.calls,calls);
+ assertJob(job);
+ const again=await f.runtime.runNodeApply(r);assert.deepEqual(again,job.outcome);assert.deepEqual(f.calls,calls);
+ assert.ok(f.events.some(e=>e.phase==='node_checkpoint'&&e.result.status==='FAILED'));
+});

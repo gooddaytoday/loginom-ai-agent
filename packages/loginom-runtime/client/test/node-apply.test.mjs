@@ -171,8 +171,9 @@ test('configuration projection uses accepted receipts once and survives replay',
 });
 test('failed configuration projection cannot create a successful checkpoint',async()=>{
  const f=fixture();f.handlers.get('imports.text').configurationReadback=()=>{throw Error('Incomplete observed settings')};
- const result=await f.run();assert.equal(result.status,'AMBIGUOUS');
- assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
+ const result=await f.run();assert.equal(result.status,'FAILED');
+ assert.equal(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 test('unsupported parameters reject before journal or graph',async()=>{
  const f=fixture(),p=request();p.parameters.unsupported=true;await assert.rejects(f.run(p),/unsupported/);assert.equal(f.calls.length,0);assert.equal(f.records.length,0);
@@ -733,4 +734,32 @@ for(const mode of ['done','close'])test('actual generic JS lifecycle '+mode+' om
  assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});assert.equal(result.output.status,'not_refreshed');
  assert.deepEqual(result.output.ports,[]);
  assert.ok(result.phases.every(p=>!['materialization_start','materialization_execute','output_mapping','execute','read'].includes(p.phase)));
+});
+
+for(const finish of ['done','execute'])test('final configuration readback failure checkpoints verified effects without stranding the operation: '+finish,async()=>{
+ const f=fixture(),p=request();p.finish=finish;if(finish==='done')p.read.ports=[];
+ let reads=0;
+ f.handlers.get('imports.text').configurationReadback=()=>{reads++;throw Error('Sorting readback: derived source coverage');};
+ const result=await f.run(p);
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ assert.equal(result.error.message,'Sorting readback: derived source coverage');
+ assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.deepEqual(result.configuration,{status:'applied'});
+ assert.equal(result.execution.status,finish==='execute'?'completed':'not_requested');
+ assert.equal(result.output.status,finish==='execute'?'complete':'not_refreshed');
+ assert.equal(result.checkpoint_kind,'local_node_failed');
+ assert.equal(f.operation.nodeApply.pending,null);assert.deepEqual(f.operation.nodeApply.result,result);
+ assert.equal(f.records.at(-1).phase,'node_checkpoint');assert.deepEqual(f.records.at(-1).result,result);
+ assert.ok(result.phases.every(p=>p.status==='verified'));
+ assert.match(result.next_step.instruction,/Do not resume/);
+ const calls=[...f.calls];assert.deepEqual(await f.run(p),result);assert.deepEqual(f.calls,calls);assert.equal(reads,1);
+});
+test('failed final readback cannot certify settlement without an exact durable checkpoint ACK',async()=>{
+ for(const corrupt of [false,true]){
+  const f=fixture({failJournal:corrupt?undefined:'node_checkpoint'});
+  f.handlers.get('imports.text').configurationReadback=()=>{throw Error('readback rejected');};
+  const result=await f.run(request(),corrupt?{record:async e=>e.phase==='node_checkpoint'?{...e,result:{...e.result,status:'SUCCEEDED'}}:e}:{});
+  assert.equal(result.status,'AMBIGUOUS');assert.match(result.error.message,/disk unavailable|acknowledgement differs/);
+  assert.equal(f.operation.nodeApply.result,undefined);
+ }
 });

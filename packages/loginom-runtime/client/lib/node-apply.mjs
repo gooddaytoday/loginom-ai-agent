@@ -469,10 +469,22 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'use a NEW dock_node_apply operation_id on this SAME existing node with target.label set to the requested caption, '
           +'parameters:{settings:{}}, inputs:[], mappings:[], finish:"execute" and read.ports:[0]. This preserves the saved import configuration without uploading again. '
           +'Otherwise report this actual caption.']:[],
-      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',
-        ...(!readingOnly&&request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
-          node:state.node,phases:state.phases,operation_id:operation.id})}:{})},
+      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
+      try{
+        result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
+      }catch(error){
+        // Projection uses only accepted receipts. Its failure cannot make the
+        // completed UI phases uncertain or strand a quiet node without a phase.
+        result.status='FAILED';result.checkpoint_kind='local_node_failed';result.pending_phase=null;
+        result.error={code:'NODE_CONFIGURATION_READBACK_FAILED',message:String(error.message).slice(0,1000)};
+        result.next_step={tool:'dock_action_run',original_operation_id:operation.id,
+          instruction:'All node phases and cleanup are verified, but the final configuration readback failed. The execution and output receipts are retained. '
+            +'Do not resume this operation, repeat Execute, or recreate the node. Saving or another action is allowed; '
+            +'use package.save_checkpoint with a NEW operation_id and the task package path to save the current scenario, and report the readback failure.'};
+      }
+    }
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
