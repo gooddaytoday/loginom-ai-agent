@@ -260,12 +260,16 @@ def records(path):
         except ValueError: continue
 
 
-def ports(value):
+def ports(value, receipt=None):
     if isinstance(value, dict):
-        if 'port' in value and 'schema' in value and 'sample' in value: yield value
-        for item in value.values(): yield from ports(item)
+        # inspect may wrap an action and its read receipt. Keep each port with
+        # the receipt that owns output.ports, never the outer inspect cleanup.
+        if isinstance(value.get('output'), dict) and 'ports' in value['output']:
+            receipt = value
+        if 'port' in value and 'schema' in value and 'sample' in value: yield receipt or {}, value
+        for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
-        for item in value: yield from ports(item)
+        for item in value: yield from ports(item, receipt)
 
 
 def port_path(reply, port):
@@ -294,7 +298,7 @@ def port_path(reply, port):
 
 
 def port_failure(replies, journal):
-    delivered = [(n, o, p) for n, o in replies for p in ports(o)]
+    delivered = [(n, owner, p) for n, o in replies for owner, p in ports(o)]
     invalid = [n for n, o, p in delivered if port_path(o, p) is None]
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
 
@@ -536,7 +540,7 @@ class Runner:
             if isinstance(reply, dict): replies.append((n, reply))
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
-        paths = {port_path(o, p) for _, o in replies for p in ports(o)} - {None}
+        paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         invalid = port_failure(replies, folder / 'model.stdout')
         if invalid:
@@ -562,7 +566,7 @@ class Runner:
             delimiter = check_csv(actual, expected['outputs'][index], header,
                                   column_order='any' if isinstance(case, Path) else None)
         self.current['csv'] = 'PASS'
-        return session, expected, delimiter
+        return session, expected, actual, delimiter
 
     def run(self):
         try:
@@ -591,11 +595,11 @@ class Runner:
                         r.update(csv='—', save='—', cleanup='—')
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
-                        session, expected, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
                     if self.options['cold']:
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', stage / 'actual.csv', '--csv-delimiter', delimiter, '--csv-header', 'labels' if case in ['q6', 'p24'] else 'names'], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', 'labels' if case in ['q6', 'p24'] else 'names'], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

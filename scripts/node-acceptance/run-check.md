@@ -47,13 +47,21 @@ r3/r4 attach only their new holdout.csv/replace.csv. CSV checks consume every ex
 order; their tasks leave CSV order free, so only those base exports map columns
 by their unique names. Final continuation CSVs retain their fixture's ordering
 rules. Names, widths, counts and every value remain checked.
-Stock cold receives `--csv` and never reapplies node settings.
+Stock cold receives `--csv` with the last checked download of the final stage
+and that file's delimiter, and never reapplies node settings. A single export
+is `actual.csv`; multiple exports are `actual-1.csv`, `actual-2.csv`, etc.
+Every export still passes the main CSV oracle. Cold independently reads all
+outputs in `expected.json`; the CSV supplies only export column order, not
+cell values. Using the last download also matches the existing `export_input`
+contract, whose `export_destination` is the last requested export.
 Save, main close/logout and runtime-close ACK must all be confirmed.
 The table reports `port-read` and the observed path (`port`, `native`, or both).
 Every delivered port must satisfy its path:
 
-- `port`: `freshness_basis=completed_execution_port_source` and top-level
-  `cleanup_complete=true` (#440).
+- `port`: `freshness_basis=completed_execution_port_source` and
+  `cleanup_complete=true` on the receipt owning `output.ports` (#440), including
+  receipts nested inside an `operation.inspect` response. Wrapper or sibling
+  cleanup cannot replace that receipt's cleanup.
 - `native`: the public verified binding matches the node, port and completed
   execution; `fresh=true`, `cell_precision.cells=exact_native`, complete
   `exact_table` and `read_coverage`; `cleanup_complete=true` and

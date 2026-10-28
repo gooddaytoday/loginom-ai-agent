@@ -300,6 +300,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
+      const regressionRefusal=request.target.type==='datamining.lin_regression'&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification==='linregression_apply_preserved'
+        &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
+        &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
+        &&replacementClosed.node_context?.verified===true
+        &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
       const replacementRefusal=name==='configure'&&request.target.type==='transform.replace_columns'
         &&refusal?.verification==='replacement_effective_preflight_completed'
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
@@ -307,7 +313,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
-          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal)
+          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal||regressionRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
       ){
@@ -399,7 +405,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
+      if(request.target.type==='datamining.lin_regression'&&request.mode==='apply')requireValue(value.mode==='close'
+        &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
+        'Applying a saved regression must discard the inspected draft without committing or training');
+      else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
         &&value.settings_applied===true&&value.execution_started===null&&value.execution_id==null
         &&value.explicit_execute_requested===false&&value.wizard_commit_verified===true
         &&value.graph_owner_verified===true&&value.source_readback_verified===true&&value.owned_done_settled===true,

@@ -9,6 +9,20 @@ const fixture=()=>{
   runtime[name]=(...args)=>{calls.push({name,args});return {operation_id:'op',state:'running'};};
  return {runtime,calls};
 };
+
+test('public apply mode reaches only the existing LinRegression handler',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'datamining.lin_regression',ref:{document_id:'doc',workflow_id:'wf',node_id:'regression'}},inputs:[],mode:'apply',
+  parameters:{input_fields:['X'],target_field:'Y'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'},parameters:{expressions:[]}}),/Unsupported node configuration mode/);
+});
 test('lifecycle dispatch retains ID, local cancellation and independent server stop',async()=>{
  const {runtime,calls}=fixture(),signal=new AbortController().signal;
  for(const name of ['status','wait','cancel','stop'])await dispatchNodeApi(runtime,'dock_node_'+name,{operation_id:'op'},{signal});
