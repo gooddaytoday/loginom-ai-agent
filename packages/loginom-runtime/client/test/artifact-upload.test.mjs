@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {Page,runtime} from './support/executor-fixture.mjs';
 import {verifyTextImportSource,verifyFullImportCount} from '../lib/text-import-node.mjs';
 import {makeArtifactUploadCode} from '../lib/executor.mjs';
+import {mkdtemp,open,readFile,rm,symlink,unlink,utimes,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createArtifactStore} from '../lib/artifacts.mjs';
+import {inspectReferenceFile} from '../lib/file-reference.mjs';
 
 function fixture(name='data.csv') {
   const page=new Page(),baseSnapshot=page.uiSnapshot.bind(page),baseLocator=page.locator.bind(page);
@@ -15,7 +20,7 @@ function fixture(name='data.csv') {
   const element={isConnected:true,tagName:'INPUT',type:'file',files:[]};
   const input={count:async()=>page.inputCount,isEnabled:async()=>true,elementHandle:async()=>input,
     evaluate:async(fn,arg)=>fn(element,arg),dispose:async()=>{},
-    setInputFiles:async(path,options)=>{assert.equal(path,'/private/staged/'+name);timeouts.push(options.timeout);submitted++;
+    setInputFiles:async(path,options)=>{assert.equal(path,page.uploadPath??'/private/staged/'+name);timeouts.push(options.timeout);submitted++;
       await page.afterUpload?.();if(page.failSubmission)throw new Error('private error');}};
   page.locator=selector=>selector.includes('FileStorageForm;tbrActions')
     ? {count:async()=>1,isVisible:async()=>!page.blocked,isEnabled:async()=>true,locator:()=>input} : baseLocator(selector);
@@ -357,3 +362,46 @@ for(const reused of [false,true])test('large runtime completion retains trusted 
   assert.ok(events.some(e=>e.phase==='large_upload_completed'));assert.ok(events.some(e=>e.phase==='large_upload_reused'));
  }
 });
+
+for(const when of ['before','during','after'])for(const change of ['size','mtime','inode','symlink']) {
+ test(`original ${change} change ${when} upload refuses ready and removes only its destination`,async()=>{
+  const root=await mkdtemp(join(tmpdir(),'original-upload-'));
+  try {
+   const source=join(root,'data.csv'),file=await open(source,'w');await file.truncate(16*1024*1024+1);await file.close();
+   const snapshot={...await inspectReferenceFile(source),sha256:null};
+   const store=await createArtifactStore({directory:join(root,'artifacts')});
+   const artifact=await store.admitReference({grant:'e'.repeat(64),chat:'chat',userMessage:'original',generation:1,name:'data.csv',snapshot},{directory:'/test',overwrite:'reject'});
+   const f=fixture();Object.assign(f.artifact,artifact);f.page.uploadPath=source;f.native();
+   const mutate=async()=>{
+    if(change==='size')await writeFile(source,'changed size');
+    if(change==='mtime')await utimes(source,new Date(),new Date(snapshot.mtime+1000));
+    if(change==='inode'){await unlink(source);await writeFile(source,'replacement');}
+    if(change==='symlink'){await unlink(source);await writeFile(join(root,'other.csv'),'foreign');await symlink(join(root,'other.csv'),source);}
+   };
+   if(when==='before')await mutate();if(when==='during')f.page.afterUpload=mutate;
+   const events=[],modes=[];let destination=false;
+   const rt=runtime(f.page,{artifactStore:store,getStorageBinding:()=>({document_id:'prep',loginom_account:'operator'}),
+    onRecord:async event=>{events.push(event);return event;},execute:async code=>{
+     if(!code.includes('largeUploadNative')){const result=await f.page.execute(code);if(code.includes('browserArtifactUpload'))destination=true;return result;}
+     const mode=code.match(/"mode":"([^"]+)/)[1];modes.push(mode);
+     let output={};
+     if(mode==='bind')output={reused:false};
+     if(mode==='poll'||mode==='cancel')output={quiet:true,bytes:artifact.bytes};
+     if(mode==='verify'){if(when==='after')await mutate();output={bytes:artifact.bytes,row:{Size:artifact.bytes}};}
+     if(mode==='cleanup')output=destination?{clean:false,gesture:{kind:'select'}}:{clean:true};
+     if(mode==='confirm_delete')destination=false;
+     return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',phase:mode,operation_id:'original-upload',output};
+    }});
+   const options={artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,observationId:(await rt.observe()).output.observation_id,
+    operationId:'original-upload',signal:new AbortController().signal,deadline:f.page.clock+60000};
+   await assert.rejects(()=>rt.uploadLargeArtifact(options),/LOGINOM_FILE_CHANGED/);
+   assert.equal(await rt.cancelLargeArtifact({operationId:'original-upload',deadline:f.page.clock+30000}),true);
+   assert.equal(destination,false);
+   assert.equal(f.counts().submitted,when==='before'?0:1);
+   assert.ok(!events.some(e=>e.phase==='large_upload_completed'));
+   if(when!=='before')assert.ok(modes.includes('confirm_delete'));
+   if(change==='symlink')assert.equal(await readFile(join(root,'other.csv'),'utf8'),'foreign');
+   await store.releaseUploads();
+  } finally {await rm(root,{recursive:true,force:true});}
+ });
+}

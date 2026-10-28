@@ -61,7 +61,8 @@ for (const size of [16 * 1024 * 1024, 16 * 1024 * 1024 + 1])
       const owner = { chat: ctx.sessionID, userMessage: "msg_original", generation: 1, run: "run" }
       const ipc: unknown[] = []
       const host = {
-        reserveReference: (userMessage: string, name: string) => references.reserve({ ...owner, userMessage }, name),
+        reserveReference: (userMessage: string, name: string, snapshot: Parameters<typeof references.reserve>[2]) =>
+          references.reserve({ ...owner, userMessage }, name, snapshot),
         discardReference: (grant: string) => references.discard(owner, grant),
         admitReference: async (reference: Parameters<typeof references.commit>[1]) => {
           ipc.push(reference)
@@ -89,7 +90,7 @@ for (const size of [16 * 1024 * 1024, 16 * 1024 * 1024 + 1])
   )
 
 it.instance(
-  "private reference admission authorizes before reserving, stages over the byte limit and sends only a descriptor",
+  "private reference admission authorizes before reserving, references the original over the byte limit and sends only a descriptor",
   () =>
     Effect.gen(function* () {
       const instance = yield* TestInstance
@@ -110,7 +111,8 @@ it.instance(
         source,
         ctx,
         {
-          reserveReference: (userMessage, name) => references.reserve({ ...owner, userMessage }, name),
+          reserveReference: (userMessage, name, snapshot) =>
+            references.reserve({ ...owner, userMessage }, name, snapshot),
           discardReference: (grant) => references.discard(owner, grant),
           admitReference: (reference) => {
             captured.push(JSON.parse(JSON.stringify(reference)))
@@ -122,6 +124,7 @@ it.instance(
         owner.userMessage,
       )
       expect(result.artifact).toMatchObject({ bytes: 16 * 1024 * 1024 + 1 })
+      expect(captured[0]).toMatchObject({ snapshot: { canonical_path: source, sha256: null } })
       expect(JSON.stringify(captured)).not.toMatch(/"(?:data|base64|buffer)":/)
       yield* Effect.promise(() => references.close())
     }),

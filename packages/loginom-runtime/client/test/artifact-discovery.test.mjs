@@ -400,9 +400,10 @@ test('native large upload observes safe progress and exact FileStore size withou
  f.row.Size--;assert.equal((await call('verify')).waiting,true);f.row.Size++;f.row.Type=1;assert.equal((await call('verify')).waiting,true);
 });
 
-for(const fault of ['receipt','digest','account','origin','time','type','directory'])test('native reuse requires trusted receipt and matching native metadata: '+fault,async()=>{
+for(const fault of ['receipt','digest','no_digest','account','origin','time','type','directory'])test('native reuse requires trusted receipt and matching native metadata: '+fault,async()=>{
  const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');const f=largeNativeFixture();f.publish();
  const receipt={row:{...f.row},sha256:f.task.artifact.sha256,account:'operator',origin:'https://test',directory:'/user'};
+ if(fault==='no_digest'){f.task.artifact.sha256=null;receipt.sha256=null;}
  if(fault==='digest')receipt.sha256='b'.repeat(64);if(fault==='account')receipt.account='other';if(fault==='origin')receipt.origin='https://other';
  if(fault==='time')f.row.Time='other';if(fault==='type')f.row.Type=1;if(fault==='directory')receipt.directory='/other';
  await assert.rejects(()=>largeUploadNative(f.page,{...f.task,mode:'bind',receipt:fault==='receipt'?undefined:receipt}),/UPLOAD_PATH_CONFLICT/);

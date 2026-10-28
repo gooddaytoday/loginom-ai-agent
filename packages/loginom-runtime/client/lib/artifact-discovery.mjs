@@ -417,7 +417,7 @@ export async function largeUploadNative(page, task) {
    const before=inventory(),existing=before.filter(matches);
    // Same size/name is never proof of local origin. The receipt comes only
    // from this runtime's acknowledged private completion journal.
-   const reused=existing.length===1&&exact(existing[0])&&t.receipt
+   const reused=existing.length===1&&exact(existing[0])&&typeof t.artifact.sha256==='string'&&t.receipt
      &&t.receipt.sha256===t.artifact.sha256&&t.receipt.account===t.binding.loginom_account&&t.receipt.origin===t.expected_origin
      &&t.receipt.directory===t.artifact.upload.directory&&JSON.stringify(t.receipt.row)===JSON.stringify(existing[0]);
    if(existing.length&&!reused)throw Error('UPLOAD_PATH_CONFLICT');
