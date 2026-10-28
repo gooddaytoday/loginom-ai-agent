@@ -66,3 +66,36 @@ test('duplicate deactivation breadcrumb requires native pending owner binding, n
   assert.equal(boundWizardDeactivationConfirmation(bad,binding),false,fault);
  }
 });
+
+for(const fault of [null,'unconfirmed','foreign','mask'])test('reopen after Import schema inspection restores the prepared selection: '+fault,async()=>{
+ const {state}=fixture(),node=state.prepared_node_context;
+ state.wizard_pending_owner={status:'unobserved'};
+ state.ui={dialogs:[],masks:[],elements:[
+  {ref:'body',tid:node.tid,graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:'point_observed'}},
+  {tid:node.tid+';Label;Label',label:'Import',graph_node:{part:'label'}}]};
+ const selected=structuredClone(state);
+ selected.ui.elements.push({ref:'settings',tid:node.tid+';Setting',allowed_actions:['begin_wizard'],
+  wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}});
+ const opened=structuredClone(selected);opened.prepared_node_context.surface='wizard';
+ opened.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},
+  path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'flow>Import>Settings',label:'Settings'}]}};
+ if(fault==='mask')state.ui.masks=[{kind:'busy'}];
+ const gestures=[];let current=state;
+ const channel={observe:async options=>{
+  assert.ok(options.ready(current),options.condition);return structuredClone(current);
+ },perform:async options=>{
+  const fresh=structuredClone(current);
+  if(fault==='foreign')fresh.prepared_node_context.node_id='foreign';
+  assert.ok(options.ready(fresh),options.condition);
+  const action=options.resolve(fresh);gestures.push(action);
+  if(fault==='unconfirmed')throw Error('unconfirmed selection');
+  current=action.verb==='click'?selected:opened;
+ }};
+ if(fault)await assert.rejects(openPreparedWizard(channel));
+ else {
+  assert.equal((await openPreparedWizard(channel)).verified,true);
+  assert.deepEqual(gestures,[{verb:'click',ref:'body'},{verb:'begin_wizard',ref:'settings'}]);
+ }
+ if(fault==='unconfirmed')assert.deepEqual(gestures,[{verb:'click',ref:'body'}]);
+ if(['foreign','mask'].includes(fault))assert.deepEqual(gestures,[]);
+});
