@@ -17,9 +17,14 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard'});
   const mapping=state.node_mapping,expected=linRegressionOutputColumns(configuration,1),active=mapping.target_fields.filter(f=>!f.excluded);
   const closed=await closePreparedWizard(channel);
-  if(!(mapping.source_fields.length>0&&active.length===expected.length&&active.every((f,i)=>
-   ['name','label','type'].every(k=>f[k]===expected[i][k])&&f.source&&mapping.source_fields.some(s=>same(s,f.source)))))
-   throw linRegressionApplyRefusal('apply requires an already trained model with saved coefficients; train with enter first',closed,'output_mapping');
+  // Coefficients are intrinsic fields: a trained node can have no mapping
+  // sources at all. Schema materialization is not evidence of model training;
+  // native Execute reports an untrained model without sending Teach.
+  if(!(active.length===expected.length&&active.every((f,i)=>
+   ['name','label','type'].every(k=>f[k]===expected[i][k])
+    &&(mapping.source_fields.length===0?f.required===false&&f.inherited===false
+     :f.source&&mapping.source_fields.some(s=>same(s,f.source))))))
+   throw linRegressionApplyRefusal('saved coefficient selection differs from the supported output; apply cannot change it',closed,'output_mapping');
   return {verified:true,cleanup_complete:true,effect_possible:true,deferred_schema:true,coefficient_mapping:mapping,
    ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  }

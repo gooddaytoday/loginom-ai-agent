@@ -90,6 +90,21 @@ for(const phase of ['configure','output_mapping'])test('known LinRegression appl
  const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(f.operation.nodeApply.pending,null);
  assert.ok(!f.calls.includes('execute'));
 });
+
+test('native missing-model failure ends apply without reading output or requesting training',async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',
+  configure:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',settings_applied:false,execution_id:'doc:root:group'});
+ f.drivers.waitExecution=async()=>({verified:true,cleanup_complete:true,status:'failed',failure_verified:true,output_refreshed:false,
+  execution_id:'doc:root:group',node,root_id:'root',group_id:'group',group_record_id:'record',
+  error:{code:'NODE_EXECUTION_FAILED',message:'Модель не построена. Необходимо обучить узел перед применением'}});
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);
+ assert.equal(result.execution.status,'failed');assert.match(result.error.message,/Модель не построена/);
+ assert.ok(!f.calls.includes('read'));assert.equal(f.operation.nodeApply.pending,null);
+});
 for(const expired of [false,true])test('host configuration beyond five minutes retains the original shared total deadline '+expired,async()=>{
  const f=fixture(),bindings=createUserWorkflowBindings(),p=request();
  bindings.remember({document_id:p.document_id,workflow_ref:p.workflow_ref});delete p.budgets;

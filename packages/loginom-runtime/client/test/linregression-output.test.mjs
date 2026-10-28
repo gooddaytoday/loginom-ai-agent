@@ -21,15 +21,28 @@ test('repeated saved-model application only inspects and closes the coefficient 
  assert.equal(actions.length,2);
 });
 
-test('apply refuses an unmaterialized coefficient output after closing its untouched draft',async()=>{
- const mapping=configuredCoefficients();mapping.source_fields=[];let closed=false;
+test('apply refuses a different coefficient selection after closing its untouched draft',async()=>{
+ const mapping=configuredCoefficients();mapping.target_fields[1].name='Different';let closed=false;
  const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
   wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
   ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
  const channel={async openOutputPort(){},async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
   async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
- await assert.rejects(configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit')),/already trained model/);
+ await assert.rejects(configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit')),/saved coefficient selection differs/);
  assert.equal(closed,true);
+});
+
+test('apply accepts trained intrinsic coefficients with no source_fields, as observed in Loginom',async()=>{
+ const mapping=configuredCoefficients();mapping.source_fields=[];
+ mapping.target_fields.forEach(f=>{f.source=null;f.exclusion_source=null;});let closed=false;
+ const state=()=>({node_mapping:mapping,prepared_node_context:{verified:true,surface:closed?'graph':'wizard',locked:false,document_id:'doc',workflow_id:'flow',node_id:'regression'},
+  wizard:closed?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}},
+  ui:{dialogs:[],masks:[],elements:[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]}});
+ const channel={async openOutputPort(){},async observe(options){const s=state();assert.equal(options.ready(s),true);return s;},
+  async perform(options){assert.deepEqual(options.resolve(state()),{verb:'click',ref:'close'});closed=true;}};
+ const before=structuredClone(mapping);
+ const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit'));
+ assert.equal(result.verified,true);assert.equal(closed,true);assert.deepEqual(mapping,before);
 });
 
 function configuredCoefficients(){
