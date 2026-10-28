@@ -114,7 +114,7 @@ Standalone CLI (`packages/agent/src/standalone.ts`, дизайн `2026-09-17-log
 
 Dock (OpenViking):
 
-- `Product.knowledgeEndpoint = https://loginom.duckdns.org/mcp`; `GET https://loginom.duckdns.org/health` отвечает 200 без ключа; `GET /api/v1/skills/loginom-automation` требует Bearer API-ключ и возвращает манифест skill с полем `revision` — по нему runtime закрепляет skill (`packages/loginom-runtime/client/lib/skill.mjs`). Skill и знания живут вне репозитория и меняются независимо от кода агента.
+- `Product.knowledgeEndpoint = PRIVATE_ENDPOINT/mcp`; `GET PRIVATE_ENDPOINT/health` отвечает 200 без ключа; `GET /api/v1/skills/loginom-automation` требует Bearer API-ключ и возвращает манифест skill с полем `revision` — по нему runtime закрепляет skill (`packages/loginom-runtime/client/lib/skill.mjs`). Skill и знания живут вне репозитория и меняются независимо от кода агента.
 - `remember` сохраняет глобальную User memory OpenViking (`services/loginom-ai/docs/loginom-dock/shared-project-memory.md`), scope — учётная запись/ключ Dock.
 
 Стенд и артефакт:
@@ -435,7 +435,7 @@ Runtime-зависимостей нет: Bun built-ins и внешние ком�
 Переменные `.env` (в `.env.example` — выбранные значения):
 
 - Loginom: `LOGINOM_URL` (`http://localhost/app/`), `LOGINOM_USERNAME` (`user`), `LOGINOM_PASSWORD` (пусто), `LOGINOM_CONTAINER` (`loginom-server-master`), `LOGINOM_STORAGE_DIR` (`/workdir/UserStorage/user`).
-- Dock: `LOGINOM_DOCK_API_KEY` (обязателен; **отдельный ключ для eval**, не ключ Desktop), `LOGINOM_DOCK_BASE_URL` (`https://loginom.duckdns.org`).
+- Dock: `LOGINOM_DOCK_API_KEY` (обязателен; **отдельный ключ для eval**, не ключ Desktop), `LOGINOM_DOCK_BASE_URL` (`PRIVATE_ENDPOINT`).
 - Агент: `EVAL_AGENT_MODEL` (`openai/gpt-5.6-sol`, обязателен), `EVAL_CLI_MODE` (`source` | `binary` | `fake`, по умолчанию `source`), `EVAL_CLI_BIN` (для `binary`), `EVAL_CLI_BUNDLE` (по умолчанию `evals/.bundle`), `EVAL_WORKSPACE_ROOT` (`/tmp/loginom-evals`), необязательный OpenAI-compatible провайдер для запасного пути: `EVAL_AGENT_PROVIDER_ID`, `EVAL_AGENT_PROVIDER_BASE_URL`, `EVAL_AGENT_PROVIDER_API_KEY`, `EVAL_AGENT_PROVIDER_MODEL_ID`.
 - Артефакт: `EVAL_ARTIFACT_SOURCE` (`docker` | `dir:<path>`, по умолчанию `docker`).
 - Судья: `JUDGE_MODEL` (`gpt-6-astra`, обязателен, без дефолта в коде), `JUDGE_REASONING` (`high`), `EVAL_JUDGE_COMMAND` (`codex`; в тестах — `bun fixtures/fake-codex.ts`; строка разбивается по пробелам, дальше добавляются аргументы `exec …`).
