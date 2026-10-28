@@ -47,7 +47,11 @@ if (
 )
   throw new Error("A complete passing Linux matrix is required")
 const matrixStatus = `Docker matrix PASS (${matrix.reports.map((entry: { name: string }) => entry.name).join(", ")})`
-for (const name of ["release-manifest.json", "windows-release-manifest.json", "macos-release-manifest.json"]) {
+// Set by release.yml from the LOGINOM_RELEASE_SKIP_MACOS repository variable when no macOS runner is available.
+const withoutMacos = process.env.LOGINOM_RELEASE_SKIP_MACOS === "true"
+const manifests = ["release-manifest.json", "windows-release-manifest.json"]
+if (!withoutMacos) manifests.push("macos-release-manifest.json")
+for (const name of manifests) {
   const manifest = await report(name)
   if (manifest?.source?.commit !== commit || manifest?.source?.dirty !== false || manifest?.version !== version)
     throw new Error(`Release provenance mismatch: ${name}`)
@@ -55,8 +59,19 @@ for (const name of ["release-manifest.json", "windows-release-manifest.json", "m
     if (hashes.get(artifact.file) !== artifact.sha256) throw new Error(`Release artifact mismatch: ${artifact.file}`)
   }
 }
-for (const name of ["macos-build-report.json", "macos-source-checks.json", "macos-offline-smoke.json"])
-  if ((await report(name))?.status !== "PASS") throw new Error(`Passing report required: ${name}`)
+if (!withoutMacos)
+  for (const name of ["macos-build-report.json", "macos-source-checks.json", "macos-offline-smoke.json"])
+    if ((await report(name))?.status !== "PASS") throw new Error(`Passing report required: ${name}`)
+// macOS rows are only built, and their reports only read, when this release builds macOS.
+const macos: [file: string, status: string][] = withoutMacos
+  ? []
+  : [
+      ["loginom-ai-agent-mac-arm64.dmg", `${await staticStatus("static-dmg.json")}; offline smoke PASS; ad-hoc signed`],
+      ["loginom-ai-agent-mac-arm64.zip", `${await staticStatus("static-zip.json")}; offline smoke PASS; ad-hoc signed`],
+      [`loginom-ai-agent-cli-${version}-darwin-arm64.tar.gz`, "archive verification and offline smoke PASS; ad-hoc signed"],
+      [`loginom-ai-agent-${version}-macos-source.tar.gz`, "macOS corresponding source"],
+      ["macos-release-manifest.json", "macOS release manifest (ad-hoc signed app; not notarized)"],
+    ]
 const expected: [file: string, status: string][] = [
   ["loginom-ai-agent-linux-amd64.deb", `${await staticStatus("static-deb.json")} + ${matrixStatus}`],
   ["loginom-ai-agent-linux-x86_64.AppImage", `${await staticStatus("static-appimage.json")}; Docker matrix covers the DEB only`],
@@ -66,15 +81,11 @@ const expected: [file: string, status: string][] = [
   ],
   ["loginom-ai-agent-win-x64.exe", `${await staticStatus("static-nsis.json")}; unsigned`],
   [`loginom-ai-agent-cli-${version}-win32-x64.zip`, "archive manifest verification PASS; unsigned"],
-  ["loginom-ai-agent-mac-arm64.dmg", `${await staticStatus("static-dmg.json")}; offline smoke PASS; ad-hoc signed`],
-  ["loginom-ai-agent-mac-arm64.zip", `${await staticStatus("static-zip.json")}; offline smoke PASS; ad-hoc signed`],
-  [`loginom-ai-agent-cli-${version}-darwin-arm64.tar.gz`, "archive verification and offline smoke PASS; ad-hoc signed"],
   [`loginom-ai-agent-${version}-source.tar.gz`, "source archive (git archive HEAD)"],
   [`loginom-ai-agent-${version}-windows-source.tar.gz`, "Windows corresponding source"],
-  [`loginom-ai-agent-${version}-macos-source.tar.gz`, "macOS corresponding source"],
   ["release-manifest.json", "Linux release manifest (unsigned)"],
   ["windows-release-manifest.json", "Windows release manifest (unsigned)"],
-  ["macos-release-manifest.json", "macOS release manifest (ad-hoc signed app; not notarized)"],
+  ...macos,
   ["static-deb.json", "static verification report"],
   ["static-appimage.json", "static verification report"],
   ["linux-matrix.json", "Docker matrix report"],
@@ -95,7 +106,9 @@ const notes = [
   `- Commit: ${commit}`,
   "- Linux x64 DEB/AppImage/CLI: static verification; DEB offline Docker matrix from this run (reports attached)",
   "- Windows x64: native CI build, settings regression tests, installer/payload and CLI archive verification",
-  "- macOS 14+ Apple Silicon arm64: native CI build, source tests, DMG/ZIP verification and offline Desktop/CLI smoke",
+  withoutMacos
+    ? "- macOS: not built for this release (no macOS runner was available); macOS assets are not attached"
+    : "- macOS 14+ Apple Silicon arm64: native CI build, source tests, DMG/ZIP verification and offline Desktop/CLI smoke",
   "- Pre-release: Linux/Windows unsigned; macOS own code ad-hoc signed, without Developer ID or notarization. OS security warnings are expected.",
   "- CI is credential-free and does not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
