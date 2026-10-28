@@ -2,6 +2,7 @@
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
 
 process.umask(0o077);
 const [root, configPath, output] = process.argv.slice(2);
@@ -10,13 +11,16 @@ const {verifyResources} = await load('src/resources.mjs');
 const {loginBrowser} = await load('src/connection-check.mjs');
 const {makeWorkspaceUiCode} = await load('client/lib/workspace-ui.mjs');
 const {findNativeStorageRow} = await load('client/lib/text-export-output.mjs');
+const {makeWorkspacePrepareCode} = await load('client/lib/workspace.mjs');
+const {makePackageCleanupCode} = await load('client/lib/package-cleanup.mjs');
 const resources = await verifyResources(root);
 const {login, name} = JSON.parse(await readFile(configPath, 'utf8'));
 if (!/^d87-[A-Za-z0-9_-]+-E[123]\.csv$/.test(name) && !/^d87-[A-Za-z0-9_-]+-X1\.xlsx$/.test(name)) throw Error('D87_NAME_INVALID');
 const directory = login.package_directory.replace(/\/$/, '');
 if (!directory.startsWith('/') || directory.split('/').slice(1).some(p => !p || p === '.' || p === '..')) throw Error('D87_DIRECTORY_INVALID');
 await mkdir(output, {recursive: true, mode: 0o700});
-let context, page;
+let context, page, prepared;
+const session = randomUUID();
 const report = {name, directory, removed: false, absent: false, logged_out: false};
 try {
   const authenticated = await loginBrowser({browserPath: resources.browserPath, profile: join(output, 'browser'),
@@ -26,6 +30,12 @@ try {
   page.setDefaultTimeout(15000);
   const at = tid => page.locator('[data-tid=' + JSON.stringify(tid) + ']');
   const execute = code => new Function('page', `return (${code})(page)`)(page);
+  // Loginom's Files toolbar needs a prepared package context (Home has no
+  // selected native NodeIndex). Own a pristine draft, then use stock teardown.
+  prepared = await execute(makeWorkspacePrepareCode({loginomUrl: login.url, sessionId: session,
+    operationId: 'd87-cleanup', intent: 'new_draft',
+    compatibility: {loginom_build: '7.4.2', platform: 'linux', browser: 'chromium'}}));
+  if (prepared.status !== 'READY') throw Error('D87_DRAFT_PREPARATION_FAILED');
   const base = {expected_origin: new URL(login.url).origin, expected_build: '7.4.2'};
   const read = async options => {
     const result = await execute(makeWorkspaceUiCode({mode: 'observe', ...base, ...options}));
@@ -80,7 +90,7 @@ try {
     }, {prefix, directory, username: login.username});
   };
   await page.waitForFunction(() => ![...document.querySelectorAll('.x-mask')].some(e => e.getBoundingClientRect().width > 0));
-  const before = await inventory();
+  const before = await ready(inventory, value => Array.isArray(value));
   if (!before) throw Error('D87_STORAGE_UNCONFIRMED');
   const own = before.filter(r => r.name === name || r.path === directory + '/' + name);
   if (own.length > 1 || own.some(r => r.path !== directory + '/' + name || r.type !== 0)) throw Error('D87_SOURCE_AMBIGUOUS');
@@ -98,15 +108,10 @@ try {
   }
   await at(prefix + ';FileStorageForm;btnRefresh').click();
   await page.waitForFunction(() => ![...document.querySelectorAll('.x-mask')].some(e => e.getBoundingClientRect().width > 0));
-  const after = await inventory();
+  const after = await ready(inventory, value => Array.isArray(value));
   const others = rows => rows.filter(r => r.name !== name).map(r => JSON.stringify(r)).sort();
   if (!after || after.some(r => r.name === name) || JSON.stringify(others(before)) !== JSON.stringify(others(after))) throw Error('D87_DELETE_UNCONFIRMED');
   report.absent = true;
-  await at('MF;cntMain;tlbMainToolbar;btnAvatar').click();
-  if ((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim() !== login.username) throw Error('D87_LOGOUT_IDENTITY_CHANGED');
-  await at('MF;AppMenuForm;btnLogOut').click();
-  await at('LoginForm;Login;edtUsername').waitFor({state: 'visible'});
-  report.logged_out = true;
 } catch (error) {
   if (page) {
     const dom = await page.evaluate(() => [...document.querySelectorAll('[data-tid]')]
@@ -116,6 +121,22 @@ try {
   }
   throw error;
 } finally {
-  await writeFile(join(output, 'result.json'), JSON.stringify(report, null, 2) + '\n');
-  await context?.close();
+  if (prepared?.status === 'READY') {
+    try {
+      await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')]
+        .some(e => e.getBoundingClientRect().width && e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden'));
+      const cleanup = await new Function('page', `return (${makePackageCleanupCode({sessionId: session,
+        documentId: prepared.document_id, account: login.username, packagePath: null,
+        loginomUrl: login.url, loginomBuild: '7.4.2', tabTid: prepared.workflow_ref.tab_tid,
+        unsavedDraft: true})})(page)`)(page);
+      report.draft_cleanup = cleanup;
+      report.logged_out = cleanup.logged_out === true;
+      if (!cleanup.package_closed || !cleanup.logged_out || cleanup.unsaved_changes_discarded) process.exitCode = 1;
+    } catch {
+      report.draft_cleanup = {status: 'FAILED', reason: 'D87_DRAFT_CLEANUP_FAILED'};
+      process.exitCode = 1;
+    }
+  }
+  try { await writeFile(join(output, 'result.json'), JSON.stringify(report, null, 2) + '\n'); }
+  finally { await context?.close(); }
 }

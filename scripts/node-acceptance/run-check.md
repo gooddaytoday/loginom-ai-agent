@@ -109,6 +109,10 @@ uniquely named source from the worker's authorized directory. The runner then
 deletes its local input and large copies under its own result directory;
 manifest, small exported CSV and diagnostic evidence remain. `dataset-cleanup`
 reports storage/disk separately; failed storage cleanup makes the run FAIL.
+Storage cleanup prepares its own empty draft before opening Files (the native
+Home toolbar lacks a NodeIndex), then closes that untouched draft and logs out
+with the existing stock cleanup primitive, without discard. Failure DOM stays
+private beside its cleanup result.
 The saved package remains for inspection; after source cleanup its original
 large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
