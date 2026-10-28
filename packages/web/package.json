@@ -1,5 +1,5 @@
 {
-  "name": "@loginom-ai-agent/web",
+  "name": "@opencode-ai/web",
   "type": "module",
   "license": "MIT",
   "version": "1.18.31",
@@ -36,7 +36,7 @@
     "vscode-languageserver-types": "3.17.5"
   },
   "devDependencies": {
-    "@loginom-ai-agent/agent": "workspace:*",
+    "opencode": "workspace:*",
     "@types/node": "catalog:",
     "@astrojs/check": "0.9.6",
     "typescript": "catalog:"

@@ -322,7 +322,7 @@ jobs:
           bun test test/windows-powershell.test.ts test/environment.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
           Pop-Location
-          Push-Location packages/agent
+          Push-Location packages/opencode
           bun typecheck
           if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
           Pop-Location
@@ -375,7 +375,7 @@ jobs:
       - name: Install locked macOS dependencies
         run: |
           test "$(uname -m)" = arm64
-          bun install --frozen-lockfile --filter loginom-ai-agent --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
+          bun install --frozen-lockfile --filter loginom-ai-agent --filter '@opencode-ai/desktop' --filter 'opencode' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
           node packages/desktop/node_modules/electron/install.js
       - name: Verify macOS source
         run: bun packages/desktop/scripts/check-macos.ts "$RUNNER_TEMP/macos-source-checks.json"

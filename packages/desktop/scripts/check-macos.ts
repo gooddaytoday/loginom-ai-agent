@@ -22,9 +22,9 @@ const checks = [
       "scripts/build-command.test.ts",
     ],
   },
-  { package: "agent", args: ["typecheck"] },
+  { package: "opencode", args: ["typecheck"] },
   {
-    package: "agent",
+    package: "opencode",
     args: [
       "test",
       "test/cli/standalone.test.ts",

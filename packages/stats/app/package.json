@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@loginom-ai-agent/stats-app",
+  "name": "@opencode-ai/stats-app",
   "version": "1.18.31",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
   "dependencies": {
     "@ibm/plex": "6.4.1",
     "@kobalte/core": "catalog:",
-    "@loginom-ai-agent/stats-core": "workspace:*",
-    "@loginom-ai-agent/ui": "workspace:*",
+    "@opencode-ai/stats-core": "workspace:*",
+    "@opencode-ai/ui": "workspace:*",
     "@solidjs/meta": "catalog:",
     "@solidjs/router": "catalog:",
     "@solidjs/start": "catalog:",

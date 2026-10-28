@@ -35,7 +35,7 @@ import type {
   TextPart,
   ReasoningPart,
   SessionStatus,
-} from "@loginom-ai-agent/sdk/v2"
+} from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"

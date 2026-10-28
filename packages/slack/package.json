@@ -1,5 +1,5 @@
 {
-  "name": "@loginom-ai-agent/slack",
+  "name": "@opencode-ai/slack",
   "version": "1.18.31",
   "type": "module",
   "license": "MIT",
@@ -8,7 +8,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@loginom-ai-agent/sdk": "workspace:*",
+    "@opencode-ai/sdk": "workspace:*",
     "@slack/bolt": "^3.17.1"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron"
 import type { ElectronAPI, WslServersEvent } from "./types"
-import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
-import type { UpdaterState } from "@loginom-ai-agent/app/updater"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
+import type { UpdaterState } from "@opencode-ai/app/updater"
 
 const updaterCallbacks = new Set<(state: UpdaterState) => void>()
 let updaterState: UpdaterState | undefined

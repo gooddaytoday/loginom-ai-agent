@@ -1,6 +1,6 @@
 import { onCleanup } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
+import type { Loginom } from "@opencode-ai/schema/loginom"
 import { Product } from "@loginom-ai-agent/product"
 
 export function loginomError(value: unknown) {

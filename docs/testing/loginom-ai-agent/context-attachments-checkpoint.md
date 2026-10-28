@@ -7,7 +7,7 @@
 - Обрезанный inline-текст доступен через Read/Grep; original data URL/filename сохранены.
 - Cache публикуется атомарно, обновляется под общим lock с cleanup и восстанавливается перед resume из original user file-parts, включая compacted history.
 - Recovery использует тот же WHATWG URL parser, что initial prompt; срок хранения остаётся семь дней.
-- Из `packages/agent`: семь затронутых suites — 230 pass, 2 existing skip, 0 fail; 737 assertions.
+- Из `packages/opencode`: семь затронутых suites — 230 pass, 2 existing skip, 0 fail; 737 assertions.
 - Финальная типобезопасная редакция concurrency regression отдельно — 1 pass, 0 fail.
 - `bun typecheck`, Prettier и `git diff --check`: PASS; independent review: No findings.
 - Ограничения: installed Desktop/Loginom и другие ОС не проверены; lock действует внутри процесса.

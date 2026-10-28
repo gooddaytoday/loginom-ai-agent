@@ -185,7 +185,7 @@ Harness сворачивает неуспешную проверку в одну
 
 ### Headless и CLI
 
-Evals запускают агента так: `evals/src/cli.ts`, аргументы `run --headless --format json …`. Сам CLI по умолчанию окно показывает. Флаг разбирается в `packages/agent/src/cli/standalone-run.ts`: `headless` истинен только если в команде есть `--headless`.
+Evals запускают агента так: `evals/src/cli.ts`, аргументы `run --headless --format json …`. Сам CLI по умолчанию окно показывает. Флаг разбирается в `packages/opencode/src/cli/standalone-run.ts`: `headless` истинен только если в команде есть `--headless`.
 
 Отдельный браузер проверки готовности всегда headless. Это `packages/loginom-host/src/host.ts`: `headless: validation || chat === "readiness" || options.headless === true`. К доставке файла в чате сценария он не относится. У него `--ozone-platform=headless`. У браузера сценария в headed-прогоне были `--start-maximized` и `--ozone-platform=x11`, флага `--headless` не было.
 

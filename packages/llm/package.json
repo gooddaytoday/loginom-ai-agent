@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.18.31",
-  "name": "@loginom-ai-agent/llm",
+  "name": "@opencode-ai/llm",
   "type": "module",
   "license": "MIT",
   "private": true,
@@ -37,7 +37,7 @@
   "devDependencies": {
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/platform-node": "catalog:",
-    "@loginom-ai-agent/http-recorder": "workspace:*",
+    "@opencode-ai/http-recorder": "workspace:*",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
@@ -45,7 +45,7 @@
   "dependencies": {
     "@smithy/eventstream-codec": "4.2.14",
     "@smithy/util-utf8": "4.2.2",
-    "@loginom-ai-agent/schema": "workspace:*",
+    "@opencode-ai/schema": "workspace:*",
     "aws4fetch": "1.0.20",
     "effect": "catalog:"
   }

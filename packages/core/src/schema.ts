@@ -7,7 +7,7 @@ import {
   PositiveInt,
   RelativePath,
   statics,
-} from "@loginom-ai-agent/schema/schema"
+} from "@opencode-ai/schema/schema"
 
 export { AbsolutePath, DateTimeUtcFromMillis, NonNegativeInt, optional, PositiveInt, RelativePath, statics }
 

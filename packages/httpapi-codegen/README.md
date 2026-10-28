@@ -1,4 +1,4 @@
-# @loginom-ai-agent/httpapi-codegen
+# @opencode-ai/httpapi-codegen
 
 Build-time source generation for domain-oriented Promise and Effect APIs derived directly from `HttpApi` and Effect Schema contracts.
 

@@ -179,7 +179,7 @@ mkdir -p evals/.profile/agent/data && jq '{"xiaomi-token-plan-sgp": .["xiaomi-to
 
 ```bash
 LOGINOM_AI_AGENT_CLI_PROFILE=$PWD/.profile/agent LOGINOM_AI_AGENT_CLI_BUNDLE=$PWD/.bundle \
-  bun run --cwd ../packages/agent dev:cli providers login
+  bun run --cwd ../packages/opencode dev:cli providers login
 ```
 
 Третий путь — `EVAL_AGENT_PROVIDER_*` для произвольного OpenAI-совместимого endpoint: раскомментировать **и** заполнить все четыре значения, затем задать `EVAL_AGENT_MODEL=<EVAL_AGENT_PROVIDER_ID>/<EVAL_AGENT_PROVIDER_MODEL_ID>`.
