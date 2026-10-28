@@ -17,7 +17,7 @@ test('admission snapshots approved bytes and revalidates the staged artifact bef
     await writeFile(input,'changed source');
     assert.deepEqual((await store.resolve(artifact.artifact_id)).buffer,payload);
     await writeFile(join(directory,'staged',artifact.artifact_id),'tampered');
-    await assert.rejects(()=>store.resolve(artifact.artifact_id),/changed|match/);
+    await assert.rejects(()=>store.resolve(artifact.artifact_id),/LOGINOM_FILE_CHANGED/);
     await assert.rejects(()=>store.resolve('../source.csv'),/not admitted/);
     const other=await createArtifactStore({directory:join(directory,'other')});
     await assert.rejects(()=>other.resolve(artifact.artifact_id),/not admitted/);
@@ -33,7 +33,7 @@ test('admission rejects symlinks, oversized files, wrong identity and path-like 
     for(const change of [{bytes:4},{sha256:'0'.repeat(64)},{name:'../file'},{name:'bad\nname'},{name:'data.csv:stream'},{name:'CON.csv'}])
       await assert.rejects(()=>store.admit({...approved,...change}));
     const link=join(directory,'link');await symlink(input,link);
-    await assert.rejects(()=>store.admit({...approved,sourcePath:link}),/regular file/);
+    await assert.rejects(()=>store.admit({...approved,sourcePath:link}),/LOGINOM_FILE_NOT_REGULAR/);
     assert.deepEqual(store.list(),[]);
     assert.equal((await readFile(input)).toString(),'abc');
   } finally {await rm(directory,{recursive:true,force:true});}
@@ -166,7 +166,7 @@ test('upload staging detects tampering and shutdown drains in-progress staging',
     const descriptor=await store.admit({sourcePath,name:'data.csv',bytes:3,sha256:createHash('sha256').update('abc').digest('hex')});
     const lease=await store.stageUpload(descriptor.artifact_id);
     await chmod(lease.path,0o600);await writeFile(lease.path,'bad');
-    await assert.rejects(()=>lease.verify(),/match/);await lease.release();
+    await assert.rejects(()=>lease.verify(),/LOGINOM_FILE_CHANGED/);await lease.release();
     const pending=Array.from({length:8},()=>store.stageUpload(descriptor.artifact_id));
     await assert.rejects(()=>store.stageUpload(descriptor.artifact_id),/Too many/);
     const shutdown=store.releaseUploads();
@@ -184,13 +184,13 @@ test('download verification requires new bytes, exact filename, size and digest'
     const descriptor=await store.admit({sourcePath,name:'Продажи.csv',bytes:3,sha256:createHash('sha256').update('abc').digest('hex')});
     const lease=await store.stageDownload(descriptor.artifact_id);
     assert.throws(()=>{lease.path=sourcePath;},TypeError);
-    await assert.rejects(()=>lease.verify(descriptor.name),/ENOENT/);
+    await assert.rejects(()=>lease.verify(descriptor.name),/LOGINOM_FILE_NOT_FOUND/);
     await writeFile(lease.path,'abc');
     for (const name of [undefined,'Продажи.zip','../Продажи.csv'])
       await assert.rejects(()=>lease.verify(name),/filename/);
     for (const bytes of ['ab','abcd','bad']) {
       await writeFile(lease.path,bytes);
-      await assert.rejects(()=>lease.verify(descriptor.name),/changed|match/);
+      await assert.rejects(()=>lease.verify(descriptor.name),/LOGINOM_FILE_CHANGED/);
     }
     await writeFile(lease.path,'abc');
     const verified=await lease.verify(descriptor.name);
@@ -209,7 +209,7 @@ test('download cleanup drains missing and pending files and shares the upload li
     const store=await createArtifactStore({directory:join(directory,'store')});
     const descriptor=await store.admit({sourcePath,name:'empty.csv',bytes:0,sha256:createHash('sha256').update('').digest('hex')});
     const empty=await store.stageDownload(descriptor.artifact_id);
-    await assert.rejects(()=>empty.verify(descriptor.name),/ENOENT/);
+    await assert.rejects(()=>empty.verify(descriptor.name),/LOGINOM_FILE_NOT_FOUND/);
     await writeFile(empty.path,'');assert.deepEqual(await empty.verify(descriptor.name),descriptor);
     await empty.release();
     const pending=Array.from({length:8},(_,i)=>i%2 ? store.stageDownload(descriptor.artifact_id) : store.stageUpload(descriptor.artifact_id));
@@ -234,7 +234,7 @@ test('download rejects symlink bytes and transfer cleanup leaves the target unto
       const lease=await (download ? store.stageDownload(descriptor.artifact_id) : store.stageUpload(descriptor.artifact_id));
       if(!download) {await chmod(join(lease.path,'..'),0o700);await unlink(lease.path);}
       await symlink(sourcePath,lease.path);
-      await assert.rejects(()=>lease.verify(descriptor.name),/regular file/);
+      await assert.rejects(()=>lease.verify(descriptor.name),/LOGINOM_FILE_NOT_REGULAR/);
       await lease.release();assert.equal((await readFile(sourcePath)).toString(),'abc');
       if(process.platform!=='win32')assert.equal((await stat(sourcePath)).mode&0o777,0o400);
     }

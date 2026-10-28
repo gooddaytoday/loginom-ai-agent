@@ -229,6 +229,21 @@ export function buildAttachmentParts(images: BuildRequestPartsInput["images"]) {
 
   const files = images.flatMap((attachment) => {
     if (attachment.mime === LOGINOM_PACKAGE_MIME) return []
+    if (attachment.reference)
+      return [
+        {
+          id: Identifier.ascending("part"),
+          type: "file" as const,
+          mime: attachment.mime,
+          url: `file://${encodeFilePath(attachment.reference.sourcePath)}`,
+          filename: attachment.filename,
+          source: {
+            type: "file" as const,
+            path: attachment.reference.sourcePath,
+            text: { value: "loginom-attachment:" + attachment.reference.receipt, start: 0, end: 0 },
+          },
+        },
+      ]
     return [
       {
         id: Identifier.ascending("part"),

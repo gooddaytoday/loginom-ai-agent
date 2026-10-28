@@ -1,5 +1,5 @@
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { hostError } from "@loginom-ai-agent/loginom-host/errors"
+import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Effect } from "effect"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
@@ -27,7 +27,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
   const loginom: Lease | undefined = yield* Effect.acquireRelease(
     Effect.promise(() =>
       LoginomHost.acquire(sessionID).catch((error) => {
-        status.failure = "acquire: " + hostError(error)
+        status.failure = "acquire: " + hostErrorText(error)
         return undefined
       }),
     ),

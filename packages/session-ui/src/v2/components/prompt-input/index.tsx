@@ -427,7 +427,7 @@ export function PromptInputV2Attachments(props: {
               <div class="relative group shrink-0">
                 <TooltipV2 value={attachment.filename} placement="top" contentClass="break-all">
                   <Show
-                    when={attachment.mime.startsWith("image/")}
+                    when={!attachment.reference && attachment.mime.startsWith("image/")}
                     fallback={
                       <AttachmentCardV2 title={attachment.filename}>
                         {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.common.file"))}

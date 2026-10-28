@@ -201,6 +201,7 @@ const progress=object({node:nullable(ref),execution,accepted_phases:array(phase)
 export const nodeJobResultSchema=object({operation_id:str,attempt:{type:'integer',minimum:1},state:values('running','settled'),
  cancel_requested:bool,server_stop_requested:bool,progress:nullable(progress),outcome:nullable(outcome),error:nullable(error)});
 export const deliveryJobResultSchema=object({operation_id:str,state:values('running','settled'),phase:str,upload_operation_id:str,
+ status:values('authorizing','staging','uploading','verifying_size','ready','cancelling','cancelled','failed','uncertain'),bytes:integer,total_bytes:integer,percent:{type:'number',minimum:0,maximum:100},elapsed_ms:integer,deadline_at:integer,poll_after_ms:integer,
  outcome:nullable(object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),upload_operation_id:str,
   destination:str,bytes:integer,sha256:str,verification_id:str,cleanup_complete:bool,upload_completion_verified:bool,
-  code:str,effect_possible:bool},['status'],true)),error:nullable(object({code:str,message:str},['message'],true))});
+  code:str,effect_possible:bool},['status'],true)),error:nullable(object({code:str,message:str},['message'],true))},['operation_id','state','phase','upload_operation_id','outcome','error']);

@@ -1,3 +1,4 @@
+import { createAttachmentReceipt, attachmentReceiptSource } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { standaloneCancellation } from "../standalone-cancellation"
 import { exitCli } from "../exit"
 import { runToolOutcome } from "../run-outcome"
@@ -20,6 +21,8 @@ import type { Argv } from "yargs"
 import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
+import { stat } from "node:fs/promises"
+import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Cause, Effect, Exit } from "effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -56,6 +59,7 @@ function resolveRunInput(value?: string, piped?: string): string | undefined {
 
 type FilePart = {
   type: "file"
+  source?: ReturnType<typeof attachmentReceiptSource>
   url: string
   filename: string
   mime: string
@@ -394,22 +398,24 @@ export const RunCommand = effectCmd({
 
         for (const filePath of list) {
           const resolvedPath = path.resolve(args.attach ? root : (directory ?? root), filePath)
-          if (!(await Filesystem.exists(resolvedPath))) {
-            UI.error(`File not found: ${filePath}`)
-            exitCli(1)
-          }
-
-          const stat = Filesystem.stat(resolvedPath)
-          const isDirectory = stat?.isDirectory() ?? false
+          const info = await stat(resolvedPath).catch((error) => {
+            UI.error(hostErrorText(fileError(error)) + " Путь: " + resolvedPath)
+            return exitCli(1)
+          })
+          const isDirectory = info.isDirectory()
           if ((args.attach || process.env.LOGINOM_AI_AGENT_CLI_ROOT) && isDirectory) {
-            UI.error(`Cannot attach local directory without a shared filesystem: ${filePath}`)
+            UI.error(
+              hostErrorText("LOGINOM_FILE_NOT_REGULAR") +
+                ". Cannot attach local directory without a shared filesystem: " +
+                filePath,
+            )
             exitCli(1)
           }
 
           const detected = FSUtil.mimeType(resolvedPath)
           if (!args.attach && detected === "application/x-loginom-package") {
-            if (!stat?.isFile()) {
-              UI.error(`Cannot attach a non-regular Loginom package: ${filePath}`)
+            if (!info.isFile()) {
+              UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR") + " Путь: " + resolvedPath)
               exitCli(1)
             }
             files.push({
@@ -421,10 +427,26 @@ export const RunCommand = effectCmd({
             continue
           }
 
+          if (info.isFile() && info.size > 10 * 1024 * 1024) {
+            if (args.attach) {
+              UI.error("Large local attachments require a local backend with a shared filesystem")
+              exitCli(1)
+            }
+            const reference = await createAttachmentReceipt(resolvedPath)
+            files.push({
+              type: "file",
+              url: pathToFileURL(resolvedPath).href,
+              filename: path.basename(resolvedPath),
+              mime: detected,
+              source: attachmentReceiptSource(reference),
+            })
+            continue
+          }
+
           const content = await (async () => {
             if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
-            return fileSnapshot(resolvedPath).catch((error: Error) => {
-              UI.error(`${error.message}: ${filePath}`)
+            return fileSnapshot(resolvedPath).catch((error: unknown) => {
+              UI.error(hostErrorText(error) + " Путь: " + resolvedPath)
               return exitCli(1)
             })
           })()

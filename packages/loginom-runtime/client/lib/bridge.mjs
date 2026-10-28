@@ -278,7 +278,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
-    const callTool = async (request, extra, privatePackage=null) => {
+    const callTool = async (request, extra, privatePackage=null, scanReceipt=undefined) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       if (recovery.owns(request.params.name)) {
         requirePreparedWorkspace(session.metadata);
@@ -433,14 +433,14 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
                 if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
-              const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
+              const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal,scanReceipt});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               return nodeResultReply(result,{userProfile,tool:request.params.name});
             };
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.
-            const local=['dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop','dock_artifact_delivery_status'].includes(request.params.name);
+            const local=['dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop','dock_artifact_delivery_status','dock_artifact_delivery_cancel'].includes(request.params.name);
             return await (local?invoke():dockGate(request.params.name,invoke));
           }
           if (request.params.name === 'dock_action_describe') {
@@ -614,6 +614,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog,
+      applyWithScanReceipt(args,receipt,extra) {
+        return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
+      },
       async prepareLocalPackage(args,pair,extra) {
         if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'
           ||Object.hasOwn(args,'package_path')||Object.hasOwn(args,'workflow_ref'))
@@ -625,9 +628,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
       },
       hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
+      cancelArtifactDeliveries: () => actionRuntime?.cancelArtifactDeliveries(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
+        await actionRuntime?.closeArtifactDeliveries();
         await recovery.close();
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         const prepared = session.metadata.workspacePreparation;

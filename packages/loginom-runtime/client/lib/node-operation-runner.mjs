@@ -13,13 +13,13 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
  const snapshot=job=>structuredClone({operation_id:job.id,attempt:job.attempt,state:job.state,
   cancel_requested:job.controller.signal.aborted,server_stop_requested:job.stopController.signal.aborted,
   progress:progress(job.id),outcome:job.outcome??null,error:job.error??null});
- const launch=(request,signature,attempt,resume,previous)=>{
-  const job={id:request.operation_id,request:structuredClone(request),signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
+ const launch=(request,signature,attempt,resume,previous,scanReceipt=previous?.scanReceipt)=>{
+  const job={id:request.operation_id,request:structuredClone(request),scanReceipt:structuredClone(scanReceipt),signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
   jobs.set(job.id,job);
   // Claim the local ID before calling run, including its synchronous validation.
   // Both rejection and success settle this promise; no unhandled background error.
   let execution;
-  try{execution=run(request,{signal:job.controller.signal,stopSignal:job.stopController.signal,resume});}catch(error){execution=Promise.reject(error);}
+  try{execution=run(request,{signal:job.controller.signal,stopSignal:job.stopController.signal,resume,scanReceipt:job.scanReceipt});}catch(error){execution=Promise.reject(error);}
   job.completion=Promise.resolve(execution).then(
    outcome=>{job.outcome=structuredClone(outcome);job.state='settled';},
    error=>{
@@ -38,7 +38,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
   get active(){const job=[...jobs.values()].find(job=>job.state==='running');return job?snapshot(job):null;},
   get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'
     ||job.outcome?.effect_possible===true&&job.outcome?.cleanup_complete!==true);},
-  start(request,{resume=false}={}) {
+  start(request,{resume=false,scanReceipt}={}) {
    request=structuredClone(request);checkId(request.operation_id);
    if(resume&&Object.keys(request).length===1)request=structuredClone(find(request.operation_id).request);
    const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);
@@ -55,7 +55,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    }
    if(resume)throw Error('Cannot resume an unknown node operation');
    if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');
-   return launch(request,signature,1,false);
+   return launch(request,signature,1,false,undefined,scanReceipt);
   },
   // A verified runtime release replaces the retained AMBIGUOUS outcome of a
   // settled job. It never starts work or touches a running job.

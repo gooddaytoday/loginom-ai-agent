@@ -1,3 +1,8 @@
+import {
+  attachmentReceiptID,
+  readAttachmentReceipt,
+  verifyAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { Cause, Effect } from "effect"
 import { basename, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -12,14 +17,112 @@ import { TaskScope } from "@/session/task-scope"
 import { Tool } from "./tool"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { fileSnapshot } from "@/util/file-snapshot"
+import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { Global } from "@opencode-ai/core/global"
+import {
+  inspectReferenceFile,
+  stageReferenceFile,
+  type FileReference,
+  type ReferenceSlot,
+} from "@loginom-ai-agent/loginom-host/file-reference"
+import { exactFileDigest } from "./loginom-file-profile-core"
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
+
+// Large files cross private IPC only as immutable Host-reserved references.
+export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")(function* (
+  path: string,
+  ctx: Tool.Context,
+  host: {
+    reserveReference(userMessage: string, name: string): Promise<ReferenceSlot>
+    admitReference(reference: FileReference): Promise<unknown>
+    discardReference(grant: string): Promise<unknown>
+  },
+  userMessage: string,
+  authorized?: { sourcePath: string; canonicalPath: string; verifyAttachment?: () => Effect.Effect<unknown, Error> },
+) {
+  const source = authorized ?? (yield* authorizeLoginomFile(path, ctx))
+  const result = yield* Effect.tryPromise({
+    try: async (signal) => {
+      const abort = AbortSignal.any([ctx.abort, signal])
+      const identity = await inspectReferenceFile(source.sourcePath)
+      if (identity.canonical_path !== source.canonicalPath) throw Error("LOGINOM_FILE_CHANGED")
+      const sha256 = await exactFileDigest(identity, join(Global.Path.data, "file-profiles", ctx.sessionID))
+      if (abort.aborted) throw Error("LOGINOM_UPLOAD_CANCELLED")
+      const slot = await host.reserveReference(userMessage, basename(source.canonicalPath))
+      const reference = await stageReferenceFile(source.sourcePath, identity, slot, { sha256, signal: abort }).catch(
+        async (error) => {
+          // No upload was dispatched. Keep the original typed file/cancel cause;
+          // Host shutdown retains responsibility for an unremoved reservation.
+          await host.discardReference(slot.grant).catch(() => undefined)
+          throw error
+        },
+      )
+      if (abort.aborted) {
+        await host.discardReference(slot.grant)
+        throw Error("LOGINOM_UPLOAD_CANCELLED")
+      }
+      // Once commit starts its reply may be lost. Retain the snapshot for an
+      // exact retry or confirmed Host shutdown rather than deleting it here.
+      const artifact = await host.admitReference(reference)
+      return { sourcePath: source.sourcePath, artifact }
+    },
+    catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
+  })
+  if (source.verifyAttachment) yield* source.verifyAttachment()
+  return result
+})
+
+type ReferenceHost = Parameters<typeof admitLoginomFileReference>[2]
+const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: string; artifact: unknown }>>()
+
+export const admitLoginomLocalFile = Effect.fn("Loginom.admitLocalFile")(function* (
+  path: string,
+  ctx: Tool.Context,
+  host: ReferenceHost & { admit(userMessage: string, files: { name: string; data: string }[]): Promise<unknown> },
+  userMessage: string,
+) {
+  const source = yield* authorizeLoginomFile(path, ctx)
+  if (source.canonicalPath.toLowerCase().endsWith(".lgp"))
+    return yield* Effect.die(
+      Error("Use loginom_dock_prepare with local_package_path for a local .lgp: " + source.sourcePath),
+    )
+  const identity = yield* Effect.tryPromise({
+    try: () => inspectReferenceFile(source.canonicalPath),
+    catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
+  })
+  if (identity.size > 16 * 1024 * 1024) {
+    const key = JSON.stringify([ctx.sessionID, userMessage, identity])
+    const cache = admittedReferences.get(host) ?? new Map()
+    admittedReferences.set(host, cache)
+    const previous = cache.get(key)
+    if (previous) return previous
+    const result = yield* admitLoginomFileReference(path, ctx, host, userMessage, source)
+    cache.set(key, result)
+    return result
+  }
+  const bytes = yield* Effect.tryPromise({
+    try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
+    catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
+  })
+  yield* source.verifyAttachment()
+  const artifacts = yield* Effect.tryPromise({
+    try: () =>
+      host.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [
+        { name: basename(source.canonicalPath), data: bytes.toString("base64") },
+      ]),
+    catch: (error) => Error(hostErrorText(error)),
+  })
+  if (!Array.isArray(artifacts) || artifacts.length !== 1)
+    return yield* Effect.die(Error("LOGINOM_INPUT_INVALID: " + source.sourcePath))
+  return { sourcePath: source.sourcePath, artifact: artifacts[0] as unknown }
+})
 
 export const snapshotLoginomFile = Effect.fn("Loginom.snapshotLocalFile")(function* (path: string, ctx: Tool.Context) {
   const source = yield* authorizeLoginomFile(path, ctx)
   const bytes = yield* Effect.tryPromise({
     try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
-    catch: (error) => Error(`${error instanceof Error ? error.message : String(error)} Путь: ${source.sourcePath}`),
+    catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
   })
   return {
     sourcePath: source.sourcePath,
@@ -52,11 +155,20 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
       return yield* Effect.die(new LocalFileDenied(sourcePath, rules))
     })
   yield* checkDeny(sourcePath)
-  const canonicalPath = yield* fs.realPath(sourcePath)
+  const canonicalPath = yield* fs
+    .realPath(sourcePath)
+    .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))
   yield* checkDeny(canonicalPath)
-  if ((yield* fs.stat(canonicalPath)).type !== "File")
-    return yield* Effect.die(Error("Путь указывает на каталог или специальный файл: " + sourcePath))
-  yield* fs.access(canonicalPath, { readable: true })
+  if (
+    (yield* fs
+      .stat(canonicalPath)
+      .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))).type !==
+    "File"
+  )
+    return yield* Effect.die(Error(hostErrorText("LOGINOM_FILE_NOT_REGULAR") + " Путь: " + sourcePath))
+  yield* fs
+    .access(canonicalPath, { readable: true })
+    .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))
   const history = yield* sessions.messages({ sessionID: ctx.sessionID })
   const attachments = TaskScope.visible({ sessionID: ctx.sessionID, messages: history, revert: session.revert })
     .filter((message) => message.info.role === "user" && !TaskScope.replayOf(message))
@@ -64,10 +176,32 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
   const attached = yield* Effect.forEach(attachments, (part) =>
     Effect.gen(function* () {
       const url = URL.parse(part.url)
-      if (!url || url.protocol !== "file:" || url.search || url.hash) return false
-      return (yield* fs.realPath(fileURLToPath(url)).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
+      if (!url || url.protocol !== "file:" || url.search || url.hash) return
+      const attachedPath = fileURLToPath(url)
+      const id = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
+      if (!id)
+        return (yield* fs.realPath(attachedPath).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
+          ? { verify: () => Effect.void }
+          : undefined
+      const owner = { session: ctx.sessionID, message: part.messageID }
+      const receipt = yield* Effect.tryPromise({
+        try: () => readAttachmentReceipt(id, attachedPath, owner),
+        catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+      })
+      if (attachedPath !== sourcePath && receipt.identity.canonical_path !== canonicalPath) return
+      yield* checkDeny(attachedPath)
+      yield* checkDeny(receipt.identity.canonical_path)
+      return {
+        verify: () =>
+          Effect.tryPromise({
+            try: () => verifyAttachmentReceipt(id, attachedPath, owner),
+            catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+          }),
+      }
     }),
   )
+  const verifyAttachment = () => Effect.forEach(attached, (entry) => (entry ? entry.verify() : Effect.void))
+  yield* verifyAttachment()
   if (!attached.some(Boolean))
     yield* Effect.gen(function* () {
       yield* assertExternalDirectoryEffect(ctx, canonicalPath)
@@ -78,7 +212,8 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
         metadata: { filepath: canonicalPath },
       })
     }).pipe(Effect.catchCause((cause) => localFilePermissionFailure(sourcePath, cause, ctx)))
-  return { sourcePath, canonicalPath }
+
+  return { sourcePath, canonicalPath, verifyAttachment }
 })
 
 export function localFilePermissionFailure(path: string, cause: Cause.Cause<unknown>, ctx: Tool.Context) {
@@ -100,7 +235,7 @@ class LocalFileDenied extends PermissionV1.DeniedError {
     super({ ruleset })
   }
   override get message() {
-    return super.message + " Путь: " + this.path
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path
   }
 }
 
@@ -109,7 +244,7 @@ class LocalFileRejected extends PermissionV1.RejectedError {
     super()
   }
   override get message() {
-    return super.message + " Путь: " + this.path + attachmentHint
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path + attachmentHint
   }
 }
 
@@ -121,6 +256,6 @@ class LocalFileCorrected extends PermissionV1.CorrectedError {
     super({ feedback })
   }
   override get message() {
-    return super.message + " Путь: " + this.path + attachmentHint
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path + attachmentHint
   }
 }

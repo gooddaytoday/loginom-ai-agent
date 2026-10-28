@@ -3164,6 +3164,9 @@ function readRenderedInputMapping(observation) {
             storageEntry.kind='file';
             storageEntry.bytes=data.Size;
             storageEntry.bytes_source='native_file_store';
+            storageEntry.path=data.FilePath;
+            const time=data.Time instanceof Date?(Number.isFinite(data.Time.getTime())?data.Time.toISOString():null):data.Time;
+            if(typeof time==='string'&&time.length>0&&time.length<=128)storageEntry.mtime=time;
           }
         }
       }

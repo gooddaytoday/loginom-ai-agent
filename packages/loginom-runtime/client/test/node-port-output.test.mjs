@@ -47,6 +47,14 @@ test('reads_bound_port_without_table',async()=>{
  assert.deepEqual(f.disposed.sort(),['columns','dataSource','integerColumn','output','realColumn','stringColumn']);
 });
 
+test('full count comes from the completed data source even above the million-row UI buffer cap',async()=>{
+ const f=fixture();f.dataSource.get_RowCount=async()=>7692308;
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.equal(result.verified,true);assert.equal(result.output.row_count,7692308);
+ assert.equal(result.output.sample_rows,1);assert.equal(result.output.sample_complete,false);
+ assert.deepEqual(f.uiCalls,[]);assert.equal(result.cleanup_complete,true);
+});
+
 for(const boundary of ['name','label','type'])for(const change of ['deadline','session'])test('stops metadata RPCs after '+boundary+' when '+change+' changes',async()=>{
  const clock={now:Date.now()},f=fixture({clock}),sent=[];
  for(const [method,step] of [['get_Name','name'],['get_DisplayName','label'],['get_DataType','type']]){

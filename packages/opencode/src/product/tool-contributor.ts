@@ -1,12 +1,13 @@
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { hostError } from "@loginom-ai-agent/loginom-host/errors"
+import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { type Tool as AITool, type JSONSchema7, tool, jsonSchema, type ToolExecutionOptions } from "ai"
 import { Effect } from "effect"
 import path from "node:path"
+import { Global } from "@opencode-ai/core/global"
 import type { Agent } from "@/agent/agent"
 import type { EffectBridge } from "@/effect/bridge"
-import type { Plugin } from "@/plugin"
+import { Plugin } from "@/plugin"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -15,6 +16,7 @@ import { PartID } from "@/session/schema"
 import type { SessionProcessor } from "@/session/processor"
 import { TaskScope } from "@/session/task-scope"
 import { Tool } from "@/tool/tool"
+import { isRecord } from "@/util/record"
 import type { Truncate } from "@/tool/truncate"
 import { toolPolicy } from "./tool-policy"
 
@@ -41,7 +43,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
   if (loginom) {
     if (input.loginomStatus) delete input.loginomStatus.failure
     const failed = (phase: string, error: unknown) => {
-      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostError(error)
+      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostErrorText(error)
     }
     const catalog = yield* Effect.promise(() =>
       loginom
@@ -54,12 +56,14 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
     )
     if (!catalog) return
     if (profile === "loginom-automation" && catalog.tools.some((item) => item.name === "dock_action_describe")) {
-      const { snapshotLoginomFile, localFilePermissionFailure } = yield* Effect.promise(
+      const { loginomFileTools } = yield* Effect.promise(() => import("@/tool/loginom-file-profile"))
+      Object.assign(tools, yield* loginomFileTools(context).pipe(Effect.provideService(Plugin.Service, plugin)))
+      const { admitLoginomLocalFile, localFilePermissionFailure } = yield* Effect.promise(
         () => import("@/tool/loginom-local-file"),
       )
       tools.loginom_file_admit = tool({
         description:
-          "Register one local data file by its literal path (relative to the session directory or absolute), up to 16 MiB. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path.",
+          "Register one local data file by its literal path (relative to the session directory or absolute), including files of several GiB. Files over 16 MiB use a private streaming snapshot, without sending bytes through IPC. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path.",
         inputSchema: jsonSchema<{ path: string }>({
           type: "object",
           properties: { path: { type: "string" } },
@@ -82,20 +86,10 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                     localFilePermissionFailure(path.resolve(input.directory, args.path), cause, ctx),
                   ),
                 )
-              const source = yield* snapshotLoginomFile(args.path, ctx)
-              if (path.extname(source.file.name).toLowerCase() === ".lgp")
-                return yield* Effect.die(
-                  Error("Use loginom_dock_prepare with local_package_path for a local .lgp: " + source.sourcePath),
-                )
-              ctx.abort.throwIfAborted()
-              const artifacts = yield* Effect.promise(() =>
-                loginom.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [source.file]),
-              )
-              if (!Array.isArray(artifacts) || artifacts.length !== 1)
-                return yield* Effect.die(Error("LOGINOM_INPUT_INVALID: " + source.sourcePath))
+              const source = yield* admitLoginomLocalFile(args.path, ctx, loginom, task!.taskMessageID)
               const output = {
-                title: "Local file: " + source.file.name,
-                output: JSON.stringify({ source_path: source.sourcePath, artifact: artifacts[0] }),
+                title: "Local file: " + path.basename(source.sourcePath),
+                output: JSON.stringify({ source_path: source.sourcePath, artifact: source.artifact }),
                 metadata: { generation: loginom.generation, truncated: false },
               }
               yield* plugin.trigger(
@@ -219,16 +213,34 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                         }
                       })
                     : undefined
+                const scanReceipt =
+                  definition.name === "dock_node_apply" &&
+                  isRecord(args.parameters) &&
+                  isRecord(args.parameters.source_switch) &&
+                  typeof args.parameters.source_switch.profile_id === "string"
+                    ? yield* Effect.promise(async () => {
+                        const { exactScanReceipt } = await import("@/tool/loginom-file-profile-core")
+                        return exactScanReceipt(
+                          (args.parameters as { source_switch: { profile_id: string } }).source_switch.profile_id,
+                          path.join(Global.Path.data, "file-profiles", ctx.sessionID),
+                        ).catch(() => undefined)
+                      })
+                    : undefined
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await loginom.call(
-                      definition.name,
-                      forwarded,
-                      task.taskMessageID,
-                      options.abortSignal,
-                      toolPolicy.isLocalLoginom(definition.name) ? undefined : admissions,
-                      packageInput,
-                    ),
+                    await loginom
+                      .call(
+                        definition.name,
+                        forwarded,
+                        task.taskMessageID,
+                        options.abortSignal,
+                        toolPolicy.isLocalLoginom(definition.name) ? undefined : admissions,
+                        packageInput,
+                        scanReceipt,
+                      )
+                      .catch((error) => {
+                        throw Error(hostErrorText(error))
+                      }),
                   ),
                 )
                 yield* plugin.trigger(

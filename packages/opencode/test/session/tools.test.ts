@@ -196,7 +196,17 @@ it.effect("preserves running tool start time across metadata updates", () =>
   }),
 )
 
-for (const failure of [undefined, "catalog", "call"]) {
+for (const failure of [
+  undefined,
+  "catalog",
+  "call",
+  "LOGINOM_FILE_TOO_LARGE",
+  "LOGINOM_FILE_NOT_FOUND",
+  "LOGINOM_FILE_NOT_REGULAR",
+  "LOGINOM_FILE_ACCESS_DENIED",
+  "LOGINOM_FILE_CHANGED",
+  "unknown",
+]) {
   it.effect(`Loginom defers original-byte admission until an authorized Dock call (${failure})`, () =>
     Effect.gen(function* () {
       const original = MessageID.ascending()
@@ -347,6 +357,15 @@ for (const failure of [undefined, "catalog", "call"]) {
               ),
             }
           },
+          async reserveReference() {
+            throw Error("Unexpected reference reservation")
+          },
+          async admitReference() {
+            throw Error("Unexpected reference admission")
+          },
+          async discardReference() {
+            throw Error("Unexpected reference discard")
+          },
           async admit(message, files) {
             admitted.push({ message, files })
             throw Error("Eager attachment admission is forbidden")
@@ -354,6 +373,15 @@ for (const failure of [undefined, "catalog", "call"]) {
           async call(name, _args, message, _signal, admissions) {
             called.push({ name, message, admissions })
             if (failure === "call" && name === "dock_prepare") throw Error("LOGINOM_INPUT_IDENTITY_CONFLICT")
+            if (failure && !["catalog", "call"].includes(failure) && name === "dock_prepare")
+              throw Object.assign(Error(failure === "unknown" ? "credential secret bytes stack" : failure), {
+                details: {
+                  actual: 20 * 1024 * 1024,
+                  limit: 16 * 1024 * 1024,
+                  credential: "secret",
+                  path: "/private/path",
+                },
+              })
             return { content: [{ type: "text", text: "ok" }] }
           },
           async release() {},
@@ -395,8 +423,22 @@ for (const failure of [undefined, "catalog", "call"]) {
           admissions: [{ userMessage: original, files: [{ name: "sales.csv", data: "QTsxCs/w6OLl8go=" }] }],
         },
       ])
-      expect(Exit.isFailure(result)).toBe(failure === "call")
-      if (Exit.isFailure(result)) expect(Cause.pretty(result.cause)).toContain("LOGINOM_INPUT_IDENTITY_CONFLICT")
+      expect(Exit.isFailure(result)).toBe(failure !== undefined)
+      if (Exit.isFailure(result)) {
+        const text = Cause.pretty(result.cause)
+        expect(text).toContain(
+          failure === "call"
+            ? "LOGINOM_INPUT_IDENTITY_CONFLICT"
+            : failure === "unknown"
+              ? "LOGINOM_HOST_REQUEST_FAILED"
+              : failure!,
+        )
+        expect(text).not.toMatch(/credential|secret|\/private\/path/)
+        if (failure === "LOGINOM_FILE_TOO_LARGE") {
+          expect(text).toContain('"actual":20971520,"limit":16777216')
+          expect(text).toContain("профиль и выборка")
+        }
+      }
     }),
   )
 }

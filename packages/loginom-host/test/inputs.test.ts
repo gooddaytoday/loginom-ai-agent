@@ -1,8 +1,40 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { inputStore } from "../src/inputs"
+
+test("oversized attachments preserve exact byte limits without writing a snapshot; malformed inputs stay invalid", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-input-limits-"))
+  const store = inputStore(root)
+  try {
+    for (const size of [16 * 1024 * 1024 + 1, 20 * 1024 * 1024]) {
+      const error = await store
+        .admit("chat", "original", [{ name: "data.csv", data: Buffer.alloc(size).toString("base64") }], "/user")
+        .catch((error: unknown) => error)
+      expect(error).toMatchObject({
+        message: "LOGINOM_FILE_TOO_LARGE",
+        details: { actual: size, limit: 16 * 1024 * 1024 },
+      })
+      expect(await readdir(root)).toEqual([])
+    }
+    for (const data of ["broken?", "?".repeat(24 * 1024 * 1024 + 1)])
+      await expect(store.admit("chat", "original", [{ name: "data.csv", data }], "/user")).rejects.toThrow(
+        "LOGINOM_INPUT_INVALID",
+      )
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      name: `data${i}.csv`,
+      data: Buffer.alloc(16 * 1024 * 1024).toString("base64"),
+    }))
+    await expect(store.admit("chat", "original", files, "/user")).rejects.toMatchObject({
+      message: "LOGINOM_FILE_TOO_LARGE",
+      details: { actual: 80 * 1024 * 1024, limit: 64 * 1024 * 1024 },
+    })
+    expect(await readdir(root)).toEqual([])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test("server copy names satisfy upload, import and package path rules while preserving bytes and extensions", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-input-names-"))
