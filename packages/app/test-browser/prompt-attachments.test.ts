@@ -232,3 +232,95 @@ test("large clipboard files without a native path are refused before blob storag
     dispose()
   })
 })
+
+test("V2 picker and drop keep local_reference descriptors before file reads or blobs", async () => {
+  await createRoot(async (dispose) => {
+    const [state, setState] = createStore({ prompt: [] as PromptInputV2Prompt })
+    const reference = {
+      kind: "local_reference" as const,
+      sourcePath: "/tmp/данные %#.xlsx",
+      filename: "данные %#.xlsx",
+      size: 5 * 1024 ** 3,
+      lastModified: 1,
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      receipt: "b".repeat(64),
+    }
+    const config = {
+      capture: () => ({
+        current: () => state.prompt,
+        cursor: () => 0,
+        set: (prompt: PromptInputV2Prompt) => setState("prompt", prompt),
+      }),
+      editor: () => document.createElement("div"),
+      focusEditor: () => undefined,
+      addPart: () => false,
+      setDraggingType: () => undefined,
+      directory: () => "/tmp",
+      isDialogActive: () => false,
+      warn: () => {
+        throw Error("unexpected warning")
+      },
+      duplicate: () => undefined,
+      onError: (error: unknown) => {
+        throw error
+      },
+      getPathForFile: () => reference.sourcePath,
+      referenceAttachment: async () => reference,
+      store: async () => {
+        throw Error("must not store a large blob")
+      },
+    }
+    const attachments = createPromptInputV2Attachments(config)
+    const file = new File(["x"], reference.filename)
+    Object.defineProperty(file, "size", { value: reference.size })
+    file.slice = () => {
+      throw Error("must not read reference bytes")
+    }
+    expect(await attachments.addAttachments([file])).toBe(true)
+    expect(state.prompt[0]).toMatchObject({ reference })
+    expect(await attachments.addAttachments([reference])).toBe(true)
+    expect(state.prompt[1]).toMatchObject({ reference })
+    dispose()
+  })
+})
+
+test("V2 refuses a large clipboard file with one missing-path warning and no blob", async () => {
+  await createRoot(async (dispose) => {
+    const [state, setState] = createStore({ prompt: [] as PromptInputV2Prompt })
+    let missing = 0,
+      unsupported = 0
+    const attachments = createPromptInputV2Attachments({
+      capture: () => ({
+        current: () => state.prompt,
+        cursor: () => 0,
+        set: (prompt: PromptInputV2Prompt) => setState("prompt", prompt),
+      }),
+      editor: () => document.createElement("div"),
+      focusEditor: () => undefined,
+      addPart: () => false,
+      setDraggingType: () => undefined,
+      directory: () => "/tmp",
+      isDialogActive: () => false,
+      warn: () => {
+        unsupported++
+      },
+      missingPath: () => {
+        missing++
+      },
+      duplicate: () => undefined,
+      onError: (error) => {
+        throw error
+      },
+      store: async () => {
+        throw Error("must not store")
+      },
+    })
+    const file = new File(["x"], "large.csv")
+    Object.defineProperty(file, "size", { value: 16 * 1024 ** 2 + 1 })
+    expect(await attachments.addAttachments([file])).toBe(false)
+    expect(state.prompt).toHaveLength(0)
+    expect(missing).toBe(1)
+    expect(unsupported).toBe(0)
+    dispose()
+  })
+})

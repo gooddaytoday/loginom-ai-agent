@@ -67,7 +67,7 @@ export async function createAttachmentReceipt(path: string, expected?: { size: n
   }
 }
 
-export async function verifyAttachmentReceipt(id: string, path: string, owner?: AttachmentOwner) {
+export async function readAttachmentReceipt(id: string, path: string, owner?: AttachmentOwner) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw hostException("LOGINOM_INPUT_INVALID")
   const receipt: Receipt = await readFile(join(root, id + ".json"), "utf8")
     .then(JSON.parse)
@@ -79,6 +79,11 @@ export async function verifyAttachmentReceipt(id: string, path: string, owner?: 
     const bound = await readFile(join(root, id + ".owner"), "utf8").catch(() => undefined)
     if (bound !== JSON.stringify(owner)) throw hostException("LOGINOM_INPUT_INVALID")
   }
+  return receipt
+}
+
+export async function verifyAttachmentReceipt(id: string, path: string, owner?: AttachmentOwner) {
+  const receipt = await readAttachmentReceipt(id, path, owner)
   const current = await inspectReferenceFile(receipt.sourcePath).catch((error) => {
     throw fileError(error)
   })

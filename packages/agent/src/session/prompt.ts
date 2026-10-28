@@ -874,7 +874,9 @@ const layer = Layer.effect(
                     messageID: info.id,
                     text: `Attached local data reference: ${filepath}. Use loginom_file_profile before reading or admission; then scan, sample and validate the scenario on the sample before delivering the full file. No file bytes are included in this message.`,
                   },
-                  { ...part, source, sessionID: input.sessionID, messageID: info.id },
+                  // References are represented to the provider by the bounded text above.
+                  // Keep CSV/XLSX paths out of provider file/download handling.
+                  { ...part, mime: "text/plain", source, sessionID: input.sessionID, messageID: info.id },
                 ]
               }
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime

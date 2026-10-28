@@ -106,7 +106,13 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       if (ok) found = true
     }
 
-    if (!found && files.length > 0 && toast) input.warn?.()
+    if (
+      !found &&
+      files.length > 0 &&
+      toast &&
+      !files.some((file) => file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))
+    )
+      input.warn?.()
     return found
   }
 

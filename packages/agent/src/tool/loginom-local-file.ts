@@ -1,4 +1,8 @@
-import { attachmentReceiptID, verifyAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import {
+  attachmentReceiptID,
+  readAttachmentReceipt,
+  verifyAttachmentReceipt,
+} from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { Cause, Effect } from "effect"
 import { basename, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -172,26 +176,32 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
   const attached = yield* Effect.forEach(attachments, (part) =>
     Effect.gen(function* () {
       const url = URL.parse(part.url)
-      if (!url || url.protocol !== "file:" || url.search || url.hash) return false
+      if (!url || url.protocol !== "file:" || url.search || url.hash) return
       const attachedPath = fileURLToPath(url)
       const id = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
-      if (
-        id &&
-        (attachedPath === sourcePath ||
-          (yield* fs.realPath(attachedPath).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath)
-      ) {
-        // Validate the original spelling as well as canonical aliases. Never
-        // refresh a receipt from today's stat while restoring history.
-        const receipt = yield* Effect.tryPromise({
-          try: () => verifyAttachmentReceipt(id, attachedPath, { session: ctx.sessionID, message: part.messageID }),
-          catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
-        })
-        if (attachedPath === sourcePath || receipt.identity.canonical_path === canonicalPath) return true
-        return false
+      if (!id)
+        return (yield* fs.realPath(attachedPath).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
+          ? { verify: () => Effect.void }
+          : undefined
+      const owner = { session: ctx.sessionID, message: part.messageID }
+      const receipt = yield* Effect.tryPromise({
+        try: () => readAttachmentReceipt(id, attachedPath, owner),
+        catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+      })
+      if (attachedPath !== sourcePath && receipt.identity.canonical_path !== canonicalPath) return
+      yield* checkDeny(attachedPath)
+      yield* checkDeny(receipt.identity.canonical_path)
+      return {
+        verify: () =>
+          Effect.tryPromise({
+            try: () => verifyAttachmentReceipt(id, attachedPath, owner),
+            catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
+          }),
       }
-      return (yield* fs.realPath(attachedPath).pipe(Effect.orElseSucceed(() => undefined))) === canonicalPath
     }),
   )
+  const verifyAttachment = () => Effect.forEach(attached, (entry) => (entry ? entry.verify() : Effect.void))
+  yield* verifyAttachment()
   if (!attached.some(Boolean))
     yield* Effect.gen(function* () {
       yield* assertExternalDirectoryEffect(ctx, canonicalPath)
@@ -202,20 +212,7 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
         metadata: { filepath: canonicalPath },
       })
     }).pipe(Effect.catchCause((cause) => localFilePermissionFailure(sourcePath, cause, ctx)))
-  const verifyAttachment = () =>
-    Effect.forEach(attachments, (part) =>
-      Effect.gen(function* () {
-        const url = URL.parse(part.url)
-        const id = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
-        if (!id || !url || url.protocol !== "file:" || url.search || url.hash) return
-        const attachedPath = fileURLToPath(url)
-        if (attachedPath !== sourcePath && attachedPath !== canonicalPath) return
-        yield* Effect.tryPromise({
-          try: () => verifyAttachmentReceipt(id, attachedPath, { session: ctx.sessionID, message: part.messageID }),
-          catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
-        })
-      }),
-    )
+
   return { sourcePath, canonicalPath, verifyAttachment }
 })
 
