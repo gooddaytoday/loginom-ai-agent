@@ -33,11 +33,32 @@ test('Chromium progress tracks only the owned page transfer before saveAs comple
  t.after(async()=>{await browser.close();http.closeAllConnections();await new Promise(resolve=>http.close(resolve));await rm(directory,{recursive:true,force:true});});
  const context=await browser.newContext({acceptDownloads:true}),page=await context.newPage(),foreign=await context.newPage();
  await page.goto(origin);await foreign.goto(origin);
+ await page.evaluate(()=>{
+  const manager={FDownloadViewController:{FFileLoaders:[]}};
+  globalThis.bg={app:{Application:{FInstance:{FMainForm:{
+   FMapTree:{FServerConnection:{UserName:'worker'}},
+   Items:{Workspace:{getActiveTab:()=>({Controller:{FController:globalThis.testController}})}}
+  }}}}};
+  globalThis.testController={FFileSenderManager:manager};
+ });
  const progress=await browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
-  server_source_binding:{bytes:1048576},browser_downloads_path:directory});
+  server_source_binding:{bytes:1048576,account:'worker',directory:'/worker',destination:'/worker/source.csv'},browser_downloads_path:directory});
  const other=foreign.waitForEvent('download');await foreign.locator('a').click();
  const otherDownload=await other;responses[0].end(Buffer.alloc(524288,'b'));await otherDownload.path();
  assert.equal(progress.guid,null);assert.equal(progress.bytes,0);
+ // LAB-457: real Loginom receives native WebSocket Blob chunks before a
+ // browser Download exists. A foreign path must never renew its allowance.
+ await page.evaluate(()=>testController.FFileSenderManager.FDownloadViewController.FFileLoaders.push({
+  FFullFileName:'/worker/foreign.csv',FFileName:'foreign.csv',FFileDirectory:'/worker/',
+  FFileSize:1048576,FFileBlobs:[new Blob([new Uint8Array(1048576)])]
+ }));
+ await progress.sample();assert.equal(progress.bytes,0);
+ await page.evaluate(()=>testController.FFileSenderManager.FDownloadViewController.FFileLoaders.push({
+  FFullFileName:'/worker/source.csv',FFileName:'source.csv',FFileDirectory:'/worker/',
+  FFileSize:1048576,FFileBlobs:[new Blob([new Uint8Array(524288)])]
+ }));
+ await progress.sample();assert.equal(progress.bytes,524288);assert.equal(progress.guid,null);
+ await progress.sample();assert.equal(progress.bytes,524288);
  const event=page.waitForEvent('download');await page.locator('a').click();const download=await event;
  const copy=download.saveAs(join(directory,'copy.csv'));
  const until=Date.now()+10000;
@@ -46,7 +67,16 @@ test('Chromium progress tracks only the owned page transfer before saveAs comple
  assert.equal(progress.failed,false);assert.equal(progress.url,download.url());
  responses[1].end(Buffer.alloc(524288,'b'));await copy;
  assert.equal(progress.bytes,1048576);assert.equal((await readFile(join(directory,'copy.csv'))).length,1048576);
+ await page.evaluate(()=>{
+  const loaders=testController.FFileSenderManager.FDownloadViewController.FFileLoaders;
+  loaders[1]={...loaders[1]};
+ });
+ await progress.sample();assert.equal(progress.failed,true);
  await progress.close();
+ await progress.close();
+ // An already running exact-path receiver cannot be adopted by a new job.
+ await assert.rejects(browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
+  server_source_binding:{bytes:1048576,account:'worker',directory:'/worker',destination:'/worker/source.csv'},browser_downloads_path:directory}),/already has a native receiver/);
 });
 
 // No synthetic download event: a trusted click follows the native Blob link

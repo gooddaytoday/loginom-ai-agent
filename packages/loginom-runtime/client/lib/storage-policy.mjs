@@ -158,7 +158,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
     cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
     effect_possible:false,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
       elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
-      byte_progress:'chromium_received_bytes'},output:job.output??{},error:job.error??null});
+      byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null});
   const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
   return {
     get busy(){return [...jobs.values()].some(j=>j.state==='running');},
@@ -271,7 +271,7 @@ const downloadId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.
 export const serverDownloadTools=[
   {name:'dock_storage_source',description:'Locate an existing CSV/TSV/TXT/XLSX by its exact path in the assigned inputs directory. Navigates the native Files UI and returns an opaque server_source_ref with native size/mtime. Does not upload or import. Use this before preview/download when the CLI starts on the workflow graph.',
     properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024}},required:['operation_id','path']},
-  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Chromium received bytes renew a 120-second no-progress limit within a size-derived hard deadline; disk-copy completion is verified separately.',
+  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Received native Blob or Chromium bytes renew a 120-second no-progress limit within a size-derived hard deadline; disk-copy completion is verified separately.',
     properties:{operation_id:downloadId,server_source_ref:downloadId},required:['operation_id','server_source_ref']},
   {name:'dock_storage_download_status',description:'Read the original server download progress and terminal cache path.',properties:{operation_id:downloadId},required:['operation_id']},
   {name:'dock_storage_download_wait',description:'Wait at most 60 seconds for the original download; a wait timeout does not cancel it.',properties:{operation_id:downloadId,timeout_ms:{type:'integer',minimum:0,maximum:60000}},required:['operation_id']},

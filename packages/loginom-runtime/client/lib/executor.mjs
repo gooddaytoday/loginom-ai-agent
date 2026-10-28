@@ -205,11 +205,61 @@ async function browserArtifactReveal(page,task,snapshot) {
 // download directory and behavior; only enable CDP events for this listener.
 export async function browserServerDownloadProgress(page,task) {
   const session=await page.context().newCDPSession(page);
+  let native,closed=false,chromiumBytes=0;
   try {
+    // Loginom receives the file into native Blob chunks over its WebSocket
+    // before emitting Download. Retain this controller privately, without
+    // replacing handlers or writing anything into the application.
+    if(task.server_source_binding.account&&typeof page.evaluateHandle==='function')native=await page.evaluateHandle(task=>{
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      if(!main)return null;
+      const controller=main.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+      const manager=controller?.FFileSenderManager;
+      if(!manager||main.FMapTree?.FServerConnection?.UserName!==task.server_source_binding.account)
+        throw Error('Server download native owner differs');
+      const loaders=manager.FDownloadViewController?.FFileLoaders??[];
+      if(!Array.isArray(loaders)||loaders.some(l=>l.FFullFileName===task.server_source_binding.destination))
+        throw Error('Server download already has a native receiver');
+      return {controller,manager,loader:null,bytes:0};
+    },task);
     const {targetInfo}=await session.send('Target.getTargetInfo');
     const {frameTree}=await session.send('Page.getFrameTree');
     const progress={bytes:0,guid:null,url:null,failed:false,
-      close:()=>session.detach()};
+      sample:async()=>{
+        if(!native||progress.failed)return;
+        try{
+          const bytes=await native.evaluate((owner,task)=>{
+            if(!owner)return 0;
+            const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+            const controller=main?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+            if(location.origin!==task.expected_origin||controller!==owner.controller
+              ||controller.FFileSenderManager!==owner.manager
+              ||main.FMapTree?.FServerConnection?.UserName!==task.server_source_binding.account)
+              throw Error('Server download native owner changed');
+            const loaders=owner.manager.FDownloadViewController?.FFileLoaders??[];
+            if(!Array.isArray(loaders))throw Error('Server download native receivers unavailable');
+            const matching=loaders.filter(l=>l.FFullFileName===task.server_source_binding.destination);
+            if(matching.length>1)throw Error('Server download native receiver ambiguous');
+            if(!matching.length)return owner.bytes;
+            const loader=matching[0];
+            if(owner.loader&&owner.loader!==loader||loader.FFileName!==task.artifact.name
+              ||loader.FFileDirectory!==task.server_source_binding.directory+'/'
+              ||loader.FFileSize!==task.server_source_binding.bytes||!Array.isArray(loader.FFileBlobs))
+              throw Error('Server download native receiver changed');
+            owner.loader=loader;
+            const bytes=loader.FFileBlobs.reduce((sum,blob)=>{
+              if(!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<0)
+                throw Error('Server download native chunk invalid');
+              return sum+blob.size;
+            },0);
+            if(!Number.isSafeInteger(bytes)||bytes<owner.bytes||bytes>task.server_source_binding.bytes)
+              throw Error('Server download native bytes invalid');
+            owner.bytes=bytes;return bytes;
+          },task);
+          progress.bytes=Math.max(progress.bytes,bytes);
+        }catch{progress.failed=true;}
+      },
+      close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
     session.on('Browser.downloadWillBegin',event=>{
       if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
       if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
@@ -218,14 +268,14 @@ export async function browserServerDownloadProgress(page,task) {
     });
     session.on('Browser.downloadProgress',event=>{
       if(event.guid!==progress.guid||progress.failed)return;
-      if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<progress.bytes
+      if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<chromiumBytes
         ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
-      progress.bytes=event.receivedBytes;
+      chromiumBytes=event.receivedBytes;progress.bytes=Math.max(progress.bytes,chromiumBytes);
     });
     await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
       browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
     return progress;
-  }catch(error){await session.detach();throw error;}
+  }catch(error){try{await native?.dispose();}finally{await session.detach();}throw error;}
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
@@ -508,6 +558,7 @@ export async function browserServerDownloadControl(page,task) {
   const base={action_key:'storage.download',action_revision:'1',operation_id:task.operation_id,
     phase:'downloading',effect_possible:false,trace:[],cleanup_complete:true};
   if(!job)return {...base,status:'FAILED',output:{},error:{code:'LOGINOM_DOWNLOAD_MISSING',message:'Original browser download is missing'}};
+  if(task.mode==='status'&&job.state==='running')await job.progress?.sample?.();
   if(task.mode==='cancel'){
     job.cancel_requested=true;
     if(job.download){await job.download.cancel();await job.completion;}
