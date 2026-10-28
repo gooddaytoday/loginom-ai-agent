@@ -341,7 +341,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
@@ -804,8 +804,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
       &&preparedNavigationNode?.tid===getTid(element)&&preparedNavigationNode.label===element.textContent.trim();
     const nativeOverflowNode=element=>{
-      if(wizard.status!=='observed'||!preparedNodeId
-        ||!(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+      if(!preparedNodeId
+        ||!(wizard.status==='observed'&&(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+          ||wizard.status==='absent'&&preparedNativeNodeId===preparedNodeId&&preparedNavigationNode?.tid===getTid(element)
+            &&preparedNavigationNode.label===element.textContent.trim())
         ||getComputedStyle(element).display!=='none'||getComputedStyle(element).visibility!=='visible'
         ||getComputedStyle(element).opacity==='0'||element.hasAttribute('hidden')||sensitive(element)||!visibleAncestors(element.parentElement))return false;
       if(preparedInputPort?.direction==='input'&&!inputOverflowOwner(element))return false;
@@ -825,19 +827,23 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return elements.length===1&&elements[0].textContent.trim()===c.label;
     });
     // Toolbar overflow is context only, for every native-verified surface.
+    // A narrow navigation read retains the independent native graph binding;
+    // it does not invent graph controls outside the requested region.
     // Match the complete prepared ancestry, including visible captions; retain
     // the ordinary visibility requirement for all gestures and descendants.
     const ancestorPort=preparedInputPort??preparedOutputPort;
     const nativeAncestry=preparedNodeId&&preparedNativeNodeId===preparedNodeId
       &&(!ancestorPort||typeof ancestorPort.port_guid==='string'&&ancestorPort.port_guid.length>0
         &&typeof ancestorPort.opening_operation_id==='string'&&ancestorPort.opening_operation_id.length>0)
-      &&(!preparedGraphTid||preparedPortReturn||nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid
+      &&(!preparedGraphTid||preparedPortReturn||!graphQueryable&&graphContainer
+        &&preparedGraphTid.startsWith(workflow.prefix+';Graph;')||nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid
         &&nativeGraphControl(e)?.status==='non_script'&&nativeGraphControl(e).node_id===preparedNodeId).length===1);
     const hiddenPreparedAncestor=memoRead(e=>nativeAncestry
-      &&preparedPathMatches&&preparedWorkflowPath?.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
+      &&preparedPathMatches&&(preparedWorkflowPath?.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
+        ||preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()&&nativeOverflowNode(e))
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)&&visibleAncestors(e.parentElement)
-      &&[...e.querySelectorAll('.maptree-icon-workflow')].every(icon=>getComputedStyle(icon).display!=='none'
+      &&[...e.querySelectorAll('.maptree-icon-workflow,[class*="bg-vendor-icon-"]')].every(icon=>getComputedStyle(icon).display!=='none'
         &&getComputedStyle(icon).visibility==='visible'&&getComputedStyle(icon).opacity!=='0'&&!icon.hasAttribute('hidden')&&!sensitive(icon)));
     const preparedAncestryObserved=preparedPathMatches&&(!preparedWorkflowPath?.length
       ||preparedWorkflowPath.every(c=>{const e=(tids.get(c.tid)??[])[0];return visible(e)||hiddenPreparedAncestor(e);}));
@@ -2845,7 +2851,14 @@ function readRenderedInputMapping(observation) {
       &&visible(storageRootPanels[0])&&storageRootPanels[0].contains(storageRootCandidates[0])
       &&visible(storageRootCandidates[0])&&!sensitive(storageRootCandidates[0])
       &&textOf(storageRootCandidates[0],true)==='Файлы'?storageRootCandidates[0]:null;
-    const interesting = element => wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+    const navigationUp=preparedNodeId&&preparedNativeNodeId===preparedNodeId&&nodeContext.status==='observed'
+      &&nodeContext.kind==='node'&&(tids.get(workflow.prefix+';up')??[]).length===1?(tids.get(workflow.prefix+';up')??[]).filter(e=>{
+        const component=globalThis.Ext?.getCmp?.(e.id);
+        return component?.el?.dom===e&&component.disabled!==true&&e.getAttribute('data-qtip')==='Вверх'
+          &&e.closest('[data-tid='+JSON.stringify(workflow.prefix+';NavigationBar')+']')
+          &&e.querySelectorAll('.navigation-icon-up').length===1&&visible(e)&&!sensitive(e);
+      }):[];
+    const interesting = element => navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
@@ -2935,6 +2948,7 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||navigationUp.length===1&&element===navigationUp[0]&&getTid(selectedRoot)===definitionPrefix+';NavigationBar;NavigationPanel'
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
