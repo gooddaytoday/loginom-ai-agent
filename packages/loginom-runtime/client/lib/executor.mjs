@@ -1092,10 +1092,31 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(!last.tid.startsWith(parent.tid+'>'))throw Error('Saved workflow parent is not addressable');
     const suffix=last.tid.slice(parent.tid.length);
     const control=page.locator('[data-tid='+cssString(parent.tid)+']');
-    if(await control.count()!==1||!await control.isVisible()||(await control.innerText()).trim()!==parent.label)
-      throw Error('Saved workflow parent changed');
-    await interact(timeout=>control.click({timeout}));
-    record('saved_navigation_parent_entered',{parent_tid:parent.tid,workflow_id:binding.workflow_id});
+    const count=await control.count(),visible=count===1&&await control.isVisible();
+    const label=count===1?(visible?(await control.innerText()).trim():await control.evaluate(e=>e.textContent.trim())):null;
+    record('saved_navigation_parent_observed',{parent_tid:parent.tid,count,visible,label_matches:label===parent.label});
+    if(count!==1||label!==parent.label)throw Error('Saved workflow parent changed');
+    if(visible)await interact(timeout=>control.click({timeout}));
+    else {
+      // A long saved name can hide this ancestor in the navigation overflow.
+      // Rebind the native workflow before using its visible, one-level Up control.
+      const rebound=await packageContinuations(binding);
+      if(!rebound.some(value=>same(value,current)))throw Error('Saved workflow navigation changed');
+      const up=page.locator('[data-tid='+cssString(binding.prefix+';up')+']');
+      if(await up.count()!==1||!await up.isVisible()||!await up.isEnabled()
+        ||!await up.evaluate((e,binding)=>{
+          const component=globalThis.Ext?.getCmp?.(e.id),app=globalThis.bg?.app;
+          const active=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
+          const last=document.querySelectorAll('[data-tid='+JSON.stringify(binding.navigation_path.at(-1).tid)+']');
+          if(!app?.WorkFlowTreeNode||!(active instanceof app.WorkFlowTreeNode)||last.length!==1
+            ||globalThis.Ext?.getCmp?.(last[0].id)?._node?.data?.node!==active)return false;
+          return component?.el?.dom===e&&component.disabled!==true&&e.getAttribute('data-qtip')==='Вверх'
+            &&!!e.closest('[data-tid='+JSON.stringify(binding.prefix+';NavigationBar')+']')
+            &&e.querySelectorAll('.navigation-icon-up').length===1;
+        },binding))throw Error('Saved workflow Up control unavailable');
+      await interact(timeout=>up.click({timeout}));
+    }
+    record('saved_navigation_parent_entered',{parent_tid:parent.tid,workflow_id:binding.workflow_id,via:visible?'breadcrumb':'up'});
     const updated=await poll(async()=>{
       const rows=await page.evaluate(prefix=>[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')]
         .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()})),binding.prefix);
