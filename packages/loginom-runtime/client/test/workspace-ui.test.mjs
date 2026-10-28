@@ -2489,8 +2489,8 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
 });
 
 for(const completion of ['done','execute'])test('wizard '+completion+' waits for the expected graph node without claiming execution completion',async()=>{
-  for(const mode of ['bound_rename','bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node','bound_rename_wrong_tid','bound_rename_user_label','bound_rename_unbound','success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
-    const expected=mode.startsWith('bound_rename')?'data.csv':mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
+  for(const mode of ['bound_rename','bound_rename_multiline','bound_rename_multiline_wrong_text','bound_rename_multiline_user_label','bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node','bound_rename_wrong_tid','bound_rename_user_label','bound_rename_unbound','success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
+    const expected=mode.startsWith('bound_rename_multiline')?'cols: Category; rows: Region; cells: Amount':mode.startsWith('bound_rename')?'data.csv':mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
     const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';const breadcrumbs=[];
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2501,7 +2501,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       if(label==='Настройка')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-wizard';
     }
     const wizard=page.add('div',base+'WizrdMCF');
-    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode',mode==='bound_rename_user_label'?'Пользовательская метка':'Автоматическая метка']]) {
+    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode',['bound_rename_user_label','bound_rename_multiline_user_label'].includes(mode)?'Пользовательская метка':'Автоматическая метка']]) {
       const owner=page.add('div',base+'WizrdMCF;DoneWizard;'+key,'',undefined,wizard);
       page.add('input',null,'',undefined,owner).value=value;
     }
@@ -2510,7 +2510,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       let postClickReads=0;
       const readNode=async()=>{const graph=page.events.includes('click')&&++postClickReads>1;
         const value={verified:true,document_id:'doc',workflow_id:'workflow',node_id:graph&&mode==='bound_foreign'?'foreign':'node',
-          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_rename')?(postClickReads<4?'Old':mode==='bound_rename_wrong_tid'?'Other.csv':'data.csv'):mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
+          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_rename')?(postClickReads<4?'Old':mode==='bound_rename_wrong_tid'?'Other.csv':mode.startsWith('bound_rename_multiline')?'cols:_Category;__rows:_Region;__cells:_Amount':'data.csv'):mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
           ...(graph&&['bound_graph_unlock','bound_graph_lock_churn'].includes(mode)?{locked:mode==='bound_graph_unlock'?postClickReads<4:postClickReads%2===1}:{})};
         if(graph&&postClickReads>=4&&['bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node'].includes(mode))
           value[mode.slice('bound_rename_'.length)]='foreign';
@@ -2525,10 +2525,10 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
     const transition=()=>{
       if(mode==='still_open')return;
       wizard.remove();breadcrumbs.at(-1).remove();breadcrumbs.at(-2).remove();
-      const graph=page.add('div',base+'ModelForm;cmpDiagram'),name=mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':mode==='wrong_label' || mode==='different_key'?'Other':mode==='actual_space'?'Сум_ма':expected.replace(/\s/g,'_').replace(/,/g,'');
+      const graph=page.add('div',base+'ModelForm;cmpDiagram'),name=mode.startsWith('bound_rename_multiline')?'cols:_Category;__rows:_Region;__cells:_Amount':mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':mode==='wrong_label' || mode==='different_key'?'Other':mode==='actual_space'?'Сум_ма':expected.replace(/\s/g,'_').replace(/,/g,'');
       const node=page.add('g',base+'Graph;'+name,'',undefined,graph);
       const wrapped=['wrapped_label','actual_space','wrapped_filename','wrapped_grouping'].includes(mode);
-      const label=page.add('span',base+'Graph;'+name+';Label;Label',wrapped?'':mode==='bound_multiline_wrong_text'?'Дубликаты: Other':mode==='wrong_label'?'Other':mode==='comma_collision'?'A B':expected,undefined,node);
+      const label=page.add('span',base+'Graph;'+name+';Label;Label',wrapped?'':mode==='bound_rename_multiline_wrong_text'?'cols: Other':mode==='bound_multiline_wrong_text'?'Дубликаты: Other':mode==='wrong_label'?'Other':mode==='comma_collision'?'A B':expected,undefined,node);
       finishedNode=node;finishedLabel=label;finishedGraph=graph;
       if(['wrapped_label','actual_space'].includes(mode)){page.add('span',null,mode==='actual_space'?'Сум ':'Сум',undefined,label);page.add('br',null,'',undefined,label);page.add('span',null,'ма',undefined,label);}
       if(mode==='wrapped_filename' || mode==='wrapped_grouping') {
@@ -2565,7 +2565,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
     };
     if(mode==='bound_rename_unbound')delete snapshot.prepared_node_context;
     const result=await page.act({verb:completion==='done'?'finish_wizard':'execute_wizard',ref:button.ref},snapshot);
-    const success=['bound_rename','success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
+    const success=['bound_rename','bound_rename_multiline','success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,1);
     if(completion==='execute' && success) {
@@ -3032,7 +3032,7 @@ test('storage byte identity uses the same cached native file record regardless o
     const cell=page.add('td',base+'colName_'+name,name,undefined,row);
     page.add('td',base+'colFileType_'+name,'Текстовый файл',undefined,row);
     const size=page.add('td',base+'colSize_'+name,'1,702',undefined,row);
-    const record={isModel:true,data:{id:'/worker/'+name,FileName:name,FilePath:'/worker/'+name,Type:0,Size:1702}};
+    const record={isModel:true,data:{id:'/worker/'+name,FileName:name,FilePath:'/worker/'+name,Type:0,Size:1702,Time:'2026-10-28T00:00:00.000Z'}};
     const data=record.data;
     if(mode==='folder')data.Type=1;
     if(mode==='wrong_name')data.FileName='other.csv';
@@ -3053,7 +3053,8 @@ test('storage byte identity uses the same cached native file record regardless o
     assert.equal(entry.kind,mode==='valid'?'file':'unknown',mode);
     if(mode==='valid') {
       assert.equal(entry.bytes_source,'native_file_store');
-      for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576]) {
+      assert.equal(entry.path,'/worker/'+name);assert.equal(entry.mtime,'2026-10-28T00:00:00.000Z');
+      for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576,2148532259,4296015909]) {
         data.Size=bytes;size.ownText='rounded KiB';assert.equal((await read()).bytes,bytes);
       }
       delete page.context.Ext;size.ownText='1702';assert.equal((await read()).bytes,undefined);
@@ -5633,7 +5634,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -5683,7 +5684,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
     assert.equal(controls.length,accepted?1:0,vendor+': '+socketIcon+': '+mode);
     if(accepted){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
-    if(['javascript','joindata'].includes(vendor)&&mode.startsWith('bound_folder')) {
+    if(['javascript','joindata','importtextfile'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
       page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);

@@ -296,6 +296,7 @@ export default defineConfig({
       ],
       components: {
         Hero: "./src/components/Hero.astro",
+        PageFrame: "./src/components/PageFrame.astro",
         Head: "./src/components/Head.astro",
         Header: "./src/components/Header.astro",
         Footer: "./src/components/Footer.astro",
@@ -317,7 +318,7 @@ function configSchema() {
     hooks: {
       "astro:build:done": async () => {
         console.log("generating config schema")
-        spawnSync("../agent/script/schema.ts", ["./dist/config.json", "./dist/tui.json"])
+        spawnSync("../opencode/script/schema.ts", ["./dist/config.json", "./dist/tui.json"])
       },
     },
   }

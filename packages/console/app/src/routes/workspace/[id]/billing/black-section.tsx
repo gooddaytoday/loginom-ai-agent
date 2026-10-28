@@ -1,12 +1,12 @@
 import { action, useParams, useAction, useSubmission, json, query, createAsync } from "@solidjs/router"
 import { createStore } from "solid-js/store"
 import { Show } from "solid-js"
-import { Billing } from "@loginom-ai-agent/console-core/billing.js"
-import { Database, eq, and, isNull, sql } from "@loginom-ai-agent/console-core/drizzle/index.js"
-import { BillingTable, SubscriptionTable } from "@loginom-ai-agent/console-core/schema/billing.sql.js"
-import { Actor } from "@loginom-ai-agent/console-core/actor.js"
-import { Subscription } from "@loginom-ai-agent/console-core/subscription.js"
-import { BlackData } from "@loginom-ai-agent/console-core/black.js"
+import { Billing } from "@opencode-ai/console-core/billing.js"
+import { Database, eq, and, isNull, sql } from "@opencode-ai/console-core/drizzle/index.js"
+import { BillingTable, SubscriptionTable } from "@opencode-ai/console-core/schema/billing.sql.js"
+import { Actor } from "@opencode-ai/console-core/actor.js"
+import { Subscription } from "@opencode-ai/console-core/subscription.js"
+import { BlackData } from "@opencode-ai/console-core/black.js"
 import { withActor } from "~/context/auth.withActor"
 import { queryBillingInfo } from "../../common"
 import styles from "./black-section.module.css"
@@ -84,23 +84,6 @@ const enroll = action(async (workspaceID: string) => {
   )
 }, "enroll")
 
-const createSessionUrl = action(async (workspaceID: string, returnUrl: string) => {
-  "use server"
-  return json(
-    await withActor(
-      () =>
-        Billing.generateSessionUrl({ returnUrl })
-          .then((data) => ({ error: undefined, data }))
-          .catch((e) => ({
-            error: e.message as string,
-            data: undefined,
-          })),
-      workspaceID,
-    ),
-    { revalidate: [queryBillingInfo.key, querySubscription.key] },
-  )
-}, "sessionUrl")
-
 const setUseBalance = action(async (form: FormData) => {
   "use server"
   const workspaceID = form.get("workspaceID") as string | null
@@ -130,26 +113,15 @@ export function BlackSection() {
   const i18n = useI18n()
   const billing = createAsync(() => queryBillingInfo(params.id!))
   const subscription = createAsync(() => querySubscription(params.id!))
-  const sessionAction = useAction(createSessionUrl)
-  const sessionSubmission = useSubmission(createSessionUrl)
   const cancelAction = useAction(cancelWaitlist)
   const cancelSubmission = useSubmission(cancelWaitlist)
   const enrollAction = useAction(enroll)
   const enrollSubmission = useSubmission(enroll)
   const useBalanceSubmission = useSubmission(setUseBalance)
   const [store, setStore] = createStore({
-    sessionRedirecting: false,
     cancelled: false,
     enrolled: false,
   })
-
-  async function onClickSession() {
-    const result = await sessionAction(params.id!, window.location.href)
-    if (result.data) {
-      setStore("sessionRedirecting", true)
-      window.location.href = result.data
-    }
-  }
 
   async function onClickCancel() {
     const result = await cancelAction(params.id!)
@@ -172,18 +144,8 @@ export function BlackSection() {
           <section class={styles.root}>
             <div data-slot="section-title">
               <h2>{i18n.t("workspace.black.subscription.title")}</h2>
-              <div data-slot="title-row">
-                <p>{i18n.t("workspace.black.subscription.message", { plan: sub().plan })}</p>
-                <button
-                  data-color="primary"
-                  disabled={sessionSubmission.pending || store.sessionRedirecting}
-                  onClick={onClickSession}
-                >
-                  {sessionSubmission.pending || store.sessionRedirecting
-                    ? i18n.t("workspace.black.loading")
-                    : i18n.t("workspace.black.subscription.manage")}
-                </button>
-              </div>
+              <p>{i18n.t("workspace.black.subscription.message", { plan: sub().plan })}</p>
+              <p>{i18n.t("workspace.black.subscription.ending")}</p>
             </div>
             <div data-slot="usage">
               <div data-slot="usage-item">

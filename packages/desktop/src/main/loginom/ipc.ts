@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron"
 import type { IpcMainInvokeEvent } from "electron"
 import { Option, Schema } from "effect"
-import { Loginom } from "@loginom-ai-agent/schema/loginom"
+import { Loginom } from "@opencode-ai/schema/loginom"
 
 export function registerLoginomIpc(api: Loginom.API) {
   function sender(event: IpcMainInvokeEvent) {

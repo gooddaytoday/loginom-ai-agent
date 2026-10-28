@@ -63,7 +63,7 @@ mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
-  const f=current;return {tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),
+  const f=current;return {tools:executor.executorTools,closeArtifactDeliveries:async()=>{},describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
       return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};

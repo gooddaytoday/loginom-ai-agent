@@ -1,4 +1,4 @@
-import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 import {
   directResult,
   explicitProxy,

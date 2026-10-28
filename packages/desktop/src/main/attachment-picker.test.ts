@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
   assertAttachmentBudget,
+  describePickedFiles,
   createPickedFileAuthorizations,
   MAX_ATTACHMENT_BYTES,
   readAttachment,
@@ -84,4 +85,18 @@ describe("picked file authorizations", () => {
     await authorizations.read(1, token, "a.txt")
     await expect(authorizations.read(1, token, "b.txt")).rejects.toThrow("budget exceeded")
   })
+})
+
+test("large picker files return references before reading and do not consume inline budget", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "large-picker-"))
+  const file = join(directory, "sales.csv")
+  try {
+    await writeFile(file, "")
+    await truncate(file, 5 * 1024 ** 3)
+    const files = await describePickedFiles([file])
+    expect(files[0]).toMatchObject({ kind: "local_reference", sourcePath: file, size: 5 * 1024 ** 3 })
+    expect(() => assertAttachmentBudget([...files, { size: MAX_ATTACHMENT_BYTES }])).not.toThrow()
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

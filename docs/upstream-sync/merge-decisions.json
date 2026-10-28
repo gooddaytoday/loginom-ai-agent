@@ -1,0 +1,125 @@
+{
+  "format": 1,
+  "decisions": [
+    {
+      "path": ".gitignore",
+      "rule": "PROCEDURE-2",
+      "reason": "объединены обе строки: `/artifacts/` upstream и `/.local/project-memory/` форка Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "install",
+      "rule": "STANDING-7",
+      "reason": "блок отказа «OpenCode 2» upstream принят слиянием; путь установки `~/.loginom-ai-agent/bin` сохранён (поведение v0.3.3, ADR-0001 п. 4); подавление предложения OpenCode 2 — отдельный коммит (шаг 3, таблица LAB-305) Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/script/build.ts",
+      "rule": "CAT-02",
+      "reason": "обе секции: codesign ad-hoc upstream для darwin и standalone-секции форка; путь codesign `${output}/${name}/bin/${executable}` Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/src/cli/cmd/tui.ts",
+      "rule": "CAT-08",
+      "reason": "`createUpdater` upstream вместо старого `setTimeout`, `try`-обёртка запуска и мост Loginom форка Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/src/cli/upgrade.ts",
+      "rule": "CAT-04",
+      "reason": "upstream (`shouldNotify`, `{available}`/`{major}`) + имена флагов форка + строка форка: при методе `unknown` вернуть `undefined`; предложения OpenCode 2 (`{major}`) подавляются отдельным коммитом (шаг 3) Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/src/provider/provider.ts",
+      "rule": "CAT-07",
+      "reason": "блок `timeoutFetch` upstream; правка форка (`callerSignal`, восстановление `HeaderTimeoutError`, G3) перенесена в него Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/test/cli/run/run-process.test.ts",
+      "rule": "PROCEDURE-2",
+      "reason": "вариант upstream: `cliIt.live` (то же исправление на обеих сторонах) Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/opencode/test/session/llm.test.ts",
+      "rule": "PROCEDURE-2",
+      "reason": "объединены оба набора тестов: матрица заголовков upstream и сценарии форка Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/tui/src/app.tsx",
+      "rule": "CAT-11",
+      "reason": "обработчик обновления удалён (upstream), `session.error` не возвращён (форк, коммит 83a2aff2) Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/tui/src/routes/home.tsx",
+      "rule": "CAT-11",
+      "reason": "`height={1}` форка + `onSizeChange` upstream Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": "packages/web/src/content/docs/cli.mdx",
+      "rule": "PROCEDURE-2",
+      "reason": "таблица `LOGINOM_AI_AGENT_*` форка + новое описание и `--major` upstream (ручная замена, F6 LAB-303); описание `--major` убирается отдельным коммитом (шаг 3) Reuse (v1.19.5): разрешение LAB-378 (слияние 891aecaf, принято LAB-385 test-verified и LAB-318 live-verified) взято без изменений; между v1.19.4 и v1.19.5 upstream файл не менял, сторона форка между af555691 и fe30573b не менялась (git diff пуст по обоим)."
+    },
+    {
+      "path": ".github/workflows/test.yml",
+      "rule": "CAT-02",
+      "reason": "блок `on:` — fork-owned (`branches: [\"**\"]`); в группе взят `v1` вместо `dev`, префикс `tests-` оставлен Разрешение LAB-378 + шаг форка «Install pinned ripgrep» (коммит 9b85b0ad, PR #486): git merge-file (текущее — разрешение 891aecaf, база af555691, другое fe30573b) код 0; upstream между v1.19.4 и v1.19.5 файл не менял."
+    },
+    {
+      "path": ".github/workflows/typecheck.yml",
+      "rule": "CAT-02",
+      "reason": "kept-fork: блок `on:` форка (проверки на любой ветке и PR); фильтр `pull_request: branches: [v1]` относится к ветке v1 upstream, которой у форка нет Разрешение LAB-378 без изменений. Новое задание upstream `generated` (v1.19.5, замена бота generate) не принято: оно идёт на раннере upstream `blacksmith-4vcpu-ubuntu-2404`, которого у форка нет, а сгенерированный клиент форк проверяет в задании unit (`check:generated`)."
+    },
+    {
+      "path": "packages/opencode/package.json",
+      "rule": "CAT-01",
+      "reason": "версия 0.1.0 — fork-owned (CAT-01 version); остальное объединено Разрешение LAB-378; конфликт v1.19.5 в `version` (1.19.4 → 1.19.5 upstream), версия 0.1.0 форка сохранена. Поправка после слияния (LAB-392 F1): разрешение LAB-378 взято без бесконфликтного изменения upstream v1.19.5 `gitlab-ai-provider` 6.19.0 → 6.23.1 (#58998); восстановлено отдельным коммитом поверх слияния, `bun.lock` пересобран Bun 1.3.14, `--frozen-lockfile` код 0."
+    },
+    {
+      "path": "packages/desktop/package.json",
+      "rule": "STANDING-7",
+      "reason": "Разрешение LAB-378 (способ задания версии и extraMetadata.name форка, STANDING-6/7), версия форка 0.3.6 (chore(release): v0.3.6 в PR #486); upstream между v1.19.4 и v1.19.5 менял только `version`."
+    },
+    {
+      "path": "bun.lock",
+      "rule": "CAT-01",
+      "reason": "Регенерирован как в LAB-378: блокировка upstream v1.19.5 + объединённые манифесты, `bun install --lockfile-only` Bun 1.3.14 (packageManager форка, CAT-02) код 0, `bun install --frozen-lockfile` код 0. Версии зависимостей upstream v1.19.5 (в т.ч. gitlab-ai-provider 6.23.1) приняты; workspace Desktop 0.3.6."
+    },
+    {
+      "path": "packages/opencode/script/publish.ts",
+      "rule": "CAT-02",
+      "reason": "kept-fork: форк заменил публикацию upstream в npm на отказ «Upstream publishing is disabled. Use the Loginom release pipeline.»; правки upstream v1.19.5 касаются публикации OpenCode v1 и форку не нужны."
+    },
+    {
+      "path": "packages/opencode/src/util/rpc.ts",
+      "rule": "CAT-07",
+      "reason": "kept-fork: обе стороны исправили одно зависание (запрос воркера, который бросает, не получал ответа; upstream #54936). Сохранён вариант форка: ограниченные коды `RPC_REQUEST_FAILED`/`RPC_CLOSED`/`RPC_SEND_FAILED`, `close()` и отказ при сбое отправки, на которые опираются `tui.ts:251` и `test/util/rpc.test.ts` («bounded failures»). Пересылка текста ошибки upstream не принята: форк намеренно не передаёт текст исключений через воркер."
+    },
+    {
+      "path": ".github/workflows/docs-locale-sync.yml",
+      "rule": "CAT-03",
+      "reason": "deleted-follow-upstream: upstream v1.19.5 удалил workflow (be242b5c, замена токена приложения OpenCode); правка форка была только переименованием переменных и секретов в LOGINOM_AI_AGENT_*; ссылок на файл в форке нет."
+    },
+    {
+      "path": ".github/workflows/generate.yml",
+      "rule": "CAT-03",
+      "reason": "deleted-follow-upstream: upstream v1.19.5 удалил workflow (be242b5c, замена токена приложения OpenCode); правка форка была только переименованием переменных и секретов в LOGINOM_AI_AGENT_*; ссылок на файл в форке нет."
+    },
+    {
+      "path": ".github/workflows/nix-hashes.yml",
+      "rule": "CAT-03",
+      "reason": "deleted-follow-upstream: upstream v1.19.5 удалил workflow (be242b5c, замена токена приложения OpenCode); правка форка была только переименованием переменных и секретов в LOGINOM_AI_AGENT_*; ссылок на файл в форке нет."
+    },
+    {
+      "path": "packages/opencode/src/session/prompt/copilot-gpt-5.txt",
+      "rule": "CAT-03",
+      "reason": "deleted-follow-upstream: upstream v1.19.5 удалил неиспользуемый файл (b01498d3); правка форка — только имя продукта в строке «Your name is …»; ссылок на файл в форке нет (git grep пуст)."
+    },
+    {
+      "path": "packages/opencode/src/share/share-next.ts",
+      "rule": "ADR-1",
+      "reason": "deleted-follow-upstream: решение владельца 27.10 (ADR-0001 «Открытые решения», п. 1, вариант (б); порядок работы LAB-198, п. 7): файл удалён вслед за upstream, вызовы не возвращаются; `LOGINOM_AI_AGENT_AUTO_SHARE` и `LOGINOM_AI_AGENT_DISABLE_SHARE` остаются как no-op отдельным коммитом (шаг 3) Решение LAB-378 без изменений."
+    },
+    {
+      "path": "docs/upstream-sync/catalog.json",
+      "rule": "PROCEDURE-2",
+      "reason": "`against` переведён на SHA принятого тега v1.19.5 810c0eba (шаг 2.6 процедуры); записи каталога не менялись; catalog-check код 0."
+    }
+  ]
+}

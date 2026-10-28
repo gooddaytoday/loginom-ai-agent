@@ -1,7 +1,7 @@
-import type { Message, Session } from "@loginom-ai-agent/sdk/v2/client"
+import type { Message, Session } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@/utils/toast"
-import { base64Encode } from "@loginom-ai-agent/core/util/encode"
-import { Binary } from "@loginom-ai-agent/core/util/binary"
+import { base64Encode } from "@opencode-ai/core/util/encode"
+import { Binary } from "@opencode-ai/core/util/binary"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, startTransition, type Accessor } from "solid-js"
 import { useTabs } from "@/context/tabs"
@@ -21,7 +21,7 @@ import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
-import { Event } from "@loginom-ai-agent/schema/event"
+import { Event } from "@opencode-ai/schema/event"
 import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { blobDataUrl } from "@/utils/draft-store"
 
@@ -61,7 +61,10 @@ async function buildCommandAttachments(text: string, images: ImageAttachmentPart
     await Promise.all(
       images.map(async (attachment) => ({
         ...attachment,
-        dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
+        dataUrl:
+          attachment.reference || attachment.mime === LOGINOM_PACKAGE_MIME
+            ? ""
+            : await blobDataUrl(attachment.blob, attachment.mime),
       })),
     ),
   )
@@ -125,7 +128,10 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const encodedImages = await Promise.all(
     images.map(async (attachment) => ({
       ...attachment,
-      dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
+      dataUrl:
+        attachment.reference || attachment.mime === LOGINOM_PACKAGE_MIME
+          ? ""
+          : await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
   const { requestParts, optimisticParts } = buildRequestParts({

@@ -33,8 +33,9 @@ if (-not (Test-Path -LiteralPath $node -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $browsers -PathType Container)) {
   throw "Pinned browser directory does not exist: $browsers"
 }
-if ((& $bun --version) -ne "1.3.14") {
-  throw "Bun 1.3.14 is required"
+$expectedBunVersion = (Get-Content -Raw -LiteralPath (Join-Path $repo "package.json") | ConvertFrom-Json).packageManager -replace '^bun@', ''
+if ((& $bun --version) -ne $expectedBunVersion) {
+  throw "Bun $expectedBunVersion is required"
 }
 if ((& $node --version) -ne "v24.19.0") {
   throw "Node 24.19.0 is required"
@@ -69,9 +70,9 @@ if (-not $SkipInstall) {
     "--frozen-lockfile",
     "--linker", "hoisted",
     "--ignore-scripts",
-    "--filter", "@loginom-ai-agent/desktop",
+    "--filter", "@opencode-ai/desktop",
     "--filter", "@loginom-ai-agent/loginom-host",
-    "--filter", "@loginom-ai-agent/agent"
+    "--filter", "opencode"
   )
 
   # The filtered graph contains optional editor grammars whose generic install

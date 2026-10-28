@@ -1,4 +1,6 @@
 export const dict = {
+  "prompt.attachment.missingPath":
+    "У вложения нет пути на диске. Сохраните файл и приложите его через выбор файла либо укажите путь.",
   "loginom.saveClose": "Сохранить и закрыть",
   "loginom.saving": "Сохраняем настройки…",
   "loginom.applying": "Применяем настройки…",

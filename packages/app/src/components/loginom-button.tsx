@@ -1,7 +1,7 @@
 import { Show } from "solid-js"
-import { Button } from "@loginom-ai-agent/ui/button"
-import { Dialog } from "@loginom-ai-agent/ui/dialog"
-import { useDialog } from "@loginom-ai-agent/ui/context/dialog"
+import { Button } from "@opencode-ai/ui/button"
+import { Dialog } from "@opencode-ai/ui/dialog"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { usePlatform } from "@/context/platform"
 import { SettingsLoginom } from "./settings-loginom"
 

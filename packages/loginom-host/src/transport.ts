@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { hostError } from "./errors"
+import { hostException } from "./errors"
 
 export type Port = {
   postMessage(value: unknown): void
@@ -35,7 +35,7 @@ export function transport(port: Port) {
     clearTimeout(request.timer)
     request.observe?.(data)
     if ("error" in data) {
-      request.reject(new Error(hostError(data.error)))
+      request.reject(hostException(data))
       return
     }
     request.resolve("result" in data ? data.result : undefined)

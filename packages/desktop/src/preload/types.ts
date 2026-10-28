@@ -1,9 +1,10 @@
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
-import type { DesktopMenuAction } from "@loginom-ai-agent/app/desktop-menu"
-import type { WslServersPlatform } from "@loginom-ai-agent/app/wsl/types"
-import type { UpdaterState } from "@loginom-ai-agent/app/updater"
-import type { DesktopNativeBundle } from "@loginom-ai-agent/app/i18n/desktop-native"
-import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
+import type { LocalAttachmentReference } from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import type { Loginom } from "@opencode-ai/schema/loginom"
+import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
+import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
+import type { UpdaterState } from "@opencode-ai/app/updater"
+import type { DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -16,7 +17,7 @@ export type {
   WslServerRuntime,
   WslServersEvent,
   WslServersState,
-} from "@loginom-ai-agent/app/wsl/types"
+} from "@opencode-ai/app/wsl/types"
 
 export type ServerReadyData = {
   url: string
@@ -89,7 +90,17 @@ export type ElectronAPI = {
     title?: string
     defaultPath?: string
     extensions?: string[]
-  }) => Promise<{ token: string; files: { path: string; name: string; size: number }[] } | null>
+  }) => Promise<{
+    token: string
+    files: (
+      | { path: string; name: string; size: number }
+      | (LocalAttachmentReference & { path: string; name: string })
+    )[]
+  } | null>
+  referenceAttachment: (
+    path: string,
+    expected: { size: number; lastModified: number },
+  ) => Promise<LocalAttachmentReference>
   readPickedFile: (token: string, path: string) => Promise<ArrayBuffer>
   releasePickedFiles: (token: string) => Promise<void>
   getPathForFile: (file: File) => string

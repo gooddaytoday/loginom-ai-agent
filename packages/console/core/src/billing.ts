@@ -12,7 +12,7 @@ import {
 import { Actor } from "./actor"
 import { fn } from "./util/fn"
 import { z } from "zod"
-import { Resource } from "@loginom-ai-agent/console-resource"
+import { Resource } from "@opencode-ai/console-resource"
 import { Identifier } from "./identifier"
 import { centsToMicroCents } from "./util/price"
 import { User } from "./user"
@@ -304,6 +304,7 @@ export namespace Billing {
     }),
     async (input) => {
       const user = Actor.assert("user")
+      throw new Error("Go subscriptions have moved to the new Console")
       const { successUrl, cancelUrl, method } = input
 
       const email = (await User.getAuthEmail(user.properties.userID))!

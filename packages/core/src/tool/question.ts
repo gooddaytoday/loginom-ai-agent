@@ -1,6 +1,6 @@
 export * as QuestionTool from "./question"
 
-import { ToolFailure } from "@loginom-ai-agent/llm"
+import { ToolFailure } from "@opencode-ai/llm"
 import { Effect, Layer, Schema } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { PermissionV2 } from "../permission"

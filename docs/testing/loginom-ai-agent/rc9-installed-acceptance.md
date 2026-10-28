@@ -13,7 +13,7 @@
 
 После синхронизации проверено только дерево исходников: клиентские тесты на
 закреплённом Node 24.19.0, runtime `src`, typecheck и узкие тесты `packages/loginom-host`,
-`packages/agent`, `packages/desktop`, карта происхождения (`verify_sources` — 5045 файлов).
+`packages/opencode`, `packages/desktop`, карта происхождения (`verify_sources` — 5045 файлов).
 Это не доказывает работу продукта в живом Loginom.
 
 Установленные сейчас артефакты собраны до RC9:

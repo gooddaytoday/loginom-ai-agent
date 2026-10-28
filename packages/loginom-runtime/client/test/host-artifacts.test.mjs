@@ -39,6 +39,6 @@ test('model paths, expired tickets, changed files and another agent cannot autho
   await assert.rejects(admit(f.token), /Expired/);
   f.ticket.created_at = Date.now();await writeFile(f.path, JSON.stringify(f.ticket));
   await writeFile(f.ticket.files[0].sourcePath, 'changed');
-  await assert.rejects(admit(f.token), /changed|match/);
+  await assert.rejects(admit(f.token), /LOGINOM_FILE_CHANGED/);
   assert.equal(session.artifactStore.list().length, 0);
 });

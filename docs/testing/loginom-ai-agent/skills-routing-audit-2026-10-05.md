@@ -21,19 +21,19 @@ Agent Skills.
   SKELETON, HELP, NARRATIVE и EMIT. Форматы результата: PDF, DOCX, Markdown.
 - `SKILL.md:35–49` запрещает изменение пакета, загрузку из файлового хранилища
   и вызовы `loginom_dock_*`, включая `prepare`.
-- [V1 prompt](../../../packages/agent/src/session/prompt.ts):1330 ограничивает
+- [V1 prompt](../../../packages/opencode/src/session/prompt.ts):1330 ограничивает
   использование `prepare` созданием и изменением сценария.
-- [SystemPrompt.skills](../../../packages/agent/src/session/system.ts):107–118
+- [SystemPrompt.skills](../../../packages/opencode/src/session/system.ts):107–118
   сообщает модели каталог и предлагает загрузить подходящий skill по описанию.
-- [SkillTool](../../../packages/agent/src/tool/skill.ts):47–60 возвращает тело
+- [SkillTool](../../../packages/opencode/src/tool/skill.ts):47–60 возвращает тело
   skill, базовый каталог и список ресурсов. Ресурсы читаются по необходимости.
-  [Compaction](../../../packages/agent/src/session/compaction.ts):31 защищает
+  [Compaction](../../../packages/opencode/src/session/compaction.ts):31 защищает
   результаты инструмента `skill` от обычного pruning.
 - [App attachments](../../../packages/app/src/components/prompt-input/build-request-parts.ts):206–227
   передаёт `.lgp` как `file://`, а не base64 для загрузки в Loginom.
-  [V1 materialization](../../../packages/agent/src/session/prompt.ts):817–832
+  [V1 materialization](../../../packages/opencode/src/session/prompt.ts):817–832
   добавляет `Attached Loginom package path:`;
-  [model conversion](../../../packages/agent/src/session/message-v2.ts):216
+  [model conversion](../../../packages/opencode/src/session/message-v2.ts):216
   не отправляет пакет как бинарный документ провайдеру.
 - Коммит `8e1e1917c` сохраняет этот путь и подсказку об отсутствующем локальном
   пути при slash-командах, включая отправку follow-up draft.
@@ -45,7 +45,7 @@ Agent Skills.
 
 ### P1: вложение запускает браузер до выбора skill
 
-В [SessionTools](../../../packages/agent/src/session/tools.ts):529–546 любые
+В [SessionTools](../../../packages/opencode/src/session/tools.ts):529–546 любые
 `data:`-вложения с именем автоматически передаются в `loginom.admit`. Проверки
 назначения запроса нет. [HostPort](../../../packages/loginom-host/src/host-port.ts):118
 создаёт runtime чата для admission, а [Host](../../../packages/loginom-host/src/host.ts):63
@@ -68,7 +68,7 @@ base64-вложений в задачах прочих skills. Это подтв
 пакует `out`, icons и `resources/loginom`.
 [stageResources](../../../packages/loginom-host/script/stage-resources.ts):96–115
 копирует Node, Chromium и выбранные части runtime; каталог skill туда не входит.
-В [V1 Skill](../../../packages/agent/src/skill/index.ts):275 встроен только
+В [V1 Skill](../../../packages/opencode/src/skill/index.ts):275 встроен только
 `customize-opencode`; V2 [SkillPlugin](../../../packages/core/src/plugin/skill.ts):18
 также не регистрирует `package_docs`.
 
@@ -86,7 +86,7 @@ skill. Он обнаруживается при работе в этом реп�
 
 ### P2: ограничения документации не исполняются кодом
 
-[SessionTools](../../../packages/agent/src/session/tools.ts):549–577 продолжает
+[SessionTools](../../../packages/opencode/src/session/tools.ts):549–577 продолжает
 регистрировать весь каталог Loginom. SkillTool только получает разрешение на
 загрузку skill; он не меняет набор инструментов и разрешения текущего шага.
 Slash-команда также вставляет инструкции, не создавая отдельной области прав.
@@ -135,7 +135,7 @@ Context7 использован для поиска документации; н
 Нужно проверить выбор по естественным запросам, а не только ручной командой.
 [Официальное руководство по descriptions](https://agentskills.io/skill-creation/optimizing-descriptions)
 описывает отдельные проверки положительных и близких отрицательных запросов.
-В текущем [session test](../../../packages/agent/test/session/prompt.test.ts):975
+В текущем [session test](../../../packages/opencode/test/session/prompt.test.ts):975
 fake LLM получает готовый вызов `skill`; далее создаётся только `structure.json`.
 Тест не доказывает автоматический выбор, обязательный Help, narrative, выпуск
 финального документа или отсутствие запуска браузера.

@@ -8,11 +8,11 @@
       "dependsOn": [],
       "outputs": ["dist/**"]
     },
-    "@loginom-ai-agent/plugin#build": {
-      "dependsOn": ["@loginom-ai-agent/sdk#build"],
+    "@opencode-ai/plugin#build": {
+      "dependsOn": ["@opencode-ai/sdk#build"],
       "outputs": ["dist/**"]
     },
-    "@loginom-ai-agent/agent#test": {
+    "opencode#test": {
       "dependsOn": ["^build"],
       "outputs": [],
       "passThroughEnv": ["*"]
@@ -21,22 +21,25 @@
       "outputs": [],
       "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE", "LOGINOM_AI_AGENT_TEST_BROWSERS"]
     },
-    "@loginom-ai-agent/core#test": {
+    "@loginom-ai-agent/product#test": {
+      "outputs": []
+    },
+    "@opencode-ai/core#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@loginom-ai-agent/function#test": {
+    "@opencode-ai/function#test": {
       "outputs": []
     },
-    "@loginom-ai-agent/app#test": {
+    "@opencode-ai/app#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@loginom-ai-agent/ui#test": {
+    "@opencode-ai/ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@loginom-ai-agent/session-ui#test": {
+    "@opencode-ai/session-ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     }

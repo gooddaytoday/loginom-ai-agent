@@ -231,7 +231,7 @@ async function linuxProfileOwners(profileDir: string) {
       const args = ((await readable(readFile(`/proc/${pid}/cmdline`, "utf8"), named)) ?? "").split("\0")
       const host = args.slice(1).some((arg) => path.basename(arg) === "node-host.mjs")
       const cli = path.basename(args[0] ?? "") === "loginom-ai-agent-cli" || args.slice(1).some((arg) =>
-        arg === "src/standalone.ts" || arg.endsWith("/packages/agent/src/standalone.ts"))
+        arg === "src/standalone.ts" || arg.endsWith("/packages/opencode/src/standalone.ts"))
       const desktop = /^loginom-ai-agent(-dev|-beta)?$/.test(path.basename(args[0] ?? ""))
       const known = named || host || cli || desktop
       const environment = ((await readable(readFile(`/proc/${pid}/environ`, "utf8"), known)) ?? "").split("\0")

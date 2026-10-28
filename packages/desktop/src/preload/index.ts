@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron"
 import type { ElectronAPI, WslServersEvent } from "./types"
-import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
-import type { UpdaterState } from "@loginom-ai-agent/app/updater"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
+import type { UpdaterState } from "@opencode-ai/app/updater"
 
 const updaterCallbacks = new Set<(state: UpdaterState) => void>()
 let updaterState: UpdaterState | undefined
@@ -108,6 +108,7 @@ const api: ElectronAPI = {
 
   openDirectoryPicker: (opts) => ipcRenderer.invoke("open-directory-picker", opts),
   openFilePicker: (opts) => ipcRenderer.invoke("open-file-picker", opts),
+  referenceAttachment: (path, expected) => ipcRenderer.invoke("reference-attachment", path, expected),
   readPickedFile: (token, path) => ipcRenderer.invoke("read-picked-file", token, path),
   releasePickedFiles: (token) => ipcRenderer.invoke("release-picked-files", token),
   getPathForFile: (file) => webUtils.getPathForFile(file),

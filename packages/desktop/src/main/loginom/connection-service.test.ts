@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { connectionStore } from "./connection-store"
 import { credentials } from "./credentials"
 import { connectionService, type ConnectionRuntime } from "./connection-service"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
+import type { Loginom } from "@opencode-ai/schema/loginom"
 
 const candidate: Loginom.Candidate = {
   revision: 0,

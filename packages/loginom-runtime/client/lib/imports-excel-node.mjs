@@ -74,6 +74,7 @@ export function createExcelImportNodeSupport(config){
    need(result.status==='SUCCEEDED'&&operation.cleanupConfirmed&&result.output?.verified===true,result.error?.message??'configuration did not complete');
    return result.output;
   }}).nodeApplyDriverFactory(options);
-  return {...drivers,verifySource:async p=>verifyTextImportSource({source:p.source,settings:{source:{source_path:p.excel.source_path}}},options.verifiedUploads(),options.uploadHistory?.())};
+  return {...drivers,verifySource:async p=>verifyTextImportSource({source:p.source,settings:{source:{source_path:p.excel.source_path}}},p.source.kind==='storage'?[]:options.verifiedUploads(),p.source.kind==='storage'?undefined:options.uploadHistory?.(),
+   p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref):undefined)};
  }};
 }

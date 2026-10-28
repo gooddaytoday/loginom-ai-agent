@@ -2,6 +2,7 @@ import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
+import { hostError, hostException } from "./errors"
 
 export type Launch = {
   node: string
@@ -192,11 +193,13 @@ async function superviseProcess(
     clearTimeout(request.timer)
     if ("error" in message) {
       request.reject(
-        new Error(
-          typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
-            ? message.error
-            : "LOGINOM_RUNTIME_FAILED",
-        ),
+        hostError(message) !== "LOGINOM_HOST_REQUEST_FAILED"
+          ? hostException(message)
+          : new Error(
+              typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
+                ? message.error
+                : "LOGINOM_RUNTIME_FAILED",
+            ),
       )
       return
     }

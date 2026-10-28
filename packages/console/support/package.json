@@ -1,6 +1,6 @@
 {
-  "name": "@loginom-ai-agent/console-support",
-  "version": "1.18.31",
+  "name": "@opencode-ai/console-support",
+  "version": "1.19.5",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "1.15.2",
-    "@loginom-ai-agent/console-core": "workspace:*",
+    "@opencode-ai/console-core": "workspace:*",
     "@solidjs/meta": "catalog:",
     "@solidjs/router": "catalog:",
     "@solidjs/start": "catalog:",

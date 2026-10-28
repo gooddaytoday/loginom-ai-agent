@@ -6,8 +6,23 @@ import {join, resolve, isAbsolute} from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
 import {requireExportDestination,requireStorageDestination} from './storage-policy.mjs';
 import {protectWindowsDirectory} from './platform.mjs';
+import {verifyReferenceFile} from './file-reference.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const fileCodes = new Set(['LOGINOM_FILE_TOO_LARGE','LOGINOM_FILE_NOT_FOUND','LOGINOM_FILE_NOT_REGULAR','LOGINOM_FILE_ACCESS_DENIED','LOGINOM_FILE_CHANGED','LOGINOM_UPLOAD_CANCELLED','LOGINOM_UPLOAD_UNCERTAIN']);
+function fileFailure(code,details={}) {
+  return Object.assign(new Error(code),{details});
+}
+// Only known file failures may carry numeric metadata through managed IPC.
+export function artifactFailure(error) {
+  if(!fileCodes.has(error?.message))return null;
+  const details={};
+  if(error.message==='LOGINOM_FILE_TOO_LARGE')for(const key of ['actual','limit']) {
+    const value=error.details?.[key];
+    if(Number.isSafeInteger(value)&&value>=0)details[key]=value;
+  }
+  return {error:error.message,details};
+}
 const validName = name => typeof name==='string' && name.length>0 && name.length<=200
   && !/[\\/:<>"|?*\x00-\x1f\x7f]/.test(name) && !/[. ]$/.test(name)
   && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name);
@@ -38,14 +53,15 @@ export async function admitStartupArtifacts(store, requests) {
         || !['bytes,name,sha256,sourcePath','bytes,name,sha256,sourcePath,upload'].includes(Object.keys(request).sort().join(','))
         || typeof request.sourcePath!=='string' || !isAbsolute(request.sourcePath)
         || !validName(request.name) || !Number.isSafeInteger(request.bytes)
-        || request.bytes<0 || request.bytes>16*1024*1024
+        || request.bytes<0
         || typeof request.sha256!=='string' || !/^[a-f0-9]{64}$/.test(request.sha256)) throw new Error('Invalid input artifact request');
+    if(request.bytes>16*1024*1024)throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:request.bytes,limit:16*1024*1024});
     if(Object.hasOwn(request,'upload'))validateUploadAuthorization(request.upload);
     const name=request.name.normalize('NFC').toLowerCase();
     if (names.has(name)) throw new Error('Input artifact names must be distinct');
     names.add(name);total+=request.bytes;
   }
-  if (total>64*1024*1024) throw new Error('Input artifact batch exceeds its byte limit');
+  if (total>64*1024*1024) throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:total,limit:64*1024*1024});
   const admitted=[];
   try { for (const request of requests) admitted.push(await store.admit(request)); }
   catch (error) {
@@ -56,14 +72,16 @@ export async function admitStartupArtifacts(store, requests) {
 }
 
 async function readVerified(path, expected, maxBytes) {
-  if (!Number.isSafeInteger(expected.bytes) || expected.bytes<0 || expected.bytes>maxBytes
+  if (!Number.isSafeInteger(expected.bytes) || expected.bytes<0
       || !/^[a-f0-9]{64}$/.test(expected.sha256)) throw new Error('Invalid artifact identity');
+  if(expected.bytes>maxBytes)throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:expected.bytes,limit:maxBytes});
+  try {
   const info=await lstat(path);
-  if (!info.isFile() || info.isSymbolicLink()) throw new Error('Artifact must be a regular file');
+  if (!info.isFile() || info.isSymbolicLink()) throw fileFailure('LOGINOM_FILE_NOT_REGULAR');
   const file=await open(path,constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   try {
     const stat=await file.stat();
-    if (!stat.isFile() || stat.size!==expected.bytes || stat.ino!==info.ino || stat.dev!==info.dev) throw new Error('Artifact changed before reading');
+    if (!stat.isFile() || stat.size!==expected.bytes || stat.ino!==info.ino || stat.dev!==info.dev) throw fileFailure('LOGINOM_FILE_CHANGED');
     // Bounded even if another process grows the file after stat().
     const bytes=Buffer.alloc(expected.bytes+1);let offset=0;
     while(offset<bytes.length) {
@@ -72,9 +90,14 @@ async function readVerified(path, expected, maxBytes) {
       offset+=result.bytesRead;
     }
     const result=bytes.subarray(0,offset);
-    if (offset!==expected.bytes || sha(result)!==expected.sha256) throw new Error('Artifact size or SHA does not match the admitted identity');
+    if (offset!==expected.bytes || sha(result)!==expected.sha256) throw fileFailure('LOGINOM_FILE_CHANGED');
     return result;
   } finally {await file.close();}
+  } catch(error) {
+    if(['ENOENT','ENOTDIR'].includes(error.code))throw fileFailure('LOGINOM_FILE_NOT_FOUND');
+    if(['EACCES','EPERM'].includes(error.code))throw fileFailure('LOGINOM_FILE_ACCESS_DENIED');
+    throw error;
+  }
 }
 
 export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessionId=null,storageDirectories=null}) {
@@ -83,6 +106,7 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
   const info=await lstat(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Artifact directory must be a real directory');
   const root=await realpath(resolve(directory)),entries=new Map(),transfers=new Set(),outputs=new Map();
+  const references=new Map(),referenceGrants=new Map();
   const browserDirectory=async fallback=>{
     if(process.platform!=='win32'){await mkdir(fallback,{mode:0o700});return fallback;}
     // Chromium's Windows file plumbing still encounters MAX_PATH in native
@@ -96,6 +120,18 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
   const stageTransfer=async (artifactId,download=false) => {
       const descriptor=entries.get(artifactId);
       if (!descriptor) throw new Error('Artifact was not admitted in this session');
+      const reference=references.get(artifactId);
+      if(reference&&!download) {
+        await verifyReferenceFile(reference.snapshot);
+        let released=false;
+        const leaseDescriptor=structuredClone(descriptor);
+        if(leaseDescriptor.upload)Object.freeze(leaseDescriptor.upload);
+        const lease=Object.freeze({path:reference.snapshot.canonical_path,descriptor:Object.freeze(leaseDescriptor),
+          async verify(){if(released)throw Error('Artifact transfer was released');await verifyReferenceFile(reference.snapshot);return structuredClone(descriptor);},
+          async release(){released=true;transfers.delete(lease);},
+        });
+        transfers.add(lease);return lease;
+      }
       const buffer=download ? null : await readVerified(join(root,artifactId),descriptor,maxBytes);
       const directory=await browserDirectory(join(root,(download?'download-':'transfer-')+randomUUID())),path=join(directory,descriptor.name);
       const owner=await lstat(directory);
@@ -191,6 +227,29 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
     },
     async resolveOutput(artifactId){const item=outputs.get(artifactId);if(!item)throw Error('Unknown session output');await item.check();return {descriptor:structuredClone(item.descriptor),buffer:await readVerified(item.path,item.descriptor,maxBytes)};},
     get outputSessionId(){return sessionId;},
+    // Managed private IPC only. Host has already checked its opaque reservation
+    // and generation; the runtime rechecks the exact immutable snapshot itself.
+    async admitReference(reference,upload) {
+      if(closing||!reference||Object.keys(reference).sort().join(',')!=='chat,generation,grant,name,snapshot,userMessage'
+        ||!/^[a-f0-9]{64}$/.test(reference.grant??'')||!reference.chat||!reference.userMessage
+        ||!Number.isSafeInteger(reference.generation)||reference.generation<0||!validName(reference.name)
+        ||reference.name!==reference.snapshot?.canonical_path?.split(/[\\/]/).at(-1))throw Error('LOGINOM_INPUT_INVALID');
+      const authorization=validateUploadAuthorization(upload);
+      if(authorization.overwrite!=='reject')throw Error('LOGINOM_INPUT_INVALID');
+      if(storageDirectories)requireStorageDestination(authorization.directory,storageDirectories,'inputs',{directory:true});
+      const parent=await lstat(resolve(reference.snapshot.canonical_path,'..'));
+      if(!parent.isDirectory()||parent.isSymbolicLink()||process.platform!=='win32'&&(parent.mode&0o777)!==0o700)throw Error('LOGINOM_INPUT_INVALID');
+      await verifyReferenceFile(reference.snapshot);
+      const previous=referenceGrants.get(reference.grant);
+      if(previous) {
+        if(JSON.stringify(references.get(previous))!==JSON.stringify(reference))throw Error('LOGINOM_FILE_CHANGED');
+        return structuredClone(entries.get(previous));
+      }
+      const artifactId=randomUUID(),descriptor={artifact_id:artifactId,name:reference.name,bytes:reference.snapshot.size,sha256:reference.snapshot.sha256,
+        upload:{grant_id:randomUUID(),...authorization,destination:authorization.directory+'/'+reference.name}};
+      entries.set(artifactId,descriptor);references.set(artifactId,structuredClone(reference));referenceGrants.set(reference.grant,artifactId);
+      return structuredClone(descriptor);
+    },
     async admit({sourcePath,name,bytes,sha256,upload}) {
       if (!validName(name)) throw new Error('Invalid artifact display name');
       const authorization=upload===undefined ? null : validateUploadAuthorization(upload);
@@ -209,7 +268,11 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
     list() {return [...entries.values()].map(value=>structuredClone(value));},
     async discardUnpublished(ids) {
       if (transfers.size || pendingStages.size) throw Error('Cannot discard artifacts during transfer');
-      const paths=ids.filter(id=>entries.has(id)).map(id=>{entries.delete(id);return join(root,id);});
+      const paths=ids.filter(id=>entries.has(id)).flatMap(id=>{
+        entries.delete(id);const reference=references.get(id);
+        if(reference){references.delete(id);referenceGrants.delete(reference.grant);return [];}
+        return [join(root,id)];
+      });
       for(const path of paths)await unlink(path);
     },
     // Trusted dispatcher resolves BOTH identifiers. A model cannot supply a
@@ -228,7 +291,9 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
     async resolve(artifactId) {
       const descriptor=entries.get(artifactId);
       if (!descriptor) throw new Error('Artifact was not admitted in this session');
-      const buffer=await readVerified(join(root,artifactId),descriptor,maxBytes);
+      const reference=references.get(artifactId);
+      if(reference)await verifyReferenceFile(reference.snapshot);
+      const buffer=await readVerified(reference?.snapshot.canonical_path??join(root,artifactId),descriptor,maxBytes);
       // Private upload adapter gets the verified bytes, never a mutable source path.
       return {descriptor:structuredClone(descriptor),buffer};
     },

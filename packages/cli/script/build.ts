@@ -3,7 +3,7 @@
 import { $ } from "bun"
 import { rm } from "fs/promises"
 import path from "path"
-import { Script } from "@loginom-ai-agent/script"
+import { Script } from "@opencode-ai/script"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 import pkg from "../package.json"
 import { modelsData } from "./generate"
@@ -48,7 +48,8 @@ const targets = singleFlag
     })
   : allTargets
 
-if (!skipInstall) await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
+// Bun 1.4.4 skips native packages for the other libc by default, but the musl targets need them.
+if (!skipInstall) await $`bun install --os="*" --cpu="*" --libc="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
 
 for (const item of targets) {
   const target = [

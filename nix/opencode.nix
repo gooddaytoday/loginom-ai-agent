@@ -52,7 +52,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   buildPhase = ''
     runHook preBuild
 
-    cd ./packages/agent
+    cd ./packages/opencode
     bun --bun ./script/build.ts --single --skip-install
     bun --bun ./script/schema.ts schema.json
 

@@ -1,4 +1,4 @@
-import type { FilePartSource } from "@loginom-ai-agent/sdk/v2/client"
+import type { FilePartSource } from "@opencode-ai/sdk/v2/client"
 
 type PromptInputV2PartBase = {
   content: string
@@ -25,11 +25,22 @@ export type PromptInputV2AgentPart = PromptInputV2PartBase & {
   name: string
 }
 
+export type LocalAttachmentReference = {
+  kind: "local_reference"
+  sourcePath: string
+  filename: string
+  size: number
+  lastModified: number
+  mime: string
+  receipt: string
+}
+
 export type PromptInputV2Attachment = {
   type: "image"
   id: string
   filename: string
   sourcePath?: string
+  reference?: LocalAttachmentReference
   mime: string
   blob: { id: string; url: string }
 }

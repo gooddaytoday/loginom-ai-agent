@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@loginom-ai-agent/product": "workspace:*",
-    "@loginom-ai-agent/schema": "workspace:*",
+    "@opencode-ai/schema": "workspace:*",
     "@xmldom/xmldom": "0.8.15",
     "@zip.js/zip.js": "2.7.62",
     "acorn": "8.15.0",

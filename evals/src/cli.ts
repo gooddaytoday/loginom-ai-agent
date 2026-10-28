@@ -135,7 +135,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     return {
       mode: "source" as const,
       cmd: ["bun", "run", "src/standalone.ts"],
-      cwd: path.join(repoRoot, "packages", "agent"),
+      cwd: path.join(repoRoot, "packages", "opencode"),
       env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
     }
   if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
