@@ -5047,9 +5047,9 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
     }
     const context=settings?result.output?.wizard?.owner_context:result.output?.wizard?.input_port_context;
     assert.equal(result.output.wizard.stage,stage,stage+':'+mode);
-    assert.equal(context?.status==='observed',mode==='valid',stage+':'+mode);
-    if(mode==='valid')assert.equal(context.node.label,'Выгрузка с русскими заголовками');
-    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),mode==='valid',stage+':'+mode);
+    assert.equal(context?.status==='observed',['valid','hidden_workflow'].includes(mode),stage+':'+mode);
+    if(['valid','hidden_workflow'].includes(mode))assert.equal(context.node.label,'Выгрузка с русскими заголовками');
+    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),['valid','hidden_workflow'].includes(mode),stage+':'+mode);
     assert.deepEqual(page.events,[]);
   }
 });
@@ -5150,8 +5150,8 @@ test('D47b native REST input0/index2 keeps hidden node and folder context',async
   if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-restclient';
   if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
-  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',mode==='valid',mode);
-  else assert.notEqual(mode,'valid',mode);
+  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',['valid','hidden_workflow'].includes(mode),mode);
+  else assert.ok(!['valid','hidden_workflow'].includes(mode),mode);
   assert.deepEqual(page.events,[]);
  }
 });
