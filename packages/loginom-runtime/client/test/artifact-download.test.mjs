@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {Page,build} from './support/executor-fixture.mjs';
+import {Page,build,runtime} from './support/executor-fixture.mjs';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {makeArtifactDownloadCode,makeNativeOutputDownloadCode,makeServerSourceDownloadCode,browserServerDownloadControl} from '../lib/executor.mjs';
 
 function fixture(name = 'sales.csv') {
@@ -46,8 +49,44 @@ test('server-only browser download retains its native Download, drains cancellat
  assert.equal((await control('status')).status,'FAILED');
 });
 
+test('server event and RPC consume the original operation deadline instead of the small artifact timeout',async t=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),root=await mkdtemp(join(tmpdir(),'server-event-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));f.page.clock=Date.now();
+ const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ let rpc,eventTimeout,rpcStarted;
+ f.page.waitForEvent=async(type,options)=>{
+  assert.equal(type,'download');eventTimeout=options.timeout;
+  // LAB-386 server4/b:448: a successful gesture, then the native event
+  // misses the old 15s window. The external Page owns this delayed event.
+  if(options.timeout<20000)throw Object.assign(Error('event has not arrived yet'),{name:'TimeoutError'});
+  return f.download;
+ };
+ f.download.saveAs=path=>writeFile(path,'abc');f.download.delete=async()=>{};
+ const r=runtime(f.page,{cacheDirectory:join(root,'cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/test',packages:'/test',exports:'/test'}}),
+  execute:async(code,options)=>{
+   if(code.includes('"download_path":')){rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;}
+   return f.page.execute(code);
+  }});
+ const roots=await r.observe({scope:'roots'}),file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);
+ const detail=await r.observe({rootRef:file.ref,observationId:roots.output.observation_id});
+ const source=detail.output.ui.elements.find(e=>e.storage_entry?.path===native.path).storage_entry.server_source_ref;
+ await r.serverDownload({operation_id:'late-event',server_source_ref:source},'dock_storage_download_start');
+ let result;
+ do{result=await r.serverDownload({operation_id:'late-event',timeout_ms:100},'dock_storage_download_wait');}while(result.state==='running');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(eventTimeout,result.progress.deadline_at-f.page.clock);
+ assert.equal(rpc.timeout,result.progress.deadline_at-rpcStarted);assert.equal(rpc.timeout-eventTimeout,5000);
+ assert.ok(eventTimeout>60000);assert.ok(rpc.signal instanceof AbortSignal);
+ assert.equal(result.output.bytes,3);assert.equal(f.calls.filter(c=>c==='click').length,1);
+ await r.cleanupServerCache();
+});
+
 test('download binds the checked file gesture to its page event and exact private save destination',async()=>{
-  const f=fixture(),result=await f.run();
+  const f=fixture(),wait=f.page.waitForEvent;
+  f.page.waitForEvent=(type,options)=>{assert.equal(options.timeout,15000);return wait(type,options);};
+  const result=await f.run();
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.cleanup_complete,true);
   assert.deepEqual(f.calls,['listen','click','save']);
   assert.equal(result.output.destination,'/test/sales.csv');

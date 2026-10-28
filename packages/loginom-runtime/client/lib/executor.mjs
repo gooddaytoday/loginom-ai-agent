@@ -295,7 +295,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
     let eventPending=true;
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>{eventPending=false;return value;},error=>{
+    // Large server files can emit the event after the small artifact window.
+    // Consume the host job's existing deadline; do not start a new allowance.
+    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
+    if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
+    event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{eventPending=false;return value;},error=>{
       eventPending=false;
       trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
     });
@@ -1577,7 +1581,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
       let started;
-      try{started=await execute(code);}
+      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now())});}
       catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
       await onRecord({phase:'storage_download_started',operation_id,outcome:started});
       if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
