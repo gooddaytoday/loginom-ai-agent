@@ -87,8 +87,8 @@ export async function readPreparedNodeContext(page, binding) {
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
         outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
         // Breadcrumb overflow may hide the node itself. Retain context only
-        // when every rendered component still owns this exact opened input0.
-        if(input&&o.portIndex===0&&o.nativeIndex===0&&typeof o.portGuid==='string'&&o.portGuid.length>0
+        // when every rendered component still owns this exact indexed input opening.
+        if(input&&Number.isInteger(o.portIndex)&&o.portIndex>=0&&o.portIndex<100&&o.portIndex===o.nativeIndex&&typeof o.portGuid==='string'&&o.portGuid.length>0
           &&typeof o.operation_id==='string'&&o.operation_id.length>0&&crumbs.length===b.workflow_ref.navigation_path.length+4){
           const ancestry=[nodeTree,group,portTree,w],path=crumbs.slice(-4);
           if(path.every((crumb,i)=>{

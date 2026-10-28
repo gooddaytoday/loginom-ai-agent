@@ -4760,6 +4760,52 @@ test('tabular input0 keeps Done and close bound to the native node icon when its
  }
 });
 
+test('D52b long saved path keeps input0 Done only with exact native opening and ancestor context',async()=>{
+ // LAB-415 D2/execution-events.jsonl:842: Group input0 remains native-bound
+ // after the long Save, but owner context and finish_wizard are absent.
+ // The journal has no ancestor rectangles: exercise each early overflow slot.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','unbound','d52_no_navigation','d52_foreign_path','d52_no_guid','d52_no_opening','d52_other_port','d52_other_index','wrong_native_icon','path','label','duplicate','visibility','opacity','attribute','clipped','workflow_icon','panel','mode']) {
+  const {page,binding}=await joinInputPortOverflowFixture(fault==='unbound'||fault.startsWith('d52_')?fault:'d52_valid',0,'group');
+  if(fault==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='d2_d52long2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c] of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Число_точек_в_группе');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Число точек в группе';
+  }
+  if(binding.navigation_node)binding.navigation_node={tid:crumbs[5].attrs['data-tid']+(fault==='d52_foreign_path'?'-foreign':''),label:crumbs[5].textContent.trim()};
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  for(const i of [hidden,5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0],c=mappingCoverageFixture(page,5);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]){
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='label')crumbs[hidden].ownText+=' foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='clipped'){crumbs[hidden].style.display='block';crumbs[hidden].box={x:1300,y:41,width:100,height:24};}
+  if(fault==='workflow_icon')crumbs[4].children[0].attrs.class='maptree-icon-modelinputports';
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  if(fault==='mode')c.tableMode.attrs.class='';
+  const r=await page.execute({mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}}),output_column_page:{offset:0,limit:8}});
+  const allowed=r.output?.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true;
+  assert.equal(allowed,fault==='none',hidden+':'+fault);
+  if(fault==='none'){
+   assert.equal(r.output.wizard.input_port_context.status,'observed');
+   assert.deepEqual(clone(r.output.wizard.input_port_context.node_path.slice(0,5).map(({tid,label})=>({tid,label}))),path);
+   assert.ok(r.output.ui.elements.filter(e=>crumbs.some(c=>c.attrs['data-tid']===e.tid)&&!e.visible).every(e=>e.allowed_actions.length===0));
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D52 hidden tabular node requires exact native opening and known mode',async()=>{
  for(const vendor of ['group','clustering','linregression'])for(const mode of ['d52_valid','d52_foreign_node','d52_foreign_path','d52_no_opening','d52_no_guid','d52_other_port','d52_other_index','d52_unknown_mode','d52_both_modes','d52_missing_chain']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
@@ -4826,6 +4872,39 @@ async function calculatorNodeOverflowFixture() {
   c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
   return {page,crumbs,nodeTree,component,wizard,binding};
 }
+
+test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
+ // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','binding','component','visibility','opacity','duplicate','panel']){
+  const {page,crumbs,wizard,binding,nodeTree,component}=await calculatorNodeOverflowFixture();
+  delete binding.input_port;
+  const guid='d6677c45-99d0-46f2-889c-be24a51bff13',name='l443f_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(crumbs[2].ownText,name).replaceAll('amount_double','Число_точек_в_группах');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек в группах';binding.node_id=guid;nodeTree.FGuid=guid;
+  for(const c of crumbs.slice(6))c.remove();
+  for(const c of [...wizard.children])c.remove();
+  page.add('div','MF;TF-5;WizrdMCF;GroupDataWizard;grdUsedFields;tbl','',undefined,wizard);
+  const settings=page.add('a',crumbs[5].attrs['data-tid']+'>Настройка','Настройка',{x:1190,y:41,width:85,height:24},crumbs[5].parentElement);
+  page.add('span',null,'',{x:1191,y:42,width:16,height:16},settings).attrs.class='maptree-icon-wizard';
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='native')nodeTree.FGuid='foreign';
+  if(fault==='binding')binding.node_id='foreign';
+  if(fault==='component')component.el.dom={};
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const r=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  assert.equal(r.output.wizard.stage,'grouping');
+  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='none',hidden+':'+fault);
+  if(fault==='none')assert.deepEqual(r.output.wizard.owner_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+  assert.deepEqual(page.events,[]);
+ }
+});
 
 test('Calculator input Done keeps the exact native node hidden by the admitted package breadcrumb',async()=>{
   const {page}=await calculatorNodeOverflowFixture(),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
@@ -4946,6 +5025,45 @@ test('Calculator output Done keeps its exact overflow node and output folder own
   const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.port_context.status,'observed');assert.equal(r.output.wizard.port_context.node.label,'amount_double');
   assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));assert.deepEqual(page.events,[]);
+});
+
+test('D52b output0 retains long saved ancestry through Done only with a verified native owner',async()=>{
+ // l443h-d52b2/execution-events.jsonl:1066-1069,1335: Group output0 is
+ // native verified, but overflow loses port_context and calculator Done times out.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','unverified','foreign_node','visibility','opacity','duplicate','panel']) {
+  const {page,crumbs,wizard,nodeTree}=await calculatorNodeOverflowFixture();
+  const name='l443h_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  const old=crumbs[2].ownText;
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(old,name).replaceAll('amount_double','Число_точек_по_группам');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек по группам';crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  for(const e of [wizard,...wizard.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  for(const c of crumbs.slice(6))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных','Результат');
+  crumbs[6].ownText='Выходные порты';crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].ownText='Результат';crumbs[7].children[0].attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='foreign_node')nodeTree.FGuid='foreign';
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const port={direction:'output',port:0,native_index:0,port_guid:'output0',opening_operation_id:'count-points:output0',node_icon_class:'bg-vendor-icon-groupdata'};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:fault!=='unverified',surface:'wizard',node_id:'node',output_port:port})));
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output?.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,fault==='none',hidden+':'+fault);
+  if(fault==='none') {
+   assert.equal(r.output.wizard.port_context.status,'observed');
+   assert.deepEqual(r.output.wizard.port_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+   const narrow=await page.execute({mode:'observe',root_ref:r.output.wizard.root_ref,output_column_page:{offset:0,limit:8}});
+   assert.deepEqual(narrow.output.wizard.port_context,r.output.wizard.port_context);
+  }
+  assert.deepEqual(page.events,[]);
+ }
 });
 
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
@@ -5091,9 +5209,9 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
     }
     const context=settings?result.output?.wizard?.owner_context:result.output?.wizard?.input_port_context;
     assert.equal(result.output.wizard.stage,stage,stage+':'+mode);
-    assert.equal(context?.status==='observed',mode==='valid',stage+':'+mode);
-    if(mode==='valid')assert.equal(context.node.label,'Выгрузка с русскими заголовками');
-    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),mode==='valid',stage+':'+mode);
+    assert.equal(context?.status==='observed',['valid','hidden_workflow'].includes(mode),stage+':'+mode);
+    if(['valid','hidden_workflow'].includes(mode))assert.equal(context.node.label,'Выгрузка с русскими заголовками');
+    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),['valid','hidden_workflow'].includes(mode),stage+':'+mode);
     assert.deepEqual(page.events,[]);
   }
 });
@@ -5194,8 +5312,8 @@ test('D47b native REST input0/index2 keeps hidden node and folder context',async
   if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-restclient';
   if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
-  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',mode==='valid',mode);
-  else assert.notEqual(mode,'valid',mode);
+  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',['valid','hidden_workflow'].includes(mode),mode);
+  else assert.ok(!['valid','hidden_workflow'].includes(mode),mode);
   assert.deepEqual(page.events,[]);
  }
 });
@@ -5397,8 +5515,77 @@ async function inputPortFinishFixture(mode='valid') {
   if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
     async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
-  return {...f,done,waits:()=>waits};
+  return {...f,done,crumbs,waits:()=>waits};
 }
+
+test('D52b2/b3 native graph keeps the long workflow path before opening input0',async()=>{
+ // l427f-d52b2:903 and l427f-d52b3:949 precede the input0 opening.
+ // Native graph/node are verified; the journal does not include crumb geometry.
+ for(const run of ['d52b2','d52b3'])for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','duplicate','visibility','opacity','attribute','icon','panel','native','node','unbound']){
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1';
+  const guid=run==='d52b2'?'9f9356ac-f499-4b3d-b4f0-512d723ff69a':'d2eba62e-ff33-4092-bb77-93dffba4109d';
+  const label=run==='d52b2'?'Количество точек в группе':'Число точек по группам';
+  const panel=page.add('div',prefix+';NavigationBar;NavigationPanel','',{x:0,y:30,width:1000,height:40});
+  const labels=['Сервер','Пакеты','l427f_'+run+'_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох','Модуль1','Сценарий'];
+  const crumbs=labels.map((label,i)=>page.add('a',prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),label,{x:10+i*100,y:40,width:90,height:20},panel));
+  const icon=page.add('span',null,'',{x:415,y:41,width:16,height:16},crumbs[4]);icon.attrs.class='maptree-icon-workflow';
+  const path=crumbs.map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  const body=page.add('g',prefix+';Graph;'+label.replaceAll(' ','_'),'',{x:100,y:200,width:60,height:60});
+  page.add('span',body.attrs['data-tid']+';Label;Label',label,{x:90,y:170,width:100,height:20},body);
+  page.add('g',body.attrs['data-tid']+';Setting','',{x:130,y:205,width:20,height:20},body.parentElement);
+  const model=page.graphModels.get(body.parentElement),native=model.byTid.get(body.attrs['data-tid']);native.FGuid=guid;native.FIconCls='bg-vendor-icon-groupdata';
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,panel);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='icon'){crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};icon.style.visibility='hidden';}
+  if(fault==='panel')panel.style.display='none';
+  if(fault==='native')model.model.FDiagram.FmxGraph.container={};
+  const options={expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix,navigation_path:path}}})};
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,options,
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:fault==='node'?'foreign':guid,surface:'graph',tid:body.attrs['data-tid']})));
+  const accepted=fault==='none';
+  assert.equal(result.output.workflow_navigation?.status==='observed',accepted,run+':'+hidden+':'+fault);
+  assert.equal(JSON.stringify(result.output.navigation_context?.path)===JSON.stringify(path),accepted,run+':'+hidden+':'+fault);
+  if(fault!=='unbound')assert.equal(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting')?.allowed_actions.includes('begin_wizard')===true,accepted,run+':'+hidden+':'+fault);
+  if(accepted){
+   assert.ok(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting').allowed_actions.includes('open_wizard'),JSON.stringify(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting')));
+   assert.ok(result.output.ui.elements.filter(e=>e.tid===crumbs[hidden].attrs['data-tid']).every(e=>!e.allowed_actions.length));
+   const narrow=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{...options,root_ref:result.output.graph_identity.container_ref},
+    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:guid,surface:'graph',tid:body.attrs['data-tid']})));
+   assert.deepEqual(narrow.output.navigation_context.path,path);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D52b input0 Done retains its exact hidden workflow ancestor through one native graph return',async()=>{
+ for(const fault of ['none','node','workflow','visibility','icon','guid','opening']){
+  const {page,owner,crumbs}=await inputPortFinishFixture();
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};crumbs[4].children[0].box={x:0,y:0,width:0,height:0};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:!owner.isConnected&&fault==='node'?'foreign':'node',surface:owner.isConnected?'wizard':'graph',tid:owner.isConnected?'MF;TF-5;WizrdMCF':'MF;TF-5;Graph;Revenue',
+    ...(owner.isConnected?{input_port:{direction:'input',port:0,native_index:0,port_guid:fault==='guid'?'':'input-0',opening_operation_id:fault==='opening'?'':'open-input',node_icon_class:'bg-vendor-icon-calcdata'},navigation_node:{tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()}}:{})})));
+  const snapshot=await page.observe(),done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  if(['guid','opening'].includes(fault)){assert.equal(done,undefined,fault);continue;}
+  assert.ok(done,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(fault==='workflow')crumbs[4].ownText='Другой сценарий';
+   if(fault==='visibility')crumbs[4].style.visibility='hidden';
+   if(fault==='icon')crumbs[4].children[0].style.visibility='hidden';
+  };
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(r.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(r.trace.some(e=>e.event==='input_port_finish_verified'),fault==='none',fault);
+ }
+});
 
 test('typed input-port finish is offered only with full mapping and exact owner evidence',async()=>{
   for(const mode of ['valid','missing_context','missing_mapping','duplicate_done']){
@@ -7510,4 +7697,42 @@ test('D70 blocking window diagnostics retain native visibility and geometry with
  root.remove();const replacement=page.add('div','OpenDialogForm','',root.box);replacement.attrs.class='x-window';
  assert.equal((await run()).windows[0].status,'incarnation_changed');
  assert.equal(page.events.filter(e=>e==='click').length,0);
+});
+
+// LAB-454 nav-preflight:2332-2342: Join input0 Close keeps nine exact
+// native breadcrumbs, but Scenario, node and input ancestry all overflow.
+test('D2 Join long native ancestry keeps typed Close for both input roles',async()=>{
+ for(const port of [0,1])for(const fault of ['none','visible_label','native','component','icon','mode','guid','opening']) {
+  const {page,binding}=await joinInputPortOverflowFixture('d52_valid',port);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='l454t_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c]of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Центры_и_число_точек');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Центры и число точек';
+   if(i>=4){c.style.display='none';c.box={x:0,y:0,width:0,height:0};for(const icon of c.children)icon.box={...c.box};}
+  }
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  page.add('span',null,'',crumbs[6].box,crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable','',undefined,wizard).attrs.class=fault==='mode'?'':'x-form-cb-checked';
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks','',undefined,wizard);
+  class ModelNodeTreeNode{};const native=new ModelNodeTreeNode();native.FGuid=fault==='native'?'foreign':'node';
+  page.app.ModelNodeTreeNode=ModelNodeTreeNode;
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:native}}}})}}}}};
+  crumbs[5].id='join-node';page.context.Ext={getCmp:id=>id===crumbs[5].id&&fault!=='component'?{el:{dom:crumbs[5]},_node:{data:{node:native}}}:null};
+  if(fault==='visible_label')crumbs[3].ownText='Другой модуль';
+  if(fault==='icon')crumbs[5].children[0].style.visibility='hidden';
+  if(fault==='guid')binding.input_port.port_guid='';
+  if(fault==='opening')binding.input_port.opening_operation_id='';
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const result=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  const yes=result.output.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,fault==='none',port+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
 });
