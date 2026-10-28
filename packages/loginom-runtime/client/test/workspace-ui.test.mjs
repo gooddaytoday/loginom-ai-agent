@@ -4670,7 +4670,8 @@ test('D52b long saved path keeps input0 Done only with exact native opening and 
  // after the long Save, but owner context and finish_wizard are absent.
  // The journal has no ancestor rectangles: exercise each early overflow slot.
  for(const hidden of [0,1,2,3,4])for(const fault of ['none','unbound','d52_no_navigation','d52_foreign_path','d52_no_guid','d52_no_opening','d52_other_port','d52_other_index','wrong_native_icon','path','label','duplicate','visibility','opacity','attribute','clipped','workflow_icon','panel','mode']) {
-  const {page,binding}=await joinInputPortOverflowFixture(fault==='none'?'d52_valid':fault,0,'group');
+  const {page,binding}=await joinInputPortOverflowFixture(fault==='unbound'||fault.startsWith('d52_')?fault:'d52_valid',0,'group');
+  if(fault==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   const name='d2_d52long2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
   for(const [i,c] of crumbs.entries()){
