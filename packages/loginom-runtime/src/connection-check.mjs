@@ -13,11 +13,13 @@ export function browserEnvironment(profile, environment = process.env, platform 
   if (platform === "win32") return env
   // SingletonSocket lives in Chromium's private temp directory, symlinked
   // from the profile. Reserve 64 bytes for its generated name, socket and NUL
-  // within sockaddr_un (104 bytes on macOS, 108 on Linux). Count UTF-8 bytes.
-  const temporary = environment.TMPDIR || "/tmp"
+  // within the conservative sockaddr_un SDK budget (104 bytes on macOS,
+  // 108 on Linux). Count UTF-8 bytes. macOS Chromium has its own override.
+  const temporary = (platform === "darwin" && environment.MAC_CHROMIUM_TMPDIR) || environment.TMPDIR || "/tmp"
   const safe = temporary.startsWith("/") && Buffer.byteLength(temporary) + 64 <= (platform === "darwin" ? 104 : 108)
     ? temporary : "/tmp"
-  return { ...env, TMPDIR: safe, TMP: safe, TEMP: safe }
+  return { ...env, TMPDIR: safe, TMP: safe, TEMP: safe,
+    ...(platform === "darwin" ? { MAC_CHROMIUM_TMPDIR: safe } : {}) }
 }
 
 export function browserLoggingArguments(profile) {

@@ -13,6 +13,7 @@ for (const platform of ['linux', 'darwin']) {
       assert.equal(result.TMPDIR, '/tmp');
       assert.equal(result.TMP, '/tmp');
       assert.equal(result.TEMP, '/tmp');
+      if (platform === 'darwin') assert.equal(result.MAC_CHROMIUM_TMPDIR, '/tmp');
       assert.equal(result.HTTP_PROXY, input.HTTP_PROXY);
       assert.equal(input.TMPDIR, temporary);
     }
@@ -24,6 +25,13 @@ for (const platform of ['linux', 'darwin']) {
     assert.equal(browserEnvironment('/profile', {}, platform).TMPDIR, '/tmp');
   });
 }
+
+test('macOS Chromium-specific override cannot bypass the socket path guard', () => {
+  const result = browserEnvironment('/profile', {TMPDIR: '/tmp/short', MAC_CHROMIUM_TMPDIR: '/tmp/' + 'x'.repeat(120)}, 'darwin');
+  assert.equal(result.MAC_CHROMIUM_TMPDIR, '/tmp');
+  assert.equal(result.TMPDIR, '/tmp');
+  assert.equal(browserEnvironment('/profile', {MAC_CHROMIUM_TMPDIR: '/tmp/mac'}, 'darwin').MAC_CHROMIUM_TMPDIR, '/tmp/mac');
+});
 
 test('Windows keeps native temporary paths', () => {
   const input = {TMPDIR: 'C:\\' + 'x'.repeat(120), TMP: 'C:\\Temp', TEMP: 'C:\\Temp'};
