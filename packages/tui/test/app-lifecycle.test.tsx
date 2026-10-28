@@ -339,3 +339,64 @@ test("the update command in the palette is named after the product", async () =>
     mock.restore()
   }
 })
+
+test("the update dialog names the product while it offers and installs the update", async () => {
+  const setup = await createTestRenderer({ width: 140, height: 40, useThread: false })
+  const core = await import("@opentui/core")
+  mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
+  const events = createEventSource()
+  const calls = createFetch()
+  let api: TuiPluginApi | undefined
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const text = () => setup.captureCharFrame().replace(/\s+/g, " ")
+
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: {},
+        updater: {
+          subscribe: () => () => {},
+          check: async () => ({ current: "1.0.0", latest: "1.0.1" }),
+          apply: () => new Promise<void>(() => {}),
+        },
+        pluginHost: {
+          async start(input) {
+            api = input.api
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node))),
+    )
+
+    await ready
+    await setup.renderOnce()
+    api?.keymap.dispatchCommand("opencode.update")
+    await setup.renderOnce()
+    await setup.renderOnce()
+    const offered = text()
+    setup.mockInput.pressEnter()
+    await setup.renderOnce()
+    await setup.renderOnce()
+    const installing = text()
+    api?.keymap.dispatchCommand("app.exit")
+    await task
+
+    expect(offered).toContain("prompted to restart Loginom AI Agent")
+    expect(installing).toContain("Updating Loginom AI Agent")
+    expect(installing).toContain("Installing Loginom AI Agent 1.0.1")
+    expect(`${offered} ${installing}`).not.toContain("OpenCode")
+  } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})
