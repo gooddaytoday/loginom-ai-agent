@@ -93,7 +93,7 @@ export const nodeApplyInputSchema=object({
  inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99)}),15),
  mode:choice('xlsx','request','enter','k_means','pivot','unpivot','impute','calendar','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact','script'),parameters:object({excel:excelSettingsSchema,...restRequestParametersSchema.properties,target_field:linRegressionParametersSchema.properties.target_field,...clusteringParametersSchema.properties,...crossTableParametersSchema.properties,...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
   source:importSourceSchema,
-  source_switch:object({profile_id:id,expected_records:integer(0,Number.MAX_SAFE_INTEGER),save_operation_id:id}),
+  source_switch:object({profile_id:id,save_operation_id:id}),
   settings:object({source:sourceSettings,format,columns:array(column,1000,1)},[]),
   fields:{anyOf:[dateTimeParametersSchema.properties.fields,missingValuesParametersSchema.properties.fields]},max_nulls_percent:missingValuesParametersSchema.properties.max_nulls_percent,ordered:missingValuesParametersSchema.properties.ordered,rules:replacementParametersSchema.properties.rules,output_mode:replacementParametersSchema.properties.output_mode,prefixes:unionParametersSchema.properties.prefixes,tables:unionParametersSchema.properties.tables,expressions:array(calculatorExpressionSchema,128),order:array(text(128),128,1),group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1),keys:array({anyOf:[sortingKeySchema,joinKeySchema]},1000,1),case_sensitive:boolean,include_joined_keys:boolean,compare_with_locale:boolean,changes:array(reformChangeSchema,128),groups:filterParametersSchema.properties.groups,
   ...javascriptParametersSchema.properties,
@@ -112,7 +112,7 @@ export const nodeApplyInputSchema=object({
 // Discovery uses the same public parameter shapes. Requirements depending on
 // target.kind remain in the installed handler, before any browser mutation.
 export const textImportParametersSchema=object({
- source_switch:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source_switch),description:'Only for an existing text import: after an exact full scan and package.save_checkpoint, switch settings.source.source_path alone, preserve/reopen-check all columns and output mapping, execute once and verify full output-0 row count. profile_id and expected_records identify the caller-supplied exact scan; runtime does not attest that local scan. No column, format or mapping changes allowed. Timeout: inspect the SAME operation, never execute again.'},
+ source_switch:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source_switch),description:'Only for an existing text import: after an exact full scan and package.save_checkpoint, switch settings.source.source_path alone, preserve/reopen-check all columns and output mapping, execute once and verify full output-0 row count. Only profile_id is supplied: backend binds an exact scan receipt to the delivered source digest. Missing receipt yields N not verified with a reason, never successful count verification. Never supply expected_records. No column, format or mapping changes allowed. Timeout: inspect the SAME operation, never execute again.'},
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
   description:'Required for new imports and configuration changes: kind:storage with server_source_ref from a native Files observation selects an existing server file WITHOUT upload; or kind:verified_delivery with artifact_id and upload_operation_id from completed verified delivery (legacy delivery IDs remain accepted). Optional bytes and sha256 must match that receipt. Omit source only to execute an unchanged existing Import: settings:{}, inputs:[], mappings:[], finish:execute and read.ports:[0]. This uses the saved native configuration without uploading again; an old upload ID is not a current receipt.'},
  settings:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.settings),
@@ -184,7 +184,7 @@ export function validateNodeApplyEnvelope(args) {
  }
  return args;
 }
-export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
+export async function dispatchNodeApi(runtime,name,args,{signal,scanReceipt}={}) {
  const definition=runtime.tools.find(tool=>tool.name===name);
  if(!definition||!isNodeApiTool(name))throw Error('Node operation tool is unavailable in this session');
  if(name==='dock_node_read'){
@@ -196,7 +196,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
  signal?.throwIfAborted();
  switch(name){
   case 'dock_node_read':return runtime.startNodeRead(args,{signal});
-  case 'dock_node_apply':return runtime.startNodeApply(args);
+  case 'dock_node_apply':return runtime.startNodeApply(args,{scanReceipt});
   case 'dock_node_resume':
    if(Object.keys(args).length>1)validateActionParameters(nodeApplyInputSchema,args);
    return runtime.startNodeApply(args,{resume:true});

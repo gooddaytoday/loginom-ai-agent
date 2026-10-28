@@ -128,7 +128,10 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 ограничение, не объявляй preview точной сверкой. Построй и проверь сценарий на
 доставленной выборке, затем сохрани пакет через `package.save_checkpoint`.
 У существующего текстового импорта используй `source_switch` с `profile_id`,
-точным `expected_records` полного прохода и `save_operation_id`; в `settings`
+и `save_operation_id`; число `expected_records` передавать запрещено. Backend сам
+загружает receipt точного прохода текущей сессии и связывает его SHA/bytes с
+проверенной доставкой. Без receipt или digest-связи (включая storage preview)
+результат «N не сверено» с причиной; успешной сверкой это не называй. В `settings`
 передай только `source:{source_path:"<полный файл>"}`, без columns/format/mappings.
 Источник — исходный storage ref или проверенная доставка полного файла.
 Этот режим сверяет колонки и mapping до и после повторного открытия мастера,

@@ -34,10 +34,9 @@ export function validateTextImportNodeParameters(p,mode,request) {
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0
     &&request.mappings.length===0&&Object.keys(p.settings).join(',')==='source'
     &&Object.keys(p.settings.source??{}).join(',')==='source_path'
-    &&Object.keys(p.source_switch).sort().join(',')==='expected_records,profile_id,save_operation_id'
-    &&Number.isSafeInteger(p.source_switch.expected_records)&&p.source_switch.expected_records>=0
+    &&Object.keys(p.source_switch).sort().join(',')==='profile_id,save_operation_id'
     &&['profile_id','save_operation_id'].every(k=>typeof p.source_switch[k]==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(p.source_switch[k])),
-    'Full source switch requires existing import, source_path only, profile_id, expected_records, saved package receipt and output 0; no column or mapping edits');
+    'Full source switch requires existing import, source_path only, profile_id (no model-supplied count), saved package receipt and output 0; no column or mapping edits');
   // Explicit admission boundary for the private Done increment. Both definition
   // readers require complete native schemas, including every offscreen field.
   requireValue(mode==='delimited' && ['done','execute','close'].includes(request.finish) && (request.read.ports.length===0||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
@@ -97,6 +96,19 @@ export function verifyImportRowCount(expected,output,execution) {
     count_source:'completed_execution_port_source'};
 }
 
+export function verifyFullImportCount(profileId,receipt,source,output,execution) {
+  const reason = !receipt ? 'Trusted exact scan receipt is absent'
+    : receipt.basis!=='backend_exact_scan'||receipt.profile_id!==profileId ? 'Exact scan profile identity does not match'
+    : source.kind==='storage' ? 'Storage preview has no trusted digest binding to the local exact scan'
+    : !/^[a-f0-9]{64}$/.test(receipt.sha256??'')||source.sha256!==receipt.sha256||source.bytes!==receipt.bytes
+      ? 'Exact scan source digest or byte identity does not match verified delivery'
+    : !receipt.identity?.canonical_path||receipt.identity.size!==receipt.bytes||!receipt.identity.file_id
+      ||!Number.isSafeInteger(receipt.records)||receipt.records<0 ? 'Exact scan receipt is incomplete' : null;
+  if(reason)return {status:'not_verified',message:'N не сверено',reason,profile_id:profileId,actual_records:output.row_count};
+  return {status:'verified',...verifyImportRowCount(receipt.records,output,execution),profile_id:profileId,
+    profile_identity_basis:'backend_exact_scan_sha256',source_identity:receipt.identity};
+}
+
 export function importSchemaSnapshot({source,format,columns,mapping}) {
   const values=(group,skip=[])=>Object.fromEntries(Object.entries(group?.fields??{}).filter(([k])=>!skip.includes(k)).map(([k,v])=>{
     requireValue(v.status==='observed'&&v.truncated!==true,'LOGINOM_IMPORT_SCHEMA_CHANGED: incomplete parsing settings');return [k,v.value];
@@ -149,7 +161,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,verifySourceSwitchSave})=>{
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,verifySourceSwitchSave,scanReceipt})=>{
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt;
     const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
@@ -357,12 +369,12 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         const aligned=alignReadSchema(output.schema,outputColumns);
         output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
         if(sourceSwitch){
-          try{output.full_import_verification={...verifyImportRowCount(sourceSwitch.expected_records,output,executionReceipt),
-            profile_id:sourceSwitch.profile_id,profile_identity_basis:'caller_supplied_exact_scan',source:sourceReceipt.source,
+          try{output.full_import_verification={...verifyFullImportCount(sourceSwitch.profile_id,scanReceipt,sourceReceipt.source,output,executionReceipt),
+            source:sourceReceipt.source,
             saved_before_switch:saveReceipt,schema_before:schemaBefore,schema_after:schemaAfter};}
           catch(error){error.nodePhaseRefusal={phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,
             verification:'text_import_full_count_refused',execution_id:executionReceipt.execution_id,
-            expected_records:sourceSwitch.expected_records,actual_records:output.row_count,port:output.port,
+            expected_records:scanReceipt?.records,actual_records:output.row_count,port:output.port,
             freshness_basis:output.freshness_basis};throw error;}
         }
         return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});

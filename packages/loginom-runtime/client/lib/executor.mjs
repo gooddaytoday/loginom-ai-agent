@@ -2795,7 +2795,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     // Host-only until the complete real drivers pass admission. All child
     // phases own the same runtime gate; they cannot re-enter public run/act.
-    async runNodeApply(request,{signal,stopSignal,resume=false}={}) {
+    async runNodeApply(request,{signal,stopSignal,resume=false,scanReceipt}={}) {
       request=structuredClone(request);
       signal?.throwIfAborted();checkId(request.operation_id);
       const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
@@ -2853,7 +2853,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
-          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,
+          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
               ...options,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000})),
             verifySourceSwitchSave:id=>{

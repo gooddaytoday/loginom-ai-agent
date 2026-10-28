@@ -269,7 +269,9 @@ async function handle(message) {
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
-        : await state.client.callTool(message.input, undefined, options)
+        : message.input.scanReceipt !== undefined
+          ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
+          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
       send({
         id: message.id,
         result: {

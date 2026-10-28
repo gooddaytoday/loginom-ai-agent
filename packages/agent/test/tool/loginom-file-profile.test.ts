@@ -8,6 +8,7 @@ import {
   sampleFile,
   profilePage,
   exactFileDigest,
+  exactScanReceipt,
 } from "../../src/tool/loginom-file-profile-core"
 import { inspectReferenceFile } from "@loginom-ai-agent/loginom-host/file-reference"
 
@@ -237,4 +238,21 @@ test("single quote dialect and explicit unambiguous date format", async () => {
       expect((await scanFile(p.profile_id, dir)).records).toBe(2)
     },
   )
+})
+
+test("private scan receipt requires exact current source identity", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "scan-receipt-"))
+  try {
+    const source = join(dir, "full.csv")
+    await writeFile(source, "A;B\n1;x\n2;y\n")
+    const p = await csvProfile(source, dir)
+    expect(await exactScanReceipt(p.profile_id, dir)).toBeUndefined()
+    const scan = await scanFile(p.profile_id, dir)
+    const receipt = await exactScanReceipt(p.profile_id, dir)
+    expect(receipt?.records).toBe(2)
+    expect(receipt?.sha256).toBe(scan.sha256)
+    expect(receipt?.identity.canonical_path).toBe(source)
+    await appendFile(source, "3;z\n")
+    await expect(exactScanReceipt(p.profile_id, dir)).rejects.toThrow("LOGINOM_FILE_CHANGED")
+  } finally { await rm(dir, { recursive: true, force: true }) }
 })

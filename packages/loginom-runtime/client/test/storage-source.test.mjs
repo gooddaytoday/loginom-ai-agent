@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServerSourceRegistry} from '../lib/storage-policy.mjs';
-import {verifyTextImportSource,verifyImportRowCount,importSchemaSnapshot,verifyImportSchema,validateTextImportNodeParameters,createTextImportNodeSupport} from '../lib/text-import-node.mjs';
+import {verifyTextImportSource,verifyImportRowCount,verifyFullImportCount,importSchemaSnapshot,verifyImportSchema,validateTextImportNodeParameters,createTextImportNodeSupport} from '../lib/text-import-node.mjs';
 import {importSourceSchema} from '../lib/storage-policy.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 
@@ -63,12 +63,12 @@ test('source discriminator rejects model paths and accepts verified delivery lar
  assert.equal(verifyTextImportSource(p,[uploaded]).source.bytes,bytes);
  uploaded.outcome.output.server_copy_verification.bytes--;assert.throws(()=>verifyTextImportSource(p,[uploaded]),/do not match/);
 });
-test('source switch admission rejects column, format, mapping and new-node mutations',()=>{
+test('source switch admission rejects model-supplied expected N, column, format, mapping and new-node mutations',()=>{
  const p={source:{kind:'storage',server_source_ref:'storage-a'},settings:{source:{source_path:'/worker/full.csv'}},
-  source_switch:{profile_id:'profile-a',expected_records:7692308,save_operation_id:'saved'}};
+  source_switch:{profile_id:'profile-a',save_operation_id:'saved'}};
  const r={target:{kind:'existing'},finish:'execute',read:{ports:[0]},mappings:[],inputs:[]};
  assert.doesNotThrow(()=>validateTextImportNodeParameters(p,'delimited',r));
- for(const change of [p=>p.settings.columns=[{name:'A',label:'A'}],p=>p.settings.format={delimiter:';'},p=>p.source_switch.expected_records=-1]){
+ for(const change of [p=>p.settings.columns=[{name:'A',label:'A'}],p=>p.settings.format={delimiter:';'},p=>p.source_switch.expected_records=7692308]){
   const next=structuredClone(p);change(next);assert.throws(()=>validateTextImportNodeParameters(next,'delimited',r));
  }
  assert.throws(()=>validateTextImportNodeParameters(p,'delimited',{...r,target:{kind:'new'}}));
@@ -94,4 +94,21 @@ test('schema verification covers every column attribute, order, parsing and outp
   s=>s.mapping.target_fields[0].source.name='Other',s=>s.format.decimal_separator='.',s=>s.source.encoding='65001']){
   const after=structuredClone(snapshot);change(after);assert.throws(()=>verifyImportSchema(snapshot,after),/LOGINOM_IMPORT_SCHEMA_CHANGED/);
  }
+});
+
+test('full N uses only a private exact scan bound to verified source bytes and digest',()=>{
+ const execution={verified:true,owner_verified:true,status:'completed',execution_id:'full'};
+ const output={port:0,fresh:true,execution_id:'full',freshness_basis:'completed_execution_port_source',row_count:17};
+ const source={kind:'verified_delivery',bytes:100,sha256:'a'.repeat(64)};
+ const receipt={basis:'backend_exact_scan',profile_id:'p',records:17,bytes:100,sha256:source.sha256,
+   identity:{canonical_path:'/private/full.csv',size:100,file_id:'1:2'}};
+ assert.equal(verifyFullImportCount('p',receipt,source,output,execution).status,'verified');
+ for(const r of [undefined,{...receipt,profile_id:'foreign'},{...receipt,sha256:'b'.repeat(64)},
+   {...receipt,bytes:101},{...receipt,basis:'model'},{...receipt,identity:{}}]){
+   const result=verifyFullImportCount('p',r,source,output,execution);
+   assert.equal(result.status,'not_verified');assert.equal(result.message,'N не сверено');assert.ok(result.reason);
+   assert.equal(result.expected_records,undefined);
+ }
+ assert.equal(verifyFullImportCount('p',receipt,{kind:'storage',bytes:100},output,execution).status,'not_verified');
+ assert.throws(()=>verifyFullImportCount('p',receipt,source,{...output,row_count:18},execution),/ROW_COUNT_MISMATCH/);
 });
