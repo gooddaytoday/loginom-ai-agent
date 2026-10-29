@@ -230,7 +230,8 @@ async function prepareWorkspace(page, options) {
           current.openError={instance,message,root,messages,info:instance.FErrorMessageInfo,element:openErrors[0]};
         return {error:'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError,blocking_windows:blockingWindows};
       }
-      if(blockingWindows?.windows.some(w=>w.message_box))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};
+      // Buttonless native progress windows may settle on their own.
+      if(blockingWindows?.windows.some(w=>w.message_box?.buttons.length>0))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};

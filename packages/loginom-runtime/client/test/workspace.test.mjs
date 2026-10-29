@@ -669,13 +669,13 @@ test('D70 an active owned offscreen picker retains the original preparation dead
  assert.equal(r.trace.at(-1).blocking_windows.windows[0].native_owner.hidden,false);
 });
 
-for(const intent of ['new_draft','open_package'])for(const owner of ['native','foreign','custom body'])test('preparation reports bounded native MessageBox diagnostics: '+intent+' '+owner,async()=>{
+for(const intent of ['new_draft','open_package'])for(const owner of ['native','foreign','custom body','transient progress'])test('preparation reports bounded native MessageBox diagnostics: '+intent+' '+owner,async()=>{
  const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll,getCmp=c.Ext.getCmp;
  const text=value=>({isConnected:true,innerText:value,getAttribute:()=>null,parentElement:null,
   getBoundingClientRect:()=>({width:100,height:20}),matches:()=>false,closest:()=>null});
  const title=text('Ошибка'),body=text('Не удалось открыть пакет. '+ 'x'.repeat(2500)),button=text('OK');
  const box={...text('DO NOT READ WHOLE DIALOG'),id:'native-msgbox',getAttribute:k=>k==='data-tid'?'msgbox':null,
-  contains:e=>[title,body,button].includes(e),querySelector:()=>null,querySelectorAll:()=>[button]};
+  contains:e=>[title,body,button].includes(e),querySelector:()=>null,querySelectorAll:()=>owner==='transient progress'?[]:[button]};
  button.getAttribute=k=>k==='data-tid'?'msgbox;tlb;ok':null;
  const native={$className:'Ext.window.MessageBox',el:{dom:owner==='foreign'?{}:box},hidden:false,
   header:{titleCmp:{textEl:{dom:title}}},body:{dom:body},
@@ -687,8 +687,12 @@ for(const intent of ['new_draft','open_package'])for(const owner of ['native','f
  const locator=f.page.locator;
  f.page.locator=q=>{const l=locator(q),click=l.click;l.click=async(...args)=>{await click(...args);if(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen'))shown=true;};return l;};
  let elapsed=0;class Clock extends Date{static now(){return elapsed;}}
- c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;};
+ c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;if(owner==='transient progress')shown=false;};
  const r=await execute(f,{intent,...(intent==='open_package'?{packagePath:'/user/test.lgp'}:{}),timeoutMs:500},Clock);
+ if(owner==='transient progress'){
+  assert.equal(r.status,'READY');assert.equal(elapsed,100);
+  assert.equal(f.events.filter(e=>e==='create_draft'||e==='open_package').length,1);return;
+ }
  assert.equal(r.status,'NOT_READY');assert.equal(r.effect_possible,true);
  const diagnostic=r.trace.at(-1).blocking_windows.windows[0].message_box;
  if(owner==='foreign'){assert.equal(diagnostic,undefined);return;}
