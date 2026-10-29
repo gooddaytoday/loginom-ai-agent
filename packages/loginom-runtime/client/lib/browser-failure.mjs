@@ -3,6 +3,7 @@
 export function browserFailureCategory(response){
  const text=(response?.content??[]).filter(b=>b.type==='text'&&typeof b.text==='string').map(b=>b.text.slice(0,16384)).join('\n');
  const known=[
+  ['UPLOAD_DEBUG_DIALOG',/\["confirm" dialog with message "Assert failed: at LoadView\.CorrectWindowPosition \(https?:\/\/[^\s")]+\/app\/bg\/filestorage\/LoadView\.js:94:23\)\n\nBreak into debugger\?"\]/],
   ['LOGINOM_DISCONNECTED',/Loginom connection is disconnected; (?:restore the original session|original session recovery unverified)/],
   ['LOGINOM_IDENTITY_CHANGED',/Loginom account or document changed; prepare the workspace again/],
   ['BROWSER_CLOSED',/Target page, context or browser has been closed|Browser has been closed|browser is closed/i],

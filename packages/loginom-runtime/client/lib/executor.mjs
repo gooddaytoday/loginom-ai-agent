@@ -2,7 +2,7 @@ import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic}
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
-import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode} from './artifact-discovery.mjs';
+import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -58,7 +58,7 @@ const artifactVerifyTool={name:'dock_artifact_verify',
   annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}};
 export const executorTools = [actionDescribeTool, actionRunTool, operationInspectTool, operationRecoverTool, uiActionTool];
 
-async function browserArtifactUpload(page,task,observe,resolveConflict) {
+async function browserArtifactUpload(page,task,observe,resolveConflict,guardDialog) {
   let phase='preconditions',effect=false,input;
   const trace=[];
   const outcome=(status,code,output={})=>({status,action_key:'artifact.upload',action_revision:'1',operation_id:task.operation_id,
@@ -118,6 +118,7 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
     }
     trace.push({event:'upload_preconditions_verified',destination:task.artifact.upload.destination});
     const inputTimeout=remaining(15000);
+    await guardDialog(page,task,'install');
     phase='submitting';effect=true;
     await input.setInputFiles(task.upload_path,{timeout:inputTimeout});
     phase='submitted';trace.push({event:'upload_input_submitted'});
@@ -157,13 +158,16 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
       artifact_id:task.artifact.artifact_id,upload_grant_id:task.artifact.upload.grant_id,destination:task.artifact.upload.destination,
       bytes:task.artifact.bytes,sha256:task.artifact.sha256,verification_required:true});
   } catch {return outcome(effect?'AMBIGUOUS':'NOT_APPLIED',effect?'UPLOAD_SUBMISSION_UNCERTAIN':'UPLOAD_PREFLIGHT_FAILED');}
-  finally {if(input)try{await input.dispose();}catch{}}
+  finally {
+    if(!task.large_upload||!effect){const dialog=await guardDialog(page,task,'release');if(dialog.dismissed)trace.push({event:'upload_debug_dialog_dismissed',count:dialog.dismissed});}
+    if(input)try{await input.dispose();}catch{}
+  }
 }
 
 export function makeArtifactUploadCode(options) {
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.snapshot?.observation_root?.ref,
     expected_build:options.expected_build,expected_origin:options.expected_origin});
-  return `async (page) => (${browserArtifactUpload.toString()})(page,${JSON.stringify(options)},${observe},${resolveArtifactUploadConflict.toString()})`;
+  return `async (page) => (${browserArtifactUpload.toString()})(page,${JSON.stringify(options)},${observe},${resolveArtifactUploadConflict.toString()},${guardUploadDebugDialog.toString()})`;
 }
 
 async function browserArtifactReveal(page,task,snapshot) {
@@ -1477,8 +1481,8 @@ export function parseCapabilityResult(response) {
     // redactor while callers retain the fixed public refusal.
     const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
       .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
-    throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
-      {cause:new Error(message)});
+    throw Object.assign(new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
+      {cause:new Error(message)}),{code:browserFailureCategory(response)});
   }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
@@ -1486,7 +1490,9 @@ export function parseCapabilityResult(response) {
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  throw new Error('Pinned browser capability returned no typed result');
+  const error=new Error('Pinned browser capability returned no typed result');
+  if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
+  throw error;
 }
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
@@ -2671,7 +2677,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             throw new Error('Upload receipt identity mismatch');
         } catch(error) {
           try{await onRecord({phase:'artifact_upload_transport_failed',operation_id:operationId,cause:operationFailureDiagnostic(error)});}catch{}
-          operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');
+          // MCP can return early when the owned toast confirm appears. The
+          // exact-dialog guard dismisses it; read the original receipt only.
+          // Never resend the upload or give it a new deadline.
+          if(error.code==='UPLOAD_DEBUG_DIALOG'){
+            for(let attempt=0;attempt<20&&now()<operation.deadline;attempt++){
+              await new Promise(resolve=>setTimeout(resolve,100));
+              try{
+                const state=await readReceipt(operation);
+                if(state.state==='completed'){outcome=state.receipt;await remember(operation,'upload_receipt_recovered',outcome);break;}
+                if(state.state!=='running')break;
+              }catch(recoveryError){if(recoveryError.code!=='UPLOAD_DEBUG_DIALOG')break;}
+            }
+          }
+          if(!outcome){operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
         }
         operation.cleanupConfirmed=!operation.transportUncertain && outcome.cleanup_complete===true;
         operation.outcome=outcome;
