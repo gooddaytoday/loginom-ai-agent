@@ -415,6 +415,7 @@ async function verificationFixture({onRecord,nodeType,shortVerificationClock=fal
  const el=(tid,allowed_actions=['click'])=>({tid,ref:'ui-'+Buffer.from(tid).toString('hex'),allowed_actions,signature:{tid}});
  const port={index:0,port_guid:'port-0',tid:'MF;TF-1;Graph;Source;Output_Data-0',active:true};
  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:files?{workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'}:workflow,authenticated:true,
+  active_tab_ref:el(files?'files-tab':workflow.tab_tid).ref,
   file_storage:files?{status:'observed',directory:'/user'}:undefined,
   dom_epoch:{document:'doc',revision:1},scan:{complete:true},prepared_node_context:context,
   wizard:{status:'absent'},nodes:[{node_ref:{workflow_ref:workflow,node_label:'Source'},bounding_box:{x:0,y:0,width:10,height:10},ports:[{tid:port.tid,ui_ref:el(port.tid).ref}]}],navigation_context:{status:'observed'},ui:{masks:[],dialogs:busy?[{ref:'ui-foreign',identity:{anchor_tid:'foreign'}}]:[],
