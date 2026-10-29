@@ -7,6 +7,62 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
+test('Excel opening waits only for its native spreadsheet LoadMask message',async()=>{
+ for(const fault of [null,'foreign_target','foreign_mask','dialog','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview','changed_node','changed_stage','expired']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let path='',waits=0,maskRoot,preview,grid;
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;Excel','',undefined,graph);
+  page.add('span',base+'Graph;Excel;Label;Label','Excel',undefined,body);
+  page.add('g',base+'Graph;Excel;Setting','',{x:500,y:300,width:30,height:30},graph);
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',
+   node_id:fault==='changed_node'&&waits?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
+   tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;Excel'),...(!page.events.includes('click')?{locked:false}:{})});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,kind:'workspace-ui',opening_timeout_ms:2000,
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},binding));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);graph.remove();
+   const wizard=page.add('div',base+'WizrdMCF');
+   page.add('input',base+'WizrdMCF;ImportExcelFilePreviewWizard;edtFileName','',undefined,wizard);
+   const tid=base+'WizrdMCF;ImportExcelFilePreviewWizard;frmSpreadSheetsPreview';
+   preview=page.add('div',tid,'',undefined,fault==='outside_preview'?page.document.body:wizard);
+   if(fault==='duplicate_preview')page.add('div',tid,'',undefined,wizard);
+   grid=page.add('div',tid+';frmPreviewExcelFile;grdSheet','',undefined,preview);grid.attrs.class='bg-excel-spreadsheet';grid.id='excel-grid';
+   maskRoot=page.add('div',null,'');maskRoot.attrs.class='x-mask';maskRoot.id='excel-mask';
+   const message=page.add('div',null,'Загрузка...',undefined,maskRoot);message.attrs.class='x-mask-msg';
+   const target={el:{dom:fault==='foreign_target'?page.document.body:grid}},mask={
+    $className:fault==='wrong_component'?'Ext.Component':'Ext.LoadMask',isLoadMask:true,target,ownerCt:target,
+    el:{dom:fault==='wrong_mask'?page.document.body:maskRoot},msgWrapEl:{dom:fault==='wrong_message'?maskRoot:message}};
+   page.context.Ext={getCmp:id=>id==='excel-mask'?mask:id==='excel-grid'?target:null};
+   const node=page.add('a',base+'cnrNaviMode;b.s_'+path+'>Excel','Excel',undefined,panel);
+   page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-importexcel';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>Excel>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+   if(fault==='detached_target')grid.remove();
+  };
+  page.waitForTimeout=async ms=>{clock.advance(ms);waits++;
+   if(fault==='foreign_mask'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(fault==='dialog'&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
+   if(fault==='changed_stage'&&waits===1){
+    page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF;ImportExcelFilePreviewWizard;edtFileName"]')[0].remove();
+    page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,preview);
+   }
+   if(fault!=='expired'&&waits===3)maskRoot.remove();
+  };
+  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',String(fault)+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  if(!fault){assert.equal(waits,3);assert.equal(result.trace.find(e=>e.event==='ui_mask_wait_started').masks[0].import_preview_owner_ref,result.output.wizard.root_ref);}
+  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(['foreign_target','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview'].includes(fault))assert.equal(waits,0,fault);
+ }
+});
+
 function tabBarFixture(options) {
   const page=new Page(options),base='MF;cntMain;cntWorkspace;Workspace;t.br';
   const bar=page.add('div',base,'',{x:10,y:5,width:400,height:30});
