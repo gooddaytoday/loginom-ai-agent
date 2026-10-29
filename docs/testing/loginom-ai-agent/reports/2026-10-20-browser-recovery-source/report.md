@@ -266,3 +266,43 @@ source audit/driver source/commands/raw pre-post receipts сохранены в 
 не выбран; root Step5 требует дальнейшего решения по недостаточным endpoint данным.
 Исторические FAIL/UNKNOWN и native cleanup outcomes не переоценены; новых ожиданий,
 recovery, API, source fix, commit/push/merge/release не было.
+
+
+## 2026-10-29 — storage settle: source ready, native BR-S5 FAIL
+
+По [отдельному плану](../../../../superpowers/plans/2026-10-29-browser-recovery-storage-settle.md)
+после independent preflight GO реализованы producer native-window readiness и ожидание
+в existing reader. Behavioral RED→GREEN и focused561/561 PASS,0fail/0skip;
+production2файла+55/−11, source7файлов+142/−22. Acceptance harness/критерии не менялись.
+Clean source `024668f7ee09613171fcae5221f2d3fc8eb70203`; fresh stock desktop/linux-x64
+stage и staged-node verifyResources PASS/4753, оба source MJS byte-equal.
+Manifest SHA256 `f718a0c587d5d54501c1c58f07c21269a52516d4affb8fdbe92ef7ff3b8fbafb`.
+
+Единственный unchanged BR-S5 FAIL/exit1: recovered.result continuable вместо
+completed. Execute fault×1, execution verified/owner_verified/completed,
+destination absence verified/existedfalse, recovery browser calls0 подтверждены.
+Четыре scroll `[1000,1000,1000,1000]`, все8 export-file steps SUCCEEDED;
+read refusal storage_navigation/STORAGE_ENTRY_UNAVAILABLE/no_scroll_owner,
+quiet own graph restored/lease released. Handoff/verified есть, dock_resumed нет;
+download/bytes_verified/read_completed0. Current файл/SHA/lineage/CSV и финальный
+Dock Save/modifiedfalse не достигнуты, completed execution их не заменяет.
+
+Последний сохранённый table после четвёртого scroll:65 name rows/65 scroll metadata,
+same exact root/owner,14 eligible anchors,top4000/max15824,rendered_window_readyfalse.
+Это pending observation, само по себе оно не демонстрирует no_scroll_owner.
+Failing logical table/name-discovery observation не сохранён: empty/no-scroll rows
+до readiness или отсутствие eligible anchor после settlement — UNKNOWN.
+Новый browser/readback/runtime для выяснения не запускался.
+
+Native cleanup отдельно BLOCKED/UNSAVED_CHANGES/package_closedfalse/logged_outfalse,
+discard не выполнялся. Managed close LOGINOM_RUNTIME_CLEANUP_FAILED/ACKfalse/exit1;
+bridge_ack rejected. Context/OS inventory UNKNOWN, exit не доказывает native logout.
+Private root `/home/george/.cache/loginom-ai-agent/storage-settle-s5-20261029-rqa7lc_h`,
+evidence `56c297df-da4a-4077-b51d-65b00c6c5607`, attempt `b1be8f4a-3ba5-4938-9048-dc23837f9f4d`.
+Raw receipts/journal/build identities/profile сохранены0700/0600; temporary stage
+launcher удалён. Root проверил raw result/recovery/cleanup/close и journal618–627.
+Никаких повторов S5/Export/Save/жестов, ручного cleanup/kill или upstream после
+отказа не было. Independent task review: source Steps1–5 compliant/quality Approved,
+mandatory0/optional0; полный Task1 BLOCKED, native S5 открыт.
+Исторические FAIL/UNKNOWN и установленная/model приёмка не переоценены; release-флаг
+не включён, merge/release не выполнялись.

@@ -74,8 +74,10 @@ test/loginom/browser-recovery-acceptance.ts BR-S5 \
 
 - [ ] **Step7 — после main-path PASS.** Один `bun run test:upstream` из `packages/loginom-runtime`, pinned Node в command-local PATH. Root проверяет текущие acceptance receipts, получает independent scoped spec+quality review, разрешает mandatory замечания; optional hardening не добавляется. Обновить3 owning docs и этот план по фактам, checkpoint≤20строк, отдельный report commit. Merge/release не входят в задачу.
 
-## Checkpoint — ACTIVE
+## Checkpoint — FAIL / STOP
 
-- Source Steps1–5 выполнены: producer readiness и reader settling, behavioral RED→GREEN, focused561/561PASS.
-- Runtime full upstream и native BR-S5 ещё не проверены; прежний S5 FAIL не переоценён.
-- Следующий шаг — clean source commit, fresh stock stage и ровно один unchangedS5; после PASS — upstream/review.
+- Source Steps1–5 выполнены; behavioral RED→GREEN и focused561/561PASS. Source commit и fresh stock stage identities — в [отчёте](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-29--storage-settle-source-ready-native-br-s5-fail).
+- Step6: единственный unchangedS5 FAIL, continuable/STORAGE_ENTRY_UNAVAILABLE/no_scroll_owner вместо completed. Последний сохранённый table pending; failing logical observation отсутствует, точная ветка UNKNOWN.
+- Native cleanup BLOCKED/UNSAVED_CHANGES, ACKfalse/exit1; context/OS inventory UNKNOWN. Повторов/ручной очистки не было, исторические ограничения сохранены.
+- Upstream не запускался: первый сквозной путь не прошёл. Independent task review: source Steps1–5 compliant/quality Approved, mandatory0/optional0; полный Task1 BLOCKED, исходный S5 не завершён.
+- Следующий шаг — принять factual report/review и определить минимальный способ установить failing observation; новый native прогон требует новой проверяемой гипотезы.

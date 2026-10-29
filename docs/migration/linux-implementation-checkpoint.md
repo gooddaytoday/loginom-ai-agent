@@ -2,17 +2,18 @@
 
 ## 2026-10-29 — browser recovery: ACTIVE
 
-Работа возобновлена по запросу владельца; новых live-прогонов нет, harness не менялся.
-Causal scroll report принят DONE_WITH_CONCERNS; literal timing/OS ограничения сохранены.
-Единственная boundary-проба: start geometry и scroll0→1000→2000→3000 подтверждены.
-Четвёртый scroll NOT_APPLIED/UI_REFERENCE_OBSCURED/no-effect, endpoint не достигнут.
-Native Close/logout/noDiscard PASS; context CLOSED/pages0; OS_NOT_CONFIRMED.
-BLOCKED report/cleanup приняты independent spec+quality review без замечаний.
-Исходный S5 FAIL/deferred; новая реализация ещё не проверена, новых live пока нет.
-Private evidence/profile/source audit сохранены, temporary executables удалены.
-[План29.10](../superpowers/plans/2026-10-29-browser-recovery-storage-settle.md) получил preflight GO:
-Producer/reader source и focused checks готовы; дальше fresh stage/один unchangedS5, затем upstream/review.
-[Историческая проба](../superpowers/plans/2026-10-20-browser-recovery-rendered-window.md),
+[Storage-settle план](../superpowers/plans/2026-10-29-browser-recovery-storage-settle.md):
+preflight GO, source producer/reader readiness, behavioral RED→GREEN/focused561PASS.
+Clean source/fresh stock stage/verifyResources4753PASS; unchanged BR-S5 FAIL:
+execution verified/completed, reader no_scroll_owner → continuable без файла/Save.
+Last saved table pending/same owner/65rows/14anchors; failing observation отсутствует,
+точная ветка UNKNOWN. Native cleanup BLOCKED/UNSAVED_CHANGES/ACKfalse/exit1;
+context/OS inventory UNKNOWN, повторов/ручного cleanup/kill не было.
+Upstream NOT_RUN до main-path PASS; source review compliant/quality Approved/mandatory0;
+полный Task1 BLOCKED. Следующий шаг — минимальная гипотеза для failed observation.
+Исторические causal timing/boundary/OS ограничения и прежний S5 FAIL не переоценены.
+Private evidence/profile/identities сохранены, temporary executable удалён.
+[Canonical checkpoint](../superpowers/plans/2026-10-19-browser-recovery.md#checkpoint--29102026-active),
 [фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
