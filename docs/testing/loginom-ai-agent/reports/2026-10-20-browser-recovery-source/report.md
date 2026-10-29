@@ -404,3 +404,30 @@ row interaction counts, refusal/restore/lease и cleanup/ACK/actual exit.
 Independent incremental native factual review APPROVED, mandatory0/optional0. Attribution завершает только
 diagnostic slice; original S5/план5Task2 остаются открыты. Следующий product fix требует
 отдельного минимального плана и independent review; прежние FAIL/UNKNOWN сохранены.
+
+
+## 2026-10-30 — scroll anchor wait: source Task1 PASS
+
+[Минимальный план](../../../../superpowers/plans/2026-10-30-browser-recovery-scroll-anchor.md)
+получил independent GO, mandatory0/optional0. Source `c3ab0f517273bf8c3fc716f03df4a6359503c226`:
+3файла84+/25−, production20 changed lines. Existing shared reader ждёт range-ready
+и допустимый anchor либо exact target, найденный conditional name discovery;
+исходный внешний fresh lookup/detail сохраняет name/binding validation. Normal path
+не получает новых reads; blocked sample добавляет1 exact lookup в пределах прежнего
+ready/deadline. Producer, actuator,12scroll/delta1000, API, journal и harness неизменны.
+Permanent absent-target/no-anchor использует существующий timeout/cleanup путь.
+
+Meaningful RED старого reader: no_scroll_owner до sleep; GREEN того же сценария
+подтвердил fresh anchor после одного sleep100 и trace[1000,1000]. Дополнительные
+source behaviors: target вне compact table без scroll, bounded permanent timeout,
+cancel/owner drift, actual Export success/download1/return и late-B inner-match→
+outer-absence с прежними public refusal/redaction/private journal/release1/download0.
+Final focused pinnedNode231/231PASS,0fail/0skip/0warnings,10087ms;
+git diff --check PASS. Independent spec/quality source review Approved, mandatory0/
+optional0; reviewer прочитал сохранённые RED/GREEN/focused logs без повторов тестов.
+
+Task1 завершён. Временность отсутствия точки и causal fix живым запуском пока
+не доказаны: Task2 stage/preflight/native и full upstream NOT_RUN. Последний native
+S5 FAIL/cleanup BLOCKED/context+OSUNKNOWN и все исторические ограничения сохраняются.
+Следующий шаг — fresh stock stage/verify и independent actual preflight, затем
+одна unchanged strict BR-S5. Модели, installed acceptance и merge/release не запускались.
