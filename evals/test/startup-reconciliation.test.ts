@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import os from "node:os"
 import { readStartupCleanup, readStartupManagement } from "../src/startup-reconciliation"
-import { writeLeaseReceipt } from "../src/lease"
+import { readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 import { reconcileEnvironment } from "../src/startup-reconciliation"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { management } from "../src/profile"
@@ -36,7 +36,7 @@ test("startup uses supervisor cleanup and refuses unknown prior processes before
   } finally { await rm(root, { recursive: true }) }
 })
 
-test("startup retains unknown prior admin ownership without touching slot files", async () => {
+test("startup retains unknown prior admin ownership and refuses proof-only release", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-unknown-")), fixture = await parallelFixture(root)
   const identity = { containerId: "a".repeat(64), startedAt: "2026-10-16T10:00:00Z", serverEpoch: "b".repeat(64),
     studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-16T10:00:00Z", configurationHash: "d".repeat(64) }
@@ -48,6 +48,8 @@ test("startup retains unknown prior admin ownership without touching slot files"
     const canary = path.join(fixture.slots.slots[0]!.workspaceRoot, "keep.txt")
     await Bun.write(canary, "unknown ownership")
     await expect(reconcileEnvironment(fixture.slots, identity, "/missing-cli", fixture.lockRoot)).rejects.toThrow("STARTUP_ADMIN_CLEANUP_UNCONFIRMED")
+    const { releaseClosedEnvironment } = await import("../src/startup-reconciliation")
+    await expect(releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)).rejects.toThrow("STARTUP_FINAL_PROOFS_UNCONFIRMED")
     expect(await Bun.file(canary).text()).toBe("unknown ownership")
   } finally { await rm(root, { recursive: true }) }
 })
@@ -70,5 +72,114 @@ test("startup reconciles an admission failure using the run's actual preparation
     await mkdir(path.join(runDir, "preparation/a/status"), { recursive: true })
     await writeLeaseReceipt(path.join(runDir, "preparation/a/status/cleanup.json"), { processes })
     expect(JSON.stringify(await readStartupManagement({ stateDir: root, runDir, commandId: "command", slotId: "a", producerPid: 12 }))).toBe(JSON.stringify(processes))
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("releaseClosedEnvironment uses saved final proofs", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-closed-")), fixture = await parallelFixture(root)
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-16T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-16T10:00:00Z", configurationHash: "d".repeat(64) }
+  const commandId = "closed-command", journal = path.join(fixture.slots.controller.stateDir, "prepare-command.json")
+  try {
+    await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, phase: "unactivated", slotIds: ["a", "b"], identity })
+    const child = Bun.spawn([process.execPath, "-e", `
+      const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+      const {writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      const file=${JSON.stringify(fixture.slots)},identity=${JSON.stringify(identity)};
+      const environment=await acquireEnvironmentLeases(file,2,identity,${JSON.stringify(journal)},${JSON.stringify(fixture.lockRoot)});
+      for(const lease of environment.slots){
+        const proof=file.controller.stateDir+"/cleanup-${commandId}-"+lease.slot.id+".json";
+        await writeLeaseReceipt(proof,{version:2,status:"confirmed",slotId:lease.slot.id,leaseToken:lease.token,serverEpoch:identity.serverEpoch,
+          processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true});
+        await lease.release(proof);
+      }
+      const reservation=environment.server.reservation;
+      await writeLeaseReceipt(file.controller.stateDir+"/cleanup-${commandId}-server.json",{version:2,status:"confirmed",reason:"run-slots-clean",
+        key:reservation.key,token:reservation.token,revision:reservation.revision,serverEpoch:identity.serverEpoch});
+      await environment.server.close();
+    `], { stdout: "ignore", stderr: "pipe" })
+    await new Response(child.stderr).text()
+    expect(await child.exited).toBe(0)
+    const before = await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot })
+    expect(before?.state).toBe("retained")
+    const proofs = await Promise.all((await readdir(fixture.slots.controller.stateDir)).map(async name => {
+      const file = path.join(fixture.slots.controller.stateDir, name)
+      return { file, bytes: await Bun.file(file).text() }
+    }))
+    const { releaseClosedEnvironment } = await import("../src/startup-reconciliation")
+    const serverProof = path.join(fixture.slots.controller.stateDir, `cleanup-${commandId}-server.json`)
+    const savedServerProof = await readLeaseReceipt(serverProof) as Record<string, unknown>
+    await rm(serverProof)
+    await expect(releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)).rejects.toThrow("STARTUP_FINAL_PROOFS_UNCONFIRMED")
+    await writeLeaseReceipt(serverProof, { ...savedServerProof, serverEpoch: "e".repeat(64) })
+    await expect(releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)).rejects.toThrow("LEASE_RELEASE_UNCONFIRMED")
+    await writeLeaseReceipt(serverProof, savedServerProof)
+    const profile = await readResourceReservation({ key: `profile:${fixture.slots.slots[0]!.profileDir}`, lockRoot: fixture.lockRoot })
+    const profileProof = await readLeaseReceipt(profile!.releaseEvidence!.path) as Record<string, unknown>
+    await writeLeaseReceipt(profile!.releaseEvidence!.path, { ...profileProof, status: "unconfirmed" })
+    await expect(releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)).rejects.toThrow("STARTUP_FINAL_PROOFS_UNCONFIRMED")
+    expect((await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot }))?.state).toBe("retained")
+    await writeLeaseReceipt(profile!.releaseEvidence!.path, profileProof)
+    await releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)
+    await releaseClosedEnvironment(fixture.slots, identity, fixture.lockRoot)
+    const after = await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot })
+    expect(after?.state).toBe("released")
+    expect(after?.token === before?.token && after?.revision === before?.revision).toBe(true)
+    for (const proof of proofs) expect(await Bun.file(proof.file).text() === proof.bytes).toBe(true)
+    for (const slot of fixture.slots.slots)
+      expect((await readResourceReservation({ key: `profile:${slot.profileDir}`, lockRoot: fixture.lockRoot }))?.state).toBe("released")
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("terminal cancellation refuses a nonterminal campaign before touching native resources", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-")), fixture = await parallelFixture(root)
+  try {
+    const { cancelUnusedVerification } = await import("../src/terminal-verification")
+    await writeLeaseReceipt(path.join(root, "owner.json"), { campaignId: "campaign" })
+    await mkdir(path.join(root, "campaign"), { mode: 0o700 })
+    await writeLeaseReceipt(path.join(root, "campaign/journal.json"), { campaignId: "campaign", final: null, published: false })
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot))
+      .rejects.toThrow("TERMINAL_CAMPAIGN_REQUIRED")
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test.each(["live", "admitted", "interrupted-admin"] as const)("terminal cancellation refuses %s verify owner", async mode => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-live-")), fixture = await parallelFixture(root)
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const { cancelUnusedVerification } = await import("../src/terminal-verification")
+  const identity = { containerId: "a".repeat(64), studioContainerId: "c".repeat(64), startedAt: "old", studioStartedAt: "old", serverEpoch: "b".repeat(64), configurationHash: "d".repeat(64) }
+  const commandId = "terminal", command = path.join(fixture.slots.controller.stateDir, `verify-command-${commandId}.json`)
+  await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "unactivated" })
+  if (mode === "live") {
+    const env = await acquireEnvironmentLeases(fixture.slots, 1, identity, command, fixture.lockRoot)
+    await env.server.close(); await env.slots[0]!.close()
+  } else {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))}); const e=await acquireEnvironmentLeases(${JSON.stringify(fixture.slots)},1,${JSON.stringify(identity)},${JSON.stringify(command)},${JSON.stringify(fixture.lockRoot)}); await e.server.close();await e.slots[0].close()`], { stdout: "ignore", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    if (mode === "admitted") await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "cli_admitted" })
+    else {
+      await mkdir(path.join(fixture.slots.controller.stateDir, "admin-original"), { mode: 0o700 })
+      await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "admin-original/connection.json"), {
+        status: "disposed", transportDisconnect: "confirmed", identity,
+        processes: { status: "confirmed", capture_complete: true, unknownProcesses: [], lifetime: { producer_pid: child.pid } },
+      })
+      const prior = path.join(fixture.slots.controller.stateDir, `terminal-${commandId}-admins/admin-interrupted`)
+      await mkdir(prior, { recursive: true, mode: 0o700 })
+      await writeLeaseReceipt(path.join(path.dirname(prior), "operation.json"), { version: 1, campaignId: "campaign", commandId, identity })
+      await writeLeaseReceipt(path.join(prior, "connection.json"), { status: "ready", identity,
+        processes: { lifetime: { producer_pid: 999999 } } })
+    }
+  }
+  try {
+    await mkdir(path.join(root, "campaign/verification/check"), { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(path.join(root, "owner.json"), { campaignId: "campaign" })
+    await writeLeaseReceipt(path.join(root, "campaign/journal.json"), { campaignId: "campaign", final: "partial", published: true,
+      verificationDir: path.join(root, "campaign/verification/check") })
+    const receipt = path.join(fixture.slots.controller.stateDir, `verification-${commandId}.json`)
+    const failure = { version: 2, commandId, identity, journal: command, receipt, status: "quarantined", ready: false, reason: "USER_PREPARATION_CONFLICT" }
+    await writeLeaseReceipt(receipt, failure)
+    await writeLeaseReceipt(path.join(root, "campaign/verification/check/receipt.json"), failure)
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow(mode === "live" ? "BUSY" : mode === "admitted" ? "TERMINAL_VERIFY_USED" : "TERMINAL_CANCELLATION_ADMIN_UNCONFIRMED")
+    expect((await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot }))?.state).toBe("retained")
   } finally { await rm(root, { recursive: true }) }
 })

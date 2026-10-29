@@ -54,6 +54,7 @@ export type AdminConnection = {
   inspectPoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
   verifySlotUser(username: string): Promise<void>
+  inspectUserAccount(username: string): Promise<{ objectId: string; name: string; userKind: number }>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
     observation: { startedAt: string; finishedAt: string }; source: { path: string; sha256: string } }>
   inspectUnactivatedUser(lease: SlotLease, secretFile: string): Promise<{ identity: ServerIdentity; username: string;
@@ -200,6 +201,14 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (!jsonObject(data) || !jsonObject(data.ownSession) || data.ownSession.isAdmin !== true)
         throw new EvalFailure("ADMIN_IDENTITY_CHANGED", 2)
       requireSlotUserPolicy(data, username)
+    },
+    async inspectUserAccount(username) {
+      if (!file.slots.some(slot => slot.username === username)) throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
+      await options.serverLease?.assertHeld()
+      const data = (await observe()).data as { users: { objectId: string; name: string; userKind: number }[] }
+      const users = data.users.filter(user => user.name.toLowerCase() === username.toLowerCase())
+      if (users.length !== 1 || users[0]!.name !== username || users[0]!.userKind !== 0) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      return { objectId: users[0]!.objectId, name: username, userKind: 0 }
     },
     async inspectSessionInventory() {
       const observation = await observe()

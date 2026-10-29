@@ -6,17 +6,20 @@ export function buildJobs(taskIds: string[], repeat: number): Job[] {
 
 export async function runSlotQueue<T>(input: {
   jobs: Job[]; slots: string[]; signal: AbortSignal
+  admit?(slotId: string, job: Job): Promise<boolean>
   execute(slotId: string, job: Job): Promise<{ result: T; quarantine: boolean; stop?: boolean }>
 }) {
   const results: { job: Job; slotId: string; result: T }[] = []
   const quarantined: string[] = []
   const stopped: string[] = []
+  const refused: Job[] = []
   let next = 0
   let failed = false
   const drains = await Promise.allSettled(input.slots.map(async slotId => {
     try {
       while (next < input.jobs.length && !input.signal.aborted && !failed) {
         const job = input.jobs[next++]!
+        if (input.admit && !await input.admit(slotId, job)) { refused.push(job); return }
         const completed = await input.execute(slotId, job)
         results[job.index] = { job, slotId, result: completed.result }
         if (completed.quarantine) { quarantined.push(slotId); return }
@@ -26,5 +29,5 @@ export async function runSlotQueue<T>(input: {
   }))
   const errors = drains.flatMap(result => result.status === "rejected" ? [result.reason] : [])
   if (errors.length) throw new AggregateError(errors, "Slot pipeline failed")
-  return { results: results.filter(row => row !== undefined), quarantined, ...(stopped.length ? { stopped } : {}), unassigned: input.jobs.slice(next) }
+  return { results: results.filter(row => row !== undefined), quarantined, ...(stopped.length ? { stopped } : {}), unassigned: [...refused, ...input.jobs.slice(next)].sort((a, b) => a.index - b.index) }
 }

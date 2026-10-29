@@ -1,10 +1,87 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { planPair, reconcilePairResource, serverEpoch, usersMarker } from "../src/parallel-pair"
+import { compatibleStablePairHashes, planPair, reconcilePairResource, serverEpoch, stablePairConfiguration, usersMarker } from "../src/parallel-pair"
 
 const server = { container: "loginom-evals-users", studioContainer: "loginom-evals-studio", network: "loginom-evals-users",
   alias: "loginom-server-7.4.2-test", url: "http://127.0.0.1:32771/app/", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" }
 const nonce = "11111111-1111-4111-8111-111111111111"
+
+test("stable pair comparison accepts only empty DNS representations without changing v1 proofs or input", () => {
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network, Dns: null }, studioHost: { NetworkMode: server.network, Dns: [] },
+    serverNetworks: {}, studioNetworks: {}, components: "components", initial: "initial", served: "served", proxy: "proxy" }
+  const forms = [
+    { ...input, serverHost: { ...input.serverHost, Dns: null }, studioHost: { ...input.studioHost, Dns: null } },
+    input,
+    { ...input, serverHost: { ...input.serverHost, Dns: [] }, studioHost: { ...input.studioHost, Dns: null } },
+    { ...input, serverHost: { ...input.serverHost, Dns: [] }, studioHost: { ...input.studioHost, Dns: [] } },
+  ]
+  const hashes = forms.map(form => stablePairConfiguration(form).hash).sort()
+  expect(new Set(hashes).size).toBe(4)
+  for (const form of forms) {
+    const saved = JSON.stringify(form)
+    expect(compatibleStablePairHashes(form).sort()).toEqual(hashes)
+    expect(JSON.stringify(form)).toBe(saved)
+  }
+})
+
+test("stable pair comparison preserves missing DNS, configured DNS order and other HostConfig fields", () => {
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network }, studioHost: { NetworkMode: server.network },
+    serverNetworks: {}, studioNetworks: {}, components: "components", initial: "initial", served: "served", proxy: "proxy" }
+  expect(compatibleStablePairHashes(input)).toEqual([stablePairConfiguration(input).hash])
+  expect(compatibleStablePairHashes(input)).not.toContain(stablePairConfiguration({ ...input,
+    serverHost: { ...input.serverHost, Dns: null } }).hash)
+  const configured = { ...input, serverHost: { ...input.serverHost, Dns: ["one", "two"], DnsOptions: [], DnsSearch: null,
+    Unknown: { enabled: true } }, studioHost: { ...input.studioHost, Dns: ["three"] } }
+  const hashes = compatibleStablePairHashes(configured)
+  expect(hashes).toEqual([stablePairConfiguration(configured).hash])
+  for (const change of [
+    { serverHost: { ...configured.serverHost, Dns: ["two", "one"] } },
+    { serverHost: { ...configured.serverHost, Dns: [] } },
+    { studioHost: { ...configured.studioHost, Dns: null } },
+    { serverHost: { ...configured.serverHost, DnsOptions: null } },
+    { serverHost: { ...configured.serverHost, DnsSearch: [] } },
+    { serverHost: { ...configured.serverHost, Unknown: { enabled: false } } },
+  ]) expect(hashes).not.toContain(stablePairConfiguration({ ...configured, ...change }).hash)
+})
+
+test("stable pair configuration survives endpoint runtime changes", () => {
+  const network = { NetworkID: "a".repeat(64), Aliases: [server.alias, server.container], IPAMConfig: null,
+    EndpointID: "b".repeat(64), IPAddress: "172.18.0.2", IPPrefixLen: 16, Gateway: "172.18.0.1",
+    GlobalIPv6Address: "", GlobalIPv6PrefixLen: 0, IPv6Gateway: "", MacAddress: "02:42:ac:12:00:02" }
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network }, studioHost: { NetworkMode: server.network },
+    serverNetworks: { [server.network]: network }, studioNetworks: { [server.network]: network },
+    components: "components\n", initial: "initial\n", served: "served\n", proxy: "proxy\n" }
+  const changed = { ...network, EndpointID: "e".repeat(64), IPAddress: "172.18.0.4", IPPrefixLen: 24, Gateway: "172.18.0.254",
+    GlobalIPv6Address: "2001:db8::4", GlobalIPv6PrefixLen: 64, IPv6Gateway: "2001:db8::1", MacAddress: "02:42:ac:12:00:04" }
+  expect(stablePairConfiguration(input)).toEqual(stablePairConfiguration({ ...input,
+    serverNetworks: { [server.network]: changed }, studioNetworks: { [server.network]: changed } }))
+})
+
+test("stable pair configuration ignores key and alias ordering while retaining actual settings", () => {
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network, Dns: ["one", "two"] }, studioHost: { RestartPolicy: { Name: "no", MaximumRetryCount: 0 } },
+    serverNetworks: { [server.network]: { NetworkID: "a".repeat(64), Aliases: [server.alias, server.container],
+      IPAMConfig: { IPv4Address: "172.18.0.2" }, UnknownOption: { enabled: true } } }, studioNetworks: {},
+    components: "components\n", initial: "initial\n", served: "served\n", proxy: "proxy\n" }
+  const proof = stablePairConfiguration(input)
+  expect(proof).toEqual(stablePairConfiguration({ ...input,
+    studioHost: { RestartPolicy: { MaximumRetryCount: 0, Name: "no" } },
+    serverNetworks: { [server.network]: { UnknownOption: { enabled: true }, IPAMConfig: { IPv4Address: "172.18.0.2" },
+      Aliases: [server.container, server.alias], NetworkID: "a".repeat(64) } } }))
+  for (const change of [
+    { serverHost: { ...input.serverHost, Dns: ["two", "one"] } }, { studioImage: "e".repeat(64) },
+    { serverNetworks: { [server.network]: { ...input.serverNetworks[server.network]!, UnknownOption: { enabled: false } } } },
+    { serverNetworks: { [server.network]: { ...input.serverNetworks[server.network]!, IPAMConfig: { IPv4Address: "172.18.0.3" } } } },
+    { serverNetworks: { [server.network]: { ...input.serverNetworks[server.network]!, NetworkID: "f".repeat(64) } } },
+    { serverNetworks: { [server.network]: { ...input.serverNetworks[server.network]!, Aliases: [server.container] } } },
+    ...["components", "initial", "served", "proxy"].map(key => ({ [key]: "changed" })),
+  ]) expect(stablePairConfiguration({ ...input, ...change })).not.toEqual(proof)
+  expect(proof).toEqual({ version: 1, hash: expect.stringMatching(/^[a-f0-9]{64}$/) })
+  expect(Object.keys(proof).sort()).toEqual(["hash", "version"])
+})
 
 test("pair CLI: missing explicit ownership arguments fails before Docker with exit 2", async () => {
   const child = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-pair.ts"), "destroy"],

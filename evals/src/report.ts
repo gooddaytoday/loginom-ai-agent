@@ -17,7 +17,7 @@ export function statusFor(
   run: {
     exitCode: number | null; timedOut: boolean; interrupted: boolean
     sessionId?: string; tokens?: { input: number; output: number; reasoning: number }
-    counters?: { toolCalls: number }; stderrHead?: string; sandboxError?: string | null
+    counters?: { toolCalls: number }; errors?: string[]; stderrHead?: string; sandboxError?: string | null
   },
   hasArtifact: boolean,
 ): { status: Status; stop: boolean } {
@@ -25,6 +25,7 @@ export function statusFor(
   if (run.interrupted) return { status: "interrupted", stop: true }
   if (run.timedOut) return { status: "timeout", stop: false }
   if (run.exitCode === 0) return { status: hasArtifact ? "completed" : "no_artifact", stop: false }
+  if (run.errors?.includes("LOGINOM_CONNECTION_NOT_READY")) return { status: "infra_error", stop: false }
   if (!run.sessionId && run.counters?.toolCalls === 0 && run.tokens?.input === 0 && run.tokens.output === 0 && run.tokens.reasoning === 0 &&
     /\b(?:LOGINOM_HOST_(?:TIMEOUT|CLOSED|NOT_READY|REQUEST_FAILED)|LOGINOM_CONNECTION_NOT_READY|PROFILE_BUSY)\b/.test(run.stderrHead ?? ""))
     return { status: "infra_error", stop: false }
@@ -72,6 +73,12 @@ export type AttemptResult = {
   errors: string[]
   harness_error: string | null
   stderr_head: string | null
+}
+
+export function isQualityResult(result: Pick<AttemptResult, "status" | "failure_kind" | "harness_error" | "pass" | "judge_status"> & Partial<Pick<AttemptResult, "errors">>) {
+  return !["infra_error", "harness_error", "interrupted"].includes(result.status) && result.failure_kind !== "provider" &&
+    !(result.status === "failed" && result.errors?.includes("LOGINOM_CONNECTION_NOT_READY")) &&
+    !result.harness_error && typeof result.pass === "boolean" && ["scored", "no_artifact"].includes(result.judge_status)
 }
 
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits

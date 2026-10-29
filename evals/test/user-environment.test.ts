@@ -10,6 +10,65 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
 
+test("user preparation preserves stable configuration through staging and reentry", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stable-preparation-")), fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const stableConfiguration = { version: 1 as const, hash: "e".repeat(64) }
+  try {
+    const prepared = await stageUserPreparation(fixture.slots, lease, "f".repeat(64), stableConfiguration)
+    expect(prepared).toMatchObject({ stableConfiguration })
+    expect(await readUserPreparation(fixture.slots, lease, prepared.secretFile)).toEqual(prepared)
+    const target = path.join(fixture.slots.controller.stateDir, "prepare-a.json"), bytes = await Bun.file(target).text()
+    expect(await stageUserPreparation(fixture.slots, lease, "f".repeat(64), stableConfiguration)).toEqual(prepared)
+    expect(await Bun.file(target).text()).toBe(bytes)
+  } finally { await lease.close(); await rm(root, { recursive: true }) }
+})
+
+test("user preparation rejects malformed stable evidence without rewriting it or exposing its contents", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stable-invalid-")), fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const proof = { version: 1 as const, hash: "e".repeat(64) }
+  try {
+    const prepared = await stageUserPreparation(fixture.slots, lease, "f".repeat(64), proof)
+    const target = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
+    for (const stableConfiguration of [null, {}, { ...proof, version: 2 }, { ...proof, hash: "short" },
+      { ...proof, diagnostic: "private-canary" }]) {
+      await writeLeaseReceipt(target, { ...prepared, stableConfiguration })
+      const bytes = await Bun.file(target).text()
+      await expect(readUserPreparation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_PREPARATION_CONFLICT")
+      await expect(stageUserPreparation(fixture.slots, lease, "f".repeat(64), proof)).rejects.toThrow("USER_PREPARATION_CONFLICT")
+      expect(await Bun.file(target).text()).toBe(bytes)
+    }
+  } finally { await lease.close(); await rm(root, { recursive: true }) }
+})
+
+test("user preparation resumes the same stable proof and never backfills a legacy receipt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stable-resume-")), fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const proof = { version: 1 as const, hash: "e".repeat(64) }
+  try {
+    const prepared = await stageUserPreparation(fixture.slots, lease, "f".repeat(64), proof)
+    const target = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
+    await writeLeaseReceipt(target, { ...prepared, state: "planned", secretHash: null })
+    const bytes = await Bun.file(target).text(), secret = await Bun.file(prepared.secretFile).text()
+    await expect(stageUserPreparation(fixture.slots, lease, "f".repeat(64), { ...proof, hash: "a".repeat(64) }))
+      .rejects.toThrow("USER_PREPARATION_CONFLICT")
+    expect(await Bun.file(target).text()).toBe(bytes)
+    expect(await stageUserPreparation(fixture.slots, lease, "f".repeat(64), proof)).toEqual(prepared)
+    expect(await Bun.file(prepared.secretFile).text()).toBe(secret)
+    const legacy = { ...prepared }
+    delete legacy.stableConfiguration
+    await writeLeaseReceipt(target, legacy)
+    const legacyBytes = await Bun.file(target).text()
+    expect(await stageUserPreparation(fixture.slots, lease, "f".repeat(64), proof)).toEqual(legacy)
+    expect(await readUserPreparation(fixture.slots, lease, prepared.secretFile)).toEqual(legacy)
+    expect(await Bun.file(target).text()).toBe(legacyBytes)
+  } finally { await lease.close(); await rm(root, { recursive: true }) }
+})
+
 test("unactivated observation reader binds private native reply and command sources without changing them", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-unactivated-read-")), fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })

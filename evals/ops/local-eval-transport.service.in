@@ -1,0 +1,18 @@
+[Unit]
+Description=Local eval-runner-3 reverse SSH
+After=network-online.target loginom-eval-runner3-vm.service
+Wants=network-online.target loginom-eval-runner3-vm.service
+
+[Service]
+Type=simple
+User=@HOST_USER@
+LoadCredential=runner2-password:@CREDENTIAL_FILE@
+UMask=0077
+ExecStart=/usr/bin/sshpass -f %d/runner2-password /usr/bin/ssh -F /dev/null -N -T -o StrictHostKeyChecking=yes -o UserKnownHostsFile=@KNOWN_HOSTS@ -o ExitOnForwardFailure=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -R 127.0.0.1:2224:@VM_SSH_ADDRESS@:2223 @RUNNER_2_TARGET@
+Restart=always
+RestartSec=30s
+TimeoutStopSec=10s
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

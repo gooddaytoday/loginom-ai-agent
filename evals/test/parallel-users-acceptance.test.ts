@@ -1,9 +1,22 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline, assessResourceIncidents } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline, assessResourceIncidents, assessContainerEpochs } from "../src/parallel-acceptance"
 import { sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import os from "node:os"
 import { readlink, stat } from "node:fs/promises"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
+
+test("container epochs distinguish missing observations from an observed identity change", () => {
+  const target = { role: "server" as const, id: "a".repeat(64), startedAt: "original" }
+  const row = { role: target.role, container_id: target.id, epoch_stable: true, inspect: { started_at: target.startedAt, running: true } }
+  expect(assessContainerEpochs({ samples: [{ containers: [row] }], containers: [target] }).status).toBe("passed")
+  for (const containers of [null, [], [{ ...row, inspect: null }], [{ ...row, epoch_stable: false }]])
+    expect(assessContainerEpochs({ samples: [{ containers }], containers: [target] }))
+      .toEqual({ status: "incomplete", codes: ["CONTAINER_RESOURCE_IDENTITY_UNCONFIRMED"] })
+  for (const changed of [{ ...row, container_id: "b".repeat(64) }, { ...row, inspect: { ...row.inspect, started_at: "changed" } },
+    { ...row, inspect: { ...row.inspect, running: false } }])
+    expect(assessContainerEpochs({ samples: [{ containers: null }, { containers: [changed] }], containers: [target] }))
+      .toEqual({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] })
+})
 
 test("resource incidents reject new OOM counters while preserving unchanged historical counts", () => {
   for (const [oom, oomKill, status] of [[5, 2, "passed"], [6, 2, "failed"], [5, 3, "failed"]] as const) {

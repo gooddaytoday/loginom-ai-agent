@@ -20,6 +20,7 @@ async function fixture(ids: string[]) {
     await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), id }))
   }
   const env = {
+    TMPDIR: os.tmpdir(),
     EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model", EVAL_PROFILE_DIR: profile,
     EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
     EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture-key",
@@ -121,14 +122,14 @@ test("CLI SIGINT во время архива infra_error сохраняет к�
   const signal = { sent: false }
   try {
     const out = path.dirname(await waitForFile(context.directory, `results/*/${id}/1/prompt.txt`))
-    // Реальные файлы удерживают архивирование открытым до доставки SIGINT.
-    await Promise.all(Array.from({ length: 2000 }, (_, i) => Bun.write(path.join(out, `archive-${i}.txt`), "fixture")))
     const observed = watch(out, (_, file) => {
       if (file !== "infra-error" || signal.sent) return
       signal.sent = true
       child.kill("SIGINT")
     })
     watcher.close = () => observed.close()
+    // Реальные файлы удерживают архивирование открытым до доставки SIGINT.
+    await Promise.all(Array.from({ length: 2000 }, (_, i) => Bun.write(path.join(out, `archive-${i}.txt`), "fixture")))
     expect(await child.exited).toBe(0)
     const summary = await Bun.file(path.resolve(out, "../../summary.json")).json() as RunSummary
     expect(signal.sent).toBe(true)

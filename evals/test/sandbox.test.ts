@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { cp, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, realpath, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
@@ -90,6 +90,31 @@ test("sandboxCommand: Python читает только входы и writable-п
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test.skipIf(!Bun.which("cc"))("superviseProcess: waits for delayed fork-to-exec before admitting the child", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-delayed-exec-"))
+  try {
+    await Promise.all([mkdir(path.join(root, "installation/bin"), { recursive: true }), mkdir(path.join(root, "profile")), mkdir(path.join(root, "workspace"))])
+    await cp("/usr/bin/python3", path.join(root, "installation/bin/cli"), { dereference: true })
+    await Bun.write(path.join(root, "installation/cli-manifest.json"), "{}")
+    const compiler = Bun.spawn([Bun.which("cc")!, "-shared", "-fPIC", "-o", path.join(root, "delay.so"),
+      path.resolve(import.meta.dir, "../fixtures/delay-exec.c")], { stdout: "ignore", stderr: "pipe" })
+    expect(await new Response(compiler.stderr).text()).toBe("")
+    expect(await compiler.exited).toBe(0)
+    const cmd = [path.join(root, "installation/bin/cli"), "-c", "import time; time.sleep(0.2)"]
+    const boundary = await sandboxCommand({ cmd, profileDir: path.join(root, "profile"), workdir: path.join(root, "workspace"), env: {} })
+    const run = await superviseProcess({ cmd, cwd: boundary.cwd, sandbox: boundary.cmd, timeoutMs: 8_000,
+      env: { ...boundary.env, LD_PRELOAD: path.join(root, "delay.so"), EVAL_EXEC_DELAY_TARGET: boundary.cmd[0]!,
+        EVAL_EXEC_DELAY_RECEIPT: path.join(root, "intercept.json") } })
+    const intercept = await Bun.file(path.join(root, "intercept.json")).json() as { pid: number; parent: number; device: number; inode: number }
+    const executable = await stat(process.execPath)
+    expect(run.processCleanup.launcher?.pid).toBe(intercept.parent)
+    expect([intercept.device, intercept.inode]).toEqual([executable.dev, executable.ino])
+    expect(run).toMatchObject({ exitCode: 0, sandboxError: null,
+      processCleanup: { status: "confirmed", error: null, unknownProcesses: [], capture_complete: true } })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 15_000)
 
 test("superviseProcess: сбой mount обёртки отличается от exit 1 изолированного CLI", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-status-"))
