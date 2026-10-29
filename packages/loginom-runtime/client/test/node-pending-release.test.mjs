@@ -9,6 +9,7 @@ import {validateSortingInputParameters,validateSortingParameters} from '../lib/s
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {runRestStep} from '../lib/rest-step.mjs';
 import {runExportNext} from '../lib/text-export-procedure.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
@@ -43,6 +44,41 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
+});
+test('release waits for its own returned graph mask within a separate finite release deadline',async()=>{
+ const s=surface(),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:true,
+  status:'SUCCEEDED',output:{prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}}}};
+ operation.nodeApply.deadline=1;operation.nodeApply.pending.deadline=1;
+ let settled=false;const observe=s.channel.observe;
+ s.channel.observe=async options=>{
+  if(!settled){assert.equal(options.releaseWizard,true);assert.equal(options.settleWizard.graph_only,true);
+   assert.equal(options.settleWizard.deadline,operation.deadline);assert.equal(options.settleWizard.node.node_id,node.node_id);settled=true;}
+  return observe(options);
+ };
+ assert.equal((await release(operation,s.channel)).cleanup_complete,true);assert.equal(settled,true);assert.deepEqual(s.gestures,[]);
+});
+for(const fault of [null,'foreign','wizard','persistent'])test('release observer settles only its returned graph mask: '+fault,async()=>{
+ let time=1,gestures=0;
+ const operation=stopped();operation.deadline=30000;operation.action={action_key:'node.apply',revision:'1'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ const context={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Source',locked:false};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true,
+  output:{prepared_node_context:context,wizard:{status:'absent'}}}};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+  prepared_node_context:context,wizard:{status:'absent'},ui:{elements:[],dialogs:[],
+   masks:[{kind:'busy',ref:'model',target_tid:'MF;TF-1;ModelForm',graph_loading_owner_ref:'model',dialog_ref:null}],
+   truncated:{elements:false,dialogs:false,masks:false}}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},
+  targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>time,monotonicNow:()=>time,
+  wait:async ms=>{time+=ms;if(!fault&&time>=20000)state.ui.masks=[];
+   if(fault==='foreign')state.ui.masks[0].target_tid='foreign';
+   if(fault==='wizard'){state.prepared_node_context={...context,surface:'wizard'};state.wizard={status:'observed',root_ref:'other',root_tid:'Other'};}},
+  execute:async()=>({status:'SUCCEEDED',output:structuredClone(state)}),record:async e=>structuredClone(e),wrapMutation:()=>{gestures++;}});
+ const run=()=>releasePendingNode({operation,channel,deadline:30000,now:()=>time,readReceipt:async()=>operation.receipt});
+ if(fault)await assert.rejects(run());else{assert.equal((await run()).cleanup_complete,true);assert.ok(time>=20000);}
+ assert.equal(gestures,0);assert.equal(operation.deadline,30000);
 });
 test('release graph reads retain the explicitly supplied deadline and clock',async()=>{
  for(const fault of [null,'before_first','after_first','before_second','after_second']) {
@@ -140,7 +176,7 @@ test('completed Export Next permits only owned draft cancellation: '+fault,async
  if(fault==='phase')operation.nodeApply.pending.phase='finish';
  if(fault==='dialog'){const observe=s.channel.observe;s.channel.observe=async o=>({...await observe(o),ui:{dialogs:[{}],masks:[]}});}
  if(fault==='graph'){let reads=0;operation.nodeTargetAdapter.observe=async()=>{const g=graphOf();if(reads++)g.links.push({source:'foreign'});return g;};}
- if(fault){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ if(fault){await assert.rejects(release(operation,s.channel));assert.equal(s.gestures.length,fault==='graph'?1:0);}
  else{const proof=await release(operation,s.channel);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);}
 });
 

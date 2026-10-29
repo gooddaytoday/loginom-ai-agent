@@ -32,7 +32,7 @@ for(const fault of ['rejected','thrown'])test('covered link keeps original refus
  const source={count:async()=>1,evaluate:async()=>{probes++;return null;}};
  const page={locator:()=>({locator:()=>source}),mouse:{move:async()=>{moves++;}},
   waitForTimeout:async ms=>{assert.equal(ms,50);waits++;},
-  evaluate:(_fn,arg)=>{if(typeof arg==='string')return false;diagnostics++;if(fault==='thrown')throw diagnosticError;return Promise.reject(diagnosticError);}};
+  evaluate:()=>{diagnostics++;if(fault==='thrown')throw diagnosticError;return Promise.reject(diagnosticError);}};
  const task={deadline:Date.now()+10000,request:{workflow_ref:{prefix:'wf'}},effect:{before:graph},source_tid:'port'};
  await assert.rejects(prepareLinkHover(page,task,async()=>graph,samePlacementGraph),error=>{
   assert.notEqual(error,diagnosticError);assert.equal(error.name,'Error');assert.equal(error.code,undefined);

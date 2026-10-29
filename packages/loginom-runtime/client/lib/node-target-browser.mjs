@@ -409,21 +409,6 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
   if(await source.count()!==1)throw Error('Link hover source is not unique');
   let point;
   for(let attempt=0;attempt<10;attempt++){
-    // Preview may mask ModelForm after the graph read. Wait only for this
-    // workflow's native mask, then recheck the complete graph before hovering.
-    const ownMask=await page.evaluate(prefix=>{
-      const visible=e=>{const b=e.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(e).visibility!=='hidden';};
-      const blockers=[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
-      return blockers.length>0&&blockers.every(e=>e.getAttribute('data-tid')===prefix+';ModelForm'&&e.classList.contains('bg-mask-message'));
-    },task.request.workflow_ref.prefix);
-    if(ownMask){
-      const timeout=Math.min(15000,task.deadline-Date.now());
-      if(!(timeout>0))throw Error('Link hover mask deadline elapsed');
-      await page.waitForFunction(prefix=>![...document.querySelectorAll('[data-tid='+JSON.stringify(prefix+';ModelForm')+'].bg-mask-message')]
-        .some(e=>{const b=e.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(e).visibility!=='hidden';}),task.request.workflow_ref.prefix,{timeout});
-      if(Date.now()>=task.deadline)throw Error('Link hover mask deadline elapsed');
-      if(!sameGraph(before,await observe()))throw Error('Graph changed while waiting for link hover mask');
-    }
     point=await source.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
       return b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))?{x,y}:null;});
     if(point)break;
@@ -606,14 +591,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const edge=effect.parameters.edge,bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
-        // A completed preparation refusal did not dispatch link.create. Keep a
-        // receipt even when its own mask never clears, so inspect can reconcile
-        // the unchanged graph later. Transport loss still leaves it unknown.
-        const refused=withBrowserReceipt(`({status:'FAILED',action_key:'link.create',operation_id:${JSON.stringify(effect.id)},phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'CAPABILITY_ERROR',message:String(error.message).slice(0,1000)},trace:[]})`,
-          {receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,operation_id:effect.id,
-            receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')});
-        graph=await call(`async page=>{try{return await (${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()});}catch(error){return await (${refused})(page);}}`,deadline);
-        if(graph?.status==='FAILED')return graph;
+        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
           source_port:{kind:'data',index:bound.source.index},target_port:{kind:'data',index:bound.target.index}};
