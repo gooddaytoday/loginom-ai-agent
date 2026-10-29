@@ -422,6 +422,33 @@ test('stable SVG DOM geometry dispatches the checked point even when Playwright 
   }
 });
 
+test('graph body clicks use the observed point and recheck it before dispatch', async () => {
+  // L491-r5b cold:68: centre (1212.5,540) is covered; the reader sees
+  // (1212.5,557.75) on the same owned 38x71 body below its hover controls.
+  for (const mode of ['center', 'lower', 'covered']) {
+    const page = new Page(), tid = 'MF;TF-1;Graph;CSV_echo_address';
+    page.context.innerWidth = 1280; page.context.innerHeight = 800;
+    page.viewportSize = () => ({ width: 1280, height: 800 });
+    const graph = page.add('div', 'MF;TF-1;ModelForm;cmpDiagram', '', { x: 48, y: 100, width: 1232, height: 700 });
+    const body = page.add('g', tid, '', { x: 1193.5, y: 504.5, width: 38, height: 71 }, graph);
+    page.add('span', tid + ';Label;Label', 'CSV echo address', { x: 1160, y: 480, width: 110, height: 20 }, graph);
+    const overlay = page.add('g', tid + ';NodesControls', '', { x: 1193.5, y: 504.5, width: 38, height: mode === 'center' ? 0 : 50 }, graph);
+    const snapshot = await page.observe(), element = snapshot.ui.elements.find(e => e.tid === tid);
+    assert.equal(element.graph_node.part, 'body');
+    assert.equal(element.interaction.state, 'point_observed');
+    assert.deepEqual(element.interaction.point, { x: 1212.5, y: mode === 'center' ? 540 : 557.75 });
+    if (mode === 'covered') page.beforeHandleGeometry = target => { if (target === body) overlay.box.height = 71; };
+    const result = await page.act({ verb: 'click', ref: element.ref }, snapshot);
+    assert.equal(result.status, mode === 'covered' ? 'NOT_APPLIED' : 'SUCCEEDED', mode + ': ' + JSON.stringify(result.error));
+    assert.deepEqual(page.clickedPoints, mode === 'covered' ? [] : [{ ...element.interaction.point, clickCount: 1 }]);
+    if (mode === 'covered') {
+      assert.equal(result.error.code, 'UI_REFERENCE_OBSCURED');
+      assert.equal(result.effect_possible, false);
+      assert.equal(result.cleanup_complete, true);
+    }
+  }
+});
+
 test('partly clipped graph visualizers use their observed painted point and refuse a newly covered point', async () => {
   for (const covered of [false, true]) {
     const page = new Page();
