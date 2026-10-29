@@ -19,6 +19,7 @@ import time
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
 D87 = {
+    'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
     'E2': dict(attachment='file', generator=['--min-bytes', '1000000000'], heavy=False),
     'E3': dict(attachment='path', generator=['--boundary', '32'], heavy=True),
@@ -63,13 +64,13 @@ def scenario(name, case_root=None):
             raise ValueError('Invalid external case name')
         src = Path(case_root).resolve() / name
         config = read(src / 'case.json')
-        if set(config) != {'source_path', 'attachment'} or config['attachment'] not in ['path', 'file']:
+        if set(config) - {'source_path', 'attachment', 'upload_only'} or not {'source_path', 'attachment'} <= set(config) or config['attachment'] not in ['path', 'file'] or type(config.get('upload_only', False)) is not bool:
             raise ValueError('External case requires source_path and attachment path/file')
         source = Path(config['source_path'])
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    local_file=source, attachment=config['attachment'])
+                    local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
     stability = DATA / 'stability-2026-10-20'
@@ -434,6 +435,10 @@ class Runner:
                    REPO / 'scripts/node-acceptance/large-dataset-gen.py', '--output', source,
                    '--manifest', fixtures / 'manifest.json', *spec['generator']], folder)
         manifest = read(fixtures / 'manifest.json')
+        if spec.get('upload_only'):
+            write(fixtures / 'expected.json', {'nodes': [], 'outputs': []})
+            (fixtures / 'task.md').write_text('Загрузи ' + str(source) + ' в Loginom.\n')
+            return dict(spec, source=fixtures, prompt=fixtures / 'task.md', data=fixtures / 'data', local_file=source)
         write(fixtures / 'expected.json', {
             'nodes': [], 'outputs': [{'output_node_type': 'export_input', 'ordered': False,
             'columns': [{'name': 'region', 'label_any': True, 'type': 'string'},
@@ -505,14 +510,15 @@ class Runner:
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
         exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                      and name != (spec.get('local_file').name if spec.get('local_file') else None)))
-        if not exports:
+        if not exports and not spec.get('upload_only'):
             count = 2 if src.parent.name == 'datamining-clustering' else 1
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
-        prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+        if not spec.get('upload_only'):
+            prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
@@ -548,6 +554,26 @@ class Runner:
             try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
             except (ValueError, TypeError): continue
             if isinstance(reply, dict): replies.append((n, reply))
+        if spec.get('upload_only'):
+            calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
+                     if event.get('type') == 'tool_use']
+            assert not any(c.get('tool') == 'loginom_dock_action_run'
+                and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
+                for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
+            assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
+            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
+            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+                       and o.get('state') == 'settled' and o.get('cleanup_complete') is True
+                       and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
+                       and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'
+            cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+            acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                and c.get('package_path') is None and c.get('save_operation_id') is None
+                and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+            assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+            self.current.update(save='0', cleanup='main PASS', upload='ready', cold='—', csv='—')
+            return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
@@ -611,7 +637,7 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                    if self.options['cold']:
+                    if self.options['cold'] and not spec.get('upload_only'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
