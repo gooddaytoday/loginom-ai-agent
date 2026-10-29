@@ -343,3 +343,20 @@ Product/stage/probe stderr пусты; postprocessing nullable-metadata ошиб
 Standalone callbacks и timing отличаются от actual Export caller; дополнительная
 такая проба не разрешена. Дальнейший scope — отдельный пересмотр источника missing
 logical observation. Native S5 по-прежнему FAIL, upstream/release не выполнялись.
+
+
+## 2026-10-29 — actual Export failure evidence: source Task1 PASS
+
+[Подплан](../../../../superpowers/plans/2026-10-29-browser-recovery-export-failure-evidence.md)
+Task1 завершён: source `99a80f68741d26bcaed3db3e8f03594cb3aebbb7`,3файла+99/−19,
+production18 changed lines. Existing unavailable Error удерживает exact table/lookup/stack
+в private payload; actual Export catch пишет его existing onRecord только при отказе.
+Публичные failure/receipt, waiter, UI reads/gestures, bounds и mandatory journal/cleanup
+не менялись. Diagnostic callback throw/wrong ACK не подменяют исходный отказ.
+Focused pinnedNode183/183PASS/0fail/0skip/0warnings; behavioral RED→GREEN для раннего
+sample, позднего lookup и actual journal. Реальные journal/redactor tests подтвердили
+private0700/0600, отсутствие credential sentinel на диске, прежний public failure
+и release/Save. Independent spec/quality review PASS, mandatory0/optional0.
+Native/stage Task2 и upstream ещё не выполнялись; это retention diagnostics,
+не доказанное исправление причины и не S5 PASS. Далее fresh stock stage/verify и
+фактический preflight перед одной unchangedS5; все прежние FAIL/UNKNOWN сохранены.
