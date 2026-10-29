@@ -476,6 +476,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    // A completed, classified REST configure refusal cancels only its own
+    // draft through the same receipt/owner/quiet-graph proof as manual release.
+    // Unknown browser completion and a failed cleanup remain pending.
+    if(request.target.type==='integration.rest_request'&&state.pending?.phase==='configure'
+      &&error.restConfigureFailure&&!operation.transportUncertain){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
+      catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
+    }
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
     if(readingOnly&&state.pending?.phase==='read'&&error.code==='NODE_READ_SCHEMA_CHANGED')state.read_schema_changed=true;
@@ -515,7 +523,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
  * release proof clears the phase; verified phases keep their facts, while an
  * unverified commit or launch is reported as unknown rather than inferred.
  */
-export async function releaseNodeApply({operation,handlers,drivers,record,signal,releaseBeforeTarget}) {
+export async function releaseNodeApply({operation,handlers,drivers,record,signal,releaseBeforeTarget,failure}) {
   const state=operation.nodeApply,pending=state?.pending??(!state?.node&&state?.target_reconciled?{phase:'target'}:null),request=state?.request;
   if(pending&&!state.node&&!state.result&&['source','workflow','target'].includes(pending.phase)&&releaseBeforeTarget){
     validateNodeApplyRequest(request,handlers);
@@ -576,7 +584,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       ...(proof.cleanup.views_returned?[readingOnly?'The node visualizers were left during release.'
         :'The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
     configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
-    error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
+    error:failure??{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,
       instruction:'The stopped text export was released, but its settings, execution and file output remain unverified. '
         +'Do not resume this operation, repeat the export or recreate the node: a file may already have been written. '

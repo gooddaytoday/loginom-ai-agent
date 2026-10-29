@@ -190,11 +190,12 @@ const stop=async(f,phase)=>{
  return job;
 };
 
-test('a completed REST configure failure releases its draft and admits the next node operation',async()=>{
+for(const classified of [false,true])test('a completed REST configure failure releases its draft and admits the next node operation (automatic='+classified+')',async()=>{
  const ui=surface({wizard:true});
  const receipt={status:'AMBIGUOUS',action_key:'node.rest.configure.internal',action_revision:'1',operation_id:'apply:n1',
   phase:'configure',effect_possible:true,cleanup_complete:false,trace:[],
-  output:{verified:false,cleanup_complete:false,effect_possible:true,error:'REST request: operation deadline exceeded'},
+  output:{verified:false,cleanup_complete:false,effect_possible:true,error:'REST request: requested query bindings timed out',
+   ...(classified?{failure:{code:'REST_CONFIGURE_STEP_TIMEOUT',step:'requested query bindings',control:'W;ParamLinks'}}:{})},
   error:{code:'REST_STEP_UNCONFIRMED',message:'REST request: operation deadline exceeded'}};
  const f=fixture({type:'integration.rest_request',execute:async code=>code.includes('"receipt_read":true')
   ?{status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'observed',effect_possible:false,
@@ -207,11 +208,19 @@ test('a completed REST configure failure releases its draft and admits the next 
  const r=request();r.target.type='integration.rest_request';
  f.runtime.startNodeApply(r);
  const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
- assert.equal(stopped.outcome.output.pending_phase,'configure');assert.equal(stopped.outcome.cleanup_complete,false);
- assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
- const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-rest'});
- assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
- assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+ if(classified){
+  assert.equal(stopped.outcome.status,'FAILED',JSON.stringify(stopped));
+  assert.equal(stopped.outcome.output.pending_phase,null);
+  assert.equal(stopped.outcome.output.error.code,'REST_CONFIGURE_STEP_TIMEOUT');
+  assert.equal(stopped.outcome.output.configuration.status,'discarded');
+  assert.equal(stopped.outcome.cleanup_complete,true);assertJob(stopped);
+ }else{
+  assert.equal(stopped.outcome.output.pending_phase,'configure');assert.equal(stopped.outcome.cleanup_complete,false);
+  assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-rest'});
+  assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+  assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+ }
  assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
  assert.equal(f.runtime.hasUnsettledWork(),false);f.runtime.assertPreparationAllowed();
  f.handler.configure=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
