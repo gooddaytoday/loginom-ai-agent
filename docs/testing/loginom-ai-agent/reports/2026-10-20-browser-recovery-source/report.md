@@ -431,3 +431,52 @@ Task1 завершён. Временность отсутствия точки �
 S5 FAIL/cleanup BLOCKED/context+OSUNKNOWN и все исторические ограничения сохраняются.
 Следующий шаг — fresh stock stage/verify и independent actual preflight, затем
 одна unchanged strict BR-S5. Модели, installed acceptance и merge/release не запускались.
+
+
+## 2026-10-30 — scroll anchor: native BR-S5 PASS, upstream FAIL
+
+[План](../../../../superpowers/plans/2026-10-30-browser-recovery-scroll-anchor.md):
+новый stock desktop/linux-x64 stage с clean builder `49bdfc99240e921be31f5b1b324ba07e42e2340f`;
+verifyResources4753PASS.355 runtime files/336MJS+5rootfiles byte-equal, current pins
+и unchanged invocation приняты independent preflight GO/mandatory0. Manifest SHA256
+`0b631a7480c394f0fff90cf9ee0886d58d19d19888358a7e08e7984825daeb04`;
+reader source/stage/manifest SHA256
+`3567aa9ed6b9f0f9fa0e8bc3730307580a649c0696e490f258fbf72c94ce88b9`.
+Один unchanged managed BR-S5:226581ms/exit0/PASS, stderr0/warnings0; source/harness/
+assertions/faults/targets/bounds не менялись. Одна execute fault/zero browser calls.
+
+Current Group06 completed/schema/fresh two rows; Export09 и configure536 привязаны
+к нему, destination_check verified/existedfalse. Finish12/recovery665 — completed,
+execution owner_verified/completed и export_file verified. Один download656/bytes657/
+read-completed660/workflow_return_verified связывают current session/document/workflow/
+node/execution/destination/verification/artifact. Retained CSV32bytes, UTF8/LF/noBOM,
+actual header Total,Category, строки35,Alpha/20,Beta совпадают с текущим Group.
+SHA256 `2f73ef403757e282950b79bbdffd6ca037acdd281c71da3d2f379e844d08f140`
+совпал с actual bytes/public artifact/event. Первый следующий Dock call13 — final
+package.save_checkpoint/operation save/SUCCEEDED/save_completed/workflow_preserved/
+modifiedfalse; второй checkpoint не понадобился. next_step S5 содержит instruction,
+а не выдуманный Save tool. Journal671: fault1/browsercalls0/download1/read-completed1/
+dock_resumed1; current receipt lineage подтверждён.
+
+Native cleanup SUCCEEDED/exact fresh own package+session+document+account,
+save_operation_id=save/package_closedtrue/logged_outtrue/noDiscard. Managed
+request_errornull/closedACKtrue/actualexit0/no signal; existing browser resource-close
+fulfilled подтверждает authenticated context close. Независимая OS process absence
+UNKNOWN/NOT_OBSERVED, inventory не добавлялся. Новый PASS не закрывает старые cleanup.
+Root напрямую сверил actual result/retained bytes/hash/CSV/journal; independent
+incremental factual review APPROVED/mandatory0/optional0 подтвердил полную цепочку.
+CSS/transient механизм этим успешным прогоном не доказан; исходный S5 отмечен PASS.
+
+Private root `/home/george/.cache/loginom-ai-agent/browser-recovery-scroll-anchor-98085677-037c-4c13-902e-23cd5b3295cc`;
+evidence `c2abaae4-9316-4a51-9687-1cc67c69ce0a`, attempt `1f9d93c1-f1e0-49fd-aa4c-edffd1141231`.
+Raw journal/receipts/profile/retained file и sanitized25binding checks сохранены0700/
+0600; temporary stage helper удалён. Повторов S5/Export/Save/gesture/manual cleanup/kill нет.
+
+После strict PASS разрешён один pinnedNode command-local PATH `bun run test:upstream`
+из runtime:222425ms/exit1,4508tests/4490PASS/4FAIL/14SKIP, warnings0. Все4 failures —
+browser-recovery-executor.test.mjs assertions560/693/823/1027: export_file.verifiedfalse,
+unconfirmedfalse/downloads[], unresolved вместо completed. Full output/status сохранены
+private, повторов/исправлений в Task2 нет. Причина fixture/product ещё не установлена;
+missing active_tab_ref общей fixture — следующая конкретная гипотеза. Полный Task2
+BLOCKED до разбора failures; native S5 PASS сохранён отдельно. Installed/model/
+release/merge не выполнялись; release-флаг остаётся выключен.

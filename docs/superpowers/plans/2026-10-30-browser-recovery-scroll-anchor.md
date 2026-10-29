@@ -75,14 +75,15 @@ Task1 завершён только source GREEN+approved review; он не оз
 
 **Interfaces:** Task1 clean source/review → новый private stock desktop/linux-x64 stage; исходные S5 assertions/managed cleanup.
 
-- [ ] **Step1 — stock stage/preflight.** Выполнить штатные stageResources/verifyResources с product pins; проверить actual source/resource byte equality и source/manifest identity, приватную конфигурацию без вывода значений. Independent preflight проверяет фактический unchanged invocation и own fresh SaveAs/Group/UUID. Старым артефактам не присваивать новую identity.
-- [ ] **Step2 — первый E2E.** Ровно одна BR-S5 по команде [storage-settle Step6](2026-10-29-browser-recovery-storage-settle.md) из `packages/desktop`, подставить только новые private resources. Исходный strict результат из Global Constraints обязателен. Первый unexpected → existing finally, фактический report, STOP; никаких probes/повторов/ручного cleanup. Existing journal позволяет установить достигнутый этап; отсутствие нужных фактов честно UNKNOWN.
+- [x] **Step1 — stock stage/preflight.** Выполнить штатные stageResources/verifyResources с product pins; проверить actual source/resource byte equality и source/manifest identity, приватную конфигурацию без вывода значений. Independent preflight проверяет фактический unchanged invocation и own fresh SaveAs/Group/UUID. Старым артефактам не присваивать новую identity.
+- [x] **Step2 — первый E2E.** Ровно одна BR-S5 по команде [storage-settle Step6](2026-10-29-browser-recovery-storage-settle.md) из `packages/desktop`, подставить только новые private resources. Исходный strict результат из Global Constraints обязателен. Первый unexpected → existing finally, фактический report, STOP; никаких probes/повторов/ручного cleanup. Existing journal позволяет установить достигнутый этап; отсутствие нужных фактов честно UNKNOWN.
 - [ ] **Step3 — проверить исход и закончить.** Root сверяет current file/bytes/SHA/lineage/CSV, первый следующий Dock Save/modifiedfalse, exact native cleanup отдельно от context/OS и managed ACK/exit. Только при strict PASS — один `bun run test:upstream` из `packages/loginom-runtime` с pinned Node в command-local PATH; затем независимое review нового scope/результата и owning docs. При FAIL/BLOCKED source остаётся candidate, гипотеза live не подтверждена; не добавлять hardening или следующий механизм. Original release/models/installed acceptance, deferred cross-platform mode assertion и merge/release — вне этого slice.
 
-## Checkpoint — Task1 COMPLETE / Task2 pending
+## Checkpoint — native S5 PASS / Task2 BLOCKED upstream
 
-- Task1 source `c3ab0f5172`: conditional existing wait/точный name lookup;3файла84+/25−, production20 changed lines. Normal reads/bounds/permissions сохранены.
-- Meaningful RED→GREEN и focused231/231PASS/0warnings; actual Export success и late-B refusal/journal/cleanup fixtures проходят.
-- Independent source spec/quality Approved, mandatory0/optional0. Source approval не доказывает transient CSS-причину или S5 PASS.
-- Следующий шаг — Task2 fresh stock stage/verify и actual-artifact/invocation preflight; одна unchangedS5 только после решения root.
-- Исходный native S5 FAIL/cleanup BLOCKED/OS unknown остаются; новых native запусков/повторов не было.
+- Task1 COMPLETE, source c3ab0f5172/focused231PASS/source spec+quality Approved0; actual build/evidence identities — в последнем разделе source report.
+- Task2 Steps1–2 выполнены: fresh stock stage4753PASS/independent preflight GO, ровно одна unchangedBR-S5 PASS/exit0.
+- Current file/bytes/SHA/lineage/CSV, первый Dock Save/modifiedfalse, exact-own native Close/logout/noDiscard, authenticated context close/managedACKexit0 подтверждены; OS absence UNKNOWN.
+- Root/raw bytes и independent incremental factual review APPROVED/mandatory0; CSS/transient механизм и старые cleanup не переоценены.
+- Однократный upstream FAIL:4490PASS/4FAIL/14SKIP, все4 в browser-recovery-executor.test.mjs. Step3/полныйTask2 открыт, suite не повторялась.
+- Следующий шаг — отдельный минимальный reviewed scope для reproducer и проверки общей fixture; production/ожидания/приёмку не ослаблять. Новый S5 этим планом не разрешён.
