@@ -244,3 +244,37 @@ for (const owner of ['mcp', 'managed']) {
     }
   });
 }
+
+test('owned upload dismisses only the observed Loginom toast debugger confirm through pinned MCP', {
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER,timeout:30000,
+},async t=>{
+ const {guardUploadDebugDialog}=await import('../lib/artifact-discovery.mjs');
+ const directory=await mkdtemp(join(tmpdir(),'upload-dialog-'));
+ const http=createServer((request,response)=>response.end(html));
+ await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
+ const url=`http://127.0.0.1:${http.address().port}/app/`,origin=new URL(url).origin;
+ const client=new Client({name:'upload-dialog',version:'1'});let context,server;
+ try{
+  context=(await loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER,profile:join(directory,'browser'),candidate:{url,username:'user',password:''},headless:true,keepOpen:true})).context;
+  server=await createConnection({snapshot:{mode:'none'}},async()=>context);
+  const [local,remote]=InMemoryTransport.createLinkedPair();await server.connect(remote);await client.connect(local);
+  const task={operation_id:'upload-test',expected_origin:origin,expected_build:'7.4.2'};
+  const message=`Assert failed: at LoadView.CorrectWindowPosition (${origin}/app/bg/filestorage/LoadView.js:94:23)\n\nBreak into debugger?`;
+  await client.callTool({name:'browser_run_code_unsafe',arguments:{code:`async page=>{
+   const task=${JSON.stringify(task)},guard=${guardUploadDebugDialog.toString()};
+   await guard(page,task,'install');
+   const accepted=await page.evaluate(message=>confirm(message),${JSON.stringify(message)});
+   page[Symbol.for('upload-test.result')]={accepted,...await guard(page,task,'release')};
+  }`}});
+  await new Promise(resolve=>setTimeout(resolve,250));
+  const response=await client.callTool({name:'browser_run_code_unsafe',arguments:{code:`async page=>page[Symbol.for('upload-test.result')]`}});
+  assert.notEqual(response.isError,true,JSON.stringify(response));
+  const text=response.content.find(b=>b.type==='text').text;
+  const match=text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);assert.ok(match,text);
+  const result=JSON.parse(match[1]);
+  assert.equal(result.accepted,false);assert.equal(result.dismissed,1);assert.equal(result.failed,false);
+ }finally{
+  await client.close();await server?.close();await context?.close();
+  await new Promise(resolve=>http.close(resolve));await rm(directory,{recursive:true,force:true});
+ }
+});

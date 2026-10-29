@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import {EventEmitter} from 'node:events';
 import { makeCapabilityCode, createActionRuntime } from '../../lib/executor.mjs';
 
 const actions = new Map(JSON.parse(await readFile(new URL('../../../executor/catalog/actions.json', import.meta.url), 'utf8')).actions.map(value => [value.action_key, value]));
@@ -71,8 +72,9 @@ class Locator {
   }
 }
 
-class Page {
+class Page extends EventEmitter {
   constructor() {
+    super();
     this.clock = 1000;
     this.prefix = 'MF;TF-1'; this.tabTid = 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
     this.active = true; this.identity = 'Без имени'; this.nodes = []; this.edges = [];
