@@ -159,7 +159,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
             return result;
           },options),
         ]);
-      } catch {}
+      } catch(error) {receipt.logout_menu_readback={status:'unavailable',error_class:error?.name==='TimeoutError'?'timeout':'read_failed'};}
     }
     // Private journal evidence, after the decision. Never retry Close, answer
     // a prompt, or promote its outcome from this diagnostic readback.
@@ -471,9 +471,10 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     receipt.logged_out = true;
     receipt.stage = 'complete';
     return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
-  } catch {
+  } catch(error) {
     // Fixed private stage only: retain refusal and never persist raw errors,
     // credentials, DOM contents or an inferred logout from browser closure.
+    receipt.failure_class=error?.name==='TimeoutError'?'ui_timeout':'step_failed';
     return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
   }
 }

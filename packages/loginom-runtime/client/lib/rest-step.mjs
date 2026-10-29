@@ -36,6 +36,11 @@ export async function runRestStep(options,ctx,kind,makeCode,parameters,config){
   operation.cleanupConfirmed=true;
   operation.nodeApply.cleanup_complete=true;
  }
- if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true)throw Error(result.error?.message??'REST step did not confirm completion');
+ if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true){
+  const error=Error(result.error?.message??'REST step did not confirm completion');
+  if(kind==='configure'&&result.output?.verified===false&&result.output.failure?.code?.startsWith('REST_CONFIGURE_'))
+   error.restConfigureFailure={code:result.output.failure.code,message:error.message};
+  throw error;
+ }
  return result.output;
 }

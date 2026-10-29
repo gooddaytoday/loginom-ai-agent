@@ -14,7 +14,7 @@ export class NodeReleaseBlocked extends Error {
 }
 
 // Proves that a stopped node operation no longer holds the workspace: the last
-// browser call settled with confirmed cleanup, only this operation's own draft
+// browser call settled, only this operation's own draft
 // or output Table view was cleaned up, and the same unlocked node rests on an
 // unchanged, quiet graph. The proof says nothing about the node's settings or
 // execution; the caller reports those as unknown unless already verified.
@@ -29,11 +29,21 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
-  requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,
+  const r=response?.receipt;
+  // REST configure never commits Done/Execute. Its completed failure receipt
+  // can truthfully retain cleanup=false because the draft is still open.
+  // Permit only the existing owned-wizard cancellation and quiet-graph proof;
+  // this does not replay configure or accept unknown transport completion.
+  const restDraft=state.pending.phase==='configure'&&state.request.target?.type==='integration.rest_request'
+   &&typeof operation.lastReceipt.operation_id==='string'&&r?.operation_id===operation.lastReceipt.operation_id
+   &&operation.lastReceipt.action_key==='node.rest.configure.internal'&&r.action_key===operation.lastReceipt.action_key
+   &&r.phase==='configure'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='REST_STEP_UNCONFIRMED';
+  requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||restDraft),
    'The last browser gesture of this operation has no confirmed cleanup');
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
-  const r=response.receipt,n=r.output?.prepared_node_context,w=r.output?.wizard;
+  const n=r.output?.prepared_node_context,w=r.output?.wizard;
   const gestures=r.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
