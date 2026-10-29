@@ -360,3 +360,47 @@ private0700/0600, отсутствие credential sentinel на диске, пр
 Native/stage Task2 и upstream ещё не выполнялись; это retention diagnostics,
 не доказанное исправление причины и не S5 PASS. Далее fresh stock stage/verify и
 фактический preflight перед одной unchangedS5; все прежние FAIL/UNKNOWN сохранены.
+
+## 2026-10-30 — actual Export failure evidence: BR-S5 FAIL, branch B captured
+
+Fresh stock desktop/linux-x64 stage построен с clean `e9ba0d65d1f89cdd44b05ed6769394cb14f4dc72`;
+staged Node verifyResources4753PASS. Independent actual artifact/invocation preflight GO,
+mandatory0/optional0:355 runtime files/336MJS byte-equal, pins и unchanged harness подтверждены.
+Manifest SHA256 `fdeb7b84f429bab34f411cf4e146bfab897a93b2f1d1c1b20602bb445170fb82`;
+changed reader source/stage/manifest SHA256
+`e645c0f0a3f9faff0e2483fbf560959e29501ef2d1a9261625f84ed3aa2894a1`.
+Это новый stage; прежним артефактам новый source SHA не присвоен.
+
+Единственный unchanged managed BR-S5:198316ms/exit1, finish continuable вместо
+обязательного completed. Native execution verified/owner_verified/completed;
+fault1/browser recovery calls0. В journal629 records ровно одна diagnostic запись620
+с exact failing table/name_lookup/stack текущей verification operation; matching
+lease/refusal623 и recovery receipt628 связывают её с текущими attempt/export/binding.
+Stack `text-export-output.mjs:128:28` подтверждает ветку B/no_scroll_owner после
+accepted table и следующего exact-name discovery, а не ранний отказ A.
+
+Failing table: rendered_window_readytrue,65 name rows/один scroll owner,
+top2000/max15896,0 eligible anchors/0 scroll actions/0 point_observed;
+25 outside_viewport и40 point_not_observed. Table elementsTruncatedtrue:
+это утверждение только об отказавшем snapshot, не всей папке или DOM.
+Следующий exact-current-name lookup имеет0elements/truncatedfalse, тот же
+document/workflow и другую DOM revision. Critical bindings присутствуют без redaction;
+storage package_identitynull не используется для native package ownership.
+Предыдущий postact sample не подменяет этот failing sample. Почему наблюдение
+готового native window не дало scroll anchors, запуск ещё не доказывает.
+
+Quiet owned graph restoration/lease release подтверждены; current file/bytes/SHA/
+lineage/CSV NOT_VERIFIED, final Dock Save NOT_REACHED. Cleanup BLOCKED/UNSAVED_CHANGES,
+package_closedfalse/logged_outfalse/noDiscard; managed ACKfalse/actualexit1/no signal,
+bridge_ack rejected. Context closure и OS process absence UNKNOWN, exit не доказывает
+logout. Upstream NOT_RUN, поскольку strictS5FAIL. Повторов, ручного cleanup/kill,
+нового collector/probe/Export/Save/gesture и installed/model/release запусков не было.
+
+Private root `/home/george/.cache/loginom-ai-agent/browser-recovery-export-failure-evidence-24e9cfb6-4244-4f3f-9830-419ddb1ff44f`;
+evidence `6b6d17f1-48e6-4379-bfbd-421733568d32`, attempt `6aca78ca-1f1a-468b-bc29-49b61ddf62fc`.
+Raw receipts/journal/profile и sanitized attribution/binding audit сохранены0700/0600;
+temporary stage launcher удалён. Root напрямую проверил exact journal620/623/628,
+row interaction counts, refusal/restore/lease и cleanup/ACK/actual exit.
+Independent incremental native factual review APPROVED, mandatory0/optional0. Attribution завершает только
+diagnostic slice; original S5/план5Task2 остаются открыты. Следующий product fix требует
+отдельного минимального плана и independent review; прежние FAIL/UNKNOWN сохранены.

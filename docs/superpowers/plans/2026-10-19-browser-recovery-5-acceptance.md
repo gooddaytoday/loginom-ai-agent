@@ -132,7 +132,7 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 - [x] BR-S2: native PASS, текущий файл/Save/native cleanup.
 - [x] BR-S4: native PASS, execution/schema/fresh read/Save/native cleanup.
-- [ ] BR-S5: новая storage-settle попытка29.10 FAIL/continuable/no_scroll_owner; точная ветка failing observation UNKNOWN. Строгий completed остаётся обязательным; [фактический отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-29--storage-settle-source-ready-native-br-s5-fail).
+- [ ] BR-S5: последняя unchanged попытка30.10 FAIL/continuable/no_scroll_owner; [diagnostic slice](2026-10-29-browser-recovery-export-failure-evidence.md) APPROVED, exact branch B установлена, причинный fix ещё не доказан. Строгий completed/current file/Save/native cleanup остаётся обязательным; [фактический отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-30--actual-export-failure-evidence-br-s5-fail-branch-b-captured).
 - [x] BR-S6: negative assertions PASS;30 current-page snapshots,31-й stopped/budget_exhausted/no dispatch. Cleanup BLOCKED/ACKfalse/exit1 отражён отдельно. Root проверил raw/journal/resource/OS evidence; независимое review кода Task2 Approved без обязательных исправлений, полный Task2 не принят из-за S5.
 
 **Минимальный план S6:**
