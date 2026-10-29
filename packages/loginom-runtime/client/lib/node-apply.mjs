@@ -490,11 +490,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
-    // A completed, classified REST configure refusal cancels only its own
-    // draft through the same receipt/owner/quiet-graph proof as manual release.
+    // A completed configure refusal cancels only its own uncommitted draft
+    // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
-    if(request.target.type==='integration.rest_request'&&state.pending?.phase==='configure'
-      &&error.restConfigureFailure&&!operation.transportUncertain){
+    if(state.pending?.phase==='configure'&&!operation.transportUncertain
+      &&(error.restConfigureFailure||request.target.type==='exports.text'&&operation.lastReceipt?.action_key==='node.export.next')){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
       catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
     }

@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 import {prepareLinkHover} from '../lib/node-target-browser.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
 
+for(const mode of ['transient','persistent','changed','foreign'])test('Preview mask arriving after graph read: '+mode,{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
+},async()=>{
+ const {chromium}=await import('playwright-core');
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
+ try{
+  const page=await browser.newPage();
+  await page.setContent(`<div data-tid="wf;ModelForm;cmpDiagram"><div data-tid="wf;Graph;Source;Output_Data-0" style="position:absolute;left:100px;top:100px;width:20px;height:20px"></div></div>
+   <div data-tid="${mode==='foreign'?'other':'wf'};ModelForm" class="bg-mask-message" style="position:absolute;inset:0;background:white;z-index:10"></div>`);
+  const graph={document_id:'doc',dom_epoch:1,nodes:[],links:[]};let reads=0,moves=0;
+  await page.exposeFunction('recordMaskHover',()=>moves++);
+  await page.evaluate(()=>document.addEventListener('mousemove',()=>window.recordMaskHover()));
+  const read=async()=>{
+   reads++;
+   if(reads===1&&mode!=='persistent')await page.evaluate(()=>setTimeout(()=>document.querySelector('.bg-mask-message').remove(),900));
+   return mode==='changed'&&reads>1?{...graph,links:[{source:'foreign'}]}:graph;
+  };
+  const task={deadline:Date.now()+(mode==='persistent'?1200:5000),request:{workflow_ref:{prefix:'wf'}},effect:{before:graph},source_tid:'wf;Graph;Source;Output_Data-0'};
+  if(mode==='transient'){await prepareLinkHover(page,task,read,samePlacementGraph);assert.equal(moves,1);}
+  else{await assert.rejects(prepareLinkHover(page,task,read,samePlacementGraph));assert.equal(moves,0);}
+ }finally{await browser.close();}
+});
+
 test('covered link refusal preserves bounded real DOM blocker identity without a gesture or text',{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
 },async()=>{
