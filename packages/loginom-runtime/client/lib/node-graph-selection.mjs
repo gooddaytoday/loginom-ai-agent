@@ -1,12 +1,11 @@
 // A selected node's hover controls can cover the entire SVG body. Its observed
 // label remains a native selection target; never click the execution overlay.
-export function preparedGraphSelection(state, {preferLabel=false}={}) {
+export function preparedGraphSelection(state) {
   const node=state.prepared_node_context;
   if(node?.verified!==true||node.surface!=='graph'||typeof node.tid!=='string')throw Error('Prepared graph node required for selection');
-  const targets=[['body',node.tid],['label',node.tid+';Label;Label']];
-  for(const [part,tid] of preferLabel?targets.reverse():targets) {
+  for(const [part,tid] of [['body',node.tid],['label',node.tid+';Label;Label']]) {
     const matches=state.ui.elements.filter(e=>e.tid===tid&&e.graph_node?.part===part
-      &&e.allowed_actions?.includes('click')&&e.interaction?.state==='point_observed');
+      &&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed');
     if(matches.length>1)throw Error('Prepared graph selection is ambiguous');
     if(matches.length===1)return {verb:'click',ref:matches[0].ref};
   }
@@ -52,7 +51,7 @@ export function isPreparedGraphBusy({receipt,observation,action}) {
     &&typeof mask.graph_loading_owner_ref==='string'&&mask.graph_loading_owner_ref===observation.graph_identity.container_ref;
 }
 
-export async function selectPreparedGraphNode(channel, initialObservation, condition, {refreshReplacedBody=false,settleGraph=false,preferLabel=false}={}) {
+export async function selectPreparedGraphNode(channel, initialObservation, condition, {refreshReplacedBody=false,settleGraph=false}={}) {
   const node=initialObservation.prepared_node_context;
   const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
     &&['document_id','workflow_id','node_id','tid'].every(k=>s.prepared_node_context[k]===node[k]);
@@ -61,7 +60,7 @@ export async function selectPreparedGraphNode(channel, initialObservation, condi
     ...(settleGraph?{refreshGraphBusy:isPreparedGraphBusy,confirmIdentity:s=>s.dom_epoch}:{})};
   if(settleGraph)initialObservation=await channel.observe({condition,ready:same,confirmIdentity:s=>s.dom_epoch});
   await channel.perform({condition,initialObservation,ready:same,identity:()=>node,...refresh,resolve:s=>{
-    const action=preparedGraphSelection(s,{preferLabel});
+    const action=preparedGraphSelection(s);
     label=s.ui.elements.find(e=>e.ref===action.ref)?.graph_node?.part==='label';
     return action;
   }});

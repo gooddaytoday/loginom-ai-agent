@@ -99,39 +99,3 @@ for(const fault of [null,'unconfirmed','foreign','mask'])test('reopen after Impo
  if(fault==='unconfirmed')assert.deepEqual(gestures,[{verb:'click',ref:'body'}]);
  if(['foreign','mask'].includes(fault))assert.deepEqual(gestures,[]);
 });
-
-for(const fault of [null,'unknown-label','foreign-body','missing-label'])test('missing Export hover controls leave the body before selecting it again: '+fault,async()=>{
- const {state}=fixture(),node=state.prepared_node_context;
- state.wizard_pending_owner={status:'unobserved'};
- state.ui={dialogs:[],masks:[],elements:[
-  {ref:'body',tid:node.tid,graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:'point_observed'}},
-  {ref:'label',tid:node.tid+';Label;Label',label:'Import',graph_node:{part:'label'},allowed_actions:['click'],interaction:{state:'point_observed'}}]};
- if(fault==='missing-label')state.ui.elements.pop();
- const gestures=[];let leftBody=false,opened=false;
- const channel={observe:async options=>{
-  assert.ok(options.ready(state),options.condition);return structuredClone(state);
- },perform:async options=>{
-  const fresh=structuredClone(state);
-  if(fault==='foreign-body'&&leftBody)fresh.prepared_node_context.node_id='foreign';
-  assert.ok(options.ready(fresh),options.condition);
-  const action=options.resolve(fresh);gestures.push(action);
-  if(action.ref==='label'){
-   if(fault==='unknown-label')throw Error('unknown label receipt');
-   leftBody=true;return;
-  }
-  if(action.ref==='body'&&(leftBody||fault==='missing-label'))state.ui.elements.push({ref:'settings',tid:node.tid+';Setting',
-   allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}});
-  if(action.verb==='begin_wizard'){
-   opened=true;state.prepared_node_context.surface='wizard';
-   state.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},
-    path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'flow>Import>Settings',label:'Settings'}]}};
-  }
- }};
- if(fault&&fault!=='missing-label'){
-  await assert.rejects(openPreparedWizard(channel));assert.equal(opened,false);
-  assert.deepEqual(gestures,[{verb:'click',ref:'label'}]);return;
- }
- assert.equal((await openPreparedWizard(channel)).verified,true);
- assert.deepEqual(gestures,[...(fault==='missing-label'?[]:[{verb:'click',ref:'label'}]),
-  {verb:'click',ref:'body'},{verb:'begin_wizard',ref:'settings'}]);
-});
