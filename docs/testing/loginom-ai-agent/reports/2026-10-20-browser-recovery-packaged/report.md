@@ -359,7 +359,7 @@ Production repair, S5, merge, release и публикация не выполн�
 Ни model/browser/runtime, ни сеть, tests/build/install/cleanup не запускались;
 исторические результаты выше сохранены. Это завершение поиска доступных данных,
 а не приёмка исходной Task3: она OPEN, release-флаг OFF. Независимое factual review
-этого дополнения ещё требуется.
+этого дополнения Approved, mandatory0/optional0; root прочитал полный отчёт ревью.
 
 ### Historical IDs и slow-host
 
