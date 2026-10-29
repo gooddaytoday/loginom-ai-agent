@@ -1,4 +1,4 @@
-import {browserFailureCategory,browserFailureDetails} from './browser-failure.mjs';
+import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -1473,7 +1473,7 @@ export function withBrowserReceipt(body, options) {
 export function parseCapabilityResult(response) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
-    // Keep the original cause private; the bridge journals it through its
+    // Keep the original cause private; upload journals it through its
     // redactor while callers retain the fixed public refusal.
     const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
       .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
@@ -2669,7 +2669,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }else outcome=raw;
           if(outcome.operation_id!==operationId || outcome.action_key!=='artifact.upload' || outcome.action_revision!=='1')
             throw new Error('Upload receipt identity mismatch');
-        } catch {operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
+        } catch(error) {
+          try{await onRecord({phase:'artifact_upload_transport_failed',operation_id:operationId,cause:operationFailureDiagnostic(error)});}catch{}
+          operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');
+        }
         operation.cleanupConfirmed=!operation.transportUncertain && outcome.cleanup_complete===true;
         operation.outcome=outcome;
         await remember(operation,'completed',outcome);
@@ -2686,7 +2689,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const task={operation_id:operationId,artifact,snapshot,binding,expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline};
       const key=fingerprint('large-file-reuse',[binding.loginom_account,targetOrigin,artifact.upload.directory,artifact.name,artifact.bytes,artifact.sha256]);
       const state={task,submitted:false,bound:false,settled:false,verified:false};largeTasks.set(operationId,state);
-      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       try {
         signal?.throwIfAborted();
         state.sourceLease=await artifactStore.stageUpload(artifactId);
@@ -2736,7 +2739,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           await new Promise(resolve=>{const timer=setTimeout(done,1000);function done(){signal?.removeEventListener('abort',done);clearTimeout(timer);resolve();}signal?.addEventListener('abort',done,{once:true});});
         }
         throw Error('LOGINOM_UPLOAD_DEADLINE');
-      }catch(error){state.sourceChanged=error.message==='LOGINOM_FILE_CHANGED';if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;}
+      }catch(error){
+        try{await onRecord({phase:'large_upload_failed',operation_id:operationId,cause:operationFailureDiagnostic(error)});}catch{}
+        state.sourceChanged=error.message==='LOGINOM_FILE_CHANGED';if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;
+      }
     },
     async cancelLargeArtifact({operationId,deadline}) {
       const state=largeTasks.get(operationId);
@@ -2744,7 +2750,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(state.settled)return state.verified!==true;
       if(!state.submitted){await state.sourceLease?.release();state.settled=true;return true;}
       const task={...state.task,deadline_at:deadline,source_changed:state.sourceChanged===true};
-      const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       while(now()<deadline){
         const progress=await native('cancel');
         if(progress.gesture||progress.quiet)await onRecord({phase:'large_upload_cleanup_step',operation_id:operationId,

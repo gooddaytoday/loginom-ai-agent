@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseCapabilityResult} from '../lib/executor.mjs';
+import {operationFailureDiagnostic} from '../lib/browser-failure.mjs';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 for(const [message,category] of [
  ['Loginom connection is disconnected; restore the original session','LOGINOM_DISCONNECTED'],
  ['Loginom account or document changed; prepare the workspace again','LOGINOM_IDENTITY_CHANGED'],
@@ -43,4 +48,21 @@ test('browser transport diagnostics retain the bounded original cause privately'
   assert.equal(error.cause.message,text);
   return true;
  });
+});
+
+test('private transport journal redacts the retained cause and keeps the public refusal fixed',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'upload-cause-'));
+ try{
+  const record=createExecutionJournal({directory,metadata:{sessionId:'test'},knownSecrets:['PRIVATE']});
+  let failure;
+  try{parseCapabilityResult({isError:true,content:[{type:'text',text:'Error: peer reset password=PRIVATE'}]});}
+  catch(error){failure=error;}
+  await record({phase:'artifact_upload_transport_failed',cause:operationFailureDiagnostic(failure)});
+  const text=await readFile(join(directory,'execution-events.jsonl'),'utf8');
+  assert.ok(!text.includes('PRIVATE'));
+  const cause=JSON.parse(text).cause;
+  assert.equal(cause.name,'Error');
+  assert.match(cause.original_message,/^Error: peer reset password=\s*\[redacted\]$/);
+  assert.equal(failure.message,'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]');
+ }finally{await rm(directory,{recursive:true,force:true});}
 });

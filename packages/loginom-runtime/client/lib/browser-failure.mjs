@@ -23,3 +23,11 @@ export function browserFailureDetails(response){
  const exception=text.match(/\b(ReferenceError|TypeError|SyntaxError|RangeError)\b/)?.[1];
  return exception?'exception='+exception:null;
 }
+
+// Private execution journal only: the journal's redactor handles these bounded
+// messages. Never attach them to model-facing outcomes or recovery suggestions.
+export function operationFailureDiagnostic(error){
+ return {name:String(error?.name??'Error').slice(0,80),code:String(error?.code??'').slice(0,100),
+  message:String(error?.message??error).slice(0,2048),
+  original_message:typeof error?.cause?.message==='string'?error.cause.message.slice(0,2048):null};
+}

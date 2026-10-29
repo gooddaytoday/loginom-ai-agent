@@ -511,3 +511,15 @@ test('sender active zero waits for the owned native DeleteFile and automatic ref
  assert.equal((await call('cancel')).quiet,false);
  f.store.isLoading=()=>false;assert.equal((await call('cancel')).quiet,true);assert.deepEqual(f.clicks,[]);
 });
+
+test('native upload refusal retains the original exception for the private journal',async()=>{
+ const {makeLargeUploadCode}=await import('../lib/artifact-discovery.mjs');
+ const f=largeNativeFixture();
+ f.page.evaluate=async()=>{throw Object.assign(new RangeError('Invalid time value'),{code:'ERR_OUT_OF_RANGE'});};
+ const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
+ assert.equal(raw.status,'FAILED');
+ assert.equal(raw.error.code,'LARGE_UPLOAD_NATIVE_REFUSED');
+ assert.equal(raw.output.failure.name,'RangeError');
+ assert.equal(raw.output.failure.message,'Invalid time value');
+ assert.equal(raw.output.failure.code,'ERR_OUT_OF_RANGE');
+});
