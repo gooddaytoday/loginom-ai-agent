@@ -97,7 +97,11 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   need(s.file_storage?.status==='observed','Export search folder unavailable');
   if(binding===null)binding=s.file_storage.directory;else need(s.file_storage.directory===binding,'Export search folder changed');
  };
- const table=()=>ready(async()=>{
+ const anchors=s=>s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
+ const table=()=>{
+ let targetFound=false;
+ return ready(async()=>{
+  targetFound=false;
   guard();const r=await roots();bind(r,false);
   const tid=r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl',es=r.ui.elements.filter(e=>e.tid===tid);
   need(es.length===1,'Unique export table required');
@@ -109,8 +113,14 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(owner===null){owner=rows[0].scroll.ref;direction=rows[0].scroll.top>0?'up':'down';}
   need(rows[0].scroll.ref===owner,'Export search scroll owner changed');
   need(typeof s.file_storage.rendered_window_ready==='boolean','Export search native window readiness unavailable');
+  if(s.file_storage.rendered_window_ready&&!anchors(s).length){
+   guard();const r=await read({discover_roots:true,storage_name:name});bind(r,false);
+   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
+   need(matches.length<=1,'Export file row is ambiguous');targetFound=matches.length===1;
+  }
   return s;
- },s=>s.file_storage.rendered_window_ready===true);
+ },s=>s.file_storage.rendered_window_ready===true&&(anchors(s).length>0||targetFound));
+ };
  guard();
  const initial=await read({discover_roots:true,storage_name:name});
  bind(initial,false);
@@ -124,9 +134,9 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
   need(matches.length<=1,'Export file row is ambiguous');
   if(matches.length){const found=await read({root_ref:matches[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
-  const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
-  if(!anchors.length)throw unavailable(s,'no_scroll_owner',r);
-  const e=anchors[0],scroll=e.scroll;
+  const eligible=anchors(s);
+  if(!eligible.length)throw unavailable(s,'no_scroll_owner',r);
+  const e=eligible[0],scroll=e.scroll;
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){direction='down';lastTop=null;}
   if(direction==='down'&&scroll.top>=scroll.max_top)throw unavailable(s,'folder_end',r);

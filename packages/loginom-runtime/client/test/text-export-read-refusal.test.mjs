@@ -100,7 +100,7 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_throw','no_scroll_owner_evidence','no_scroll_owner_evidence_actions','folder_end','no_scroll_owner','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
+for(const kind of ['anchor_pending_success','no_scroll_owner_evidence_ack','no_scroll_owner_evidence_throw','no_scroll_owner_evidence','no_scroll_owner_evidence_actions','folder_end','no_scroll_owner','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
@@ -110,11 +110,11 @@ for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_thro
  const journalDirectory=evidence?await mkdtemp(join(tmpdir(),'export-read-evidence-')):null;
  if(journalDirectory)t.after(()=>rm(journalDirectory,{recursive:true,force:true}));
  const journal=evidence?createExecutionJournal({directory:journalDirectory,metadata:{sessionId:'session'},redactor}):null;
- const success=['success','return_tabs_stale'].includes(kind),storage=kind.includes('scroll')||['folder_end','foreign_storage'].includes(kind);
+ const success=['success','return_tabs_stale','anchor_pending_success'].includes(kind),storage=kind.includes('scroll')||['folder_end','foreign_storage','anchor_pending_success'].includes(kind);
  const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted'].includes(kind);
  let files=false,downloads=0,releases=0,retained=0,failed=false,tabReads=0,freshRoots=0;const gestures=[],records=[];
- let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
+ let nameLookups=0,tableReads=0,scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
  const snapshot=()=>({active_tab_ref:files?'files-tab':workflow.tab_tid,authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:evidence?observations.length:1},
@@ -161,6 +161,7 @@ for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_thro
    assert.ok(match,'known native observation or gesture');const task=JSON.parse(match[1]);
    if(task.mode==='act'){
     const tid=task.snapshot.ui.elements.find(e=>e.ref===task.action.ref).tid;gestures.push(tid);
+    if(kind==='anchor_pending_success')assert.notEqual(task.snapshot.observation_root?.ref,'ui-file-table','blocked table is never used for a gesture');
     if(tid.endsWith('btnFilestorage')){
      files=true;
      if(['open_files','mutating','unknown_gesture'].includes(kind)){
@@ -194,6 +195,16 @@ for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_thro
    }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
+   if(kind==='anchor_pending_success'){
+    if(task.root_ref==='ui-file-table'){
+     tableReads++;output.ui.elements.filter(e=>e.scroll).forEach(e=>{e.allowed_actions=tableReads===1?[]:['scroll'];e.interaction={state:tableReads===1?'point_not_observed':'point_observed'};});
+    }
+    if(task.storage_name||task.root_ref==='ui-csv'){
+     output.ui.elements=output.ui.elements.filter(e=>!e.tid.includes(';FileStorageForm;colName_'));
+     if(tableReads>1)output.ui.elements.push(element('MF;TF-2;FileStorageForm;colName_result.csv','csv',{label:task.storage_name?'':'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']}));
+    }
+   }
+   if(kind==='no_scroll_owner_evidence_actions'&&task.storage_name&&++nameLookups===2)output.ui.elements.push(element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix(sentinel+'.csv'),'transient',{label:''}));
    if(task.root_ref==='ui-file-table'){output.observation_root={ref:task.root_ref,identity:{anchor_tid:'MF;TF-2;FileStorageForm;pnlFileStorage;tbl'}};output.file_storage.rendered_window_ready=true;}
    output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
    if(task.prepared_node_context){
@@ -255,8 +266,10 @@ for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_thro
   assert.deepEqual(result.nodePhaseRefusal.proof.failure,{step:'storage_navigation',code:'STORAGE_ENTRY_UNAVAILABLE',kind:'Error',reason:'no_scroll_owner'});
   assert.equal(/exportStorageFailure|stack/.test(JSON.stringify(result.nodePhaseRefusal)),false);
   assert.equal(downloads,0);assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage','MF;TF-2;FileStorageForm;btnRefresh',workflow.tab_tid]);
-  assert.equal(observations.length,kind!=='no_scroll_owner_evidence_actions'?16:17,'existing navigation, failure sample and quiet graph restoration reads only');
+  if(kind==='no_scroll_owner_evidence_actions')assert.equal(nameLookups,3,'inner target match does not replace the fresh outer lookup');
+  assert.equal(observations.length,kind!=='no_scroll_owner_evidence_actions'?16:18,'existing navigation, failure sample and quiet graph restoration reads only');
  }
+ if(kind==='anchor_pending_success'){assert.equal(tableReads,2);assert.equal(downloads,1);assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage','MF;TF-2;FileStorageForm;btnRefresh',workflow.tab_tid]);}
  if(kind==='return_tabs_stale'){
   assert.equal(tabReads,2);assert.equal(freshRoots,1);assert.equal(downloads,1);
   assert.equal(gestures.filter(t=>t===workflow.tab_tid).length,1,'one return gesture');
