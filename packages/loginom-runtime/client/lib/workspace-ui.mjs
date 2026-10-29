@@ -3241,6 +3241,23 @@ function readRenderedInputMapping(observation) {
         &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
         &&wizardForms.length===1&&wizardForms[0].contains(element)
         &&(tids.get(getTid(element))??[]).filter(visible).length===1;
+      // Excel's locked spreadsheet grid renders its Ext.LoadMask in a portal.
+      // The message has no data-tid: bind its exact native mask/target objects
+      // to the unique preview inside this wizard before permitting only a wait.
+      const excelPreview=(()=>{
+        if(!preparedNodeId||wizard.status!=='observed'||wizard.stage!=='excel_import_file'
+          ||wizardForms.length!==1||getTid(element)||!element.classList.contains('x-mask-msg')||owner)return false;
+        try{
+          const previews=(tids.get(wizard.root_tid+';ImportExcelFilePreviewWizard;frmSpreadSheetsPreview')??[]).filter(visible);
+          const root=element.closest('.x-mask'),mask=root&&globalThis.Ext?.getCmp?.(root.id),target=mask?.target?.el?.dom;
+          const grid=target?.closest('.bg-excel-spreadsheet');
+          return previews.length===1&&wizardForms[0].contains(previews[0])&&!!grid
+            &&target.isConnected&&visible(target)&&previews[0].contains(grid)&&grid.contains(target)
+            &&mask.$className==='Ext.LoadMask'&&mask.isLoadMask===true&&mask.el?.dom===root
+            &&mask.msgWrapEl?.dom===element&&mask.ownerCt===mask.target
+            &&globalThis.Ext.getCmp(target.id)===mask.target;
+        }catch{return false;}
+      })();
       // Ext's input-mapping loading message has no data-tid and can flicker
       // while the wizard's own mask remains. Bind only a contained message
       // under that exact busy wizard; this permits waiting, never a gesture.
@@ -3259,7 +3276,7 @@ function readRenderedInputMapping(observation) {
         &&(tids.get(getTid(element))??[]).filter(visible).length===1
         &&graphs.filter(g=>visible(g)&&element.contains(g)).length===1;
       return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
-        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
+        ...(importPreview||excelPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
         ...(inputMapping?{input_mapping_owner_ref:wizard.root_ref}:{}),
         ...(containedLoading?{wizard_loading_owner_ref:wizard.root_ref}:{}),
         ...(graphLoading?{graph_loading_owner_ref:refOf(graphs.find(g=>visible(g)&&element.contains(g)))}:{}) };
@@ -4364,6 +4381,9 @@ function readRenderedInputMapping(observation) {
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
                   &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
                   &&mask.import_preview_owner_ref===fresh.wizard.root_ref
+                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
+                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='excel_import_file'
+                  &&mask.target_tid===null&&mask.import_preview_owner_ref===fresh.wizard.root_ref
                 ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='input_mapping'
                   &&mask.input_mapping_owner_ref===fresh.wizard.root_ref));
