@@ -65,9 +65,11 @@ STOP: source/stage/config ownership mismatch, preparatory failure, первый 
 
 Возможная последующая production correction — отдельное решение по точному наблюдению и отдельный reviewed scope; этот план её и второй S5 не разрешает и не обещает.
 
-## Checkpoint — ONE PROBE AUTHORIZED
+## Checkpoint — DIAGNOSTIC BLOCKED / STOP
 
-- Plan preflight GO; actual private adaptation172lines/+16−54 и pinnedNode syntax PASS. Production/harness не менялись.
-- Independent actual-source review после M1 correction: spec compliant/quality Approved, mandatory0/optional0. Marker обозначает READINESS_ONLY, не доказательство settling.
-- Root разрешает один PhaseB run после fresh stock stage/verifyResources текущего clean source. Первый неожиданный отказ — existing cleanup/STOP, без повторов.
-- Native sample/branch, own initial Save/native/context cleanup и OS facts ещё не проверены. S5 и storage-settle Task1 остаются BLOCKED.
+- Step1 выполнен: private172lines/+16−54, syntax PASS; independent source review после M1 correction compliant/Approved/mandatory0. Production/harness не менялись.
+- Единственный PhaseB завершён на втором scroll: NOT_APPLIED/UI_EPOCH_CHANGED/preconditions/effect_possiblefalse/cleanuptrue; wrapper UI_GESTURE_UNCONFIRMED. Первый scroll0→1000 SUCCEEDED. no_scroll_owner NOT_REPRODUCED, A/B branch не установлена, exact target не найден.
+- Fresh stock stage/verify4753PASS; actual build/evidence identities — в [отчёте](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-29--captured-shared-reader-probe-blocked).
+- Initial own Save/modifiedfalse, native Close/logout/noDiscard и context CLOSED/closeevent/pages0 подтверждены. OS_NOT_CONFIRMED; late final saved-state не выполнялся, process absence не заменяет attribution.
+- Full Task1/Steps2–3 не завершены по целевому diagnostic outcome. Factual BLOCKED slice/cleanup приняты incremental independent spec+quality review, mandatory0/optional0; executable удалён, audits/evidence/profile сохранены. Повторов не будет.
+- Следующий шаг — пересмотреть получение failing observation внутри actual Export caller; standalone callbacks/timing отличаются от него. S5 и storage-settle Task1 остаются BLOCKED; новый scope требует отдельного решения/review.

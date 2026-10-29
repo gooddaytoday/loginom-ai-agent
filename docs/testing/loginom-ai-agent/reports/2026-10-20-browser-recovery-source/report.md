@@ -306,3 +306,40 @@ launcher удалён. Root проверил raw result/recovery/cleanup/close �
 mandatory0/optional0; полный Task1 BLOCKED, native S5 открыт.
 Исторические FAIL/UNKNOWN и установленная/model приёмка не переоценены; release-флаг
 не включён, merge/release не выполнялись.
+
+
+## 2026-10-29 — captured shared-reader probe: BLOCKED
+
+[Подплан](../../../../superpowers/plans/2026-10-29-browser-recovery-failure-observation.md)
+получил plan GO; private adaptation172строки/+16−54 прошла independent source review
+после M1 correction: readiness marker не называется доказательством settling.
+Production/harness неизменны. Fresh stock stage/verifyResources4753PASS;
+clean builder `326928c48768eb1cb7ec199cdc63272ad2abb65a`, executable runtime bytes
+совпадают с предыдущей попыткой; manifest identity остаётся указанной выше.
+Один standalone loginBrowser/shared-reader probe, не managed IPC/S5 acceptance.
+
+Initial own empty draft/UUID package Save verified/save_completed/reopenedfalse/
+workflow_preserved и native modifiedfalse подтверждены. Первый scroll0→1000
+SUCCEEDED. Accepted table128:65rows/65same owner/36anchors/readinesstrue,
+следующий exact lookup132 target не нашёл. Второй scroll136 НЕ применён:
+NOT_APPLIED/preconditions/UI_EPOCH_CHANGED/effect_possiblefalse/cleanuptrue,
+без ui_scroll_applied. Wrapper uncertaintrue/UI_GESTURE_UNCONFIRMED остановил probe;
+raw receipt подтверждает known no-effect, не неизвестный эффект этого жеста.
+no_scroll_owner NOT_REPRODUCED; A/B branch и полный exact-target поиск не доказаны.
+Driver exit0 означает завершённый finally; diagnostic result остаётся BLOCKED.
+
+Из-за uncertain guarded return/final saved-state пропущены; final replace отсутствует.
+Single native cleanup независимо SUCCEEDED/package_closed/logged_out/noDiscard,
+same original session/document/account/path. Context CLOSED/closeeventtrue/pages0.
+OS attributionfalse/candidates0/remaining0 → OS_NOT_CONFIRMED. Эта cleanup PASS
+не закрывает предыдущие UNKNOWN/BLOCKED. Повторов/Export/upload/gesture retry/kill нет.
+Private root `/home/george/.cache/loginom-ai-agent/browser-recovery-failure-observation-gf7ikzl0`;
+raw ledger/result, source/diffs, actual stage identities/profile сохранены0700/0600.
+Temporary probe/stage executables удалены после audit. Root проверил raw128/132,
+actual refusal/Save/saved-state/native cleanup/context и source/resource equality.
+Product/stage/probe stderr пусты; postprocessing nullable-metadata ошибки исправлены
+чтением уже сохранённых JSON, без нового native run. Incremental independent review
+выполненного BLOCKED slice/cleanup: spec/quality Approved, mandatory0/optional0.
+Standalone callbacks и timing отличаются от actual Export caller; дополнительная
+такая проба не разрешена. Дальнейший scope — отдельный пересмотр источника missing
+logical observation. Native S5 по-прежнему FAIL, upstream/release не выполнялись.
