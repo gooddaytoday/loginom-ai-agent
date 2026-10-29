@@ -1,8 +1,9 @@
 import type { ToolPart } from "@opencode-ai/sdk/v2"
+import path from "node:path"
 
 // Correlation is deliberately explicit: a different successful operation does not repair a failure.
 export function runToolOutcome() {
-  const unresolved = new Set<string>()
+  const unresolved = new Map<string, ToolPart>()
   const connectionFailures = new Map<string, "LOGINOM_CONFIG_REQUIRED" | "LOGINOM_CONNECTION_NOT_READY">()
   return {
     observe(part: ToolPart) {
@@ -37,14 +38,33 @@ export function runToolOutcome() {
           : ["arguments", input]
       const key = part.tool === "invalid" ? `invalid:${part.id}` : JSON.stringify([part.tool, canonical(identity)])
       if (part.state.status === "error" || part.tool === "invalid" || part.state.metadata?.isError === true) {
-        unresolved.add(key)
+        unresolved.set(key, part)
         return
       }
       unresolved.delete(key)
+      for (const [key, failure] of unresolved) {
+        if (correctedRead(failure, part)) unresolved.delete(key)
+      }
     },
     failed: () => unresolved.size > 0,
     connectionFailure: () => [...connectionFailures.values()].at(-1),
   }
+}
+
+function correctedRead(failure: ToolPart, success: ToolPart) {
+  if (failure.tool !== "read" || success.tool !== "read" || failure.state.status !== "error") return false
+  if (failure.sessionID !== success.sessionID) return false
+  const before = failure.state.input.filePath
+  const after = success.state.input.filePath
+  if (typeof before !== "string" || typeof after !== "string") return false
+  if (!failure.state.error.startsWith(`File not found: ${before}`) || failure.state.metadata?.permissionDenied) return false
+  if (path.dirname(before) !== path.dirname(after) || path.extname(before) !== path.extname(after)) return false
+  // A later successful read repairs missing-file errors in this directory and
+  // extension only when all other arguments match; filename similarity is irrelevant.
+  return (
+    JSON.stringify(canonical({ ...failure.state.input, filePath: undefined })) ===
+    JSON.stringify(canonical({ ...success.state.input, filePath: undefined }))
+  )
 }
 
 function canonical(value: unknown): unknown {

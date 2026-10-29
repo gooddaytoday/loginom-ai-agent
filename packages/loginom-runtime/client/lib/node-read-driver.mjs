@@ -134,15 +134,15 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   // Same-ID delivery retries return the original worker. Unknown browser effects
   // stay blocked; this route never restarts an uncertain execution automatically.
   verifyContinuation:async()=>false,
-  ...(!javascript?{
-   releasePendingPhases:['finish','read'],
+   releasePendingPhases:javascript?['read']:['finish','read'],
    async releasePending(state,{signal}={}){
-    need(['finish','read'].includes(state.pending?.phase),'Only a stopped output-read finish or read can be released here');
+    need((javascript?['read']:['finish','read']).includes(state.pending?.phase),'Only a stopped output-read finish or read can be released here');
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     enter({signal,deadline,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
+  ...(!javascript?{
    // Browser recovery runs the same proof for any stopped phase: the model, not
    // this driver, restored the page, and the proof rechecks the quiet graph.
    async recoveryReleasePending(state,{signal}={}){

@@ -10,6 +10,23 @@ const control=(s,suffix,verb)=>{
  requireValue(matches.length===1,'Unique calculator control unavailable: '+suffix);return matches[0];
 };
 
+export async function previewCalculator(channel) {
+ const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
+ const before=await channel.observe({condition:'calculator preview available',readCalculator:true,ready});
+ await channel.perform({condition:'preview calculator formulas before completion',initialObservation:before,ready,
+  identity:s=>s.prepared_node_context,resolve:s=>({verb:'click',ref:control(s,';CalcDataWizard;btnPreview','click').ref})});
+ const preview=await channel.observe({condition:'owned calculator preview result',ready:s=>s.wizard?.calculator_preview?.status==='observed'});
+ await channel.perform({condition:'close owned calculator preview',initialObservation:preview,
+  ready:s=>s.wizard?.calculator_preview?.status==='observed',identity:s=>s.wizard.calculator_preview,
+  resolve:s=>({verb:'click',ref:control(s,';CalcPreviewForm;p.h;close','click').ref})});
+ const after=await channel.observe({condition:'calculator returned from preview',readCalculator:true,ready:s=>ready(s)&&s.ui.dialogs.length===0});
+ requireValue(same(before.node_calculator.expressions.map(semantic),after.node_calculator.expressions.map(semantic)),
+  'Calculator expressions changed during preview');
+ requireValue(preview.wizard.calculator_preview.errors.length===0,
+  'CALCULATOR_PREVIEW_FORMULA_ERROR: '+preview.wizard.calculator_preview.errors.join('\n'));
+ return {status:'accepted_by_loginom_preview',settings_applied:false};
+}
+
 export async function configureCalculator(channel,parameters,{newNode=false,recoverRejectedRequest=false,captureBaseline}={}) {
  const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
  const observe=condition=>channel.observe({condition,readCalculator:true,ready});

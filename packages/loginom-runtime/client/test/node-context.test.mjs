@@ -148,3 +148,14 @@ test('D52 input breadcrumb binding requires the exact native node, port and open
   assert.equal(!!r.navigation_node,fault==='valid',fault);
  }
 });
+
+test('native input ancestry binds each exact indexed opening with the same component proof',async()=>{
+ for(const index of [0,1,2]) {
+  const f=fixture(),p=f.enterInputBreadcrumbs();
+  p.opening.portIndex=index;p.opening.nativeIndex=index;p.opening.port.FPortIndex=index;p.portTree.FIndex=index;
+  const result=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(result.verified,true);assert.ok(result.navigation_node,'input '+index);
+  p.components[0]._node.data.node={FGuid:'foreign'};
+  assert.equal((await readPreparedNodeContext(f.page,f.binding)).navigation_node,undefined);
+ }
+});

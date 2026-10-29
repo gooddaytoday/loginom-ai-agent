@@ -100,11 +100,11 @@ export function createUserWorkflowBindings() {
       let parameters=request.parameters;
       if(request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
         parameters={...exportCreationDefaults,...parameters};
-      if(request.target.kind==='new'&&request.target.type==='imports.text'&&parameters?.settings){
+      if(request.target.kind==='new'&&request.target.type==='imports.text'&&parameters?.settings&&parameters.preview_only!==true){
         const settings=parameters.settings,upload=uploads.get(parameters.source?.upload_operation_id);
         parameters={...parameters,settings:{...settings,
           source:{encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true,
-            ...(upload?.artifact_id===parameters.source?.artifact_id?{source_path:upload.destination}:{}),...settings.source},
+            ...(upload&&upload.artifact_id===parameters.source?.artifact_id?{source_path:upload.destination}:{}),...settings.source},
           format:{delimiter:',',decimal_separator:'.',null_marker:'',text_qualifier:'"',...settings.format},
           ...(Array.isArray(settings.columns)?{columns:settings.columns.map(c=>c&&typeof c==='object'&&!Array.isArray(c)?({label:c.name,
             data_kind:c.type==='real'?'Непрерывный':'Дискретный',used:true,...c}):c)}:{}),

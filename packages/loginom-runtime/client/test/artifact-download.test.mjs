@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {Page,build} from './support/executor-fixture.mjs';
-import {makeArtifactDownloadCode,makeNativeOutputDownloadCode} from '../lib/executor.mjs';
+import {Page,build,runtime} from './support/executor-fixture.mjs';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {makeArtifactDownloadCode,makeNativeOutputDownloadCode,makeServerSourceDownloadCode,browserServerDownloadControl} from '../lib/executor.mjs';
 
 function fixture(name = 'sales.csv') {
   const page=new Page(),elements=page.elements.bind(page),snapshot=page.uiSnapshot.bind(page);
@@ -23,8 +26,95 @@ function fixture(name = 'sales.csv') {
   return {page,options,download,calls,run:()=>page.execute(makeArtifactDownloadCode(options))};
 }
 
+test('server-only browser download retains its native Download, drains cancellation and never sends bytes',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ // The real MCP unsafe-code VM exposes page only, with no Node timer globals.
+ await f.page.execute('async page=>null');
+ const native={kind:'file',path:'/test/sales.csv',bytes:2147483648,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ f.options.snapshot=f.page.uiSnapshot();delete f.options.artifact.upload;
+ f.options.server_source_binding={directory:'/test',destination:native.path,bytes:native.bytes,mtime:native.mtime};
+ f.options.deadline_at=Date.now()+10000;
+ let finish;
+ f.download.saveAs=async()=>{f.calls.push('save');await new Promise(resolve=>{finish=resolve;});};
+ f.download.cancel=async()=>{f.calls.push('cancel');finish?.();};
+ f.download.delete=async()=>{f.calls.push('delete');};
+ const started=await f.page.execute(makeServerSourceDownloadCode(f.options));
+ assert.equal(started.status,'SUCCEEDED');assert.equal(started.output.download_started,true);
+ assert.deepEqual(f.calls,['listen','click','save']);
+ const control=mode=>{f.page.context=null;return f.page.execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id:f.options.operation_id,mode})})`);};
+ assert.equal((await control('status')).output.state,'running');
+ assert.equal((await control('cancel')).output.state,'settled');
+ await control('release');assert.deepEqual(f.calls,['listen','click','save','cancel','delete']);
+ assert.equal((await control('status')).status,'FAILED');
+});
+
+test('retained server precondition refusal releases without a nonexistent Download',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page);
+ const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ f.options.snapshot=f.page.uiSnapshot();delete f.options.artifact.upload;
+ f.options.server_source_binding={directory:'/test',destination:native.path,bytes:3,mtime:native.mtime};
+ f.options.deadline_at=Date.now()+10000;f.options.browser_downloads_path='/private/browser-downloads';
+ const code=makeServerSourceDownloadCode(f.options);native.mtime='changed';
+ const start=await f.page.execute(code);assert.equal(start.output.download_started,true);
+ const control=mode=>f.page.execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id:f.options.operation_id,mode})})`);
+ let status=await control('status');
+ while(status.output.state==='running'){await new Promise(resolve=>setImmediate(resolve));status=await control('status');}
+ assert.equal(status.output.failed,true);assert.equal(status.output.outcome.effect_possible,false);
+ assert.equal(status.output.outcome.cleanup_complete,true);assert.deepEqual(f.calls,[]);
+ assert.equal((await control('cancel')).output.state,'settled');
+ assert.equal((await control('release')).status,'SUCCEEDED');
+ assert.equal((await control('status')).error.code,'LOGINOM_DOWNLOAD_MISSING');
+});
+
+test('server event and RPC consume the original operation deadline instead of the small artifact timeout',async t=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),root=await mkdtemp(join(tmpdir(),'server-event-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));f.page.clock=Date.now();
+ const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ let rpc,eventTimeout,rpcStarted;
+ const listeners=new Map();
+ const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),detach:async()=>{},
+  send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
+ f.page.waitForEvent=async(type,options)=>{
+  assert.equal(type,'download');eventTimeout=options.timeout;
+  // LAB-386 server4/b:448: a successful gesture, then the native event
+  // misses the old 15s window. The external Page owns this delayed event.
+  if(options.timeout<20000)throw Object.assign(Error('event has not arrived yet'),{name:'TimeoutError'});
+  listeners.get('Browser.downloadWillBegin')?.({guid:'owned',frameId:'frame',suggestedFilename:'sales.csv',url:f.download.url()});
+  listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:3});
+  return f.download;
+ };
+ f.download.saveAs=path=>writeFile(path,'abc');f.download.delete=async()=>{};
+ const r=runtime(f.page,{cacheDirectory:join(root,'cache'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:'https://loginom.invalid',loginom_account:'worker',directories:{inputs:'/test',packages:'/test',exports:'/test'}}),
+  execute:async(code,options)=>{
+   if(code.includes('"download_path":')){
+    rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
+    return structuredClone(await vm.runInContext(`(${code})`,f.page.context)(page));
+   }
+   return f.page.execute(code);
+  }});
+ const roots=await r.observe({scope:'roots'}),file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);
+ const detail=await r.observe({rootRef:file.ref,observationId:roots.output.observation_id});
+ const source=detail.output.ui.elements.find(e=>e.storage_entry?.path===native.path).storage_entry.server_source_ref;
+ await r.serverDownload({operation_id:'late-event',server_source_ref:source},'dock_storage_download_start');
+ let result;
+ do{result=await r.serverDownload({operation_id:'late-event',timeout_ms:100},'dock_storage_download_wait');}while(result.state==='running');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(eventTimeout,result.progress.deadline_at-f.page.clock);
+ assert.equal(rpc.timeout,result.progress.deadline_at-rpcStarted);assert.equal(rpc.timeout-eventTimeout,5000);
+ assert.ok(eventTimeout>60000);assert.ok(rpc.signal instanceof AbortSignal);
+ assert.equal(result.output.bytes,3);assert.equal(f.calls.filter(c=>c==='click').length,1);
+ await r.cleanupServerCache();
+});
+
 test('download binds the checked file gesture to its page event and exact private save destination',async()=>{
-  const f=fixture(),result=await f.run();
+  const f=fixture(),wait=f.page.waitForEvent;
+  f.page.waitForEvent=(type,options)=>{assert.equal(options.timeout,15000);return wait(type,options);};
+  const result=await f.run();
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.cleanup_complete,true);
   assert.deepEqual(f.calls,['listen','click','save']);
   assert.equal(result.output.destination,'/test/sales.csv');
@@ -119,6 +209,94 @@ test('missing event and post-download context change cannot claim a verified cop
   changed.download.saveAs=async path=>{await save(path);changed.page.directory='/other';};
   const result=await changed.run();assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED');
   assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.download_completed,undefined);
+  const refused=result.trace.find(e=>e.event==='download_post_context_refused');
+  assert.equal(refused.checks.storage,false);assert.equal(refused.checks.document,true);
+  assert.ok(Object.values(refused.checks).every(v=>typeof v==='boolean'));
+});
+
+function downloadToastFixture(mode='closes') {
+  const f=fixture('sample.xlsx'),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
+  let saved=false,reads=0;
+  // Native data-tid=toast DOM captured in LAB-449. Its disappearance may
+  // happen between the workspace snapshot and the bound-element read.
+  const toast=()=>({isConnected:true,className:'x-window bg-notify-msg-color-info x-layer x-window-default x-closable x-window-closable x-window-default-closable x-border-box',
+    textContent:mode==='unknown_text'?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
+    getAttribute:key=>key==='data-tid'?'toast':null,
+    getBoundingClientRect:()=>({width:100,height:50})});
+  let element=toast();
+  const document={querySelectorAll:()=>element.isConnected?[element]:[]};
+  const sandbox={document,getComputedStyle:()=>({visibility:'visible',display:'block'})};
+  const save=f.download.saveAs;
+  f.download.saveAs=async path=>{await save(path);saved=true;};
+  f.page.uiSnapshot=()=>{
+    const s=snapshot();
+    if(saved){
+      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding'].includes(mode)?reads++<1:true;
+      element.isConnected=visible;
+      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:'[outside selected root]'}]:[];
+      // Recorded sequence: snapshot still has the original toast/ref, then
+      // inspect sees it detached; only the next snapshot has no dialogs.
+      if(mode==='closes_between_reads'&&reads===2)element.isConnected=false;
+      if(mode==='mask')s.ui.masks=[{ref:'foreign-mask'}];
+    }
+    return s;
+  };
+  f.page.evaluateHandle=async fn=>{
+    const handle={value:vm.runInNewContext('('+fn.toString()+')',sandbox)(),dispose:async()=>{}};
+    if(mode==='closes_after_binding')element.isConnected=false;
+    return handle;
+  };
+  f.page.evaluate=async(fn,arg)=>fn.name.includes('DownloadToast')||!fn.toString().includes('workspace-ui.identity.v1')&&fn.toString().includes('[role="dialog"],.x-window,.bg-dialog')
+    ?vm.runInNewContext('('+fn.toString()+')',sandbox)(arg?.value??arg):evaluate(fn,arg);
+  const wait=f.page.waitForTimeout.bind(f.page);
+  f.page.waitForTimeout=async ms=>{
+    await wait(ms);if(mode==='directory')f.page.directory='/other';if(mode.startsWith('replaced'))element=toast();
+    if(mode==='changed_classes')element.className+=' foreign';
+    if(mode==='changed_text')element.textContent='Сохранение пакета';
+  };
+  f.options.deadline_at=f.page.clock+300;
+  return f;
+}
+
+test('completed XLSX download waits read-only for the owned Loginom download toast to close',async()=>{
+  const f=downloadToastFixture(),result=await f.run();
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.cleanup_complete,true);
+  assert.deepEqual(f.calls,['listen','click','save']);
+  assert.ok(result.trace.some(e=>e.event==='download_toast_settled'));
+  assert.ok(f.page.clock<=f.options.deadline_at);
+});
+
+test('LAB-449 native toast closes between observation and inspection without changing download context',async()=>{
+  for(const mode of ['closes_between_reads','closes_after_binding']){
+    const f=downloadToastFixture(mode),result=await f.run();
+    assert.equal(result.status,'SUCCEEDED',mode);assert.equal(result.output.download_completed,true,mode);
+    assert.equal(result.cleanup_complete,true);assert.deepEqual(f.calls,['listen','click','save']);
+    assert.ok(result.trace.some(e=>e.event==='download_toast_settled'));
+    assert.ok(!result.trace.some(e=>e.event==='download_toast_guard_refused'));
+    assert.ok(f.page.clock<=f.options.deadline_at);
+  }
+});
+
+test('download toast refusal names the changed native guard and predicate',async()=>{
+  for(const [mode,predicate] of [['replaced','same_element'],['changed_classes','same_classes'],['changed_text','download_text']]){
+    const f=downloadToastFixture(mode),result=await f.run();
+    assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.download_completed,undefined);
+    const guard=result.trace.find(e=>e.event==='download_toast_guard_refused');
+    assert.deepEqual(guard,{event:'download_toast_guard_refused',guard:'native_toast',predicate,observed:'changed'});
+    assert.deepEqual(f.calls,['listen','click','save']);
+  }
+});
+
+test('download toast settlement refuses foreign dialogs, owner changes and the original deadline',async()=>{
+  for(const mode of ['unknown_text','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline']) {
+    const f=downloadToastFixture(mode);
+    if(mode==='no_deadline')delete f.options.deadline_at;
+    const result=await f.run();
+    assert.equal(result.status,'AMBIGUOUS',mode);assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED',mode);
+    assert.equal(result.output.download_completed,undefined,mode);assert.equal(result.cleanup_complete,true,mode);
+    assert.deepEqual(f.calls,['listen','click','save'],mode);
+    assert.ok(f.page.clock<=1300,mode);
+  }
 });
 
 function revealFixture(mode='success') {
@@ -176,7 +354,7 @@ test('verification reveals its original clipped or offscreen file owner once bef
     assert.equal(result.trace.filter(t=>t.event==='download_file_revealed').length,1);
     assert.equal(result.trace.find(t=>t.event==='download_file_revealed').delta,50);
     assert.equal(result.trace.find(t=>t.event==='download_reveal_confirmed').interaction,'point_observed');
-    assert.equal(f.waitCount(),mode==='delayed_repaint'?4:2);
+    assert.equal(f.waitCount(),mode==='delayed_repaint'?5:3);
   }
 });
 
@@ -349,4 +527,22 @@ test('TXT download preserves exact name and destination and delegates one owned 
  const f=fixture('transactions.txt'),r=await f.run();
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);
  assert.equal(r.output.destination,'/test/transactions.txt');assert.deepEqual(f.calls,['listen','click','save']);
+});
+
+test('completed download waits out a post-copy dialog using observations and one gesture',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),save=f.download.saveAs;let copied=false,reads=0;
+ f.download.saveAs=async path=>{await save(path);copied=true;};
+ f.page.uiSnapshot=()=>{const s=snapshot();if(copied&&++reads===1)s.ui.dialogs=[{ref:'late-dialog',identity:{anchor_tid:'toast'}}];return s;};
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(f.calls.filter(c=>c==='save').length,1);
+ assert.ok(reads>=3);assert.ok(result.trace.some(e=>e.event==='download_post_observation_settled'));
+});
+test('post-copy blocking dialog cannot extend the original download deadline',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),save=f.download.saveAs;let copied=false;
+ f.options.deadline_at=f.page.clock+1000;
+ f.download.saveAs=async path=>{await save(path);copied=true;};
+ f.page.uiSnapshot=()=>{const s=snapshot();if(copied)s.ui.dialogs=[{ref:'persistent-dialog',identity:{anchor_tid:'msgbox'}}];return s;};
+ const result=await f.run();assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED');
+ assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(result.cleanup_complete,true);
+ assert.equal(result.output.download_completed,undefined);
 });

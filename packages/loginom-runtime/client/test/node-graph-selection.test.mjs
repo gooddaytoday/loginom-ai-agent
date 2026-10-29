@@ -66,3 +66,17 @@ test('body replacement recovery is opt-in for source selection',async()=>{
   await selectPreparedGraphNode(channel,s,'select',{refreshReplacedBody:enabled});
  }
 });
+
+test('import selection waits only for its exact owned graph loading mask',async()=>{
+ const {isPreparedGraphBusy}=await import('../lib/node-graph-selection.mjs');
+ const x=replacement();x.receipt.output.ui.elements[0].ref='old';
+ x.observation.graph_identity.container_ref=x.receipt.output.graph_identity.container_ref='graph-root';
+ x.receipt.output.ui.elements[0].interaction={state:'point_not_observed',covering:[{tid:'MF;TF-1;ModelForm'}]};
+ x.receipt.output.ui.masks=[{kind:'busy',target_tid:'MF;TF-1;ModelForm',dialog_ref:null,graph_loading_owner_ref:'graph-root'}];
+ x.observation.workflow_ref.prefix=x.receipt.output.workflow_ref.prefix='MF;TF-1';
+ assert.equal(isPreparedGraphBusy(x),true);
+ for(const mutate of [x=>x.receipt.output.ui.masks[0].graph_loading_owner_ref='foreign',
+  x=>x.receipt.output.ui.dialogs.push({}),x=>x.receipt.output.prepared_node_context.node_id='foreign',
+  x=>x.receipt.output.ui.elements[0].signature.tag='rect',x=>x.receipt.output.ui.masks.push({}),
+  x=>x.receipt.output.ui.truncated.masks=true]){const copy=structuredClone(x);mutate(copy);assert.equal(isPreparedGraphBusy(copy),false);}
+});

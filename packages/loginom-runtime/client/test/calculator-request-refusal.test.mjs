@@ -45,6 +45,36 @@ test('syntax refusal requires native error, unchanged restored settings and unch
   const r=structuredClone(f.error.nodePhaseRefusal);mutate(r.proof);assert.equal(verifiedCalculatorRequestRefusal(r,node),false);
  }
 });
+
+test('native preview console refusal closes the owned modal before restoring the draft',async()=>{
+ const f=syntaxFixture(),w=f.error.receipt.output.wizard;
+ w.calculator_validation.source='loginom_calculator_preview_console';
+ w.calculator_preview={status:'observed',root_ref:'preview',root_tid:'MF;TF;WizrdMCF;CalcPreviewForm',errors:[w.calculator_validation.message]};
+ const retained=f.channel.observe;let opened=true;
+ f.channel.observe=async()=>{
+  if(opened)return {...state(),wizard:structuredClone(w),ui:{elements:[{tid:w.calculator_preview.root_tid+';p.h;close',ref:'close',allowed_actions:['click']}]}};
+  const s=await retained();s.wizard.calculator_preview={status:'absent'};return s;
+ };
+ f.channel.perform=async({resolve})=>{assert.deepEqual(resolve(await f.channel.observe()),{verb:'click',ref:'close'});f.calls.push('preview_close');opened=false;};
+ assert.equal(verifiedCalculatorSyntaxFailure(f.error,f.baseline),true);
+ await assert.rejects(rejectUnchangedCalculatorDraft(f.channel,f.baseline,f.error,f.ops),e=>e===f.error);
+ assert.equal(verifiedCalculatorRequestRefusal(f.error.nodePhaseRefusal,node),true);
+ assert.equal(f.calls[0],'preview_close');
+});
+
+test('preview parse-error dialog requires its confirmed OK before draft rollback',async()=>{
+ const f=syntaxFixture(),v=f.error.receipt.output.wizard.calculator_validation;
+ v.source='loginom_calculator_preview_error_dialog';v.field_name='E';
+ v.message='Ошибка разбора выражения "E". Неправильное выражение: "X+"';
+ f.error.receipt.error.message=v.message;f.error.receipt.trace[0].message=v.message;
+ f.error.receipt.trace.push({event:'wizard_calculator_preview_error_dismissed',root_ref:'wizard',message:v.message});
+ const read=f.channel.observe;f.channel.observe=async()=>{const s=await read();s.wizard.calculator_preview={status:'absent'};s.ui={dialogs:[]};return s;};
+ assert.equal(verifiedCalculatorSyntaxFailure(f.error,f.baseline),true);
+ const unconfirmed=structuredClone(f.error.receipt);unconfirmed.trace.pop();
+ assert.equal(verifiedCalculatorSyntaxFailure({receipt:unconfirmed},f.baseline),false);
+ await assert.rejects(rejectUnchangedCalculatorDraft(f.channel,f.baseline,f.error,f.ops),e=>e===f.error);
+ assert.equal(verifiedCalculatorRequestRefusal(f.error.nodePhaseRefusal,node),true);
+});
 test('syntax phase proof excludes unrelated UI strings altered by journal normalization',async()=>{
  const f=syntaxFixture();f.error.receipt.output.origin='http://10.200.11.224';
  f.error.receipt.output.ui={elements:[{label:'{ "unrelated": true }'}]};

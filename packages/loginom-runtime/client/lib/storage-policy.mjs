@@ -2,6 +2,8 @@
 // or paths inferred from the authenticated account's name.
 import {guardLoginomConnection} from './connection-recovery.mjs';
 import {randomUUID} from 'node:crypto';
+import {mkdir,mkdtemp,lstat,chmod,rm} from 'node:fs/promises';
+import {join,basename} from 'node:path';
 const purposes = ['packages', 'inputs', 'exports'];
 
 export function storagePath(value) {
@@ -68,7 +70,7 @@ export function requireExportDestination(value, directories = null) {
 // References are minted only from native, row-bound FileStore observations in
 // this prepared session. A model-supplied path/size/time is never a receipt.
 export function createServerSourceRegistry({getBinding}) {
-  const sources=new Map();
+  const sources=new Map(),index=new Map();
   const entries=outcome=>outcome?.status==='SUCCEEDED'&&outcome.output?.file_storage?.status==='observed'
     ?(outcome.output.ui?.elements??[]).map(e=>e.storage_entry).filter(e=>e?.kind==='file'
       &&e.bytes_source==='native_file_store'&&Number.isSafeInteger(e.bytes)&&e.bytes>=0
@@ -80,9 +82,11 @@ export function createServerSourceRegistry({getBinding}) {
       const binding=getBinding();if(!binding)return;
       for(const entry of entries(outcome)) {
         try{requireStorageDestination(entry.path,binding.directories,'inputs');}catch{continue;}
-        const ref='storage-'+randomUUID();
-        sources.set(ref,{binding:structuredClone(binding),...identity(entry)});
-        if(sources.size>10000)sources.delete(sources.keys().next().value);
+        // Pagination reobserves the same native row. A freshly minted token
+        // would itself change the snapshot revision and invalidate every page.
+        const key=JSON.stringify([binding,identity(entry)]),ref=index.get(key)??'storage-'+randomUUID();
+        if(!sources.has(ref)){sources.set(ref,{binding:structuredClone(binding),...identity(entry),key});index.set(key,ref);}
+        if(sources.size>10000){const oldest=sources.keys().next().value;index.delete(sources.get(oldest).key);sources.delete(oldest);}
         entry.server_source_ref=ref;
       }
     },
@@ -109,7 +113,9 @@ export function createServerSourceRegistry({getBinding}) {
       if(matches.length!==1||JSON.stringify(identity(matches[0]))!==JSON.stringify(identity(source)))
         throw Error('LOGINOM_FILE_CHANGED: native storage size/mtime or path changed; observe the file again');
       return {verified:true,kind:'storage',server_source_ref:ref,destination:source.path,bytes:source.bytes,mtime:source.mtime,
-        origin:binding.origin,account:binding.loginom_account,document_id:binding.document_id,coverage:'preview'};
+        // The durable journal serializes URL witnesses as href. Keep this
+        // receipt stable across its ACK; the private binding retains origin.
+        origin:new URL(binding.origin).href,account:binding.loginom_account,document_id:binding.document_id,coverage:'preview'};
     },
   };
 }
@@ -132,3 +138,145 @@ export function validateImportSource(source) {
       &&(source.sha256===undefined||typeof source.sha256==='string'&&/^[a-f0-9]{64}$/.test(source.sha256)));
   if(!valid)throw Error('Verified source identity required: storage reference or verified delivery IDs');
 }
+
+export function serverDownloadBudget(bytes) {
+  if(!Number.isSafeInteger(bytes)||bytes<0)throw Error('Native server size is required');
+  // Local hard ceiling at 1 MiB/s, including validation and the disk copy.
+  // Actual Chromium byte growth renews the shorter no-progress allowance.
+  return Math.min(7200000,120000+Math.ceil(bytes/(1024*1024)*1000));
+}
+
+// The browser writes to disk; this registry transports only paths and metadata.
+// Cache identity is private authority for the backend exact-scan receipt.
+export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now}) {
+  const jobs=new Map();
+  const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
+  const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
+  const find=id=>{const job=jobs.get(id);if(!job)throw Error('Unknown server download operation');return job;};
+  const snapshot=job=>({result_version:'user-v1',operation_id:job.request.operation_id,state:job.state,
+    ...(job.status?{status:job.status}:{}),action_key:'storage.download',phase:job.phase,
+    cancel_requested:job.controller.signal.aborted,cleanup_complete:job.state==='settled'&&job.cleanup!==false,
+    effect_possible:false,progress:{bytes:job.bytes??0,total_bytes:job.source?.bytes??null,
+      elapsed_ms:Math.max(0,now()-job.started),deadline_at:job.deadline??null,
+      byte_progress:'native_blob_or_chromium_received_bytes'},output:job.output??{},error:job.error??null});
+  const remove=async job=>{if(job.directory)await rm(job.directory,{recursive:true,force:true});};
+  return {
+    get busy(){return [...jobs.values()].some(j=>j.state==='running');},
+    get unsettled(){return [...jobs.values()].some(j=>j.state==='running'||j.cleanup===false);},
+    start(request) {
+      if(!request||Object.keys(request).some(k=>!['operation_id','server_source_ref'].includes(k))
+        ||![request.operation_id,request.server_source_ref].every(v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(v)))
+        throw Error('Server download requires operation_id and server_source_ref only');
+      const old=jobs.get(request.operation_id);
+      if(old){if(old.request.server_source_ref!==request.server_source_ref)throw Error('Download ID has different parameters');return snapshot(old);}
+      if(this.unsettled)throw Error('Another server download is running or its cleanup is unconfirmed');
+      if(jobs.size>=128)throw Error('Server download capacity reached');
+      const job={request:structuredClone(request),state:'running',phase:'validating',controller:new AbortController(),started:now()};
+      jobs.set(request.operation_id,job);
+      job.completion=(async()=>{
+        let timer;
+        const arm=()=>{
+          clearTimeout(timer);
+          const deadline=Math.min(job.deadline,job.lastProgress+120000);
+          const code=job.deadline<=job.lastProgress+120000?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
+          if(now()>=deadline){job.controller.abort(Error(code));return;}
+          timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
+        };
+        try {
+          job.source=await inspect(request.server_source_ref,{signal:job.controller.signal});job.controller.signal.throwIfAborted();
+          job.deadline=job.started+serverDownloadBudget(job.source.bytes);
+          if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
+          if(!/\.(csv|tsv|txt|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
+          await mkdir(directory,{recursive:true,mode:0o700});
+          const root=await lstat(directory);
+          if(root.isSymbolicLink()||!root.isDirectory()||(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');
+          job.directory=await mkdtemp(join(directory,'source-'));await chmod(job.directory,0o700);
+          job.path=join(job.directory,basename(job.source.destination));job.phase='downloading';
+          await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,
+            signal:job.controller.signal,deadline:job.deadline,onProgress:bytes=>{
+              // Check expiry before accepting growth: late or repeated status
+              // replies cannot revive a stalled transfer.
+              arm();job.controller.signal.throwIfAborted();
+              if(!Number.isSafeInteger(bytes)||bytes<0||bytes>job.source.bytes)throw Error('LOGINOM_DOWNLOAD_FAILED');
+              if(bytes>(job.bytes??0)){job.bytes=bytes;job.lastProgress=now();arm();}
+            }});
+          job.controller.signal.throwIfAborted();job.phase='verifying';
+          const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline}),copy=await lstat(job.path);
+          if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
+            throw Error('LOGINOM_FILE_CHANGED');
+          await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
+          job.controller.signal.throwIfAborted();
+          if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          job.bytes=copy.size;job.status='SUCCEEDED';job.phase='cached';
+          job.output={path:job.path,server_source_ref:request.server_source_ref,bytes:copy.size,
+            native_size:after.bytes,native_mtime:after.mtime,coverage:'downloaded_copy',
+            next_step:'loginom_file_profile on path, then loginom_file_scan and loginom_file_sample. Upload only the sample; switch back to the original storage ref.'};
+        }catch(error){
+          job.status='FAILED';job.phase='failed';
+          job.error={code:job.controller.signal.aborted?(['LOGINOM_DOWNLOAD_DEADLINE','LOGINOM_DOWNLOAD_NO_PROGRESS'].includes(job.controller.signal.reason?.message)
+            ?job.controller.signal.reason.message:'LOGINOM_DOWNLOAD_CANCELLED'):/^LOGINOM_[A-Z_]+$/.test(error.message)?error.message:'LOGINOM_DOWNLOAD_FAILED',
+            message:'Server cache is invalid; no full calculation is authorized. Observe the original file and start a new operation.'};
+          if(['browser_start_refused','save_failed','browser_transfer_failed'].includes(error.details?.reason))
+            job.error.details={reason:error.details.reason,...(/^[A-Z_]{1,80}$/.test(error.details.code??'')?{code:error.details.code}:{})};
+          if(error.cleanupUnconfirmed)job.browserUnsettled=true;
+          try{if(job.browserUnsettled)throw Error('Browser transfer is unsettled');await remove(job);}
+          catch{job.cleanup=false;job.output={cleanup_error:{code:'LOGINOM_DOWNLOAD_CLEANUP_FAILED',message:'Partial cache cleanup failed or browser transfer is unsettled'}};}
+        }finally{clearTimeout(timer);job.state='settled';}
+      })();
+      return snapshot(job);
+    },
+    status:id=>snapshot(find(id)),
+    async wait(id,{timeoutMs=1000,signal}={}) {
+      if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>60000)throw Error('Download wait must be 0..60000 ms');
+      signal?.throwIfAborted();const job=find(id);let timer,abort;
+      try{await Promise.race([job.completion,new Promise((resolve,reject)=>{
+        timer=setTimeout(resolve,timeoutMs);
+        if(signal){abort=()=>reject(signal.reason);signal.addEventListener('abort',abort,{once:true});}
+      })]);return snapshot(job);}
+      finally{clearTimeout(timer);if(abort)signal.removeEventListener('abort',abort);}
+    },
+    cancel(id){const job=find(id);if(job.state==='running')job.controller.abort(Error('LOGINOM_DOWNLOAD_CANCELLED'));return snapshot(job);},
+    async bind(source,receipt) {
+      if(!receipt||receipt.basis!=='backend_exact_scan'||receipt.bytes!==source.bytes
+        ||!/^[a-f0-9]{64}$/.test(receipt.sha256??''))return source;
+      for(const job of jobs.values()) {
+        if(job.status!=='SUCCEEDED'||job.phase!=='cached'||native(job.source)!==native(source)
+          ||receipt.identity?.canonical_path!==job.path||JSON.stringify(localIdentity(receipt.identity))!==JSON.stringify(job.identity))continue;
+        const copy=await lstat(job.path).catch(()=>null);
+        if(!copy||copy.isSymbolicLink()||!copy.isFile()||JSON.stringify(local(copy))!==JSON.stringify(job.identity))return source;
+        return {...source,sha256:receipt.sha256,cache_binding:{server_source_ref:source.server_source_ref,
+          download_source_ref:job.source.server_source_ref,native_size:source.bytes,native_mtime:source.mtime,copy_bytes:copy.size,identity:receipt.identity}};
+      }
+      return source;
+    },
+    async cleanup(id) {
+      const selected=id?[find(id)]:[...jobs.values()];
+      for(const job of selected)if(job.state==='running')job.controller.abort(Error('LOGINOM_DOWNLOAD_CANCELLED'));
+      await Promise.all(selected.map(j=>j.completion));
+      for(const job of selected){
+        if(job.browserUnsettled){if(!recover)throw Error('Original browser download cleanup is unconfirmed');await recover(job.request.operation_id);job.browserUnsettled=false;}
+        await remove(job);job.phase='removed';job.output={cache_removed:true};job.cleanup=true;
+      }
+      return {result_version:'user-v1',operation_id:id??'storage-cache-cleanup',status:'SUCCEEDED',cleanup_complete:true,output:{cache_removed:true}};
+    },
+  };
+}
+
+function localIdentity(identity) {
+  return {size:identity?.size,mtime:identity?.mtime,ctime:identity?.ctime,file_id:identity?.file_id};
+}
+
+const downloadId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.:-]+$'};
+export const serverDownloadTools=[
+  {name:'dock_storage_source',description:'Locate an existing CSV/TSV/TXT/XLSX by its exact path in the assigned inputs directory. Navigates the native Files UI and returns an opaque server_source_ref with native size/mtime. Does not upload or import. Use this before preview/download when the CLI starts on the workflow graph.',
+    properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024}},required:['operation_id','path']},
+  {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Received native Blob or Chromium bytes renew a 120-second no-progress limit within a size-derived hard deadline; disk-copy completion is verified separately.',
+    properties:{operation_id:downloadId,server_source_ref:downloadId},required:['operation_id','server_source_ref']},
+  {name:'dock_storage_download_status',description:'Read the original server download progress and terminal cache path.',properties:{operation_id:downloadId},required:['operation_id']},
+  {name:'dock_storage_download_wait',description:'Wait at most 60 seconds for the original download; a wait timeout does not cancel it.',properties:{operation_id:downloadId,timeout_ms:{type:'integer',minimum:0,maximum:60000}},required:['operation_id']},
+  {name:'dock_storage_download_cancel',description:'Cancel the original download. Wait for cleanup_complete before another browser action.',properties:{operation_id:downloadId},required:['operation_id']},
+  {name:'dock_storage_download_cleanup',description:'Remove this completed cache after the full calculation, or cancel and drain its transfer before removing partials.',properties:{operation_id:downloadId},required:['operation_id']},
+].map(({properties,required,...tool})=>({...tool,inputSchema:{type:'object',properties,required,additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}}));
+
+export const isServerDownloadTool=name=>serverDownloadTools.some(tool=>tool.name===name);

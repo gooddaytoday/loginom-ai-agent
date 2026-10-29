@@ -2,6 +2,7 @@ import {storageTidSuffix} from './storage-policy.mjs';
 import {findNativeStorageRow} from './text-export-output.mjs';
 import {createHash} from 'node:crypto';
 import {referenceUploadBudget} from './file-reference.mjs';
+import {operationFailureDiagnostic} from './browser-failure.mjs';
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const one=(values,message)=>{requireValue(values.length===1,message);return values[0];};
@@ -274,9 +275,12 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    await finish(job,artifact,final);
   } catch(error) {
    if(job.largeUpload){
+    try{await acknowledge(job,'large_upload_failed',{failed_phase:job.phase,upload_started:job.uploadStarted===true,
+     cause:operationFailureDiagnostic(error)});}catch{ /* Diagnostics cannot prevent native cleanup. */ }
     job.status='cancelling';
     let cleanup=false;
-    try{cleanup=!job.uploadStarted?job.navigationUncertain!==true:await runtime.cancelLargeArtifact({operationId:job.uploadId,deadline:now()+30000});}catch{}
+    try{cleanup=!job.uploadStarted?job.navigationUncertain!==true:await runtime.cancelLargeArtifact({operationId:job.uploadId,deadline:now()+30000});}
+    catch(cleanupError){try{await acknowledge(job,'large_upload_cleanup_failed',{cause:operationFailureDiagnostic(cleanupError)});}catch{}}
     const cancelled=signal?.aborted===true&&cleanup;
     job.status=!cleanup?'uncertain':cancelled?'cancelled':'failed';job.phase=job.status;
     const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';

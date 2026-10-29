@@ -12,7 +12,7 @@ function fixture(kind,fault) {
  const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref,dom_epoch:1,
   nodes:[{ref,type:'transform.sorting',label:'Sort',dom_epoch:2,position:{x:936,y:80},locked:false,inputs:[0],outputs:[0]}],links:[],foreign_links:[]};
  if(fault?.startsWith('deselect_')){graph.nodes[0].position={x:152,y:1528};graph.nodes[0].type='transform.calculator';graph.nodes[0].label='Поля справочника стран';}
- const before=structuredClone(graph),order=[];let revealed=false,held=false,edited='';
+ const before=structuredClone(graph),order=[];let revealed=false,held=false,edited='',deselected=false;
  const canvas={scrollLeft:0,scrollTop:0,getBoundingClientRect:()=>({x:0,y:50,width:1280,height:750,right:1280,bottom:800}),contains:e=>e===canvas||e===body||e===label,closest:()=>null};
  const body={parent:canvas,getAttribute:()=>tid,getBoundingClientRect:()=>({x:revealed?700:1380,y:200,width:56,height:60}),contains:e=>e===body||e===label};
  const label={parent:body,getAttribute:()=>tid+';Label;Label',getBoundingClientRect:()=>({x:revealed?690:1370,y:175,width:80,height:20}),contains:e=>e===label};
@@ -34,6 +34,7 @@ function fixture(kind,fault) {
  };
  const page={locator,evaluate:async(fn,arg)=>evaluate(fn,arg),waitForTimeout:async()=>{},keyboard:{type:async text=>{edited=text;},press:async()=>{}},mouse:{
   click:async()=>{
+   deselected=true;
    if(fault?.startsWith('deselect_')){
     graph.nodes[0].dom_epoch++;
     if(fault==='deselect_position')graph.nodes[0].position.x++;
@@ -53,8 +54,26 @@ function fixture(kind,fault) {
   if(fault==='foreign')graph.nodes[0].ref.node_id='foreign';
   await args.guard();return {point:{x:400,y:180},fully_visible:fault!=='not_visible',zoom_steps:2,outline_closed:true};
  };
- let pendingReads=0;
- const read=async()=>{if(kind==='create'&&graph.nodes.length===2&&pendingReads++<2)throw Error('Node identity is not rendered');return structuredClone(graph);};
+ let pendingReads=0,deselectionReads=0;
+ const read=async()=>{
+  // The SVG can be replaced after selection is empty and its first graph read.
+  if(fault?.startsWith('deselect_late_') && deselected && ++deselectionReads===2){
+   graph.nodes[0].dom_epoch++;
+   if(fault==='deselect_late_position')graph.nodes[0].position.x++;
+   if(fault==='deselect_late_label')graph.nodes[0].label='foreign';
+   if(fault==='deselect_late_lock')graph.nodes[0].locked=true;
+   if(fault==='deselect_late_root')graph.dom_epoch++;
+   if(fault==='deselect_late_document')graph.document_id='foreign';
+   if(fault==='deselect_late_links')graph.foreign_links.push('foreign');
+   if(fault==='deselect_late_ports')graph.nodes[0].inputs.push(1);
+   if(fault==='deselect_late_type')graph.nodes[0].type='foreign';
+   if(fault==='deselect_late_workflow')graph.workflow_ref.workflow_id='foreign';
+   if(fault==='deselect_late_node_id')graph.nodes[0].ref.node_id='foreign';
+   if(fault==='deselect_late_readiness')graph.interaction_ready=false;
+   if(fault==='deselect_late_native_links')graph.links.push({source:'node',output:0,target:'foreign',input:0});
+  }
+  if(kind==='create'&&graph.nodes.length===2&&pendingReads++<2)throw Error('Node identity is not rendered');return structuredClone(graph);
+ };
  const effect={id:'effect',kind,before,parameters:kind==='create'?{type:'programming.javascript',position:{x:400,y:80}}:{ref,...(kind==='rename'?{label:'Debt descending'}:{position:fault?.startsWith('deselect_')?{x:180,y:400}:{x:648,y:400}})}};
  return {order,effect,run:()=>mutateGraph(page,{effect,request:{document_id:'doc',workflow_ref},types:NODE_TYPES,deadline:Date.now()+15000},read,null,null,null,reveal,samePlacementGraph)};
 }
@@ -86,5 +105,18 @@ test('D49 deselection rebinds drawing epochs before exactly one move',async()=>{
 });
 for(const fault of ['position','label','lock','root','document','links'])test('D49 deselection refuses changed '+fault+' before drag',async()=>{
  const f=fixture('move','deselect_'+fault),r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
+});
+
+// LAB-428/J2: a second repaint lands between deselection readback and drag.
+test('late deselection redraw permits exactly one move',async()=>{
+ const f=fixture('move','deselect_late_redraw'),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.deepEqual(f.order,['reveal','move']);
+ assert.ok(verifyNodeTargetEffect(f.effect,r.after,(n,p)=>n.position.x===Math.round(p.x/8)*8&&n.position.y===Math.round(p.y/8)*8));
+ assert.equal(r.cleanup_complete,true);
+});
+for(const fault of ['position','label','lock','root','document','links','ports','type','workflow','node_id','readiness','native_links'])test('late deselection refuses changed '+fault+' before drag',async()=>{
+ const f=fixture('move','deselect_late_'+fault),r=await f.run();
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
 });

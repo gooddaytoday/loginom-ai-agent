@@ -511,3 +511,32 @@ test('sender active zero waits for the owned native DeleteFile and automatic ref
  assert.equal((await call('cancel')).quiet,false);
  f.store.isLoading=()=>false;assert.equal((await call('cancel')).quiet,true);assert.deepEqual(f.clicks,[]);
 });
+
+test('native upload refusal retains the original exception for the private journal',async()=>{
+ const {makeLargeUploadCode}=await import('../lib/artifact-discovery.mjs');
+ const f=largeNativeFixture();
+ f.page.evaluate=async()=>{throw Object.assign(new RangeError('Invalid time value'),{code:'ERR_OUT_OF_RANGE'});};
+ const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
+ assert.equal(raw.status,'FAILED');
+ assert.equal(raw.error.code,'LARGE_UPLOAD_NATIVE_REFUSED');
+ assert.equal(raw.output.failure.name,'RangeError');
+ assert.equal(raw.output.failure.message,'Invalid time value');
+ assert.equal(raw.output.failure.code,'ERR_OUT_OF_RANGE');
+});
+
+test('upload dialog guard leaves other confirms untouched and removes only its own listener',async()=>{
+ const {guardUploadDebugDialog}=await import('../lib/artifact-discovery.mjs');
+ let handler,removed=0,dismissed=0;
+ const page={url:()=> 'https://test/app/',on:(event,fn)=>{assert.equal(event,'dialog');handler=fn;},off:(event,fn)=>{assert.equal(fn,handler);removed++;}};
+ const task={operation_id:'owned',expected_origin:'https://test',expected_build:'7.4.2'};
+ await guardUploadDebugDialog(page,task,'install');
+ await assert.rejects(guardUploadDebugDialog(page,{...task,operation_id:'foreign'},'install'),/UPLOAD_DIALOG_OWNER_CHANGED/);
+ const message='Assert failed: at LoadView.CorrectWindowPosition (https://test/app/bg/filestorage/LoadView.js:94:23)\n\nBreak into debugger?';
+ const dialog={type:()=> 'confirm',message:()=>message,dismiss:async()=>{dismissed++;}};
+ handler({...dialog,message:()=> 'Delete this file?'});handler({...dialog,type:()=> 'alert'});
+ assert.equal((await guardUploadDebugDialog(page,task,'status')).dismissed,0);assert.equal(dismissed,0);
+ handler(dialog);
+ assert.equal((await guardUploadDebugDialog(page,task,'release')).dismissed,1);
+ assert.equal(dismissed,1);assert.equal(removed,1);
+ assert.equal(page[Symbol.for('loginom-dock.upload-debug-dialog.v1')],undefined);
+});

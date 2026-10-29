@@ -24,10 +24,13 @@ export async function returnToExecutedWorkflow(channel,node) {
   requireValue(context.kind==='node'&&path?.length&&(context.node?.tid===path.at(-1).tid+'>'
     +s.prepared_node_context.tid.split(';Graph;')[1]||boundNavigation?.tid===context.node?.tid&&boundNavigation?.label===context.node?.label),'Execution navigation does not belong to the prepared node');
   const workflow=path.at(-1),identity=()=>({node,path});
+  const controls=s=>{
+    const breadcrumb=s.ui.elements.filter(e=>e.tid===workflow.tid&&e.label===workflow.label);
+    return breadcrumb.length?breadcrumb.filter(e=>e.allowed_actions.includes('click')):s.ui.elements.filter(e=>e.tid===s.workflow_ref?.prefix+';up'&&e.allowed_actions.includes('click'));
+  };
   await channel.perform({condition:'return from executed node to its scenario',initialObservation:s,
-    ready:s=>sameNode(s)&&JSON.stringify(s.node_context?.path)===JSON.stringify(context.path)
-      &&s.ui.elements.filter(e=>e.tid===workflow.tid&&e.label===workflow.label&&e.allowed_actions.includes('click')).length===1,
-    identity,resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===workflow.tid&&e.label===workflow.label),'Scenario breadcrumb unavailable').ref})});
+    ready:s=>sameNode(s)&&JSON.stringify(s.node_context?.path)===JSON.stringify(context.path)&&controls(s).length===1,
+    identity,resolve:s=>({verb:'click',ref:one(controls(s),'Scenario navigation unavailable').ref})});
   await channel.observe({condition:'executed scenario navigation restored',readNavigation:true,ready:s=>sameNode(s)
     &&s.navigation_context?.status==='observed'&&JSON.stringify(s.navigation_context.path)===JSON.stringify(path.map(({tid,label})=>({tid,label})))});
 }
