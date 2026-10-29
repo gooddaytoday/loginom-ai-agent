@@ -106,6 +106,31 @@ test('active port opening confirms its bound question once and replay performs n
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
+test('deactivation ignores hidden controls retained by an earlier dialog',async()=>{
+ for(const direction of ['input','output'])for(const name of ['yes','no','cancel']){
+  const f=fixture(direction);f.flags.deactivation=true;
+  const stale=f.el('msgbox;tlb;'+name);stale.visible=false;
+  stale.textContent='Предыдущий диалог';f.nativeControls.set(stale.id,{el:{dom:stale}});
+  const result=await f.run();assert.equal(result.status,'SUCCEEDED',direction+':'+name+':'+result.error);
+  assert.equal(f.gestures.length,3);assert.equal(f.gestures.at(-1),'msgbox;tlb;yes');
+  const observed=result.trace.find(t=>t.event===direction+'_port_deactivation_issued').confirmation_controls;
+  assert.equal(observed.find(c=>c.tid==='msgbox;tlb;'+name).matches,2);
+  assert.ok(observed.every(c=>c.visible_matches===1));
+ }
+});
+
+test('deactivation refuses visible duplicate or foreign confirmation controls',async()=>{
+ for(const name of ['yes','no','cancel'])for(const variant of ['duplicate','foreign']){
+  const f=fixture('input');f.flags.deactivation=true;
+  if(variant==='duplicate'){
+   const duplicate=f.el('msgbox;tlb;'+name);duplicate.parent=f.dialog;
+   duplicate.textContent=f.confirmation[name].textContent;f.nativeControls.set(duplicate.id,{el:{dom:duplicate}});
+  }else f.confirmation[name].parent={};
+  assert.equal((await f.run()).status,'AMBIGUOUS',name+':'+variant);
+  assert.equal(f.gestures.length,2);
+ }
+});
+
 test('deactivation rechecks question, node, port, dialog and control before Yes',async()=>{
  const changes=[
   f=>{f.dialog.innerText=f.dialog.innerText.replace('порта','узла');},
