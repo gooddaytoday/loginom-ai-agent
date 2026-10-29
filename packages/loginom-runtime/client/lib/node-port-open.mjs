@@ -59,17 +59,19 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
      &&!(e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
        &&e.parentElement?.getAttribute('data-tid')==='MF')))fail('Port confirmation has an unrelated mask');
-   let yes;
+   let yes;const confirmationControls=[];
    for(const [name,label] of Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'})) {
-    const es=exact('msgbox;tlb;'+name),e=es[0],control=e&&globalThis.Ext?.getCmp?.(e.id);
+    // Ext retains hidden buttons from earlier dialogs with these same tids.
+    const matches=exact('msgbox;tlb;'+name),es=matches.filter(visible),e=es[0],control=e&&globalThis.Ext?.getCmp?.(e.id);
+    confirmationControls.push({tid:'msgbox;tlb;'+name,matches:matches.length,visible_matches:es.length});
     if(es.length!==1||!dialog.contains(e)||!visible(e)||normalize(e.textContent)!==label
-      ||control?.el?.dom!==e||control.disabled===true||e.closest('.x-item-disabled,.x-btn-disabled'))fail('Port confirmation control changed');
+      ||control?.el?.dom!==e||control.disabled===true||e.closest('.x-item-disabled,.x-btn-disabled'))fail('Port confirmation control changed: '+name+' matches='+matches.length+' visible='+es.length);
     if(name==='yes')yes=e;
    }
    if(r.confirmation&&(r.confirmation.dialog!==dialog||r.confirmation.native!==native||r.confirmation.yes!==yes))fail('Port confirmation instance changed');
    r.confirmation??={dialog,native,yes};
    if(mode==='deactivation_issued')r.phase='deactivation_issued';
-   return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id};
+   return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id,confirmation_controls:confirmationControls};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
@@ -213,10 +215,11 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    if(transition.wizard)break;
    if(transition.deactivation) {
     trace.push({event:direction+'_port_deactivation_question_verified',...transition});
-    await at('msgbox;tlb;yes').click({trial:true,timeout:remaining()});
+    const yes=page.locator('[data-tid="msgbox;tlb;yes"]:visible');
+    await yes.click({trial:true,timeout:remaining()});
     const issued=await inspect('deactivation_issued');
     trace.push({event:direction+'_port_deactivation_issued',...issued});
-    await at('msgbox;tlb;yes').click({timeout:remaining()});
+    await yes.click({timeout:remaining()});
     break;
    }
    await page.waitForTimeout(Math.min(100,remaining()));
