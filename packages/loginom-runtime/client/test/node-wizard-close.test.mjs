@@ -36,6 +36,16 @@ test('portal discovery alone cannot authorize the affirmative click',()=>{
  assert.equal(boundWizardCloseConfirmation(state,binding,false),true);
  assert.equal(boundWizardCloseConfirmation(state,binding),false);
 });
+test('calculator rollback accepts the second native message box after a Preview error',()=>{
+ const {state,binding}=fixture();
+ state.wizard.stage=binding.stage='calculator';
+ for(const e of state.ui.elements)e.tid=e.tid.replace('msgbox;','msgbox-1;');
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ for(const change of [s=>s.ui.elements[1].tid='msgbox;tlb;no',
+  s=>s.ui.elements[0].signature.dialog_ref='foreign',s=>s.ui.elements[0].tid='msgbox-2;tlb;yes']) {
+  const altered=structuredClone(state);change(altered);assert.equal(boundWizardCloseConfirmation(altered,binding),false);
+ }
+});
 test('the deactivation prompt is not a wizard cancellation even when native button IDs coincide',()=>{
  const {state,binding}=fixture();
  state.ui.dialogs[0].title='Loginom 7.4.2';

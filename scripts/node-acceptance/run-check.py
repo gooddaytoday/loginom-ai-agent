@@ -19,6 +19,7 @@ import time
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
 D87 = {
+    'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
     'E2': dict(attachment='file', generator=['--min-bytes', '1000000000'], heavy=False),
     'E3': dict(attachment='path', generator=['--boundary', '32'], heavy=True),
@@ -29,9 +30,10 @@ D87 = {
 
 def pair_login(config, source):
     directory = config.get('package_directory') or config.get('personal_folder')
-    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(config.get('loginom'), dict) or not config['loginom'].get('username'):
+    login = config.get('loginom', config)
+    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(login, dict) or not login.get('username'):
         raise ValueError(f'{source}: expected loginom.username and package_directory or personal_folder; keys: ' + ', '.join(sorted(config)))
-    return dict(config['loginom'], package_directory=directory)
+    return dict(login, package_directory=directory)
 
 
 def scenario_names(value, case_root=None):
@@ -57,19 +59,26 @@ def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
 
-def scenario(name, case_root=None):
+def scenario(name, case_root=None, *, cases=None):
+    # Operator fixtures (including private large-file oracles) stay outside Git.
+    # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
+    if cases and re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name):
+        src = Path(cases).resolve() / name
+        if (src / 'task.md').is_file():
+            assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
+            return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
     if case_root is not None:
         if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
         src = Path(case_root).resolve() / name
         config = read(src / 'case.json')
-        if set(config) != {'source_path', 'attachment'} or config['attachment'] not in ['path', 'file']:
+        if set(config) - {'source_path', 'attachment', 'upload_only'} or not {'source_path', 'attachment'} <= set(config) or config['attachment'] not in ['path', 'file'] or type(config.get('upload_only', False)) is not bool:
             raise ValueError('External case requires source_path and attachment path/file')
         source = Path(config['source_path'])
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    local_file=source, attachment=config['attachment'])
+                    local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
     stability = DATA / 'stability-2026-10-20'
@@ -122,6 +131,7 @@ def arguments(argv=None):
     start.add_argument('--scenarios', required=True)
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
+    start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
@@ -434,6 +444,10 @@ class Runner:
                    REPO / 'scripts/node-acceptance/large-dataset-gen.py', '--output', source,
                    '--manifest', fixtures / 'manifest.json', *spec['generator']], folder)
         manifest = read(fixtures / 'manifest.json')
+        if spec.get('upload_only'):
+            write(fixtures / 'expected.json', {'nodes': [], 'outputs': []})
+            (fixtures / 'task.md').write_text('Загрузи ' + str(source) + ' в Loginom.\n')
+            return dict(spec, source=fixtures, prompt=fixtures / 'task.md', data=fixtures / 'data', local_file=source)
         write(fixtures / 'expected.json', {
             'nodes': [], 'outputs': [{'output_node_type': 'export_input', 'ordered': False,
             'columns': [{'name': 'region', 'label_any': True, 'type': 'string'},
@@ -498,21 +512,27 @@ class Runner:
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
-                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root')))
+                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
+                    cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
         expected = expected_for(spec, package)
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
-        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
-                                     and name != (spec.get('local_file').name if spec.get('local_file') else None)))
-        if not exports:
+        exports = ([Path(output['export_destination']).name for output in expected['outputs']]
+                   if spec.get('external') else
+                   list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
+                                        and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('external'):
+            assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
+        if not exports and not spec.get('upload_only'):
             count = 2 if src.parent.name == 'datamining-clustering' else 1
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
-        prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+        if not spec.get('upload_only'):
+            prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
@@ -548,6 +568,26 @@ class Runner:
             try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
             except (ValueError, TypeError): continue
             if isinstance(reply, dict): replies.append((n, reply))
+        if spec.get('upload_only'):
+            calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
+                     if event.get('type') == 'tool_use']
+            assert not any(c.get('tool') == 'loginom_dock_action_run'
+                and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
+                for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
+            assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
+            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
+            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+                       and o.get('state') == 'settled' and o.get('cleanup_complete') is True
+                       and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
+                       and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'
+            cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+            acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                and c.get('package_path') is None and c.get('save_operation_id') is None
+                and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+            assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+            self.current.update(save='0', cleanup='main PASS', upload='ready', cold='—', csv='—')
+            return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
@@ -603,7 +643,7 @@ class Runner:
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    spec = scenario(case, self.options.get('case_root'))
+                    spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):
@@ -611,7 +651,7 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                    if self.options['cold']:
+                    if self.options['cold'] and not spec.get('upload_only'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
@@ -661,7 +701,7 @@ def main():
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
     for name in names:
-        spec = scenario(name, args.case_root)
+        spec = scenario(name, args.case_root, cases=args.cases)
         if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert args.case_root or (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
@@ -685,7 +725,9 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
-    request = vars(args) | {'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None, 'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
+    request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
+                            'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
+                            'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:

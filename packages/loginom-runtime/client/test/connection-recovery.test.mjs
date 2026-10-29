@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {parseCapabilityResult} from '../lib/executor.mjs';
 import {withStorageIdentity,createStorageBinding} from '../lib/storage-policy.mjs';
+import {connectionTimelineScript} from '../lib/connection-recovery.mjs';
+
+test('passive connection timeline timestamps native loss without a server call or gesture',()=>{
+ let at=1000,tick,intervals=0;
+ const connection={Connected:true,FRemoteSession:{},FSession:{}};
+ const form={FMapTree:{FServerConnection:connection},FReconnecting:false};
+ const context=vm.createContext({location:{origin:'https://loginom.invalid'},
+  document:{querySelector:()=>null},bg:{app:{Application:{FInstance:{FMainForm:form}}}},
+  Date:{now:()=>at},setInterval:(callback,ms)=>{assert.equal(ms,1000);intervals++;tick=callback;}});
+ const script=connectionTimelineScript('https://loginom.invalid/app/');
+ vm.runInContext(script,context);vm.runInContext(script,context);assert.equal(intervals,1);
+ at=30000;tick();assert.equal(context.__loginomConnectionTimelineV1.samples.length,1);
+ at=121000;connection.Connected=false;form.FReconnecting=true;tick();
+ const samples=context.__loginomConnectionTimelineV1.samples;
+ assert.equal(samples.length,2);assert.equal(samples[1].at,121000);assert.equal(samples[1].connected,false);
+ assert.equal(samples[1].local_session,true);assert.equal(samples[1].remote_session,true);
+ for(let i=0;i<200;i++){connection.Connected=!connection.Connected;tick();}
+ assert.equal(samples.length,128);assert.equal(context.__loginomConnectionTimelineV1.dropped,74);
+});
 
 function fixture(){
  const c={Connected:true,UserName:'mimo',FRemoteSession:{},FSession:{}};

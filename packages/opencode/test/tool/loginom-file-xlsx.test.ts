@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile, appendFile, readdir } from "node:fs/p
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ZipWriter, Uint8ArrayWriter, TextReader, ZipReader, Uint8ArrayReader, TextWriter } from "@zip.js/zip.js"
-import { profileFile, scanFile, sampleFile, profilePage } from "../../src/tool/loginom-file-profile-core"
+import { profileFile, scanFile, sampleFile, profilePage, exactScanReceipt } from "../../src/tool/loginom-file-profile-core"
 import { validateExcelParameters } from "../../../loginom-runtime/client/lib/imports-excel-parameters.mjs"
 
 const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -289,5 +289,16 @@ test("cancelled scan stays partial without an exact count", async () => {
     const scan = await scanFile(p.profile_id, dir, { signal: controller.signal })
     expect(scan.status).toBe("partial")
     expect(scan.records).toBeUndefined()
+  })
+})
+
+test("XLSX exact receipt retains selected worksheet and count policies", async () => {
+  await fixture(header + `<row r="2">${text("A", 2, "North")}${num("B", 2, "1")}</row>`, async (path, dir) => {
+    const p = await profile(path, dir, { sheet_name: "Sales", header_rows: 1, blank_rows: "import" })
+    expect(await exactScanReceipt(p.profile_id, dir)).toBeUndefined()
+    await scanFile(p.profile_id, dir)
+    const receipt = await exactScanReceipt(p.profile_id, dir)
+    expect(receipt?.records).toBe(1)
+    expect(receipt?.xlsx).toEqual({ sheet_name: "Sales", sheet_index: 1, header_rows: 1, blank_rows: "import" })
   })
 })

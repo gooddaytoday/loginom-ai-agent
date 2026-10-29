@@ -95,6 +95,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
+  let calculatorDialogFailure;
   let cancellationSurfaceReads=0;
   let finishSurfaceReads=0;
   let openingSurfaceReads=0;
@@ -174,7 +175,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false, scanRetried = false, settleMasks = true) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
+    const previousNode=task.snapshot?.prepared_node_context;
+    const previousPort=previousNode?.input_port??previousNode?.output_port;
+    const preparedPortReturn=effectPossible&&task.action?.verb==='finish_wizard'
+      &&previousNode?.verified===true&&previousNode.surface==='wizard'&&nodeContext?.surface==='graph'
+      &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
+      &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
+      &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -334,7 +342,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
@@ -377,6 +385,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       '[data-tid$=";WizrdMCF;ExprDataEditForm"]',
       ...['edtName','edtDisplayName','cbxDataType'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+'"]';return [owner,owner+' input'];}),
       ...['chbIntermediate','chbCached'].flatMap(name=>['',';InputEl',';DisplayEl'].map(part=>'[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+part+'"]')),
+      '[data-tid$=";WizrdMCF;CalcDataWizard"]','[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
       ...wizardButtons.map(name=>'[data-tid$=";WizrdMCF;'+name+'"]')].join(',');
     if (requestedRoot || discoverRoots) {
       // Native fixed queries discover global blockers/context without walking
@@ -508,6 +517,44 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
+      // Input Done returns to the graph. Its caption remains node metadata,
+      // bound to the prepared GUID and native Calculator shape after repaint.
+      if(preparedNodeId&&preparedGraphTid?.startsWith(definitionPrefix+';Graph;')
+        &&/token|токен/i.test(preparedGraphTid)
+        &&(tid===preparedGraphTid||tid.startsWith(preparedGraphTid+';')
+          &&/^(?:Label;Label|Setting|Visualizers|(?:Input|Output)_(?:Data|Var)-[0-9]+)$/.test(tid.slice(preparedGraphTid.length+1)))) {
+        const app=globalThis.bg?.app,model=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const diagram=model?.FDiagram,graph=diagram?.FmxGraph,nodes=diagram?.FNodes?.FCollection;
+        const owners=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===preparedNodeId):[];
+        const owner=owners.length===1?owners[0]:null,body=owner&&graph?.view?.getState?.(owner.FCell)?.shape?.node;
+        if(app?.ModelForm&&model instanceof app.ModelForm&&owner?.FIconCls==='bg-vendor-icon-calcdata'
+          &&body&&getTid(body)===preparedGraphTid&&(tids.get(preparedGraphTid)??[]).length===1
+          &&graph.container?.contains(body)&&graph.container.contains(element)&&(tids.get(tid)??[]).length===1
+          &&!element.isContentEditable&&!element.closest('[contenteditable="true"],a[href]'))
+          return definitionPrefix+';Graph;'+preparedGraphTid.slice((definitionPrefix+';Graph;').length).replace(/token|токен/gi,'caption')+tid.slice(preparedGraphTid.length);
+      }
+      // D84: "Точные токены товаров" is a node caption in data-tid, not
+      // an authentication control. Exempt only its token word, with the exact
+      // native Calculator and its opened port/settings still bound.
+      const stem=definitionPrefix+';cnrNaviMode;b.s_',parts=tid.startsWith(stem)?tid.slice(stem.length).split('>'):[];
+      if(preparedNodeId&&parts.length>=6&&parts.length<=9&&/token|токен/i.test(parts[5])) {
+        const nodeTid=stem+parts.slice(0,6).join('>'),nodes=tids.get(nodeTid)??[];
+        const node=nodes.length===1?nodes[0]:null,component=node&&globalThis.Ext?.getCmp?.(node.id);
+        const native=component?._node?.data?.node,app=globalThis.bg?.app,suffix=parts.slice(6).join('>');
+        const port=preparedInputPort??preparedOutputPort;
+        const portPaths=port?.direction==='input'?['Входные_порты>Входной_источник_данных']
+          :['Выходные_порты>Результат','Выходные_порты>Выходной_набор_данных'];
+        const bound=port?port.port===0&&port.native_index===0&&port.node_icon_class==='bg-vendor-icon-calcdata'
+          &&typeof port.port_guid==='string'&&!!port.port_guid&&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id
+          &&portPaths.some(path=>[path.split('>')[0],path,path+'>Настройка',''].includes(suffix))
+          &&(port.direction!=='input'||preparedNavigationNode?.tid===nodeTid&&preparedNavigationNode.label===node?.textContent.trim())
+          :preparedNodeWizard&&['','Настройка'].includes(suffix);
+        if(bound&&app?.ModelNodeTreeNode&&native instanceof app.ModelNodeTreeNode&&native.FGuid===preparedNodeId
+          &&component.el?.dom===node&&node.querySelectorAll('.bg-vendor-icon-calcdata').length===1
+          &&parts[5]===node.textContent.trim().replace(/\s/g,'_').replace(/,/g,'')
+          &&!node.isContentEditable&&!node.closest('[contenteditable="true"],a[href]'))
+          return stem+[...parts.slice(0,5),parts[5].replace(/token|токен/gi,'caption'),...parts.slice(6)].join('>');
+      }
       const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
@@ -797,8 +844,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
       &&preparedNavigationNode?.tid===getTid(element)&&preparedNavigationNode.label===element.textContent.trim();
     const nativeOverflowNode=element=>{
-      if(wizard.status!=='observed'||!preparedNodeId
-        ||!(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+      if(!preparedNodeId
+        ||!(wizard.status==='observed'&&(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+          ||wizard.status==='absent'&&preparedNativeNodeId===preparedNodeId&&preparedNavigationNode?.tid===getTid(element)
+            &&preparedNavigationNode.label===element.textContent.trim())
         ||getComputedStyle(element).display!=='none'||getComputedStyle(element).visibility!=='visible'
         ||getComputedStyle(element).opacity==='0'||element.hasAttribute('hidden')||sensitive(element)||!visibleAncestors(element.parentElement))return false;
       if(preparedInputPort?.direction==='input'&&!inputOverflowOwner(element))return false;
@@ -813,6 +862,31 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       }
       return false;
     };
+    const preparedPathMatches=!preparedWorkflowPath?.length||preparedWorkflowPath.every(c=>{
+      const elements=tids.get(c.tid)??[];
+      return elements.length===1&&elements[0].textContent.trim()===c.label;
+    });
+    // Toolbar overflow is context only, for every native-verified surface.
+    // A narrow navigation read retains the independent native graph binding;
+    // it does not invent graph controls outside the requested region.
+    // Match the complete prepared ancestry, including visible captions; retain
+    // the ordinary visibility requirement for all gestures and descendants.
+    const ancestorPort=preparedInputPort??preparedOutputPort;
+    const nativeAncestry=preparedNodeId&&preparedNativeNodeId===preparedNodeId
+      &&(!ancestorPort||typeof ancestorPort.port_guid==='string'&&ancestorPort.port_guid.length>0
+        &&typeof ancestorPort.opening_operation_id==='string'&&ancestorPort.opening_operation_id.length>0)
+      &&(!preparedGraphTid||preparedPortReturn||!graphQueryable&&graphContainer
+        &&preparedGraphTid.startsWith(workflow.prefix+';Graph;')||nativeGraphElements.filter(e=>getTid(e)===preparedGraphTid
+        &&nativeGraphControl(e)?.status==='non_script'&&nativeGraphControl(e).node_id===preparedNodeId).length===1);
+    const hiddenPreparedAncestor=memoRead(e=>nativeAncestry
+      &&preparedPathMatches&&(preparedWorkflowPath?.some(c=>c.tid===getTid(e)&&c.label===e.textContent.trim())
+        ||preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()&&nativeOverflowNode(e))
+      &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)&&visibleAncestors(e.parentElement)
+      &&[...e.querySelectorAll('.maptree-icon-workflow,[class*="bg-vendor-icon-"]')].every(icon=>getComputedStyle(icon).display!=='none'
+        &&getComputedStyle(icon).visibility==='visible'&&getComputedStyle(icon).opacity!=='0'&&!icon.hasAttribute('hidden')&&!sensitive(icon)));
+    const preparedAncestryObserved=preparedPathMatches&&(!preparedWorkflowPath?.length
+      ||preparedWorkflowPath.every(c=>{const e=(tids.get(c.tid)??[])[0];return visible(e)||hiddenPreparedAncestor(e);}));
     // Source validation is data from this exact visible wizard field. Do not
     // infer it from global alerts, tooltip HTML or a hidden wizard card.
     if(wizard.status==='observed' && wizard.stage==='text_import_file') {
@@ -900,12 +974,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
             &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
-        const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+        const crumbs=all.filter(e=>{charge();return preparedAncestryObserved && (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
+          && (visible(e)||hiddenPreparedAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenPreparedAncestor(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -940,7 +1014,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               node:{ref:parent.ref,tid:parent.tid,label:parent.label},port:{ref:node.ref,tid:node.tid,label:node.label},
               path:items.map(({ref,tid,label})=>({ref,tid,label}))};
           }
-          else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.vendor_icon && node.label && items.at(-3)?.workflow_icon) {
+          else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.vendor_icon && node.label && items.at(-3)?.workflow_icon
+            &&(preparedWorkflowPath?.length!==5||preparedWorkflowPath.length===items.length-2
+              &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label))) {
             ownerContext={status:'observed',opening_verified:false,panel_ref:refOf(panels[0]),
               node:{ref:node.ref,tid:node.tid,label:node.label},
               path:items.map(({ref,tid,label})=>({ref,tid,label}))};
@@ -965,8 +1041,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)nodeContext.status='bounded';
-        else if(crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)?short(e.textContent):textOf(e,true)}));
+        else if(preparedAncestryObserved&&crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||hiddenPreparedAncestor(e)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||hiddenPreparedAncestor(e)?short(e.textContent):textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -977,7 +1053,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
             &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
               ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
-          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e));};
+          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||hiddenPreparedAncestor(e)||e===crumbs[5]&&hiddenExportNode(e));};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
           else if(!unique||!chain)nodeContext.status='ambiguous';
@@ -1020,7 +1096,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(preparedAncestryObserved&&crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||hiddenPreparedAncestor(e)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
@@ -1044,7 +1120,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               ||(preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица'
                 ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port)
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
-          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
+          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenPreparedAncestor(e)||hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -1055,7 +1131,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||hiddenPreparedAncestor(e)
+              ||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
@@ -1554,6 +1631,34 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ?errorButtons[0].getAttribute('data-qtip'):null;
       wizard.calculator_validation=typeof errorText==='string'&&errorText.length>0&&errorText.length<=4096
         &&!sensitive(errorButtons[0])?{status:'observed',root_ref:wizard.root_ref,message:errorText,source:'loginom_wizard_error_tooltip'}:{status:'unobserved'};
+      wizard.calculator_preview={status:'absent'};
+      const previews=(tids.get(wizard.root_tid+';CalcPreviewForm')??[]).filter(visible);
+      if(previews.length) {
+        wizard.calculator_preview={status:'unverified'};
+        const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+        const model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const items=own(own(model,'FWizardItems'),'FItems'),page=(tids.get(base.slice(0,-1))??[])[0];
+        const view=page&&globalThis.Ext?.getCmp?.(page.id);
+        const matches=Array.isArray(items)&&items.length<=32?items.filter(i=>{
+          const pages=own(i,'FPages');return Array.isArray(pages)&&pages.length<=32&&pages.includes(view);
+        }):[];
+        const controller=matches.length===1?own(matches[0],'FWizard'):null,form=own(controller,'FPreviewForm');
+        const previewView=own(form,'FView'),store=own(own(form,'FCodeConsole'),'FConsoleStore');
+        const records=store?.getData?.()?.items;
+        if(preparedNodeId&&preparedNodeWizard&&previews.length===1&&view?.el?.dom===page
+          &&own(controller,'FWizardForm')===model&&controller?.constructor?.name==='CalcDataWizard'
+          &&previewView?.el?.dom===previews[0]&&previewView.Controller===form
+          &&globalThis.Ext?.getCmp?.(previews[0].id)===previewView&&!sensitive(previews[0])
+          &&Array.isArray(records)&&records.length<=128&&!store.isLoading?.()&&store.getCount?.()===records.length
+          &&Number.isInteger(globalThis.bg?.TBGCodeConsoleMessageType?.cmtError)
+          &&records.every(r=>r?.isModel&&typeof r.data?.Text==='string'&&r.data.Text.length<=4096&&Number.isInteger(r.data.MessageType))
+          &&records.reduce((n,r)=>n+r.data.Text.length,0)<=4096)
+          wizard.calculator_preview={status:'observed',root_ref:refOf(previews[0]),root_tid:getTid(previews[0]),
+            errors:records.filter(r=>r.data.MessageType===globalThis.bg?.TBGCodeConsoleMessageType?.cmtError).map(r=>r.data.Text)};
+        if(wizard.calculator_preview.status==='observed'&&wizard.calculator_preview.errors.length)
+          wizard.calculator_validation={status:'observed',root_ref:wizard.root_ref,
+            message:wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
+      }
       const selected=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colExpressionName_') && visible(e) && !sensitive(e) && e.closest('table')?.classList.contains('x-grid-item-selected');});
       wizard.expression_selection={status:selected.length>1?'ambiguous':'unobserved'};
       if(selected.length===1) {
@@ -2812,7 +2917,15 @@ function readRenderedInputMapping(observation) {
       &&visible(storageRootPanels[0])&&storageRootPanels[0].contains(storageRootCandidates[0])
       &&visible(storageRootCandidates[0])&&!sensitive(storageRootCandidates[0])
       &&textOf(storageRootCandidates[0],true)==='Файлы'?storageRootCandidates[0]:null;
-    const interesting = element => wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+    const navigationUp=preparedNodeId&&preparedNativeNodeId===preparedNodeId&&nodeContext.status==='observed'
+      &&nodeContext.kind==='node'&&(tids.get(workflow.prefix+';up')??[]).length===1?(tids.get(workflow.prefix+';up')??[]).filter(e=>{
+        const component=globalThis.Ext?.getCmp?.(e.id);
+        return component?.el?.dom===e&&component.disabled!==true&&e.getAttribute('data-qtip')==='Вверх'
+          &&e.closest('[data-tid='+JSON.stringify(workflow.prefix+';NavigationBar')+']')
+          &&e.querySelectorAll('.navigation-icon-up').length===1&&visible(e)&&!sensitive(e);
+      }):[];
+    const interesting = element => navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+      || wizard.calculator_preview?.status==='observed'&&getTid(element)===wizard.calculator_preview.root_tid+';p.h;close'
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
@@ -2902,6 +3015,7 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||navigationUp.length===1&&element===navigationUp[0]&&getTid(selectedRoot)===definitionPrefix+';NavigationBar;NavigationPanel'
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
@@ -3078,6 +3192,8 @@ function readRenderedInputMapping(observation) {
       const graphExecution=graphExecutionOf(element);
       const openNodeViews=wizard.status==='absent' && graphNodeOf(element)?.part==='visualizers';
       const openWizard=wizard.status==='absent' && navigationContext.status==='observed' && graphNodeOf(element)?.part==='settings'
+        &&(!preparedWorkflowPath?.length||preparedWorkflowPath.length===navigationContext.path.length
+          &&preparedWorkflowPath.every((c,i)=>c.tid===navigationContext.path[i].tid&&c.label===navigationContext.path[i].label))
         ? {node:graphNodeOf(element),workflow_path:navigationContext.path}:null;
       const inputPortFinishReady=wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
         &&wizard.input_port_context.node?.ref&&wizard.input_port_context.port_ref && (preparedInputPort?.direction==='input'&&wizard.output_columns?.auto_sync?.status==='observed'
@@ -3102,7 +3218,7 @@ function readRenderedInputMapping(observation) {
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
-      const closeConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
+      const closeConfirmation=/^msgbox(?:-1)?;tlb;yes$/.test(tid) && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element) && dialogs[0].title==='Подтвердить'
         && dialogs[0].text==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'
         ? {root_ref:wizard.root_ref,root_tid:wizard.root_tid,stage:wizard.stage,
@@ -3241,6 +3357,23 @@ function readRenderedInputMapping(observation) {
         &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
         &&wizardForms.length===1&&wizardForms[0].contains(element)
         &&(tids.get(getTid(element))??[]).filter(visible).length===1;
+      // Excel's locked spreadsheet grid renders its Ext.LoadMask in a portal.
+      // The message has no data-tid: bind its exact native mask/target objects
+      // to the unique preview inside this wizard before permitting only a wait.
+      const excelPreview=(()=>{
+        if(!preparedNodeId||wizard.status!=='observed'||wizard.stage!=='excel_import_file'
+          ||wizardForms.length!==1||getTid(element)||!element.classList.contains('x-mask-msg')||owner)return false;
+        try{
+          const previews=(tids.get(wizard.root_tid+';ImportExcelFilePreviewWizard;frmSpreadSheetsPreview')??[]).filter(visible);
+          const root=element.closest('.x-mask'),mask=root&&globalThis.Ext?.getCmp?.(root.id),target=mask?.target?.el?.dom;
+          const grid=target?.closest('.bg-excel-spreadsheet');
+          return previews.length===1&&wizardForms[0].contains(previews[0])&&!!grid
+            &&target.isConnected&&visible(target)&&previews[0].contains(grid)&&grid.contains(target)
+            &&mask.$className==='Ext.LoadMask'&&mask.isLoadMask===true&&mask.el?.dom===root
+            &&mask.msgWrapEl?.dom===element&&mask.ownerCt===mask.target
+            &&globalThis.Ext.getCmp(target.id)===mask.target;
+        }catch{return false;}
+      })();
       // Ext's input-mapping loading message has no data-tid and can flicker
       // while the wizard's own mask remains. Bind only a contained message
       // under that exact busy wizard; this permits waiting, never a gesture.
@@ -3259,7 +3392,7 @@ function readRenderedInputMapping(observation) {
         &&(tids.get(getTid(element))??[]).filter(visible).length===1
         &&graphs.filter(g=>visible(g)&&element.contains(g)).length===1;
       return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
-        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
+        ...(importPreview||excelPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
         ...(inputMapping?{input_mapping_owner_ref:wizard.root_ref}:{}),
         ...(containedLoading?{wizard_loading_owner_ref:wizard.root_ref}:{}),
         ...(graphLoading?{graph_loading_owner_ref:refOf(graphs.find(g=>visible(g)&&element.contains(g)))}:{}) };
@@ -3662,11 +3795,12 @@ function readRenderedInputMapping(observation) {
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
-    preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
+    preparedNativeNodeId:nodeContext?.node_id??null,
+    preparedGraphTid:nodeContext?.surface==='graph'&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedPortReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     timeout();
     if (observed?.ui_read_failure) {
@@ -4228,6 +4362,74 @@ function readRenderedInputMapping(observation) {
           observed=await readUi(true);
           record('ui_root_closed_after_gesture',{verification_required:true});
         }
+        if(task.action.verb==='click'&&current.prepared_node_context?.verified===true&&current.wizard.stage==='calculator'
+          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';CalcDataWizard;btnPreview') {
+          const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build===current.loginom_build
+            &&same(s.workflow_ref,current.workflow_ref)&&same(s.prepared_node_context,current.prepared_node_context)
+            &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.stage==='calculator'&&s.wizard.root_ref===current.wizard.root_ref;
+          const accepted=s=>s.wizard.calculator_preview?.status==='observed'&&s.ui.dialogs.length===1
+            &&s.ui.dialogs[0].ref===s.wizard.calculator_preview.root_ref
+            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===s.wizard.root_tid);
+          for(let attempt=0;attempt<60&&owned(observed)&&!accepted(observed);attempt++) {
+            if(observed.ui.dialogs.length===1&&observed.ui.dialogs[0].identity?.anchor_tid==='msgbox') {
+              const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+              postActionRoot=dialog.ref;
+              try {
+                const popup=await readUi(),buttons=popup.ui.elements.filter(e=>e.tid==='msgbox;tlb;ok'
+                  &&e.label==='OK'&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click'));
+                const readError=()=>page.evaluate(()=>{
+                  const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+                  const instance=own(globalThis.bg?.ext?.errormessage?.ErrorMsg,'FInstance'),box=own(instance,'FMessageBox');
+                  const root=own(own(box,'el'),'dom'),roots=document.querySelectorAll('[data-tid="msgbox"]');
+                  if(roots.length!==1||roots[0]!==root||globalThis.Ext?.getCmp?.(root.id)!==box)return null;
+                  const text=root.innerText;
+                  return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
+                });
+                const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
+                if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
+                  ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1
+                  ||task.snapshot.node_calculator?.verified!==true||!task.snapshot.node_calculator.expressions.some(e=>e.name===field))break;
+                const checked=await readUi();
+                if(!owned(checked)||checked.ui.masks.length||!same(checked.ui.dialogs,popup.ui.dialogs)
+                  ||!same(checked.dom_epoch,popup.dom_epoch)||await readError()!==message)break;
+                const target=await checkedHandle(buttons[0],checked.ui.elements.find(e=>e.ref===buttons[0].ref),'click');
+                if(!same(await boundNode(),current.prepared_node_context))break;
+                const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                  state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+                if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Calculator preview error changed before OK');
+                timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:field,source:'loginom_calculator_preview_error_dialog'};
+                record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
+              } finally {postActionRoot=wizardRoot;}
+              if(calculatorDialogFailure) {
+                observed=await readUi();
+                if(!owned(observed)||observed.ui.dialogs.length||observed.ui.masks.length)
+                  fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Calculator did not return from its error dialog');
+                record('wizard_calculator_validation_failed',calculatorDialogFailure);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',calculatorDialogFailure.message);
+              }
+            }
+            const validation=observed.wizard.calculator_validation;
+            if(observed.ui.dialogs.length===0&&observed.ui.masks.length===0&&validation?.status==='observed') {
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              if(owned(fresh)&&!fresh.ui.dialogs.length&&!fresh.ui.masks.length&&same(fresh.wizard.calculator_validation,validation)) {
+                observed=fresh;record('wizard_calculator_validation_failed',validation);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+              }
+              observed=fresh;continue;
+            }
+            if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid))break;
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi();
+          }
+          if(!owned(observed)||!accepted(observed))fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Owned calculator preview did not settle after one click; inspect before retry');
+          record('wizard_calculator_preview_verified',{root_ref:observed.wizard.calculator_preview.root_ref,settings_applied:false});
+          if(observed.wizard.calculator_preview.errors.length) {
+            const validation={status:'observed',root_ref:observed.wizard.root_ref,
+              message:observed.wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
+            observed.wizard.calculator_validation=validation;record('wizard_calculator_validation_failed',validation);
+            fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
+          }
+        }
         if(task.action.verb==='confirm_wizard_close') {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;
           const path=(confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
@@ -4364,6 +4566,9 @@ function readRenderedInputMapping(observation) {
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
                   &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
                   &&mask.import_preview_owner_ref===fresh.wizard.root_ref
+                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
+                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='excel_import_file'
+                  &&mask.target_tid===null&&mask.import_preview_owner_ref===fresh.wizard.root_ref
                 ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='input_mapping'
                   &&mask.input_mapping_owner_ref===fresh.wizard.root_ref));
@@ -4674,6 +4879,10 @@ function readRenderedInputMapping(observation) {
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };
       else try { observed = await readUi(); } catch { /* Never replace uncertainty with a fabricated observation. */ }
+      if(error?.code==='WIZARD_CALCULATOR_VALIDATION_FAILED'&&calculatorDialogFailure
+        &&observed.prepared_node_context?.verified===true&&observed.wizard?.stage==='calculator'
+        &&observed.wizard.root_ref===calculatorDialogFailure.root_ref&&!observed.ui.dialogs.length&&!observed.ui.masks.length)
+        observed.wizard.calculator_validation=calculatorDialogFailure;
       outcome = result(effectPossible ? 'AMBIGUOUS' : 'NOT_APPLIED', observed,
         { code: error?.code ?? 'UI_BROWSER_CALL_FAILED', message: error?.code ? error.message : 'The browser did not confirm the UI operation; inspect the workspace before recovery' });
     } finally {

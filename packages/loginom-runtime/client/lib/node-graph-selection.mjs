@@ -34,12 +34,31 @@ export function isPreparedBodyReplacement({receipt,observation,action}) {
     &&same(old.identity,next.identity)&&same(old.signature,next.signature);
 }
 
-export async function selectPreparedGraphNode(channel, initialObservation, condition, {refreshReplacedBody=false}={}) {
+// A late graph mask can arrive after materialization but before selection.
+// Only an unchanged native target and this graph's own loading mask may wait.
+export function isPreparedGraphBusy({receipt,observation,action}) {
+  const after=receipt?.output,node=observation?.prepared_node_context,same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  if(action?.verb!=='click'||node?.verified!==true||node.surface!=='graph'||node.locked!==false
+    ||!same(node,after?.prepared_node_context)||!['origin','loginom_build','workflow_ref','graph_identity'].every(k=>observation[k]!==undefined&&same(observation[k],after[k]))
+    ||!observation.dom_epoch?.document||observation.dom_epoch.document!==after.dom_epoch?.document
+    ||after.scan?.complete!==true||after.ui?.truncated?.dialogs!==false||after.ui?.truncated?.masks!==false
+    ||after.ui.dialogs.length!==0||after.ui.masks.length!==1)return false;
+  const mask=after.ui.masks[0],before=observation.ui.elements.filter(e=>e.ref===action.ref),next=after.ui.elements.filter(e=>e.ref===action.ref);
+  return before.length===1&&next.length===1&&before[0].scope==='graph'&&['body','label'].includes(before[0].graph_node?.part)
+    &&same(before[0].identity,next[0].identity)&&same(before[0].signature,next[0].signature)
+    &&next[0].interaction?.state==='point_not_observed'&&next[0].allowed_actions?.includes('click')
+    &&mask.kind==='busy'&&!mask.dialog_ref&&mask.target_tid===observation.workflow_ref.prefix+';ModelForm'
+    &&typeof mask.graph_loading_owner_ref==='string'&&mask.graph_loading_owner_ref===observation.graph_identity.container_ref;
+}
+
+export async function selectPreparedGraphNode(channel, initialObservation, condition, {refreshReplacedBody=false,settleGraph=false}={}) {
   const node=initialObservation.prepared_node_context;
   const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
     &&['document_id','workflow_id','node_id','tid'].every(k=>s.prepared_node_context[k]===node[k]);
   let label=false;
-  const refresh=refreshReplacedBody?{refreshReplacedBody:isPreparedBodyReplacement}:{};
+  const refresh={...(refreshReplacedBody?{refreshReplacedBody:isPreparedBodyReplacement}:{}),
+    ...(settleGraph?{refreshGraphBusy:isPreparedGraphBusy,confirmIdentity:s=>s.dom_epoch}:{})};
+  if(settleGraph)initialObservation=await channel.observe({condition,ready:same,confirmIdentity:s=>s.dom_epoch});
   await channel.perform({condition,initialObservation,ready:same,identity:()=>node,...refresh,resolve:s=>{
     const action=preparedGraphSelection(s);
     label=s.ui.elements.find(e=>e.ref===action.ref)?.graph_node?.part==='label';

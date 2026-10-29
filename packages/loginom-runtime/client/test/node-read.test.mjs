@@ -14,6 +14,36 @@ const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
 const args={operation_id:'read',source_operation_id:'created',read:{sample_rows:100,require_exact_numbers:true}};
 const handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){throw Error('Configuration validation must not run');},configure(){throw Error('Configuration must not run');},configurationReadback(){throw Error('No configuration readback');}}]]);
+for(const fault of [null,'cleanup','owner','transport','journal'])test('cancelled JavaScript reread releases only confirmed owned cleanup: '+fault,async()=>{
+ const request=buildNodeReadRequest(args,source()),operation={id:'read'},controller=new AbortController(),calls=[];
+ request.target.type='programming.javascript';request.parameters.javascript_source={source_sha256:'a'.repeat(64),source_utf8_bytes:1,source_lf_lines:1};
+ const installed=new Map([['programming.javascript',handlers.get('transform.calculator')]]);
+ const ok=value=>({verified:true,cleanup_complete:true,...value});
+ const drivers={verifySource:async()=>ok({}),prepareTarget:async()=>ok({node}),
+  finishGraph:async()=>{calls.push('execute');return ok({mode:'execute',execution_id:'fresh',settings_applied:false});},
+  waitExecution:async()=>ok({execution_id:'fresh',status:'completed'}),
+  readOutput:async()=>{calls.push('read');controller.abort(Error('Local node cancellation requested'));
+   operation.transportUncertain=fault==='transport';throw controller.signal.reason;},
+  releasePending:async(state,{signal}={})=>{assert.equal(signal?.aborted,undefined);calls.push('release');
+   if(operation.transportUncertain)throw Error('Browser call uncertain');
+   return {verified:true,cleanup_complete:fault!=='cleanup',node_context:fault==='owner'?{...node,node_id:'foreign'}:node,
+    cleanup:{wizard_closed:false,read_view_restored:true,views_returned:true}};}};
+ const record=async e=>{if(fault==='journal'&&e.phase==='node_operation_released')throw Error('ACK lost');return structuredClone(e);};
+ const result=await applyNode({request,operation,handlers:installed,drivers,record,signal:controller.signal});
+ if(fault){assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);assert.equal(operation.nodeApply.pending.phase,'read');return;}
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_READ_CANCELLED');
+ assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);assert.equal(operation.nodeApply.pending,null);
+ assert.equal(result.execution.status,'completed');assert.equal(result.execution.execution_id,'fresh');
+ assert.deepEqual(calls,['execute','read','release']);assert.match(result.next_step.instruction,/source_operation_id:"created"/);
+ assert.deepEqual(await applyNode({request,operation,handlers:installed,drivers,record}),result);
+ assert.deepEqual(calls,['execute','read','release']);
+});
+test('JavaScript reread admits release only at read, preserving the finish refusal',()=>{
+ const request=buildNodeReadRequest(args,source());request.target.type='programming.javascript';
+ const driver=createNodeReadDrivers({operation:{id:'read',parameters:request}},{});
+ assert.deepEqual(driver.releasePendingPhases,['read']);
+ return assert.rejects(()=>driver.releasePending({pending:{phase:'finish'}}),/stopped output-read/);
+});
 function portReadFixture(request,output){
  const calls=[];let tableActions=0;
  const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',process_id:'1.1',process_record_id:'child'};
