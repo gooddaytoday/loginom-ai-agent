@@ -1,6 +1,6 @@
-# Browser recovery: rendered file window Implementation Plan
+# Browser recovery: rendered file window — закрытая исследовательская попытка
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task after the design gate below. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Исторический протокол одной BLOCKED-пробы. Оставшиеся шаги этого документа не выполнять: дальнейшая реализация идёт по [плану29.10](2026-10-29-browser-recovery-storage-settle.md), принятому независимым preflight review.
 
 **Goal:** Получить первый исходный BR-S5 PASS: completed recovery, текущий Export-файл с bytes/SHA/lineage, первый следующий Dock-вызов final Save, native Close/logout/noDiscard и managed ACK/exit0.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Статус: **runtime DESIGN_BLOCKED до фактов Task1 и review predicate.** Этот документ назначает один подготовительный boundary probe после независимого review плана; его автор ничего не запускает. После Task1 — отдельное preflight-дополнение/review точного predicate до RED/кода.
+- Текущий статус: одна исследовательская попытка BLOCKED, отчёт/cleanup приняты. Endpoint gate заменён proof native record range из нового плана29.10; ниже сохранён исторический протокол, новой пробы он не назначает.
 - Сохранить public tools, T2/handoff/finish actions[], browser calls0, execution/export provenance, активный вход, unknown-upload rules и один managed authenticated browser.
 - Существующие bounds: максимум12 scroll, `delta_y` в −1000…1000; export readiness100 logical reads с100ms sleep и исходным outer guard/deadline. Не добавлять budget, API, hooks, options, dependencies, gesture retries, новый actuator или общий coverage framework.
 - Пустой/чужой список не ждать. Смену folder/workflow/document/tab/root/scroll owner проверять до ожидания; текущие отказ, отмена и unknown-effect semantics сохраняются.
@@ -85,11 +85,11 @@ test/loginom/browser-recovery-acceptance.ts BR-S5 \
 
 Pinned local tools для Step4–6: Node `/home/george/.cache/loginom-toolchain/loginom-node/node-v24.19.0-linux-x64/bin/node`; Bun указан в команде; browsers `/home/george/.cache/loginom-toolchain/browsers-recovery-1246`. `stageResources` принимает абсолютные `destination,node,browsers`, `target:{platform:"linux",arch:"x64"}`, `flavor:"desktop"`.
 
-## Checkpoint — PAUSED по запросу владельца
+## Checkpoint — ACTIVE, возобновлено29.10 по запросу владельца
 
 - Source пробы: `de0ce2eeac`; одна попытка завершена, новых запусков нет.
 - Start geometry/три scroll подтверждены; четвёртый NOT_APPLIED/UI_REFERENCE_OBSCURED/no-effect, endpoint не достигнут.
 - Native Close/logout/noDiscard и context close PASS; OS_NOT_CONFIRMED. Исторические ограничения сохранены.
 - BLOCKED report/cleanup приняты independent spec+quality review, замечаний0; это не полная Task1/Step5 или S5 acceptance.
-- Runtime/harness не менялись; Task2 DESIGN_BLOCKED. Private evidence/source audit и ignored ledger сохранены, temporary executables удалены.
-- После возобновления: прочитать Task1 report/review и переоценить самый простой predicate; новая проба или правка требуют конкретной гипотезы и review. Design reassessment прерван при паузе, вывода нет.
+- До новой реализации runtime/harness не менялись; работа переходит в план29.10 после independent GO. Private evidence/source audit и ignored ledger сохранены, temporary executables удалены.
+- Следующий шаг — TDD producer/reader и один неизменённый S5 по плану29.10. Native first/last record proof заменяет endpoint-равенство, не ослабляя исходную приёмку.
