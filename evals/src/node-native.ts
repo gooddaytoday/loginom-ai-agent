@@ -2,6 +2,7 @@ import path from "node:path"
 import { readdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { confirmedProfileArchive } from "./profile-archive"
+import { writeLeaseReceipt } from "./lease"
 
 /** Export observed native inventories after cleanup; never manufacture a numeric mask from function names. */
 export async function collectNodeNativeEvidence(attemptDir:string, profileDir:string, historyDir = path.resolve(profileDir)+".history") {
@@ -29,5 +30,5 @@ export async function collectNodeNativeEvidence(attemptDir:string, profileDir:st
     }
   }
   await visit(archive)
-  await Bun.write(path.join(attemptDir,"native-crosstable.json"), JSON.stringify({version:1,archive,observations:[...observations.values()],local_variable_observations:localVariables},null,2)+"\n")
+  await writeLeaseReceipt(path.join(attemptDir,"native-crosstable.json"), {version:1,archive,observations:[...observations.values()],local_variable_observations:localVariables})
 }

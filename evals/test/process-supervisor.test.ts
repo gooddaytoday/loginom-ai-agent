@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 
 const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
+import { createInterface } from "node:readline"
 import { cp, mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
@@ -517,7 +518,7 @@ test("parallel observation evidence records delayed starts separately from scan 
   } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
 }, 10_000)
 
-processDenial("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
+processDenial("parallel registry keeps healthy cleanup when a live peer becomes unreadable", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-unreadable-"))
   const a = path.join(root, "a"), b = path.join(root, "b")
   await Promise.all([mkdir(a), mkdir(b)])
@@ -541,8 +542,8 @@ processDenial("parallel registry does not publish a fresh peer claim for an unre
     const pid = await Promise.race([ready.promise, pendingB.then(() => { throw Error("Protected peer ended before readiness") })])
     const before = await Bun.file(heartbeat).text()
     const run = await pendingA
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.exitCode).toBe(0)
     expect(run.processCleanup.peerProcesses?.some(entry => entry.process.pid === pid)).toBe(false)
     expect(run.processCleanup.processes.some(entry => entry.pid === pid)).toBe(false)
     expect(await Bun.file(heartbeat).text()).not.toBe(before)
@@ -832,6 +833,69 @@ test("supervisor ancestry: a reaped candidate is absent rather than an unreadabl
   expect(await child.exited).toBe(0)
   expect(await hasOwnedAncestry(child.pid, [owner])).toBe(false)
 })
+
+test("supervisor ancestry: a live child remains owned while its parent exits and it is reparented", async () => {
+  for (let round = 0; round < 4; round++) {
+    const parent = spawn(Bun.which("python3")!, ["-c", `import ctypes, json, os, select, sys
+assert ctypes.CDLL(None).prctl(36, 1, 0, 0, 0) == 0
+pidr, pidw = os.pipe()
+gater, gatew = os.pipe()
+stopr, stopw = os.pipe()
+child = os.fork()
+if child == 0:
+    os.close(pidr); os.close(gatew); os.close(stopw)
+    candidate = os.fork()
+    if candidate == 0:
+        os.close(pidw); os.close(gater)
+        select.select([stopr], [], [], 20)
+        os._exit(0)
+    os.close(stopr)
+    os.write(pidw, str(candidate).encode()); os.close(pidw)
+    select.select([gater], [], [], 20)
+    os._exit(0)
+os.close(pidw); os.close(gater); os.close(stopr)
+candidate = int(os.read(pidr, 128)); os.close(pidr)
+print(json.dumps(dict(owner=os.getpid(), parent=child, candidate=candidate)), flush=True)
+reaped = False
+try:
+    sys.stdin.readline()
+    os.close(gatew); gatew = None
+    os.waitpid(child, 0); reaped = True
+    print("reparented", flush=True)
+    sys.stdin.readline()
+finally:
+    if gatew is not None: os.close(gatew)
+    os.close(stopw)
+    if not reaped: os.waitpid(child, 0)
+    os.waitpid(candidate, 0)
+`], { stdio: ["pipe", "pipe", "ignore"] })
+    const exited = new Promise<number | null>(resolve => parent.once("close", resolve))
+    const lines = createInterface({ input: parent.stdout! })[Symbol.asyncIterator]()
+    try {
+      const family = JSON.parse((await lines.next()).value!) as { owner: number; parent: number; candidate: number }
+      const raw = await readFile(`/proc/${family.owner}/stat`, "utf8")
+      const owner = { pid: family.owner, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+      const ancestor = await readFile(`/proc/${family.parent}/stat`, "utf8")
+      const before = await readFile(`/proc/${family.candidate}/stat`, "utf8")
+      expect(await hasOwnedAncestry(family.candidate, [owner])).toBe(true)
+      const observations = Promise.allSettled(Array.from({ length: 256 }, () => hasOwnedAncestry(family.candidate, [owner])))
+      parent.stdin!.write("\n")
+      expect((await lines.next()).value).toBe("reparented")
+      const after = await readFile(`/proc/${family.candidate}/stat`, "utf8")
+      expect(after.slice(after.lastIndexOf(")") + 2).split(" ")[19]).toBe(before.slice(before.lastIndexOf(")") + 2).split(" ")[19])
+      expect(Number(after.slice(after.lastIndexOf(")") + 2).split(" ")[1])).toBe(family.owner)
+      const outcomes = await observations
+      expect(outcomes.filter(result => result.status === "rejected")).toHaveLength(0)
+      expect(await hasOwnedAncestry(family.candidate, [owner])).toBe(true)
+      expect(await hasOwnedAncestry(family.candidate, [{ ...owner, starttime: "0" }])).toBe(false)
+      expect(await hasOwnedAncestry(family.candidate, [{ pid: family.parent,
+        starttime: ancestor.slice(ancestor.lastIndexOf(")") + 2).split(" ")[19]! }])).toBe(false)
+    } finally {
+      parent.stdin!.end("\n\n")
+      expect(await exited).toBe(0)
+    }
+  }
+}, 10_000)
 
 test("supervisor ancestry: an unreaped zombie is not a live owned candidate", async () => {
   const parent = spawn(Bun.which("python3")!, ["-c", `import os, sys

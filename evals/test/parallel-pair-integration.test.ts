@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { createPair, destroyPair, pairImages, readServerIdentity, verifyParallelPair } from "../src/parallel-pair"
+import { createPair, destroyPair, pairImages, readServerIdentity, readServerObservation, verifyParallelPair } from "../src/parallel-pair"
 import { parseSlots } from "../src/slots"
 import { cleanupIsolatedStorage } from "../src/artifact"
 import { writeLeaseReceipt } from "../src/lease"
@@ -10,6 +10,33 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 const pairProgram = 'const {createPair,destroyPair}=await import("./src/parallel-pair");const file=await Bun.file(process.argv[1]).json();try{await (process.argv[3]==="create"?createPair:destroyPair)(file,JSON.parse(process.argv[2]));process.exitCode=0}catch(error){console.error(error.message);process.exitCode=2}'
+
+integration("stable configuration survives a real owned pair restart without weakening runtime identity", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "eval-pair-stable-")), fixture = await parallelFixture(root)
+  const name = `eval-stable-${crypto.randomUUID().slice(0, 8)}`
+  const port = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${port.port}/app/`
+  port.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`,
+    studioContainer: `${name}-studio`, network: name, alias: "loginom-server-7.4.2-test", url } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  try {
+    const created = await createPair(file, options)
+    const before = await readServerObservation(file)
+    expect(before.identity).toEqual(created.identity)
+    await Bun.$`docker restart ${created.identity.containerId} ${created.identity.studioContainerId}`.quiet()
+    const after = await readServerObservation(file)
+    expect(after.identity.serverEpoch).not.toBe(before.identity.serverEpoch)
+    expect(after.identity.configurationHash).not.toBe(before.identity.configurationHash)
+    expect(after.stableConfiguration).toEqual(before.stableConfiguration)
+    expect(await readServerIdentity(file)).toEqual(after.identity)
+    expect(await verifyParallelPair(file, after.identity)).toEqual(after.identity)
+    await expect(verifyParallelPair(file, before.identity)).rejects.toThrow("SERVER_EPOCH_CHANGED")
+  } finally {
+    await destroyPair(file, options)
+    await rm(root, { recursive: true })
+  }
+}, 90_000)
 
 integration("pair identity: a failed real Docker read exposes only safe operation and exit metadata", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "eval-pair-read-failure-")), fixture = await parallelFixture(root)

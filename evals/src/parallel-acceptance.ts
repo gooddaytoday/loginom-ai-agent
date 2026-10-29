@@ -4,6 +4,21 @@ import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
 import { serverStorageBinding } from "./parallel-resource-storage"
 
+export async function checkRunResourceEvidence(input: {
+  runId: string; startedAt: string; finishedAt: string; samplesFile: string; summaryFile: string; budget: { file: string; sha256: string }
+  containers: { role: "server" | "studio"; id: string; startedAt: string }[]
+}) {
+  const { readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  try {
+    const budget = await readFrozenResourceBudget({ ...input.budget, runId: input.runId, startedAt: input.startedAt })
+    const evidence = await readResourceEvidence({ file: input.summaryFile, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
+    return [assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
+      assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
+      assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
+      assessContainerEpochs({ samples: evidence.samples, containers: input.containers })]
+  } catch (error) { return [{ status: "failed", codes: [error instanceof Error ? error.message : "RESOURCE_EVIDENCE_UNVERIFIED"] }] }
+}
+
 // Checks the declared host/container scopes against the frozen evidence.
 export async function checkResourceEvidence(input: {
   file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
@@ -70,6 +85,21 @@ export function assessResourceTimeline(input: { samples: readonly unknown[]; int
       sample.elapsed_ms <= Number(samples[index - 1]!.elapsed_ms) || sample.elapsed_ms - Number(samples[index - 1]!.elapsed_ms) >= input.intervalMs * 2 ||
       times[index]! < times[index - 1]! || times[index]! - times[index - 1]! >= input.intervalMs * 2)))
     return { status: "incomplete" as const, codes: ["RESOURCE_CADENCE_INCOMPLETE"] }
+  return { status: "passed" as const, codes: [] }
+}
+
+export function assessContainerEpochs(input: { samples: readonly unknown[]; containers: { role: "server" | "studio"; id: string; startedAt: string }[] }) {
+  const frames = input.samples.flatMap(sample => input.containers.map(target => {
+    const containers = acceptanceObject(sample).containers
+    const rows = Array.isArray(containers) ? containers.map(acceptanceObject).filter(row => row.role === target.role || row.container_id === target.id) : []
+    return { target, rows }
+  }))
+  if (frames.some(frame => frame.rows.some(row => {
+    const inspect = acceptanceObject(row.inspect)
+    return typeof row.container_id === "string" && row.container_id !== frame.target.id || typeof inspect.started_at === "string" && inspect.started_at !== frame.target.startedAt || inspect.running === false
+  }))) return { status: "failed" as const, codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] }
+  if (!input.samples.length || frames.some(frame => frame.rows.length !== 1 || frame.rows[0]!.epoch_stable !== true || typeof acceptanceObject(frame.rows[0]!.inspect).started_at !== "string"))
+    return { status: "incomplete" as const, codes: ["CONTAINER_RESOURCE_IDENTITY_UNCONFIRMED"] }
   return { status: "passed" as const, codes: [] }
 }
 

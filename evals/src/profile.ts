@@ -111,6 +111,20 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
   const result = await superviseProcess(input)
   if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), processes: result.processCleanup })
+  // Diagnostic only: never substitutes for process cleanup or connection-check proof.
+  if (out && args[0] === "loginom" && args[1] === "check") {
+    const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
+      { ok?: unknown; code?: unknown; help?: { state?: unknown } } | null | undefined
+    await writeLeaseReceipt(path.join(out, "connection-check-outcome.json"), {
+      version: 1, kind: "connection-check-outcome", exitCode: result.exitCode,
+      timedOut: result.timedOut, interrupted: result.interrupted, sandboxRefused: Boolean(result.sandboxError),
+      stdoutLength: result.stdout.length, stderrLength: result.stderr.length,
+      jsonShape: receipt === undefined ? "invalid" : receipt === null ? "null" : Array.isArray(receipt) ? "array" : typeof receipt,
+      predicates: { exitCodeZero: result.exitCode === 0, sandboxAccepted: !result.sandboxError,
+        withinTimeout: !result.timedOut, uninterrupted: !result.interrupted,
+        okTrue: receipt?.ok === true, connectionValid: receipt?.code === "LOGINOM_CONNECTION_VALID", helpReady: receipt?.help?.state === "ready" },
+    })
+  }
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
@@ -316,38 +330,40 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
     throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
   const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
-  if (fresh) {
-    const setup = await management(
-      command,
-      ["loginom", "setup", "--stdin-json", "--format", "json"],
-      JSON.stringify({
-        url: config.loginom.url,
-        username: config.loginom.username,
-        password: config.loginom.password,
-        apiKey: config.dock.apiKey,
-      }),
-    )
-    const secrets = [config.dock.apiKey, config.loginom.password].filter((s) => s.length > 0)
-    if (secrets.some((secret) => setup.stdout.includes(secret) || setup.stderr.includes(secret)))
-      throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
-    if (setup.exitCode !== 0)
-      throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
-    if (config.slotsFile) {
-      const prepared = parseView(setup.stdout)
-      if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
-        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
-      const checked = await management(command, ["loginom", "status", "--format", "json"])
-      if (checked.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
-      const saved = parseView(checked.stdout)
-      if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
-        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
-    }
-  }
+  if (fresh) await setupProfile(config, command)
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
     JSON.stringify(agentConfigJson(config), null, 2),
   )
   return { fresh }
+}
+
+export async function setupProfile(config: EvalConfig, command: AgentCommand) {
+  const setup = await management(
+    command,
+    ["loginom", "setup", "--stdin-json", "--format", "json"],
+    JSON.stringify({
+      url: config.loginom.url,
+      username: config.loginom.username,
+      password: config.loginom.password,
+      apiKey: config.dock.apiKey,
+    }),
+  )
+  const secrets = [config.dock.apiKey, config.loginom.password].filter((s) => s.length > 0)
+  if (secrets.some((secret) => setup.stdout.includes(secret) || setup.stderr.includes(secret)))
+    throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
+  if (setup.exitCode !== 0)
+    throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
+  if (config.slotsFile) {
+    const prepared = parseView(setup.stdout)
+    if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
+      throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+    const checked = await management(command, ["loginom", "status", "--format", "json"])
+    if (checked.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
+    const saved = parseView(checked.stdout)
+    if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
+      throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+  }
 }
 
 export async function assertAuth(config: EvalConfig, command: AgentCommand) {

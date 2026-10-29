@@ -5,11 +5,34 @@ import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleSupervisedResources } from "../src/parallel-resources"
 import { freezeResourceBudget, readFrozenResourceBudget, readResourceEvidence, readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { superviseProcess } from "../src/process-supervisor"
+import { checkRunResourceEvidence } from "../src/parallel-acceptance"
 
 
 
 
 import { readLeaseReceipt } from "../src/lease"
+
+test("run resource checks permit missing observations but reject changes to frozen evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-run-resource-checks-"))
+  try {
+    const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "checked",
+      bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
+    while (Date.now() <= Date.parse(budget.budget.fixed_at)) await Bun.sleep(1)
+    const startedAt = new Date().toISOString(), samplesFile = path.join(root, "samples.jsonl"), summaryFile = path.join(root, "summary.json")
+    const host = await sampleHostResources([root])
+    const samples = [0, 1].map(index => ({ version: 1, sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0, duration_ms: 1,
+      interval_ms: 1000, run_id: "checked", phase: "run", host: { ...host, memory: null }, containers: null, processes: null }))
+    await writeFile(samplesFile, samples.map(sample => JSON.stringify(sample) + "\n").join(""), { mode: 0o600 })
+    await writeResourceSummary({ samplesFile, out: summaryFile })
+    const request = { runId: "checked", startedAt, finishedAt: new Date().toISOString(), samplesFile, summaryFile, budget: budget.source,
+      containers: [{ role: "server" as const, id: "a".repeat(64), startedAt: "original" }] }
+    const gaps = await checkRunResourceEvidence(request)
+    expect(gaps.some(check => check.status === "incomplete")).toBe(true)
+    expect(gaps.some(check => check.status === "failed")).toBe(false)
+    await appendFile(budget.source.file, "\n")
+    expect(await checkRunResourceEvidence(request)).toEqual([{ status: "failed", codes: ["RESOURCE_SOURCE_HASH_MISMATCH"] }])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("resource budget freezes private thresholds before dispatch and verifies their original bytes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-frozen-budget-")), file = path.join(root, "budget.json")

@@ -5,6 +5,7 @@ import path from "node:path"
 import { acquireNodeHarnessLease, acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
+import { emptyResult } from "../src/run"
 
 async function runtime() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-node-ops-"))
@@ -322,10 +323,12 @@ test("offline code check preserves both summary and original code verdict and st
     const tasks = path.join(role.checkout, "evals/tasks/node-evals")
     const id = "crosstable-fixed-sum"
     await Bun.write(path.join(tasks, id, "task.json"), JSON.stringify({ id, checklist: [{ id: "crosstable", required: true }] }))
+    const attempt = { ...emptyResult(id, 1, false), status: "failed", environment_cleanup: { status: "confirmed" },
+      session_id: "measured-product-fail", infra_retry: { initial: { status: "infra_error",
+        stderr_head: "sensitive-sentinel", errors: ["sensitive-sentinel"], harness_error: "sensitive-sentinel" } } }
     await Bun.write(path.join(run, "summary.json"), JSON.stringify({ started_at: new Date().toISOString(), harness: { git_sha: "a".repeat(9), dirty: false },
-      interrupted: false, stopped_reason: null, config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id, attempts: [{ attempt: 1, status: "failed", cleanup_error: null,
-        environment_cleanup: { status: "confirmed" }, session_id: "measured-product-fail", infra_retry: { initial: { status: "infra_error",
-          stderr_head: "sensitive-sentinel", errors: ["sensitive-sentinel"], harness_error: "sensitive-sentinel" } } }] }] }))
+      interrupted: false, stopped_reason: null, config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id, attempts: [attempt] }] }))
+    await Bun.write(path.join(run, id, "1/result.json"), JSON.stringify(attempt))
     await Bun.write(path.join(run, id, "1/cleanup.json"), JSON.stringify({ processes: { status: "confirmed" },
       result: { status: "confirmed", error: null }, stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
     await Bun.write(path.join(run, "code-verdict.json"), '{"historical":"immutable"}\n')
@@ -417,9 +420,10 @@ test.skipIf(!dockerAvailable || browserBusy)("real harness summary format releas
     await Bun.write(path.join(role.evalProfile, "data/session.txt"), "fixture evidence, no model executed")
     const historyArchive = await archiveProfileHistory(role.evalProfile, "fixture-attempt")
     const run = path.join(role.resultsRoot, "fresh-fail")
+    const attempt = { ...emptyResult(id, 1, false), status: "failed", environment_cleanup: { status: "confirmed" }, session_id: "fixture" }
     await Bun.write(path.join(run, "summary.json"), JSON.stringify({ started_at: new Date().toISOString(), harness: { git_sha: sha.slice(0, 9), dirty: false },
-      interrupted: false, stopped_reason: null, config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id, attempts: [{ attempt: 1, status: "failed", cleanup_error: null,
-        environment_cleanup: { status: "confirmed" }, session_id: "fixture" }] }] }))
+      interrupted: false, stopped_reason: null, config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id, attempts: [attempt] }] }))
+    await Bun.write(path.join(run, id, "1/result.json"), JSON.stringify(attempt))
     const cleanupFile = path.join(run, id, "1/cleanup.json")
     const cleanup = { result: { status: "confirmed", error: null }, processes: { ...execution.processCleanup, status: "failed" },
       stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed", ...(stage === "profile_history" ? { path: historyArchive } : {}) })) }
