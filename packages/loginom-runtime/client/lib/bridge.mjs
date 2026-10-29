@@ -635,6 +635,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         await actionRuntime?.closeArtifactDeliveries();
         await recovery.close();
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
+        // MCP cancellation settles the caller before the admitted browser task.
+        // Read its final receipt only after that task has left the shared gate.
+        if (normalCleanup && session.metadata.workspaceReady !== true
+          && session.metadata.workspacePreparation?.attempted && !session.metadata.workspacePreparation.state)
+          await browserGate(async () => {});
         const prepared = session.metadata.workspacePreparation;
         const preparationRequest = prepared?.identity ? JSON.parse(prepared.identity) : null;
         // A refusal in a fresh continuation has no Save receipt. Its confirmed
@@ -644,8 +649,12 @@ export async function createBridge(config, session, { browserTransport: managedB
           && preparationRequest?.intent === 'open_package' && prepared.state?.status === 'READY'
           && prepared.state.created_draft === false && prepared.state.package_ref?.persisted === true
           && prepared.state.package_ref.path === preparationRequest.package_path ? prepared.state.package_ref.path : null;
-        const unsavedDraft = normalCleanup && !lastSavedPackage && session.metadata.workspaceReady === true
-          && preparationRequest?.intent === 'new_draft' && prepared.state?.status === 'READY'
+        const unsavedDraft = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'new_draft'
+          && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
+            || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
+              && prepared.state.target_verified === true && prepared.state.ownership_verified === true)
+          && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
           && prepared.state.created_draft === true && prepared.state.package_ref?.persisted === false
           && prepared.state.package_ref.path === null;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
@@ -659,7 +668,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-              if (session.metadata.workspaceReady !== true || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
+              if (session.metadata.workspaceReady !== true && !unsavedDraft || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
                   || normalCleanup && lastSavedPackage && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
@@ -671,7 +680,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
                   packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
-                  loginomBuild:session.metadata.targetIdentity.loginom_build,
+                  loginomBuild:session.metadata.targetIdentity?.loginom_build ?? prepared.state.target?.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
