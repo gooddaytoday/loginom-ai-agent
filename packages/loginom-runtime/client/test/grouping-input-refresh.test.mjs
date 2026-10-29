@@ -23,7 +23,8 @@ function fixture({active=false,lost=false,foreign=false,incomplete=false}={}){
   if(a.verb==='execute_graph_node'){launched=true;if(lost)throw Error('Unknown launch reply');}
   return {status:'SUCCEEDED',cleanup_complete:true,operation_id:'refresh:launch',action_key:'ui.act',action_revision:'1',output:{gesture_applied:true}};
  }};
- const options={operation:{nodeApply:{request:{target:{kind:'existing'},finish:'execute',inputs:[]}}}};
+ const options={operation:{nodeApply:{request:{target:{kind:'existing'},finish:'execute',inputs:[],mappings:[],
+  parameters:{group_by:[{kind:'input_field',name:'Region'}],measures:[{field:{kind:'input_field',name:'Amount'},function:'sum',name:'Total',label:'Total'}]}}}}};
  return {channel,options,actions,run:()=>prepareGroupingInput(options,{node},{channel})};
 }
 test('reopened inactive Grouping materializes its saved output once before opening input settings',async()=>{
@@ -46,4 +47,12 @@ test('unknown Grouping materialization launch stops after one gesture',async()=>
  const f=fixture({lost:true});await assert.rejects(f.run(),/Unknown launch reply/);
  assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
  assert.equal(f.actions.some(a=>a.verb==='show_process_node'),false);
+});
+test('S-small preserved Grouping execution never launches a preliminary schema calculation',async()=>{
+ const f=fixture();f.options.operation.nodeApply.request.parameters={};
+ await f.run();assert.deepEqual(f.actions,[]);
+});
+for(const options of [{foreign:true},{incomplete:true}])test('preserved Grouping execution retains the output ownership/activity guard '+JSON.stringify(options),async()=>{
+ const f=fixture(options);f.options.operation.nodeApply.request.parameters={};
+ await assert.rejects(f.run());assert.deepEqual(f.actions,[]);
 });

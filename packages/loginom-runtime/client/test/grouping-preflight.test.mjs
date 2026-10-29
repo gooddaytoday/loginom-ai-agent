@@ -51,3 +51,22 @@ test('unknown upstream observation failure keeps the target boundary unresolved'
  assert.match(outcome.error.message,/transport lost/);assert.ok(f.operation.nodeApply.pending);
  assert.ok(!f.records.some(e=>e.phase==='node_phase_refused'));
 });
+
+for(const icon of ['bg-vendor-icon-importtextfile','bg-vendor-icon-calcdata'])test('LAB-504 inactive configured source reaches its owned schema editor: '+icon,async()=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'source'},tid='MF;TF;Graph;Source';
+ const workflow={workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',navigation_path:[{tid:'path',label:'Scenario'}]};
+ const owner={...node,verified:true,surface:'graph',locked:false,tid};
+ const port={index:0,native_index:0,port_guid:'output',tid:tid+';Output_Data-0',active:false};
+ const operation={id:'l504',action:{action_key:'node.apply',revision:'1'},deadline:100000,parameters:{document_id:'doc',workflow_ref:workflow,target:{kind:'new'},
+  parameters:{group_by:[{kind:'input_field',name:'region'}],measures:[{field:{kind:'input_field',name:'amount'},function:'count',name:'Count',label:'Count'}]},
+  inputs:[{source:node,input:0,output:0}],mappings:[]}};
+ const options={operation,now:()=>1000,onRecord:async e=>e,receiptOptions:()=>({}),execute:async code=>{
+  assert.ok(!code.includes('"key":"F3"')&&!code.includes('"verb":"execute_graph_node"'));
+  if(code.includes('readOutputContext'))return {verified:true,node_context:owner,ports:[port]};
+  if(code.includes('openPreparedOutputPort'))throw Error('OWNED_SCHEMA_EDITOR');
+  return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:false,output:{origin:'https://example.test',loginom_build:'7.4.2',workflow_ref:workflow,
+   dom_epoch:{document:'doc'},prepared_node_context:owner,wizard:{status:'absent'},scan:{complete:true},
+   ui:{elements:[{tid,ref:'body',signature:{native_graph:{status:'non_script',icon,node_id:node.node_id}},allowed_actions:['click']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}}};
+ }};
+ await assert.rejects(()=>preflightGroupingSource(options,{}, {targetOrigin:'https://example.test',targetBuild:'7.4.2'}),/OWNED_SCHEMA_EDITOR/);
+});
