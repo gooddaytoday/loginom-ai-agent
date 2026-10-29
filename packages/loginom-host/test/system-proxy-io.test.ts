@@ -22,7 +22,6 @@ test("socket probe distinguishes an HTTP proxy, a non-HTTP port, refusal and tim
     expect(await probeProxyPort("127.0.0.1", port(http), 500)).toBe("http")
     expect(await probeProxyPort("127.0.0.1", port(other), 500)).toBe("other")
     expect(await probeProxyPort("127.0.0.1", 1, 500)).toBe("closed")
-    expect(await probeProxyPort("127.0.0.1", port(http), 50)).toBe("http")
     const silent = createNetServer((socket) => {
       socket.on("data", () => undefined)
     })

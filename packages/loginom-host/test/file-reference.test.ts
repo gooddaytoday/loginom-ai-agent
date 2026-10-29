@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileReferences, inspectReferenceFile, verifyReferenceFile } from "../src/file-reference"
 import { hostException, hostFailure, hostErrorText } from "../src/errors"
 
 async function fixture(run: (root: string) => Promise<void>) {
-  const root = await mkdtemp(join(tmpdir(), "loginom-reference-"))
+  // macOS tmpdir can contain /var -> /private/var; legacy cleanup requires a canonical root.
+  const root = await realpath(await mkdtemp(join(tmpdir(), "loginom-reference-")))
   try {
     await run(root)
   } finally {
