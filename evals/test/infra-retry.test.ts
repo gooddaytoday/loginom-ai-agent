@@ -122,8 +122,10 @@ test("CLI SIGINT во время архива infra_error сохраняет к�
   const signal = { sent: false }
   try {
     const out = path.dirname(await waitForFile(context.directory, `results/*/${id}/1/prompt.txt`))
-    const observed = watch(out, (_, file) => {
-      if (file !== "infra-error" || signal.sent) return
+    // Bun's non-recursive watcher can miss the directory rename event while
+    // archive entries move. Nested archive events identify the same phase.
+    const observed = watch(out, { recursive: true }, (_, file) => {
+      if (!file?.split(path.sep).includes("infra-error") || signal.sent) return
       signal.sent = true
       child.kill("SIGINT")
     })

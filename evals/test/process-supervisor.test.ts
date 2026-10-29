@@ -426,7 +426,8 @@ if(process.argv.some(arg=>arg.startsWith(${JSON.stringify("--user-data-dir=" + b
     expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
     expect(finishedA.processCleanup.processes.some(process => process.pid === pid)).toBe(false)
     expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1)!.split(" ")[19]).toBe(child.starttime)
-    await signalProcess(child, "SIGKILL")
+    // Keep the refused child alive until B has recorded its own refusal.
+    // Killing it first races the supervisor's identity and binding observations.
     abort.abort()
     const finishedB = await pendingB
     expect(finishedB.processCleanup.status).toBe("failed")
@@ -487,11 +488,12 @@ for (const delay of [0, 2800]) test(`parallel supervisors preserve a sibling's r
     expect(current[19]).toBe(birth)
     expect(["Z", "X"]).not.toContain(current[0])
     expect((await readFile(`/proc/${helper}/cmdline`, "utf8")).replaceAll("\0", "")).toBe("")
-    expect(finishedA.processCleanup.peerProcesses?.find(entry => entry.process.pid === helper)).toMatchObject({
-      process: { starttime: birth }, owner: { kind: "slot", id: b } })
+    // A's last peer snapshot can precede B's admission of this helper.
+    // The live heartbeat above and B's final birth-bound receipt prove preservation.
     abort.abort()
     const finishedB = await pendingB
     expect(finishedB.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedB.processCleanup.lifetime?.owner).toEqual({ kind: "slot", id: b })
     expect(finishedB.processCleanup.processes.find(entry => entry.pid === helper)?.starttime).toBe(birth)
     expect(finishedB.processCleanup.origins?.find(entry => entry.pid === helper)?.via).toBe("subreaper")
     await rm(root, { recursive: true })
