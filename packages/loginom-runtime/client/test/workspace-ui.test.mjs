@@ -5417,7 +5417,7 @@ test('input port context rejects foreign duplicated hidden and incomplete breadc
 test('native process console joins bounded grids and keeps ownership and execution unverified',async()=>{
   const {readFileSync}=await import('node:fs');
   const source=JSON.parse(readFileSync(new URL('./fixtures/process-console-run15.json',import.meta.url),'utf8'));
-  for(const mode of ['complete','hidden','overflow','record','unknown_state','duplicate','hidden_filter','foreign_bound','two_selected','unknown_menu']) {
+  for(const mode of ['complete','sensitive_caption','hidden','overflow','record','unknown_state','duplicate','hidden_filter','foreign_bound','two_selected','unknown_menu']) {
     const page=new Page();page.context.innerWidth=1440;page.context.innerHeight=1000;
     const panel=page.add('div','ConsoleForm','',{x:48,y:397,width:1392,height:603});
     const grids=[];
@@ -5427,7 +5427,7 @@ test('native process console joins bounded grids and keeps ownership and executi
       const container=page.add('div',null,'',g.containers[0].rect,grid);container.attrs.class='x-grid-item-container';container.style.transform='none';
       for(const r of g.rows) {
         const row=page.add('table',null,'',r.rect,container);Object.assign(row.attrs,r.attributes,{class:'x-grid-item'});
-        for(const c of r.cells){const cell=page.add('td',c.attributes['data-tid'],c.text,c.rect,row);cell.attrs.class=c.classes;}
+        for(const c of r.cells){const cell=page.add('td',mode==='sensitive_caption'?c.attributes['data-tid'].replace('Root>','Root>Точные_токены_'):c.attributes['data-tid'],c.text,c.rect,row);cell.attrs.class=c.classes;}
       }
       grids.push({grid,container});
     }
@@ -6854,7 +6854,7 @@ test('scrolled process window offers native-bound rows without claiming complete
 });
 
 test('native process captions containing code tokens remain process controls, not editors',async()=>{
- for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor']){
+ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor','Точные токены Bread и Milk','Token count','Проверка пароля','secret report','api_key statistics']){
   const f=scrolledProcessWindowFixture(prefix),path='Root>'+name.replace(/\s/g,'_');
   for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']=prefix+';ProgressForm;'+column+path;
   f.cell.ownText=name;
@@ -6865,6 +6865,31 @@ test('native process captions containing code tokens remain process controls, no
   assert.ok(!row.allowed_actions.includes('fill'));assert.ok(!row.allowed_actions.includes('double_click'));
   const result=await f.page.act({verb:'right_click',ref:row.ref},s);
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ }
+});
+
+test('process caption keywords preserve secret field and session value redaction',async()=>{
+ const {createRedactor}=await import('../lib/redact.mjs');
+ for(const mode of ['safe','name','id','aria-label','autocomplete','ancestor','password','hidden','file']){
+  const f=scrolledProcessWindowFixture(),path='Root>Точные_токены_Bread_и_Milk';
+  for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']='ConsoleForm;ProgressForm;'+column+path;
+  f.cell.ownText='Точные токены Bread и Milk';
+  if(['name','id','aria-label','autocomplete'].includes(mode))f.cell.attrs[mode]='password';
+  if(mode==='ancestor')f.rows[0].attrs['aria-label']='secret';
+  if(['password','hidden','file'].includes(mode)){
+   f.cell.tagName='INPUT';f.cell.attrs.type=mode;
+  }
+  const observed=await f.page.observe();
+  if(mode!=='safe'){
+   assert.equal(observed.ui.elements.some(e=>e.process_row),false,mode);continue;
+  }
+  assert.ok(observed.ui.elements.some(e=>e.process_row));
+  const secret='session-sensitive-value',key='sk-'+ 'a'.repeat(24);
+  f.cell.ownText+=' '+secret+' '+key;
+  const redactor=createRedactor([secret]),clean=redactor.redact(await f.page.observe());
+  assert.ok(clean.ui.elements.some(e=>e.process_row));
+  assert.ok(!JSON.stringify(clean).includes(secret));assert.ok(!JSON.stringify(clean).includes(key));
+  assert.ok(JSON.stringify(clean).includes('Точные токены'));
  }
 });
 

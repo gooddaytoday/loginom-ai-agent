@@ -604,8 +604,22 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(names[0].textContent!==match[4])return tid;
       return prefix+match[3];
     });
+    const sensitivityTid=memoRead(element=>{
+      const tid=definitionMetadataTid(element);
+      // Process paths embed user node captions in every column and expander.
+      // Classify the structural prefix, never that data suffix. Values still
+      // pass through the session redactor; all other secret attributes remain.
+      const match=/^((?:MF;)?ConsoleForm;ProgressForm;)col(Id|Process|Percent|Progress|ActionStop|ActionDelete|ErrorDetails|ProgressStart|ProgressFinish|ProcessTime)_(Root>.+?)(;TreeExpander)?$/.exec(tid);
+      if(!match||element.isContentEditable||element.closest('[contenteditable="true"],input,textarea,select,a[href],.monaco-editor,.CodeMirror,.ace_editor'))return tid;
+      const cell=match[4]?element.closest('td[data-tid]'):element;
+      if(cell?.tagName!=='TD'||match[4]&&(element.tagName!=='IMG'||!element.classList.contains('x-tree-expander')
+        ||getTid(cell)!==tid.slice(0,-';TreeExpander'.length)))return tid;
+      const row=cell.closest('table.x-grid-item'),grid=row?.closest('[data-tid="'+match[1]+'trpProgress;'+(['Id','Process'].includes(match[2])?'treepanel;tree':'grd;tbl')+'"]');
+      if(!grid||!grid.getAttribute('id')||row.getAttribute('data-boundview')!==grid.getAttribute('id'))return tid;
+      return match[1]+'col'+match[2]+'_';
+    });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
-      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?definitionMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
+      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?sensitivityTid(parent):parent.getAttribute(name)??'').join(' '))
       &&!(getTid(parent)??'').startsWith('LoginForm;'),document.body);
     const sensitive = memoRead(element => !safeAncestors(element));
     const short = (value, limit = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
