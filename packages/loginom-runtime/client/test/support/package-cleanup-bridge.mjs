@@ -30,8 +30,12 @@ class ExternalClient {
     }
     const code=request.arguments.code;
     let value;
-    if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null}};
+    if(code.includes('async function prepareWorkspace')){
+      this.f.preparing?.resolve();
+      await this.f.finishPreparation?.promise;
+      value={status:'READY',authenticated:true,target_verified:true,
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
+    }
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -366,7 +370,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted'])
+for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -384,6 +388,14 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     const state=session.metadata.workspacePreparation.state;
     state.package_ref={path:null,persisted:scenario==='draft-persisted'};
     if(scenario==='draft-not-owned')state.created_draft=false;
+    if(scenario.startsWith('draft-cancelled-')){
+      session.metadata.workspaceReady=false;session.metadata.targetIdentity=null;
+      state.status='NOT_READY';state.reason='CANCELLED';
+      if(scenario==='draft-cancelled-unverified')state.target_verified=false;
+      if(scenario==='draft-cancelled-not-owned')state.ownership_verified=false;
+      if(scenario==='draft-cancelled-no-tab')delete state.workflow_ref;
+      if(scenario==='draft-cancelled-persisted')state.package_ref.persisted=true;
+    }
     f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
     const result=await bridge.close();
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
@@ -399,3 +411,40 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+for(const dirty of [false,true])test('SIGINT shutdown waits for admitted prepare and protects dirty draft: '+dirty,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-interrupt-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:dirty?'draft-dirty':'draft-clean',events:[],busy:false,saves:0,path:null,receipts:new Map(),catalog,
+    preparing:Promise.withResolvers(),finishPreparation:Promise.withResolvers()};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'interrupt-cleanup',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const controller=new AbortController();
+    const pending=client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}},undefined,{signal:controller.signal}).catch(()=>null);
+    await f.preparing.promise;
+    assert.equal(session.metadata.workspaceReady,false);
+    assert.equal(session.metadata.workspacePreparation.state,undefined);
+    controller.abort();await pending;
+    await new Promise(resolve=>setImmediate(resolve));
+    await client.close();
+    const closing=bridge.close();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(f.events.includes('browser-close'),false);
+    f.finishPreparation.resolve();
+    const result=await closing;
+    assert.equal(session.metadata.workspacePreparation.state.reason,'CANCELLED');
+    assert.equal(session.metadata.workspaceReady,false);
+    assert.equal(result.browser_transport_closed,true);
+    assert.equal(result.package_cleanup.status,dirty?'BLOCKED':'SUCCEEDED');
+    assert.equal(result.package_cleanup.policy,'unsaved_draft');
+    assert.equal(result.package_cleanup.unsaved_changes_discarded,false);
+    assert.equal(f.saves,0);
+  }finally{f.finishPreparation.resolve();await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
