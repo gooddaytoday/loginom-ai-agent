@@ -407,10 +407,45 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
   const root=page.locator('[data-tid='+JSON.stringify(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
+  const maskDeadline=Math.min(task.deadline,Date.now()+15000);
   let point;
   for(let attempt=0;attempt<10;attempt++){
-    point=await source.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
-      return b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))?{x,y}:null;});
+    if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+    point=await source.evaluate(async(e,{request,origin,build,deadline})=>{
+      const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+      const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+      const point=()=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
+        return {x,y,hit,reachable:b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))};};
+      const initial=point(),mask=initial.hit?.closest('.bg-mask-message');
+      // Native Preview/graph refresh can mask ModelForm after readGraph has
+      // returned. Wait read-only for this exact owner; never replay a gesture.
+      if(!initial.reachable&&mask?.getAttribute('data-tid')===request.workflow_ref.prefix+';ModelForm'){
+        const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+        const receipt=prep&&[...prep.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
+        const card=app?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller.FController;
+        const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram'),tabs=exact(request.workflow_ref.tab_tid);
+        const owned=()=>location.origin===origin&&app?.Version===build&&globalThis.__loginomDockPreparationV1===prep
+          &&prep?.document===document&&prep.id===request.document_id&&receipt?.phase==='verified'
+          &&receipt.workflowId===request.workflow_ref.workflow_id&&[...prep.receipts.values()].includes(receipt)
+          &&app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()===card&&card.Controller.FController===model
+          &&app.ModelForm&&model instanceof app.ModelForm&&model.FView?.el?.dom===mask
+          &&receipt.nodeTargetWorkflowNode&&card.Controller.Node?.data?.node===receipt.nodeTargetWorkflowNode
+          &&tabs.length===1&&tabs[0]===receipt.tab&&tabs[0].isConnected&&tabs[0].classList.contains('x-tab-active')
+          &&exact(request.workflow_ref.tab_tid).length===1
+          &&roots.length===1&&roots[0].isConnected&&model.FDiagram?.FmxGraph?.container===roots[0]
+          &&exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram').length===1
+          &&exact(request.workflow_ref.prefix+';ModelForm').length===1&&mask.isConnected&&visible(mask)&&mask.contains(roots[0])
+          &&e.isConnected&&roots[0].contains(e)&&exact(e.getAttribute('data-tid')).length===1
+          &&![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(n=>visible(n)&&n!==mask);
+        for(;;){
+          if(!owned())throw Error('MODELFORM_MASK_CONTEXT_CHANGED: link hover owner or blocker changed');
+          if(Date.now()>=deadline)throw Error('MODELFORM_MASK_TIMEOUT: owned graph mask did not clear before link hover');
+          if(!mask.classList.contains('bg-mask-message'))break;
+          await new Promise(resolve=>setTimeout(resolve,50));
+        }
+      }
+      const current=point();return current.reachable?{x:current.x,y:current.y}:null;
+    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline});
     if(point)break;
     await page.waitForTimeout(50);
   }
@@ -446,6 +481,8 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     throw refusal;
   }
   if(!sameGraph(before,await observe()))throw Error('Graph changed before link hover gesture');
+  if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+  if(Date.now()>=task.deadline)throw Error('Link hover deadline elapsed');
   await page.mouse.move(point.x,point.y);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const after=await observe();
