@@ -137,6 +137,8 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
           await writeLeaseReceipt(path.join(out, "result.json"), result).catch(() => {})
         })
         if (state.stopped) break outer
+        // Let queued SIGINT handlers run before admitting an infrastructure retry.
+        await new Promise<void>(resolve => setTimeout(resolve, 0))
         history.initial = result
       }
     }

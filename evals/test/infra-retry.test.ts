@@ -132,8 +132,9 @@ test("CLI SIGINT во время архива infra_error сохраняет к�
     watcher.close = () => observed.close()
     // Реальные файлы удерживают архивирование открытым до доставки SIGINT.
     await Promise.all(Array.from({ length: 2000 }, (_, i) => Bun.write(path.join(out, `archive-${i}.txt`), "fixture")))
-    expect(await child.exited).toBe(0)
+    const code = await child.exited
     const summary = await Bun.file(path.resolve(out, "../../summary.json")).json() as RunSummary
+    expect({ code, stopped_reason: summary.stopped_reason }).toEqual({ code: 0, stopped_reason: null })
     expect(signal.sent).toBe(true)
     expect(summary.interrupted).toBe(true)
     const result = summary.tasks[0]!.attempts[0]!
