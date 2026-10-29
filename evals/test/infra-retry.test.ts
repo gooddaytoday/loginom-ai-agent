@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test"
-import { watch } from "node:fs"
 import { cp, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -118,24 +117,36 @@ test("CLI SIGINT во время архива infra_error сохраняет к�
   const child = Bun.spawn([process.execPath, path.join(evalsRoot, "src/run.ts"), "--skip-judge", "--tasks", context.tasks], {
     env: { PATH: process.env.PATH, ...context.env }, stdout: "pipe", stderr: "pipe",
   })
-  const watcher = { close() {} }
-  const signal = { sent: false }
+  const watcher = { async close() {} }
   try {
     const out = path.dirname(await waitForFile(context.directory, `results/*/${id}/1/prompt.txt`))
-    // Bun's non-recursive watcher can miss the directory rename event while
-    // archive entries move. Nested archive events identify the same phase.
-    const observed = watch(out, { recursive: true }, (_, file) => {
-      if (!file?.split(path.sep).includes("infra-error") || signal.sent) return
-      signal.sent = true
-      child.kill("SIGINT")
-    })
-    watcher.close = () => observed.close()
+    const node = Bun.which("node")
+    if (!node) throw Error("Archive observer requires Node.js on PATH")
+    // Node observes the directory creation directly. Bun can coalesce it or
+    // delay recursive notifications until archive moves have already finished.
+    const observed = Bun.spawn([node, "-e", `
+      const signal = { sent: false };
+      const watcher = require("node:fs").watch(${JSON.stringify(out)}, (_, file) => {
+        if (file !== "infra-error" || signal.sent) return;
+        signal.sent = true;
+        process.kill(${child.pid}, "SIGINT");
+        watcher.close();
+      });
+      process.stdout.write("ready");
+    `], { env: { PATH: process.env.PATH }, stdout: "pipe", stderr: "pipe" })
+    watcher.close = async () => {
+      if (observed.exitCode === null) observed.kill("SIGKILL")
+      await observed.exited
+    }
+    const ready = observed.stdout.getReader()
+    expect(new TextDecoder().decode((await ready.read()).value)).toBe("ready")
+    ready.releaseLock()
     // Реальные файлы удерживают архивирование открытым до доставки SIGINT.
     await Promise.all(Array.from({ length: 2000 }, (_, i) => Bun.write(path.join(out, `archive-${i}.txt`), "fixture")))
     const code = await child.exited
     const summary = await Bun.file(path.resolve(out, "../../summary.json")).json() as RunSummary
     expect({ code, stopped_reason: summary.stopped_reason }).toEqual({ code: 0, stopped_reason: null })
-    expect(signal.sent).toBe(true)
+    expect(await observed.exited).toBe(0)
     expect(summary.interrupted).toBe(true)
     const result = summary.tasks[0]!.attempts[0]!
     expect(result).toMatchObject({ status: "infra_error", environment_cleanup: { status: "confirmed" } })
@@ -144,7 +155,7 @@ test("CLI SIGINT во время архива infra_error сохраняет к�
     expect(await Bun.file(path.join(out, "infra-error/result.json")).json()).toEqual(result)
     expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
   } finally {
-    watcher.close()
+    await watcher.close()
     if (child.exitCode === null) child.kill("SIGKILL")
     await child.exited
     await context.close()
