@@ -3121,6 +3121,35 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    if(fileStorage.status==='observed' && getTid(selectedRoot)===storagePrefix+'pnlFileStorage;tbl') {
+      // Native first/last records cover short lists and terminal border gaps.
+      // An incomplete same-view range is pending; an invalid binding is unavailable.
+      const gridTid=storagePrefix+'pnlFileStorage',grid=selectedRoot.closest('[data-tid='+JSON.stringify(gridTid)+']');
+      const grids=document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']');charge();
+      const component=grid&&globalThis.Ext?.getCmp?.(grid.id),view=component?.getView?.(),store=component?.getStore?.();
+      const count=store?.getCount?.();
+      if(grid&&grids.length===1&&visible(grid)&&!sensitive(grid)&&component?.el?.dom===grid
+        &&view?.el?.dom===selectedRoot&&store?.$className==='bg.filedialog.FileStore'&&!store.isBufferedStore
+        &&store.isLoading?.()===false&&Number.isSafeInteger(count)&&count>0&&count<=10000) {
+        const records=store.getRange?.();charge();
+        const names=all.filter(element=>{charge();return getTid(element)?.startsWith(storagePrefix+'colName_')&&selectedRoot.contains(element)&&visible(element);});
+        if(Array.isArray(records)&&records.length===count&&names.length) {
+          const indices=new Map();records.forEach((record,index)=>{charge();indices.set(record,index);});
+          const rows=names.map(element=>{charge();return element.closest('.x-grid-item');});
+          const bounds=rows.map(row=>row?.getBoundingClientRect()),ownerBox=selectedRoot.getBoundingClientRect();
+          const positions=rows.map(row=>{charge();const record=row&&view.getRecord?.(row);return record?.isModel===true&&view.getNode?.(record)===row?indices.get(record):undefined;});
+          const validBox=box=>box&&[box.x,box.y,box.top,box.bottom,box.left,box.right,box.width,box.height].every(Number.isFinite)&&box.width>0&&box.height>0;
+          if(indices.size===count&&new Set(rows).size===rows.length&&validBox(ownerBox)
+            &&elements.every(element=>!element.tid?.startsWith(storagePrefix+'colName_')||!element.scroll||element.scroll.ref===rootRef)
+            &&names.every((element,index)=>{charge();return rows[index]&&selectedRoot.contains(rows[index])&&!sensitive(element)
+              &&validBox(bounds[index])&&Number.isSafeInteger(positions[index])
+              &&(!index||positions[index]===positions[index-1]+1&&bounds[index].top>bounds[index-1].top&&bounds[index].bottom>bounds[index-1].bottom);})) {
+            fileStorage.rendered_window_ready=(positions[0]===0||bounds[0].top<=ownerBox.top)
+              &&(positions.at(-1)===records.length-1||bounds.at(-1).bottom>=ownerBox.bottom);
+          }
+        }
+      }
+    }
     // Candidate: observed Table settings only, never result/execution acceptance.
     let tableSettings={status:'unobserved',settings_applied:false,result_complete:false,execution_verified:false};
     if(workflow) {

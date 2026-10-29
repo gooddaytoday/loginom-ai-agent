@@ -47,7 +47,7 @@ export class Element {
   get textContent() { return this.ownText + this.children.map(child => child.textContent).join(' '); }
   getAttribute(name) { return this.attrs[name] ?? null; }
   hasAttribute(name) { return Object.hasOwn(this.attrs, name); }
-  getBoundingClientRect() { return { ...this.box }; }
+  getBoundingClientRect() { return { ...this.box, top:this.box.y, bottom:this.box.y+this.box.height, left:this.box.x, right:this.box.x+this.box.width }; }
   matches(selector) { return matches(this, selector); }
   closest(selector) { for (let element = this; element; element = element.parentElement) if (element.matches(selector)) return element; return null; }
   contains(other) { for (let element = other; element; element = element.parentElement) if (element === this) return true; return false; }

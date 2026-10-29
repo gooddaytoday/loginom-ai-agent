@@ -82,39 +82,54 @@ export async function releaseRefusedExportRead({operationId,binding,navigationOn
 // Search only the observed folder, through bounded native scroll gestures.
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
- let binding=null,owner=null,lastTop=null,direction=null;
+ let binding=null,context=null,tab=null,owner=null,lastTop=null,direction=null;
  const unavailable=(s,reason)=>Object.assign(new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory)),
   {code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason}});
- const bind=s=>{
+ const bind=(s,folder=true)=>{
+  const value=JSON.stringify({document:s.dom_epoch?.document,workflow:s.workflow_ref});
+  if(context===null)context=value;else need(value===context,'Export search document or workflow changed');
+  if(!folder)return;
+  need(typeof s.active_tab_ref==='string','Export search tab unavailable');
+  if(tab===null)tab=s.active_tab_ref;else need(s.active_tab_ref===tab,'Export search tab changed');
   need(s.file_storage?.status==='observed','Export search folder unavailable');
-  const value=JSON.stringify({workflow:s.workflow_ref,directory:s.file_storage.directory});
-  if(binding===null)binding=value;else need(value===binding,'Export search folder changed');
+  if(binding===null)binding=s.file_storage.directory;else need(s.file_storage.directory===binding,'Export search folder changed');
  };
- const table=()=>ready(async()=>{const r=await roots();const es=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl');need(es.length<=1,'Export table ambiguous');return es.length?read({root_ref:es[0].ref}):r;},s=>s.file_storage?.status==='observed');
+ const table=()=>ready(async()=>{
+  guard();const r=await roots();bind(r,false);
+  const tid=r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl',es=r.ui.elements.filter(e=>e.tid===tid);
+  need(es.length===1,'Unique export table required');
+  const s=await read({root_ref:es[0].ref});bind(s);
+  need(s.observation_root?.ref===es[0].ref&&s.observation_root.identity?.anchor_tid===tid,'Export search table root changed');
+  const rows=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_'));
+  if(!rows.length||!rows[0].scroll)throw unavailable(s,'no_scroll_owner');
+  need(rows.every(e=>e.scroll?.ref===rows[0].scroll.ref),'Export search scroll owner ambiguous');
+  if(owner===null){owner=rows[0].scroll.ref;direction=rows[0].scroll.top>0?'up':'down';}
+  need(rows[0].scroll.ref===owner,'Export search scroll owner changed');
+  need(typeof s.file_storage.rendered_window_ready==='boolean','Export search native window readiness unavailable');
+  return s;
+ },s=>s.file_storage.rendered_window_ready===true);
  guard();
  const initial=await read({discover_roots:true,storage_name:name});
+ bind(initial,false);
  const issued=initial.ui.elements.filter(e=>e.tid===initial.workflow_ref?.prefix+suffix);need(issued.length<=1,'Export file row is ambiguous');
  if(issued.length){const found=await read({root_ref:issued[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
- let s=await table();bind(s);
+ let s=await table();
  for(let step=0;step<=12;step++){
   guard();
   const r=await read({discover_roots:true,storage_name:name});
+  bind(r,false);
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
   need(matches.length<=1,'Export file row is ambiguous');
   if(matches.length){const found=await read({root_ref:matches[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
-  s=await table();bind(s);
   const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
   if(!anchors.length)throw unavailable(s,'no_scroll_owner');
   const e=anchors[0],scroll=e.scroll;
-  need(anchors.every(a=>a.scroll.ref===scroll.ref),'Export search scroll owner ambiguous');
-  if(owner===null){owner=scroll.ref;direction=scroll.top>0?'up':'down';}
-  need(scroll.ref===owner,'Export search scroll owner changed');
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){direction='down';lastTop=null;}
   if(direction==='down'&&scroll.top>=scroll.max_top)throw unavailable(s,'folder_end');
   need(step<12,'Export file search scroll budget exhausted');
   const delta=direction==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top);
-  lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});
+  lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});s=await table();
  }
  throw Error('Export file search exhausted');
 }

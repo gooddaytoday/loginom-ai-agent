@@ -107,7 +107,7 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
- const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:1},
+ const snapshot=()=>({active_tab_ref:files?'files-tab':workflow.tab_tid,authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:1},
   workflow_ref:files?{tab_tid:filesWorkflow.tab_tid,prefix:failed&&['foreign_storage','return_tabs_foreign'].includes(kind)?'foreign':filesWorkflow.prefix}:
    {tab_tid:workflow.tab_tid,prefix:failed&&kind==='changed_workflow'?'foreign':workflow.prefix},wizard:{status:!files&&failed&&kind==='graph_wizard'?'observed':'absent'},
   ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
@@ -178,6 +178,7 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
    }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
+   if(task.root_ref==='ui-file-table'){output.observation_root={ref:task.root_ref,identity:{anchor_tid:'MF;TF-2;FileStorageForm;pnlFileStorage;tbl'}};output.file_storage.rendered_window_ready=true;}
    output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
    if(task.prepared_node_context){
     assert.deepEqual(task.prepared_node_context,{document_id:'doc',workflow_ref:workflow,node});

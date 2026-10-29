@@ -2828,6 +2828,64 @@ test('storage row selection reads folder type from its own visible unique cell',
   type.ownText='Текстовый файл';assert.equal((await read()).kind,'unknown');
 });
 
+test('native storage readiness waits for the same view to cover its rendered window',async()=>{
+ const page=new Page(),base='MF;TF-1;FileStorageForm;';
+ const grid=page.add('div',base+'pnlFileStorage');grid.id='storage-grid';
+ const table=page.add('div',base+'pnlFileStorage;tbl','',{x:0,y:100,width:500,height:200},grid);
+ const records=Array.from({length:5},()=>({isModel:true})),rows=[];
+ const render=(indices,top)=>{
+  rows.splice(0).forEach(row=>row.remove());
+  for(const [offset,index] of indices.entries()) {
+   const row=page.add('table',null,'',{x:0,y:top+offset*100,width:500,height:100},table);row.attrs.class='x-grid-item';row.record=records[index];rows.push(row);
+   page.add('td',base+'colName_file'+index,'file'+index,{x:0,y:top+offset*100,width:100,height:20},row);
+  }
+ };
+ const store={$className:'bg.filedialog.FileStore',isLoading:()=>false,getCount:()=>records.length,getRange:()=>records};
+ const view={el:{dom:table},getRecord:row=>row.record,getNode:record=>rows.find(row=>row.record===record)};
+ page.context.Ext={getCmp:()=>({el:{dom:grid},getView:()=>view,getStore:()=>store})};
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+ for(const [i,text] of ['Файлы','user'].entries()) {
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_'+i,'',undefined,bar);
+  page.add('span',null,text,undefined,button).attrs.class='x-btn-inner-default-toolbar-small';
+ }
+ render([1],100);
+ const roots=await page.execute({mode:'observe',discover_roots:true}),ref=roots.output.ui.elements.find(e=>e.tid===base+'pnlFileStorage;tbl').ref;
+ const read=async()=>{const r=await page.execute({mode:'observe',root_ref:ref});assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));return r.output.file_storage;};
+ assert.equal((await read()).rendered_window_ready,false);
+ render([1,2,3],50);
+ assert.equal((await read()).rendered_window_ready,true);
+ render([0,1,2,3,4],120);
+ assert.equal((await read()).rendered_window_ready,true,'static full range needs no reference change');
+ render([3,4],80);
+ assert.equal((await read()).rendered_window_ready,true,'native last record closes the terminal row-container border gap');
+ render([2,3],80);
+ assert.equal((await read()).rendered_window_ready,false,'stale terminal range without last native record stays pending');
+ records.splice(1);render([0],120);
+ assert.equal((await read()).rendered_window_ready,true,'short list is complete inside the owner border');
+ table.scrollHeight=500;table.clientHeight=200;table.scrollTop=0;table.style.overflowY='auto';
+ assert.equal((await read()).rendered_window_ready,true,'observed scroll metadata belongs to the native view');
+ rows[0].scrollHeight=200;rows[0].clientHeight=100;rows[0].scrollTop=0;rows[0].style.overflowY='auto';
+ assert.equal((await read()).rendered_window_ready,undefined,'foreign row scroll owner is unavailable');
+ rows[0].style.overflowY='';
+ const getNode=view.getNode;view.getNode=()=>table;
+ assert.equal((await read()).rendered_window_ready,undefined,'row-to-record mismatch is unavailable');
+ view.getNode=getNode;view.el.dom=grid;
+ assert.equal((await read()).rendered_window_ready,undefined,'foreign native view is unavailable');
+ view.el.dom=table;render([],120);
+ assert.equal((await read()).rendered_window_ready,undefined,'empty rendered range is unavailable');
+ render([0],120);let nativeReads=0;const getRange=store.getRange;store.getRange=()=>{nativeReads++;return getRange();};
+ const narrowRoots=await page.execute({mode:'observe',discover_roots:true});
+ assert.equal(narrowRoots.output.file_storage?.rendered_window_ready,undefined);assert.equal(nativeReads,0);
+ const navigation=narrowRoots.output.ui.elements.find(e=>e.tid==='MF;TF-1;NavigationBar;NavigationPanel');
+ const navigationRead=await page.execute({mode:'observe',root_ref:navigation.ref});
+ assert.equal(navigationRead.output.file_storage.rendered_window_ready,undefined);assert.equal(nativeReads,0);
+ const discovery=await page.execute({mode:'observe',discover_roots:true,storage_name:'file0'});
+ assert.equal(discovery.output.file_storage?.rendered_window_ready,undefined);assert.equal(nativeReads,0);
+ const name=(await page.execute({mode:'observe',root_ref:ref})).output.ui.elements.find(e=>e.tid===base+'colName_file0');nativeReads=0;
+ const nameRead=await page.execute({mode:'observe',root_ref:name.ref});
+ assert.equal(nameRead.output.file_storage.rendered_window_ready,undefined);assert.equal(nativeReads,1,'only the existing file-byte proof reads the native range');
+});
+
 test('storage byte identity uses the same cached native file record regardless of rendered size',async()=>{
   for(const mode of ['valid','loading','foreign_grid','foreign_view','foreign_row','foreign_record','wrong_store',
     'buffered','wrong_count','folder','wrong_name','wrong_path','wrong_id','fractional','negative','overflow','duplicate_grid']) {
