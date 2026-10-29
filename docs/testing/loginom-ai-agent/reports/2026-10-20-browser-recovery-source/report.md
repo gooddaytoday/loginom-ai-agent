@@ -480,3 +480,25 @@ private, повторов/исправлений в Task2 нет. Причина
 missing active_tab_ref общей fixture — следующая конкретная гипотеза. Полный Task2
 BLOCKED до разбора failures; native S5 PASS сохранён отдельно. Installed/model/
 release/merge не выполнялись; release-флаг остаётся выключен.
+
+
+## 2026-10-30 — executor fixture correction: full upstream PASS
+
+[План](../../../../superpowers/plans/2026-10-30-browser-recovery-executor-fixture.md)
+завершён. Source `cc77b1f8dd`: один field `active_tab_ref` в существующем
+verificationFixture.state(), соответствующий уже delivered active tab. Production,
+reader guards и четыре исходных assertions не менялись. Missing snapshot field
+подтверждён meaningful focused RED/exit1 → тот же test GREEN/exit0; весь файл74PASS.
+Единственный полный upstream после исправления:4508total/4494PASS/0FAIL/14SKIP,
+exit0/230834ms, новых warnings нет; stderr только штатный Bun script echo.
+Root проверил actual diff/raw summary/полный scoped review. Independent source
+spec+quality Approved, mandatory0/optional0; git diff --check PASS.
+
+359 source hashes и355 staged runtime files совпадают с принятыми native resources;
+fixture в stage не входит, critical MJS hash прежний. Native/stage не повторялись,
+actual builder/manifest предыдущего раздела сохраняют исходную identity.
+Scroll-anchor Task2 и исходный план5Task2 завершены: native BR-S5 strict PASS принят
+отдельно от полного upstream GREEN. CSS/transient причина не доказана; OS absence
+UNKNOWN, прежние FAIL/UNKNOWN/cleanup BLOCKED остаются историческими ограничениями.
+Следующий шаг — packaged Task3: model acceptance остаётся открытой, release gate
+закрыт. Installed/model/merge/release не запускались, release-флаг выключен.

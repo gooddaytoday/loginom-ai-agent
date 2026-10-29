@@ -128,12 +128,12 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 **Подтверждённый прогресс:** ordinary Export, BR-S2/BR-S4/BR-S5 native PASS; S6 negative assertions PASS отдельно от BLOCKED cleanup. [Scroll-anchor план](2026-10-30-browser-recovery-scroll-anchor.md): source focused231PASS/review Approved; fresh stock stage/preflight и единственная unchangedS5 подтвердили completed/current file/bytes/SHA/lineage/CSV/first Dock Save/modifiedfalse/native Close/logout/noDiscard/managedACKexit0. CSS-механизм не установлен, все прежние FAIL/UNKNOWN сохранены в source report.
 
-**Полный Task2 открыт по upstream:** первый полный прогон после native PASS дал4490PASS/4FAIL/14SKIP, все4 failures в browser-recovery-executor.test.mjs. Следующий scope — изолировать общий fixture/product mismatch без ослабления acceptance; нового native повтора не требуется только при доказанном test-only исправлении и неизменных runtime bytes.
+**Task2 завершён:** [executor-fixture slice](2026-10-30-browser-recovery-executor-fixture.md) подтвердил missing active_tab_ref общей test fixture и исправил один field без production/assertion изменений. Focused RED→GREEN/file74PASS/full upstream4494PASS/0FAIL/14SKIP, independent source Approved0. Runtime bytes неизменны; принятый native S5 не повторялся, actual build identity сохранена. Исторический upstream FAIL остаётся в source report.
 
 - [x] BR-S2: native PASS, текущий файл/Save/native cleanup.
 - [x] BR-S4: native PASS, execution/schema/fresh read/Save/native cleanup.
-- [x] BR-S5: native strict PASS30.10, current bytes/SHA/CSV/lineage, первый final Save/modifiedfalse и exact-own native cleanup/managedACKexit0; [фактический отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-30--scroll-anchor-native-br-s5-pass-upstream-fail). OS absence UNKNOWN; upstream4FAIL сохраняет полный Task2 открытым.
-- [x] BR-S6: negative assertions PASS;30 current-page snapshots,31-й stopped/budget_exhausted/no dispatch. Cleanup BLOCKED/ACKfalse/exit1 отражён отдельно. Root проверил raw/journal/resource/OS evidence; независимое review кода Task2 Approved без обязательных исправлений, полный Task2 не принят из-за S5.
+- [x] BR-S5: native strict PASS30.10, current bytes/SHA/CSV/lineage, первый final Save/modifiedfalse и exact-own native cleanup/managedACKexit0; [фактический отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-30--scroll-anchor-native-br-s5-pass-upstream-fail). OS absence UNKNOWN; полный upstream после test-only исправления PASS, Task2 завершён.
+- [x] BR-S6: negative assertions PASS;30 current-page snapshots,31-й stopped/budget_exhausted/no dispatch. Cleanup BLOCKED/ACKfalse/exit1 отражён отдельно. Root проверил raw/journal/resource/OS evidence; независимое review кода Task2 Approved без обязательных исправлений, S5 и последующий полный upstream приняты отдельно, Task2 завершён.
 
 **Минимальный план S6:**
 1. Только harness/runbook: включить S6 в существующий Export configure fault/T2 путь; после start выполнить четыре безопасных ожидаемых отказа, не ослабляя invoke для S1–S5. Затем30 разрешённых snapshot depth1, первый remaining29, текущие metadata/attempt/state;31-й отказ budget_exhausted/stopped/remaining0. Не Cancel/finish/repeat Export/Save.
@@ -145,7 +145,7 @@ S6 использует уже согласованную узкую expected-er
 
 - [x] **Step 1: Extend the script and runbook**
 
-- [ ] **Step 2: Run the scenarios**
+- [x] **Step 2: Run the scenarios**
 
 Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S2 /path/to/private/saved-A.json` (остальные сценарии — по текущему порядку выше)
 Expected: все четыре выполняют требуемый результат; в журналах BR-S2, BR-S4 и BR-S5 есть `acceptance_fault_injected`, `browser_recovery_handoff`, `browser_recovery_verified`, `browser_recovery_dock_resumed`.
@@ -201,7 +201,7 @@ git add docs/testing/loginom-ai-agent
 git commit -m "docs(testing): record packaged browser recovery acceptance"
 ```
 
-**Текущее выполнение Task3:** [подплан](2026-10-20-browser-recovery-packaged.md), build/availability приняты независимым review. WIZARD LAB-91/103006-r3: новый image run прошёл current business output/CSV/Save/native cleanup, но recovery0/no transition → BLOCKED; text provider rate limit → SIGINT/exit130,0tools/0task, native task NOT_OBSERVED. Desktop model BLOCKED/no eligible CLI transition; missing IDs/slow-host association ограничивают свои строки. [Отчёт и обе session IDs](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Обе собственные установки штатно удалены без purge; profiles/evidence/oldguard/auth сохранены. Current report/teardown приняты independent spec compliant/quality Approved без обязательных замечаний; модельная приёмка/Task3 отложены и открыты. Следующий шаг — первый сквозной S5/Task2, не ослабляя его критериев; release gate закрыт.
+**Текущее выполнение Task3:** [подплан](2026-10-20-browser-recovery-packaged.md), build/availability приняты независимым review. WIZARD LAB-91/103006-r3: новый image run прошёл current business output/CSV/Save/native cleanup, но recovery0/no transition → BLOCKED; text provider rate limit → SIGINT/exit130,0tools/0task, native task NOT_OBSERVED. Desktop model BLOCKED/no eligible CLI transition; missing IDs/slow-host association ограничивают свои строки. [Отчёт и обе session IDs](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Обе собственные установки штатно удалены без purge; profiles/evidence/oldguard/auth сохранены. Current report/teardown приняты independent spec compliant/quality Approved без обязательных замечаний; модельная приёмка/Task3 отложены и открыты. Task2 завершён. Следующий шаг — восстановить отсутствующие IDs/slow-host association и проверить catalog/image evidence до решения о новых model runs; release gate закрыт.
 
 ### Task 4: Включение флага в release
 

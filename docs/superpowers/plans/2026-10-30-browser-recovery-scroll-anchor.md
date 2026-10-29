@@ -77,13 +77,13 @@ Task1 завершён только source GREEN+approved review; он не оз
 
 - [x] **Step1 — stock stage/preflight.** Выполнить штатные stageResources/verifyResources с product pins; проверить actual source/resource byte equality и source/manifest identity, приватную конфигурацию без вывода значений. Independent preflight проверяет фактический unchanged invocation и own fresh SaveAs/Group/UUID. Старым артефактам не присваивать новую identity.
 - [x] **Step2 — первый E2E.** Ровно одна BR-S5 по команде [storage-settle Step6](2026-10-29-browser-recovery-storage-settle.md) из `packages/desktop`, подставить только новые private resources. Исходный strict результат из Global Constraints обязателен. Первый unexpected → existing finally, фактический report, STOP; никаких probes/повторов/ручного cleanup. Existing journal позволяет установить достигнутый этап; отсутствие нужных фактов честно UNKNOWN.
-- [ ] **Step3 — проверить исход и закончить.** Root сверяет current file/bytes/SHA/lineage/CSV, первый следующий Dock Save/modifiedfalse, exact native cleanup отдельно от context/OS и managed ACK/exit. Только при strict PASS — один `bun run test:upstream` из `packages/loginom-runtime` с pinned Node в command-local PATH; затем независимое review нового scope/результата и owning docs. При FAIL/BLOCKED source остаётся candidate, гипотеза live не подтверждена; не добавлять hardening или следующий механизм. Original release/models/installed acceptance, deferred cross-platform mode assertion и merge/release — вне этого slice.
+- [x] **Step3 — проверить исход и закончить.** Root сверяет current file/bytes/SHA/lineage/CSV, первый следующий Dock Save/modifiedfalse, exact native cleanup отдельно от context/OS и managed ACK/exit. Только при strict PASS — один `bun run test:upstream` из `packages/loginom-runtime` с pinned Node в command-local PATH; затем независимое review нового scope/результата и owning docs. При FAIL/BLOCKED source остаётся candidate, гипотеза live не подтверждена; не добавлять hardening или следующий механизм. Original release/models/installed acceptance, deferred cross-platform mode assertion и merge/release — вне этого slice.
 
-## Checkpoint — native S5 PASS / Task2 BLOCKED upstream
+## Checkpoint — COMPLETE
 
-- Task1 COMPLETE, source c3ab0f5172/focused231PASS/source spec+quality Approved0; actual build/evidence identities — в последнем разделе source report.
-- Task2 Steps1–2 выполнены: fresh stock stage4753PASS/independent preflight GO, ровно одна unchangedBR-S5 PASS/exit0.
+- Tasks1–2 COMPLETE: production c3ab0f5172/focused231PASS/source spec+quality Approved0; actual build/evidence identities — в source report.
+- Fresh stock stage4753PASS/independent preflight GO и ровно одна unchanged BR-S5 strict PASS/exit0 приняты.
 - Current file/bytes/SHA/lineage/CSV, первый Dock Save/modifiedfalse, exact-own native Close/logout/noDiscard, authenticated context close/managedACKexit0 подтверждены; OS absence UNKNOWN.
 - Root/raw bytes и independent incremental factual review APPROVED/mandatory0; CSS/transient механизм и старые cleanup не переоценены.
-- Однократный upstream FAIL:4490PASS/4FAIL/14SKIP, все4 в browser-recovery-executor.test.mjs. Step3/полныйTask2 открыт, suite не повторялась.
-- Следующий шаг — отдельный минимальный reviewed scope для reproducer и проверки общей fixture; production/ожидания/приёмку не ослаблять. Новый S5 этим планом не разрешён.
+- Четыре upstream failures устранены одним snapshot field в test-only [executor-fixture slice](2026-10-30-browser-recovery-executor-fixture.md): focused RED→GREEN/file74PASS/full4494PASS/0FAIL/14SKIP, independent source Approved0.
+- Runtime bytes неизменны; stage/native повторно не запускались и не получили новую source identity. План5Task2 завершён, следующий шаг — packaged Task3; release gate закрыт.
