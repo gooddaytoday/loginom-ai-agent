@@ -96,7 +96,7 @@ async function prepareWorkspace(page, options) {
           return {text:text.slice(0,limit),truncated:raw.length>limit||count>512||length>=8192};
         };
         const title=messageBox?read(c.header?.titleCmp?.textEl?.dom??e.querySelector('.x-title-text'),240):null;
-        const text=messageBox?read(c.msg?.el?.dom??e.querySelector('.x-window-text,.x-message-box-text,.bg-error-messages'),2048):null;
+        const text=messageBox?read(c.body?.dom??c.msg?.el?.dom??e.querySelector('.x-window-text,.x-message-box-text,.bg-error-messages'),2048):null;
         const buttons=messageBox?[...e.querySelectorAll('button,[role="button"],.x-btn')].filter(visible):[];
         return {tid:short(e.getAttribute('data-tid')),class_name:short(e.getAttribute('class')),
           bounding_box:{x:box.x,y:box.y,width:box.width,height:box.height},

@@ -669,7 +669,7 @@ test('D70 an active owned offscreen picker retains the original preparation dead
  assert.equal(r.trace.at(-1).blocking_windows.windows[0].native_owner.hidden,false);
 });
 
-for(const intent of ['new_draft','open_package'])for(const owner of ['native','foreign'])test('preparation reports bounded native MessageBox diagnostics: '+intent+' '+owner,async()=>{
+for(const intent of ['new_draft','open_package'])for(const owner of ['native','foreign','custom body'])test('preparation reports bounded native MessageBox diagnostics: '+intent+' '+owner,async()=>{
  const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll,getCmp=c.Ext.getCmp;
  const text=value=>({isConnected:true,innerText:value,getAttribute:()=>null,parentElement:null,
   getBoundingClientRect:()=>({width:100,height:20}),matches:()=>false,closest:()=>null});
@@ -677,8 +677,9 @@ for(const intent of ['new_draft','open_package'])for(const owner of ['native','f
  const box={...text('DO NOT READ WHOLE DIALOG'),id:'native-msgbox',getAttribute:k=>k==='data-tid'?'msgbox':null,
   contains:e=>[title,body,button].includes(e),querySelector:()=>null,querySelectorAll:()=>[button]};
  button.getAttribute=k=>k==='data-tid'?'msgbox;tlb;ok':null;
- const native={$className:'Ext.window.MessageBox',el:{dom:owner==='native'?box:{}},hidden:false,
-  header:{titleCmp:{textEl:{dom:title}}},msg:{el:{dom:body}}};
+ const native={$className:'Ext.window.MessageBox',el:{dom:owner==='foreign'?{}:box},hidden:false,
+  header:{titleCmp:{textEl:{dom:title}}},body:{dom:body},
+  msg:{el:{dom:owner==='custom body'?{getBoundingClientRect:()=>({width:0,height:0})}:body}}};
  let shown=false;
  c.Ext.getCmp=id=>id===box.id?native:getCmp(id);
  c.document.querySelectorAll=q=>shown&&q.startsWith('[role=')?[box]:query(q);
