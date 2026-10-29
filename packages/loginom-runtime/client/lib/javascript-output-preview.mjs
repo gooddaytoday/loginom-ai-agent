@@ -110,7 +110,15 @@ export async function runJavascriptOutputPreview(page,task,capture,inspect){
   try{
    lease.ticket=await page.evaluateHandle(inspect,{held:handle,task,capture:true});
    return await page.evaluate(inspect,{held:handle,ticket:lease.ticket,task});
-  }catch(error){leases.delete(task.operation_id);try{await lease.ticket?.dispose();}finally{await handle.dispose();}throw error;}
+  }catch(error){
+   leases.delete(task.operation_id);try{await lease.ticket?.dispose();}finally{await handle.dispose();}
+   // Capture only reads native ownership. Preserve its completed refusal so
+   // release can prove that neither selection nor F3 was ever dispatched.
+   return {status:'NOT_APPLIED',action_key:'node.javascript.preview.capture.internal',action_revision:'1',
+    operation_id:task.operation_id,phase:'capture',effect_possible:false,cleanup_complete:true,
+    output:{node_context:task.owner,port_guid:task.output.port_guid,lease_disposed:true,execution_started:false},
+    error:{code:'PREVIEW_CAPTURE_REFUSED',message:String(error.message)},trace:[]};
+  }
  }
  const lease=leases.get(task.operation_id);
  if(!lease||lease.identity!==identity)throw Error('Managed preview lease changed');

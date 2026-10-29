@@ -74,7 +74,7 @@ function fixture(fault='none'){
  },preflight:async()=>{},activateWorkflow:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
  verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow})};
  const drivers=createGroupingNodeSupport(config).nodeApplyDriverFactory(options);
- return {operation,records,actions,receipts,clock:()=>time,previewReads:()=>previewReads,publicRuntime(){
+ return {operation,records,actions,receipts,hidePreview:()=>{preview=false;},clock:()=>time,previewReads:()=>previewReads,publicRuntime(){
   return createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},now:()=>time,
    targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,execute:options.execute,onRecord:options.onRecord,
    nodeTargetAdapterFactory:()=>adapter,
@@ -170,4 +170,37 @@ test('D68 refuses unproved preview release without another F3: '+fault,async()=>
  assert.equal(f.operation.cleanupConfirmed,false);
  assert.equal(f.operation.preTargetGraph,undefined);
  assert.equal(f.actions.filter(a=>a.key==='F3').length,1);
+});
+
+
+for(const fault of ['foreign_preview','foreign_effect','locked','running','ack','deadline','transport'])
+test('C1 no-gesture capture refusal releases only an unchanged quiet owner graph: '+fault,async()=>{
+ const f=fixture(fault==='transport'?'none':fault);await f.stop();
+ const p=f.operation.groupingPreview;
+ Object.assign(p,{managed:true,capture_refused:true,lease_disposed:true});
+ Object.assign(p.receipt,{action_key:'node.javascript.preview.capture.internal',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+ p.receipt.output={node_context:p.binding.node,port_guid:p.port.port_guid,lease_disposed:true};
+ p.reference.action_key=p.receipt.action_key;f.operation.lastReceipt=structuredClone(p.reference);
+ f.receipts.set(p.reference.id,structuredClone(p.receipt));f.operation.cleanupConfirmed=false;
+ if(fault!=='foreign_preview')f.hidePreview();
+ // The original failure is before any port click/F3. The fixture's first F3
+ // only creates the pending checkpoint; its graph is restored before release.
+ f.actions.length=0;
+ if(fault==='transport')f.operation.transportUncertain=true;
+ // Capture cannot have opened a preview: an observed preview is a refusal.
+ // The no_preview fixture supplies the positive case separately below.
+ await assert.rejects(f.release());
+ assert.equal(f.actions.length,0);
+ assert.equal(f.operation.preTargetGraph,undefined);
+});
+test('C1 completed capture refusal releases without a preview or target gesture',async()=>{
+ const f=fixture('no_preview');await f.stop();f.actions.length=0;
+ const p=f.operation.groupingPreview;
+ Object.assign(p,{managed:true,capture_refused:true,lease_disposed:true});
+ Object.assign(p.receipt,{action_key:'node.javascript.preview.capture.internal',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+ p.receipt.output={node_context:p.binding.node,port_guid:p.port.port_guid,lease_disposed:true};
+ p.reference.action_key=p.receipt.action_key;f.operation.lastReceipt=structuredClone(p.reference);
+ f.receipts.set(p.reference.id,structuredClone(p.receipt));f.operation.cleanupConfirmed=false;
+ await f.release();assert.equal((await f.releaseTarget()).verified,true);
+ assert.deepEqual(f.actions,[]);assert.equal(f.operation.groupingPreview,undefined);
 });

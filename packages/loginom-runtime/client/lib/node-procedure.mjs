@@ -248,7 +248,28 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
         targetOrigin,targetBuild,deadline:operation.deadline};
       const read=mode=>execute(makeJavascriptOutputPreviewCode({...task,mode}),{timeout:Math.max(5000,operation.deadline-now()+5000)});
-      let expected=await read('capture');
+      const captureKey='node.javascript.preview.capture.internal',captureSignature=digest([task,'capture']);
+      let expected;
+      try{expected=await execute(wrapMutation(makeJavascriptOutputPreviewCode({...task,mode:'capture'}),
+        {id:task.operation_id,signature:captureSignature,action_key:captureKey}),
+        {timeout:Math.max(5000,operation.deadline-now()+5000)});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      if(expected?.status==='NOT_APPLIED'){
+        if(expected.operation_id!==task.operation_id||expected.action_key!==captureKey||expected.action_revision!=='1'
+          ||expected.phase!=='capture'||expected.effect_possible!==false||expected.cleanup_complete!==true
+          ||expected.output?.lease_disposed!==true||expected.output.execution_started!==false
+          ||expected.output.port_guid!==port.port_guid
+          ||!['document_id','workflow_id','node_id'].every(k=>expected.output.node_context?.[k]===task.owner[k]))
+          throw Error('Managed preview capture receipt identity differs');
+        const event={lease_operation_id:task.operation_id,owner:task.owner,port_guid:port.port_guid,
+          reference:structuredClone(operation.lastReceipt),receipt:structuredClone(expected)};
+        const saved=await entry('node_preview_capture_refused',event);
+        if(JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))
+          throw Error('Managed preview capture refusal was not durably acknowledged');
+        if(operation.groupingPreview?.managed===true)Object.assign(operation.groupingPreview,
+          {failed:true,capture_refused:true,lease_disposed:true,reference:event.reference,receipt:event.receipt});
+        throw Error(expected.error?.message??'Managed preview capture refused');
+      }
       snapshot=null;evidenceSnapshot=null;
       try{
         for(const mode of ['select','open']){
