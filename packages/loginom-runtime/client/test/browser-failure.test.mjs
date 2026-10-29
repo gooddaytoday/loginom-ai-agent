@@ -35,3 +35,12 @@ test('unrecognized connection reason is never echoed',()=>{
   'Loginom connection is disconnected; original session recovery unverified (PRIVATE)'}]}),
   {message:'Pinned browser capability call failed [LOGINOM_DISCONNECTED]'});
 });
+
+test('browser transport diagnostics retain the bounded original cause privately',()=>{
+ const text='Error: socket peer reset password=PRIVATE';
+ assert.throws(()=>parseCapabilityResult({isError:true,content:[{type:'text',text}]}),error=>{
+  assert.equal(error.message,'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]');
+  assert.equal(error.cause.message,text);
+  return true;
+ });
+});

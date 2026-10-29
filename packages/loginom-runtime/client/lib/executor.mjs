@@ -1473,7 +1473,12 @@ export function withBrowserReceipt(body, options) {
 export function parseCapabilityResult(response) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
-    throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''));
+    // Keep the original cause private; the bridge journals it through its
+    // redactor while callers retain the fixed public refusal.
+    const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+      .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
+    throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
+      {cause:new Error(message)});
   }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;

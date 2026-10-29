@@ -177,10 +177,20 @@ export async function createBridge(config, session, { browserTransport: managedB
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
-        const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
-        } }, undefined, options);
-        return parseCapabilityResult(response);
+        try {
+          const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+            code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
+          } }, undefined, options);
+          return parseCapabilityResult(response);
+        } catch(error) {
+          // Diagnostics must not replace the original failure or certify cleanup.
+          try { await recordExecution({phase:'browser_capability_failed',cause:{
+            name:String(error?.name??'Error').slice(0,80),code:String(error?.code??'').slice(0,100),
+            message:String(error?.message??error).slice(0,2048),
+            original_message:error?.cause instanceof Error?error.cause.message.slice(0,2048):null,
+          }}); } catch {}
+          throw error;
+        }
       } });
     }
     const groups = selectToolGroups(config.mode ?? 'classic', {
