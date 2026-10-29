@@ -5,13 +5,13 @@ import {validateNativeExportParams} from '../lib/text-export-parameters.mjs';
 const binding={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'navigation',label:'Workflow'}]},node:{document_id:'doc',workflow_id:'wf',node_id:'node'}};
 const before={verified:true,stage:'text_export_params',values:{destination:{value:'/test-2/a.csv'}}};
 const task=()=>({binding,before,destination:'/test-2/a.csv',overwrite:'replace',origin:'http://logi-test-plan.bg.local',operation_id:'next',deadline:Date.now()+10000});
-function fixture({exists=false,interrupt,expire=false}={}){
- let stage='params';const clicks=[],t=task(),page={};
+function fixture({exists=false,interrupt,expire=false,pending=false}={}){
+ let stage='params',waits=0;const clicks=[],t=task(),page={};
  const hit=at=>{if(at===interrupt){if(expire)t.deadline=Date.now()-1;else page[Symbol.for('loginom-dock.text-export-cancel')]=new Set([t.operation_id]);}};
  page.evaluate=async fn=>{if(fn.toString().includes('new URL')){hit('origin');return true;}hit('question');return {present:stage==='question',exact:true};};
- page.locator=selector=>({count:async()=>{hit('count');return 1;},elementHandle:async()=>{hit('handle');return {evaluate:async()=>{hit('hit');return true;},dispose:async()=>{},click:async()=>{clicks.push(selector);if(selector.includes('btnNext')){stage=exists?'question':'format';hit('next');}else {stage=selector.includes(';yes')?'format':'params';hit('answer');}}};}});
- page.waitForTimeout=async()=>{};
- const readContext=async()=>{hit('read');return stage==='format'?{verified:true,stage:'text_export_format'}:structuredClone(before);};
+ page.locator=selector=>({count:async()=>{hit('count');return 1;},elementHandle:async()=>{hit('handle');return {evaluate:async()=>{hit('hit');return true;},dispose:async()=>{},click:async()=>{clicks.push(selector);if(selector.includes('btnNext')){stage=pending?'pending':exists?'question':'format';hit('next');}else {stage=selector.includes(';yes')?'format':'params';hit('answer');}}};}});
+ page.waitForTimeout=async()=>{if(pending&&++waits>=(Array.isArray(pending)?pending.length:1))t.deadline=Date.now()-1;};
+ const readContext=async()=>{hit('read');return stage==='pending'&&pending!=='params'?{verified:false,reason:Array.isArray(pending)?pending[waits]:pending}:stage==='format'?{verified:true,stage:'text_export_format'}:structuredClone(before);};
  const readNode=async()=>{hit('owner');return {verified:true,surface:'wizard',node_id:'node'};};
  return {run:()=>exportNext(page,t,readNode,readContext,()=>{},{}),t,clicks};
 }
@@ -19,6 +19,24 @@ test('export Next preserves native absence, replace and reject decisions',async(
  for(const [exists,overwrite,count]of [[false,'reject',1],[true,'replace',2],[true,'reject',2]]){
   const f=fixture({exists});f.t.overwrite=overwrite;const r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);assert.equal(f.clicks.length,count);assert.equal(r.output.existed,exists);if(exists)assert.equal(r.output.decision,overwrite);
  }
+});
+for(const pending of ['params','export_control_header'])test('export Next timeout retains the last native state: '+pending,async()=>{
+ const f=fixture({pending}),r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);assert.equal(f.clicks.length,1);
+ assert.deepEqual(r.trace.map(e=>e.event),['export_next_click_started','export_next_clicked','export_next_observed','export_next_stopped']);
+ const observed=r.trace[2];assert.equal(observed.verified,pending==='params');
+ assert.equal(observed.stage,pending==='params'?'text_export_params':null);
+ assert.equal(observed.reason,pending==='params'?null:'export_control_header');
+ assert.equal(r.trace.at(-1).reason,'deadline');
+ assert.ok(r.trace.every(e=>Number.isInteger(e.elapsed_ms)&&e.elapsed_ms>=0));
+ assert.equal(JSON.stringify(r.trace).includes(f.t.destination),false);
+});
+test('export Next bounds diagnostics while retaining the click and final native state',async()=>{
+ const pending=Array.from({length:30},(_,i)=>'export_control_'+i),f=fixture({pending}),r=await f.run();
+ assert.equal(r.trace.length,24);assert.equal(f.clicks.length,1);
+ assert.equal(r.trace[0].event,'export_next_click_started');assert.equal(r.trace[1].event,'export_next_clicked');
+ assert.equal(r.trace.at(-2).reason,pending.at(-1));assert.equal(r.trace.at(-1).reason,'deadline');
+ assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);
 });
 test('export Next refuses cancellation/deadline after awaited reads before a gesture',async()=>{
  for(const expire of [false,true])for(const interrupt of ['origin','read','count','handle','hit']){
