@@ -349,3 +349,99 @@ Metadata-снимки семи собственных старых/новых п
 `evidence/teardown-before.json`/`teardown-after.json` и
 `cli-uninstall.*`/`desktop-remove.*` содержат проверки/вывод/exit.
 Production repair, S5, merge, release и публикация не выполнялись.
+
+
+<a id="packaged-reentry-2026-10-30"></a>
+## Локальный re-entry 30.10.2026: historical evidence не восстановлено
+
+Выполнен один ограниченный read-only проход по
+[плану re-entry](../../../../superpowers/plans/2026-10-30-browser-recovery-packaged-reentry.md).
+Ни model/browser/runtime, ни сеть, tests/build/install/cleanup не запускались;
+исторические результаты выше сохранены. Это завершение поиска доступных данных,
+а не приёмка исходной Task3: она OPEN, release-флаг OFF. Независимое factual review
+этого дополнения ещё требуется.
+
+### Historical IDs и slow-host
+
+Прочитаны [срез18.10 и S1–S8](../../../../node-development/nodes/integration-restrequest/large-graph-interaction.md),
+исходное исследование/§11 [дизайна](../../../../superpowers/specs/2026-10-19-browser-recovery-design.md)
+и адресная Git-история этих путей, packaged report и
+`docs/investigations/2026-10-19-loginom-tool-recovery/` через
+`git log --all -- <точные пути>` и `git show <найденный ref>:<путь>`.
+У среза одна версия `b4e9ebca0a`; у investigations нет ни текущего каталога,
+ни записей истории. Редакции дизайна, найденные по названиям классов/исследования,
+не добавляют связь четырёх классов с run ID; исходный packaged report
+`b314d16209` уже фиксировал те же пробелы.
+
+- DOM-owner — **BLOCKED**: срез/адресная история не связывают класс с case/run ID;
+  подробные эпизоды отсылают в отсутствующий investigations.
+- `UI_SCAN_LIMIT` — **BLOCKED** по той же проверенной границе: название класса
+  есть в дизайне, соответствующего ID в прочитанных источниках нет.
+- Ожидание готовности — **BLOCKED**: отдельный case/run ID не установлен;
+  геометрические отказы среза не переименовываются в этот класс.
+- Подтверждение журнала JS — **BLOCKED**: отдельный case/run ID не установлен;
+  опубликованный список источников не даёт проверяемой связи.
+- Slow-host download — **BLOCKED**: S2/`100909-r1` в срезе подтверждает итоговый
+  отказ скачивания, но не медленный host. Название класса в дизайне без связи
+  с этой попыткой не восполняет отсутствующее свидетельство.
+
+Именованные локальные копии `lab91-{acceptance,reviewer,wcalc,reviewer-9f}-logs.tar.xz`,
+`r18-logs.tar.xz`, `r18-validation.tar.xz`, `large-graph-observations.json` не найдены
+в деревьях `docs/`, `.superpowers/` и Task3 evidence root ниже; также проверены
+точные basename в корнях worktree и `/tmp`. Browser/cache/home поддеревья при
+поиске архивов исключены. Для S5–S7 срез даёт attachment URL/серии без имени
+локальной копии; новый локальный путь не установлен. За этими границами поиск
+не выполнялся, прежние HTTP401 не повторялись. WIZARD и его входы не расследовались
+повторно; новых ID, требующих сверки input/source, не найдено.
+
+### Сохранённые model evidence
+
+От `evidence/{preflight,image-summary,text-summary,teardown-before,teardown-after}.json`
+в `/tmp/loginom-browser-recovery-task3-4wmxpueb` прочитаны только нужные поля и
+связанные `image/`/`text/` case/run metadata, `run.stdout`, profile agent log и
+SQLite `data/loginom-ai-agent.db`. SQL выполнялся с `mode=ro`, только по двум
+уже известным session IDs в таблицах `message`, `part`, `event`; auth/connection
+content, browser cache и image bytes не читались. Inventory файлов/схем предшествовал
+чтению; полный provider request/response или отдельная trace-запись не найдены
+в перечисленных evidence roots/форматах.
+
+- Image `ses_ea685a818ffefdcuJvJtZoMRd9`: 20 messages, 82 parts, 24 tool parts;
+  screenshot tool parts0 и tool attachments0. Все249 session EventV2 records —
+  проекции session/message/part; screenshot/image attachments и полный outbound
+  catalog в них отсутствуют. `run.stdout` содержит step/text/tool-use projections,
+  agent log — metadata/error records без tools schemas/request body.
+  **Catalog BLOCKED**: `toolCatalogCaptured:false` не восполнен raw provider turn.
+  **Image delivery BLOCKED**: screenshot reply с image payload/связью с model turn
+  не найден; screenshot0 и recovery0/no transition остаются прежними фактами.
+- У image сохранён текущий runtime `6704466b-5ade-4429-b644-55d1e3db31e1`, attempt
+  `b7387485-29c1-4877-a241-f04d2364301a`, под chat hash
+  `066c5bf240d739445d3da3dd6a059eb6b52e44d93c6f762334a795bfa7f7d343`.
+  Его `session.json` подтверждает прежние browserRecovery/workspaceReady true;
+  соседний `tools.json` содержит24 runtime Dock/knowledge schemas. Это runtime
+  inventory, не полный фактический provider-turn catalog; отсутствие screenshot
+  в этом файле не доказывает его публикацию/непубликацию модели.
+  Runtime diagnostics содержат15 tool-boundary metadata records без provider
+  request/tools schemas; в console artifact таких schemas также не найдено.
+- Text `ses_ea67c88c1ffeWIbFC5AYXgRdJR`: 2 messages, 4 parts, tool parts0,
+  attachments0; 12 session EventV2 records того же projected формата;
+  stdout содержит только error, agent log сохраняет provider rate limit.
+  **Catalog BLOCKED**: полного опубликованного каталога нет, screenshot-tool
+  absence не доказана. **Image delivery NOT_OBSERVED**: screenshot reply/image
+  payload отсутствует; это не положительная проверка текстовой модели.
+  Task runtime отсутствует, capability/native task facts остаются NOT_OBSERVED.
+
+Сохранённый CLI artifact manifest имеет source
+`2e625530354afad01a8f6d99fc3269317015b6ea` (clean, prod, flagtrue), отличный от
+нынешнего HEAD. Для понимания формата адресно прочитаны `llm.ts` (`prepared.tools`,
+`activeTools`) и `message-v2.ts` (tool attachments) именно на этом source:
+они описывают подготовку/передачу данных, но не восстанавливают historical request.
+Ни source path, ни capabilities не приняты за catalog/image evidence.
+
+Следующее действие при появлении новых данных — адресно прочитать конкретную
+доступную локальную копию авторских эпизодов/названного архива с case/run mapping
+и slow-host свидетельством либо raw provider turn, связанный с указанной session.
+Пока такого источника нет, **STOP/BLOCKED для продолжения Task3**; historical
+catalog/image evidence не восстановлено. Отсутствие старого evidence само по себе
+не обосновывает live run. Будущий запуск требует отдельного решения/плана с новой
+проверяемой гипотезой, current build identity, фактическим catalog и независимым
+preflight; Desktop model по-прежнему зависит от eligible CLI recovery transition.
