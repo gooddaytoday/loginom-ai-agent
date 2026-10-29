@@ -497,7 +497,7 @@ for (const delay of [0, 2800]) test(`parallel supervisors preserve a sibling's r
     expect(finishedB.processCleanup.processes.find(entry => entry.pid === helper)?.starttime).toBe(birth)
     // The helper may first be observed through its live parent or after adoption.
     // Its kernel PPID above proves reparenting independently of that sampling race.
-    expect(Number(current[1])).toBe(finishedB.processCleanup.launcher?.pid)
+    expect(Number(current[1])).toBe(finishedB.processCleanup.launcher!.pid)
     await rm(root, { recursive: true })
   } finally { abort.abort(); await Promise.all([pendingA, pendingB]) }
 }, 40_000)
