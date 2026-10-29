@@ -609,19 +609,22 @@ async function continuationPage() {
  const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
  let parentLength=0;const components=new Map();
+ const up=page.element(page.prefix+';up',{id:'save-up',kind:'save_up',attributes:{'data-qtip':'Вверх'}});
+ up.closest=()=>({});up.querySelectorAll=()=>[{}];
+ components.set(up.id,{el:{dom:up},disabled:false});
  const crumbs=()=>{
   const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
   return labels.slice(0,parentLength||labels.length).map((label,i)=>{
-   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:!page.hiddenAncestors||i>=3});
+   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
    components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
   });
  };
  const elements=page.elements.bind(page),click=page.click.bind(page);
- page.elements=()=>[...elements(),...crumbs(),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
- page.click=async item=>{if(item.kind==='save_nav_parent'){parentLength=item.navigationLength;return;}return click(item);};
+ page.elements=()=>[...elements(),...crumbs(),...(page.missingSaveUp?[]:[up]),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
+ page.click=async item=>{if(item.kind==='save_up'){parentLength=4;return;}if(item.kind==='save_nav_parent'){parentLength=item.navigationLength;return;}return click(item);};
  page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
  const document={querySelectorAll:selector=>{
-   if(selector.includes('cnrNaviMode'))return crumbs();
+   if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
    if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
    if(selector.includes('tb-1'))return [tab];return [];
  }};
@@ -683,6 +686,36 @@ test('saved continuation retains hidden ancestors before its native workflow',as
  const [continuation]=result.output.workflow_continuations;
  assert.deepEqual(continuation.previous_workflow_ref.navigation_path.map(e=>e.label),['Server','Packages','Draft','Module','Workflow']);
  assert.deepEqual(continuation.workflow_ref.navigation_path.map(e=>e.label),['Server','Packages','Saved','Module','Workflow']);
+});
+
+test('saved continuation refreshes a parent hidden by a long saved name through the owned Up control',async()=>{
+ const {page}=await continuationPage();page.hiddenSaveParent=true;
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/'+ 'д'.repeat(137)+'.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.output.save_completed,true);
+ assert.ok(result.trace.some(row=>row.event==='saved_navigation_parent_entered'&&row.via==='up'));
+ assert.equal(page.events.includes('package_closed'),false);
+});
+
+test('saved continuation refuses changed parent labels and unavailable or foreign Up controls',async()=>{
+ for(const mode of ['visible_label','hidden_label','missing_up','disabled_up','foreign_up','descendant']){
+  const {page,flow,card}=await continuationPage();page.hiddenSaveParent=mode!=='visible_label';
+  if(mode==='descendant'){const save=page.save.bind(page);page.save=()=>{save();card.Controller.Node.data.node={ParentNode:flow};};}
+  page.missingSaveUp=mode==='missing_up';
+  const locator=page.locator.bind(page);
+  page.locator=query=>{const control=locator(query);if(query.endsWith('Saved>Module"]')&&mode.endsWith('label')){
+   control.innerText=async()=> 'Foreign module';control.evaluate=async()=> 'Foreign module';
+  }return control;};
+  const getCmp=page.context.Ext.getCmp;
+  page.context.Ext.getCmp=id=>{const component=getCmp(id);if(id==='save-up'){
+   if(mode==='disabled_up')component.disabled=true;
+   if(mode==='foreign_up')component.el.dom={};
+  }return component;};
+  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/refused-parent.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'AMBIGUOUS',mode+JSON.stringify(result));
+  assert.equal(result.trace.some(row=>row.event==='saved_navigation_parent_entered'),false,mode);
+  assert.equal(page.events.includes('package_closed'),false,mode);
+ }
 });
 
 test('JavaScript saver drives real save capability twice through verified navigation changes', async () => {

@@ -145,7 +145,7 @@ export async function readGraph(page, task) {
 }
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
-// pre-effect snapshot must still match immediately before the gesture.
+// pre-effect graph must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
   let gestureBefore=task.effect.before;
@@ -170,7 +170,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const p=await locator.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
       const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw new Error('Target is covered');return{x,y};});return p;
   };
-  const drag=async(source,to)=>{const from=await point(source);remaining();if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
+  const drag=async(source,to)=>{const from=await point(source);remaining();const current=await read(page,task);
+    // Deselection can replace node SVG after its first readback. Only moves
+    // permit fresh node drawing epochs; root/document and all graph data match.
+    if(task.effect.kind==='move'?!sameGraph(gestureBefore,current):JSON.stringify(current)!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');
+    await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
   try {
     const before=await read(page,task);
@@ -246,7 +250,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const deselected=await read(page,task);
       if(!sameGraph(gestureBefore,deselected))throw new Error('Graph changed while deselecting');
       // Selection can redraw SVG. Rebind only drawing epochs after the full
-      // native graph comparison; drag still requires this exact fresh snapshot.
+      // native graph comparison; drag rechecks it even if another repaint lands.
       gestureBefore=deselected;
       const source=find(tid),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});

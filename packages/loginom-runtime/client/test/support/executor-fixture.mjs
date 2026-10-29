@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import {EventEmitter} from 'node:events';
 import { makeCapabilityCode, createActionRuntime } from '../../lib/executor.mjs';
 
 const actions = new Map(JSON.parse(await readFile(new URL('../../../executor/catalog/actions.json', import.meta.url), 'utf8')).actions.map(value => [value.action_key, value]));
@@ -71,8 +72,9 @@ class Locator {
   }
 }
 
-class Page {
+class Page extends EventEmitter {
   constructor() {
+    super();
     this.clock = 1000;
     this.prefix = 'MF;TF-1'; this.tabTid = 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
     this.active = true; this.identity = 'Без имени'; this.nodes = []; this.edges = [];
@@ -296,7 +298,7 @@ function linkPage() { const page = new Page(); page.graph = { scrollLeft: 12, sc
 function linkParameters(page, kind = 'add') { return { source_node: page.ref('Источник'), target_node: page.ref('Приёмник'), source_port: { kind: 'data' }, target_port: { kind } }; }
 const run = (page, key, parameters, options = {}) => page.execute(makeCapabilityCode(actions.get(key), selectors, parameters, {
   expected_build: build, ...(page.storageBinding ? { storage_binding: page.storageBinding } : {}), ...options }));
-function runtime(page, options = {}) { return createActionRuntime({ pinned: { actions, selectors, pins: {}, compatibility: { loginom_build: build } }, allowCandidate: true,
+function runtime(page, options = {}) { return createActionRuntime({ pinned: { actions, selectors, pins: {}, compatibility: { loginom_build: build } }, allowCandidate: true,serverSourceCache:true,
   execute: code => page.execute(code), now: () => page.clock, targetOrigin: 'https://loginom.invalid', ...options }); }
 
 

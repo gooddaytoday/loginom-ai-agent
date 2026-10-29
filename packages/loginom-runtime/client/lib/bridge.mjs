@@ -31,7 +31,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
-import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
+import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
@@ -171,6 +171,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
       actionRuntime = createActionRuntime({ pinned,
+        cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
@@ -194,7 +195,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:tool.name==='dock_node_read'
           ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties,
               ...javascriptContextReceiptSchema.properties,kind:{enum:['source','context']}},
-            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:userActionTool(tool));
+            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:isServerDownloadTool(tool.name)?{...tool,outputSchema:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);
     if (actionRuntime) {
@@ -204,6 +205,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       for (const name of ['dock_operation_inspect', 'dock_operation_recover', 'dock_ui_action', 'dock_artifact_upload', 'dock_artifact_verify'])
         if(catalog.tools.some(t=>t.name===name))catalog.routes.set(name,'action');
       for(const tool of actionRuntime.tools.filter(tool=>isNodeApiTool(tool.name)))catalog.routes.set(tool.name,'action');
+      for(const tool of actionRuntime.tools.filter(tool=>isServerDownloadTool(tool.name)))catalog.routes.set(tool.name,'action');
     }
     await session.save(catalog);
     // The recovery lease is a temporary part of the catalog outside its hashed static tools.
@@ -377,12 +379,15 @@ export async function createBridge(config, session, { browserTransport: managedB
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
                   });
-                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-                    code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
+                  const geometryCode = makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
                       operation_id: state.operation_id, document_id: state.document_id,
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
-                      workflow_ref: state.workflow_ref }),
+                      workflow_ref: state.workflow_ref });
+                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                    // Capture the connected owner before local profiling can
+                    // leave the first delivery without a recovery baseline.
+                    code: config.storageDirectories ? withStorageIdentity(geometryCode,session.metadata.storageBinding) : geometryCode,
                   } }, undefined, { timeout: privatePackage?Math.min(15000,remaining()+1000):15000 });
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
@@ -424,6 +429,14 @@ export async function createBridge(config, session, { browserTransport: managedB
           }) }] };
         }
         if (owner === 'action') {
+          if(isServerDownloadTool(request.params.name)) {
+            requirePreparedWorkspace(session.metadata);
+            const args=request.params.arguments??{};
+            validateActionParameters(actionRuntime.tools.find(t=>t.name===request.params.name).inputSchema,args);
+            const result=await actionRuntime.serverDownload(args,request.params.name,{signal:extra.signal});
+            await logResult(request.params.name,result);
+            return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+          }
           if(isNodeApiTool(request.params.name)) {
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
@@ -602,7 +615,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           const reply=actionReply(failure,{userProfile});
           // A rejected request is not a job snapshot. Preserve its recovery data
           // as an MCP error; outputSchema applies to successful tool responses.
-          if(isNodeApiTool(request.params.name))reply.isError=true;
+          if(isNodeApiTool(request.params.name)||isServerDownloadTool(request.params.name))reply.isError=true;
           return reply;
         }
         return { isError: true, content: [{ type: 'text', text: message }] };
@@ -633,7 +646,26 @@ export async function createBridge(config, session, { browserTransport: managedB
       shutdownStarted = true;
       closing ??= (async () => {
         await actionRuntime?.closeArtifactDeliveries();
+        await actionRuntime?.cleanupServerCache();
         await recovery.close();
+        if(config.storageDirectories&&actionRuntime){
+          // Diagnostics are read without the connection guard, including after
+          // a disconnect. They never certify package or transport cleanup.
+          try{
+            const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+              code:`async page=>page.evaluate(()=>{
+                const timeline=globalThis.__loginomConnectionTimelineV1;
+                if(!Array.isArray(timeline?.samples))return null;
+                return {resolution_ms:1000,dropped:Number.isSafeInteger(timeline.dropped)?timeline.dropped:0,
+                  samples:timeline.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
+                    at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
+                    remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
+                  }))};
+              })`,
+            }},undefined,{timeout:1000});
+            await recordExecution({phase:'native_connection_timeline',timeline:parseCapabilityResult(response)});
+          }catch{ /* Diagnostic availability cannot change shutdown. */ }
+        }
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         // MCP cancellation settles the caller before the admitted browser task.
         // Read its final receipt only after that task has left the shared gate.

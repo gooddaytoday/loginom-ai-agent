@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {validateExcelParameters,excelColumns,excelParametersSchema} from '../lib/imports-excel-parameters.mjs';
-import {createExcelImportNodeSupport,excelReadback} from '../lib/imports-excel-node.mjs';
+import {createExcelImportNodeSupport,excelReadback,excelSchemaSnapshot,verifyExcelFullCount} from '../lib/imports-excel-node.mjs';
 import {excelConfigureCapability,makeExcelConfigureCode} from '../lib/imports-excel-procedure.mjs';
+import {verifyImportSchema} from '../lib/text-import-node.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {nodeApplyInputSchema,validateNodeApplyEnvelope} from '../lib/node-api.mjs';
@@ -12,6 +13,15 @@ import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mj
 const request={inputs:[],mappings:[],finish:'execute',read:{ports:[0]}};
 const parameters={source:{artifact_id:'book',upload_operation_id:'upload'},excel:{source_path:'/worker/sales.xlsx',header_rows:1,
  columns:[{name:'Id',label:'Id',type:'integer'},{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'Amount',type:'real'}]}};
+test('existing Excel source switch admits only file/sheet and backend scan/save IDs',()=>{
+ const p={source:parameters.source,excel:{source_path:'/worker/full.xlsx',sheet_name:'Sales'},source_switch:{profile_id:'profile',save_operation_id:'save'}};
+ const r={...request,target:{kind:'existing'}};
+ assert.doesNotThrow(()=>validateExcelParameters(p,'xlsx',r));
+ for(const change of [v=>v.excel.columns=parameters.excel.columns,v=>v.excel.header_rows=1,v=>v.source_switch.expected_records=500000]){
+  const v=structuredClone(p);change(v);assert.throws(()=>validateExcelParameters(v,'xlsx',r));
+ }
+ assert.throws(()=>validateExcelParameters(p,'xlsx',{...r,target:{kind:'new'}}));
+});
 test('Excel contract and compact request schema register a zero-input XLSX import additively',()=>{
  const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
  assert.ok(handlers.has('imports.excel'));assert.ok(handlers.has('imports.text'));
@@ -159,4 +169,51 @@ test('native type choice auto-commits and closes its editor without another Ente
  };
  const result=await excelConfigureCapability(page,{deadline:Date.now()+10000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},excel:parameters.excel,origin:'https://test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
  assert.equal(result.verified,true,result.error);assert.equal(result.configuration.columns[2].type,'real');assert.equal(pressed.includes('Enter'),false);
+});
+
+// Exercise the same browser capability used by the installed Excel driver.
+for(const inspect of [false,true])test('Excel source switch never edits/recreates definitions: inspect='+inspect,async()=>{
+ const root='MF;TF;WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
+ let stage=0,target,sourcePath='/worker/sample.xlsx';const edits=[];
+ const columns=[{name:'Region',label:'Регион',type:'Строковый',data_kind:'Дискретный',used:true},{name:'Total',label:'Продажи',type:'Вещественный',data_kind:'Непрерывный',used:true}];
+ const values=new Map([[file+'cbbTableNamingMethod;ValueControl','По имени'],[file+'cbbTableName;ValueContainer;cbx','Sales'],[file+'cbbActionBlankRow;ValueControl','Импортировать'],[file+'edtTitleRowCount;ValueControl','1'],[defs+'cbbAutoDetectColumnsMode;ValueControl','Нет']]);
+ const locator=tid=>({count:async()=>tid==='masks'?0:1,locator:()=>locator(tid),inputValue:async()=>tid===file+'edtFileName;ValueControl'?sourcePath:values.get(tid),
+  fill:async value=>{edits.push(tid);assert.equal(tid,file+'edtFileName;ValueControl');sourcePath=value;},press:async()=>{},
+  evaluate:async fn=>{if(fn.toString().includes('getBoundingClientRect')){target=tid;return{x:1,y:1};}return true;},
+  isVisible:async()=>tid===root+';btnError'?false:tid===file+'edtFileName;ValueControl'?stage===0:tid===grid?stage===1:tid.includes('ColumnsMappingEngineOutputPortWizard')?stage===2:tid===root+';DoneWizard'?stage===3:true,
+ });
+ const page={locator:s=>s.startsWith('.x-mask')?locator('masks'):locator(JSON.parse(s.slice('[data-tid='.length,-1))),
+  mouse:{click:async()=>{assert.equal(target,root+';btnNext');stage++;}},
+  evaluate:async(fn,arg)=>arg?.grid?structuredClone(columns):arg?.file?{source_path:sourcePath,sheet_method:'По имени',sheet:'Sales',header_rows:1,whole_sheet:true,blank_rows:'Импортировать'}:arg?.origin?true:stage,
+  waitForTimeout:async()=>{throw Error('Unexpected wait');},
+ };
+ const result=await excelConfigureCapability(page,{deadline:Date.now()+10000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},excel:{source_path:'/worker/full.xlsx'},origin:'https://test',inspect,preserve:!inspect},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
+ assert.equal(result.verified,true,result.error);assert.equal(sourcePath,inspect?'/worker/sample.xlsx':'/worker/full.xlsx');
+ assert.equal(edits.length,inspect?0:1);assert.equal(result.configuration.columns[1].label,'Продажи');
+});
+
+for(const fault of ['name','label','type','data_kind','used','order','field_id','mapping'])test('Excel schema comparison refuses '+fault,()=>{
+ const fixture=excelReadbackFixture(),c=fixture.phases[0].value.configuration,m=fixture.phases[2].value.native_mapping;
+ const before=excelSchemaSnapshot(c,m),after=structuredClone(before);
+ if(fault==='order')after.columns.reverse();
+ else if(fault==='mapping')after.mapping.target_fields[0].source.name='foreign';
+ else if(fault==='field_id')after.mapping.source_fields[0].field_id='recreated';
+ else after.columns[0][fault]=fault==='used'?false:'changed';
+ assert.throws(()=>verifyImportSchema(before,after),/LOGINOM_IMPORT_SCHEMA_CHANGED/);
+ assert.equal(verifyImportSchema(before,excelSchemaSnapshot(c,m)),true);
+});
+test('Excel full N uses exact scan and completed port metadata with matching worksheet policy',()=>{
+ const source={sha256:'a'.repeat(64),bytes:42},receipt={basis:'backend_exact_scan',profile_id:'p',...source,records:500000,
+  identity:{canonical_path:'/local/book.xlsx',size:42,file_id:'inode'},xlsx:{sheet_name:'Sales',sheet_index:2,header_rows:1,blank_rows:'import'}};
+ const c={source:{sheet_method:'По имени',sheet:'Sales',header_rows:1,whole_sheet:true,blank_rows:'Импортировать'}};
+ const execution={verified:true,owner_verified:true,status:'completed',execution_id:'exec'};
+ const output={port:0,row_count:500000,fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source'};
+ const verify=(r=receipt,o=output)=>verifyExcelFullCount('p',r,source,c,o,execution);
+ assert.equal(verify().status,'verified');
+ assert.throws(()=>verify(receipt,{...output,row_count:499999}),/LOGINOM_ROW_COUNT_MISMATCH/);
+ for(const freshness_basis of ['grid','BufferedStore','group_count'])assert.throws(()=>verify(receipt,{...output,freshness_basis}),/LOGINOM_ROW_COUNT_UNAVAILABLE/);
+ for(const patch of [{sheet_name:'Other'},{header_rows:2},{blank_rows:'skip'}])assert.equal(verify({...receipt,xlsx:{...receipt.xlsx,...patch}}).status,'not_verified');
+ assert.equal(verifyExcelFullCount('p',null,source,c,output,execution).status,'not_verified');
+ assert.equal(verify({...receipt,sha256:'b'.repeat(64)}).status,'not_verified');
+ c.source.sheet_method='По номеру';c.source.sheet='2';assert.equal(verify().status,'verified');
 });

@@ -35,6 +35,100 @@ test("exact argument retry ignores object key order but preserves array order", 
   expect(outcome.failed()).toBe(false)
 })
 
+function missing(filePath: string, input: Record<string, unknown> = {}) {
+  const result = part("read", { filePath, ...input }, true)
+  if (result.state.status !== "error") throw Error("invalid fixture")
+  result.state.error = `File not found: ${filePath}`
+  return result
+}
+
+test.each([
+  "/data/poitns.csv",
+  "/data/poins.csv",
+  "/data/POINTS.csv",
+  "/data/orders.csv",
+])("a successful read repairs the missing filename %s", (filePath) => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing(filePath))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test.each(["message", "next-message"])("a missing read is repaired in %s", (messageID) => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe({ ...part("read", { filePath: "/data/points.csv" }, false), messageID })
+  expect(outcome.failed()).toBe(false)
+})
+
+test.each([
+  { filePath: "/other/points.csv" },
+  { filePath: "/data/points.txt" },
+  { filePath: "/data/points.csv", offset: 20 },
+])("an unrelated read does not repair a missing read: %j", (input) => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  outcome.observe(part("read", input, false))
+  expect(outcome.failed()).toBe(true)
+})
+
+test("only a successful read can repair the missing read", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  outcome.observe(part("glob", { filePath: "/data/points.csv" }, false))
+  outcome.observe(missing("/data/points.csv"))
+  expect(outcome.failed()).toBe(true)
+  const result = part("read", { filePath: "/data/points.csv" }, false)
+  if (result.state.status !== "completed") throw Error("invalid fixture")
+  result.state.metadata.isError = true
+  outcome.observe(result)
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test("a corrected read preserves other unresolved failures", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  outcome.observe(missing("/other/orders.csv"))
+  outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/other/orders.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test("a missing read without a successful read remains unresolved", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("glob", { pattern: "*.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+})
+
+test("a corrected path cannot repair a different read error", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(part("read", { filePath: "/data/poitns.csv" }, true))
+  outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+})
+
+test("a pending or running corrected read cannot repair a failure", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  const result = part("read", { filePath: "/data/points.csv" }, false)
+  outcome.observe({ ...result, state: { status: "running", input: result.state.input, time: { start: 3 } } })
+  expect(outcome.failed()).toBe(true)
+})
+
+test("a corrected read in another session cannot repair a failure", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/poitns.csv"))
+  outcome.observe({ ...part("read", { filePath: "/data/points.csv" }, false), sessionID: "other-session" })
+  expect(outcome.failed()).toBe(true)
+})
+
 test("invalid and MCP error markers cannot be mistaken for completed success", () => {
   const outcome = runToolOutcome()
   const result = part("probe", {}, false)

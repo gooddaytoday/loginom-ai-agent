@@ -14,6 +14,17 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('LAB-374 preview request expands without an upload destination or import defaults',async()=>{
+ const b=createUserWorkflowBindings();b.remember(workspace());
+ const parameters={source:{kind:'storage',server_source_ref:'storage-one'},preview_only:true,
+  settings:{source:{source_path:'/worker/full.csv'}}};
+ const expanded=b.expandNode({...request(),target:{kind:'new',type:'imports.text'},mode:'delimited',
+  parameters,finish:'close',read:{ports:[]}});
+ assert.deepEqual(expanded.parameters,parameters);
+ const {validateTextImportNodeParameters}=await import('../lib/text-import-node.mjs');
+ assert.doesNotThrow(()=>validateTextImportNodeParameters(expanded.parameters,'delimited',expanded));
+});
+
 test('user node apply publishes finish first without changing its contract or source schema',()=>{
  const source=nodeApiTools.find(t=>t.name==='dock_node_apply'),before=structuredClone(source);
  const tool=userNodeTool(source),keys=Object.keys(JSON.parse(JSON.stringify(tool.inputSchema)).properties);

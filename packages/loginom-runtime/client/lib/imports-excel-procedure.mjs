@@ -4,7 +4,7 @@ export const makeExcelConfigureCode=t=>`async page=>(${excelConfigureCapability.
 // One owned native Excel wizard. Mutations use trusted UI gestures; native
 // inspection is read-only and never assigns Loginom objects or prototypes.
 export async function excelConfigureCapability(page,t,readContext){
- const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
+ const need=(v,m)=>{if(!v)throw Error(m.startsWith('LOGINOM_')?m:'Excel import: '+m);};
  const remaining=()=>{const n=t.deadline-Date.now();need(n>0,'operation deadline exceeded');return n;};
  const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node};
  const root=t.workflow_ref.prefix+';WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
@@ -36,22 +36,29 @@ export async function excelConfigureCapability(page,t,readContext){
    const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error((await error.getAttribute('data-qtip'))??'Loginom refused the Excel page');return await panel()!==before;
   });await quiet();};
   await wait('Excel source page',()=>find(file+'edtFileName;ValueControl').isVisible());
+  if(!t.inspect){
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
   if(await pathInput.inputValue()!==t.excel.source_path)await fill(pathInput,t.excel.source_path);
+  if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.sheet_name===undefined?'По номеру':'По имени');
   const sheet=find(file+'cbbTableName;ValueContainer;cbx').locator('input');
   await fill(sheet,t.excel.sheet_name??'1');
+  }
+  }
+  if(!t.inspect&&!t.preserve){
   const whole=find(file+'chkUsedRange;ValueControl');
   if(!await whole.evaluate(e=>e.classList.contains('x-form-cb-checked')))await click(whole);
   await choose(file+'cbbActionBlankRow;ValueControl','Импортировать');
   await fill(find(file+'edtTitleRowCount;ValueControl').locator('input'),t.excel.header_rows);
+  }
   await quiet();await guard();
   const source=await page.evaluate(({file})=>{const input=key=>{const a=document.querySelectorAll('[data-tid='+JSON.stringify(file+key)+'] input');if(a.length!==1)throw Error('Excel source field ambiguous');return a[0].value;};
    return {source_path:input('edtFileName;ValueControl'),sheet_method:input('cbbTableNamingMethod;ValueControl'),sheet:input('cbbTableName;ValueContainer;cbx'),header_rows:Number(input('edtTitleRowCount;ValueControl')),
     whole_sheet:document.querySelector('[data-tid='+JSON.stringify(file+'chkUsedRange;ValueControl')+']')?.classList.contains('x-form-cb-checked'),blank_rows:input('cbbActionBlankRow;ValueControl')};},{file});
-  need(source.source_path===t.excel.source_path&&source.sheet===(t.excel.sheet_name??'1')&&source.header_rows===t.excel.header_rows&&source.whole_sheet&&source.blank_rows==='Импортировать','source settings differ');
+  need((t.inspect||source.source_path===t.excel.source_path&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.sheet_name??'1')))
+   &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)&&source.whole_sheet&&source.blank_rows==='Импортировать','source settings differ');
   await advance();await wait('Excel column page',()=>find(grid).isVisible());
-  await choose(defs+'cbbAutoDetectColumnsMode;ValueControl','Нет');
+  if(!t.inspect&&!t.preserve)await choose(defs+'cbbAutoDetectColumnsMode;ValueControl','Нет');
   const types={integer:'Целый',real:'Вещественный',string:'Строковый',datetime:'Дата/Время'};
   const read=async()=>{await quiet();await guard();return page.evaluate(({grid,root})=>{
    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
@@ -66,7 +73,9 @@ export async function excelConfigureCapability(page,t,readContext){
     const checks=cells[4].querySelectorAll('.x-grid-checkcolumn');if(checks.length!==1)throw Error('Excel used flag unavailable');
     return {name:cells[0].textContent.trim(),label:cells[1].textContent.trim(),type:cells[2].textContent.trim(),data_kind:cells[3].textContent.trim(),used:checks[0].classList.contains('x-grid-checkcolumn-checked')};});
   },{grid,root});};
-  let current=await read();need(current.length===t.excel.columns.length,'explicit columns must cover the whole worksheet schema');
+  let current=await read();
+  if(!t.inspect&&!t.preserve){
+  need(current.length===t.excel.columns.length,'explicit columns must cover the whole worksheet schema');
   need(current.every((f,i)=>f.name===(t.excel.columns[i].source_name??t.excel.columns[i].name)||f.label===(t.excel.columns[i].source_name??t.excel.columns[i].name)),'source column names differ; use exact source_name headers');
   for(let i=0;i<t.excel.columns.length;i++){
    const c=t.excel.columns[i],expected={name:c.name,label:c.label,type:types[c.type],data_kind:c.data_kind??(c.type==='string'?'Дискретный':'Непрерывный'),used:true};
@@ -91,7 +100,8 @@ export async function excelConfigureCapability(page,t,readContext){
    }
    need(Object.keys(expected).every(k=>current[i][k]===expected[k]),'explicit column settings differ');
   }
-  const auto=await find(defs+'cbbAutoDetectColumnsMode;ValueControl').locator('input').inputValue();need(auto==='Нет','automatic typing must be disabled');
+  }
+  const auto=await find(defs+'cbbAutoDetectColumnsMode;ValueControl').locator('input').inputValue();need(auto==='Нет','LOGINOM_IMPORT_SCHEMA_CHANGED: automatic typing must be disabled');
   await advance();await wait('Excel output mapping',()=>find(root+';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn').isVisible());
   await advance();await wait('Excel completion page',()=>find(root+';DoneWizard').isVisible());
   const reverse=Object.fromEntries(Object.entries(types).map(([k,v])=>[v,k]));

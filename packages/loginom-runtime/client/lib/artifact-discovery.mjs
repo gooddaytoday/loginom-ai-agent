@@ -556,6 +556,29 @@ export async function largeUploadNative(page, task) {
  return read;
 }
 
+// A 7.4.2 toast layout assertion asks whether to enter the debugger. Dismiss
+// only this observed confirm while our upload owns the page; do not patch Debug
+// or application code, and leave every other native dialog to normal handling.
+export async function guardUploadDebugDialog(page,task,mode) {
+ const key=Symbol.for('loginom-dock.upload-debug-dialog.v1');
+ let state=page[key];
+ if(mode==='install'){
+  if(state){if(state.id!==task.operation_id)throw Error('UPLOAD_DIALOG_OWNER_CHANGED');return;}
+  state={id:task.operation_id,dismissed:0,failed:false,pending:[]};
+  state.handler=dialog=>{state.pending.push((async()=>{
+   const message=`Assert failed: at LoadView.CorrectWindowPosition (${task.expected_origin}/app/bg/filestorage/LoadView.js:94:23)\n\nBreak into debugger?`;
+   if(task.expected_build!=='7.4.2'||await dialog.type()!=='confirm'
+     ||(await page.url()).split('/').slice(0,3).join('/')!==task.expected_origin||await dialog.message()!==message)return;
+   await dialog.dismiss();state.dismissed++;
+  })().catch(()=>{state.failed=true;}));};
+  page.on('dialog',state.handler);page[key]=state;return;
+ }
+ if(!state||state.id!==task.operation_id)return {dismissed:0,failed:false};
+ await Promise.all(state.pending);
+ if(mode==='release'){page.off('dialog',state.handler);delete page[key];}
+ return {dismissed:state.dismissed,failed:state.failed};
+}
+
 export function makeLargeUploadCode(task) {
- return `async page=>{const task=${JSON.stringify(task)};try{const output=await (${largeUploadNative.toString()})(page,task);return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!!output.gesture,cleanup_complete:true,output,error:null,trace:[]};}catch(error){const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error.message)?error.message:'LARGE_UPLOAD_NATIVE_REFUSED';return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!['bind','poll','verify'].includes(task.mode),cleanup_complete:false,output:{},error:{code,message:code},trace:[]};}}`;
+ return `async page=>{const task=${JSON.stringify(task)};try{const output=await (${largeUploadNative.toString()})(page,task);const dialog=await (${guardUploadDebugDialog.toString()})(page,task,task.mode==='verify'&&!output.waiting||task.mode==='cleanup'&&output.clean?'release':'status');return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!!output.gesture,cleanup_complete:true,output:{...output,debug_dialog_dismissed:dialog.dismissed},error:null,trace:[]};}catch(error){const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error.message)?error.message:'LARGE_UPLOAD_NATIVE_REFUSED';return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!['bind','poll','verify'].includes(task.mode),cleanup_complete:false,output:{failure:{name:String(error.name??'Error').slice(0,80),code:String(error.code??'').slice(0,100),message:String(error.message??error).slice(0,2048)}},error:{code,message:code},trace:[]};}}`;
 }

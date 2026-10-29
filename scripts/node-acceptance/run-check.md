@@ -93,7 +93,7 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: upload_only, n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
@@ -107,6 +107,14 @@ Unknown names are refused before detach. No automatic retries or account switchi
 profiles/packages are retained; main cleanup never discards changes. Cold uses
 its stock diagnostic cleanup. Archive evidence before deleting run directories;
 never share a whole profile or `cold-config.json` (they contain credentials).
+
+Private large/server-file fixtures can use `--cases /absolute/private/cases`
+with named subdirectories passed in `--scenarios`. Each contains `task.md`,
+`expected.json`, `oracle.py` and `data/` (empty for a server-only request).
+Each expected output declares its CSV `export_destination`; its basename is
+the export filename in the task. This keeps server-source filenames out of the
+export replacement list. Only `task.md` and files in `data/` reach the model;
+oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
 D87 large-file regression, one foreground command (from the repository root):
 
@@ -185,3 +193,11 @@ Native output selectors (`output_node_type`, `output_port`, `export_destination`
 metadata and precision checks stay with the unchanged stock cold checker. CSV
 cannot establish native types or labels absent from its selected header mode.
 Date/time normalization, nulls, full row counts and widths remain checked.
+
+`upload_only` generates a 64 MiB CSV with the existing generator and sends only
+«Загрузи <исходный путь> в Loginom». It requires exactly one delivery, verified
+ready/bytes, zero Save attempts and no node creation/configuration. Main cleanup
+must close the pristine draft and log out without Save or discard, with a
+runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
+The existing generated-source storage/disk cleanup runs afterwards. External
+`case.json` may set `"upload_only": true` for the same assertions.

@@ -8,7 +8,7 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {validateCalculatorParameters} from './calculator-parameters.mjs';
 import {preflightCalculatorSource} from './calculator-preflight.mjs';
-import {configureCalculator} from './calculator-procedure.mjs';
+import {configureCalculator,previewCalculator} from './calculator-procedure.mjs';
 import {rejectUnchangedCalculatorDraft,verifiedCalculatorSyntaxFailure} from './calculator-request-refusal.mjs';
 import {calculatorConfigurationReadback} from './calculator-readback.mjs';
 import {calculatorParametersSchema} from './node-api.mjs';
@@ -148,12 +148,16 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Close discards this editor draft directly. Next can validate a formula or
     // synchronize a derived port, neither of which is needed for cancellation.
     if(operation.nodeApply.request.finish==='close')return verified({...changed});
-    const s=await channel.observe({condition:'calculator syntax validation available',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
-    try{await channel.perform({condition:'validate calculator expressions and advance',initialObservation:s,ready:s=>s.wizard?.stage==='calculator',identity:()=>ctx.node,
+    let previewValidation;
+    try{previewValidation=await previewCalculator(channel);
+     const validated=await channel.observe({condition:'calculator Next after preview',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
+     await channel.perform({condition:'validate calculator expressions and advance',initialObservation:validated,ready:s=>s.wizard?.stage==='calculator',identity:()=>ctx.node,
      resolve:s=>({verb:'wizard_step',ref:control(s,'btnNext','wizard_step').ref,expected_stage:['output_mapping','done']})});}
     catch(error){
-     if(!operation.transportUncertain&&operation.cleanupConfirmed===true&&verifiedCalculatorSyntaxFailure(error,baseline))
+     if(!operation.transportUncertain&&operation.cleanupConfirmed===true&&verifiedCalculatorSyntaxFailure(error,baseline)) {
+      error.message='Calculator formula error; computed fields: '+configured.expressions.map(e=>e.name).join(', ')+'. '+error.message;
       await rejectUnchangedCalculatorDraft(channel,baseline,error,{syntax:true,graphBefore:configurationGraph,readGraph:graphForRejection});
+     }
      throw error;
     }
     let inlineMapping;
@@ -180,7 +184,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       resolve:s=>({verb:'wizard_step',ref:control(s,'btnNext','wizard_step').ref,expected_stage:'done'})});
     }
     const done=await channel.observe({condition:'calculator syntax accepted on completion page',ready:s=>s.wizard?.stage==='done'});
-    return verified({...changed,effect_possible:true,syntax_validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context},configuration:configured,...(inlineMapping?{inline_mapping:inlineMapping}:{})});
+    return verified({...changed,effect_possible:true,syntax_validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context},preview_validation:previewValidation,configuration:configured,...(inlineMapping?{inline_mapping:inlineMapping}:{})});
    },
    async mapPorts(mappings,ctx) {
     if(ctx.receipt_id===operation.id+':input_mapping'){
@@ -293,6 +297,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
+    if(mode==='execute'&&!implementation){
+     // Preview creates native process groups. Capture them after the wizard
+     // and port commits, before attributing the one final graph launch.
+     executionDriver=createNodeExecutionProcedure(channel,ctx.node);
+     await executionDriver.prepare();
+    }
     if(mode==='execute'&&implementation?.keepExecutionConsoleOpen===true){
      // REST progress repaints the toolbar while HTTP is running. Prepare the
      // existing pinned console before launch, rather than opening it afterward.
@@ -305,7 +315,20 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      const result=await implementation.beforeGraphExecute(options,ctx,configured,channel);
      if(result?.training){training=result.training;executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true});await executionDriver.prepare();}
     }
-    const graph=await channel.observe({condition:'calculator graph ready after port commit',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
+    // Closing the inspected LinReg apply draft asynchronously replaces its SVG
+    // body. Settle that selection by reading, before issuing the first click;
+    // retain the original observation/operation deadlines and gesture guards.
+    const settleApply=implementation?.type==='datamining.lin_regression'&&operation.nodeApply.request.mode==='apply';
+    const selection=s=>s.ui.elements.filter(e=>
+     (e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
+      ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
+     &&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed');
+    const graph=await channel.observe({condition:'calculator graph ready after port commit',
+     ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+      &&(!settleApply||s.prepared_node_context.locked===false
+       &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k])&&selection(s).length>0),
+     ...(settleApply?{confirmIdentity:s=>({node:s.prepared_node_context,
+      selection:selection(s).map(({ref,signature,bounding_box,interaction})=>({ref,signature,bounding_box,interaction}))})}:{})});
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{

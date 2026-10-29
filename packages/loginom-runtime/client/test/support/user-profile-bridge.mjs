@@ -11,6 +11,7 @@ import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import { Page } from './workspace-ui-fixture.mjs';
+import {withStorageIdentity} from '../../lib/storage-policy.mjs';
 
 test('managed user preparation returns local pins and dynamic knowledge without static workflow instructions', async t => {
   const resources = await createBundledSkillFixture(t);
@@ -19,6 +20,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const compatibility = { profile_id: 'unit-linux-chromium', loginom_build: '7.4.2', platform: 'linux', browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
+  let connectionPage=null;
   const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
@@ -35,6 +37,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls.push(request);
       const code = request.arguments.code;
+      if(connectionPage&&code.includes('async function observeGeometry('))
+        return {content:[{type:'text',text:JSON.stringify(await runInNewContext(code)(connectionPage))}]};
       if(identityPage&&code.includes('"identityOnly":true')){
         if(identityFault==='transport')throw Error('Identity probe reply was lost');
         const state=await runInNewContext(code)(identityPage);
@@ -97,6 +101,20 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     await Promise.all([client.connect(agent), bridge.server.connect(server)]);
     assert.match(client.getInstructions(), /activate.*loginom-automation/i);
     assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
+    const connection={Connected:true,UserName:'user',FRemoteSession:{},FSession:{}};
+    const packageNode={PackageFileName:''};
+    const form={FReconnecting:false,FMapTree:{FServerConnection:connection,PackageNodes:{Count:1,Items:()=>packageNode}}};
+    const native={document:{},location:{origin:'https://loginom.invalid',pathname:'/'},
+      bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:form}}}},__loginomDockPreparationV1:{id:'fixture-document'},
+      innerWidth:1280,innerHeight:800,outerWidth:1280,outerHeight:800,screenX:0,screenY:0,screen:{}};
+    let restores=0,deliveryReads=0;
+    connectionPage={viewportSize:()=>({width:1280,height:800}),
+      evaluate:async(fn,input)=>runInNewContext('('+fn.toString()+')(input)',{...native,input}),
+      locator:selector=>({waitFor:async()=>{},count:async()=>1,isVisible:async()=>true,
+        innerText:async()=>selector.includes('p.h;p.t')?'Восстановление сессии':selector.includes('tlb;yes')?'Восстановить':'Обнаружен разрыв связи. Восстановить сессию?',
+        click:async()=>{restores++;connection.Connected=true;form.FReconnecting=false;}}),
+      waitForFunction:async fn=>assert.equal(await connectionPage.evaluate(fn),true),
+      deliveryRead:()=>++deliveryReads};
     const reply = await client.callTool({ name: 'dock_prepare', arguments: {} });
     assert.notEqual(reply.isError, true, JSON.stringify(reply));
     assert.equal(reply.content.length, 1);
@@ -111,6 +129,13 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.ok(result.knowledge.node_types.length > 0);
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
     assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
+    // LAB-450: prepare -> local profile/scan/sample/admit (no browser calls)
+    // -> first sample-delivery observation after native connection loss.
+    connection.Connected=false;form.FReconnecting=true;
+    const firstDeliveryRead=runInNewContext(withStorageIdentity('async page=>page.deliveryRead()',session.metadata.storageBinding));
+    assert.equal(await firstDeliveryRead(connectionPage),1);
+    assert.equal(restores,1);assert.equal(deliveryReads,1);
+    connectionPage=null;
     reloadedPage=new Page();reloadedPage.app.Version=compatibility.loginom_build;
     Object.assign(reloadedPage.location,{origin:'https://loginom.invalid',pathname:'/'});
     Object.assign(reloadedPage.context,{innerWidth:1000,innerHeight:800,outerWidth:1000,outerHeight:900,screen:{availWidth:1000,availHeight:900}});
