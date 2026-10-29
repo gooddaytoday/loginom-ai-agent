@@ -1,5 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm,stat} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {createRedactor} from '../lib/redact.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {releaseRefusedExportRead,readNativeExportFile} from '../lib/text-export-output.mjs';
 import {storageTidSuffix} from '../lib/storage-policy.mjs';
@@ -95,11 +100,16 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
+for(const kind of ['no_scroll_owner_evidence_ack','no_scroll_owner_evidence_throw','no_scroll_owner_evidence','no_scroll_owner_evidence_actions','folder_end','no_scroll_owner','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
- 'verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'])test('native export read and real save: '+kind,async()=>{
+ 'verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'])test('native export read and real save: '+kind,async t=>{
+ const evidence=kind.startsWith('no_scroll_owner_evidence'),sentinel='export-evidence-credential-9876',destination=evidence?'/user/'+sentinel+'.csv':binding.destination;
+ const expectedBinding={...binding,destination},observations=[],redactor=createRedactor([sentinel]);
+ const journalDirectory=evidence?await mkdtemp(join(tmpdir(),'export-read-evidence-')):null;
+ if(journalDirectory)t.after(()=>rm(journalDirectory,{recursive:true,force:true}));
+ const journal=evidence?createExecutionJournal({directory:journalDirectory,metadata:{sessionId:'session'},redactor}):null;
  const success=['success','return_tabs_stale'].includes(kind),storage=kind.includes('scroll')||['folder_end','foreign_storage'].includes(kind);
  const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted'].includes(kind);
@@ -107,7 +117,7 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
- const snapshot=()=>({active_tab_ref:files?'files-tab':workflow.tab_tid,authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:1},
+ const snapshot=()=>({active_tab_ref:files?'files-tab':workflow.tab_tid,authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:evidence?observations.length:1},
   workflow_ref:files?{tab_tid:filesWorkflow.tab_tid,prefix:failed&&['foreign_storage','return_tabs_foreign'].includes(kind)?'foreign':filesWorkflow.prefix}:
    {tab_tid:workflow.tab_tid,prefix:failed&&kind==='changed_workflow'?'foreign':workflow.prefix},wizard:{status:!files&&failed&&kind==='graph_wizard'?'observed':'absent'},
   ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
@@ -116,13 +126,19 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
    element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
    ...(kind==='directory_navigation'?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
-   ...(kind==='no_scroll_owner'?[]:storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
-    scroll:{ref:'ui-scroll-owner',top:kind==='changed_scroll'?999:scrollTop,max_top:kind==='folder_end'?0:3000},allowed_actions:['scroll']})]
+   ...(kind==='no_scroll_owner'||evidence&&kind!=='no_scroll_owner_evidence_actions'?[]:storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
+    scroll:{ref:'ui-scroll-owner',top:kind==='changed_scroll'?999:scrollTop,max_top:kind==='folder_end'?0:3000},allowed_actions:kind==='no_scroll_owner_evidence_actions'?[]:['scroll']})]
     :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
-  file_storage:files?{status:'observed',directory}:undefined});
+  file_storage:files?{status:'observed',directory,...(evidence?{caption:sentinel}:{})}:undefined});
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
-  onRecord:async e=>{records.push(e);if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
-  artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
+  onRecord:async e=>{
+   records.push(e);
+   if(kind==='no_scroll_owner_evidence_ack'&&e.phase==='export_file_observation_unsettled')return {phase:'wrong',operation_id:e.operation_id};
+   if(kind==='no_scroll_owner_evidence_throw'&&e.phase==='export_file_observation_unsettled')throw Error('diagnostic journal unavailable');
+   if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');
+   return journal?journal(e):e;
+  },receiptOptions:()=>({}),
+  artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,expectedBinding);return {artifact_id:'artifact',path:'/private/download.csv',
    release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{
     if(kind==='retain_failure')throw Error('Artifact size or SHA does not match the admitted identity');
     if(kind==='retain_storage_wrong_code')throw Object.assign(Error('private /token/path'),{code:'OTHER_ERROR',storage_entry:{reason:'no_scroll_owner'}});
@@ -187,10 +203,10 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
     if(kind==='root_only')output.observation_kind='roots';
     if(kind==='truncated_masks')output.ui.truncated.masks=true;
    }
-   return {status:'SUCCEEDED',output};
+   observations.push({task,output});return {status:'SUCCEEDED',output};
   }};
  const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000};
- const result=await readNativeExportFile(options,ctx,{destination:'/user/result.csv',configured:{destination_check:{verified:true,destination:'/user/result.csv',existed:false}}},
+ const result=await readNativeExportFile(options,ctx,{destination,configured:{destination_check:{verified:true,destination,existed:false}}},
   {verified:true,owner_verified:true,status:'completed',execution_id:'exec'}).catch(e=>e);
  if(success){assert.equal(result.artifact_id,'artifact',String(result.stack));assert.equal(retained,1);assert.equal(releases,0);}
  else if(blocked){assert.ok(result instanceof Error);assert.equal(result.nodePhaseRefusal,undefined);assert.equal(retained,0);
@@ -208,6 +224,7 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
   assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));assert.equal(page.packagePath,'/user/data/packages/read-refusal.lgp');
  }
  assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','lease_failure','return_tabs_document','return_tabs_exhausted'].includes(kind));
+ assert.equal(records.filter(r=>r.phase==='export_file_observation_unsettled').length,evidence||['no_scroll_owner','folder_end'].includes(kind)?1:0);
  assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),downloadSucceeded);
  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),success);
  if(downloadSucceeded&&!success&&!blocked){
@@ -224,6 +241,21 @@ for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','
   assert.deepEqual(failure,{step:'storage_navigation',code:'STORAGE_ENTRY_UNAVAILABLE',kind:'Error',reason:kind});
   assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
   assert.equal(downloads,0);
+ }
+ if(evidence){
+  const diagnostic=records.filter(r=>r.phase==='export_file_observation_unsettled');assert.equal(diagnostic.length,1);
+  const actual=observations.find(x=>x.task.root_ref==='ui-file-table').output;
+  assert.equal(diagnostic[0].observation.table,actual);assert.equal(diagnostic[0].observation.name_lookup,kind!=='no_scroll_owner_evidence_actions'?null:observations.filter(x=>x.task.storage_name).at(-1).output);
+  assert.match(diagnostic[0].observation.stack,/findNativeStorageRow/);assert.ok(diagnostic[0].observation.stack.includes(sentinel));
+  const raw=await readFile(join(journalDirectory,'execution-events.jsonl'),'utf8'),persisted=raw.trim().split('\n').map(line=>JSON.parse(line));
+  if(['no_scroll_owner_evidence_throw','no_scroll_owner_evidence_ack'].includes(kind))assert.equal(persisted.some(r=>r.phase==='export_file_observation_unsettled'),false);
+  else assert.deepEqual(persisted.find(r=>r.phase==='export_file_observation_unsettled').observation,JSON.parse(JSON.stringify(redactor.redact(diagnostic[0].observation))));
+  assert.equal(raw.includes(sentinel),false);assert.equal((await stat(join(journalDirectory,'execution-events.jsonl'))).mode&0o777,0o600);
+  assert.equal((await stat(journalDirectory)).mode&0o777,0o700);
+  assert.deepEqual(result.nodePhaseRefusal.proof.failure,{step:'storage_navigation',code:'STORAGE_ENTRY_UNAVAILABLE',kind:'Error',reason:'no_scroll_owner'});
+  assert.equal(/exportStorageFailure|stack/.test(JSON.stringify(result.nodePhaseRefusal)),false);
+  assert.equal(downloads,0);assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage','MF;TF-2;FileStorageForm;btnRefresh',workflow.tab_tid]);
+  assert.equal(observations.length,kind!=='no_scroll_owner_evidence_actions'?16:17,'existing navigation, failure sample and quiet graph restoration reads only');
  }
  if(kind==='return_tabs_stale'){
   assert.equal(tabReads,2);assert.equal(freshRoots,1);assert.equal(downloads,1);

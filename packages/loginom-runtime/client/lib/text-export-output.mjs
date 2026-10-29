@@ -83,8 +83,11 @@ export async function releaseRefusedExportRead({operationId,binding,navigationOn
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
  let binding=null,context=null,tab=null,owner=null,lastTop=null,direction=null;
- const unavailable=(s,reason)=>Object.assign(new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory)),
-  {code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason}});
+ const unavailable=(s,reason,lookup=null)=>{
+  const error=new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory));
+  return Object.assign(error,{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason},
+   exportStorageFailure:{table:s,name_lookup:lookup,stack:error.stack}});
+ };
  const bind=(s,folder=true)=>{
   const value=JSON.stringify({document:s.dom_epoch?.document,workflow:s.workflow_ref});
   if(context===null)context=value;else need(value===context,'Export search document or workflow changed');
@@ -122,11 +125,11 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   need(matches.length<=1,'Export file row is ambiguous');
   if(matches.length){const found=await read({root_ref:matches[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
   const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
-  if(!anchors.length)throw unavailable(s,'no_scroll_owner');
+  if(!anchors.length)throw unavailable(s,'no_scroll_owner',r);
   const e=anchors[0],scroll=e.scroll;
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){direction='down';lastTop=null;}
-  if(direction==='down'&&scroll.top>=scroll.max_top)throw unavailable(s,'folder_end');
+  if(direction==='down'&&scroll.top>=scroll.max_top)throw unavailable(s,'folder_end',r);
   need(step<12,'Export file search scroll budget exhausted');
   const delta=direction==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top);
   lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});s=await table();
@@ -289,6 +292,13 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     'Export file read did not return to its workflow','Output lease owner changed','Unverified output cannot be retained',
     'Invalid artifact identity','Artifact must be a regular file','Artifact changed before reading',
     'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null};
+  // Additional evidence must not block restoration or replace its original refusal.
+  if(error?.code==='STORAGE_ENTRY_UNAVAILABLE'&&error.exportStorageFailure){
+   try{
+    const phase='export_file_observation_unsettled',r=await onRecord({phase,operation_id:operation.id,observation:error.exportStorageFailure});
+    need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');
+   }catch{}
+  }
   uncertain=true;
   try{
    const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,failure,
