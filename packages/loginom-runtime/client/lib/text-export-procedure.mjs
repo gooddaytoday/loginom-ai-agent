@@ -11,7 +11,9 @@ export function makeExportNextCode(task){
  return `async page=>(${exportNext.toString()})(page,${JSON.stringify(task)},${readPreparedNodeContext.toString()},${readTextExportContext.toString()},${readTextExportBrowser.toString()},${JSON.stringify(EXPORT_FIELDS)})`;
 }
 export async function exportNext(page,task,readNode,readContext,readBrowser,fields){
- let effect=false;const result=(status,code,output={},cleanup=false)=>({status,action_key:'node.export.next',action_revision:'1',operation_id:task.operation_id,phase:'export_next',effect_possible:effect,cleanup_complete:cleanup,output,error:code?{code,message:code}:null,trace:[]});
+ const started=Date.now(),trace=[];
+ const record=(event,details={})=>{if(trace.length===24)trace.splice(2,1);trace.push({event,elapsed_ms:Date.now()-started,...details});};
+ let effect=false;const result=(status,code,output={},cleanup=false)=>({status,action_key:'node.export.next',action_revision:'1',operation_id:task.operation_id,phase:'export_next',effect_possible:effect,cleanup_complete:cleanup,output,error:code?{code,message:code}:null,trace});
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),base=task.binding.workflow_ref.prefix+';WizrdMCF;';
  const remaining=()=>{if(page[Symbol.for('loginom-dock.text-export-cancel')]?.has(task.operation_id))throw Error('Export Next cancelled');const n=task.deadline-Date.now();if(!Number.isSafeInteger(task.deadline)||n<=0)throw Error('Export Next deadline elapsed');return n;};
  const read=async()=>{remaining();const r=await readContext(page,task.binding,readNode,readBrowser,fields);remaining();return r;};
@@ -27,7 +29,7 @@ export async function exportNext(page,task,readNode,readContext,readBrowser,fiel
     const timeout=Math.min(5000,remaining());if(!ok)throw Error('control blocked');effect=true;await h.click({timeout});remaining();
    }finally{await h.dispose();}
   };
-  await click(base+'btnNext');let answered=false,decision=null;
+  record('export_next_click_started');await click(base+'btnNext');record('export_next_clicked');let answered=false,decision=null,lastState=null;
   while(remaining()>0){
    const owner=await readNode(page,task.binding);if(!owner.verified||owner.surface!=='wizard'||owner.node_id!==task.binding.node.node_id)throw Error('owner changed');
    remaining();
@@ -45,12 +47,14 @@ export async function exportNext(page,task,readNode,readContext,readBrowser,fiel
     continue;
    }
    const current=await read();
+   const state=JSON.stringify({verified:current.verified,stage:current.stage??null,reason:current.reason??null});
+   if(state!==lastState){record('export_next_observed',JSON.parse(state));lastState=state;}
    if(current.verified&&current.stage==='text_export_format')return result('SUCCEEDED',null,{verified:true,destination:task.destination,overwrite:task.overwrite,existed:answered,decision,format_page:current,node_context:owner},true);
    if(answered&&decision==='reject'&&same(current,before))return result('SUCCEEDED',null,{verified:true,destination:task.destination,overwrite:'reject',existed:true,decision:'reject',rejected:true,node_context:owner},true);
    await page.waitForTimeout(Math.min(100,remaining()));
   }
   return result('AMBIGUOUS','EXPORT_NEXT_UNSETTLED');
- }catch{return result(effect?'AMBIGUOUS':'NOT_APPLIED','EXPORT_NEXT_UNCONFIRMED',{},!effect);}
+ }catch{record('export_next_stopped',{reason:task.deadline<=Date.now()?'deadline':page[Symbol.for('loginom-dock.text-export-cancel')]?.has(task.operation_id)?'cancelled':'transition_refused'});return result(effect?'AMBIGUOUS':'NOT_APPLIED','EXPORT_NEXT_UNCONFIRMED',{},!effect);}
 }
 
 // The host signal is mirrored only for this in-flight native transition. Keep
