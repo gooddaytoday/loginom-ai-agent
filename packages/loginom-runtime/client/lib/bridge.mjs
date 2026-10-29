@@ -372,7 +372,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
                   code:privatePackage?withStorageIdentity(code,session.metadata.storageBinding):code,
                 } }, undefined, { timeout: privatePackage?remaining()+1000:125000 });
-                const state = parseWorkspacePreparation(response);
+                const state = structuredClone(redactor.redact(parseWorkspacePreparation(response)));
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
                     sessionId: session.metadata.sessionId, origin: new URL(config.loginomUrl).origin,

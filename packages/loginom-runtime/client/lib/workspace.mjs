@@ -70,11 +70,42 @@ async function prepareWorkspace(page, options) {
       windows:blockers.slice(0,12).map(e=>{
         const c=globalThis.Ext?.getCmp?.(e.id),style=getComputedStyle(e),box=e.getBoundingClientRect();
         const short=v=>typeof v==='string'?v.slice(0,512):null;
+        // Read only the exact native MessageBox's rendered text, never form
+        // values or arbitrary window text. These diagnostics grant no gesture.
+        const messageBox=c?.$className==='Ext.window.MessageBox'&&c.el?.dom===e;
+        const read=(element,limit)=>{
+          if(!element||!e.contains(element)||!visible(element))return {text:null,truncated:false};
+          const parts=[],walker=document.createTreeWalker(element,4);
+          let node,count=0,length=0;
+          while(count++<512&&(node=walker.nextNode())&&length<8192){
+            let safe=true;
+            for(let parent=node.parentElement,depth=0;parent&&depth<64;parent=parent.parentElement,depth++){
+              if(parent.matches('input,textarea,select,script,style,[contenteditable="true"]')
+                ||/password|passwd|secret|token|credential|authorization|api[_ -]?key|парол|секрет|токен/i.test(
+                  ['name','id','data-tid','autocomplete','aria-label'].map(k=>parent.getAttribute(k)??'').join(' ')))safe=false;
+              if(parent===e)break;
+            }
+            if(safe&&visible(node.parentElement)){
+              const value=(node.textContent??'').slice(0,8192-length);parts.push(value);length+=value.length;
+            }
+          }
+          const raw=parts.join(' ').replace(/\s+/g,' ').trim();
+          // Conservatively omit the field when it contains credential syntax;
+          // the caller's session redactor also removes configured secret values.
+          const text=/(?:password|passwd|api[_ -]?key|token|secret|пароль|токен|секретный ключ)["']?\s*[:=]|\b(?:Bearer|Basic)\s+\S+|\b(?:sk-|gh[pousr]_|glpat-)[\w-]{12,}|https?:\/\/[^\s/]*@|[?&#](?:key|auth|token|password|secret|api_key)=/i.test(raw)?'[redacted]':raw;
+          return {text:text.slice(0,limit),truncated:raw.length>limit||count>512||length>=8192};
+        };
+        const title=messageBox?read(c.header?.titleCmp?.textEl?.dom??e.querySelector('.x-title-text'),240):null;
+        const text=messageBox?read(c.msg?.el?.dom??e.querySelector('.x-window-text,.x-message-box-text,.bg-error-messages'),2048):null;
+        const buttons=messageBox?[...e.querySelectorAll('button,[role="button"],.x-btn')].filter(visible):[];
         return {tid:short(e.getAttribute('data-tid')),class_name:short(e.getAttribute('class')),
           bounding_box:{x:box.x,y:box.y,width:box.width,height:box.height},
           style:Object.fromEntries(['display','visibility','opacity','position','top','left','transform'].map(k=>[k,short(style[k])])),
           native_owner:{class_name:short(c?.$className),exact_dom:c?.el?.dom===e,hidden:typeof c?.hidden==='boolean'?c.hidden:null,
-            prepared_picker:[...state.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===c)}};
+            prepared_picker:[...state.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===c)},
+          ...(messageBox?{message_box:{title:title.text,title_truncated:title.truncated,text:text.text,text_truncated:text.truncated,
+            buttons:buttons.slice(0,8).map(b=>{const label=read(b,120);return {tid:short(b.getAttribute('data-tid')),label:label.text,label_truncated:label.truncated};}),
+            buttons_truncated:buttons.length>8}}:{})};
       })}:null;
     const unsaved = blockers.some(e => /сохранить изменения в пакете/i.test(e.textContent??''));
     const hardBlocked = blockers.some(e=>!e.matches('.bg-mask-message,.x-mask-msg'));
@@ -197,8 +228,9 @@ async function prepareWorkspace(page, options) {
           &&instance.FErrorMessageInfo!==current.openErrorBefore
           &&(openErrors[0].textContent??'').trim()==="Cannot read properties of undefined (reading 'TestableCellRenderer')")
           current.openError={instance,message,root,messages,info:instance.FErrorMessageInfo,element:openErrors[0]};
-        return {error:'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError};
+        return {error:'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError,blocking_windows:blockingWindows};
       }
+      if(blockingWindows?.windows.some(w=>w.message_box))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};
@@ -304,6 +336,7 @@ async function prepareWorkspace(page, options) {
     }
     const verified=await wait('exact_workflow_ready',()=>inspect('verify'));
     if (verified.error) return result('NOT_READY',verified.error,{authenticated:true,
+      ...(verified.error==='NATIVE_MESSAGE_BOX_BLOCKED'?{message:'Loginom is blocked by a native MessageBox. Report its title, text and buttons from trace.blocking_windows to the user. Preparation is unconfirmed; do not repeat the package gesture or dismiss an unknown dialog.'}:{}),
       ...(verified.error==='PACKAGE_OPEN_REJECTED' ? {message:(verified.renderer_error
         ? 'Loginom could not render the opened package (TestableCellRenderer). '
         : 'Loginom reported an error while opening the saved package. ')
