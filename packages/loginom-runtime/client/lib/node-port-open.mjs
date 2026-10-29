@@ -65,7 +65,10 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     const matches=exact('msgbox;tlb;'+name),es=matches.filter(visible),e=es[0],control=e&&globalThis.Ext?.getCmp?.(e.id);
     confirmationControls.push({tid:'msgbox;tlb;'+name,matches:matches.length,visible_matches:es.length});
     if(es.length!==1||!dialog.contains(e)||!visible(e)||normalize(e.textContent)!==label
-      ||control?.el?.dom!==e||control.disabled===true||e.closest('.x-item-disabled,.x-btn-disabled'))fail('Port confirmation control changed: '+name+' matches='+matches.length+' visible='+es.length);
+      ||control?.el?.dom!==e||control.disabled===true||e.closest('.x-item-disabled,.x-btn-disabled'))fail('Port confirmation control changed: '+name+' '+JSON.stringify({
+       matches:matches.length,visible_matches:es.length,in_dialog:!!e&&dialog.contains(e),
+       label_matches:!!e&&normalize(e.textContent)===label,native_matches:!!e&&control?.el?.dom===e,
+       disabled:control?.disabled===true,disabled_ancestor:!!e?.closest('.x-item-disabled,.x-btn-disabled')}));
     if(name==='yes')yes=e;
    }
    if(r.confirmation&&(r.confirmation.dialog!==dialog||r.confirmation.native!==native||r.confirmation.yes!==yes))fail('Port confirmation instance changed');
