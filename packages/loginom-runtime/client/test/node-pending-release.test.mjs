@@ -7,6 +7,7 @@ import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
 import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {runRestStep} from '../lib/rest-step.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
@@ -98,6 +99,29 @@ test('release cancels only the stopped node\'s own wizard draft',async()=>{
  const s=surface({wizard:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(proof.cleanup.wizard_closed,true);assert.equal(proof.effect_possible,true);
 });
+
+// A completed REST configure call can leave its uncommitted wizard open.
+// Cleanup is the purpose of release, not proof that the browser call is running.
+for(const fault of [null,'pending','transport','receipt','action','phase','type','successful','foreign'])
+test('stopped REST configure release: '+(fault??'owned draft'),async()=>{
+ const s=surface({wizard:true,foreign:fault==='foreign'}),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'node.rest.configure.internal'};
+ operation.nodeApply.request.target={type:fault==='type'?'programming.javascript':'integration.rest_request'};
+ if(fault==='phase')operation.nodeApply.pending.phase='finish';
+ if(fault==='transport')operation.transportUncertain=true;
+ operation.receipt={state:fault==='pending'?'pending':'completed',receipt:{
+  operation_id:fault==='receipt'?'other':'apply:n7',action_key:fault==='action'?'node.rest.connection.internal':'node.rest.configure.internal',
+  phase:'configure',status:fault==='successful'?'SUCCEEDED':'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+  output:{verified:false,effect_possible:true,cleanup_complete:false,error:'REST request: operation deadline exceeded'},
+  error:{code:'REST_STEP_UNCONFIRMED',message:'REST request: operation deadline exceeded'},
+ }};
+ if(fault){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ else{
+  const proof=await release(operation,s.channel);
+  assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);
+  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);
+ }
+});
 test('release leaves the stopped node\'s visualizers through the observed scenario control',async()=>{
  const s=surface({views:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-nav'}]);assert.equal(proof.cleanup.views_returned,true);assert.equal(proof.effect_possible,true);
@@ -136,7 +160,7 @@ test('release refuses a graph that changes between quiet reads',async()=>{
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({release:releaseDriver}={}) {
+function fixture({release:releaseDriver,type='imports.text',execute=async()=>{throw Error('Unexpected public transport');}}={}) {
  const calls=[],events=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
   reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:node,
@@ -149,10 +173,11 @@ function fixture({release:releaseDriver}={}) {
   readOutput:ok('read',{status:'complete',execution_id:'exec',evidence_ref:'evidence',ports:[]}),verifyContinuation:async()=>true,
   ...(releaseDriver?{releasePending:async state=>{calls.push('release:'+state.pending.phase);return releaseDriver(state);}}:{})};
  const handler={revision:'1',modes:['delimited'],validate:()=>{},configure:ok('configure')};
- const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute:async()=>{throw Error('Unexpected public transport');},
-  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([['imports.text',handler]]),nodeApplyDriverFactory:()=>drivers,
+ let context;
+ const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,
+  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([[type,handler]]),nodeApplyDriverFactory:value=>{context=value;return drivers;},
   onRecord:async e=>{events.push(e);return e;}});
- return {runtime,calls,events,drivers,handler};
+ return {runtime,calls,events,drivers,handler,context:()=>context};
 }
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
  node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
@@ -164,6 +189,36 @@ const stop=async(f,phase)=>{
  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(job.outcome.output.pending_phase,phase);
  return job;
 };
+
+test('a completed REST configure failure releases its draft and admits the next node operation',async()=>{
+ const ui=surface({wizard:true});
+ const receipt={status:'AMBIGUOUS',action_key:'node.rest.configure.internal',action_revision:'1',operation_id:'apply:n1',
+  phase:'configure',effect_possible:true,cleanup_complete:false,trace:[],
+  output:{verified:false,cleanup_complete:false,effect_possible:true,error:'REST request: operation deadline exceeded'},
+  error:{code:'REST_STEP_UNCONFIRMED',message:'REST request: operation deadline exceeded'}};
+ const f=fixture({type:'integration.rest_request',execute:async code=>code.includes('"receipt_read":true')
+  ?{status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'observed',effect_possible:false,
+    error:null,trace:[],output:{state:'completed',receipt}}
+  :{status:'SUCCEEDED',output:{value:receipt}},
+  release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,
+    readReceipt:f.context().readReceipt,deadline:Date.now()+10000})});
+ f.handler.configure=(_parameters,_mode,ctx)=>runRestStep(f.context(),{...ctx,document_id:'doc',workflow_ref:workflow,node,
+  deadline:Date.now()+10000},'configure',()=> 'async()=>({})',{},{});
+ const r=request();r.target.type='integration.rest_request';
+ f.runtime.startNodeApply(r);
+ const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(stopped.outcome.output.pending_phase,'configure');assert.equal(stopped.outcome.cleanup_complete,false);
+ assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+ const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-rest'});
+ assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+ assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+ assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+ assert.equal(f.runtime.hasUnsettledWork(),false);f.runtime.assertPreparationAllowed();
+ f.handler.configure=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ f.runtime.startNodeApply({...r,operation_id:'next',target:{kind:'existing',type:'integration.rest_request',ref:node},finish:'done'});
+ assert.equal((await f.runtime.waitNodeApply('next',{timeoutMs:1000})).outcome.status,'SUCCEEDED');
+ assert.equal(f.events.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='rest_configure').length,1);
+});
 
 test('a stopped finish is released once and unblocks preparation, saving and new node work',async()=>{
  const f=fixture({release:proved()});await stop(f,'finish');
