@@ -14,5 +14,6 @@
 Изменение узла проверяется вместе с новым source identity и последующим Save.
 Случайный, равномерный случайный, стратифицированный и biased режимы исключены.
 
-Живое native discovery подтвердило только rows. Null/empty — NOT_CHECKED
-после потерь связи; update — NOT_RUN. Ожидания не являются результатом приёмки.
+Живое native discovery подтвердило только rows. **NULL/empty — проверяется
+на этапе 1 по oracle**, по решению LAB-533; сейчас NOT_CHECKED. Update — NOT_RUN.
+Статус ready_for_development относится к подплану; ожидания не являются PASS.

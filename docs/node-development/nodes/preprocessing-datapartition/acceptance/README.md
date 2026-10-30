@@ -8,8 +8,10 @@ ordered=true, явный output_port, точный порядок строк/п�
 real abs=0/rel=0, integer/string/boolean сравниваются точно.
 
 Основные выходы подтверждены native UI и stock matchesExpectedOutput.
-NULL/empty не проверены из-за трёх потерь связи стенда. Генерация expected
-не доказывает поведение продукта. Update/cold NOT_RUN. Модель получает только
+**NULL/empty — проверяется на этапе 1 по oracle**, по решению LAB-533;
+это оговорка завершения этапа 0, а не PASS. Четыре короткие попытки не дали
+подтверждённого чтения выходов. Генерация expected не доказывает поведение
+продукта. Update/cold NOT_RUN. Модель получает только
 task.md и нужные CSV; oracle/expected/discovery не передавать.
 Запуск — штатный run-check; своего раннера нет. Runtime type не зарегистрирован,
 этап0 запрещает сборку CLI. Модельный PASS не заявлен.
