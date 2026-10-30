@@ -14,8 +14,8 @@ function fixture(change=()=>{}){
  for(const key of Object.keys(values)){add(key+';ValueControl',{getValue:()=>values[key]});add(key+';SwitchButton',{pressed:false});}
  const view={el:{dom:root}},wizardView={el:{dom:{}}},queue={IsEmpty:true};
  wizardView[Symbol('LockQueue')]=queue;
- const controller={FView:view,FWizardForm:{FView:wizardView},FColumnsStore:store,FCurrentRecord:fields[1],FColumnPropEditors:[{}]};
- view.Controller=controller;components.set('root',view);elements.set(prefix+';WizrdMCF',wizardView.el.dom);components.set('wizard',wizardView);wizardView.el.dom.id='wizard';root.id='root';
+ const controller={constructor:{name:'ElimOutlierWizard'},FView:{el:{dom:{}}},FWizardForm:{FView:wizardView},FColumnsStore:store,FCurrentRecord:fields[1],FColumnPropEditors:[{}]};
+ view['@@TestCmpController']=controller;components.set('root',view);elements.set(prefix+';WizrdMCF',wizardView.el.dom);components.set('wizard',wizardView);wizardView.el.dom.id='wizard';root.id='root';
  const radios=[true,false];for(const [i,key] of ['radiofield','radiofield-1'].entries())add('pedModeOE;ValueControl;'+key,{getValue:()=>radios[i]});
  change({fields,store,values,radios,selection,components,elements,controller,queue,wizardView});
  if(controller.FCurrentRecord===fields[1]&&selection.length===1){controller.FCurrentRecord=selection[0];controller.FColumnPropEditors=selection[0].data.ChkUsable?[{}]:null;}
@@ -88,5 +88,5 @@ test('grid selection is not ready until native editor binding and wizard queue s
  const settled=fixture(f=>{f.selection[0]=f.fields[2];f.store.getModifiedRecords=()=>[f.fields[1]];});
  assert.equal(settled.verified,true);assert.equal(settled.binding_ready,true);
  assert.equal(settled.selected.name,'Note');assert.equal(settled.settings,null);
- for(const change of [f=>f.controller.FColumnsStore={},f=>f.controller.FView={},f=>delete f.wizardView[Object.getOwnPropertySymbols(f.wizardView)[0]]])assert.equal(fixture(change).verified,false);
+ for(const change of [f=>f.controller.FColumnsStore={},f=>f.controller.FWizardForm.FView={},f=>delete f.wizardView[Object.getOwnPropertySymbols(f.wizardView)[0]]])assert.equal(fixture(change).verified,false);
 });

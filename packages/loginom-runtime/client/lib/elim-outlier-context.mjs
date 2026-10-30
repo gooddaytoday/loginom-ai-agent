@@ -28,9 +28,11 @@ export function readElimOutlierBrowser(prefix){
  // Selection changes before PrepareViewAfterColumnSelect finishes saving the
  // previous field and initializing its editors. Next is ignored while the
  // shared native wizard queue is busy, even without a visible mask.
- const view=globalThis.Ext?.getCmp?.(roots[0].id),controller=view?.Controller;
+ const view=globalThis.Ext?.getCmp?.(roots[0].id),controller=view?.['@@TestCmpController'];
  const wizardRoots=exact(prefix+';WizrdMCF'),wizardView=wizardRoots.length===1?globalThis.Ext?.getCmp?.(wizardRoots[0].id):null;
- if(view?.el?.dom!==roots[0]||controller?.FView!==view||controller.FColumnsStore!==store
+ // Native JoinWizard moves the page out of the vendor FView; testable keeps
+ // its controller on the rendered page through @@TestCmpController.
+ if(view?.el?.dom!==roots[0]||controller?.constructor?.name!=='ElimOutlierWizard'||controller.FColumnsStore!==store
   ||controller.FWizardForm?.FView!==wizardView||wizardView?.el?.dom!==wizardRoots[0])return fail('elim_outlier_binding_owner');
  const queues=Object.getOwnPropertySymbols(wizardView).filter(s=>s.description==='LockQueue');
  if(queues.length!==1||wizardView[queues[0]]?.IsEmpty!==true
