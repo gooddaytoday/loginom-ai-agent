@@ -198,3 +198,22 @@ const linRegressionConfigurationReadback=object({kind:values('lin_regression'),s
 const excelConfigurationReadback=object({kind:values('excel_import'),scope:values('observed_before_verified_finish'),node:ref,values_are:values('observed_ui_values'),source:object({source_path:str,sheet_method:str,sheet:str,header_rows:integer,whole_sheet:bool,blank_rows:str}),auto_detect:values('Нет'),columns:array(object({name:str,label:str,type:str,data_kind:str,used:bool})),receipt_ids:array(str),package_persistence_verified:{const:false}});
 const corrAnalysisConfigurationReadback=object({kind:values('corr_analysis'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,receipt_ids:{...array(str),minItems:5,maxItems:5},mode:values('pearson'),first_set:{...array(str),minItems:1,maxItems:128},second_set:{...array(str),minItems:1,maxItems:128},coefficients:array(values('pearson')),package_persistence_verified:{const:false}});
 const configurationReadback={anyOf:[regexReplacementConfigurationReadback,logRegressionConfigurationReadback,corrAnalysisConfigurationReadback,slidingWindowConfigurationReadback,restConfigurationReadback,excelConfigurationReadback,linRegressionConfigurationReadback,clusteringConfigurationReadback,crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptDeclaredDoneReadback,javascriptExecutedConfigurationReadback,javascriptDeclaredConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
+ effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
+ package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),
+ configuration:object({status:values('applied','discarded','not_requested','unknown'),readback:configurationReadback},['status']),
+ checkpoint_kind:values('local_node_checkpoint','local_node_cancellation','local_node_stopped','local_node_failed','local_node_released'),
+ persisted_package_verified:{type:'boolean',const:false},pending_phase:nullable(phase),released_phase:phase,error,
+ next_step:object({tool:values('dock_node_apply','dock_node_read','dock_action_run'),original_operation_id:str,instruction:str})},
+ ['operation_id','status','effect_possible','phases','node','execution','output','package_saved','cleanup_complete','warnings']);
+const outcome=object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),action_key:{type:'string',const:'node.apply'},
+ action_revision:str,operation_id:str,phase:str,effect_possible:bool,cleanup_complete:bool,
+ output:nodeApplyResultSchema,error:nullable(error),trace:array({type:'object'})});
+const progress=object({node:nullable(ref),execution,accepted_phases:array(phase),pending_phase:nullable(phase),effect_possible:bool,cleanup_complete:bool});
+export const nodeJobResultSchema=object({operation_id:str,attempt:{type:'integer',minimum:1},state:values('running','settled'),
+ cancel_requested:bool,server_stop_requested:bool,progress:nullable(progress),outcome:nullable(outcome),error:nullable(error)});
+export const deliveryJobResultSchema=object({operation_id:str,state:values('running','settled'),phase:str,upload_operation_id:str,
+ status:values('authorizing','staging','uploading','verifying_size','ready','cancelling','cancelled','failed','uncertain'),bytes:integer,total_bytes:integer,percent:{type:'number',minimum:0,maximum:100},elapsed_ms:integer,deadline_at:integer,poll_after_ms:integer,
+ outcome:nullable(object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),upload_operation_id:str,
+  destination:str,bytes:integer,sha256:str,verification_id:str,cleanup_complete:bool,upload_completion_verified:bool,
+  code:str,effect_possible:bool},['status'],true)),error:nullable(object({code:str,message:str},['message'],true))},['operation_id','state','phase','upload_operation_id','outcome','error']);

@@ -95,16 +95,17 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-<<<<<<< HEAD
     if name in ['regex-add', 'regex-replace']:
         node = REPO / 'docs/node-development/nodes/replacement'
         return dict(source=node / 'acceptance/regex',
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
-=======
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['join-right', 'join-full', 'join-difference']:
+        src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
@@ -137,7 +138,11 @@ def scenario(name, case_root=None, *, cases=None):
 def expected_for(case, package):
     src = case['source']
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
-    if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
+    if case.get('expected_name'):
+        expected = read(src / case['expected_name'])
+        if case['expected_name'] == 'expected-age-pressure.json':
+            expected['outputs'].reverse()  # One final CSV; cold still checks both tables.
+    elif re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
@@ -577,6 +582,7 @@ class Runner:
         # README exceptions: p14 tests Excel, and the regression base uses only
         # train.csv; its other fixtures belong to later operator scenarios.
         if case == 'p14': files = [spec['data'] / 'exhibits.xlsx']
+        if spec.get('input_files'): files = [spec['data'] / name for name in spec['input_files']]
         if isinstance(case, Path) and src.parent.name == 'datamining-linregression':
             files = [spec['data'] / 'train.csv']
         if spec.get('local_file'):
@@ -784,4 +790,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
->>>>>>> origin/acceptance-hygiene
