@@ -3,8 +3,9 @@ import { existsSync } from "node:fs"
 
 process.on("SIGINT", () => {})
 process.on("SIGTERM", () => {})
-if (process.env.EVAL_FAKE_BROWSER_STOP_FILE)
-  setInterval(() => { if (existsSync(process.env.EVAL_FAKE_BROWSER_STOP_FILE!)) process.exit(0) }, 10)
+const stopFile = process.env.EVAL_FAKE_BROWSER_STOP_FILE
+if (stopFile)
+  setInterval(() => { if (existsSync(stopFile)) process.exit(0) }, 10)
 const heartbeat = process.env.EVAL_FAKE_BROWSER_HEARTBEAT
 if (process.argv.includes("--type=helper") && heartbeat)
   setInterval(() => { void writeFile(heartbeat, String(Date.now())) }, 50)
