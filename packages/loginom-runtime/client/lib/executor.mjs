@@ -208,8 +208,12 @@ async function browserArtifactReveal(page,task,snapshot) {
 // Listen on the existing authenticated context. Keep Playwright's configured
 // download directory and behavior; only enable CDP events for this listener.
 export async function browserServerDownloadProgress(page,task) {
-  const session=await page.context().newCDPSession(page);
-  let native,closed=false,chromiumBytes=0;
+  // Chromium resets the context's download permission when the session that
+  // set it detaches. Reuse one Page-owned session until the context closes;
+  // per-transfer close removes listeners and native handles only.
+  const key=Symbol.for('loginom-dock.download-progress-session.v1');
+  const session=page[key]??=await page.context().newCDPSession(page);
+  let native,closed=false,chromiumBytes=0,onBegin,onProgress;
   try {
     // Loginom receives the file into native Blob chunks over its WebSocket
     // before emitting Download. Retain this controller privately, without
@@ -263,23 +267,30 @@ export async function browserServerDownloadProgress(page,task) {
           progress.bytes=Math.max(progress.bytes,bytes);
         }catch{if(!closed)progress.failed=true;}
       },
-      close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
-    session.on('Browser.downloadWillBegin',event=>{
+      close:async()=>{if(closed)return;closed=true;
+        session.off('Browser.downloadWillBegin',onBegin);session.off('Browser.downloadProgress',onProgress);
+        await native?.dispose();}};
+    onBegin=event=>{
       if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
       if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
       if(progress.guid){progress.failed=true;return;}
       progress.guid=event.guid;progress.url=event.url;
-    });
-    session.on('Browser.downloadProgress',event=>{
+    };
+    onProgress=event=>{
       if(event.guid!==progress.guid||progress.failed)return;
       if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<chromiumBytes
         ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
       chromiumBytes=event.receivedBytes;progress.bytes=Math.max(progress.bytes,chromiumBytes);
-    });
+    };
+    session.on('Browser.downloadWillBegin',onBegin);session.on('Browser.downloadProgress',onProgress);
     await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
       browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
     return progress;
-  }catch(error){try{await native?.dispose();}finally{await session.detach();}throw error;}
+  }catch(error){
+    if(onBegin)session.off('Browser.downloadWillBegin',onBegin);
+    if(onProgress)session.off('Browser.downloadProgress',onProgress);
+    await native?.dispose();throw error;
+  }
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
