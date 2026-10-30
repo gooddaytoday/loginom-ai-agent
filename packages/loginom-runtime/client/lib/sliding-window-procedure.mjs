@@ -30,7 +30,7 @@ export async function configureSlidingWindow(channel,p,{inputMapping}){
    await channel.perform({condition:'set window '+key,initialObservation:s,ready:editorReady,identity:()=>original,
     resolve:s=>({verb:'fill',ref:unique(s,e=>(e.tid===tid||e.identity?.anchor_tid===tid||e.tid?.startsWith(tid+';'))&&e.allowed_actions.includes('fill')).ref,text:String(field[key])})});
   }
-  const update=s.wizard.root_tid+';SlidingWindowWizard;grdColumns;roweditorbuttons;update';
+  const update='roweditorbuttons;update';
   s=await channel.observe({condition:'window row ready to apply',readSlidingWindow:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===update&&e.allowed_actions.includes('click'))});
   await channel.perform({condition:'apply window row once',initialObservation:s,ready,identity:()=>original,resolve:s=>({verb:'click',ref:unique(s,e=>e.tid===update&&e.allowed_actions.includes('click')).ref})});
   s=await channel.observe({condition:'exact window row readback',readSlidingWindow:true,ready:s=>ready(s)&&s.node_sliding_window.fields.some(f=>f.record_id===original.record_id&&f.history===field.history&&f.horizon===field.horizon)});

@@ -9,7 +9,7 @@ function fixture(){
  const element=(tid,verbs,ref)=>({tid,identity:{anchor_tid:tid},allowed_actions:verbs,ref:'ui-'+ref});
  function refresh(){state.ui.elements=editing?[
   ...['colHistory_num','colForecast_num'].map((column,i)=>element(base+'grdColumns;roweditor;'+column,['fill'],i?'horizon':'history')),
-  element(base+'grdColumns;roweditorbuttons;update',['click'],'update'),
+  element('roweditorbuttons;update',['click'],'update'),
  ]:[...fields.map(f=>element(base+'colDisplayName_'+f.name,['double_click'],f.name)),element(base+'pedIncompleteRecordsProcessing;ValueControl;trg_picker',['click'],'picker'),
   ...(picker?[element(base+'pedIncompleteRecordsProcessing;ValueControl;boundlist;Оставлять_неполные_записи',['click'],'policy')]:[])];}
  refresh();
