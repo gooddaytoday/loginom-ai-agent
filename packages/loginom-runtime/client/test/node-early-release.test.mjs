@@ -395,3 +395,28 @@ for(const confirmed of [true,false])test('D49 pending move release requires nati
  else{assert.equal(result.error.code,'NODE_RELEASE_REFUSED');assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);}
  assert.deepEqual(f.calls,['move'],'release never replays a move');
 });
+
+// l500b-r5 main-execution-events.jsonl:997-1002: created + renamed
+// calculator, connect pending, evaluate threw before hover, release refused.
+for(const transport of [false,true])test('LAB-506 mask refusal releases settled partial target; lost transport remains pending: '+transport,async()=>{
+ const f=fixture('mask_connect','transform.calculator');
+ f.state.graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'source'},type:'imports.text',label:'Source',position:{x:64,y:64},inputs:[],outputs:[0],locked:false});
+ f.request.inputs=[{source:f.state.graph.nodes[0].ref,output:0,input:0}];
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  if(effect.kind==='connect'){
+   if(transport)throw Error('Execution context was destroyed');
+   return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:'MODELFORM_MASK_CONTEXT_CHANGED: model_form'};
+  }
+  const result=await mutate(effect);f.state.graph.nodes.find(n=>n.ref.node_id==='created').inputs=[0];return result;
+ };
+ await stop(f);
+ assert.equal(f.calls.filter(k=>k==='create').length,1);assert.equal(f.state.graph.links.length,0);
+ const target=f.state.operation.targetPhase;
+ if(transport){assert.equal(target.pending.kind,'connect');assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');}
+ else{
+  assert.equal(target.pending,null);assert.equal(target.refusals.length,3);
+  const result=await release(f);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+  f.runtime.assertPreparationAllowed();
+ }
+});
