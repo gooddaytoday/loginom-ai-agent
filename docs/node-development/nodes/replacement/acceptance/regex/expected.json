@@ -1,5 +1,6 @@
 {
   "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
   "nodes": [
     {
       "type": "imports.text"
@@ -12,7 +13,6 @@
     {
       "output_node_type": "transform.replace_columns",
       "output_port": 0,
-      "null_marker": "NULL",
       "ordered": false,
       "column_order": "exact",
       "columns": [
