@@ -1,5 +1,6 @@
 {
   "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
   "nodes": [
     {
       "type": "imports.text"

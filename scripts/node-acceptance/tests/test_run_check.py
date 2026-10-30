@@ -758,6 +758,12 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, text, null_marker='?')
 
+    def test_corr_null_fixture_declares_csv_marker_separately_from_native_nulls(self):
+        expected = runner.expected_for(runner.scenario('corr-null'), '/own/test.lgp')
+        self.assertEqual(expected['null_marker'], '?')
+        self.assertIsNone(expected['outputs'][0]['rows'][0]['Pirson'])
+        self.assertNotIn('null_marker', expected['outputs'][0])
+
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)

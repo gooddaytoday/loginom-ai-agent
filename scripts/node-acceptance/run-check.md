@@ -208,6 +208,12 @@ runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
 
+Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
+`corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
+age/pressure business task). Fixtures and independent expected tables are in
+`docs/node-development/nodes/research-corranalysis/acceptance`; each model run
+receives only its named input CSV and user task. Other coefficients are deferred.
+
 `n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
 `docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
 независимый expected.json; точный порядок строк и полей, все значения, типы и NULL.
