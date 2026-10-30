@@ -3,9 +3,9 @@
   "properties": {
     "windows": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 128,
-      "description": "Complete replacement of per-field lag windows; unlisted input fields use history=0 and horizon=0.",
+      "description": "Replace all windows; unlisted=0/0. Required on new; omit on existing to preserve.",
       "items": {
         "type": "object",
         "properties": {
@@ -13,17 +13,19 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Exact observed technical name of an input field; duplicates and unknown names refuse before mutation."
+            "description": "Observed technical input name; unique in windows."
           },
           "history": {
             "type": "integer",
             "minimum": 0,
-            "description": "Number of previous input rows copied for this field; zero adds no historical columns. Native upper bound awaits discovery."
+            "description": "Previous-row count; 0 disables history.",
+            "maximum": 134217727
           },
           "horizon": {
             "type": "integer",
             "minimum": 0,
-            "description": "Number of following input rows copied for this field; zero adds no future columns. Native upper bound awaits discovery."
+            "description": "Following-row count; 0 disables forecast.",
+            "maximum": 134217727
           }
         },
         "required": [
@@ -41,12 +43,9 @@
         "drop_added",
         "drop_all_incomplete"
       ],
-      "description": "Explicit native incomplete-row policy: keep expanded edges, retain original rows only, or retain complete rows only. Exact NULL behavior awaits discovery; variable binding is unsupported."
+      "description": "keep_incomplete expands edges; drop_added keeps originals; drop_all_incomplete trims edges, not source NULL. Required on new; omit on existing to preserve."
     }
   },
-  "required": [
-    "windows",
-    "incomplete_records"
-  ],
+  "required": [],
   "additionalProperties": false
 }
