@@ -1,0 +1,267 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.data_partition"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "IsTestSet",
+          "type": "boolean",
+          "label": "Тестовое множество"
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "IsTestSet": false,
+          "RowID": 106,
+          "Class": "A",
+          "Value": 1060
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 107,
+          "Class": "A",
+          "Value": 1070
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 108,
+          "Class": "A",
+          "Value": 1080
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 109,
+          "Class": "A",
+          "Value": 1090
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 110,
+          "Class": "A",
+          "Value": 1100
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 111,
+          "Class": "B",
+          "Value": 1110
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 112,
+          "Class": "B",
+          "Value": 1120
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 113,
+          "Class": "B",
+          "Value": 1130
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 114,
+          "Class": "B",
+          "Value": 1140
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 115,
+          "Class": "B",
+          "Value": 1150
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 101,
+          "Class": "A",
+          "Value": 1010
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 102,
+          "Class": "A",
+          "Value": 1020
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 103,
+          "Class": "A",
+          "Value": 1030
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 104,
+          "Class": "A",
+          "Value": 1040
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 105,
+          "Class": "A",
+          "Value": 1050
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 106,
+          "Class": "A",
+          "Value": 1060
+        },
+        {
+          "RowID": 107,
+          "Class": "A",
+          "Value": 1070
+        },
+        {
+          "RowID": 108,
+          "Class": "A",
+          "Value": 1080
+        },
+        {
+          "RowID": 109,
+          "Class": "A",
+          "Value": 1090
+        },
+        {
+          "RowID": 110,
+          "Class": "A",
+          "Value": 1100
+        },
+        {
+          "RowID": 111,
+          "Class": "B",
+          "Value": 1110
+        },
+        {
+          "RowID": 112,
+          "Class": "B",
+          "Value": 1120
+        },
+        {
+          "RowID": 113,
+          "Class": "B",
+          "Value": 1130
+        },
+        {
+          "RowID": 114,
+          "Class": "B",
+          "Value": 1140
+        },
+        {
+          "RowID": 115,
+          "Class": "B",
+          "Value": 1150
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 101,
+          "Class": "A",
+          "Value": 1010
+        },
+        {
+          "RowID": 102,
+          "Class": "A",
+          "Value": 1020
+        },
+        {
+          "RowID": 103,
+          "Class": "A",
+          "Value": 1030
+        },
+        {
+          "RowID": 104,
+          "Class": "A",
+          "Value": 1040
+        },
+        {
+          "RowID": 105,
+          "Class": "A",
+          "Value": 1050
+        }
+      ]
+    }
+  ]
+}

@@ -4889,9 +4889,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-533: этап 0 завершён с оговоркой «NULL/empty — проверяется на этапе 1 по oracle»; критерии последовательного режима и оговорка — на утверждение владельцу, затем отдельное назначение этапа 1.",
       "plan": "nodes/preprocessing-datapartition/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.preprocessing.Elimoutlier",
@@ -4959,7 +4959,7 @@
       "queue_class": "backlog",
       "handler": null,
       "card": "nodes/preprocessing-sampling/README.md",
-      "initial_scope": "Два отдельных детерминированных метода: Последовательный и Отбор со смещением; размер и параметры каждого заданы отдельно. Случайные/стратифицированные режимы — последующие расширения.",
+      "initial_scope": "Только Последовательный с явным размером в строках; смещение исключено из v0.3.8 решением LAB-533. Остальные методы — следующие этапы.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
         "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
@@ -5005,9 +5005,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-533: этап 0 завершён с оговоркой «NULL/empty — проверяется на этапе 1 по oracle»; критерии последовательного режима и оговорка — на утверждение владельцу, затем отдельное назначение этапа 1.",
       "plan": "nodes/preprocessing-sampling/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.preprocessing.Smoothing",
