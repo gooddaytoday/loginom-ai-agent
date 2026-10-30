@@ -63,6 +63,57 @@ export const groupingParametersSchema=object({group_by:array(groupingFieldSchema
 export const replacementValueSchema=object({type:choice('string','integer','real'),value:{type:['string','number','null'],maxLength:2048}});
 export const replacementRuleSchema=object({field:groupingFieldSchema,type:choice('string','integer','real'),pairs:array(object({from:replacementValueSchema,to:replacementValueSchema}),256),other:object({mode:choice('keep','null','value'),value:replacementValueSchema},['mode']),case_sensitive:boolean,precision:{const:0}},['field','type','pairs','other']);
 export const replacementParametersSchema=object({rules:array(replacementRuleSchema,128,1),output_mode:choice('replace','add')},[]);
+export const slidingWindowParametersSchema={
+  "type": "object",
+  "properties": {
+    "windows": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 128,
+      "description": "Replace all windows; unlisted=0/0. Required on new; omit on existing to preserve.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Observed technical input name; unique in windows."
+          },
+          "history": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Previous-row count; 0 disables history.",
+            "maximum": 134217727
+          },
+          "horizon": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Following-row count; 0 disables forecast.",
+            "maximum": 134217727
+          }
+        },
+        "required": [
+          "field",
+          "history",
+          "horizon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "incomplete_records": {
+      "type": "string",
+      "enum": [
+        "keep_incomplete",
+        "drop_added",
+        "drop_all_incomplete"
+      ],
+      "description": "keep_incomplete expands edges; drop_added keeps originals; drop_all_incomplete trims edges, not source NULL. Required on new; omit on existing to preserve."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+};
 export const dateTimeParametersSchema=object({fields:array(object({field:groupingFieldSchema,transformations:array(object({operation:choice(...Object.keys(DATE_TIME_OPERATIONS)),name:text(128),label:text(120)}),12)}),128)},[]);
 export const missingValuesFieldSchema=object({field:groupingFieldSchema,method:choice('mean','constant'),value:{type:'string',maxLength:2048}},['field','method']);
 export const missingValuesParametersSchema=object({fields:array(missingValuesFieldSchema,128,1),max_nulls_percent:{type:'integer',minimum:0,maximum:100},ordered:{const:false}},[]);
@@ -88,10 +139,10 @@ export const textExportParametersSchema=object({destination:text(512),overwrite:
 export const nodeApplyInputSchema=object({
  operation_id:id,contract_revision:choice('1.0.0'),document_id:id,
  workflow_ref:object({workflow_id:id,tab_tid:text(128),prefix:text(128),navigation_path:array(object({tid:text(512),label:{type:'string'}}),32,1)}),
- target:object({kind:choice('new','existing'),type:choice('imports.excel','integration.rest_request','datamining.lin_regression','datamining.clustering','transform.cross_table','exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data','programming.javascript'),label:{...text(200),pattern:'^(?!\\s*$)[^;|<>"\'\\\\\\u0000-\\u001f]+$',description:'Optional nonblank node caption, 1–200 UTF-16 units. No ; | < >, single/double quotes, backslash or U+0000..U+001F. Omit if unneeded; conditions and formulas in parameters, not target.label.'},ref,
+ target:object({kind:choice('new','existing'),type:choice('imports.excel','integration.rest_request','datamining.lin_regression','datamining.clustering','transform.cross_table','exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','transform.sliding_window','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data','programming.javascript'),label:{...text(200),pattern:'^(?!\\s*$)[^;|<>"\'\\\\\\u0000-\\u001f]+$',description:'Optional nonblank node caption, 1–200 UTF-16 units. No ; | < >, single/double quotes, backslash or U+0000..U+001F. Omit if unneeded; conditions and formulas in parameters, not target.label.'},ref,
   position:{...object({x:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000},y:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000}}),description:'Model coordinates; safe label/port margin. Omit=auto; explicit unchanged.'}},['kind','type']),
  inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99)}),15),
- mode:choice('apply','xlsx','request','enter','k_means','pivot','unpivot','impute','calendar','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact','script'),parameters:object({excel:excelSettingsSchema,...restRequestParametersSchema.properties,target_field:linRegressionParametersSchema.properties.target_field,...clusteringParametersSchema.properties,...crossTableParametersSchema.properties,...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
+ mode:choice('apply','xlsx','request','enter','k_means','pivot','unpivot','impute','calendar','lag','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact','script'),parameters:object({...slidingWindowParametersSchema.properties,excel:excelSettingsSchema,...restRequestParametersSchema.properties,target_field:linRegressionParametersSchema.properties.target_field,...clusteringParametersSchema.properties,...crossTableParametersSchema.properties,...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
   source:importSourceSchema,
   preview_only:{const:true},
   source_switch:object({profile_id:id,save_operation_id:id}),
