@@ -15,7 +15,7 @@ import {createUnionNodeSupport} from './union-node.mjs';
 import {createTextExportNodeSupport} from './text-export-node.mjs';
 import {createJoinNodeSupport} from './join-node.mjs';
 import {createFilterNodeSupport} from './filter-node.mjs';
-import {createTextImportNodeSupport} from './text-import-node.mjs';
+import {createTextImportNodeSupport,verifyDeferredTextImportSources} from './text-import-node.mjs';
 import {createSortingNodeSupport} from './sorting-node.mjs';
 import {createGroupingNodeSupport} from './grouping-node.mjs';
 import {createReformNodeSupport} from './reform-node.mjs';
@@ -77,7 +77,11 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,readOutput:async(...args)=>{
+  return {...drivers,verifySource:async(...args)=>{
+   const checked=await verifyDeferredTextImportSources(options.operation.parameters,options.nodeHistory?.(),options.resolveStorageSource);
+   const value=await drivers.verifySource(...args);
+   return checked.length?{...value,switched_sources:checked}:value;
+  },readOutput:async(...args)=>{
    const value=await drivers.readOutput(...args);
    return readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
     ||value.ports?.some(port=>port.freshness_basis==='completed_execution_port_source')?nodeOutputForJournal(value,redactor):value;

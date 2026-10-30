@@ -61,12 +61,13 @@ export function validateTextImportNodeParameters(p,mode,request) {
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
   validateImportSource(p.source);
-  if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0
+  if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
+    ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
     &&request.mappings.length===0&&Object.keys(p.settings).join(',')==='source'
     &&Object.keys(p.settings.source??{}).join(',')==='source_path'
     &&Object.keys(p.source_switch).sort().join(',')==='profile_id,save_operation_id'
     &&['profile_id','save_operation_id'].every(k=>typeof p.source_switch[k]==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(p.source_switch[k])),
-    'Full source switch requires existing import, source_path only, profile_id (no model-supplied count), saved package receipt and output 0; no column or mapping edits');
+    'Full source switch requires existing import, source_path only, profile_id, saved package receipt and Done without a port read (or Execute with output 0); no column or mapping edits');
   // Explicit admission boundary for the private Done increment. Both definition
   // readers require complete native schemas, including every offscreen field.
   requireValue(mode==='delimited' && ['done','execute','close'].includes(request.finish) && (request.read.ports.length===0||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
@@ -117,7 +118,14 @@ export function verifyImportRowCount(expected,output,execution) {
 }
 
 export function verifyFullImportCount(profileId,receipt,source,output,execution) {
-  const reason = !receipt ? 'Trusted exact scan receipt is absent'
+  const reason=fullImportSourceReason(profileId,receipt,source);
+  if(reason)return {status:'not_verified',message:'N не сверено',reason,profile_id:profileId,actual_records:output.row_count};
+  return {status:'verified',...verifyImportRowCount(receipt.records,output,execution),profile_id:profileId,
+    profile_identity_basis:'backend_exact_scan_sha256',source_identity:receipt.identity};
+}
+
+function fullImportSourceReason(profileId,receipt,source) {
+  return !receipt ? 'Trusted exact scan receipt is absent'
     : receipt.basis!=='backend_exact_scan'||receipt.profile_id!==profileId ? 'Exact scan profile identity does not match'
     : source.kind==='storage'&&(!source.cache_binding||source.cache_binding.server_source_ref!==source.server_source_ref
       ||source.cache_binding.native_size!==source.bytes||source.cache_binding.copy_bytes!==receipt.bytes
@@ -128,9 +136,34 @@ export function verifyFullImportCount(profileId,receipt,source,output,execution)
       ? 'Exact scan source digest or byte identity does not match verified delivery'
     : !receipt.identity?.canonical_path||receipt.identity.size!==receipt.bytes||!receipt.identity.file_id
       ||!Number.isSafeInteger(receipt.records)||receipt.records<0 ? 'Exact scan receipt is incomplete' : null;
-  if(reason)return {status:'not_verified',message:'N не сверено',reason,profile_id:profileId,actual_records:output.row_count};
-  return {status:'verified',...verifyImportRowCount(receipt.records,output,execution),profile_id:profileId,
-    profile_identity_basis:'backend_exact_scan_sha256',source_identity:receipt.identity};
+}
+
+// Reuse the source/scan witnesses retained by the normal operation journal.
+// A configured Done is not authority to consume yesterday's source or output.
+export async function verifyDeferredTextImportSources(request,history,resolveStorageSource) {
+  if(request.finish!=='execute')return [];
+  const latest=new Map();
+  for(const entry of history??[])if(entry.request?.target?.type==='imports.text'
+    &&entry.request.document_id===request.document_id&&entry.request.workflow_ref?.workflow_id===request.workflow_ref?.workflow_id
+    &&entry.outcome?.status==='SUCCEEDED'&&entry.cleanup_confirmed===true&&entry.outcome.output?.node?.node_id
+    &&entry.source)latest.set(entry.outcome.output.node.node_id,entry);
+  const checked=[];
+  for(const entry of latest.values()){
+    if(entry.request.finish!=='done'||!entry.request.parameters?.source_switch)continue;
+    try{
+      const before=entry.source,native=before.native_source??before;
+      requireValue(typeof resolveStorageSource==='function'&&native.server_source_ref,'LOGINOM_FILE_CHANGED: native source witness is missing');
+      const current=await resolveStorageSource(native.server_source_ref,entry.scan_receipt);
+      requireValue(['destination','bytes','mtime','server_source_ref'].every(k=>current[k]===native[k])
+        &&(before.kind!=='storage'||current.sha256===before.sha256)
+        &&!fullImportSourceReason(entry.request.parameters.source_switch.profile_id,entry.scan_receipt,before.kind==='storage'?current:before),
+        'LOGINOM_FILE_CHANGED: switched source identity, size or exact-scan digest changed; chain execution refused');
+      checked.push({node:entry.outcome.output.node,source:current,profile_id:entry.request.parameters.source_switch.profile_id});
+    }catch(error){
+      error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+    }
+  }
+  return checked;
 }
 
 export function importSchemaSnapshot({source,format,columns,mapping}) {
@@ -185,7 +218,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,verifySourceSwitchSave,scanReceipt})=>{
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt})=>{
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt;
     const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
@@ -245,6 +278,14 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           }
           requireValue(typeof verifySourceSwitchSave==='function','Full source switch requires a verified package save');
           saveReceipt=verifySourceSwitchSave(sourceSwitch.save_operation_id);
+          if((operation.nodeApply?.request??operation.parameters).finish==='done'){
+            if(p.source.kind!=='storage'){
+              requireValue(typeof resolveDeliveredSource==='function','LOGINOM_FILE_CHANGED: native delivery witness is missing');
+              sourceReceipt.source.native_source=await resolveDeliveredSource(sourceReceipt.source.destination);
+            }
+            requireValue(!fullImportSourceReason(sourceSwitch.profile_id,scanReceipt,sourceReceipt.source),
+              'LOGINOM_FILE_CHANGED: deferred source switch requires the exact scan bound to source bytes and SHA');
+          }
         }
         return sourceReceipt;
         }catch(error){error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
@@ -404,6 +445,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           requireValue(reopened.source_path===sourceReceipt.source.destination,'LOGINOM_FILE_CHANGED: committed full source path differs');
           try{verifyImportSchema(schemaBefore,schemaAfter);}catch(error){return refuseSwitchSchema(error,'finish');}
           await closePreparedWizard(channel);
+          if(mode==='done')return verified({effect_possible:true,mode,execution_started:false,execution_id:null,settings_applied:true,
+            node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true,
+            schema_before:schemaBefore,schema_after:schemaAfter});
           // Done and independent reopen precede the only launch. A timeout is
           // retained by the existing execution journal/inspect path, never retried.
           await executionDriver.launchGraph();
