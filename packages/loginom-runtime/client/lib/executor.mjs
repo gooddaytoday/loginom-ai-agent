@@ -3505,7 +3505,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try {
         if(!operation){
-          operation={id:operationId,signature,parameters:request,
+          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
           operation.nodeTargetAdapter=targetAdapter(operation);
@@ -3520,10 +3520,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
-            resolveStorageSource:async ref=>{
+            resolveStorageSource:async(ref,receipt=scanReceipt)=>{
               const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
-              return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
+              return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
+            resolveDeliveredSource:path=>inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3536,7 +3537,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
             nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
-              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed})),
+              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
+                source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt})),
             uploadHistory:()=>({complete:true,records:[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o.action.capability==='artifact.upload')
               .map(({o,sequence})=>structuredClone({sequence,operation_id:o.id,destination:o.parameters.destination,artifact:o.checkpoint.artifact,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed===true,transport_uncertain:o.transportUncertain===true}))}),
             exclusiveNodeOperation:()=>running===true&&pending===operation&&operation.nodeApply?.pending?.phase==='read',

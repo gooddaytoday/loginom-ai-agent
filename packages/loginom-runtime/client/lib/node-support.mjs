@@ -1,6 +1,8 @@
+import {createLogRegressionNodeSupport} from './log-regression-node.mjs';
 import {createExcelImportNodeSupport} from './imports-excel-node.mjs';
 import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
+import {createCorrAnalysisNodeSupport} from './corr-analysis-node.mjs';
 import {createClusteringNodeSupport} from './clustering-node.mjs';
 import {createCrossTableNodeSupport} from './crosstable-node.mjs';
 import {createReplacementNodeSupport} from './replacement-node.mjs';
@@ -13,7 +15,7 @@ import {createUnionNodeSupport} from './union-node.mjs';
 import {createTextExportNodeSupport} from './text-export-node.mjs';
 import {createJoinNodeSupport} from './join-node.mjs';
 import {createFilterNodeSupport} from './filter-node.mjs';
-import {createTextImportNodeSupport} from './text-import-node.mjs';
+import {createTextImportNodeSupport,verifyDeferredTextImportSources} from './text-import-node.mjs';
 import {createSortingNodeSupport} from './sorting-node.mjs';
 import {createGroupingNodeSupport} from './grouping-node.mjs';
 import {createReformNodeSupport} from './reform-node.mjs';
@@ -35,12 +37,12 @@ export function nodeOutputForJournal(value,redactor){
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
  const slidingWindow=createSlidingWindowNodeSupport(config);
- const linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
+ const logregression=createLogRegressionNodeSupport(config),correlation=createCorrAnalysisNodeSupport(config),linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
  const excel=createExcelImportNodeSupport(config),rest=createRestRequestNodeSupport(config);
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
@@ -49,7 +51,9 @@ export function createCandidateNodeSupport(config) {
    return readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
   }
+  if(type==='datamining.log_regression')return logregression.nodeApplyDriverFactory(options);
   if(type==='datamining.lin_regression')return linregression.nodeApplyDriverFactory(options);
+  if(type==='research.corr_analysis')return correlation.nodeApplyDriverFactory(options);
   if(type==='datamining.clustering')return clustering.nodeApplyDriverFactory(options);
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);
   if(type==='exports.text')return exports.nodeApplyDriverFactory(options);
@@ -73,7 +77,11 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,readOutput:async(...args)=>{
+  return {...drivers,verifySource:async(...args)=>{
+   const checked=await verifyDeferredTextImportSources(options.operation.parameters,options.nodeHistory?.(),options.resolveStorageSource);
+   const value=await drivers.verifySource(...args);
+   return checked.length?{...value,switched_sources:checked}:value;
+  },readOutput:async(...args)=>{
    const value=await drivers.readOutput(...args);
    return readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
     ||value.ports?.some(port=>port.freshness_basis==='completed_execution_port_source')?nodeOutputForJournal(value,redactor):value;

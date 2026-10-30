@@ -513,7 +513,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(usage['runtime'], 0)
 
     def test_all_regression_names_resolve_real_inputs(self):
-        names = ([f'n{i}' for i in range(1, 22)] + [f'p{i}' for i in range(1, 26)]
+        names = ([f'n{i}' for i in range(1, 22)] + ['logreg-enter'] + [f'p{i}' for i in range(1, 26)]
                  + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
                  + [f's{i}' for i in range(1, 9)]
                  + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
@@ -526,6 +526,21 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n22', 'q11', 's9', '../n1', 'clustering']:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
+
+    def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
+        self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
+        case = runner.scenario('logreg-enter')
+        self.assertEqual(case['source'].parent.name, 'datamining-logregression')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertIsNone(case['base'])
+        self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['train.csv'])
+        expected = runner.expected_for(case, '/test/logistic.lgp')
+        self.assertEqual(expected['package_path'], '/test/logistic.lgp')
+        self.assertEqual(expected['outputs'][0]['output_port'], 0)
+        self.assertEqual(len(expected['outputs'][0]['rows']), 32)
+        self.assertEqual(expected['outputs'][0]['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
+        result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')
@@ -742,6 +757,12 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                      'Value,Text\n?,?\n?,\n', 'Value,Text\n?,\n0,\n']:
             with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, text, null_marker='?')
+
+    def test_corr_null_fixture_declares_csv_marker_separately_from_native_nulls(self):
+        expected = runner.expected_for(runner.scenario('corr-null'), '/own/test.lgp')
+        self.assertEqual(expected['null_marker'], '?')
+        self.assertIsNone(expected['outputs'][0]['rows'][0]['Pirson'])
+        self.assertNotIn('null_marker', expected['outputs'][0])
 
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:

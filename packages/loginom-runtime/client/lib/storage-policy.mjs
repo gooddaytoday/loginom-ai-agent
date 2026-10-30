@@ -95,6 +95,12 @@ export function createServerSourceRegistry({getBinding}) {
       if(!source)throw Error('Verified storage source reference is missing');
       return structuredClone(source);
     },
+    referenceForPath(path) {
+      const binding=getBinding();
+      const entry=[...sources.entries()].findLast(([,s])=>s.path===path&&JSON.stringify(s.binding)===JSON.stringify(binding));
+      if(!entry)throw Error('LOGINOM_FILE_CHANGED: observe the delivered file in Files before switching its source');
+      return entry[0];
+    },
     async inspect(ref,observe) {
       const source=this.peek(ref),name=source.path.slice(source.path.lastIndexOf('/')+1);
       const roots=await observe({discover_roots:true,storage_name:name});

@@ -109,7 +109,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
     signal,
-    input.closeSavedPackageOnShutdown === true ? 45_000 : 5000,
+    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,
   )
   const ready = runtime.ready
   if (

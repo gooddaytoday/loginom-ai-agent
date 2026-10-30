@@ -83,8 +83,18 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['corr-pairs', 'corr-null', 'corr-age']:
+        src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
+        task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
+                                'corr-null': ('task-null.md', 'expected-null.json', 'null.csv'),
+                                'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
+        return dict(source=src, prompt=src / task, data=src / 'data', base=None,
+                    expected_name=expected, input_files=[data])
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'logreg-enter':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -119,7 +129,11 @@ def scenario(name, case_root=None, *, cases=None):
 def expected_for(case, package):
     src = case['source']
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
-    if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
+    if case.get('expected_name'):
+        expected = read(src / case['expected_name'])
+        if case['expected_name'] == 'expected-age-pressure.json':
+            expected['outputs'].reverse()  # One final CSV; cold still checks both tables.
+    elif re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
@@ -559,6 +573,7 @@ class Runner:
         # README exceptions: p14 tests Excel, and the regression base uses only
         # train.csv; its other fixtures belong to later operator scenarios.
         if case == 'p14': files = [spec['data'] / 'exhibits.xlsx']
+        if spec.get('input_files'): files = [spec['data'] / name for name in spec['input_files']]
         if isinstance(case, Path) and src.parent.name == 'datamining-linregression':
             files = [spec['data'] / 'train.csv']
         if spec.get('local_file'):
@@ -619,7 +634,7 @@ class Runner:
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
-            if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
+            if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)

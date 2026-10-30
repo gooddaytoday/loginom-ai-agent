@@ -55,12 +55,13 @@ export async function selectPreparedGraphNode(channel, initialObservation, condi
   const node=initialObservation.prepared_node_context;
   const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
     &&['document_id','workflow_id','node_id','tid'].every(k=>s.prepared_node_context[k]===node[k]);
-  let label=false;
+  let label=false,selection;
   const refresh={...(refreshReplacedBody?{refreshReplacedBody:isPreparedBodyReplacement}:{}),
     ...(settleGraph?{refreshGraphBusy:isPreparedGraphBusy,confirmIdentity:s=>s.dom_epoch}:{})};
   if(settleGraph)initialObservation=await channel.observe({condition,ready:same,confirmIdentity:s=>s.dom_epoch});
-  await channel.perform({condition,initialObservation,ready:same,identity:()=>node,...refresh,resolve:s=>{
+  let receipt=await channel.perform({condition,initialObservation,ready:same,identity:()=>node,...refresh,resolve:s=>{
     const action=preparedGraphSelection(s);
+    selection={observation:structuredClone(s),action};
     label=s.ui.elements.find(e=>e.ref===action.ref)?.graph_node?.part==='label';
     return action;
   }});
@@ -69,7 +70,8 @@ export async function selectPreparedGraphNode(channel, initialObservation, condi
     // then exposes the settings controls just as in the ordinary path.
     const restored=await channel.observe({condition:'prepared body visible after leaving hover controls',ready:s=>same(s)
       &&s.ui.elements.some(e=>e.tid===node.tid&&e.graph_node?.part==='body'&&e.interaction?.state==='point_observed')});
-    await channel.perform({condition:'select prepared body after hover dismissal',initialObservation:restored,ready:same,identity:()=>node,...refresh,
-      resolve:s=>{const action=preparedGraphSelection(s);if(s.ui.elements.find(e=>e.ref===action.ref)?.graph_node?.part!=='body')throw Error('Prepared body remains covered');return action;}});
+    receipt=await channel.perform({condition:'select prepared body after hover dismissal',initialObservation:restored,ready:same,identity:()=>node,...refresh,
+      resolve:s=>{const action=preparedGraphSelection(s);if(s.ui.elements.find(e=>e.ref===action.ref)?.graph_node?.part!=='body')throw Error('Prepared body remains covered');selection={observation:structuredClone(s),action};return action;}});
   }
+  return {...selection,receipt};
 }
