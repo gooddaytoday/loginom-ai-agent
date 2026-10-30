@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {applyNode} from '../lib/node-apply.mjs';
 import {createCandidateNodeSupport,nodeOutputForJournal} from '../lib/node-support.mjs';
+import {verifyDeferredTextImportSources} from '../lib/text-import-node.mjs';
 import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
@@ -86,7 +87,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   configurationObservation:{condition:'owned settings fixture',ready:s=>s.wizard.status==='observed'},
   configureOutput:async()=>({verified:true,cleanup_complete:true,native_mapping:{target_fields:[]}}),
  });
- const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:contract.NODE_READ_MODE,
+ const context={createRedactor,nodeOutputForJournal,verifyDeferredTextImportSources,NODE_READ_MODE:contract.NODE_READ_MODE,
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
  for(const name of ['LogRegression','CorrAnalysis','SlidingWindow','ExcelImport','LinRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
