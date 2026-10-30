@@ -24,7 +24,7 @@ export function replacementConfigurationReadback({node,phases,operation_id}){
   return {...pick(f,['index','name','label','type','data_kind','excluded']),source_name:source.name};
  });
  need(linked.size===m.source_fields.length,'derived source coverage');
- return {kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'exact',
+ return {kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'exact',
   rules:structuredClone(c.rules),output_mode:m.produce_mode==='supplement'?'add':'replace',
   input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mapping:{port:0,autosync:m.autosync,fields:output},package_persistence_verified:false};
 }

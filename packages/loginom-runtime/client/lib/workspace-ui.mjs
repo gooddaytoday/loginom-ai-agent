@@ -2740,8 +2740,10 @@ function readRenderedInputMapping(observation) {
       const inputRecords=inputGrid?.getStore?.().getData?.()?.items;
       const selected=inputGrid?.el?.dom===inputElement&&selection?.length===1&&Array.isArray(inputRecords)&&inputRecords.includes(selection[0])?selection[0]:null;
       if(selected?.isModel&&typeof selected.data?.Name==='string'){
-        const buttons=tids.get(base+'grdReplaceItems;tbl;GroupHeader;0;AddButton')??[];
-        if(buttons.length===1&&visible(buttons[0])&&!sensitive(buttons[0]))replacementCells.set(refOf(buttons[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'add',wizard_root_ref:wizard.root_ref});
+        for(const group of [0,1]){
+        const buttons=tids.get(base+'grdReplaceItems;tbl;GroupHeader;'+group+';AddButton')??[];
+        if(buttons.length===1&&visible(buttons[0])&&!sensitive(buttons[0]))replacementCells.set(refOf(buttons[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'add',collection_id:group,wizard_root_ref:wizard.root_ref});
+        }
       }
       if(selected?.isModel){
         if(selected.data?.ReplaceMode===1){
@@ -2762,10 +2764,10 @@ function readRenderedInputMapping(observation) {
         if(view?.el?.dom!==grid||store?.$className!=='Ext.data.Store'||store.isLoading?.()||!Array.isArray(records)||records.length>1000)continue;
         for(const row of grid.querySelectorAll('table.x-grid-item')){
           const r=records.find(r=>String(r.internalId)===row.getAttribute('data-recordid')),d=r?.data;
-          if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id||role==='pair'&&(!selected||d.CollectionID!==0||!Object.hasOwn(d,'DataValueType')))continue;
+          if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id||role==='pair'&&(!selected||!(d.CollectionID===0&&Object.hasOwn(d,'DataValueType')||d.CollectionID===1&&Object.hasOwn(d,'RegularExpression'))))continue;
           const name=role==='field'?d.Name:selected.data.Name;if(typeof name!=='string'||!name)continue;
           for(const [column,part] of role==='field'?[['colInputData_','select'],['colReplaceSource_','mode']]:[['colReplaceValue_','from'],['colReplaceBy_','to'],['colReplaceDelete_','delete']]){
-            const tid=base+column+(role==='field'?name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===tid&&!e.closest('tr.x-grid-row-summary'));
+            const tid=base+column+(role==='field'?name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(role==='pair'&&d.CollectionID===1?(getTid(e)??'').startsWith(base+column):getTid(e)===tid)&&!e.closest('tr.x-grid-row-summary'));
             if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
             replacementCells.set(refOf(cells[0]),{field_key:name,record_id:String(r.internalId),selected_record_id:role==='pair'?String(selected.internalId):null,role,part,index:role==='pair'?d.Index:null,row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
           }

@@ -16,7 +16,7 @@ export function replacementValueKey(v,caseSensitive=true){
  return v.type+':value:'+ (v.type==='integer'?BigInt(v.value).toString():v.type==='string'&&!caseSensitive?v.value.toLowerCase():String(v.value));
 }
 export function validateReplacementParameters(p,mode,r){
- need(mode==='exact','Replacement supports exact internal tables only');
+ need(['exact','regex'].includes(mode),'Replacement supports exact or regex internal tables only');
  need(keys(p,['rules','output_mode']),'Invalid replacement parameters');
  need(p.rules!==undefined||r.target.kind==='existing','New replacement requires complete rules');
  need(p.output_mode===undefined?r.target.kind==='existing':['replace','add'].includes(p.output_mode),'Explicit replacement output_mode required');
@@ -27,16 +27,22 @@ export function validateReplacementParameters(p,mode,r){
    need(keys(rule,['field','type','pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
    need(!fields.has(rule.field.name.toLowerCase()),'Duplicate replacement field');fields.add(rule.field.name.toLowerCase());
    need(['string','integer','real'].includes(rule.type),'Replacement type unsupported');
-   need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
+   if(mode==='regex')need(rule.type==='string'&&rule.case_sensitive===undefined&&rule.precision===undefined,'Regex requires string rules; omit case_sensitive and precision, use inline (?i)');
+   if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
     'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires precision zero (precision=0) and forbids case_sensitive'));
    need(Array.isArray(rule.pairs)&&rule.pairs.length<=256,'Replacement table exceeds supported bound');
    const seen=new Set();
    for(const pair of rule.pairs){
     need(keys(pair,['from','to']),'Invalid replacement pair');validateReplacementValue(pair.from,rule.type);validateReplacementValue(pair.to,rule.type);
+    if(mode==='regex'){
+     validateReplacementRegex(pair.from.value);
+     need(typeof pair.to.value==='string','Regex replacement must be a literal string constant');
+    }
     // The tested binary comparison covers ASCII. Do not guess non-ASCII case folding.
-    need(rule.type!=='string'||rule.case_sensitive||pair.from.value===null||/^[\x01-\x7f]*$/.test(pair.from.value),'Non-ASCII case-insensitive keys require verified Loginom comparison');
-    const key=replacementValueKey(pair.from,rule.case_sensitive);need(!seen.has(key),'Duplicate replacement key');seen.add(key);
+    need(mode==='regex'||rule.type!=='string'||rule.case_sensitive||pair.from.value===null||/^[\x01-\x7f]*$/.test(pair.from.value),'Non-ASCII case-insensitive keys require verified Loginom comparison');
+    const key=replacementValueKey(pair.from,mode==='regex'||rule.case_sensitive);need(!seen.has(key),'Duplicate replacement key');seen.add(key);
    }
+   if(mode==='regex')need(['keep','null'].includes(rule.other?.mode),'Regex remaining values support keep or null only');
    need(keys(rule.other,['mode','value'])&&['keep','null','value'].includes(rule.other.mode),'Explicit remaining-value policy required');
    if(rule.other.mode==='value'){validateReplacementValue(rule.other.value,rule.type);need(rule.other.value.value!==null,'Remaining Null requires null mode');need(rule.type!=='real'||Number(rule.other.value.value.toFixed(2))===rule.other.value.value,'Loginom remaining-value real editor supports at most two decimal places');}else need(rule.other.value===undefined,'Unexpected remaining replacement value');
   }
@@ -62,4 +68,15 @@ export function resolveEffectiveReplacementParameters(p,fields,savedRules,savedM
  need(['replace','add'].includes(mode),'Observed replacement output mode required for partial rules');
  const rules=savedRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]);
  return resolveReplacementParameters({rules,output_mode:mode},fields);
+}
+
+// Deliberately bounded shared ASCII grammar. Loginom Next remains the native
+// validator; inline (?i) is a Loginom flag, not JavaScript RegExp syntax.
+export function validateReplacementRegex(pattern){
+ need(typeof pattern==='string'&&pattern.length>0&&pattern.length<=2048,'Nonempty regex required');
+ const source=pattern.startsWith('(?i)')?pattern.slice(4):pattern;
+ need(/^(?:[A-Za-z0-9 _=,:;@#%&/!<>~-]|\[.()[\]{}^$+*?|\\]|\[0-9\]|[()^$]|\{[1-9][0-9]{0,3}\})+$/.test(source),'Unsupported regex; use ASCII literals, groups, [0-9], positive {n}, anchors and inline (?i)');
+ need(!source.includes('()'),'Empty regex group unsupported');
+ let compiled;try{compiled=new RegExp(source);}catch{need(false,'Invalid regex');}
+ need(!compiled.test(''),'Zero-length regex unsupported');
 }

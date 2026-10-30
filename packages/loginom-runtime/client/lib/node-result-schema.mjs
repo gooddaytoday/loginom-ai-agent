@@ -73,7 +73,7 @@ const sortingConfigurationReadback=object({kind:values('sorting'),scope:values('
 const replacementValue=object({type:values('string','integer','real'),value:{type:['string','number','null']}});
 const replacementRule=object({field:object({kind:values('input_field'),name:str}),type:values('string','integer','real'),pairs:{...array(object({from:replacementValue,to:replacementValue})),maxItems:256},other:object({mode:values('keep','null','value'),value:replacementValue},['mode']),case_sensitive:bool,precision:{const:0}},['field','type','pairs','other']);
 const replacementConfigurationReadback=object({kind:values('replacement'),scope:values('observed_before_verified_finish'),node:ref,
- receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('exact'),
+ receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('exact','regex'),
  rules:{...array(replacementRule),minItems:1,maxItems:128},output_mode:values('replace','add'),
  input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),

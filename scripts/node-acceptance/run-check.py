@@ -85,6 +85,12 @@ def scenario(name, case_root=None, *, cases=None):
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name in ['regex-add', 'regex-replace']:
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/regex',
+                    prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
+                    data=node / 'fixtures/regex', base=None,
+                    expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -116,7 +122,9 @@ def scenario(name, case_root=None, *, cases=None):
 def expected_for(case, package):
     src = case['source']
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
-    if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
+    if case.get('expected_name'):
+        expected = read(src / case['expected_name'])
+    elif re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
