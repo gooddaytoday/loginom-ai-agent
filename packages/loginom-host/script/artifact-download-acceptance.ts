@@ -12,11 +12,19 @@ const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 const resourcesPath = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
 assert.ok(configPath && resourcesPath, "Set LOGINOM_AI_AGENT_TEST_CONFIG and LOGINOM_AI_AGENT_TEST_RESOURCES")
 const config = JSON.parse(await readFile(configPath, "utf8"))
-assert.ok(typeof config.api_key === "string" && config.api_key.length > 0, "Test credentials required")
+const login = config.loginom ?? {
+  api_key: config.api_key,
+  url: config.loginom_url,
+  username: config.workflow_profile?.loginom_user,
+  password: config.workflow_profile?.password,
+}
+assert.ok(typeof login.api_key === "string" && login.api_key.length > 0, "Test credentials required")
 const resources = resolve(resourcesPath)
 const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-const url = process.env.LOGINOM_AI_AGENT_TEST_URL ?? config.loginom_url
-const username = process.env.LOGINOM_AI_AGENT_TEST_USER ?? config.workflow_profile?.loginom_user
+const url = process.env.LOGINOM_AI_AGENT_TEST_URL ?? login.url
+const username = process.env.LOGINOM_AI_AGENT_TEST_USER ?? login.username
+const deliveryBudget = Number(process.env.LOGINOM_AI_AGENT_TEST_DELIVERY_BUDGET_MS ?? 120000)
+assert.ok(Number.isSafeInteger(deliveryBudget) && deliveryBudget > 0, "Positive delivery budget required")
 assert.ok(typeof url === "string" && typeof username === "string", "Explicit Loginom URL and account required")
 const directory = await mkdtemp(join(tmpdir(), "loginom-artifact-acceptance-"))
 const csv = "Item,Qty\nA,5\nA,10\nB,25\n"
@@ -39,7 +47,7 @@ for (const headless of [true, false]) {
     endpoint: manifest.endpoint,
     actionManifestUri: manifest.actionManifestUri,
     actionManifestSha256: manifest.actionManifestSha256,
-    connection: { apiKey: config.api_key, password: "", url, username },
+    connection: { apiKey: login.api_key, password: login.password ?? "", url, username },
     acceptanceCleanupPackage: packagePath,
   })
   const receipts = { sequence: 0 }
@@ -47,12 +55,14 @@ for (const headless of [true, false]) {
     const envelope = await child.request("call", { name, arguments: args })
     assert.ok(envelope && typeof envelope === "object" && "result" in envelope)
     const serialized = JSON.stringify(envelope.result)
-    assert.equal(serialized.includes(config.api_key), false, "Secret in receipt")
+    assert.equal(serialized.includes(login.api_key), false, "Secret in receipt")
     const reply = JSON.parse(serialized)
     await writeFile(join(directory, `${chat}-${++receipts.sequence}-${name}.json`), serialized + "\n", { mode: 0o600 })
     assert.equal(reply.isError ?? false, false, `Tool failed: ${name}`)
-    const body =
-      reply.structuredContent ?? JSON.parse(reply.content.find((item: { type: string }) => item.type === "text").text)
+    // dock_node_wait omits duplicate ports from structuredContent; the public
+    // text block is the complete result consumed by the production client.
+    const content = reply.content?.find((item: { type: string }) => item.type === "text")
+    const body = content ? JSON.parse(content.text) : reply.structuredContent
     console.log(
       JSON.stringify({ mode: headless ? "headless" : "headed", tool: name, status: body.status, state: body.state }),
     )
@@ -77,6 +87,7 @@ for (const headless of [true, false]) {
     return result
   }
   const outcome = await (async () => {
+    let failed = false
     try {
       const files = await inputStore(join(directory, "inputs")).admit(
         chat,
@@ -98,7 +109,7 @@ for (const headless of [true, false]) {
           operation_id: operation,
           artifact_id: artifact.artifact_id,
           upload_grant_id: artifact.upload.grant_id,
-          budget_ms: 120000,
+          budget_ms: deliveryBudget,
         })
         const delivery = await (async () => {
           if (started.state !== "running") return started
@@ -183,8 +194,14 @@ for (const headless of [true, false]) {
         .find((item: { kind?: string }) => item.kind === "dock_saved_package_state")
       assert.equal(advice?.modified, false, "Saved package must be clean")
       return { chat, headless, deliveries, exports, packagePath }
+    } catch (error) {
+      failed = true
+      throw error
     } finally {
-      await child.close()
+      await child.close().catch((error) => {
+        if (!failed) throw error
+        console.error("Acceptance cleanup also failed:", error)
+      })
     }
   })()
   const attempts = join(directory, "generations/1/chats", chat, "attempts")
