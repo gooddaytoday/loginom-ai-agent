@@ -12,6 +12,7 @@
     {
       "output_node_type": "transform.replace_columns",
       "output_port": 0,
+      "null_marker": "NULL",
       "ordered": false,
       "column_order": "exact",
       "columns": [
