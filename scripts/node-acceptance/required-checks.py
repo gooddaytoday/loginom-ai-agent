@@ -29,6 +29,7 @@ RULES = (
     ((C + 'union-*.mjs',), ('live-ui',), ('s4',)),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18',)),
+    ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
