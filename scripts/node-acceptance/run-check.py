@@ -92,6 +92,9 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name=expected, input_files=[data])
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'n21':
+        src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
