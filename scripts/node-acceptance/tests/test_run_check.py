@@ -21,6 +21,135 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_sequential_node_scenarios_resolve_approved_oracles(self):
+        for name, count, ports in [('sampling', 2, [0, 0]), ('data-partition', 3, [0, 1, 2])]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, 'task.md')
+            self.assertTrue((case['data'] / 'rows.csv').is_file())
+            expected = runner.expected_for(case, '/test/check.lgp')
+            self.assertEqual(len(expected['outputs']), count)
+            self.assertEqual([o['output_port'] for o in expected['outputs']], ports)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertNotIn('oracle', case['prompt'].read_text())
+
+    def test_sequential_null_empty_keep_approved_schema_order_and_row_counts(self):
+        for name, counts in [('sampling-null', [3, 2]), ('sampling-empty', [0, 0]),
+                             ('data-partition-null', [3, 2, 1]), ('data-partition-empty', [0, 0, 0])]:
+            case = runner.scenario(name)
+            variant = name.split('-')[-1]
+            self.assertEqual([p.name for p in case['data'].iterdir()], [variant + '.csv'])
+            expected = runner.expected_for(case, '/test/null-empty.lgp')
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertEqual(expected['outputs'][0]['columns'][-1]['type'], 'datetime')
+            self.assertTrue(all(o['column_order'] == 'exact' and o['ordered'] for o in expected['outputs']))
+
+    def upload_model(self, root, receipt, *, calls=None):
+        source = root / 'input.csv'
+        source.write_text('Id,Value\n1,test\n')
+        case = root / 'cases/seed'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Загрузи исходник без сохранения пакета')
+        runner.write(case / 'case.json', dict(source_path=str(source), attachment='path', upload_only=True))
+        runner.write(case / 'expected.json', dict(nodes=[], outputs=[]))
+        folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
+        folder.mkdir(); workspace.mkdir(); profile.mkdir()
+        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True,
+                     package_path=None, save_operation_id=None, unsaved_changes_discarded=False))
+        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        instance = runner.Runner.__new__(runner.Runner)
+        instance.out, instance.env, instance.current = root, {}, {}
+        instance.options = dict(case_root=str(case.parent))
+        events = calls or [dict(tool='loginom_dock_artifact_deliver', state=dict(
+            status='completed', output=json.dumps(receipt)))]
+        def phase(*args, **kwargs):
+            (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(
+                type='tool_use', sessionID='session', part=part)) for part in events))
+        with patch.object(instance, 'phase', side_effect=phase):
+            result = instance.model('seed', folder, profile, workspace, '/test/run.lgp',
+                                    dict(package_directory='/test'), root / 'build')
+        self.assertEqual(instance.current['upload'], 'ready')
+        return result
+
+    def test_upload_only_accepts_verified_sync_and_async_receipts(self):
+        # LAB-549 l549cseed2/model.stdout:20: settled success has no upload_status.
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for mode in ['sync', 'async']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                calls = None
+                if mode == 'async':
+                    reply['upload_status'] = 'ready'
+                    calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(status='completed',
+                                  output=json.dumps(dict(state='running', upload_status='authorizing')))),
+                             dict(tool='loginom_dock_artifact_delivery_status', state=dict(
+                                  status='completed', output=json.dumps(reply)))]
+                self.upload_model(Path(directory), reply, calls=calls)
+
+    def test_upload_count_excludes_only_proven_prebrowser_rejections(self):
+        # LAB-549 Sseed/model.stdout:20 rejects budget_ms before any browser effect.
+        receipt = dict(status='SUCCEEDED', state='settled', upload_status='ready', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        rejected = dict(status='NOT_APPLIED', state='settled', action_key='request.validate',
+                        phase='request_rejected', request_rejected=True, effect_possible=False,
+                        error=dict(code='REQUEST_REJECTED', parameter_path='budget_ms'))
+        cases = [('prebrowser', rejected, True), ('possible effect', dict(rejected, effect_possible=True), False),
+                 ('unknown effect', {k: v for k, v in rejected.items() if k != 'effect_possible'}, False),
+                 ('unproven rejection', dict(rejected, request_rejected=False), False),
+                 ('runtime error', dict(state='settled', status='FAILED'), False),
+                 ('malformed', None, False), ('second upload', receipt, False)]
+        for name, prior, accepted in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed' if name == 'second upload' else 'error',
+                             **{'output' if name == 'second upload' else 'error':
+                                json.dumps(prior) if prior else 'not JSON'})),
+                         dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed', output=json.dumps(receipt)))]
+                if accepted:
+                    self.upload_model(Path(directory), receipt, calls=calls)
+                else:
+                    with self.assertRaisesRegex(AssertionError, 'UPLOAD_COUNT'):
+                        self.upload_model(Path(directory), receipt, calls=calls)
+
+    def test_upload_only_keeps_verification_requirements(self):
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for key, value in [('status', 'NOT_APPLIED'), ('state', 'running'), ('cleanup_complete', False),
+                           ('bytes', 15), ('upload_completion_verified', False), ('upload_status', 'failed')]:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                (reply['output'] if key in ['bytes', 'upload_completion_verified'] else reply)[key] = value
+                with self.assertRaisesRegex(AssertionError, 'UPLOAD_NOT_READY'):
+                    self.upload_model(Path(directory), reply)
+
+    def test_regex_catalog_keeps_oracles_out_of_model_inputs(self):
+        for name, expected, width in [('regex-add', 'expected.json', 5), ('regex-replace', 'expected-replace.json', 4)]:
+            case = runner.scenario(name)
+            self.assertEqual(case['expected_name'], expected)
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual([p.name for p in case['data'].glob('*.csv')], ['input.csv'])
+            result = runner.expected_for(case, '/test/regex.lgp')
+            self.assertEqual(result['package_path'], '/test/regex.lgp')
+            self.assertEqual(len(result['outputs'][0]['columns']), width)
+            self.assertEqual(len(result['outputs'][0]['rows']), 8)
+            self.assertIn('transform.replace_columns', [n['type'] for n in result['nodes']])
+
+    def test_join_modes_resolve_approved_tasks_inputs_and_cold_expectations(self):
+        for mode, columns, rows in [('right', 6, 7), ('full', 6, 9), ('difference', 3, 2)]:
+            with self.subTest(mode=mode):
+                case = runner.scenario('join-' + mode)
+                self.assertIsNone(case['base'])
+                self.assertEqual(case['prompt'].resolve(), (runner.REPO / 'docs/node-development/nodes/join/acceptance' / ('task-' + mode + '.md')).resolve())
+                self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['left.csv', 'manifest.json', 'right.csv'])
+                expected = runner.expected_for(case, '/test/join.lgp')
+                self.assertEqual(expected['package_path'], '/test/join.lgp')
+                self.assertEqual(expected['null_marker'], 'NULL')
+                output = expected['outputs'][0]
+                self.assertEqual(len(output['columns']), columns)
+                self.assertEqual(len(output['rows']), rows)
+                self.assertEqual(output['export_destination'], '/' + mode + '-result.csv')
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -654,6 +783,20 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 for column in output['columns']: fields.update(column)
         self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
+
+    def test_outlier_scenarios_resolve_frozen_tasks_and_all_three_ports(self):
+        for name, method, counts in [('outlier-sd', 'стандартного отклонения', [22, 0, 1]),
+                                     ('outlier-iqr', 'интерквартильной ширины', [22, 1, 1])]:
+            case = runner.scenario(name)
+            self.assertIn(method, case['prompt'].read_text())
+            self.assertEqual(case['export_count'], 3)
+            self.assertTrue((case['source'] / 'oracle.py').is_file())
+            self.assertEqual(len(list(case['data'].glob('*.csv'))), 1)
+            expected = runner.expected_for(case, '/test.lgp')
+            self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertTrue(all(c.get('label_any') for o in expected['outputs'] for c in o['columns']))
 
     def test_n19_file_oracle_accepts_labels_but_rejects_bad_centers_and_extra_rows(self):
         case = runner.scenario('n19')

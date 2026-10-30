@@ -139,3 +139,55 @@ test("new tag without the loginom baseline fails closed", async () => {
   expect(result.code).not.toBe(0)
   expect(result.output).not.toContain('"status":"clean"')
 })
+
+for (const secret of [false, true]) {
+  test(`force push with an unavailable before object ${secret ? "blocks an intermediate secret" : "scans the clean range"}`, async () => {
+    const root = await repo()
+    git(root, "update-ref", "refs/remotes/origin/loginom", "HEAD")
+    await Bun.write(
+      join(root, "config.txt"),
+      secret ? "token=" + "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k" : "ordinary change\n",
+    )
+    git(root, "add", ".")
+    git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "incoming")
+    git(root, "rm", "-q", "config.txt")
+    git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "removed")
+    const result = scan(root, {
+      EVENT: "push",
+      BASE: "",
+      HEAD: git(root, "rev-parse", "HEAD"),
+      BEFORE: "1".repeat(40),
+    })
+    expect(result.code).toBe(secret ? 2 : 0)
+    expect(result.output).toContain(secret ? "github-pat" : '"commits":2')
+  })
+}
+
+test("force push with an available divergent before scans from the common ancestor", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, "config.txt"), "token=" + "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k")
+  git(root, "add", ".")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "shared secret")
+  const shared = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "old tip")
+  const before = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-q", "--detach", shared)
+  git(root, "rm", "-q", "config.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "new tip")
+  // The common ancestor itself is trusted history, so neither it nor older commits are incoming.
+  const result = scan(root, { EVENT: "push", BASE: base, HEAD: git(root, "rev-parse", "HEAD"), BEFORE: before })
+  expect(result.code).toBe(0)
+  expect(result.output).toContain('"commits":1')
+})
+
+test("unavailable before without a usable baseline fails closed", async () => {
+  const root = await repo()
+  const head = git(root, "rev-parse", "HEAD")
+  const env = { EVENT: "push", BASE: "", HEAD: head, BEFORE: "1".repeat(40) }
+  expect(scan(root, env).code).not.toBe(0)
+  git(root, "update-ref", "refs/remotes/origin/loginom", head)
+  const result = scan(root, env)
+  expect(result.code).not.toBe(0)
+  expect(result.output).not.toContain('"status":"clean"')
+})

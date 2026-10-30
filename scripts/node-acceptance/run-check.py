@@ -90,13 +90,33 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name in ['outlier-sd', 'outlier-iqr']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
+        if name == 'outlier-iqr': src = src / 'iqr'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['regex-add', 'regex-replace']:
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/regex',
+                    prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
+                    data=node / 'fixtures/regex', base=None,
+                    expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling', 'data-partition', 'sampling-null', 'sampling-empty', 'data-partition-null', 'data-partition-empty']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        variant = next((v for v in ['null', 'empty'] if name.endswith('-' + v)), None)
+        src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'),
+                    data=src / ('data-' + variant if variant else 'data'), base=None,
+                    expected_name='expected-' + variant + '.json' if variant else 'expected.json')
+    if name in ['join-right', 'join-full', 'join-difference']:
+        src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
@@ -552,9 +572,10 @@ class Runner:
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
         if not exports and not spec.get('upload_only'):
-            count = 2 if src.parent.name == 'datamining-clustering' else 1
+            count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
@@ -603,8 +624,21 @@ class Runner:
                 and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
                 for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
             assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
-            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
-            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+            uploads = []
+            for call in calls:
+                if call.get('tool') != 'loginom_dock_artifact_deliver': continue
+                state = call.get('state', {})
+                # Validation failures with no possible effect never reach the browser.
+                try: rejected = json.JSONDecoder().raw_decode(state.get('error', ''))[0]
+                except (ValueError, TypeError): rejected = None
+                if (state.get('status') == 'error' and isinstance(rejected, dict)
+                        and rejected.get('request_rejected') is True and rejected.get('effect_possible') is False
+                        and rejected.get('status') == 'NOT_APPLIED' and rejected.get('state') == 'settled'
+                        and rejected.get('action_key') == 'request.validate'):
+                    continue
+                uploads.append(call)
+            assert len(uploads) == 1, 'UPLOAD_COUNT'
+            assert any(o.get('upload_status', 'ready') == 'ready' and o.get('status') == 'SUCCEEDED'
                        and o.get('state') == 'settled' and o.get('cleanup_complete') is True
                        and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
                        and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'

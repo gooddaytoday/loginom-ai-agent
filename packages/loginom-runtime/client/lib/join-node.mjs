@@ -33,7 +33,7 @@ export async function preflightJoin(options,ctx,config){
  try{
   resolveJoinKeys(request.parameters,schemas);
   const output=request.mappings.find(m=>m.direction==='output');
-  const fields=joinOutputFields({input_fields:schemas,...request.parameters},output);
+  const fields=joinOutputFields({input_fields:schemas,...request.parameters,mode:request.mode},output);
   need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field');
   if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Join output mapping is incomplete');
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
@@ -49,7 +49,7 @@ export function validateJoinInlineSources(configuration,native){
  return native.target_fields.filter(f=>!f.excluded&&f.source===null);
 }
 export function createJoinNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.join_data',modes:['inner','left'],revision:'join-v4-internal-2',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
+ type:'transform.join_data',modes:['inner','left','right','full','difference'],revision:'join-v5-internal-1',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
  validate:validateJoinParameters,preflight:preflightJoin,configureInputs:configureJoinInputs,
  configurationObservation:{condition:'join configuration page',readJoin:true,ready:joinReady},
  async configure(channel,p,{request}){

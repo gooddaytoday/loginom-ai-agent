@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'datamining.log_regression' | 'research.corr_analysis' | 'transform.sliding_window' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | LogRegressionConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | LogRegressionConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -140,15 +140,21 @@ export type ReplacementRule = {
   pairs: Array<{from: ReplacementValue; to: ReplacementValue}>;
   other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue};
 } & ({type: 'string'; case_sensitive: boolean} | {type: 'integer' | 'real'; precision: 0});
+export interface RegexReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string';
+  pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
+  other: {mode: 'keep' | 'null'};
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: ReplacementRule[];
+  rules?: Array<ReplacementRule | RegexReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact'; rules: ReplacementRule[]; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }
@@ -235,7 +241,7 @@ export type JoinParameters = {keys: Array<{left: string; right: string}>;
 export interface JoinConfigurationReadback {
   kind: 'join'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'inner' | 'left'; keys: Array<{left: string; right: string}>;
+  mode: 'inner' | 'left' | 'right' | 'full' | 'difference'; keys: Array<{left: string; right: string}>;
   case_sensitive: boolean; include_joined_keys: boolean;
   input_mappings: Array<{port: 0 | 1; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>}>;
@@ -318,10 +324,24 @@ export interface LinRegressionConfigurationReadback {
   training: ClusteringConfigurationReadback['training'];
 }
 
+export interface SamplingConfigurationReadback {
+ kind:'sampling' | 'data_partition'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
+ node:NodeRef; receipt_ids:string[]; mode:'sequential'; counts:number[]; groups:string[];
+ output_mappings:Array<{port:number;fields:Array<{index:number;name:string;label:string;type:string;data_kind:string;source_name:string}>}>;
+ package_persistence_verified:false;
+}
+
 export interface CorrAnalysisConfigurationReadback {
  kind: 'corr_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
  node: NodeRef; receipt_ids: string[]; mode: 'pearson'; first_set: string[]; second_set: string[];
  coefficients: ['pearson']; package_persistence_verified: false;
+}
+
+export interface ElimOutlierConfigurationReadback {
+ kind:'elim_outlier';scope:'observed_before_verified_finish';values_are:'observed_ui_values';node:NodeRef;receipt_ids:string[];mode:'detect';
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep';extreme_policy:'keep'}>;
+ ordered:boolean;training_basis:'current_input';training:ClusteringConfigurationReadback['training'];
+ output_mappings:Array<{port:number;fields:Array<{index:number;name:string;label:string;type:string;data_kind:string;source_name:string}>}>;package_persistence_verified:false;
 }
 
 export interface LogRegressionConfigurationReadback {
