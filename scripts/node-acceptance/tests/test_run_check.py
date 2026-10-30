@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,66 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_model_phase_budget_comes_from_scenario_catalog(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, timeout in [('C1', 2700), ('5-REST', 2700), ('other', 1800), ('s1', 1800), ('n11', 1800)]:
+                with self.subTest(name=name):
+                    if name in ['C1', '5-REST', 'other']:
+                        source = root / 'cases' / name
+                        (source / 'data').mkdir(parents=True)
+                        (source / 'task.md').write_text('Выгрузи result.csv')
+                        runner.write(source / 'expected.json', {'nodes': [], 'outputs': [{
+                            'output_node_type': 'export_input', 'export_destination': '/test/result.csv'}]})
+                    instance = runner.Runner.__new__(runner.Runner)
+                    instance.out, instance.env, instance.options = root, {}, {'cases': str(root / 'cases')}
+                    folder, workspace = root / (name + '-run'), root / (name + '-workspace')
+                    folder.mkdir(); workspace.mkdir()
+                    with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                        with self.assertRaises(InterruptedError):
+                            instance.model(name, folder, root / 'profile', workspace, '/test/run.lgp',
+                                           {'package_directory': '/test'}, root / 'build')
+                    self.assertEqual(phase.call_args.kwargs.get('timeout', 1800), timeout)
+
+    def test_deadline_interrupts_cli_before_emergency_group_signals(self):
+        for exits_on in ['owner', 'group', 'kill']:
+            with self.subTest(exits_on=exits_on), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                instance = self.make_runner(root)
+                calls = []
+                class Child:
+                    pid = 12345
+                    def poll(self): return None
+                    def send_signal(self, sig): calls.append(('owner', sig))
+                    def wait(self, timeout=None):
+                        calls.append(('wait', timeout))
+                        if (len(calls) == 2 and exits_on != 'owner'
+                                or len(calls) == 4 and exits_on == 'kill'):
+                            raise subprocess.TimeoutExpired('fake-cli', timeout)
+                        return 0
+                with patch.object(runner.os, 'getloadavg', return_value=(0, 0, 0)), \
+                     patch.object(runner.subprocess, 'Popen', return_value=Child()), \
+                     patch.object(runner.subprocess, 'check_output', return_value=b'{"pid": 99999}'), \
+                     patch.object(runner.os, 'killpg', side_effect=lambda pid, sig: calls.append(('group', sig))), \
+                     patch.object(instance, 'memory', return_value={}):
+                    with self.assertRaisesRegex(TimeoutError, 'model deadline'):
+                        instance.phase('model', ['fake-cli'], root, timeout=0)
+                expected = [('owner', signal.SIGINT), ('wait', 100)]
+                if exits_on != 'owner': expected += [('group', signal.SIGINT), ('wait', 40)]
+                if exits_on == 'kill': expected += [('group', signal.SIGKILL), ('wait', None)]
+                self.assertEqual(calls, expected)
+
+    def test_case_root_keeps_catalog_budgets_and_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'input.csv'
+            source.write_text('a\n1\n')
+            for name, timeout in [('C1', 2700), ('5-REST', 2700), ('E1', 1800)]:
+                case = root / name
+                case.mkdir()
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                self.assertEqual(runner.scenario(name, root).get('model_timeout', 1800), timeout)
+
     def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -234,6 +295,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                         instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
                                        {'package_directory': '/test'}, root / 'build')
                 command = list(map(str, phase.call_args.args[1]))
+                self.assertEqual(phase.call_args.kwargs['timeout'], 1800)
                 attached = [command[i+1] for i, v in enumerate(command) if v == '--file']
                 self.assertEqual(attached, [str(spec['local_file'])] if mode == 'E2' else [])
                 self.assertEqual(list(workspace.iterdir()), [])
@@ -322,6 +384,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                                            {'package_directory': '/test'}, root / 'build',
                                            session='base-session' if index else None)
                     command = phase.call_args.args[1]
+                    self.assertEqual(phase.call_args.kwargs['timeout'], 1800, name)
                     attached = [Path(command[i + 1]) for i, item in enumerate(command) if item == '--file']
                     self.assertEqual(sorted(attached), sorted(workspace / p.name for p in inputs))
                     for source in inputs:
