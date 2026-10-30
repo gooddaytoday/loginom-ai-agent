@@ -40,7 +40,8 @@ node schema-size.mjs                      # измерение, без реги�
 `holdout-expected.json` и `threshold-half-expected.json` — отдельные операторские
 предложения, не добавленные в главный сценарий. Равенство p=0.5 и порога 0.5
 в живой пробе дало событие: правило **p >= threshold**. `../fixtures/null-x.csv` и
-`single-class.csv` — небольшие входы для будущих адресных отказов.
+`single-class.csv` — небольшие входы для адресных отказов. Native Teach
+на null-x отказал по NULL X; single-class пока not_checked.
 Формат всех входов: UTF-8, заголовок, запятая, точка, NULL `?`.
 Пустые значения Target в holdout допустимы при Apply, запрещены при Teach;
 прогноз не должен молча переобучать модель.

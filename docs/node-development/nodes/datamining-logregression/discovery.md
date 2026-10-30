@@ -36,7 +36,7 @@ Native vendor в `FVendorInfo` собственного дерева узла:
 | `NormTuneWizard` | X: «Нет», важность 1; Target: штатное кодирование «Отклонение». Кнопка `btnActivationPort`: «Не активировано» → «Вход активирован». |
 | `LearnPartitionWizard` | Обучение 100%, тест 0%, случайное разбиение, без валидации; доступен seed. При 100% не требуется воспроизводить PRNG. |
 | `LogRegressionWizard` | Выбор события, метода и поправки на долю событий. Умолчания: более редкое событие, auto=true, Ridge (disabled), denormalize=true, detailed=false, reference coefficients=true; поправка — на основе обучения. |
-| `LogRegressionWizard-1` | Детальная страница при detailed=true: epsilon 0.0001, threshold 0.5, intercept=true (disabled при denormalize), confidence 95. Epsilon/threshold имеют UI-границы 0..1. Приняты epsilon=1e-10 и threshold=0.8. |
+| `LogRegressionWizard-1` | Детальная страница при detailed=true: epsilon 0.0001, threshold 0.5, intercept=true (disabled в этой конфигурации), confidence 95. Epsilon/threshold имеют UI-границы 0..1. Приняты epsilon=1e-10 и threshold=0.8. |
 | `DoneWizard` | Описание узла, Done / Execute. Табличные выходы настраиваются отдельно через меню порта `mn;mniConfigurePort`. |
 
 Методы в picker: Enter, Forward, Backward, Stepwise, Ridge, LASSO, Elastic-net.
@@ -118,6 +118,13 @@ RowID 33/34/35, X=-3/0/3, p≈0.035714285844886055/0.5/0.964285714155114,
 Изменения источника этого опыта отброшены; пакет закрыт и logout подтверждён.
 Файл на сервере сохранил исходную train-модель.
 
+`fixtures/null-x.csv` (пять строк, оба класса) дал при Teach явный отказ:
+**«Пропущенные значения запрещены (пропущенное значение в колонке "X")»**.
+Причина прочитана по клику
+`ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-2>Логрегрессия:_Target_X`
+в `msgbox-1;cnt;cnt;MessagesView`. Пороговая и отрицательная пробы закрыты
+с отбрасыванием только собственных изменений; исходная train-модель сохранена.
+
 При отдельной настройке threshold=0.5 и повторном Teach на train строки
 RowID 15..18 имели ровно p=0.5, PredictionEvent=true, Target_predicted=yes.
 **Правило решения: p >= threshold**, равенство относится к событию.
@@ -136,8 +143,9 @@ RowID 15..18 имели ровно p=0.5, PredictionEvent=true, Target_predicted
 `acceptance/parameter-schema.json`. Это оставляет прежние общие описания
 `target_field` / `input_fields` неизменными. Все четыре поля обязательны,
 имеют description; строковый enum режима — существующий `enter`, индексы
-native enum наружу не передаются. NULL/пустая/неизвестная event, совпадающие
-имена факторов и цели, иные типы/роли/порты отклоняются до мутации.
+native enum наружу не передаются. NULL/пустая event, совпадающие имена факторов и цели и неподдержанные
+режимы/порты отклоняются до мутации. Типы/роли и наличие event проверяются
+по наблюдённому входу и списку классов до сохранения настроек модели.
 При NULL обучающей цели / фактора причина приходит штатным отказом Loginom;
 нельзя подставлять ноль, пропускать строки или молча выбирать другой метод.
 
