@@ -1,25 +1,31 @@
-Предложение LAB-533, не PASS и не утверждённый контракт.
+Предложение критериев LAB-533 для утверждения владельцем до этапа1.
+Только последовательный метод; смещение исключено из v0.3.8.
 
-`python3 oracle.py` строит expected только из fixtures/rows.csv независимыми
-срезами Python. Модель получает только task.md и data/rows.csv.
-Не передавать ей oracle, expected или результаты discovery.
+`python3 oracle.py --case CASE` независимо строит expected из fixtures/ срезами
+Python и конкатенацией; не читает Loginom/runtime/actual. Без аргументов —
+expected.json; CASE null/empty/update — expected-CASE.json. [Матрица](matrix.md).
+ordered=true, явный output_port, точный порядок строк/полей, типы и NULL;
+real abs=0/rel=0, integer/string/boolean сравниваются точно.
 
-Предлагаемая семантика портов: 0 — общий результат, 1 — обучающий,
-2 — тестовый. UI подтвердил три табличных выхода; их смысл и фактическая
-схема ещё не проверены живым выполнением из-за остановки парной карточки.
-Имя Boolean-признака свободное (`name_any`), смысл — true для тестовых строк.
-Предлагаемый порядок: исходные RowID, Class, Value, затем признак на порте 0.
-Это предложение владельцу, а не якобы наблюдённая схема Loginom.
+Основные выходы подтверждены native UI и stock matchesExpectedOutput.
+NULL/empty не проверены из-за трёх потерь связи стенда. Генерация expected
+не доказывает поведение продукта. Update/cold NOT_RUN. Модель получает только
+task.md и нужные CSV; oracle/expected/discovery не передавать.
+Запуск — штатный run-check; своего раннера нет. Runtime type не зарегистрирован,
+этап0 запрещает сборку CLI. Модельный PASS не заявлен.
 
-Порт 0: RowID 1..15, 15 строк, 5 true, сумма Value=1200.
-Порт 1: RowID 6..15, 10 строк, сумма Value=1050.
-Порт 2: RowID 1..5, 5 строк, сумма Value=150.
-Неиспользуемые: RowID 16..20; отдельного четвёртого выхода не ожидается.
-Пересечение train/test пусто. Все значения, порядок, типы, NULL точные;
-tolerance=0 (числа real в этом наборе отсутствуют).
+Sequential: train_count/test_count в строках, порядок test → train → unused.
+Скрытые cntTestPriority/pedTestPriorityPosition не входят в последовательный контракт.
+Native engine TBGPartitionEngine подтверждён сохранённым XML.
 
-При смене источника на update.csv предлагается тот же состав со сдвигом
-RowID на 100 и Value на 1000. NULL/empty fixtures — предложения дополнительных
-проверок; пока не часть основного task/expected. Прогоны NOT_RUN.
-Штатный run-check и cold умеют несколько output_port одного узла на базе
-2098aaf; прежнее требование отдельной W3 нельзя переносить из старого плана.
+| output_port | Наблюдённый результат rows.csv | Строки | Сумма Value |
+|---|---|---:|---:|
+| 0 общий | IsTestSet boolean первым, RowID6..15 затем1..5 | 15 | 1200 |
+| 1 train | RowID6..15, исходные3 поля | 10 | 1050 |
+| 2 test | RowID1..5, исходные3 поля | 5 | 150 |
+
+IsTestSet label «Тестовое множество», false для train, true для test.
+Поля train/test: RowID integer, Class string, Value integer. Unused16..20
+не входит ни в один выход. Общий выход concat train+test; глобальный порядок
+входа не сохраняется, порядок внутри каждого множества точный.
+Предложенный order train_test_unused ещё требует отдельной проверки до реализации.

@@ -1,27 +1,13 @@
 # Сэмплинг
 
-Устойчивый ID: `component.preprocessing.Sampling`. Slug: `preprocessing-sampling`. Исторический номер не назначен.
+Component ID: `component.preprocessing.Sampling`. Runtime proposal:
+`preprocessing.sampling`. Обработчика нет; `discovery_required`.
 
-[Подплан](plan.md) · [реестр](../../registry.json).
+[Подплан](plan.md) · [Discovery](discovery.md) · [Приёмочный комплект](acceptance/README.md).
 
-## Состояние
-
-Обработчика нет; `discovery_required`. В LAB-533 выполнена часть живого
-исследования пары; этап 0 blocked из-за неподтверждённого детерминированного
-контракта «Отбора со смещением». [Наблюдения](discovery.md),
-[приёмочные предложения](acceptance/README.md). CLI не собирался,
-модельная приёмка не запускалась; готовность реестра не менялась.
-
-## Планируемый объём по этапам
-
-- Назначенный этап 1 — Последовательный и Отбор со смещением; контракт
-  последнего требует решения владельца до завершения этапа 0.
-- Случайные и стратифицированные режимы — отдельные последующие назначения.
-
-Общие изменения: нет в объявленном срезе.
-
-## Источники
-
-- [Сэмплинг](https://help.loginom.ru/userguide/processors/preprocessing/sampling.html) — `loginom-help@353e506b:data/processors/preprocessing/sampling.md`.
-- `e2e-tests@486caef44:tests/toreview/acceptance/wizards/preprocessing/sampling/sampling.ts:202-478 — random/uniform/stratified/sequential/bias; :toreview` — прочитанные исходники, не результат выполнения.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; обработчика нет.
+В v0.3.8 только «Последовательный». Native engine, основные типы, параметры,
+численные результаты и порты подтверждены в UI Loginom7.4.2. NULL/empty
+остались непроверенными после трёх потерь связи стенда; этап0 blocked по
+окружению. ready_for_development пока не заявлен. Смещение и случайные/
+стратифицированные методы — следующие этапы. CLI не собирался; модельные
+run-check/cold NOT_RUN. Критерии утверждает владелец до этапа1.

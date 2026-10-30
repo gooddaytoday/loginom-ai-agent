@@ -25,6 +25,11 @@
       "column_order": "exact",
       "columns": [
         {
+          "name": "IsTestSet",
+          "type": "boolean",
+          "label": "Тестовое множество"
+        },
+        {
           "name": "RowID",
           "type": "integer",
           "label_any": true
@@ -38,104 +43,98 @@
           "name": "Value",
           "type": "integer",
           "label_any": true
-        },
-        {
-          "name": "Test",
-          "type": "boolean",
-          "name_any": true,
-          "label_any": true
         }
       ],
       "rows": [
         {
-          "RowID": 1,
-          "Class": "A",
-          "Value": 10,
-          "Test": true
-        },
-        {
-          "RowID": 2,
-          "Class": "A",
-          "Value": 20,
-          "Test": true
-        },
-        {
-          "RowID": 3,
-          "Class": "A",
-          "Value": 30,
-          "Test": true
-        },
-        {
-          "RowID": 4,
-          "Class": "A",
-          "Value": 40,
-          "Test": true
-        },
-        {
-          "RowID": 5,
-          "Class": "A",
-          "Value": 50,
-          "Test": true
-        },
-        {
+          "IsTestSet": false,
           "RowID": 6,
           "Class": "A",
-          "Value": 60,
-          "Test": false
+          "Value": 60
         },
         {
+          "IsTestSet": false,
           "RowID": 7,
           "Class": "A",
-          "Value": 70,
-          "Test": false
+          "Value": 70
         },
         {
+          "IsTestSet": false,
           "RowID": 8,
           "Class": "A",
-          "Value": 80,
-          "Test": false
+          "Value": 80
         },
         {
+          "IsTestSet": false,
           "RowID": 9,
           "Class": "A",
-          "Value": 90,
-          "Test": false
+          "Value": 90
         },
         {
+          "IsTestSet": false,
           "RowID": 10,
           "Class": "A",
-          "Value": 100,
-          "Test": false
+          "Value": 100
         },
         {
+          "IsTestSet": false,
           "RowID": 11,
           "Class": "B",
-          "Value": 110,
-          "Test": false
+          "Value": 110
         },
         {
+          "IsTestSet": false,
           "RowID": 12,
           "Class": "B",
-          "Value": 120,
-          "Test": false
+          "Value": 120
         },
         {
+          "IsTestSet": false,
           "RowID": 13,
           "Class": "B",
-          "Value": 130,
-          "Test": false
+          "Value": 130
         },
         {
+          "IsTestSet": false,
           "RowID": 14,
           "Class": "B",
-          "Value": 140,
-          "Test": false
+          "Value": 140
         },
         {
+          "IsTestSet": false,
           "RowID": 15,
           "Class": "B",
-          "Value": 150,
-          "Test": false
+          "Value": 150
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 1,
+          "Class": "A",
+          "Value": 10
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 2,
+          "Class": "A",
+          "Value": 20
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 3,
+          "Class": "A",
+          "Value": 30
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 4,
+          "Class": "A",
+          "Value": 40
+        },
+        {
+          "IsTestSet": true,
+          "RowID": 5,
+          "Class": "A",
+          "Value": 50
         }
       ]
     },

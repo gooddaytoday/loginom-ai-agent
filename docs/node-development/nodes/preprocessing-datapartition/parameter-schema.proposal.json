@@ -3,9 +3,8 @@
   "properties": {
     "train_count": {"type": "integer", "minimum": 0, "description": "Explicit training size in rows; train plus test must not exceed input size."},
     "test_count": {"type": "integer", "minimum": 0, "description": "Explicit test size in rows."},
-    "order": {"type": "string", "enum": ["test_train_unused", "train_test_unused", "unused_train_test"], "description": "Sequential allocation order; preserve original row order within each output."},
-    "test_priority": {"type": "string", "enum": ["none", "first", "last"], "description": "Explicit native test priority and placement. No random allocation."}
+    "order": {"type": "string", "enum": ["test_train_unused", "train_test_unused"], "description": "Sequential allocation order. Combined port 0 is train then test, prefixed by Boolean IsTestSet; ports 1/2 retain input fields and row order."}
   },
-  "required": ["train_count", "test_count", "order", "test_priority"],
+  "required": ["train_count", "test_count", "order"],
   "additionalProperties": false
 }

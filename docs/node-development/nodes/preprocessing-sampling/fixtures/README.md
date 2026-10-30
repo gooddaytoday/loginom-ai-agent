@@ -1,14 +1,13 @@
-Маленькие входы предложения этапа 0 LAB-533, UTF-8 без BOM, LF, заголовок,
-разделитель `,`, десятичная точка, кавычка `"`, NULL-маркер `?`.
+Входы предложения LAB-533: UTF-8 без BOM, LF, заголовок, разделитель `,`,
+десятичная точка, кавычка `"`, NULL-маркер `?`.
 
-| Файл | Явная схема в порядке полей | Назначение |
+| Файл | Явная схема | Назначение |
 |---|---|---|
-| rows.csv | RowID integer, Class string, Value integer | 20 строк, A/B по 10, основное независимое ожидание |
-| update.csv | та же | RowID +100, Value +1000, обновление того же узла |
-| empty.csv | та же | заголовок без данных; предложено 0 строк с прежней схемой |
-| null.csv | RowID integer, Class string, Value real, Flag boolean, Stamp datetime | пустая строка отдельно от NULL, real 0.5/-12.25, false/true/NULL, локальные даты без TZ |
+| rows.csv | RowID integer, Class string, Value integer | 20 строк; основной живой результат подтверждён |
+| update.csv | та же | RowID+100, Value+1000; обновление тех же узлов; NOT_RUN |
+| null.csv | RowID integer, Class string, Value real, Flag boolean, Stamp datetime | 3 строки; пустая строка, NULL, false, real и даты; NOT_CHECKED |
+| empty.csv | те же5 полей, что null.csv | заголовок без данных; сохранение явных типов; NOT_CHECKED |
 
-Основной task получает только rows.csv. Дополнительные наборы предложены для
-будущей матрицы, живым выполнением не проверены и в основной expected не входят.
-Для null.csv предлагать точное сохранение всех значений и типов, допуска 0;
-NULL в Class/Value второй строки и Flag/Stamp третьей строки должен остаться NULL.
+Основной task получает только data/rows.csv. Дополнительные expected
+воспроизводит oracle.py --case CASE; они не доказывают поведение продукта.
+Oracle/expected не передавать модели.
