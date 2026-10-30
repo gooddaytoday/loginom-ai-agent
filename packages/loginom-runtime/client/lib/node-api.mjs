@@ -68,7 +68,7 @@ export const missingValuesFieldSchema=object({field:groupingFieldSchema,method:c
 export const missingValuesParametersSchema=object({fields:array(missingValuesFieldSchema,128,1),max_nulls_percent:{type:'integer',minimum:0,maximum:100},ordered:{const:false}},[]);
 export const collapseParametersSchema=object({information:array(groupingFieldSchema,128),transposed:array(groupingFieldSchema,128,1),ignore_empty:boolean},[]);
 export const linRegressionParametersSchema=object({input_fields:{...array(text(128),128,1),description:'Complete list of continuous numeric predictor field names. Identifier and other unlisted fields are retained and ignored.'},target_field:{...text(128),description:'One continuous numeric response name; distinct from all predictors.'}},['input_fields','target_field']);
-export const elimOutlierParametersSchema=object({outlier:object({fields:{...array(text(128),128,1),uniqueItems:true,description:'Complete continuous numeric field names; retain unlisted fields.'},method:choice('sd','iqr'),outlier_factor:{type:'number',minimum:0,description:'Explicit outlier multiplier.'},extreme_factor:{type:'number',minimum:0,description:'Explicit extreme multiplier >= outlier_factor.'},ordered:{...boolean,description:'Input already ordered; does not sort.'}},[])},[]);
+export const elimOutlierParametersSchema=object({outlier:object({fields:{...array(text(128),128,1),uniqueItems:true,description:'Complete continuous numeric field names; retain unlisted fields.'},method:{...choice('sd','iqr'),description:'SD about mean or IQR fences.'},outlier_factor:{type:'number',minimum:0,description:'Explicit outlier multiplier.'},extreme_factor:{type:'number',minimum:0,description:'Explicit extreme multiplier >= outlier_factor.'},ordered:{...boolean,description:'Input already ordered; does not sort.'}},[])},[]);
 export const clusteringParametersSchema=object({features:{...array(groupingFieldSchema,128,1),description:'All continuous numeric features; retain/ignore unlisted fields/IDs.'},clusters:{...integer(2,1000),description:'Fixed cluster count; no auto.'},seed:{...integer(0,2147483647),description:'New default=42; existing omitted=preserve.'},normalization:{...choice('none'),description:'Default none; only mode.'}},[]);
 export const sortingKeySchema=object({field:groupingFieldSchema,direction:choice('ASC','DESC'),case_sensitive:{...boolean,description:'Per key: required for string/variant; omit for numeric/date/boolean.'}},['field','direction']);
 export const sortingParametersSchema=object({keys:array(sortingKeySchema,128,1),compare_with_locale:boolean},[]);
@@ -104,7 +104,7 @@ export const nodeApplyInputSchema=object({
   changes:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000),description:'Output patch. Mutually exclusive with fields per mapping.'},
   fields:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000,1),description:'Complete ordered layout: EVERY source, including excluded:true. Mutually exclusive with changes per mapping; ordering+exclusions use fields.'}},['direction','port']),16),
  finish:{...choice('done','execute','close'),description:'Required top-level field beside parameters; no default. "finish":"execute"=commit/run/fresh read; done=commit; close=discard. done/close: read.ports=[]. Omit read=defaults.'},
- read:object({ports:{...array(integer(0,1),2),description:'execute only; done/close/text export=[]. Omit read=defaults.'},sample_rows:integer(0,100),require_exact_numbers:boolean,coverage:{...choice('full','sample'),description:'sample default=10, max100 rows/10000 cells/512 KiB UTF-8 JSON values. full: executed Collapse/CrossTable port0 (native, <=50 rows/8 columns), or installed JavaScript port0 with sample_rows=100, require_exact_numbers=true; refuses unproven complete bounded preview, no native-byte provenance.'}},['ports','sample_rows','require_exact_numbers']),
+ read:object({ports:{...array(integer(0,2),3),description:'execute only; done/close/text export=[]. Omit read=defaults.'},sample_rows:integer(0,100),require_exact_numbers:boolean,coverage:{...choice('full','sample'),description:'sample default=10, max100 rows/10000 cells/512 KiB UTF-8 JSON values. full: executed Collapse/CrossTable port0 (native, <=50 rows/8 columns), or installed JavaScript port0 with sample_rows=100, require_exact_numbers=true; refuses unproven complete bounded preview, no native-byte provenance.'}},['ports','sample_rows','require_exact_numbers']),
  budgets:{...object({
   configure_ms:{...integer(1,1800000),description:'All setup: source/workflow/mappings/finish; wide imports may exceed 120s.'},
   execute_ms:{...integer(1,1800000),description:'Identified execution wait.'},
@@ -124,6 +124,8 @@ export const textImportParametersSchema=object({
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
 nodeApplyInputSchema.allOf=[
+ {if:{properties:{target:{properties:{type:{const:'preprocessing.elim_outlier'}},required:['type']}},required:['target']},
+  then:{},else:{properties:{read:{properties:{ports:array(integer(0,1),2)}}}}},
  {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']}},required:['target']},
   then:{properties:{mode:{const:'script'},parameters:javascriptParametersSchema}},
   else:{properties:{mode:{not:{const:'script'}},parameters:{not:{anyOf:Object.keys(javascriptParametersSchema.properties).filter(key=>key!=='columns').map(key=>({required:[key]}))}}}}},
@@ -144,7 +146,7 @@ const operation=object({operation_id:id});
 const deliveryId={...id,maxLength:80};
 const delivery=object({operation_id:deliveryId,artifact_id:id,upload_grant_id:id,budget_ms:integer(1000,1800000)});
 const resumeDelivery=object({operation_id:deliveryId,resume_id:deliveryId,budget_ms:integer(1000,1800000)});
-export const nodeOutputReadInputSchema=object({operation_id:id,source_operation_id:id,read:object({ports:array(integer(0,1),2),sample_rows:integer(0,100),require_exact_numbers:boolean},[]),budget_ms:integer(1,1800000)},['operation_id','source_operation_id']);
+export const nodeOutputReadInputSchema=object({operation_id:id,source_operation_id:id,read:object({ports:array(integer(0,2),3),sample_rows:integer(0,100),require_exact_numbers:boolean},[]),budget_ms:integer(1,1800000)},['operation_id','source_operation_id']);
 const unionObject=branches=>({type:'object',properties:{...Object.assign({},...branches.map(branch=>branch.properties)),
   kind:{enum:[...new Set(branches.flatMap(branch=>branch.properties.kind?.const?[branch.properties.kind.const]:[]))]}},
   additionalProperties:false,oneOf:branches});
@@ -171,6 +173,10 @@ export const deliveryApiTools=Object.freeze([
 ]);
 export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool=>tool.name===name);
 export function validateNodeApplyEnvelope(args) {
+ // The new three-output type alone extends the original public read bound.
+ // The small structural validator does not interpret JSON Schema allOf.
+ if(args.target?.type!=='preprocessing.elim_outlier'&&args.read?.ports!==undefined)
+  validateActionParameters(array(integer(0,1),2),args.read.ports,'parameters.read.ports');
  const javascript=args.target?.type==='programming.javascript';
  if(javascript){
   if(args.mode!=='script')throw Error('Invalid parameters.mode: programming.javascript requires script');

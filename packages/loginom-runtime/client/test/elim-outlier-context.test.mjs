@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readElimOutlierBrowser,readElimOutlierContext} from '../lib/elim-outlier-context.mjs';
+import {selectElimOutlierField} from '../lib/elim-outlier-procedure.mjs';
 function fixture(change=()=>{}){
  const prefix='MF;TF-1',base=prefix+';WizrdMCF;ElimOutlierWizard;',elements=new Map(),components=new Map();
  const root={checkVisibility:()=>true,contains:e=>[...elements.values()].includes(e)};
@@ -29,4 +30,15 @@ test('native outlier context refuses ownership drift and port surfaces',async()=
  const binding={workflow_ref:{prefix:'x'}},page={evaluate:async()=>({verified:true})};let count=0;
  assert.equal((await readElimOutlierContext(page,binding,async()=>({verified:true,surface:'wizard',node_id:++count}))).reason,'elim_outlier_owner_changed');
  assert.equal((await readElimOutlierContext(page,binding,async()=>({verified:true,surface:'wizard',output_port:{port:0}}))).verified,false);
+});
+test('initial native wizard may have a complete inventory with no selected field',()=>{
+ const result=fixture(f=>f.selection.length=0);
+ assert.equal(result.verified,true);assert.equal(result.selected,null);assert.equal(result.settings,null);assert.equal(result.fields.length,3);
+});
+test('field selection starts with no selected row and binds the chosen record before settings',async()=>{
+ const baseline=fixture(),field=baseline.fields[1];
+ const state={wizard:{stage:'elim_outlier'},node_elim_outlier:{...baseline,selected:null},ui:{elements:[{ref:'x',elim_outlier_cell:{part:'field',record_id:field.record_id},allowed_actions:['click']}]}};
+ let clicks=0;
+ const result=await selectElimOutlierField({observe:async o=>{assert.equal(o.ready(state),true);return structuredClone(state);},perform:async o=>{assert.deepEqual(o.resolve(state),{verb:'click',ref:'x'});state.node_elim_outlier.selected=field;clicks++;}},baseline,'X');
+ assert.equal(clicks,1);assert.equal(result.node_elim_outlier.selected.record_id,field.record_id);
 });

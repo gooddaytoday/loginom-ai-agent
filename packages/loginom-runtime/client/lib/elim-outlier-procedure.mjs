@@ -9,11 +9,11 @@ export async function selectElimOutlierField(channel,baseline,name){
  const f=baseline.fields.find(f=>f.name===name);need(f,'field disappeared');
  for(let attempt=0;attempt<130;attempt++){
   need(same(s.node_elim_outlier.fields.map(({used,...f})=>f),baseline.fields.map(({used,...f})=>f)),'field inventory changed');
-  if(s.node_elim_outlier.selected.record_id===f.record_id)return s;
+  if(s.node_elim_outlier.selected?.record_id===f.record_id)return s;
   const cells=s.ui.elements.filter(e=>e.elim_outlier_cell?.part==='field'),cell=cells.find(e=>e.elim_outlier_cell.record_id===f.record_id&&e.allowed_actions.includes('click'));
   if(cell){
    await channel.perform({condition:'select exact outlier field',initialObservation:s,ready,identity:()=>f,resolve:()=>({verb:'click',ref:cell.ref})});
-   return channel.observe({condition:'selected outlier controls belong to field',readElimOutlier:true,ready:s=>ready(s)&&s.node_elim_outlier.selected.record_id===f.record_id});
+   return channel.observe({condition:'selected outlier controls belong to field',readElimOutlier:true,ready:s=>ready(s)&&s.node_elim_outlier.selected?.record_id===f.record_id});
   }
   const visible=cells.filter(e=>e.scroll&&e.allowed_actions.includes('scroll'));need(visible.length&&attempt<129,'field cannot be revealed');
   const first=baseline.fields.findIndex(f=>f.record_id===visible[0].elim_outlier_cell.record_id),anchor=visible[Math.floor(visible.length/2)];

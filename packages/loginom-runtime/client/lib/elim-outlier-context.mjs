@@ -24,8 +24,10 @@ export function readElimOutlierBrowser(prefix){
   names.add(d.Name);ids.add(id);fields.push({index,record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],used:d.ChkUsable});
  }
  const selection=grid.getSelectionModel?.().getSelection?.();
- if(!Array.isArray(selection)||selection.length!==1||!rs.includes(selection[0]))return fail('elim_outlier_selection');
- const selected=fields[rs.indexOf(selection[0])],values={},switches={};
+ if(!Array.isArray(selection)||selection.length>1||selection.length===1&&!rs.includes(selection[0]))return fail('elim_outlier_selection');
+ // A newly opened native page has no selected row. The complete inventory
+ // authorizes selecting a field, never inferring that field's parameters.
+ const selected=selection.length===1?fields[rs.indexOf(selection[0])]:null,values={},switches={};
  for(const key of ['pedDetectOSko','pedDetectESko','pedDetectOKvartil','pedDetectEKvartil','pedActionOut','pedActionExtr','pedOrderedSample','pedUseQuality']){
   const c=cmp(key+';ValueControl');if(!c||typeof c.getValue!=='function')return fail('elim_outlier_control:'+key);
   values[key]=c.getValue();const es=exact(base+key+';SwitchButton');
@@ -33,13 +35,13 @@ export function readElimOutlierBrowser(prefix){
   switches[key]=es.length===1&&cmp(key+';SwitchButton').pressed;
  }
  const radios=['pedModeOE;ValueControl;radiofield','pedModeOE;ValueControl;radiofield-1'].map(k=>cmp(k)?.getValue?.());
- if(selected.used&&(!radios.every(v=>typeof v==='boolean')||radios[0]===radios[1]
+ if(selected?.used&&(!radios.every(v=>typeof v==='boolean')||radios[0]===radios[1]
   ||!['pedDetectOSko','pedDetectESko','pedDetectOKvartil','pedDetectEKvartil'].every(k=>Number.isFinite(values[k])&&values[k]>=0)
   ||!['pedActionOut','pedActionExtr'].every(k=>Number.isInteger(values[k])&&values[k]>=1&&values[k]<=7)))return fail('elim_outlier_selected_settings');
  if(typeof values.pedOrderedSample!=='boolean'||typeof values.pedUseQuality!=='boolean')return fail('elim_outlier_global_settings');
  const method=radios[0]?'sd':'iqr';
  return {verified:true,inventory_complete:true,state_source:'cached_elim_outlier_store',fields,selected,values,switches,
   ordered:values.pedOrderedSample,quality:values.pedUseQuality,
-  settings:selected.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:values.pedActionOut===1?'keep':'unsupported',extreme_policy:values.pedActionExtr===1?'keep':'unsupported'}:null,
+  settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:values.pedActionOut===1?'keep':'unsupported',extreme_policy:values.pedActionExtr===1?'keep':'unsupported'}:null,
   settings_applied:false};
 }
