@@ -1,0 +1,105 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.corr_analysis"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.corr_analysis",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ColSet1",
+          "label": "Поле1.Имя",
+          "type": "string"
+        },
+        {
+          "name": "ColSet1_Label",
+          "label": "Поле1.Метка",
+          "type": "string"
+        },
+        {
+          "name": "ColSet2",
+          "label": "Поле2.Имя",
+          "type": "string"
+        },
+        {
+          "name": "ColSet2_Label",
+          "label": "Поле2.Метка",
+          "type": "string"
+        },
+        {
+          "name": "Pirson",
+          "label": "Пирсона",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ],
+      "rows": [
+        {
+          "ColSet1": "age",
+          "ColSet1_Label": "age",
+          "ColSet2": "blood_pressure",
+          "ColSet2_Label": "blood_pressure",
+          "Pirson": 0.8322856293730624
+        }
+      ]
+    },
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "n",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "age_mean",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        },
+        {
+          "name": "pressure_mean",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        },
+        {
+          "name": "pearson_r",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ],
+      "rows": [
+        {
+          "n": 300,
+          "age_mean": 43.32,
+          "pressure_mean": 117.584667,
+          "pearson_r": 0.832286
+        }
+      ]
+    }
+  ]
+}
