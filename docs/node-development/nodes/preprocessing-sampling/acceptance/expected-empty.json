@@ -1,0 +1,100 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.sampling"
+    },
+    {
+      "type": "preprocessing.sampling"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.sampling",
+      "output_node_label": "Первые пять",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "preprocessing.sampling",
+      "output_node_label": "Последние пять",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

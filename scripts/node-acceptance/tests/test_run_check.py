@@ -741,6 +741,20 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, text, header='labels')
 
+    def test_csv_null_marker_is_explicit_and_preserves_other_values(self):
+        output = {'columns': [{'name': 'Value', 'type': 'real'},
+                              {'name': 'Text', 'type': 'string'}],
+                  'rows': [{'Value': None, 'Text': '?'}, {'Value': 0, 'Text': ''}],
+                  'ordered': True}
+        self.csv_result(output, 'Value,Text\n,?\n0,\n')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'Value,Text\n?,?\n0,\n')
+        self.csv_result(output, 'Value,Text\n?,?\n0,\n', null_marker='?')
+        for text in ['Value,Text\n,?\n0,\n', 'Value,Text\n0,?\n0,\n',
+                     'Value,Text\n?,?\n?,\n', 'Value,Text\n?,\n0,\n']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, text, null_marker='?')
+
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)
