@@ -2693,7 +2693,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(previous.outcome);
         }
         auxiliary.set(id,{signature});storageNavigating=true;
-        const deadline=now()+120000;let step=0;
+        const deadline=now()+90000;let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const readPages=async options=>{
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
@@ -2740,7 +2740,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
-          const original=binding(s);let quiet=null;
+          const original=binding(s),rootIdentity=s.observation_root?.identity??e.identity??{anchor_tid:e.tid,path:[]};let quiet=null;
           for(let attempt=0;attempt<3;attempt++){
             let previous=null;
             s=await ready(async()=>{
@@ -2758,6 +2758,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               ||result.cleanup_complete!==true||result.error?.code!=='UI_EPOCH_CHANGED'||attempt===2
               ||!Array.isArray(result.trace)||result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event)))
               throw Error('Server storage navigation requires inspection: '+result.operation_id);
+            // uiAct consumes the issued observation even for a no-effect
+            // refusal. Reissue the same owner/target before the next read.
+            const discovered=await read({scope:'roots',...(e.storage_entry?{storageName:e.label}:{})});
+            if(!same(binding(discovered).slice(0,4),original.slice(0,4)))throw Error('Server storage owner changed');
+            const root=one(discovered.ui.elements.filter(item=>same(item.identity??{anchor_tid:item.tid,path:[]},rootIdentity)));
+            const fresh=await detail(discovered,root);
+            const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+            if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
+            s=fresh;e=matches[0];
           }
         };
         const ready=async(probe,predicate)=>{

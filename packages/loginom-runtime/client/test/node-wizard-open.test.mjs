@@ -97,5 +97,69 @@ for(const fault of [null,'unconfirmed','foreign','mask'])test('reopen after Impo
   assert.deepEqual(gestures,[{verb:'click',ref:'body'},{verb:'begin_wizard',ref:'settings'}]);
  }
  if(fault==='unconfirmed')assert.deepEqual(gestures,[{verb:'click',ref:'body'}]);
- if(['foreign','mask'].includes(fault))assert.deepEqual(gestures,[]);
+if(['foreign','mask'].includes(fault))assert.deepEqual(gestures,[]);
 });
+
+function lateBodyReplacement(fault) {
+ const {state}=fixture(),node=state.prepared_node_context;
+ node.locked=false;
+ Object.assign(state,{origin:'https://app.loginom.ai/',workflow_ref:{workflow_id:'flow'},
+  graph_identity:{status:'observed',container_ref:'graph'},dom_epoch:{document:'doc',revision:1},scan:{complete:true}});
+ state.wizard_pending_owner={status:'unobserved'};
+ state.ui={dialogs:[],masks:[],truncated:{dialogs:false,masks:false},elements:[
+  {ref:'old-body',tid:node.tid,scope:'graph',identity:{anchor_tid:node.tid,path:[]},signature:{tag:'g',native_graph:{node_id:'node'}},
+   graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:'point_observed'}}]};
+ const fresh=structuredClone(state);fresh.ui.elements[0].ref='fresh-body';fresh.dom_epoch.revision++;
+ const selected=structuredClone(fresh);
+ selected.ui.elements.push({ref:'settings',tid:node.tid+';Setting',allowed_actions:['begin_wizard'],
+  wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}});
+ const opened=structuredClone(selected);opened.prepared_node_context.surface='wizard';
+ opened.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},
+  path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'flow>Import>Settings',label:'Settings'}]}};
+ if(fault==='same-body')fresh.ui.elements[0].ref='old-body';
+ if(fault==='foreign-guid')fresh.prepared_node_context.node_id='other';
+ if(fault==='foreign-document')fresh.dom_epoch.document='other';
+ if(fault==='foreign-workflow')fresh.workflow_ref.workflow_id='other';
+ if(fault==='signature')fresh.ui.elements[0].signature.native_graph.node_id='other';
+ if(fault==='label')fresh.ui.elements[0].graph_node.part='label';
+ if(fault==='mask')fresh.ui.masks.push({kind:'busy'});
+ if(fault==='dialog')fresh.ui.dialogs.push({});
+ if(fault==='incomplete')fresh.scan.complete=false;
+ if(fault==='locked')fresh.prepared_node_context.locked=true;
+ if(fault==='covered')fresh.ui.elements[0].interaction.state='point_not_observed';
+ if(fault==='duplicate')fresh.ui.elements.push({...fresh.ui.elements[0]});
+ let current=state,clock=0,reads=0;
+ const gestures=[],settingsTimeouts=[];
+ const channel={now:()=>clock,observe:async options=>{
+  if(options.condition==='prepared node settings available')settingsTimeouts.push(options.timeoutMs??15000);
+  const deadline=clock+(options.timeoutMs??15000);
+  do {
+   if(gestures.length===1&&++reads>=3)current=fresh;
+   if(options.ready(current))return structuredClone(current);
+   clock+=200;
+  } while(clock<deadline);
+  throw Error('readiness timeout');
+ },perform:async options=>{
+  assert.ok(options.ready(current));const action=options.resolve(structuredClone(current));gestures.push(action);
+  if(action.verb==='begin_wizard')current=opened;
+  else if(gestures.length===1&&fault==='lost-reply')throw Error('transport reply lost');
+  else if(gestures.length>1) {
+   current=fault==='second-replacement'?structuredClone(fresh):selected;
+   if(fault==='second-replacement')current.ui.elements[0].ref='third-body';
+  }
+  return {status:fault==='unknown'?'UNKNOWN':'SUCCEEDED',cleanup_complete:fault!=='cleanup',effect_possible:true};
+ }};
+ return {channel,gestures,settingsTimeouts};
+}
+
+test('settled selection followed by a late body replacement selects the fresh body and opens settings once',async()=>{
+ const f=lateBodyReplacement();assert.equal((await openPreparedWizard(f.channel)).verified,true);
+ assert.deepEqual(f.gestures,[{verb:'click',ref:'old-body'},{verb:'click',ref:'fresh-body'},{verb:'begin_wizard',ref:'settings'}]);
+ assert.ok(f.settingsTimeouts[1]<f.settingsTimeouts[0],'replacement must not reset the settings deadline');
+});
+for(const fault of ['same-body','foreign-guid','foreign-document','foreign-workflow','signature','label','mask','dialog',
+ 'incomplete','locked','covered','duplicate','lost-reply','unknown','cleanup','second-replacement'])
+ test('late settings selection refuses unproved or repeated replacement: '+fault,async()=>{
+  const f=lateBodyReplacement(fault);await assert.rejects(openPreparedWizard(f.channel));
+  assert.deepEqual(f.gestures,fault==='second-replacement'?[{verb:'click',ref:'old-body'},{verb:'click',ref:'fresh-body'}]:[{verb:'click',ref:'old-body'}]);
+ });

@@ -1,7 +1,7 @@
 import {resolveElimOutlierParameters} from './elim-outlier-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const ready=s=>s.wizard?.stage==='elim_outlier'&&s.node_elim_outlier?.verified===true;
+const ready=s=>s.wizard?.stage==='elim_outlier'&&s.node_elim_outlier?.verified===true&&s.node_elim_outlier.binding_ready===true;
 const observe=(channel,condition)=>channel.observe({condition,readElimOutlier:true,ready});
 const one=(s,p,m)=>{const es=s.ui.elements.filter(p);need(es.length===1,m);return es[0];};
 export async function selectElimOutlierField(channel,baseline,name){
@@ -80,6 +80,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
  if(s.node_elim_outlier.ordered!==ordered){await act(s,'pedOrderedSample;ValueControl;DisplayEl',{verb:'set_checked',checked:ordered});s=await observe(channel,'outlier ordered flag readback');}
  need(s.node_elim_outlier.ordered===ordered&&!s.node_elim_outlier.quality&&!Object.values(s.node_elim_outlier.switches).some(Boolean),'global outlier settings differ');
  need(same(s.node_elim_outlier.fields.filter(f=>f.used).map(f=>f.name),baseline.fields.filter(f=>selected.includes(f.name)).map(f=>f.name)),'selected field set differs');
+ s=await observe(channel,'outlier editor binding and native queue idle before Next');
  const configuration={...s.node_elim_outlier,field_settings:after};
  await channel.perform({condition:'validate outlier detect settings',initialObservation:s,ready,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Outlier Next unavailable').ref,expected_stage:'done'})});

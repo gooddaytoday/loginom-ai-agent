@@ -12,13 +12,19 @@ function fixture(change=()=>{}){
  const selection=[fields[1]],values={pedDetectOSko:1,pedDetectESko:3,pedDetectOKvartil:1.5,pedDetectEKvartil:3,pedActionOut:1,pedActionExtr:1,pedOrderedSample:false,pedUseQuality:false};
  add('grdColumnsSettings',{getStore:()=>store,getSelectionModel:()=>({getSelection:()=>selection})});
  for(const key of Object.keys(values)){add(key+';ValueControl',{getValue:()=>values[key]});add(key+';SwitchButton',{pressed:false});}
+ const view={el:{dom:root}},wizardView={el:{dom:{}}},queue={IsEmpty:true};
+ wizardView[Symbol('LockQueue')]=queue;
+ const controller={constructor:{name:'ElimOutlierWizard'},FView:{el:{dom:{}}},FWizardForm:{FView:wizardView},FColumnsStore:store,FCurrentRecord:fields[1],FColumnPropEditors:[{}]};
+ view['@@TestCmpController']=controller;components.set('root',view);elements.set(prefix+';WizrdMCF',wizardView.el.dom);components.set('wizard',wizardView);wizardView.el.dom.id='wizard';root.id='root';
  const radios=[true,false];for(const [i,key] of ['radiofield','radiofield-1'].entries())add('pedModeOE;ValueControl;'+key,{getValue:()=>radios[i]});
- change({fields,store,values,radios,selection,components,elements});
+ change({fields,store,values,radios,selection,components,elements,controller,queue,wizardView});
+ if(controller.FCurrentRecord===fields[1]&&selection.length===1){controller.FCurrentRecord=selection[0];controller.FColumnPropEditors=selection[0].data.ChkUsable?[{}]:null;}
+ if(!selection.length)controller.FCurrentRecord=null;
  const context=vm.createContext({document:{querySelectorAll:s=>{const tid=JSON.parse(s.slice(10,-1));return tid===base.slice(0,-1)?[root]:elements.has(tid)?[elements.get(tid)]:[];}},Ext:{getCmp:id=>components.get(id)}});
  return JSON.parse(JSON.stringify(vm.runInContext('('+readElimOutlierBrowser.toString()+')',context)(prefix)));
 }
 test('complete bound native store yields SD/IQR controls and separate field participation',()=>{
- const s=fixture();assert.equal(s.verified,true);assert.equal(s.fields.length,3);assert.equal(s.selected.name,'X');assert.deepEqual(s.settings,{method:'sd',outlier_factor:1,extreme_factor:3,outlier_policy:'keep',extreme_policy:'keep'});
+ const s=fixture();assert.equal(s.verified,true);assert.equal(s.binding_ready,true);assert.equal(s.fields.length,3);assert.equal(s.selected.name,'X');assert.deepEqual(s.settings,{method:'sd',outlier_factor:1,extreme_factor:3,outlier_policy:'keep',extreme_policy:'keep'});
  assert.equal(fixture(f=>{f.radios[0]=false;f.radios[1]=true;}).settings.method,'iqr');
  assert.equal(fixture(f=>{f.selection[0]=f.fields[0];f.values.pedDetectOSko=null;}).settings,null);
 });
@@ -69,4 +75,18 @@ for(const method of ['sd','iqr'])test('native '+method+' controls use the observ
  assert.equal(result.configuration.field_settings[0].settings.outlier_policy,'keep');assert.equal(result.configuration.field_settings[0].settings.extreme_policy,'keep');
  assert.equal(result.configuration.field_settings[0].settings.method,method);
  assert.deepEqual(result.configuration.field_settings[1],{name:'Note',used:false,settings:null});
+});
+
+test('grid selection is not ready until native editor binding and wizard queue settle',()=>{
+ // mas3 lab569-2-sd/main-1-execution-events.jsonl:474-480: Note selected,
+ // Next acknowledged, wizard still elim_outlier. Native PrepareViewAfterColumnSelect
+ // awaits SaveSettingsFrame before updating FCurrentRecord under LockQueue.
+ const stale=fixture(f=>{f.selection[0]=f.fields[2];f.controller.FCurrentRecord={...f.fields[1]};});
+ assert.equal(stale.verified,false);assert.equal(stale.reason,'elim_outlier_binding_pending');
+ const pending=fixture(f=>{f.selection[0]=f.fields[2];f.queue.IsEmpty=false;});
+ assert.equal(pending.verified,false);assert.equal(pending.reason,'elim_outlier_binding_pending');
+ const settled=fixture(f=>{f.selection[0]=f.fields[2];f.store.getModifiedRecords=()=>[f.fields[1]];});
+ assert.equal(settled.verified,true);assert.equal(settled.binding_ready,true);
+ assert.equal(settled.selected.name,'Note');assert.equal(settled.settings,null);
+ for(const change of [f=>f.controller.FColumnsStore={},f=>f.controller.FWizardForm.FView={},f=>delete f.wizardView[Object.getOwnPropertySymbols(f.wizardView)[0]]])assert.equal(fixture(change).verified,false);
 });

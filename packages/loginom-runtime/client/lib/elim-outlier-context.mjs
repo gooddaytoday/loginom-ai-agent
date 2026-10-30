@@ -25,6 +25,19 @@ export function readElimOutlierBrowser(prefix){
  }
  const selection=grid.getSelectionModel?.().getSelection?.();
  if(!Array.isArray(selection)||selection.length>1||selection.length===1&&!rs.includes(selection[0]))return fail('elim_outlier_selection');
+ // Selection changes before PrepareViewAfterColumnSelect finishes saving the
+ // previous field and initializing its editors. Next is ignored while the
+ // shared native wizard queue is busy, even without a visible mask.
+ const view=globalThis.Ext?.getCmp?.(roots[0].id),controller=view?.['@@TestCmpController'];
+ const wizardRoots=exact(prefix+';WizrdMCF'),wizardView=wizardRoots.length===1?globalThis.Ext?.getCmp?.(wizardRoots[0].id):null;
+ // Native JoinWizard moves the page out of the vendor FView; testable keeps
+ // its controller on the rendered page through @@TestCmpController.
+ if(view?.el?.dom!==roots[0]||controller?.constructor?.name!=='ElimOutlierWizard'||controller.FColumnsStore!==store
+  ||controller.FWizardForm?.FView!==wizardView||wizardView?.el?.dom!==wizardRoots[0])return fail('elim_outlier_binding_owner');
+ const queues=Object.getOwnPropertySymbols(wizardView).filter(s=>s.description==='LockQueue');
+ if(queues.length!==1||wizardView[queues[0]]?.IsEmpty!==true
+  ||(selection[0]??null)!==(controller.FCurrentRecord??null)
+  ||selection[0]&&(selection[0].data.ChkUsable?!Array.isArray(controller.FColumnPropEditors)||!controller.FColumnPropEditors.length:controller.FColumnPropEditors!==null))return fail('elim_outlier_binding_pending');
  // A newly opened native page has no selected row. The complete inventory
  // authorizes selecting a field, never inferring that field's parameters.
  const selected=selection.length===1?fields[rs.indexOf(selection[0])]:null,values={},switches={};
@@ -40,7 +53,7 @@ export function readElimOutlierBrowser(prefix){
   ||!['pedActionOut','pedActionExtr'].every(k=>Number.isInteger(values[k])&&values[k]>=1&&values[k]<=7)))return fail('elim_outlier_selected_settings');
  if(typeof values.pedOrderedSample!=='boolean'||typeof values.pedUseQuality!=='boolean')return fail('elim_outlier_global_settings');
  const method=radios[0]?'sd':'iqr';
- return {verified:true,inventory_complete:true,state_source:'cached_elim_outlier_store',fields,selected,values,switches,
+ return {verified:true,binding_ready:true,inventory_complete:true,state_source:'cached_elim_outlier_store',fields,selected,values,switches,
   ordered:values.pedOrderedSample,quality:values.pedUseQuality,
   settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:values.pedActionOut===1?'keep':'unsupported',extreme_policy:values.pedActionExtr===1?'keep':'unsupported'}:null,
   settings_applied:false};
