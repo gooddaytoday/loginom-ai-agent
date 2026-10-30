@@ -21,6 +21,18 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_regex_catalog_keeps_oracles_out_of_model_inputs(self):
+        for name, expected, width in [('regex-add', 'expected.json', 5), ('regex-replace', 'expected-replace.json', 4)]:
+            case = runner.scenario(name)
+            self.assertEqual(case['expected_name'], expected)
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual([p.name for p in case['data'].glob('*.csv')], ['input.csv'])
+            result = runner.expected_for(case, '/test/regex.lgp')
+            self.assertEqual(result['package_path'], '/test/regex.lgp')
+            self.assertEqual(len(result['outputs'][0]['columns']), width)
+            self.assertEqual(len(result['outputs'][0]['rows']), 8)
+            self.assertIn('transform.replace_columns', [n['type'] for n in result['nodes']])
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
