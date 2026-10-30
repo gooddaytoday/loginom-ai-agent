@@ -1,0 +1,225 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "bom": false,
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "header": true,
+    "line_ending": "LF"
+  },
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "X",
+      "type": "real",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "Note",
+      "type": "string",
+      "data_kind": "discrete"
+    }
+  ],
+  "oracle_dependencies": "Python 3 stdlib csv, fractions, json; no third-party or Loginom imports",
+  "files": [
+    {
+      "path": "constant.csv",
+      "bytes": 68,
+      "sha256": "e583e35e26decabb3b5ca2a3637903fe8be4033b16047721cf1265b840dee964",
+      "rows": 5,
+      "purpose": "zero variance"
+    },
+    {
+      "path": "empty.csv",
+      "bytes": 13,
+      "sha256": "cb39effb32d8454b57feb2d35beeb47a8538bc908ca8556db4f311e0168f9a42",
+      "rows": 0,
+      "purpose": "empty input; not a passing numerical case"
+    },
+    {
+      "path": "fences.csv",
+      "bytes": 173,
+      "sha256": "433a5f4da937fc6d405eba6fa4b9d426d9a315bd736487530ad5c0e83f115768",
+      "rows": 13,
+      "purpose": "equality at IQR fences"
+    },
+    {
+      "path": "invalid.csv",
+      "bytes": 39,
+      "sha256": "6114e3c42b8e4745b1d35fe9c089e7734e582f5a073ba66738681796f8e2ef08",
+      "rows": 2,
+      "purpose": "string X, unsupported in stage 1"
+    },
+    {
+      "path": "iqr-boundary.csv",
+      "bytes": 113,
+      "sha256": "432881e417f46fd32e8b916c3383a1129366e0e9312e4c845655ba8cd00f66bd",
+      "rows": 9,
+      "purpose": "inclusive/exclusive quartile discriminator"
+    },
+    {
+      "path": "iqr.csv",
+      "bytes": 295,
+      "sha256": "513f951bdfcb9814df009d399a9b20cb3d6263a58f018edfb7e4c0c423237191",
+      "rows": 22,
+      "purpose": "IQR main; 1..20, 40, 100"
+    },
+    {
+      "path": "null.csv",
+      "bytes": 297,
+      "sha256": "dc18c157d67ac4a88e4ae3bf9cabd47335487d2c56a8379a0368f543daaeb333",
+      "rows": 23,
+      "purpose": "NULL is not zero; statistics exclude NULL"
+    },
+    {
+      "path": "sd-boundary.csv",
+      "bytes": 70,
+      "sha256": "0deef01b042b1f3f8a7fda9bba8bdbd3caf311246205ef411efdddb2db584daf",
+      "rows": 5,
+      "purpose": "sample/population SD discriminator at multiplier 1.3"
+    },
+    {
+      "path": "shifted.csv",
+      "bytes": 347,
+      "sha256": "a4b9cb41ed38643a8afbcd6dc1085064733e4d836dd3bebd8d28f83eba85f819",
+      "rows": 22,
+      "purpose": "learn/apply discrimination; +1000 shift"
+    },
+    {
+      "path": "update.csv",
+      "bytes": 286,
+      "sha256": "003ec4152874a48a709fba858c9a8fc352556eb670374cc4326776305f73c814",
+      "rows": 22,
+      "purpose": "same RowIDs, negative tail"
+    },
+    {
+      "path": "values.csv",
+      "bytes": 284,
+      "sha256": "22bdda70c0f02a7a68b7041b5947769625cadb8b0b423dcf6fcb256466388334",
+      "rows": 22,
+      "purpose": "SD main; 20 zeros, 10, 100"
+    },
+    {
+      "path": "conventions.csv",
+      "bytes": 967,
+      "sha256": "70b5c6d3a251ae22df6d1de9d84639eb9227802af1d572944665b3d348ad7eb7",
+      "rows": 50,
+      "purpose": "combined independent probes; NULL padding; Note empty at RowID49 and NULL at50",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "SD",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "IQR",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Fence",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Nullable",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "data_kind": "discrete"
+        }
+      ]
+    },
+    {
+      "path": "conventions-refresh.csv",
+      "bytes": 1096,
+      "sha256": "331e3611caad1b122f04039fa715828c6b61731bd5f20c37e2ddce16ccda7528",
+      "rows": 50,
+      "purpose": "explicit retrain after +1000 shift; IQR n8 [1..7,11.75] separates type7 interpolation; row14 IQR NULL",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "SD",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "IQR",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Fence",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Nullable",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "data_kind": "discrete"
+        }
+      ]
+    },
+    {
+      "path": "quartile-conventions.csv",
+      "bytes": 965,
+      "sha256": "cb1feda1409f4bb36c2d332460328957614ca799acee9be74a47d4446757097a",
+      "rows": 50,
+      "purpose": "all four fields IQR1.5/3; HF1->13,23,35; HF2->23,35; HF4->7,13,35; Tukey hinges->7,23,35; upper-rank->23; NULL padding; type7->7,13,23,35; native hypothesis, not yet executed",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "SD",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "IQR",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Fence",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Nullable",
+          "type": "real",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "data_kind": "discrete"
+        }
+      ]
+    }
+  ]
+}
