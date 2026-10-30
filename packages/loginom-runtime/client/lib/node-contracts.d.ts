@@ -140,15 +140,21 @@ export type ReplacementRule = {
   pairs: Array<{from: ReplacementValue; to: ReplacementValue}>;
   other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue};
 } & ({type: 'string'; case_sensitive: boolean} | {type: 'integer' | 'real'; precision: 0});
+export interface RegexReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string';
+  pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
+  other: {mode: 'keep' | 'null'};
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: ReplacementRule[];
+  rules?: Array<ReplacementRule | RegexReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact'; rules: ReplacementRule[]; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }
@@ -235,7 +241,7 @@ export type JoinParameters = {keys: Array<{left: string; right: string}>;
 export interface JoinConfigurationReadback {
   kind: 'join'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'inner' | 'left'; keys: Array<{left: string; right: string}>;
+  mode: 'inner' | 'left' | 'right' | 'full' | 'difference'; keys: Array<{left: string; right: string}>;
   case_sensitive: boolean; include_joined_keys: boolean;
   input_mappings: Array<{port: 0 | 1; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>}>;

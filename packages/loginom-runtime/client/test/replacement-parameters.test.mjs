@@ -5,6 +5,12 @@ const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
 test('Null, empty string and literal null remain three distinct keys',()=>assert.equal(validateReplacementParameters(params(),'exact',request).rules[0].pairs.length,3));
+test('regex accepts ordered string constants and inline case flag, refusing unsupported semantics',()=>{
+ const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Code'},type:'string',pairs:[{from:value('(?i)AB-([0-9]{2})'),to:value('SKU-$1')},{from:value('^AB-00$'),to:value('ZERO')}],other:{mode:'null'}}]};
+ assert.equal(validateReplacementParameters(p,'regex',request),p);
+ for(const pattern of ['',null,'a*','(?=a)','(a)\\1','[','é','()','^$','(?i)a|b','a{0}']){const bad=structuredClone(p);bad.rules[0].pairs[0].from.value=pattern;assert.throws(()=>validateReplacementParameters(bad,'regex',request),/regex/i);}
+ for(const change of [r=>r.case_sensitive=false,r=>r.precision=0,r=>r.type='integer',r=>r.other={mode:'value',value:value('x')},r=>r.pairs[0].to.value=null]){const bad=structuredClone(p);change(bad.rules[0]);assert.throws(()=>validateReplacementParameters(bad,'regex',request),/regex/i);}
+});
 test('incompatible comparison flags identify the rule and required correction',()=>{
  const p=params();p.rules[0].precision=0;
  assert.throws(()=>validateReplacementParameters(p,'exact',request),/parameters.rules.0: Category \(string\).*forbids precision/);

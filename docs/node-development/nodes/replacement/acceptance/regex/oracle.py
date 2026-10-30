@@ -42,7 +42,7 @@ def expectations(replace=False):
     if not replace:
         columns.append(column('Code_Replace', 'string'))
     columns += [column('Code_Replaced', 'boolean'), column('Keep', 'string')]
-    return dict(package_path='{{PACKAGE_PATH}}',
+    return dict(package_path='{{PACKAGE_PATH}}', null_marker='NULL',
                 nodes=[dict(type='imports.text'), dict(type='transform.replace_columns')],
                 outputs=[dict(output_node_type='transform.replace_columns', output_port=0,
                               ordered=False, column_order='exact', columns=columns, rows=rows)])
