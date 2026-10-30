@@ -1,0 +1,84 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Target_regression",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Target_probability",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label": "X"
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label": "Target"
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label": "RowID"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label": "Note"
+        }
+      ],
+      "rows": [
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.03571428571428571,
+          "RowID": 33,
+          "X": -3.0,
+          "Target": null,
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.5000000000000001,
+          "RowID": 34,
+          "X": 0.0,
+          "Target": null,
+          "Note": "new"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.9642857142857143,
+          "RowID": 35,
+          "X": 3.0,
+          "Target": null,
+          "Note": "new"
+        }
+      ]
+    }
+  ]
+}

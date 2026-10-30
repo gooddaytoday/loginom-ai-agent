@@ -1,0 +1,316 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Target_regression",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Target_probability",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label": "X"
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label": "Target"
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label": "RowID"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label": "Note"
+        }
+      ],
+      "rows": [
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 1,
+          "X": -2.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 2,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 3,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 4,
+          "X": -2.0,
+          "Target": "no",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 5,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 6,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 7,
+          "X": -2.0,
+          "Target": "no",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 8,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 9,
+          "X": -2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.09999999999999998,
+          "RowID": 10,
+          "X": -2.0,
+          "Target": "no",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.25000000000000006,
+          "RowID": 11,
+          "X": -1.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.25000000000000006,
+          "RowID": 12,
+          "X": -1.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.25000000000000006,
+          "RowID": 13,
+          "X": -1.0,
+          "Target": "no",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.25000000000000006,
+          "RowID": 14,
+          "X": -1.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.5000000000000001,
+          "RowID": 15,
+          "X": 0.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.5000000000000001,
+          "RowID": 16,
+          "X": 0.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.5000000000000001,
+          "RowID": 17,
+          "X": 0.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.5000000000000001,
+          "RowID": 18,
+          "X": 0.0,
+          "Target": "no",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.75,
+          "RowID": 19,
+          "X": 1.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.75,
+          "RowID": 20,
+          "X": 1.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.75,
+          "RowID": 21,
+          "X": 1.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "no",
+          "Target_probability": 0.75,
+          "RowID": 22,
+          "X": 1.0,
+          "Target": "no",
+          "Note": null
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 23,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 24,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 25,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 26,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 27,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 28,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 29,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 30,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": "synthetic"
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 31,
+          "X": 2.0,
+          "Target": "yes",
+          "Note": null
+        },
+        {
+          "Target_regression": "yes",
+          "Target_probability": 0.8999999999999999,
+          "RowID": 32,
+          "X": 2.0,
+          "Target": "no",
+          "Note": "synthetic"
+        }
+      ]
+    }
+  ]
+}
