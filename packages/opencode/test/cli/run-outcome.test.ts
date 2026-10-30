@@ -63,6 +63,39 @@ test.each(["message", "next-message"])("a missing read is repaired in %s", (mess
   expect(outcome.failed()).toBe(false)
 })
 
+test("a successful read repairs only the latest matching missing file", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/orders.csv"))
+  outcome.observe(missing("/data/customers.csv"))
+  outcome.observe(part("read", { filePath: "/data/products.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/orders.csv" }, true))
+  outcome.observe(part("read", { filePath: "/data/orders.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test("an exact read retry preserves other missing files", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/orders.csv"))
+  outcome.observe(missing("/data/customers.csv"))
+  outcome.observe(part("read", { filePath: "/data/orders.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/customers.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test("a repeated missing read becomes the latest matching failure", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(missing("/data/orders.csv"))
+  outcome.observe(missing("/data/customers.csv"))
+  outcome.observe(missing("/data/orders.csv"))
+  outcome.observe(part("read", { filePath: "/data/products.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/customers.csv" }, true))
+  outcome.observe(part("read", { filePath: "/data/customers.csv" }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
 test.each([
   { filePath: "/other/points.csv" },
   { filePath: "/data/points.txt" },
@@ -86,6 +119,8 @@ test("only a successful read can repair the missing read", () => {
   outcome.observe(result)
   expect(outcome.failed()).toBe(true)
   outcome.observe(part("read", { filePath: "/data/points.csv" }, false))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/poitns.csv" }, false))
   expect(outcome.failed()).toBe(false)
 })
 
