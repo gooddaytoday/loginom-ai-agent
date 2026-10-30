@@ -25,10 +25,10 @@ export async function configureSlidingWindow(channel,p,{inputMapping}){
   await channel.perform({condition:'edit exact window field',initialObservation:s,ready,identity:()=>original,resolve:()=>({verb:'double_click',ref:cell.ref})});
   for(const [key,column] of [['history','colHistory_num'],['horizon','colForecast_num']]){
    const tid=s.wizard.root_tid+';SlidingWindowWizard;grdColumns;roweditor;'+column;
-   const editorReady=s=>ready(s)&&s.ui.elements.some(e=>e.tid===tid&&e.allowed_actions.includes('fill'));
+   const editorReady=s=>ready(s)&&s.ui.elements.some(e=>(e.tid===tid||e.identity?.anchor_tid===tid||e.tid?.startsWith(tid+';'))&&e.allowed_actions.includes('fill'));
    s=await channel.observe({condition:'window row editor '+key,readSlidingWindow:true,ready:editorReady});
    await channel.perform({condition:'set window '+key,initialObservation:s,ready:editorReady,identity:()=>original,
-    resolve:s=>({verb:'fill',ref:unique(s,e=>e.tid===tid&&e.allowed_actions.includes('fill')).ref,value:String(field[key])})});
+    resolve:s=>({verb:'fill',ref:unique(s,e=>(e.tid===tid||e.identity?.anchor_tid===tid||e.tid?.startsWith(tid+';'))&&e.allowed_actions.includes('fill')).ref,text:String(field[key])})});
   }
   const update=s.wizard.root_tid+';SlidingWindowWizard;grdColumns;roweditorbuttons;update';
   s=await channel.observe({condition:'window row ready to apply',readSlidingWindow:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===update&&e.allowed_actions.includes('click'))});

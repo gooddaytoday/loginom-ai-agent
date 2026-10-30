@@ -27,7 +27,7 @@ export function readSlidingWindowBrowser(prefix){
  }
  const policy=component('pedIncompleteRecordsProcessing;ValueControl'),inputs=exact(base+'pedIncompleteRecordsProcessing;ValueControl').flatMap(e=>[...e.querySelectorAll('input')]);
  const labels={'Оставлять неполные записи':'keep_incomplete','Удалять добавленные неполные записи':'drop_added','Удалять все неполные записи':'drop_all_incomplete'};
- const switches=exact(base+'pedIncompleteRecordsProcessing;SwitchButton');
- if(!policy||inputs.length!==1||!Object.hasOwn(labels,inputs[0].value)||switches.some(e=>e.classList.contains('x-btn-pressed')))return fail('sliding_window_policy');
+ const sw=component('pedIncompleteRecordsProcessing;SwitchButton');
+ if(!policy||inputs.length!==1||!Object.hasOwn(labels,inputs[0].value)||sw?.pressed!==false)return fail('sliding_window_policy');
  return {verified:true,inventory_complete:true,state_source:'cached_sliding_window_store',fields,incomplete_records:labels[inputs[0].value],settings_applied:false};
 }

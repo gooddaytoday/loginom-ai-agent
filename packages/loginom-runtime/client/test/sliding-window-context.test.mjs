@@ -6,9 +6,9 @@ function fixture(change=()=>{}){
  const base='MF;TF-1;WizrdMCF;SlidingWindowWizard;',root={checkVisibility:()=>true,contains:()=>true};
  const record={isModel:true,internalId:'Sales-1',data:{Name:'Sales',DisplayName:'Продажи',DataType:4,History:3,Forecast:1}};
  const records=[record],store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
- const input={value:'Оставлять неполные записи'},grid={id:'grid'},history={id:'history'},horizon={id:'horizon'},policy={id:'policy',querySelectorAll:()=>[input]};
- const nodes=new Map([[base.slice(0,-1),root],[base+'grdColumns',grid],[base+'colHistory',history],[base+'colForecast',horizon],[base+'pedIncompleteRecordsProcessing;ValueControl',policy]]);
- const components={grid:{el:{dom:grid},getStore:()=>store},history:{el:{dom:history},dataIndex:'History'},horizon:{el:{dom:horizon},dataIndex:'Forecast'},policy:{el:{dom:policy}}};
+ const input={value:'Оставлять неполные записи'},grid={id:'grid'},history={id:'history'},horizon={id:'horizon'},policy={id:'policy',querySelectorAll:()=>[input]},sw={id:'switch'};
+ const nodes=new Map([[base.slice(0,-1),root],[base+'grdColumns',grid],[base+'colHistory',history],[base+'colForecast',horizon],[base+'pedIncompleteRecordsProcessing;ValueControl',policy],[base+'pedIncompleteRecordsProcessing;SwitchButton',sw]]);
+ const components={grid:{el:{dom:grid},getStore:()=>store},history:{el:{dom:history},dataIndex:'History'},horizon:{el:{dom:horizon},dataIndex:'Forecast'},policy:{el:{dom:policy}},switch:{el:{dom:sw},pressed:false}};
  change({record,records,store,input,nodes,base});
  const context=vm.createContext({document:{querySelectorAll:s=>{const t=JSON.parse(s.slice(10,-1));return nodes.has(t)?[nodes.get(t)]:[];}},Ext:{getCmp:id=>components[id]}});
  return JSON.parse(JSON.stringify(vm.runInContext('('+readSlidingWindowBrowser.toString()+')',context)('MF;TF-1')));

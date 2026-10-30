@@ -131,9 +131,9 @@ const missingValuesConfigurationReadback=object({kind:values('missing_values'),s
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
  package_persistence_verified:disabled});
 const slidingWindowConfigurationReadback=object({kind:values('sliding_window'),scope:values('observed_before_verified_finish'),node:ref,
- receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('lag'),
- incomplete_records:values('keep_incomplete','drop_added','drop_all_incomplete'),windows:boundedFields(object({field:str,history:integer,horizon:integer})),
- output_port:{type:'integer',const:0},fields:boundedFields(object({name:str,label:str,type:str,source_field:str,offset:{type:'integer'},excluded:bool})),package_persistence_verified:disabled});
+ receipt_ids:{type:'array',items:str,minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('lag'),
+ incomplete_records:values('keep_incomplete','drop_added','drop_all_incomplete'),windows:{type:'array',items:object({field:str,history:integer,horizon:integer}),maxItems:1000},
+ output_port:{type:'integer',const:0},fields:{type:'array',items:object({name:str,label:str,type:str,source_field:str,offset:{type:'integer'},excluded:bool}),maxItems:1000},package_persistence_verified:disabled});
 const dateTimeConfigurationReadback=object({kind:values('date_time'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('calendar'),
  fields:{...boundedFields(object({name:str,matrix:{...array(object({index:integer,record_id:str,func:{type:'integer',minimum:0,maximum:18},iso:bool,
