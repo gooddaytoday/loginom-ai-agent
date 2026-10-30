@@ -44,17 +44,21 @@ test('field selection starts with no selected row and binds the chosen record be
 });
 for(const method of ['sd','iqr'])test('native '+method+' controls use the observed radio display and policy input',async()=>{
  // Native failures: lab552-3-sd/main-1-execution-events.jsonl:453,455;
- // lab552-3-iqr/main-1-execution-events.jsonl:416,418.
+ // lab552-3-iqr/main-1-execution-events.jsonl:416,418; unused Note retains
+ // X's controls: lab552-4-sd/main-1-execution-events.jsonl:458,512,514.
  const baseline=fixture(),field=baseline.fields[1],root='MF;TF-1;WizrdMCF',base=root+';ElimOutlierWizard;';
- baseline.fields=[field];baseline.values.pedActionOut=7;baseline.values.pedActionExtr=7;
+ const ignored=baseline.fields[2],settings=baseline.settings;
+ baseline.fields=[field,ignored];baseline.values.pedActionOut=7;baseline.values.pedActionExtr=7;
  baseline.settings.outlier_policy='unsupported';baseline.settings.extreme_policy='unsupported';
  const input=key=>({ref:key,tid:null,identity:{anchor_tid:base+key+';ValueControl',path:[1,0,0,0]},allowed_actions:['click']});
- const controls=[input('pedActionOut'),input('pedActionExtr'),{ref:'iqr',tid:base+'pedModeOE;ValueControl;radiofield-1;DisplayEl',allowed_actions:['click']},{ref:'next',tid:root+';btnNext',allowed_actions:['wizard_step']}];
+ const controls=[...baseline.fields.map(f=>({ref:'select:'+f.name,elim_outlier_cell:{record_id:f.record_id,part:'field'},allowed_actions:['click']})),input('pedActionOut'),input('pedActionExtr'),{ref:'iqr',tid:base+'pedModeOE;ValueControl;radiofield-1;DisplayEl',allowed_actions:['click']},{ref:'next',tid:root+';btnNext',allowed_actions:['wizard_step']}];
  const state={wizard:{stage:'elim_outlier',root_tid:root},node_elim_outlier:baseline,ui:{elements:controls}};
  const chosen=[];
  const channel={observe:async o=>{assert.equal(o.ready(state),true,o.condition);return structuredClone(state);},perform:async o=>{
   const a=o.resolve(state);
   if(a.ref==='next'){state.wizard.stage='done';return;}
+  if(a.ref.startsWith('select:')){baseline.selected=baseline.fields.find(f=>f.name===a.ref.slice(7));baseline.settings=baseline.selected.used?settings:null;return;}
+  assert.equal(baseline.selected.name,'X','unused Note must never receive parameter edits');
   if(a.ref==='iqr'){assert.equal(a.verb,'click');baseline.settings.method='iqr';baseline.settings.outlier_factor=baseline.values.pedDetectOKvartil;baseline.settings.extreme_factor=baseline.values.pedDetectEKvartil;return;}
   const key=a.ref.replace(':keep','');assert.ok(['pedActionOut','pedActionExtr'].includes(key));assert.equal(a.verb,'click');
   if(a.ref===key){state.ui.elements=[...controls,{ref:key+':keep',tid:base+key+';ValueControl;boundlist;Оставить_без_изменения',label:'Оставить без изменения',allowed_actions:['click']}];return;}
@@ -64,4 +68,5 @@ for(const method of ['sd','iqr'])test('native '+method+' controls use the observ
  assert.deepEqual(chosen,['pedActionOut','pedActionExtr']);assert.equal(result.validation.status,'accepted_by_loginom_next');
  assert.equal(result.configuration.field_settings[0].settings.outlier_policy,'keep');assert.equal(result.configuration.field_settings[0].settings.extreme_policy,'keep');
  assert.equal(result.configuration.field_settings[0].settings.method,method);
+ assert.deepEqual(result.configuration.field_settings[1],{name:'Note',used:false,settings:null});
 });

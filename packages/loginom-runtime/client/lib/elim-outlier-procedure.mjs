@@ -32,7 +32,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
  // Capture every used field through ordinary UI selection before any edit.
  // Existing heterogeneous settings remain per-field when omitted in a patch.
  const before=[];
- for(const f of baseline.fields){const s=await selectElimOutlierField(channel,baseline,f.name);need(!Object.values(s.node_elim_outlier.switches).some(Boolean),'variable-driven field parameters are unsupported');before.push({name:f.name,used:f.used,values:s.node_elim_outlier.values,settings:s.node_elim_outlier.settings});}
+ for(const f of baseline.fields){const s=await selectElimOutlierField(channel,baseline,f.name);need(!Object.values(s.node_elim_outlier.switches).some(Boolean),'variable-driven field parameters are unsupported');before.push({name:f.name,used:f.used,settings:s.node_elim_outlier.settings});}
  const planned=selected.map(name=>{
   const old=before.find(f=>f.name===name).settings;
   const wanted=resolveElimOutlierParameters(p,baseline.fields,{...old,fields:selected,ordered:baseline.ordered});
@@ -71,8 +71,8 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
    }
    need(same(s.node_elim_outlier.settings,Object.fromEntries(Object.entries(wanted).filter(([k])=>k!=='name'))),'final outlier field settings differ');
   }
-  const original=before.find(b=>b.name===f.name);
-  if(!used&&!original.used)need(same(s.node_elim_outlier.values,original.values),'ignored field settings changed');
+  // Unused fields have no bound settings. Native controls may still display
+  // the last used field; participation is checked from the complete store below.
   after.push({name:f.name,used,settings:s.node_elim_outlier.settings});
  }
  let s=await observe(channel,'outlier ordered flag before edit');
