@@ -566,10 +566,12 @@ test("supervisor: происхождение без точного browser profi
   const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
   const pidFile = path.join(out, "browser.pid")
   const helperFile = path.join(out, "helper.pid")
+  const stopFile = path.join(out, "stop")
   let run: Awaited<ReturnType<typeof runAgent>> | undefined
   try {
     run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
-      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile", EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile, EVAL_FAKE_BROWSER_HELPER_DETACHED: "1" } },
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile", EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile, EVAL_FAKE_BROWSER_HELPER_DETACHED: "1",
+      EVAL_FAKE_BROWSER_STOP_FILE: stopFile } },
       taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
       outDir: out, profileDir: out, timeoutMs: 30_000 })
     expect(run.processCleanup.status).toBe("failed")
@@ -579,12 +581,27 @@ test("supervisor: происхождение без точного browser profi
     expect(run.processCleanup.admissions?.find((entry) => entry.pid === helper)?.status).not.toBe("allowed")
     process.kill(helper, 0)
   } finally {
+    // The refused process may have exec'd or detached after its ledger sample.
+    // Let this fixture stop its own family without reusing that signal identity.
+    await Bun.write(stopFile, "stop")
     for (const file of [pidFile, helperFile]) {
       if (!(await Bun.file(file).exists())) continue
       const pid = Number(await Bun.file(file).text())
       const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
-      if (saved) await signalProcess(saved, "SIGKILL")
+      if (!saved) continue
+      for (let wait = 0; wait < 200; wait++) {
+        const raw = await readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined
+          throw error
+        })
+        const fields = raw?.slice(raw.lastIndexOf(")") + 2).split(" ")
+        if (!fields || fields[19] !== saved.starttime || ["Z", "X"].includes(fields[0]!)) break
+        if (wait === 199) throw Error("Fixture browser did not stop")
+        await Bun.sleep(10)
+      }
     }
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
   }
 }, 20_000)
 

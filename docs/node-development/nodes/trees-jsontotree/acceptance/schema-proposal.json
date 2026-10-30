@@ -1,0 +1,29 @@
+{
+  "trees.from_json": {
+    "mode": "auto_structure",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "json_field": {"type": "string", "minLength": 1, "maxLength": 128, "description": "Exact input string column name containing JSON."},
+        "root_mode": {"type": "string", "enum": ["auto"], "description": "Automatic root only; forced root modes are deferred."}
+      },
+      "required": ["json_field", "root_mode"],
+      "additionalProperties": false
+    }
+  },
+  "trees.to_table": {
+    "mode": "selected_nodes",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "selected_paths": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 512}, "description": "Full leaf selection in schema order; JSON Pointer schema paths omit array indexes."},
+        "repeat_parents": {"type": "boolean", "description": "Repeat selected ancestor values on every child row."},
+        "composite_names": {"type": "boolean", "const": false, "description": "Use leaf technical names; composite names are deferred."},
+        "composite_labels": {"type": "boolean", "const": false, "description": "Use leaf labels; composite labels are deferred."},
+        "label_separator": {"type": "string", "enum": ["."], "description": "Save native separator dot; inactive with leaf labels."}
+      },
+      "required": ["selected_paths", "repeat_parents", "composite_names", "composite_labels", "label_separator"],
+      "additionalProperties": false
+    }
+  }
+}

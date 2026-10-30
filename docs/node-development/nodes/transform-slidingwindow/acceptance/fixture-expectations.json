@@ -1,0 +1,5110 @@
+{
+  "sales.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_3",
+          "label": "Sales[-3]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price_H_1",
+          "label": "Price[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Price",
+          "label": "Price",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Month": null,
+          "Sales_H_3": null,
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": null,
+          "Sales_F_1": 100,
+          "Price_H_1": null,
+          "Price": null
+        },
+        {
+          "Month": "2025-01",
+          "Sales_H_3": null,
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": 100,
+          "Sales_F_1": 110,
+          "Price_H_1": null,
+          "Price": 10.0
+        },
+        {
+          "Month": "2025-02",
+          "Sales_H_3": null,
+          "Sales_H_2": null,
+          "Sales_H_1": 100,
+          "Sales": 110,
+          "Sales_F_1": 120,
+          "Price_H_1": 10.0,
+          "Price": 10.25
+        },
+        {
+          "Month": "2025-03",
+          "Sales_H_3": null,
+          "Sales_H_2": 100,
+          "Sales_H_1": 110,
+          "Sales": 120,
+          "Sales_F_1": 130,
+          "Price_H_1": 10.25,
+          "Price": 10.5
+        },
+        {
+          "Month": "2025-04",
+          "Sales_H_3": 100,
+          "Sales_H_2": 110,
+          "Sales_H_1": 120,
+          "Sales": 130,
+          "Sales_F_1": 140,
+          "Price_H_1": 10.5,
+          "Price": 10.75
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_3": 110,
+          "Sales_H_2": 120,
+          "Sales_H_1": 130,
+          "Sales": 140,
+          "Sales_F_1": 150,
+          "Price_H_1": 10.75,
+          "Price": 11.0
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_3": 120,
+          "Sales_H_2": 130,
+          "Sales_H_1": 140,
+          "Sales": 150,
+          "Sales_F_1": 160,
+          "Price_H_1": 11.0,
+          "Price": 11.25
+        },
+        {
+          "Month": "2025-07",
+          "Sales_H_3": 130,
+          "Sales_H_2": 140,
+          "Sales_H_1": 150,
+          "Sales": 160,
+          "Sales_F_1": 170,
+          "Price_H_1": 11.25,
+          "Price": 11.5
+        },
+        {
+          "Month": "2025-08",
+          "Sales_H_3": 140,
+          "Sales_H_2": 150,
+          "Sales_H_1": 160,
+          "Sales": 170,
+          "Sales_F_1": 180,
+          "Price_H_1": 11.5,
+          "Price": 11.75
+        },
+        {
+          "Month": "2025-09",
+          "Sales_H_3": 150,
+          "Sales_H_2": 160,
+          "Sales_H_1": 170,
+          "Sales": 180,
+          "Sales_F_1": 190,
+          "Price_H_1": 11.75,
+          "Price": 12.0
+        },
+        {
+          "Month": "2025-10",
+          "Sales_H_3": 160,
+          "Sales_H_2": 170,
+          "Sales_H_1": 180,
+          "Sales": 190,
+          "Sales_F_1": 200,
+          "Price_H_1": 12.0,
+          "Price": 12.25
+        },
+        {
+          "Month": "2025-11",
+          "Sales_H_3": 170,
+          "Sales_H_2": 180,
+          "Sales_H_1": 190,
+          "Sales": 200,
+          "Sales_F_1": 210,
+          "Price_H_1": 12.25,
+          "Price": 12.5
+        },
+        {
+          "Month": "2025-12",
+          "Sales_H_3": 180,
+          "Sales_H_2": 190,
+          "Sales_H_1": 200,
+          "Sales": 210,
+          "Sales_F_1": 220,
+          "Price_H_1": 12.5,
+          "Price": 12.75
+        },
+        {
+          "Month": "2026-01",
+          "Sales_H_3": 190,
+          "Sales_H_2": 200,
+          "Sales_H_1": 210,
+          "Sales": 220,
+          "Sales_F_1": 230,
+          "Price_H_1": 12.75,
+          "Price": 13.0
+        },
+        {
+          "Month": "2026-02",
+          "Sales_H_3": 200,
+          "Sales_H_2": 210,
+          "Sales_H_1": 220,
+          "Sales": 230,
+          "Sales_F_1": null,
+          "Price_H_1": 13.0,
+          "Price": 13.25
+        },
+        {
+          "Month": null,
+          "Sales_H_3": 210,
+          "Sales_H_2": 220,
+          "Sales_H_1": 230,
+          "Sales": null,
+          "Sales_F_1": null,
+          "Price_H_1": 13.25,
+          "Price": null
+        },
+        {
+          "Month": null,
+          "Sales_H_3": 220,
+          "Sales_H_2": 230,
+          "Sales_H_1": null,
+          "Sales": null,
+          "Sales_F_1": null,
+          "Price_H_1": null,
+          "Price": null
+        },
+        {
+          "Month": null,
+          "Sales_H_3": 230,
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": null,
+          "Sales_F_1": null,
+          "Price_H_1": null,
+          "Price": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_3",
+          "label": "Sales[-3]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price_H_1",
+          "label": "Price[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Price",
+          "label": "Price",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2025-01",
+          "Sales_H_3": null,
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": 100,
+          "Sales_F_1": 110,
+          "Price_H_1": null,
+          "Price": 10.0
+        },
+        {
+          "Month": "2025-02",
+          "Sales_H_3": null,
+          "Sales_H_2": null,
+          "Sales_H_1": 100,
+          "Sales": 110,
+          "Sales_F_1": 120,
+          "Price_H_1": 10.0,
+          "Price": 10.25
+        },
+        {
+          "Month": "2025-03",
+          "Sales_H_3": null,
+          "Sales_H_2": 100,
+          "Sales_H_1": 110,
+          "Sales": 120,
+          "Sales_F_1": 130,
+          "Price_H_1": 10.25,
+          "Price": 10.5
+        },
+        {
+          "Month": "2025-04",
+          "Sales_H_3": 100,
+          "Sales_H_2": 110,
+          "Sales_H_1": 120,
+          "Sales": 130,
+          "Sales_F_1": 140,
+          "Price_H_1": 10.5,
+          "Price": 10.75
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_3": 110,
+          "Sales_H_2": 120,
+          "Sales_H_1": 130,
+          "Sales": 140,
+          "Sales_F_1": 150,
+          "Price_H_1": 10.75,
+          "Price": 11.0
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_3": 120,
+          "Sales_H_2": 130,
+          "Sales_H_1": 140,
+          "Sales": 150,
+          "Sales_F_1": 160,
+          "Price_H_1": 11.0,
+          "Price": 11.25
+        },
+        {
+          "Month": "2025-07",
+          "Sales_H_3": 130,
+          "Sales_H_2": 140,
+          "Sales_H_1": 150,
+          "Sales": 160,
+          "Sales_F_1": 170,
+          "Price_H_1": 11.25,
+          "Price": 11.5
+        },
+        {
+          "Month": "2025-08",
+          "Sales_H_3": 140,
+          "Sales_H_2": 150,
+          "Sales_H_1": 160,
+          "Sales": 170,
+          "Sales_F_1": 180,
+          "Price_H_1": 11.5,
+          "Price": 11.75
+        },
+        {
+          "Month": "2025-09",
+          "Sales_H_3": 150,
+          "Sales_H_2": 160,
+          "Sales_H_1": 170,
+          "Sales": 180,
+          "Sales_F_1": 190,
+          "Price_H_1": 11.75,
+          "Price": 12.0
+        },
+        {
+          "Month": "2025-10",
+          "Sales_H_3": 160,
+          "Sales_H_2": 170,
+          "Sales_H_1": 180,
+          "Sales": 190,
+          "Sales_F_1": 200,
+          "Price_H_1": 12.0,
+          "Price": 12.25
+        },
+        {
+          "Month": "2025-11",
+          "Sales_H_3": 170,
+          "Sales_H_2": 180,
+          "Sales_H_1": 190,
+          "Sales": 200,
+          "Sales_F_1": 210,
+          "Price_H_1": 12.25,
+          "Price": 12.5
+        },
+        {
+          "Month": "2025-12",
+          "Sales_H_3": 180,
+          "Sales_H_2": 190,
+          "Sales_H_1": 200,
+          "Sales": 210,
+          "Sales_F_1": 220,
+          "Price_H_1": 12.5,
+          "Price": 12.75
+        },
+        {
+          "Month": "2026-01",
+          "Sales_H_3": 190,
+          "Sales_H_2": 200,
+          "Sales_H_1": 210,
+          "Sales": 220,
+          "Sales_F_1": 230,
+          "Price_H_1": 12.75,
+          "Price": 13.0
+        },
+        {
+          "Month": "2026-02",
+          "Sales_H_3": 200,
+          "Sales_H_2": 210,
+          "Sales_H_1": 220,
+          "Sales": 230,
+          "Sales_F_1": null,
+          "Price_H_1": 13.0,
+          "Price": 13.25
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_3",
+          "label": "Sales[-3]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price_H_1",
+          "label": "Price[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Price",
+          "label": "Price",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2025-04",
+          "Sales_H_3": 100,
+          "Sales_H_2": 110,
+          "Sales_H_1": 120,
+          "Sales": 130,
+          "Sales_F_1": 140,
+          "Price_H_1": 10.5,
+          "Price": 10.75
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_3": 110,
+          "Sales_H_2": 120,
+          "Sales_H_1": 130,
+          "Sales": 140,
+          "Sales_F_1": 150,
+          "Price_H_1": 10.75,
+          "Price": 11.0
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_3": 120,
+          "Sales_H_2": 130,
+          "Sales_H_1": 140,
+          "Sales": 150,
+          "Sales_F_1": 160,
+          "Price_H_1": 11.0,
+          "Price": 11.25
+        },
+        {
+          "Month": "2025-07",
+          "Sales_H_3": 130,
+          "Sales_H_2": 140,
+          "Sales_H_1": 150,
+          "Sales": 160,
+          "Sales_F_1": 170,
+          "Price_H_1": 11.25,
+          "Price": 11.5
+        },
+        {
+          "Month": "2025-08",
+          "Sales_H_3": 140,
+          "Sales_H_2": 150,
+          "Sales_H_1": 160,
+          "Sales": 170,
+          "Sales_F_1": 180,
+          "Price_H_1": 11.5,
+          "Price": 11.75
+        },
+        {
+          "Month": "2025-09",
+          "Sales_H_3": 150,
+          "Sales_H_2": 160,
+          "Sales_H_1": 170,
+          "Sales": 180,
+          "Sales_F_1": 190,
+          "Price_H_1": 11.75,
+          "Price": 12.0
+        },
+        {
+          "Month": "2025-10",
+          "Sales_H_3": 160,
+          "Sales_H_2": 170,
+          "Sales_H_1": 180,
+          "Sales": 190,
+          "Sales_F_1": 200,
+          "Price_H_1": 12.0,
+          "Price": 12.25
+        },
+        {
+          "Month": "2025-11",
+          "Sales_H_3": 170,
+          "Sales_H_2": 180,
+          "Sales_H_1": 190,
+          "Sales": 200,
+          "Sales_F_1": 210,
+          "Price_H_1": 12.25,
+          "Price": 12.5
+        },
+        {
+          "Month": "2025-12",
+          "Sales_H_3": 180,
+          "Sales_H_2": 190,
+          "Sales_H_1": 200,
+          "Sales": 210,
+          "Sales_F_1": 220,
+          "Price_H_1": 12.5,
+          "Price": 12.75
+        },
+        {
+          "Month": "2026-01",
+          "Sales_H_3": 190,
+          "Sales_H_2": 200,
+          "Sales_H_1": 210,
+          "Sales": 220,
+          "Sales_F_1": 230,
+          "Price_H_1": 12.75,
+          "Price": 13.0
+        }
+      ]
+    }
+  },
+  "series.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": 10
+        },
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": 30
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null
+        },
+        {
+          "RowID": null,
+          "X_H_1": 50,
+          "X": null,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": 30
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": 30
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50
+        }
+      ]
+    }
+  },
+  "null-inside.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": 10
+        },
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": null
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": null,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": null,
+          "X": 40,
+          "X_F_1": 50
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null
+        },
+        {
+          "RowID": null,
+          "X_H_1": 50,
+          "X": null,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": null
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": null,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": null,
+          "X": 40,
+          "X_F_1": 50
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": null
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 20,
+          "X": null,
+          "X_F_1": 40
+        },
+        {
+          "RowID": 4,
+          "X_H_1": null,
+          "X": 40,
+          "X_F_1": 50
+        }
+      ]
+    }
+  },
+  "replace.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": 100
+        },
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 100,
+          "X_F_1": 200
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 100,
+          "X": 200,
+          "X_F_1": 300
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 200,
+          "X": 300,
+          "X_F_1": 400
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 300,
+          "X": 400,
+          "X_F_1": 500
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 400,
+          "X": 500,
+          "X_F_1": null
+        },
+        {
+          "RowID": null,
+          "X_H_1": 500,
+          "X": null,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 100,
+          "X_F_1": 200
+        },
+        {
+          "RowID": 2,
+          "X_H_1": 100,
+          "X": 200,
+          "X_F_1": 300
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 200,
+          "X": 300,
+          "X_F_1": 400
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 300,
+          "X": 400,
+          "X_F_1": 500
+        },
+        {
+          "RowID": 5,
+          "X_H_1": 400,
+          "X": 500,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "X_H_1": 100,
+          "X": 200,
+          "X_F_1": 300
+        },
+        {
+          "RowID": 3,
+          "X_H_1": 200,
+          "X": 300,
+          "X_F_1": 400
+        },
+        {
+          "RowID": 4,
+          "X_H_1": 300,
+          "X": 400,
+          "X_F_1": 500
+        }
+      ]
+    }
+  },
+  "two-windows.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_2",
+          "label": "X[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y_H_1",
+          "label": "Y[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_2": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": 10,
+          "Y_H_1": null,
+          "Y": null
+        },
+        {
+          "RowID": 1,
+          "X_H_2": null,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20,
+          "Y_H_1": null,
+          "Y": 100
+        },
+        {
+          "RowID": 2,
+          "X_H_2": null,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": 30,
+          "Y_H_1": 100,
+          "Y": 200
+        },
+        {
+          "RowID": 3,
+          "X_H_2": 10,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40,
+          "Y_H_1": 200,
+          "Y": 300
+        },
+        {
+          "RowID": 4,
+          "X_H_2": 20,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50,
+          "Y_H_1": 300,
+          "Y": 400
+        },
+        {
+          "RowID": 5,
+          "X_H_2": 30,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null,
+          "Y_H_1": 400,
+          "Y": 500
+        },
+        {
+          "RowID": null,
+          "X_H_2": 40,
+          "X_H_1": 50,
+          "X": null,
+          "X_F_1": null,
+          "Y_H_1": 500,
+          "Y": null
+        },
+        {
+          "RowID": null,
+          "X_H_2": 50,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": null,
+          "Y_H_1": null,
+          "Y": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_2",
+          "label": "X[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y_H_1",
+          "label": "Y[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X_H_2": null,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": 20,
+          "Y_H_1": null,
+          "Y": 100
+        },
+        {
+          "RowID": 2,
+          "X_H_2": null,
+          "X_H_1": 10,
+          "X": 20,
+          "X_F_1": 30,
+          "Y_H_1": 100,
+          "Y": 200
+        },
+        {
+          "RowID": 3,
+          "X_H_2": 10,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40,
+          "Y_H_1": 200,
+          "Y": 300
+        },
+        {
+          "RowID": 4,
+          "X_H_2": 20,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50,
+          "Y_H_1": 300,
+          "Y": 400
+        },
+        {
+          "RowID": 5,
+          "X_H_2": 30,
+          "X_H_1": 40,
+          "X": 50,
+          "X_F_1": null,
+          "Y_H_1": 400,
+          "Y": 500
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_2",
+          "label": "X[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y_H_1",
+          "label": "Y[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "X_H_2": 10,
+          "X_H_1": 20,
+          "X": 30,
+          "X_F_1": 40,
+          "Y_H_1": 200,
+          "Y": 300
+        },
+        {
+          "RowID": 4,
+          "X_H_2": 20,
+          "X_H_1": 30,
+          "X": 40,
+          "X_F_1": 50,
+          "Y_H_1": 300,
+          "Y": 400
+        }
+      ]
+    }
+  },
+  "short.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": 10
+        },
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": null
+        },
+        {
+          "RowID": null,
+          "X_H_1": 10,
+          "X": null,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X_H_1": null,
+          "X": 10,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  },
+  "empty.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": null
+        },
+        {
+          "RowID": null,
+          "X_H_1": null,
+          "X": null,
+          "X_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_H_1",
+          "label": "X[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_F_1",
+          "label": "X[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  },
+  "help-example.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Month": null,
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": null,
+          "Sales_F_1": 45
+        },
+        {
+          "Month": "2025-01",
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": 45,
+          "Sales_F_1": 82
+        },
+        {
+          "Month": "2025-02",
+          "Sales_H_2": null,
+          "Sales_H_1": 45,
+          "Sales": 82,
+          "Sales_F_1": 120
+        },
+        {
+          "Month": "2025-03",
+          "Sales_H_2": 45,
+          "Sales_H_1": 82,
+          "Sales": 120,
+          "Sales_F_1": 192
+        },
+        {
+          "Month": "2025-04",
+          "Sales_H_2": 82,
+          "Sales_H_1": 120,
+          "Sales": 192,
+          "Sales_F_1": 229
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_2": 120,
+          "Sales_H_1": 192,
+          "Sales": 229,
+          "Sales_F_1": 161
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_2": 192,
+          "Sales_H_1": 229,
+          "Sales": 161,
+          "Sales_F_1": null
+        },
+        {
+          "Month": null,
+          "Sales_H_2": 229,
+          "Sales_H_1": 161,
+          "Sales": null,
+          "Sales_F_1": null
+        },
+        {
+          "Month": null,
+          "Sales_H_2": 161,
+          "Sales_H_1": null,
+          "Sales": null,
+          "Sales_F_1": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2025-01",
+          "Sales_H_2": null,
+          "Sales_H_1": null,
+          "Sales": 45,
+          "Sales_F_1": 82
+        },
+        {
+          "Month": "2025-02",
+          "Sales_H_2": null,
+          "Sales_H_1": 45,
+          "Sales": 82,
+          "Sales_F_1": 120
+        },
+        {
+          "Month": "2025-03",
+          "Sales_H_2": 45,
+          "Sales_H_1": 82,
+          "Sales": 120,
+          "Sales_F_1": 192
+        },
+        {
+          "Month": "2025-04",
+          "Sales_H_2": 82,
+          "Sales_H_1": 120,
+          "Sales": 192,
+          "Sales_F_1": 229
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_2": 120,
+          "Sales_H_1": 192,
+          "Sales": 229,
+          "Sales_F_1": 161
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_2": 192,
+          "Sales_H_1": 229,
+          "Sales": 161,
+          "Sales_F_1": null
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2025-03",
+          "Sales_H_2": 45,
+          "Sales_H_1": 82,
+          "Sales": 120,
+          "Sales_F_1": 192
+        },
+        {
+          "Month": "2025-04",
+          "Sales_H_2": 82,
+          "Sales_H_1": 120,
+          "Sales": 192,
+          "Sales_F_1": 229
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_2": 120,
+          "Sales_H_1": 192,
+          "Sales": 229,
+          "Sales_F_1": 161
+        }
+      ]
+    }
+  },
+  "types.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": 1,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": 2,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": null,
+          "I_H_1": 1,
+          "I": 2,
+          "I_F_1": 3,
+          "R_H_1": 1.25,
+          "R": 2.25,
+          "S_H_1": "A",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": 3,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": 3,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": 3,
+          "I_H_1": 4,
+          "I": 5,
+          "I_F_1": null,
+          "R_H_1": 4.25,
+          "R": 5.25,
+          "S_H_1": "D",
+          "S": "E",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-04T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": null,
+          "I_H_2": 4,
+          "I_H_1": 5,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": 5.25,
+          "R": null,
+          "S_H_1": "E",
+          "S": null,
+          "B_H_1": true,
+          "B": null,
+          "D_H_1": "2025-01-05T12:30:00.000",
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": 5,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": 2,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": null,
+          "I_H_1": 1,
+          "I": 2,
+          "I_F_1": 3,
+          "R_H_1": 1.25,
+          "R": 2.25,
+          "S_H_1": "A",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": 3,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": 3,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": 3,
+          "I_H_1": 4,
+          "I": 5,
+          "I_F_1": null,
+          "R_H_1": 4.25,
+          "R": 5.25,
+          "S_H_1": "D",
+          "S": "E",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-04T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": 3,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": 3,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        }
+      ]
+    }
+  },
+  "types-null.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": 1,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": 2,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": null,
+          "I_H_1": 1,
+          "I": 2,
+          "I_F_1": null,
+          "R_H_1": 1.25,
+          "R": 2.25,
+          "S_H_1": "A",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": null,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": null,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": null,
+          "I_H_1": 4,
+          "I": 5,
+          "I_F_1": null,
+          "R_H_1": 4.25,
+          "R": 5.25,
+          "S_H_1": "D",
+          "S": "E",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-04T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": null,
+          "I_H_2": 4,
+          "I_H_1": 5,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": 5.25,
+          "R": null,
+          "S_H_1": "E",
+          "S": null,
+          "B_H_1": true,
+          "B": null,
+          "D_H_1": "2025-01-05T12:30:00.000",
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": 5,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": 2,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": null,
+          "I_H_1": 1,
+          "I": 2,
+          "I_F_1": null,
+          "R_H_1": 1.25,
+          "R": 2.25,
+          "S_H_1": "A",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": null,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": null,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": null,
+          "I_H_1": 4,
+          "I": 5,
+          "I_F_1": null,
+          "R_H_1": 4.25,
+          "R": 5.25,
+          "S_H_1": "D",
+          "S": "E",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-04T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "I_H_2": 1,
+          "I_H_1": 2,
+          "I": null,
+          "I_F_1": 4,
+          "R_H_1": 2.25,
+          "R": 3.25,
+          "S_H_1": "B",
+          "S": "C",
+          "B_H_1": false,
+          "B": true,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 2,
+          "I_H_1": null,
+          "I": 4,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 4.25,
+          "S_H_1": "C",
+          "S": "D",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        }
+      ]
+    }
+  },
+  "types-order.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": 3,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": 3,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 3,
+          "I_F_1": 1,
+          "R_H_1": null,
+          "R": 3.25,
+          "S_H_1": null,
+          "S": "C",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": 3,
+          "I": 1,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 1.25,
+          "S_H_1": "C",
+          "S": "A",
+          "B_H_1": true,
+          "B": true,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": 3,
+          "I_H_1": 1,
+          "I": 5,
+          "I_F_1": 2,
+          "R_H_1": 1.25,
+          "R": 5.25,
+          "S_H_1": "A",
+          "S": "E",
+          "B_H_1": true,
+          "B": true,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": 1,
+          "I_H_1": 5,
+          "I": 2,
+          "I_F_1": 4,
+          "R_H_1": 5.25,
+          "R": 2.25,
+          "S_H_1": "E",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-05T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 5,
+          "I_H_1": 2,
+          "I": 4,
+          "I_F_1": null,
+          "R_H_1": 2.25,
+          "R": 4.25,
+          "S_H_1": "B",
+          "S": "D",
+          "B_H_1": false,
+          "B": false,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": null,
+          "I_H_2": 2,
+          "I_H_1": 4,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": 4.25,
+          "R": null,
+          "S_H_1": "D",
+          "S": null,
+          "B_H_1": false,
+          "B": null,
+          "D_H_1": "2025-01-04T12:30:00.000",
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": 4,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 3,
+          "I_F_1": 1,
+          "R_H_1": null,
+          "R": 3.25,
+          "S_H_1": null,
+          "S": "C",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": 3,
+          "I": 1,
+          "I_F_1": 5,
+          "R_H_1": 3.25,
+          "R": 1.25,
+          "S_H_1": "C",
+          "S": "A",
+          "B_H_1": true,
+          "B": true,
+          "D_H_1": "2025-01-03T12:30:00.000",
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_2": 3,
+          "I_H_1": 1,
+          "I": 5,
+          "I_F_1": 2,
+          "R_H_1": 1.25,
+          "R": 5.25,
+          "S_H_1": "A",
+          "S": "E",
+          "B_H_1": true,
+          "B": true,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": 1,
+          "I_H_1": 5,
+          "I": 2,
+          "I_F_1": 4,
+          "R_H_1": 5.25,
+          "R": 2.25,
+          "S_H_1": "E",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-05T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_2": 5,
+          "I_H_1": 2,
+          "I": 4,
+          "I_F_1": null,
+          "R_H_1": 2.25,
+          "R": 4.25,
+          "S_H_1": "B",
+          "S": "D",
+          "B_H_1": false,
+          "B": false,
+          "D_H_1": "2025-01-02T12:30:00.000",
+          "D": "2025-01-04T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 5,
+          "I_H_2": 3,
+          "I_H_1": 1,
+          "I": 5,
+          "I_F_1": 2,
+          "R_H_1": 1.25,
+          "R": 5.25,
+          "S_H_1": "A",
+          "S": "E",
+          "B_H_1": true,
+          "B": true,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_2": 1,
+          "I_H_1": 5,
+          "I": 2,
+          "I_F_1": 4,
+          "R_H_1": 5.25,
+          "R": 2.25,
+          "S_H_1": "E",
+          "S": "B",
+          "B_H_1": true,
+          "B": false,
+          "D_H_1": "2025-01-05T12:30:00.000",
+          "D": "2025-01-02T12:30:00.000"
+        }
+      ]
+    }
+  },
+  "types-short.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": 1,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": 1,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": 1.25,
+          "R": null,
+          "S_H_1": "A",
+          "S": null,
+          "B_H_1": true,
+          "B": null,
+          "D_H_1": "2025-01-01T12:30:00.000",
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": 1,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": 1,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": 1.25,
+          "S_H_1": null,
+          "S": "A",
+          "B_H_1": null,
+          "B": true,
+          "D_H_1": null,
+          "D": "2025-01-01T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  },
+  "types-empty.csv": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        },
+        {
+          "RowID": null,
+          "I_H_2": null,
+          "I_H_1": null,
+          "I": null,
+          "I_F_1": null,
+          "R_H_1": null,
+          "R": null,
+          "S_H_1": null,
+          "S": null,
+          "B_H_1": null,
+          "B": null,
+          "D_H_1": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_2",
+          "label": "I[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_F_1",
+          "label": "I[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R_H_1",
+          "label": "R[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S_H_1",
+          "label": "S[-1]",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B_H_1",
+          "label": "B[-1]",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D_H_1",
+          "label": "D[-1]",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  },
+  "types-zero": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    }
+  },
+  "types-one-lag-existing": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000",
+          "I_H_1": null
+        },
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000",
+          "I_H_1": 1
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000",
+          "I_H_1": 2
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000",
+          "I_H_1": 3
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000",
+          "I_H_1": 4
+        },
+        {
+          "RowID": null,
+          "I": null,
+          "R": null,
+          "S": null,
+          "B": null,
+          "D": null,
+          "I_H_1": 5
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000",
+          "I_H_1": null
+        },
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000",
+          "I_H_1": 1
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000",
+          "I_H_1": 2
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000",
+          "I_H_1": 3
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000",
+          "I_H_1": 4
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000",
+          "I_H_1": 1
+        },
+        {
+          "RowID": 3,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000",
+          "I_H_1": 2
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000",
+          "I_H_1": 3
+        },
+        {
+          "RowID": 5,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000",
+          "I_H_1": 4
+        }
+      ]
+    }
+  },
+  "types-one-lag-reopened": {
+    "keep_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I_H_1": null,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_1": 1,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_1": 2,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_1": 3,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_1": 4,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        },
+        {
+          "RowID": null,
+          "I_H_1": 5,
+          "I": null,
+          "R": null,
+          "S": null,
+          "B": null,
+          "D": null
+        }
+      ]
+    },
+    "drop_added": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I_H_1": null,
+          "I": 1,
+          "R": 1.25,
+          "S": "A",
+          "B": true,
+          "D": "2025-01-01T12:30:00.000"
+        },
+        {
+          "RowID": 2,
+          "I_H_1": 1,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_1": 2,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_1": 3,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_1": 4,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    },
+    "drop_all_incomplete": {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_H_1",
+          "label": "I[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "label": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "label": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "D",
+          "label": "D",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "I_H_1": 1,
+          "I": 2,
+          "R": 2.25,
+          "S": "B",
+          "B": false,
+          "D": "2025-01-02T12:30:00.000"
+        },
+        {
+          "RowID": 3,
+          "I_H_1": 2,
+          "I": 3,
+          "R": 3.25,
+          "S": "C",
+          "B": true,
+          "D": "2025-01-03T12:30:00.000"
+        },
+        {
+          "RowID": 4,
+          "I_H_1": 3,
+          "I": 4,
+          "R": 4.25,
+          "S": "D",
+          "B": false,
+          "D": "2025-01-04T12:30:00.000"
+        },
+        {
+          "RowID": 5,
+          "I_H_1": 4,
+          "I": 5,
+          "R": 5.25,
+          "S": "E",
+          "B": true,
+          "D": "2025-01-05T12:30:00.000"
+        }
+      ]
+    }
+  }
+}

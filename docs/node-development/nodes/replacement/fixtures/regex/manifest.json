@@ -1,0 +1,28 @@
+{
+  "file": "input.csv",
+  "bytes": 116,
+  "sha256": "d316549972527d1ccace38f65023b9a9715006d8c777ea72ed9f23733fbbf27b",
+  "encoding": "UTF-8",
+  "bom": false,
+  "delimiter": ";",
+  "line_ending": "LF",
+  "header": true,
+  "records": 8,
+  "null_marker": "NULL",
+  "empty_string": "",
+  "columns": [
+    {
+      "name": "Id",
+      "type": "integer"
+    },
+    {
+      "name": "Code",
+      "type": "string"
+    },
+    {
+      "name": "Keep",
+      "type": "string"
+    }
+  ],
+  "ordered": false
+}

@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "count": {"type": "integer", "minimum": 0, "description": "Explicit sample size in rows."},
+    "position": {"type": "string", "enum": ["first", "last"], "description": "Sequential selection from the start or end; retain input order, column types and NULLs."}
+  },
+  "required": ["count", "position"],
+  "additionalProperties": false
+}

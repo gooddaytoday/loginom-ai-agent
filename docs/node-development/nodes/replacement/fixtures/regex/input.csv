@@ -1,0 +1,9 @@
+Id;Code;Keep
+1;AB-12;one
+2;ab-34;two
+3;AB-12 AB-34;three
+4;xAB-56y;four
+5;NO;five
+6;NULL;six
+7;;seven
+8;AB-00;eight

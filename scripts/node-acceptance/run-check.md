@@ -29,6 +29,12 @@ with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
 Defaults: medium/1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
 between phase starts, 85 minutes total per batch including builds. `--spacing`,
 `--host-load-max`, `--out` and `--build` override these where exposed by help.
+The scenario catalog sets `model_timeout=2700` only for private C1 and 5-REST
+fixtures supplied through `--cases` or `--case-root`; other scenarios, including
+node acceptance, keep 1800 seconds. The batch deadline still caps each phase.
+At a phase deadline, SIGINT goes to the CLI owner first, with 100 seconds for
+normal close/ACK. If it stays alive, the process group receives SIGINT and
+another 40-second wait, then SIGKILL as the final fallback.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
 A supplied build must have matching SHA and `sourceDirty=false`.
 The total budget is shared by sequential scenarios. If it expires before a
@@ -93,7 +99,7 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: upload_only, n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: upload_only, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
@@ -201,3 +207,7 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+`n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
+`docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
+независимый expected.json; точный порядок строк и полей, все значения, типы и NULL.
