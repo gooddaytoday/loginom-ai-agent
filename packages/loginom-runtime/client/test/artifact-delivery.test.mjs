@@ -52,6 +52,40 @@ function fixture(fault,initialDirectory='/',options={}) {
  const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;},...options});
  return {service,artifact,calls,events,runtime};
 }
+test('a 1000 ms request still delivers a small attachment after slower navigation',async()=>{
+ let clock=0;
+ const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe;
+ f.runtime.observe=async options=>{clock+=500;return observe(options);};
+ const result=await f.service.deliver({...request,budget_ms:1000});
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+ assert.equal(f.calls.filter(c=>c==='verify').length,1);
+ assert.equal(f.events.find(e=>e.phase==='artifact_delivery_prepared').deadline_at,121000);
+});
+test('an expired pre-upload checkpoint resumes successfully without repeating an upload',async()=>{
+ let clock=0,failed=false;
+ const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe;
+ f.runtime.observe=async options=>{if(f.calls.length&&!failed){failed=true;clock=200000;throw Error('Read transport failed');}return observe(options);};
+ await f.service.deliver({...request,budget_ms:1000});
+ const retry={operation_id:'delivery',resume_id:'renew-and-deliver',budget_ms:1000};
+ const promise=f.service.resume(retry),result=await promise;
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.resume(retry),promise);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+ assert.equal(f.events.filter(e=>e.phase==='artifact_delivery_prepared').at(-1).deadline_at,321000);
+});
+test('a settled pre-upload pause can renew its expired deadline only once',async()=>{
+ let clock=0,fail=true;
+ const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe;
+ f.runtime.observe=async options=>{if(fail&&f.calls.length){clock+=200000;throw Error('Read transport failed');}return observe(options);};
+ const first=await f.service.deliver({...request,budget_ms:1000});
+ assert.equal(first.outcome.status,'NOT_APPLIED');assert.equal(first.outcome.cleanup_complete,true);
+ assert.equal(first.outcome.inspection_required,false);assert.ok(!f.calls.includes('upload'));
+ const retry={operation_id:'delivery',resume_id:'renew-once',budget_ms:1000};
+ const second=await f.service.resume(retry);
+ assert.equal(second.outcome.status,'NOT_APPLIED');assert.ok(!f.calls.includes('upload'));
+ clock+=200000;fail=false;
+ assert.throws(()=>f.service.resume({...retry,resume_id:'no-second-renewal'}),/deadline elapsed/);
+});
 for(const fault of [null,'document','workflow','tab','offscreen','disabled','masked'])test('Files navigation waits for an owned reachable toolbar before delivery: '+fault,async()=>{
  let clock=0,opened=false,reads=0;
  const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe,act=f.runtime.uiAct;
@@ -317,8 +351,8 @@ for(const fault of ['running','foreign'])test('delivery never proceeds from '+fa
 });
 
 
-function resumeFixture(stage) {
- const f=fixture(),inspect=f.runtime.inspect;
+function resumeFixture(stage,options={}) {
+ const f=fixture(undefined,'/',options),inspect=f.runtime.inspect;
  f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';r.output.outcome.cleanup_complete=true;return r;};
  if(stage==='upload') {
   f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return {status:'AMBIGUOUS',error:{code:'BROWSER_CALL_UNCERTAIN'}};};
@@ -422,8 +456,9 @@ test('local verification refusal resumes the original upload without another sub
 });
 
 test('resume never extends the original delivery deadline',async()=>{
- const f=resumeFixture('upload');await f.service.deliver({...request,budget_ms:1000});
- await new Promise(resolve=>setTimeout(resolve,1050));
+ let clock=0;
+ const f=resumeFixture('upload',{now:()=>clock});await f.service.deliver({...request,budget_ms:1000});
+ clock=121000;
  assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.ok(!f.calls.includes('verify'));
 });
