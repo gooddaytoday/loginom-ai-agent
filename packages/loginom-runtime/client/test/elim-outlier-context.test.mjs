@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readElimOutlierBrowser,readElimOutlierContext} from '../lib/elim-outlier-context.mjs';
-import {selectElimOutlierField} from '../lib/elim-outlier-procedure.mjs';
+import {selectElimOutlierField,configureElimOutlier} from '../lib/elim-outlier-procedure.mjs';
 function fixture(change=()=>{}){
  const prefix='MF;TF-1',base=prefix+';WizrdMCF;ElimOutlierWizard;',elements=new Map(),components=new Map();
  const root={checkVisibility:()=>true,contains:e=>[...elements.values()].includes(e)};
@@ -41,4 +41,27 @@ test('field selection starts with no selected row and binds the chosen record be
  let clicks=0;
  const result=await selectElimOutlierField({observe:async o=>{assert.equal(o.ready(state),true);return structuredClone(state);},perform:async o=>{assert.deepEqual(o.resolve(state),{verb:'click',ref:'x'});state.node_elim_outlier.selected=field;clicks++;}},baseline,'X');
  assert.equal(clicks,1);assert.equal(result.node_elim_outlier.selected.record_id,field.record_id);
+});
+for(const method of ['sd','iqr'])test('native '+method+' controls use the observed radio display and policy input',async()=>{
+ // Native failures: lab552-3-sd/main-1-execution-events.jsonl:453,455;
+ // lab552-3-iqr/main-1-execution-events.jsonl:416,418.
+ const baseline=fixture(),field=baseline.fields[1],root='MF;TF-1;WizrdMCF',base=root+';ElimOutlierWizard;';
+ baseline.fields=[field];baseline.values.pedActionOut=7;baseline.values.pedActionExtr=7;
+ baseline.settings.outlier_policy='unsupported';baseline.settings.extreme_policy='unsupported';
+ const input=key=>({ref:key,tid:null,identity:{anchor_tid:base+key+';ValueControl',path:[1,0,0,0]},allowed_actions:['click']});
+ const controls=[input('pedActionOut'),input('pedActionExtr'),{ref:'iqr',tid:base+'pedModeOE;ValueControl;radiofield-1;DisplayEl',allowed_actions:['click']},{ref:'next',tid:root+';btnNext',allowed_actions:['wizard_step']}];
+ const state={wizard:{stage:'elim_outlier',root_tid:root},node_elim_outlier:baseline,ui:{elements:controls}};
+ const chosen=[];
+ const channel={observe:async o=>{assert.equal(o.ready(state),true,o.condition);return structuredClone(state);},perform:async o=>{
+  const a=o.resolve(state);
+  if(a.ref==='next'){state.wizard.stage='done';return;}
+  if(a.ref==='iqr'){assert.equal(a.verb,'click');baseline.settings.method='iqr';baseline.settings.outlier_factor=baseline.values.pedDetectOKvartil;baseline.settings.extreme_factor=baseline.values.pedDetectEKvartil;return;}
+  const key=a.ref.replace(':keep','');assert.ok(['pedActionOut','pedActionExtr'].includes(key));assert.equal(a.verb,'click');
+  if(a.ref===key){state.ui.elements=[...controls,{ref:key+':keep',tid:base+key+';ValueControl;boundlist;Оставить_без_изменения',label:'Оставить без изменения',allowed_actions:['click']}];return;}
+  chosen.push(key);baseline.values[key]=1;baseline.settings[key==='pedActionOut'?'outlier_policy':'extreme_policy']='keep';state.ui.elements=controls;
+ }};
+ const result=await configureElimOutlier(channel,{outlier:{fields:['X'],method,outlier_factor:method==='sd'?1:1.5,extreme_factor:3}},{inputMapping:{verified:true,inventory_complete:true,target_fields:baseline.fields}});
+ assert.deepEqual(chosen,['pedActionOut','pedActionExtr']);assert.equal(result.validation.status,'accepted_by_loginom_next');
+ assert.equal(result.configuration.field_settings[0].settings.outlier_policy,'keep');assert.equal(result.configuration.field_settings[0].settings.extreme_policy,'keep');
+ assert.equal(result.configuration.field_settings[0].settings.method,method);
 });

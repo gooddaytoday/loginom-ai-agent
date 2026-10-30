@@ -52,7 +52,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
   if(used){
    const wanted=planned.find(w=>w.name===f.name);
    if(s.node_elim_outlier.settings.method!==wanted.method){
-    await act(s,'pedModeOE;ValueControl;'+(wanted.method==='sd'?'radiofield':'radiofield-1'),{verb:'click'});
+    await act(s,'pedModeOE;ValueControl;'+(wanted.method==='sd'?'radiofield':'radiofield-1')+';DisplayEl',{verb:'click'});
     s=await observe(channel,'outlier method readback');need(s.node_elim_outlier.settings.method===wanted.method,'method differs');
    }
    for(const [key,name] of [[wanted.method==='sd'?'pedDetectOSko':'pedDetectOKvartil','outlier_factor'],[wanted.method==='sd'?'pedDetectESko':'pedDetectEKvartil','extreme_factor']]){
@@ -63,7 +63,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
    for(const key of ['pedActionOut','pedActionExtr']){
     if(s.node_elim_outlier.values[key]===1)continue;
     const owner=s.wizard.root_tid+';ElimOutlierWizard;'+key+';ValueControl';
-    await act(s,key+';ValueControl;trg_picker',{verb:'click'});
+    await act(s,key+';ValueControl',{verb:'click'});
     s=await channel.observe({condition:'native keep policy option',readElimOutlier:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Оставить без изменения'&&e.allowed_actions.includes('click'))});
     const option=one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Оставить без изменения'&&e.allowed_actions.includes('click'),'Unique keep option required');
     await channel.perform({condition:'select native keep policy',initialObservation:s,ready,identity:()=>f,resolve:()=>({verb:'click',ref:option.ref})});
