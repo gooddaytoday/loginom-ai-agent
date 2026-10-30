@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'datamining.log_regression' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | LogRegressionConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | LogRegressionConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -316,4 +316,12 @@ export interface LinRegressionConfigurationReadback {
   node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply'; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
+}
+
+export interface LogRegressionConfigurationReadback {
+ kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
+ node:NodeRef; receipt_ids:string[]; mode:'enter'; input_fields:string[]; target_field:string;
+ classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
+ normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
+ training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;
 }
