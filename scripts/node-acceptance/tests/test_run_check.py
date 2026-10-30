@@ -21,6 +21,60 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def upload_model(self, root, receipt, *, calls=None):
+        source = root / 'input.csv'
+        source.write_text('Id,Value\n1,test\n')
+        case = root / 'cases/seed'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Загрузи исходник без сохранения пакета')
+        runner.write(case / 'case.json', dict(source_path=str(source), attachment='path', upload_only=True))
+        runner.write(case / 'expected.json', dict(nodes=[], outputs=[]))
+        folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
+        folder.mkdir(); workspace.mkdir(); profile.mkdir()
+        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True,
+                     package_path=None, save_operation_id=None, unsaved_changes_discarded=False))
+        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        instance = runner.Runner.__new__(runner.Runner)
+        instance.out, instance.env, instance.current = root, {}, {}
+        instance.options = dict(case_root=str(case.parent))
+        events = calls or [dict(tool='loginom_dock_artifact_deliver', state=dict(
+            status='completed', output=json.dumps(receipt)))]
+        def phase(*args, **kwargs):
+            (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(
+                type='tool_use', sessionID='session', part=part)) for part in events))
+        with patch.object(instance, 'phase', side_effect=phase):
+            result = instance.model('seed', folder, profile, workspace, '/test/run.lgp',
+                                    dict(package_directory='/test'), root / 'build')
+        self.assertEqual(instance.current['upload'], 'ready')
+        return result
+
+    def test_upload_only_accepts_verified_sync_and_async_receipts(self):
+        # LAB-549 l549cseed2/model.stdout:20: settled success has no upload_status.
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for mode in ['sync', 'async']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                calls = None
+                if mode == 'async':
+                    reply['upload_status'] = 'ready'
+                    calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(status='completed',
+                                  output=json.dumps(dict(state='running', upload_status='authorizing')))),
+                             dict(tool='loginom_dock_artifact_delivery_status', state=dict(
+                                  status='completed', output=json.dumps(reply)))]
+                self.upload_model(Path(directory), reply, calls=calls)
+
+    def test_upload_only_keeps_verification_requirements(self):
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for key, value in [('status', 'NOT_APPLIED'), ('state', 'running'), ('cleanup_complete', False),
+                           ('bytes', 15), ('upload_completion_verified', False), ('upload_status', 'failed')]:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                (reply['output'] if key in ['bytes', 'upload_completion_verified'] else reply)[key] = value
+                with self.assertRaisesRegex(AssertionError, 'UPLOAD_NOT_READY'):
+                    self.upload_model(Path(directory), reply)
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

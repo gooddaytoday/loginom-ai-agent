@@ -592,7 +592,7 @@ class Runner:
                 for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
             assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
             assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
-            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+            assert any(o.get('upload_status', 'ready') == 'ready' and o.get('status') == 'SUCCEEDED'
                        and o.get('state') == 'settled' and o.get('cleanup_complete') is True
                        and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
                        and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'
