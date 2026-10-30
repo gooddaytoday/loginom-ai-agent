@@ -12,7 +12,11 @@ async function fixture(mode,targetType='exports.text'){
  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',pinned,execute:async code=>{
   if(code.startsWith('async page=>{(page[Symbol')||code.startsWith('async page=>{page[Symbol'))return true;
   if(code.includes('function browserCapability')){links++;return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};}
-  if(code.includes('async function prepareLinkHover'))return structuredClone(graph);
+  if(code.includes('async function prepareLinkHover')){
+   if(mode==='hover_transport')throw Error('Execution context was destroyed');
+   if(mode==='hover_refusal')return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:'MODELFORM_MASK_CONTEXT_CHANGED: model_form'};
+   return structuredClone(graph);
+  }
   if(code.includes('page.waitForFunction')){waits++;if(mode==='cancel')controller.abort();if(mode==='deadline')await new Promise(r=>setTimeout(r,30));return true;}
   if(code.includes('async function readGraph')){
    if(code.includes('\"read_bindings\":true')){if(mode==='cancel_rebind')controller.abort();return {...structuredClone(graph),native_bindings:[{node_id:'source',label:'Source',outputs:[0]},{node_id:'target',label:'Export',inputs:[1]}]};}
@@ -53,4 +57,12 @@ test('initial connect observation rebinds only node drawing epochs',async()=>{
   assert.equal(rejected.links,0,mode);assert.equal(rejected.outcome?.status,'NOT_APPLIED',mode);
   assert.equal(rejected.outcome?.reason,'connect_graph_changed',mode);
  }
+});
+
+test('LAB-506 pre-hover mask refusal returns unchanged without invoking the link primitive',async()=>{
+ const r=await fixture('hover_refusal');
+ assert.equal(r.error,undefined);assert.equal(r.outcome.status,'NOT_APPLIED');
+ assert.equal(r.outcome.effect_possible,false);assert.equal(r.outcome.cleanup_complete,true);
+ assert.equal(r.outcome.error,'MODELFORM_MASK_CONTEXT_CHANGED: model_form');assert.equal(r.links,0);
+ const lost=await fixture('hover_transport');assert.match(lost.error.message,/context was destroyed/);assert.equal(lost.outcome,undefined);assert.equal(lost.links,0);
 });
