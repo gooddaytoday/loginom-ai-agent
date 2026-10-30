@@ -2,7 +2,7 @@
 """Independent Pearson proposal: exact rational sums and Decimal square root.
 
 Python standard library only. No Loginom output, model, runtime or network input.
-NULL calculations below propose pairwise deletion; native semantics are unverified.
+NULL uses pairwise deletion, observed in native UI on 2026-10-30.
 """
 import csv
 import hashlib
@@ -22,7 +22,7 @@ def read(name):
 
 def pearson(rows, left, right):
     pairs = [(Fraction(row[left]), Fraction(row[right])) for row in rows
-             if row[left] not in ('', '?') and row[right] not in ('', '?')]
+             if row[left] != '?' and row[right] != '?']
     n = len(pairs)
     if n < 2:
         return None
@@ -43,20 +43,52 @@ def reference():
     assert pearson([dict(x=str(i), y=str(-i)) for i in range(1, 9)], 'x', 'y') == -1
     assert pearson([dict(x='1', y='2'), dict(x='2', y='2')], 'x', 'y') is None
     return {
-        'status': 'proposal_pending_native_output_schema_and_owner_approval',
+        'status': 'proposal_pending_owner_approval',
         'tolerance': {'abs': 1e-6},
-        'pair_order': 'proposed: first-set source order, then second-set source order',
+        'pair_order': 'native: second-set source order outside, first-set source order inside',
         'pairs': {name: [dict(first=a, second=b, pearson_r=pearson(read(name), a, b))
-                         for a in ['X', 'Y'] for b in ['Z', 'W']]
+                         for b in ['Z', 'W'] for a in ['X', 'Y']]
                   for name in ['pairs.csv', 'update.csv']},
-        'null_proposal_only': [dict(first=a, second=b, pearson_r=pearson(read('null.csv'), a, b))
-                               for a, b in [('X', 'Y'), ('X', 'Z')]],
+        'null_pairs': [dict(first=a, second=b, pearson_r=pearson(read('null.csv'), a, b))
+                       for b in ['Z', 'W'] for a in ['X', 'Y']],
         'age_pressure': {
             'n': len(read('age-pressure.csv')),
             'age_mean': float(sum(Fraction(r['age']) for r in read('age-pressure.csv')) / len(read('age-pressure.csv'))),
             'pressure_mean': float(sum(Fraction(r['blood_pressure']) for r in read('age-pressure.csv')) / len(read('age-pressure.csv'))),
             'pearson_r': pearson(read('age-pressure.csv'), 'age', 'blood_pressure'),
         },
+    }
+
+
+def native_output(name, first=('X', 'Y'), second=('Z', 'W')):
+    return dict(output_node_type='research.corr_analysis', output_port=0,
+                ordered=True, column_order='exact', columns=[
+                    dict(name='ColSet1', label='Поле1.Имя', type='string'),
+                    dict(name='ColSet1_Label', label='Поле1.Метка', type='string'),
+                    dict(name='ColSet2', label='Поле2.Имя', type='string'),
+                    dict(name='ColSet2_Label', label='Поле2.Метка', type='string'),
+                    dict(name='Pirson', label='Пирсона', type='real', tolerance=dict(abs=1e-6)),
+                ], rows=[dict(ColSet1=a, ColSet1_Label=a, ColSet2=b, ColSet2_Label=b,
+                              Pirson=pearson(read(name), a, b)) for b in second for a in first])
+
+
+def expectations():
+    def package(outputs):
+        return dict(package_path='{{PACKAGE_PATH}}',
+                    nodes=[dict(type=t) for t in ['imports.text', 'research.corr_analysis', 'exports.text']],
+                    outputs=outputs)
+    age = reference()['age_pressure']
+    return {
+        'expected.json': package([native_output('pairs.csv')]),
+        'expected-update.json': package([native_output('update.csv')]),
+        'expected-null.json': package([native_output('null.csv')]),
+        'expected-age-pressure.json': package([
+            native_output('age-pressure.csv', ('age',), ('blood_pressure',)),
+            dict(output_node_type='export_input', ordered=True, column_order='exact',
+                 columns=[dict(name=k, label_any=True, type='integer' if k == 'n' else 'real',
+                               **({} if k == 'n' else dict(tolerance=dict(abs=1e-6))))
+                          for k in ['n', 'age_mean', 'pressure_mean', 'pearson_r']],
+                 rows=[{k: v if k == 'n' else round(v, 6) for k, v in age.items()}])]),
     }
 
 
@@ -85,5 +117,11 @@ if __name__ == '__main__':
             assert json.loads(path.read_text(encoding='utf-8')) == value, name
         else:
             print(json.dumps(value, ensure_ascii=False, indent=2))
+    for name, value in expectations().items():
+        path = ROOT / name
+        if sys.argv[1:] == ['--write']:
+            path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        elif sys.argv[1:] == ['--check']:
+            assert json.loads(path.read_text(encoding='utf-8')) == value, name
     if sys.argv[1:] == ['--check']:
         print('PASS: independent Pearson numbers, analytic identities and fixture manifest')

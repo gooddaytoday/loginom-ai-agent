@@ -1,9 +1,9 @@
 {
-  "status": "proposal_pending_native_output_schema_and_owner_approval",
+  "status": "proposal_pending_owner_approval",
   "tolerance": {
     "abs": 1e-06
   },
-  "pair_order": "proposed: first-set source order, then second-set source order",
+  "pair_order": "native: second-set source order outside, first-set source order inside",
   "pairs": {
     "pairs.csv": [
       {
@@ -12,14 +12,14 @@
         "pearson_r": -1.0
       },
       {
-        "first": "X",
-        "second": "W",
-        "pearson_r": 0.4774552605594227
-      },
-      {
         "first": "Y",
         "second": "Z",
         "pearson_r": -1.0
+      },
+      {
+        "first": "X",
+        "second": "W",
+        "pearson_r": 0.4774552605594227
       },
       {
         "first": "Y",
@@ -34,14 +34,14 @@
         "pearson_r": -1.0
       },
       {
-        "first": "X",
-        "second": "W",
-        "pearson_r": 0.4774552605594227
-      },
-      {
         "first": "Y",
         "second": "Z",
         "pearson_r": 1.0
+      },
+      {
+        "first": "X",
+        "second": "W",
+        "pearson_r": 0.4774552605594227
       },
       {
         "first": "Y",
@@ -50,16 +50,26 @@
       }
     ]
   },
-  "null_proposal_only": [
-    {
-      "first": "X",
-      "second": "Y",
-      "pearson_r": 1.0
-    },
+  "null_pairs": [
     {
       "first": "X",
       "second": "Z",
       "pearson_r": null
+    },
+    {
+      "first": "Y",
+      "second": "Z",
+      "pearson_r": null
+    },
+    {
+      "first": "X",
+      "second": "W",
+      "pearson_r": -0.25819888974716115
+    },
+    {
+      "first": "Y",
+      "second": "W",
+      "pearson_r": -0.5
     }
   ],
   "age_pressure": {
