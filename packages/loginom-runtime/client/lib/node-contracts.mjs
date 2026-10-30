@@ -23,7 +23,7 @@ const definitions = [
   ['transform.date_time', 'Дата и время', 'datereform', 1, 1, false, ['calendar'], 'processors/transformation/trans-datatime/README.md'],
   ['transform.collapse_columns', 'Свертка столбцов', 'columnflipping', 1, 1, false, ['unpivot'], 'processors/transformation/collapse-columns.md'],
   ['transform.sorting', 'Сортировка', 'sorting', 1, 1, false, ['keys'], 'processors/transformation/sorting.md'],
-  ['transform.join_data', 'Слияние', 'joindata', 2, 1, false, ['inner', 'left'], 'processors/transformation/join/README.md'],
+  ['transform.join_data', 'Слияние', 'joindata', 2, 1, false, ['inner', 'left', 'right', 'full', 'difference'], 'processors/transformation/join/README.md'],
   ['transform.union_data', 'Объединение', 'uniondata', 2, 1, true, ['append_all'], 'processors/transformation/union.md'],
   ['programming.javascript', 'JavaScript', 'javascript', 1, 1, false, ['script'], 'processors/programming/java-script/index.html'],
 ];

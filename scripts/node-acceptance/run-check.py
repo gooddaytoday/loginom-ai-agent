@@ -85,6 +85,9 @@ def scenario(name, case_root=None, *, cases=None):
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name in ['join-right', 'join-full', 'join-difference']:
+        src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):

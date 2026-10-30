@@ -74,6 +74,12 @@ test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t
  assert.notEqual(r.run('list','--base','missing-ref').status,0);
 });
 
+test('join changes require the three registered mode scenarios',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/join-parameters.mjs');
+ const text=r.list();assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['join-right','join-full','join-difference'])assert.ok(text.includes(name));
+});
+
 test('deleted and renamed source paths still require their suites',t=>{
  const r=repo(t),path='packages/loginom-runtime/src/managed-entry.mjs';
  r.commit(path);r.git('branch','-f','base','HEAD');

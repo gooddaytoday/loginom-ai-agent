@@ -21,6 +21,20 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_join_modes_resolve_approved_tasks_inputs_and_cold_expectations(self):
+        for mode, columns, rows in [('right', 6, 7), ('full', 6, 9), ('difference', 3, 2)]:
+            with self.subTest(mode=mode):
+                case = runner.scenario('join-' + mode)
+                self.assertIsNone(case['base'])
+                self.assertEqual(case['prompt'].resolve(), (runner.REPO / 'docs/node-development/nodes/join/acceptance' / ('task-' + mode + '.md')).resolve())
+                self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['left.csv', 'manifest.json', 'right.csv'])
+                expected = runner.expected_for(case, '/test/join.lgp')
+                self.assertEqual(expected['package_path'], '/test/join.lgp')
+                output = expected['outputs'][0]
+                self.assertEqual(len(output['columns']), columns)
+                self.assertEqual(len(output['rows']), rows)
+                self.assertEqual(output['export_destination'], '/' + mode + '-result.csv')
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

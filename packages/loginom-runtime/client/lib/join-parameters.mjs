@@ -1,7 +1,7 @@
 const need=(v,m)=>{if(!v)throw Error(m);};
 const name=v=>typeof v==='string'&&v.length>0&&v.length<=200&&!/[\x00-\x1f]/.test(v);
 export function validateJoinParameters(p,mode,r){
- need(['inner','left'].includes(mode),'Join supports inner and left modes');
+ need(['inner','left','right','full','difference'].includes(mode),'Join supports inner, left, right, full and difference modes');
  need(p&&typeof p==='object'&&!Array.isArray(p),'Join parameters required');
  const preserve=Object.keys(p).length===0;
  need(!preserve||r.target.kind==='existing','New join requires explicit keys and options');
@@ -42,7 +42,7 @@ export function resolveJoinKeys(parameters,schemas){
 }
 export function joinOutputFields(configuration,outputMapping){
  const rightKeys=new Set(configuration.keys.map(k=>k.right));
- const fields=[...configuration.input_fields[0],...configuration.input_fields[1].filter(f=>configuration.include_joined_keys||!rightKeys.has(f.name))].map(f=>({name:f.name,label:f.label,type:f.type,used:true}));
+ const fields=[...configuration.input_fields[0],...(configuration.mode==='difference'?[]:configuration.input_fields[1].filter(f=>configuration.include_joined_keys||!rightKeys.has(f.name)))].map(f=>({name:f.name,label:f.label,type:f.type,used:true}));
  need((outputMapping?.changes??[]).every(f=>fields.some(s=>s.name===f.source.name)),'Join output changes reference an unknown source');
  return fields;
 }

@@ -235,7 +235,7 @@ export type JoinParameters = {keys: Array<{left: string; right: string}>;
 export interface JoinConfigurationReadback {
   kind: 'join'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'inner' | 'left'; keys: Array<{left: string; right: string}>;
+  mode: 'inner' | 'left' | 'right' | 'full' | 'difference'; keys: Array<{left: string; right: string}>;
   case_sensitive: boolean; include_joined_keys: boolean;
   input_mappings: Array<{port: 0 | 1; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>}>;
