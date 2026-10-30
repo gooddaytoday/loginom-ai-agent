@@ -604,7 +604,7 @@ test('D56c Open diagnostics read native inventory/errors without binding or RPC 
  assert.deepEqual(f.events,[]);
 });
 
-// Both retained cold journals show an exact new package, writable mode,
+// The retained cold journals show an exact new package, writable mode,
 // PACKAGE_OPEN_REJECTED and the same renderer text under the TabForm mask.
 // Modal ownership below models the native ErrorMsg/FMessages contract; the
 // historical journals did not capture its data-tid or DOM (not a live proof).
@@ -680,6 +680,48 @@ for(const sample of ['p15 cold:1–2','LAB-173 p24 cold1:1–2'])test('D78 repla
 test('D78 late own modal disappearance is read-only settlement, never another OK',async()=>{
  const f=failedOpenFixture('late modal'),r=await f.runFailed();
  assert.equal(r.status,'SUCCEEDED');assert.equal(f.state.dismissals,1);assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+});
+
+// LAB-510 native-messagebox.json: details, mailto and an unlabeled control
+// accompany OK; only the message-box toolbar offers a response choice.
+for(const outcome of ['hidden body', 'released native handles', 'persistent window', 'replacement window'])
+test('D78 Loginom 7.4.2 four-button error settles after its own OK: '+outcome,async()=>{
+ const f=failedOpenFixture('late modal'),c=f.context;
+ const r=c.__loginomDockPreparationV1.receipts.get('prepare'),error=r.openError;
+ const query=c.document.querySelectorAll;
+ const extras=[['DetailPanel;btnDetais','Технические подробности'],['DetailPanel;btnMailto','Сообщить об ошибке'],['b','']]
+  .map(([tid,label])=>({getAttribute:()=>tid,innerText:label,getBoundingClientRect:()=>({width:20,height:10})}));
+ const contains=error.root.contains;error.root.contains=e=>extras.includes(e)||contains(e);
+ c.document.querySelectorAll=q=>q==='[data-tid^="DetailPanel;"]'?extras.slice(0,2):q==='[data-tid="b"]'?[extras[2]]:query(q);
+ const ok=query('[data-tid="msgbox;tlb;ok"]')[0],click=ok.click;
+ ok.click=()=>{
+  click();
+  // The close animation can hide the messages before its window disappears.
+  error.element.getBoundingClientRect=()=>({width:0,height:0});
+ };
+ const wait=f.page.waitForTimeout;
+ let waits=0;
+ f.page.waitForTimeout=async ms=>{
+  await wait(ms);
+  if(ms>100)return;
+  waits++;
+  if(outcome==='hidden body'&&waits===1)f.state.openError=true;
+  if(outcome==='released native handles'){
+   error.message.el=null;error.messages.el=null;c.bg.ext.errormessage.ErrorMsg.FInstance=null;
+  }
+  if(outcome==='persistent window')f.state.openError=true;
+  if(outcome==='replacement window'){
+   f.state.openError=true;c.bg.ext.errormessage.ErrorMsg.FInstance={};
+  }
+ };
+ const result=await f.runFailed(),success=['hidden body','released native handles'].includes(outcome);
+ assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
+ assert.equal(result.package_closed,success);assert.equal(result.logged_out,success);
+ assert.equal(f.state.dismissals,1);assert.equal(f.events.filter(x=>x==='close').length,success?1:0);
+ assert.equal(result.unsaved_changes_discarded,false);
+ if(success)assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ if(outcome==='hidden body')assert.equal(waits,2);
+ if(outcome==='persistent window')assert.equal(f.state.clock,f.state.deadline);
 });
 
 test('D78 a later cleanup call cannot renew the failed Open cleanup deadline',async()=>{
