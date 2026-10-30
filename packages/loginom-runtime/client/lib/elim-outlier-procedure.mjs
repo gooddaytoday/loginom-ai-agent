@@ -80,6 +80,11 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
  if(s.node_elim_outlier.ordered!==ordered){await act(s,'pedOrderedSample;ValueControl;DisplayEl',{verb:'set_checked',checked:ordered});s=await observe(channel,'outlier ordered flag readback');}
  need(s.node_elim_outlier.ordered===ordered&&!s.node_elim_outlier.quality&&!Object.values(s.node_elim_outlier.switches).some(Boolean),'global outlier settings differ');
  need(same(s.node_elim_outlier.fields.filter(f=>f.used).map(f=>f.name),baseline.fields.filter(f=>selected.includes(f.name)).map(f=>f.name)),'selected field set differs');
+ // Native Next leaves this page unchanged when the final selected row is
+ // ignored and its parameter panel is hidden (lab552-5-sd:465,468).
+ // Bind a used field again; never retry the validation gesture.
+ s=await selectElimOutlierField(channel,baseline,selected[0]);
+ need(s.node_elim_outlier.selected.used&&same(s.node_elim_outlier.settings,Object.fromEntries(Object.entries(planned[0]).filter(([k])=>k!=='name'))),'validation field settings differ');
  const configuration={...s.node_elim_outlier,field_settings:after};
  await channel.perform({condition:'validate outlier detect settings',initialObservation:s,ready,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Outlier Next unavailable').ref,expected_stage:'done'})});

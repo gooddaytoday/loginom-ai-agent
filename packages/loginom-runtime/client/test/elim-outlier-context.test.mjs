@@ -56,7 +56,7 @@ for(const method of ['sd','iqr'])test('native '+method+' controls use the observ
  const chosen=[];
  const channel={observe:async o=>{assert.equal(o.ready(state),true,o.condition);return structuredClone(state);},perform:async o=>{
   const a=o.resolve(state);
-  if(a.ref==='next'){state.wizard.stage='done';return;}
+  if(a.ref==='next'){assert.equal(baseline.selected.name,'X','Next must validate a used field with bound controls, never ignored Note');assert.equal(baseline.selected.used,true);assert.equal(baseline.settings.method,method);state.wizard.stage='done';return;}
   if(a.ref.startsWith('select:')){baseline.selected=baseline.fields.find(f=>f.name===a.ref.slice(7));baseline.settings=baseline.selected.used?settings:null;return;}
   assert.equal(baseline.selected.name,'X','unused Note must never receive parameter edits');
   if(a.ref==='iqr'){assert.equal(a.verb,'click');baseline.settings.method='iqr';baseline.settings.outlier_factor=baseline.values.pedDetectOKvartil;baseline.settings.extreme_factor=baseline.values.pedDetectEKvartil;return;}
