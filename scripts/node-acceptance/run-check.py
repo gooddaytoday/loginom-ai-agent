@@ -90,6 +90,10 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name in ['outlier-sd', 'outlier-iqr']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
+        if name == 'outlier-iqr': src = src / 'iqr'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
     if name == 'logreg-enter':
@@ -104,6 +108,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling', 'data-partition', 'sampling-null', 'sampling-empty', 'data-partition-null', 'data-partition-empty']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        variant = next((v for v in ['null', 'empty'] if name.endswith('-' + v)), None)
+        src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'),
+                    data=src / ('data-' + variant if variant else 'data'), base=None,
+                    expected_name='expected-' + variant + '.json' if variant else 'expected.json')
     if name in ['join-right', 'join-full', 'join-difference']:
         src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -561,9 +572,10 @@ class Runner:
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
         if not exports and not spec.get('upload_only'):
-            count = 2 if src.parent.name == 'datamining-clustering' else 1
+            count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)

@@ -140,6 +140,18 @@ Execute вычисляющих узлов ради чтения, ответа и
 Для изменения текста замены передай тот же existing ref и полное правило
 этого поля; незаданные поля и `output_mode` сохраняются. Смешанные exact/regex
 таблицы и другие конструкции требуют явного отказа, а не обхода через JS.
+Для поиска выбросов и экстремальных значений по SD или IQR выбирай
+`dock_node_apply`: `target.type:preprocessing.elim_outlier`, `mode:detect`.
+В `parameters.outlier` нового узла задай `fields` (технические имена только
+непрерывных числовых полей), `method:sd|iqr`, явные `outlier_factor`,
+`extreme_factor` (не меньше первого) и `ordered` (признак уже упорядоченного
+входа, без сортировки). Detect сохраняет исходные значения (keep/keep),
+обучается на текущем входе перед Execute. Используй `finish:execute` и
+`read.ports:[0,1,2]`: все строки, выбросы без экстремумов, экстремумы.
+Для patch существующего узла неуказанные параметры сохраняются.
+Эту поддержанную операцию выполняй данным узлом; Калькулятор и JavaScript
+для её самостоятельного вычисления не нужны. Другие политики редактирования,
+quality и применение сохранённой модели к новому входу пока недоступны.
 
 Для копий предыдущих и следующих записей выбирай `dock_node_apply` с
 `target.type="transform.sliding_window"`, `mode="lag"` и
@@ -196,6 +208,8 @@ JS-узлы не удаляй автоматически; их наличие н
 Для незнакомого обработчика сначала запроси его `parameter_schema` через
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
+
+Первые/последние N строк выбирай узлом `preprocessing.sampling`, `mode:"sequential"`, `parameters:{count:N,position:"first"}` или `position:"last"`. Последовательное разбиение выполняй `preprocessing.data_partition`, `mode:"sequential"`, `parameters:{train_count:N,test_count:M,allocation_order:"test_train_unused"}`. Размеры — в строках; порядок выделения задаётся `allocation_order`. Обычный `finish:"execute"`, без обучения. Читай порты `[0,1,2]`: общий/train/test; общий содержит сначала train, затем test и первое поле `IsTestSet` boolean (false/train, true/test). Для полного малого результата укажи `sample_rows:100,require_exact_numbers:true` и проверь полноту. При экспорте результатов этих узлов задавай маркер NULL отдельно: если пользователь не указал его для экспорта, используй `parameters:{null_marker:""}` у `exports.text`. Для полей `datetime`, если пользователь не задал формат экспорта, у `exports.text` явно укажи `date_format:"yyyy/mm/dd",date_separator:"-",time_format:"hh:nn:ss.zzz",time_separator:":"`: пустые настройки используют локальный формат даты. Для этих операций выбирай указанные узлы; Калькулятор и JavaScript не нужны. Случайные режимы и отбор со смещением этим контрактом не поддержаны.
 
 Для бинарной строковой цели и вероятности события используй
 `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`,
