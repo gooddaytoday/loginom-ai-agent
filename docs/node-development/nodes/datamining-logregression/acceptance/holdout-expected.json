@@ -1,0 +1,100 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "PredictionEvent",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "PredictionProbability",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "ActualEvent",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Target_predicted",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label": "X"
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label": "Target"
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label": "RowID"
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label": "Note"
+        }
+      ],
+      "rows": [
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.03571428571428571,
+          "ActualEvent": null,
+          "Target_predicted": "no",
+          "RowID": 33,
+          "X": -3.0,
+          "Target": null,
+          "Note": null
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5,
+          "ActualEvent": null,
+          "Target_predicted": "no",
+          "RowID": 34,
+          "X": 0.0,
+          "Target": null,
+          "Note": "new"
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.9642857142857143,
+          "ActualEvent": null,
+          "Target_predicted": "yes",
+          "RowID": 35,
+          "X": 3.0,
+          "Target": null,
+          "Note": "new"
+        }
+      ]
+    }
+  ]
+}
