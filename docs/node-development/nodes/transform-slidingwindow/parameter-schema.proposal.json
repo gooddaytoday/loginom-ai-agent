@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "properties": {
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "description": "Complete replacement of per-field lag windows; unlisted input fields use history=0 and horizon=0.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Exact observed technical name of an input field; duplicates and unknown names refuse before mutation."
+          },
+          "history": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of previous input rows copied for this field; zero adds no historical columns. Native upper bound awaits discovery."
+          },
+          "horizon": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of following input rows copied for this field; zero adds no future columns. Native upper bound awaits discovery."
+          }
+        },
+        "required": [
+          "field",
+          "history",
+          "horizon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "incomplete_records": {
+      "type": "string",
+      "enum": [
+        "keep_incomplete",
+        "drop_added",
+        "drop_all_incomplete"
+      ],
+      "description": "Explicit native incomplete-row policy: keep expanded edges, retain original rows only, or retain complete rows only. Exact NULL behavior awaits discovery; variable binding is unsupported."
+    }
+  },
+  "required": [
+    "windows",
+    "incomplete_records"
+  ],
+  "additionalProperties": false
+}
