@@ -89,7 +89,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
  const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:contract.NODE_READ_MODE,
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
- for(const name of ['Sampling','DataPartition','ExcelImport','LinRegression','LogRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
+ for(const name of ['CorrAnalysis','Sampling','DataPartition','ExcelImport','LinRegression','LogRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
   'DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
    nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
@@ -136,7 +136,7 @@ test('D46 unchanged execution predicate excludes every configuration edit and ot
  }
 });
 
-for(const mode of ['inner','left'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
+for(const mode of ['inner','left','right','full','difference'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
  const f=fixture('transform.join_data',{savedMode:mode,mode,initialStage:'input_mapping'}),result=await f.run();
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  assert.deepEqual(f.calls,['select','open','next','close','baseline','Execute']);

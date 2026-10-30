@@ -54,6 +54,7 @@ def expected(mode, package='{{PACKAGE_PATH}}', include_keys=True, case_sensitive
         rows.append(dict(zip(names, values)))
     return {
         'package_path': package,
+        'null_marker': 'NULL',
         'nodes': [{'type': 'imports.text'}, {'type': 'imports.text'},
                   {'type': 'transform.join_data'}, {'type': 'exports.text'}],
         'outputs': [{

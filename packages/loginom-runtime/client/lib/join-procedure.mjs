@@ -14,7 +14,8 @@ export async function configureJoin(channel,p,{request}){
  const changes=[];
  if(before.mode!==request.mode){
   await channel.perform({condition:'open join mode choices',initialObservation:s,ready:joinReady,identity:()=>semantic(before),resolve:s=>({verb:'click',ref:control(s,'pedJoinType;ValueControl;trg_picker','click').ref})});
-  const label=request.mode==='inner'?'Внутреннее_соединение':'Левое_соединение';
+  const label={inner:'Внутреннее_соединение',left:'Левое_соединение',right:'Правое_соединение',full:'Полное_соединение',difference:'Разность'}[request.mode];
+  need(label,'Unsupported join mode');
   s=await channel.observe({condition:'join mode choice visible',readJoin:true,ready:s=>joinReady(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';JoinDataWizard;pedJoinType;ValueControl;boundlist;'+label)});
   await channel.perform({condition:'choose requested join mode',initialObservation:s,ready:joinReady,identity:()=>semantic(before),resolve:s=>({verb:'click',ref:control(s,'pedJoinType;ValueControl;boundlist;'+label,'click').ref})});
   s=await channel.observe({condition:'join mode applied',readJoin:true,ready:s=>joinReady(s)&&s.node_join.mode===request.mode});changes.push('mode');

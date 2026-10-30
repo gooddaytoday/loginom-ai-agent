@@ -81,7 +81,7 @@ def expectations():
     return {
         'expected.json': package([native_output('pairs.csv')]),
         'expected-update.json': package([native_output('update.csv')]),
-        'expected-null.json': package([native_output('null.csv')]),
+        'expected-null.json': dict(package([native_output('null.csv')]), null_marker='?'),
         'expected-age-pressure.json': package([
             native_output('age-pressure.csv', ('age',), ('blood_pressure',)),
             dict(output_node_type='export_input', ordered=True, column_order='exact',

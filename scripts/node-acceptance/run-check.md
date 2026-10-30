@@ -99,9 +99,12 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+`join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
+CSV inputs and expected outputs in `docs/node-development/nodes/join/acceptance/`.
+Each runs independently with the stock CSV, Save, cold and cleanup checks.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
 values against the separate cold JSON fixture;
 n14–n17 previously lacked that fixture. Their new fixtures use the independent
@@ -207,6 +210,12 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
+`corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
+age/pressure business task). Fixtures and independent expected tables are in
+`docs/node-development/nodes/research-corranalysis/acceptance`; each model run
+receives only its named input CSV and user task. Other coefficients are deferred.
 
 `n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
 `docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
