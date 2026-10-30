@@ -9,7 +9,9 @@ export function isWindowsSystemOwner(owner, systemRoot) {
   if (!owner || !systemRoot || !Number.isInteger(owner.pid) || owner.pid <= 0) return false;
   return owner.name?.toLowerCase() === 'svchost.exe' && owner.parentName?.toLowerCase() === 'services.exe'
     && owner.path?.toLowerCase() === win32.join(systemRoot, 'System32', 'svchost.exe').toLowerCase()
-    && owner.parentPath?.toLowerCase() === win32.join(systemRoot, 'System32', 'services.exe').toLowerCase()
+    // Protected services.exe can hide ExecutablePath from an unprivileged observer.
+    && (owner.parentPath === null
+      || owner.parentPath?.toLowerCase() === win32.join(systemRoot, 'System32', 'services.exe').toLowerCase())
     && Array.isArray(owner.services) && owner.services.some(service =>
       service.pid === owner.pid && service.state === 'Running' && typeof service.name === 'string' && service.name.length > 0);
 }

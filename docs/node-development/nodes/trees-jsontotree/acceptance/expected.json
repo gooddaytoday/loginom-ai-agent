@@ -1,0 +1,258 @@
+{
+  "proposal": "Owner approval and tree_io required; not a runnable v0.3.8 scenario.",
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "trees.from_json"
+    },
+    {
+      "type": "trees.to_table"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "trees.to_table",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "active",
+          "label_any": true,
+          "type": "boolean"
+        },
+        {
+          "name": "sku",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "qty",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "price",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "note",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "id": "9007199254740993",
+          "active": false,
+          "sku": "A",
+          "qty": 2,
+          "price": 1.25,
+          "note": null
+        },
+        {
+          "id": "9007199254740993",
+          "active": false,
+          "sku": "B",
+          "qty": 0,
+          "price": 0.5,
+          "note": ""
+        },
+        {
+          "id": "9007199254740993",
+          "active": false,
+          "sku": "C",
+          "qty": 3,
+          "price": 2.0,
+          "note": "x"
+        },
+        {
+          "id": "9007199254740993",
+          "active": false,
+          "sku": "D",
+          "qty": 1,
+          "price": 0.5,
+          "note": null
+        }
+      ]
+    }
+  ],
+  "proposed_tree_output": {
+    "output_node_type": "trees.from_json",
+    "output_port": 0,
+    "port_kind": "tree",
+    "ordered": true,
+    "schema_field_order": [
+      "id",
+      "active",
+      "items"
+    ],
+    "item_field_order": [
+      "sku",
+      "qty",
+      "price",
+      "note"
+    ],
+    "tolerance": {
+      "abs": 0,
+      "rel": 0
+    },
+    "document": {
+      "path": "",
+      "type": "object",
+      "children": [
+        {
+          "path": "/id",
+          "type": "integer",
+          "value": "9007199254740993"
+        },
+        {
+          "path": "/active",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "path": "/items",
+          "type": "array",
+          "children": [
+            {
+              "path": "/items/0",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/0/sku",
+                  "type": "string",
+                  "value": "A"
+                },
+                {
+                  "path": "/items/0/qty",
+                  "type": "integer",
+                  "value": "2"
+                },
+                {
+                  "path": "/items/0/price",
+                  "type": "real",
+                  "value": "1.25"
+                },
+                {
+                  "path": "/items/0/note",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            },
+            {
+              "path": "/items/1",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/1/sku",
+                  "type": "string",
+                  "value": "B"
+                },
+                {
+                  "path": "/items/1/qty",
+                  "type": "integer",
+                  "value": "0"
+                },
+                {
+                  "path": "/items/1/price",
+                  "type": "real",
+                  "value": "0.5"
+                },
+                {
+                  "path": "/items/1/note",
+                  "type": "string",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "path": "/items/2",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/2/sku",
+                  "type": "string",
+                  "value": "C"
+                },
+                {
+                  "path": "/items/2/qty",
+                  "type": "integer",
+                  "value": "3"
+                },
+                {
+                  "path": "/items/2/price",
+                  "type": "real",
+                  "value": "2.0"
+                },
+                {
+                  "path": "/items/2/note",
+                  "type": "string",
+                  "value": "x"
+                }
+              ]
+            },
+            {
+              "path": "/items/3",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/3/sku",
+                  "type": "string",
+                  "value": "D"
+                },
+                {
+                  "path": "/items/3/qty",
+                  "type": "integer",
+                  "value": "1"
+                },
+                {
+                  "path": "/items/3/price",
+                  "type": "real",
+                  "value": "0.5"
+                },
+                {
+                  "path": "/items/3/note",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "schema_types": {
+      "/id": "integer",
+      "/active": "boolean",
+      "/items": "object_array",
+      "/items/sku": "string",
+      "/items/qty": "integer",
+      "/items/price": "real",
+      "/items/note": "string"
+    },
+    "source_missing_paths": [
+      "/items/3/note"
+    ],
+    "missing_paths": [],
+    "null_paths": [
+      "/items/0/note",
+      "/items/3/note"
+    ],
+    "note": "Paths and tags are the oracle format, not the current runtime wire contract."
+  }
+}

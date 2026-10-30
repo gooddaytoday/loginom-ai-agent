@@ -2,8 +2,28 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
+import { execFileSync } from "node:child_process"
 
 const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
+
+// Capture provenance at build time, never from the user's working directory.
+const source = (() => {
+  try {
+    const git = (...args: string[]) =>
+      execFileSync("git", args, {
+        cwd: import.meta.dirname,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim()
+    // electron-vite creates this untracked ESM loader while evaluating us.
+    const dirty = git("status", "--porcelain", "--untracked-files=all")
+      .split("\n")
+      .some((line) => line && !/^\?\? "?(?:.*\/)?electron\.vite\.config\.\d+\.mjs"?$/.test(line))
+    return { sha: git("rev-parse", "HEAD"), dirty }
+  } catch {
+    return { sha: null, dirty: null }
+  }
+})()
 
 const channel = (() => {
   const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
@@ -35,6 +55,8 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),
+      "import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY": JSON.stringify(source.dirty),
       // Release builds bake browser recovery; packaged mode is still required at runtime.
       "import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY": JSON.stringify(
         process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",

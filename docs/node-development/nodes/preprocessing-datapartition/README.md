@@ -1,23 +1,15 @@
 # Разбиение на множества
 
-Устойчивый ID: `component.preprocessing.DataPartition`. Slug: `preprocessing-datapartition`. Исторический номер не назначен.
+Component ID: `component.preprocessing.DataPartition`. Runtime proposal:
+`preprocessing.data_partition`. Обработчика нет; подплан `ready_for_development`.
 
-[Подплан](plan.md) · [реестр](../../registry.json).
+[Подплан](plan.md) · [Discovery](discovery.md) · [Приёмочный комплект](acceptance/README.md).
 
-## Состояние
-
-Обработчика нет; `discovery_required`. Следующая карточка Multica — этап 0 (живое исследование), отдельно от реализации. Назначение этапа 1 требует закреплённого контракта и решения владельца по общим изменениям: W3.
-Живые наблюдения, CLI и численная приёмка не выполнялись; готовность реестра не менялась.
-
-## Планируемый объём по этапам
-
-- Этап 1 — Размеры, приоритет и три выхода.
-- Этап 2 — Все методы сэмплинга и seed.
-
-Общие изменения: W3 — адресация и независимое чтение нескольких портов одного узла.
-
-## Источники
-
-- [Разбиение на множества](https://help.loginom.ru/userguide/processors/preprocessing/partitioning.html) — `loginom-help@353e506b:data/processors/preprocessing/partitioning.md`.
-- `e2e-tests@486caef44:bg/labels.ts:150-160 — метки Предобработки; общие workflow/port_label и mapping-сценарии не являются oracle этого алгоритма` — прочитанные исходники, не результат выполнения.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; обработчика нет.
+В v0.3.8 только «Последовательный». Native engine, основные типы, параметры,
+численные результаты и порты подтверждены в UI Loginom 7.4.2. Этап 0 завершён
+с разрешённой оговоркой: **NULL/empty — проверяется на этапе 1 по oracle**;
+четыре новые сессии не дали подтверждённых выходов этих случаев.
+Готовность подплана не означает подтверждение NULL/empty или приёмку обработчика.
+Смещение и случайные/стратифицированные методы — следующие этапы.
+CLI не собирался; run-check/cold NOT_RUN. Критерии и оговорку утверждает владелец
+до этапа 1.
