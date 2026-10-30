@@ -1,0 +1,131 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.join_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/full-result.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "LKey",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LPart",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LValue",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RKey",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RPart",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RValue",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "LKey": "A",
+          "LPart": "X",
+          "LValue": "left1",
+          "RKey": "A",
+          "RPart": "X",
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "LPart": "X",
+          "LValue": "left1",
+          "RKey": "A",
+          "RPart": "X",
+          "RValue": "right2"
+        },
+        {
+          "LKey": "A",
+          "LPart": "X",
+          "LValue": "left2",
+          "RKey": "A",
+          "RPart": "X",
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "LPart": "X",
+          "LValue": "left2",
+          "RKey": "A",
+          "RPart": "X",
+          "RValue": "right2"
+        },
+        {
+          "LKey": "a",
+          "LPart": "X",
+          "LValue": "lower-left",
+          "RKey": "a",
+          "RPart": "X",
+          "RValue": "lower-right"
+        },
+        {
+          "LKey": "B",
+          "LPart": "X",
+          "LValue": "only-left",
+          "RKey": null,
+          "RPart": null,
+          "RValue": null
+        },
+        {
+          "LKey": "A",
+          "LPart": "Y",
+          "LValue": "left-other-part",
+          "RKey": null,
+          "RPart": null,
+          "RValue": null
+        },
+        {
+          "LKey": null,
+          "LPart": null,
+          "LValue": null,
+          "RKey": "C",
+          "RPart": "X",
+          "RValue": "only-right"
+        },
+        {
+          "LKey": null,
+          "LPart": null,
+          "LValue": null,
+          "RKey": "A",
+          "RPart": "Z",
+          "RValue": "right-other-part"
+        }
+      ]
+    }
+  ]
+}

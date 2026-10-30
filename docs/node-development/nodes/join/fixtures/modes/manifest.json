@@ -1,0 +1,51 @@
+{
+  "encoding": "UTF-8",
+  "bom": false,
+  "delimiter": ";",
+  "line_ending": "LF",
+  "header": true,
+  "row_order": "source order; output is a multiset",
+  "null_marker": "NULL (not present in inputs)",
+  "files": [
+    {
+      "name": "left.csv",
+      "bytes": 87,
+      "sha256": "c9f5ccc4cc7572d60fa2ae53ce13cbcec1a3c09dcffe8c44a22cffec03935780",
+      "rows": 5,
+      "columns": [
+        {
+          "name": "LKey",
+          "type": "string"
+        },
+        {
+          "name": "LPart",
+          "type": "string"
+        },
+        {
+          "name": "LValue",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "right.csv",
+      "bytes": 92,
+      "sha256": "3717fc54f285b6c9295bae7b02a7380a8101cdc87c0b79bab5c89fbd40bd8961",
+      "rows": 5,
+      "columns": [
+        {
+          "name": "RKey",
+          "type": "string"
+        },
+        {
+          "name": "RPart",
+          "type": "string"
+        },
+        {
+          "name": "RValue",
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}
