@@ -55,6 +55,8 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/node-port-output.mjs','n19'],
  ['packages/loginom-runtime/client/lib/crosstable-readback.mjs','n13'],
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
+ ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
+ ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();

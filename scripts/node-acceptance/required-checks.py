@@ -30,6 +30,7 @@ RULES = (
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18',)),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
+    ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter',)),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17',)),
