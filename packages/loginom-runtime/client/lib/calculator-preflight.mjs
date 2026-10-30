@@ -1,3 +1,4 @@
+import {preflightInactiveTabularSource} from './grouping-preflight.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 
@@ -45,5 +46,11 @@ export function predictNewCalculatorOutput(parameters,inputFields,mappings=[]) {
 export function preflightCalculatorSource(options,ctx,config){
  const request=options.operation.parameters;
  return preflightTabularSource(options,ctx,config,{required:true,label:'calculator',
+  inactiveSource:source=>preflightInactiveCalculatorSource(options,source),
   resolve:(parameters,fields)=>predictNewCalculatorOutput(parameters,fields,request.mappings)});
+}
+
+export function preflightInactiveCalculatorSource(options,source){
+ return preflightInactiveTabularSource(options,source,{label:'calculator',sourceIcons:['bg-vendor-icon-importtextfile'],
+  resolve:(parameters,fields)=>predictNewCalculatorOutput(parameters,fields,options.operation.parameters.mappings)});
 }

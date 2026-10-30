@@ -1,4 +1,9 @@
+import {showMissingValuesMappingTable} from './missing-values-output.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
+import {readCalculatorOutputMapping} from './calculator-output-source.mjs';
 import {managedJavascriptPreviewAdmission} from './javascript-output-preview.mjs';
+import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody} from './javascript-managed-selection.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {createNodeProcedure,NodeProcedureStepError,NodeReadinessTimeout} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
@@ -110,9 +115,13 @@ export async function releaseNodeSchemaPreview(options,ctx,config){
   &&operation.nodeApply.pending?.phase==='target'&&same(operation.lastReceipt,p.reference),
   'Grouping preview has no releasable original F3 receipt');
  const saved=await options.readReceipt(p.reference),r=saved?.receipt;
+ const capture=p.managed===true&&p.capture_refused===true&&p.lease_disposed===true
+  &&r?.action_key==='node.javascript.preview.capture.internal'&&r.status==='NOT_APPLIED'
+  &&r.effect_possible===false&&r.cleanup_complete===true&&r.output?.lease_disposed===true
+  &&same(r.output.node_context,p.binding.node)&&r.output.port_guid===p.port.port_guid;
  need(saved?.state==='completed'&&same(r,p.receipt)&&['AMBIGUOUS','SUCCEEDED','NOT_APPLIED','FAILED'].includes(r.status)
   &&(r.cleanup_complete===true||p.managed===true&&p.lease_disposed===true&&r.action_key==='node.javascript.preview.open.internal')
-  &&['ui.act','node.javascript.preview.open.internal'].includes(r.action_key),'Original F3 browser completion is unconfirmed');
+  &&(capture||['ui.act','node.javascript.preview.open.internal'].includes(r.action_key)),'Original F3 browser completion is unconfirmed');
  const previous=operation.deadline;operation.deadline=ctx.deadline;
  try{
   const channel=createNodeProcedure({operation,execute,record:onRecord,now,...config,signal:ctx.signal,preparedNodeContext:p.binding,
@@ -134,6 +143,7 @@ export async function releaseNodeSchemaPreview(options,ctx,config){
     if(!(error instanceof NodeReadinessTimeout)||error.condition!==condition||now()>=ctx.deadline)throw error;
    }
   }
+  need(!capture||!owned(s)&&s.ui.dialogs.length===0&&s.ui.masks.length===0,'Capture refusal cannot own an opened preview');
   if(owned(s))await channel.perform({condition:'close original grouping preview after failed F3',initialObservation:s,
    ready:owned,identity:()=>({node:p.binding.node,port_guid:p.port.port_guid,root:s.node_preview_schema.root_tid}),
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.node_preview_schema.root_tid+';p.h;close'&&e.allowed_actions.includes('click'));
@@ -174,11 +184,36 @@ export async function preflightGroupingSource(options,ctx,config){
   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
  }
  const port=ports[0];
+ if(port.index===0&&port.active===false)return preflightInactiveTabularSource(options,{channel,binding,port,state:s},
+  {label:'grouping',sourceIcons:['bg-vendor-icon-importtextfile','bg-vendor-icon-calcdata'],resolve:resolveGroupingParameters});
  if(port.index!==0||port.active!==true){const error=Error('Grouping preflight requires an active source output zero');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
  const admission=script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
  let preview;
- if(admission)preview=await openNodeSchemaPreview(options,ctx,config,channel,binding,port,s,{managed:true});
+ if(admission){
+  // C1 can leave another REST branch's JS selected. Use the existing owned
+  // body gesture before strict native-port capture, as Sort/Join already do.
+  const task={operation_id:operation.id+':source-select-0',owner:binding.node,
+   workflow_ref:{prefix:binding.workflow_ref.prefix,tab_tid:binding.workflow_ref.tab_tid},
+   targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,deadline:operation.deadline};
+  const before=await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'capture'}));
+  try{
+   let selected=before;
+   if(before.ready!==true){
+    operation.cleanupConfirmed=false;
+    let result;
+    try{result=await dispatchManagedJavascriptBody({task,before,execute,record:onRecord,receiptOptions});}
+    catch(error){operation.transportUncertain=true;operation.nodeEffectPossible=true;throw error;}
+    operation.nodeEffectPossible ||= result.effect_possible===true;
+    operation.cleanupConfirmed=result.cleanup_complete===true;
+    need(result.status==='SUCCEEDED','Managed JavaScript source selection refused');
+    selected=result.output?.selection;
+   }
+   need(selected?.ready===true&&selected.node_tid===s.prepared_node_context.tid,
+    'Managed JavaScript source selection unconfirmed');
+  }finally{if(!operation.transportUncertain)await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}));}
+  preview=await openNodeSchemaPreview(options,ctx,config,channel,binding,port,s,{managed:true});
+ }
  if(!admission){
   const portControl=s=>s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes('click'));
   need(portControl(s).length===1,'Upstream port is not interactable');
@@ -201,6 +236,61 @@ export async function preflightGroupingSource(options,ctx,config){
  const saved=await onRecord({phase:'grouping_preflight_completed',operation_id:operation.id,proof});
  need(saved?.phase==='grouping_preflight_completed'&&JSON.stringify(saved.proof)===JSON.stringify(proof),'Grouping preflight was not durably acknowledged');
  delete operation.groupingPreview;
+ if(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+ return proof;
+}
+
+// Inactive configured sources have no data to preview. Read their complete
+// schema in the owned output editor, then cancel without executing upstream.
+export async function preflightInactiveTabularSource(options,{channel,binding,port,state},{label,sourceIcons,resolve}){
+ const {operation,onRecord}=options,request=operation.parameters;
+ // Only the native body signature carries node_id; port signatures carry
+ // native object identities instead. The output reader already binds the port.
+ const controls=state.ui.elements.filter(e=>e.tid===state.prepared_node_context?.tid&&e.signature?.native_graph?.status==='non_script'
+  &&sourceIcons.includes(e.signature.native_graph.icon)&&e.signature.native_graph.node_id===binding.node.node_id);
+ if(port.active!==false||port.index!==0||controls.length!==1){
+  const error=Error(label+' preflight requires an active source output or a verified configured source');
+  error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+ }
+ const icon=controls[0].signature.native_graph.icon;
+ await channel.openOutputPort(port.index);
+ // The derived Calculator editor exposes its complete stores in Links mode;
+ // the import editor exposes the configured schema in Table mode.
+ const observed=icon==='bg-vendor-icon-calcdata'?await readCalculatorOutputMapping(channel):await (async()=>{
+  await showMissingValuesMappingTable(channel);
+  return channel.observe({condition:'complete inactive '+label+' source schema',readMappings:true,
+   ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
+ })();
+ const mapping=observed.node_mapping,owner=observed.prepared_node_context;
+ need(mapping.inventory_complete===true&&mapping.source_identity_verified===true
+  &&owner.output_port?.port_guid===port.port_guid&&owner.output_port.port===port.index
+  &&owner.output_port.node_icon_class===icon,'Inactive '+label+' source schema owner is unconfirmed');
+ let fields=mapping.target_fields.filter(f=>!f.excluded).map(({name,label,type})=>({name,label,type})),error;
+ try{
+  need(fields.length>0&&fields.length<=1000&&new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length
+   &&fields.every(f=>typeof f.name==='string'&&f.name.length>0&&typeof f.label==='string'
+    &&['boolean','datetime','real','integer','string','variant'].includes(f.type)),'Complete inactive '+label+' source schema required');
+  const input=request.mappings.find(m=>m.direction==='input');
+  if(input?.fields){need(input.fields.length===fields.length,'Input mapping must account for every upstream field');const seen=new Set();fields=input.fields.map(f=>{const source=fields.find(c=>c.name===f.source?.name);need(source&&!seen.has(source.name)&&f.excluded!==true,'Invalid '+label+' input mapping');seen.add(source.name);return {...source,name:f.name??source.name,label:f.label??source.label};});}
+  resolve(request.parameters,fields);
+ }catch(e){error=e;}
+ const cancellation=await closePreparedWizard(channel);
+ need(cancellation.verified===true&&cancellation.draft_discarded===true&&cancellation.settings_applied===false,
+  'Inactive '+label+' source cancellation is unconfirmed');
+ let returned=await channel.observe({condition:'inactive '+label+' source unchanged after schema inspection',readOutputs:true,
+  ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
+ // Cancelling the editor deselects its node and hides its native port shapes.
+ if(!returned.node_outputs.node_selected){
+  await selectPreparedGraphNode(channel,returned,'reselect inactive '+label+' source after cancellation',{refreshReplacedBody:true});
+  returned=await channel.observe({condition:'selected inactive '+label+' source after schema inspection',readOutputs:true,
+   ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'&&s.node_outputs?.verified===true&&s.node_outputs.node_selected===true});
+ }
+ const after=returned.node_outputs.ports.filter(p=>p.index===port.index);
+ need(after.length===1&&after[0].port_guid===port.port_guid&&after[0].active===false,'Inactive '+label+' source identity or activity changed');
+ const proof={verified:true,cleanup_complete:true,settings_changed:false,source:binding.node,port:port.index,schema:fields,
+  cancellation,node_context:returned.prepared_node_context,parameters_valid:!error,source_activity:{before:false,after:false,changed:false}};
+ const phase=label+'_preflight_completed',saved=await onRecord({phase,operation_id:operation.id,proof});
+ need(saved?.phase===phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),label+' preflight was not durably acknowledged');
  if(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  return proof;
 }

@@ -17,7 +17,7 @@ export function validateGroupingParameters(p,mode,r) {
    requireValue(name(m.name)&&!names.has(m.name.toLowerCase()),'Invalid or duplicate grouping output name');names.add(m.name.toLowerCase());
    requireValue(typeof m.label==='string'&&m.label.length>0&&m.label.length<=120&&!/[\x00-\x1f]/.test(m.label),'Invalid grouping output label');
    const key=m.field.name.toLowerCase()+':'+m.function;requireValue(!pairs.has(key),'Duplicate field/function pair');pairs.add(key);
-   requireValue(!p.group_by.some(g=>g.name.toLowerCase()===m.field.name.toLowerCase()),'A field cannot be both a key and a measure');
+   requireValue(!p.group_by.some(g=>g.name.toLowerCase()===m.field.name.toLowerCase()),'A field cannot be both a key and a measure. For a count of all rows, use count on another non-key field: native Loginom Count includes NULL values. If the same source field is required, first add a copy in transform.calculator (new field name, formula containing only the original field name, same type), keep the original as the key, and aggregate the copy. If one execution is requested, configure with finish:"done" and execute only the final chain; do not execute the import separately.');
   }
  }
  requireValue(preserved||r.inputs.length===1,'Complete grouping configuration requires one explicit input');

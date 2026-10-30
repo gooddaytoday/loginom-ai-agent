@@ -28,7 +28,7 @@ export async function restorePreflightSourceActivity(channel,node,before,observe
 export async function preflightSortingSource(options,ctx,config){
  return preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.keys!==undefined,resolve:resolveSortingParameters,label:'sorting'});
 }
-export async function preflightTabularSource(options,ctx,config,{required,resolve,label,inputPort,existingSource=false}){
+export async function preflightTabularSource(options,ctx,config,{required,resolve,label,inputPort,existingSource=false,inactiveSource}){
  const {operation,execute,onRecord,now,receiptOptions}=options,request=operation.parameters;
  if(!required)return {verified:true,not_applicable:true};
  // Existing input mappings can retain names absent from the upstream output.
@@ -45,6 +45,7 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
  let s=await channel.observe({condition:'upstream graph before '+label+' validation',readOutputs:true,ready:s=>graph(s)&&s.node_outputs?.verified===true});
  const ports=s.node_outputs.ports.filter(p=>p.index===input.output);need(ports.length===1,'Exact upstream '+label+' port required');const port=ports[0];
+ if(port.active===false&&inactiveSource)return inactiveSource({channel,binding,port,state:s});
  if(port.active!==true){const error=Error(label+' preflight requires an active source output');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
  const admission=['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;

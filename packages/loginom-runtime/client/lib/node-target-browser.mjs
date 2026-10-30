@@ -414,7 +414,8 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     point=await source.evaluate(async(e,{request,origin,build,deadline})=>{
       const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
-      const point=()=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
+      let element=e;
+      const point=()=>{const e=element,b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
         return {x,y,hit,reachable:b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))};};
       const initial=point(),mask=initial.hit?.closest('.bg-mask-message');
       // Native Preview/graph refresh can mask ModelForm after readGraph has
@@ -423,29 +424,41 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
         const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
         const receipt=prep&&[...prep.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
         const card=app?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller.FController;
-        const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram'),tabs=exact(request.workflow_ref.tab_tid);
-        const owned=()=>location.origin===origin&&app?.Version===build&&globalThis.__loginomDockPreparationV1===prep
-          &&prep?.document===document&&prep.id===request.document_id&&receipt?.phase==='verified'
-          &&receipt.workflowId===request.workflow_ref.workflow_id&&[...prep.receipts.values()].includes(receipt)
-          &&app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()===card&&card.Controller.FController===model
-          &&app.ModelForm&&model instanceof app.ModelForm&&model.FView?.el?.dom===mask
-          &&receipt.nodeTargetWorkflowNode&&card.Controller.Node?.data?.node===receipt.nodeTargetWorkflowNode
-          &&tabs.length===1&&tabs[0]===receipt.tab&&tabs[0].isConnected&&tabs[0].classList.contains('x-tab-active')
-          &&exact(request.workflow_ref.tab_tid).length===1
-          &&roots.length===1&&roots[0].isConnected&&model.FDiagram?.FmxGraph?.container===roots[0]
-          &&exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram').length===1
-          &&exact(request.workflow_ref.prefix+';ModelForm').length===1&&mask.isConnected&&visible(mask)&&mask.contains(roots[0])
-          &&e.isConnected&&roots[0].contains(e)&&exact(e.getAttribute('data-tid')).length===1
-          &&![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(n=>visible(n)&&n!==mask);
+        const contextChanged=()=>{
+          if(location.origin!==origin||app?.Version!==build||globalThis.__loginomDockPreparationV1!==prep
+            ||prep?.document!==document||prep.id!==request.document_id)return 'document';
+          if(receipt?.phase!=='verified'||receipt.workflowId!==request.workflow_ref.workflow_id
+            ||![...prep.receipts.values()].includes(receipt))return 'receipt';
+          if(app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()!==card||card.Controller.FController!==model
+            ||!app.ModelForm||!(model instanceof app.ModelForm)
+            ||!receipt.nodeTargetWorkflowNode||card.Controller.Node?.data?.node!==receipt.nodeTargetWorkflowNode)return 'owner';
+          const tabs=exact(request.workflow_ref.tab_tid),roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram'),masks=exact(request.workflow_ref.prefix+';ModelForm');
+          if(tabs.length!==1||tabs[0]!==receipt.tab||!tabs[0].isConnected||!tabs[0].classList.contains('x-tab-active'))return 'tab';
+          if(masks.length!==1||model.FView?.el?.dom!==masks[0]||!visible(masks[0]))return 'model_form';
+          if(roots.length!==1||model.FDiagram?.FmxGraph?.container!==roots[0]||!masks[0].contains(roots[0]))return 'graph';
+          const sources=exact(e.getAttribute('data-tid'));
+          if(sources.length!==1||!roots[0].contains(sources[0]))return 'source';
+          // Rebind only DOM drawings still owned by the same native controller,
+          // workflow receipt and active tab. The full graph is checked before hover.
+          element=sources[0];
+          if([...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(n=>visible(n)&&n!==masks[0]))return 'blocker';
+          return null;
+        };
         for(;;){
-          if(!owned())throw Error('MODELFORM_MASK_CONTEXT_CHANGED: link hover owner or blocker changed');
-          if(Date.now()>=deadline)throw Error('MODELFORM_MASK_TIMEOUT: owned graph mask did not clear before link hover');
-          if(!mask.classList.contains('bg-mask-message'))break;
+          const changed=contextChanged();
+          // A browser-side exception is indistinguishable from transport loss.
+          // These read-only refusals precede every hover/link gesture.
+          if(changed)return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+            error:'MODELFORM_MASK_CONTEXT_CHANGED: '+changed};
+          if(Date.now()>=deadline)return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+            error:'MODELFORM_MASK_TIMEOUT: owned graph mask did not clear before link hover'};
+          if(!model.FView.el.dom.classList.contains('bg-mask-message'))break;
           await new Promise(resolve=>setTimeout(resolve,50));
         }
       }
       const current=point();return current.reachable?{x:current.x,y:current.y}:null;
     },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline});
+    if(point?.status==='NOT_APPLIED')return point;
     if(point)break;
     await page.waitForTimeout(50);
   }
@@ -629,6 +642,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
         graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
+        if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
           source_port:{kind:'data',index:bound.source.index},target_port:{kind:'data',index:bound.target.index}};

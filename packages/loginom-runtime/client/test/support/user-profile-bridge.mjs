@@ -54,6 +54,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       if(openFailure&&code.includes('async function prepareWorkspace(')&&!code.includes('"identityOnly":true')){
         const failure=openFailure;openFailure=null;
         return {content:[{type:'text',text:JSON.stringify({status:'NOT_READY',reason:'UI_BLOCKED',authenticated:true,
+          trace:[{blocking_windows:{windows:[{message_box:{title:'Loginom',text:'UNIT-NONSECRET',buttons:[]}}]}}],
           created_draft:false,target:compatibility,effect_possible:failure.effect_possible,operation_id:expectedOperation})}]};
       }
       const output = code.includes('"identityOnly":true')
@@ -231,6 +232,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const openRefusal=JSON.parse(failed.content[0].text);
     assert.deepEqual(openRefusal.next_step.arguments,{intent:'open_package',operation_id:expectedOperation,package_path:expectedPackage});
     assert.equal(session.metadata.workspaceReady,false);
+    assert.equal(session.metadata.workspacePreparation.state.trace[0].blocking_windows.windows[0].message_box.text,'[redacted]');
     const deliveriesBefore=packageDeliveries.length;
     const resumed=await client.callTool({name:openRefusal.next_step.tool,arguments:openRefusal.next_step.arguments});
     assert.notEqual(resumed.isError,true,JSON.stringify(resumed));
