@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateElimOutlierParameters,resolveElimOutlierParameters} from '../lib/elim-outlier-parameters.mjs';
+import {validateElimOutlierParameters,resolveElimOutlierParameters,validateElimOutlierPreview} from '../lib/elim-outlier-parameters.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {nodeApiTools} from '../lib/node-api.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
@@ -34,5 +34,14 @@ test('existing patch preserves omitted settings, validates merged factors and co
  assert.deepEqual(resolveElimOutlierParameters({outlier:{outlier_factor:2}},fields,old),{...old,outlier_factor:2});
  assert.throws(()=>resolveElimOutlierParameters({outlier:{outlier_factor:4}},fields,old),/extreme_factor/);
  for(const name of ['Note','unknown'])assert.throws(()=>resolveElimOutlierParameters({outlier:{...outlier,fields:[name]}},fields),/continuous numeric/);
+ assert.throws(()=>resolveElimOutlierParameters({outlier},fields.map(f=>({...f,data_kind:'Дискретный'}))),/continuous numeric/);
+});
+test('live preview without data kind checks numeric names; full input mapping still requires continuous kind',()=>{
+ // execution-events.jsonl:321/331: cached_preview_column_infos exposes type,
+ // but no data_kind. Absence here is not a discrete field or a kind proof.
+ const preview=fields.map(({data_kind,...f})=>f);
+ assert.doesNotThrow(()=>validateElimOutlierPreview({outlier},preview));
+ for(const name of ['Note','unknown'])assert.throws(()=>validateElimOutlierPreview({outlier:{...outlier,fields:[name]}},preview));
+ assert.throws(()=>resolveElimOutlierParameters({outlier},preview),/continuous numeric/);
  assert.throws(()=>resolveElimOutlierParameters({outlier},fields.map(f=>({...f,data_kind:'Дискретный'}))),/continuous numeric/);
 });

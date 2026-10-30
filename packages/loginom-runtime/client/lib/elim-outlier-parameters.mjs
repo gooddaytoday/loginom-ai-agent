@@ -1,5 +1,10 @@
 const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
 const keys=['fields','method','outlier_factor','extreme_factor','ordered'];
+export function validateElimOutlierPreview(p,fields){
+ // Native Preview omits DataKind. Validate numeric names here; the complete
+ // owned input mapping checks continuous kind before its Done/configuration.
+ need(p.outlier.fields.every(name=>fields.some(f=>f.name===name&&['integer','real'].includes(f.type))),'preview fields must name numeric input fields');
+}
 export function validateElimOutlierParameters(p,mode,r){
  need(mode==='detect','only detect (keep/keep, Train current input) is supported');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='outlier'),'use parameters.outlier');

@@ -1,5 +1,5 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
-import {validateElimOutlierParameters,resolveElimOutlierParameters} from './elim-outlier-parameters.mjs';
+import {validateElimOutlierParameters,resolveElimOutlierParameters,validateElimOutlierPreview} from './elim-outlier-parameters.mjs';
 import {elimOutlierParametersSchema} from './node-api.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 import {configureElimOutlier} from './elim-outlier-procedure.mjs';
@@ -10,7 +10,7 @@ const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
 export function createElimOutlierNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'preprocessing.elim_outlier',mode:'detect',revision:'elim-outlier-v1-internal-1',parameterSchema:elimOutlierParametersSchema,
  validate:validateElimOutlierParameters,validateInput:(p,resolved,native)=>{if(p.outlier?.fields)resolveElimOutlierParameters(p,resolved.fields??native.target_fields);},readback:elimOutlierConfigurationReadback,
- preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.outlier?.fields!==undefined,resolve:resolveElimOutlierParameters,label:'elim_outlier'}),
+ preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.outlier?.fields!==undefined,resolve:validateElimOutlierPreview,label:'elim_outlier'}),
  configurationObservation:{condition:'outlier detect fields',readElimOutlier:true,ready:s=>s.wizard?.stage==='elim_outlier'&&s.node_elim_outlier?.verified===true},
  async configure(channel,p,context){
   if(context.request.finish==='close'){
