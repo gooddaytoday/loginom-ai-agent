@@ -18,6 +18,10 @@ import time
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
+SCENARIOS = {
+    'C1': dict(model_timeout=2700),
+    '5-REST': dict(model_timeout=2700),
+}
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -62,13 +66,13 @@ def git(*args, cwd=REPO):
 def scenario(name, case_root=None, *, cases=None):
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
-    if cases and re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name):
+    if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
         src = Path(cases).resolve() / name
         if (src / 'task.md').is_file():
             assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
-            return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
+            return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
     if case_root is not None:
-        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
+        if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
         src = Path(case_root).resolve() / name
         config = read(src / 'case.json')
@@ -77,7 +81,7 @@ def scenario(name, case_root=None, *, cases=None):
         source = Path(config['source_path'])
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
-        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+        return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
@@ -396,11 +400,17 @@ class Runner:
                     if time.time() >= end:
                         daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
                         assert child.pid != daemon['pid'], 'Cannot terminate daemon'
-                        os.killpg(child.pid, signal.SIGINT)
-                        try: child.wait(timeout=40)
+                        # The CLI owns runtime close/ACK. Let it close children
+                        # before interrupting the whole process group.
+                        child.send_signal(signal.SIGINT)
+                        # Host teardown already allows up to 90 seconds.
+                        try: child.wait(timeout=100)
                         except subprocess.TimeoutExpired:
-                            os.killpg(child.pid, signal.SIGKILL)
-                            child.wait()
+                            os.killpg(child.pid, signal.SIGINT)
+                            try: child.wait(timeout=40)
+                            except subprocess.TimeoutExpired:
+                                os.killpg(child.pid, signal.SIGKILL)
+                                child.wait()
                         raise TimeoutError(name + ' deadline')
                     try: child.wait(timeout=1)
                     except subprocess.TimeoutExpired: pass
@@ -558,7 +568,7 @@ class Runner:
             shutil.copyfile(file, target)
             command += ['--file', target]
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
-        self.phase('model', command + ['--', prompt], folder, env=env, cwd=workspace)
+        self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = []

@@ -65,10 +65,21 @@ class RunCheckTests(unittest.TestCase):
                      patch.object(instance, 'memory', return_value={}):
                     with self.assertRaisesRegex(TimeoutError, 'model deadline'):
                         instance.phase('model', ['fake-cli'], root, timeout=0)
-                expected = [('owner', signal.SIGINT), ('wait', 40)]
+                expected = [('owner', signal.SIGINT), ('wait', 100)]
                 if exits_on != 'owner': expected += [('group', signal.SIGINT), ('wait', 40)]
                 if exits_on == 'kill': expected += [('group', signal.SIGKILL), ('wait', None)]
                 self.assertEqual(calls, expected)
+
+    def test_case_root_keeps_catalog_budgets_and_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'input.csv'
+            source.write_text('a\n1\n')
+            for name, timeout in [('C1', 2700), ('5-REST', 2700), ('E1', 1800)]:
+                case = root / name
+                case.mkdir()
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                self.assertEqual(runner.scenario(name, root).get('model_timeout', 1800), timeout)
 
     def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -284,6 +295,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                         instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
                                        {'package_directory': '/test'}, root / 'build')
                 command = list(map(str, phase.call_args.args[1]))
+                self.assertEqual(phase.call_args.kwargs['timeout'], 1800)
                 attached = [command[i+1] for i, v in enumerate(command) if v == '--file']
                 self.assertEqual(attached, [str(spec['local_file'])] if mode == 'E2' else [])
                 self.assertEqual(list(workspace.iterdir()), [])
@@ -372,6 +384,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                                            {'package_directory': '/test'}, root / 'build',
                                            session='base-session' if index else None)
                     command = phase.call_args.args[1]
+                    self.assertEqual(phase.call_args.kwargs['timeout'], 1800, name)
                     attached = [Path(command[i + 1]) for i, item in enumerate(command) if item == '--file']
                     self.assertEqual(sorted(attached), sorted(workspace / p.name for p in inputs))
                     for source in inputs:
