@@ -90,7 +90,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
  for(const name of ['ExcelImport','LinRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
-  'DateTime','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
+  'DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
    nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
  const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)(config);

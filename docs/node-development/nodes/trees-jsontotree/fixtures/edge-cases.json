@@ -1,0 +1,15 @@
+{
+  "empty_array": {
+    "items": []
+  },
+  "missing_array": {},
+  "null_array": {
+    "items": null
+  },
+  "invalid": "{\"items\":[}",
+  "duplicate_same": "{\"id\":1,\"id\":2}",
+  "duplicate_mixed": "{\"id\":1,\"id\":\"2\"}",
+  "mixed_array": "{\"items\":[1,\"x\"]}",
+  "null_input": null,
+  "empty_input": ""
+}

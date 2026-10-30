@@ -99,7 +99,7 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: upload_only, n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: upload_only, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
@@ -207,3 +207,7 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+`n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
+`docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
+независимый expected.json; точный порядок строк и полей, все значения, типы и NULL.

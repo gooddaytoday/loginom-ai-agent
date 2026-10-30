@@ -85,6 +85,9 @@ def scenario(name, case_root=None, *, cases=None):
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'n21':
+        src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -196,7 +199,7 @@ def csv_delimiter(path):
         raise
 
 
-def check_csv(path, expected, header='names', *, column_order=None):
+def check_csv(path, expected, header='names', *, column_order=None, null_marker=''):
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
@@ -206,7 +209,7 @@ def check_csv(path, expected, header='names', *, column_order=None):
 
     def equal(value, col, target):
         if col.get('category_labels_any'): return bool(value.strip())
-        if target is None: return value == ''
+        if target is None: return value == null_marker
         if col['type'] in ['integer', 'real']:
             try:
                 number = float(value.replace(',', '.'))
@@ -624,7 +627,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             delimiter = check_csv(actual, expected['outputs'][index], header,
-                                  column_order='any' if isinstance(case, Path) else None)
+                                  column_order='any' if isinstance(case, Path) else None,
+                                  null_marker=expected.get('null_marker', ''))
         self.current['csv'] = 'PASS'
         return session, expected, actual, delimiter
 
