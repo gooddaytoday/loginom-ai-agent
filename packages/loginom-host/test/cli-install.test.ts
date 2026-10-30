@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, cp, mkdir, mkdtemp, readFile, readlink, rename, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readlink, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { installCli, uninstallCli } from "../src/cli-install"
@@ -61,7 +61,7 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
           protocol: 1, files: await resourceInventory(join(artifact, "resources/loginom")),
         }))
       }
-      await cp("/bin/sleep", join(artifact, "bin/loginom-ai-agent-cli"))
+      await copyFile("/bin/sleep", join(artifact, "bin/loginom-ai-agent-cli"))
       await chmod(join(artifact, "bin/loginom-ai-agent-cli"), 0o755)
       await symlink("loginom-ai-agent-cli", join(artifact, "bin/alias"))
       await writeCliManifest(artifact, {
