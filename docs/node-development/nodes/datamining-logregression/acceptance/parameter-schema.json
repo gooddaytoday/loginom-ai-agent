@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "properties": {
+    "input_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "minItems": 1,
+      "maxItems": 128,
+      "description": "Complete continuous numeric predictor names; other fields pass through."
+    },
+    "target_field": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "One discrete string target with exactly two non-null classes."
+    },
+    "event": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Exact event category label, resolved from the observed class list, never an index."
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Explicit cutoff: event if probability >= threshold."
+    }
+  },
+  "required": [
+    "input_fields",
+    "target_field",
+    "event",
+    "threshold"
+  ],
+  "additionalProperties": false
+}
