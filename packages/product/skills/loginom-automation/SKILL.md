@@ -143,6 +143,8 @@ JS-узлы не удаляй автоматически; их наличие н
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
+Первые/последние N строк выбирай узлом `preprocessing.sampling`, `mode:"sequential"`, `parameters:{count:N,position:"first"}` или `position:"last"`. Последовательное разбиение выполняй `preprocessing.data_partition`, `mode:"sequential"`, `parameters:{train_count:N,test_count:M,allocation_order:"test_train_unused"}`. Размеры — в строках; порядок выделения задаётся `allocation_order`. Обычный `finish:"execute"`, без обучения. Читай порты `[0,1,2]`: общий/train/test; общий содержит сначала train, затем test и первое поле `IsTestSet` boolean (false/train, true/test). Для полного малого результата укажи `sample_rows:100,require_exact_numbers:true` и проверь полноту. Для этих операций выбирай указанные узлы; Калькулятор и JavaScript не нужны. Случайные режимы и отбор со смещением этим контрактом не поддержаны.
+
 Для прогноза LinReg на новых данных используй `mode:"apply"` на уже обученном узле с сохранёнными `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; `enter` обучает или переобучает модель.
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или

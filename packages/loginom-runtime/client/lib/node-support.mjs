@@ -1,3 +1,5 @@
+import {createSamplingNodeSupport} from './sampling-node.mjs';
+import {createDataPartitionNodeSupport} from './data-partition-node.mjs';
 import {createExcelImportNodeSupport} from './imports-excel-node.mjs';
 import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
@@ -36,11 +38,12 @@ export function nodeOutputForJournal(value,redactor){
 export function createCandidateNodeSupport(config) {
  const slidingWindow=createSlidingWindowNodeSupport(config);
  const linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
+ const sampling=createSamplingNodeSupport(config),partition=createDataPartitionNodeSupport(config);
  const excel=createExcelImportNodeSupport(config),rest=createRestRequestNodeSupport(config);
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
@@ -49,6 +52,8 @@ export function createCandidateNodeSupport(config) {
    return readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
   }
+  if(type==='preprocessing.sampling')return sampling.nodeApplyDriverFactory(options);
+  if(type==='preprocessing.data_partition')return partition.nodeApplyDriverFactory(options);
   if(type==='datamining.lin_regression')return linregression.nodeApplyDriverFactory(options);
   if(type==='datamining.clustering')return clustering.nodeApplyDriverFactory(options);
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);

@@ -21,6 +21,28 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_sequential_node_scenarios_resolve_approved_oracles(self):
+        for name, count, ports in [('sampling', 2, [0, 0]), ('data-partition', 3, [0, 1, 2])]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, 'task.md')
+            self.assertTrue((case['data'] / 'rows.csv').is_file())
+            expected = runner.expected_for(case, '/test/check.lgp')
+            self.assertEqual(len(expected['outputs']), count)
+            self.assertEqual([o['output_port'] for o in expected['outputs']], ports)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertNotIn('oracle', case['prompt'].read_text())
+
+    def test_sequential_null_empty_keep_approved_schema_order_and_row_counts(self):
+        for name, counts in [('sampling-null', [3, 2]), ('sampling-empty', [0, 0]),
+                             ('data-partition-null', [3, 2, 1]), ('data-partition-empty', [0, 0, 0])]:
+            case = runner.scenario(name)
+            variant = name.split('-')[-1]
+            self.assertEqual([p.name for p in case['data'].iterdir()], [variant + '.csv'])
+            expected = runner.expected_for(case, '/test/null-empty.lgp')
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertEqual(expected['outputs'][0]['columns'][-1]['type'], 'datetime')
+            self.assertTrue(all(o['column_order'] == 'exact' and o['ordered'] for o in expected['outputs']))
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
