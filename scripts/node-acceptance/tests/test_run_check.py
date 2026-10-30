@@ -30,6 +30,7 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['left.csv', 'manifest.json', 'right.csv'])
                 expected = runner.expected_for(case, '/test/join.lgp')
                 self.assertEqual(expected['package_path'], '/test/join.lgp')
+                self.assertEqual(expected['null_marker'], 'NULL')
                 output = expected['outputs'][0]
                 self.assertEqual(len(output['columns']), columns)
                 self.assertEqual(len(output['rows']), rows)
