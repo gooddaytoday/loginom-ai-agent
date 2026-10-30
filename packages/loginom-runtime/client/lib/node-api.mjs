@@ -74,7 +74,7 @@ export const sortingParametersSchema=object({keys:array(sortingKeySchema,128,1),
 export const filterConditionSchema=object({field:object({kind:choice('input_field','row_number'),name:text(128)},['kind']),
  operator:choice('<','<=','>','>=','=','<>','is_null','not_null','between','not_between','in','not_in','contains','not_contains','starts_with','not_starts_with','ends_with','not_ends_with','is_true','is_false'),
  type:choice('integer','real','string','datetime','boolean'),value:{type:['string','number','boolean']},lower:{type:['string','number']},upper:{type:['string','number']},values:array({type:['string','number']},128,1),case_sensitive:boolean},['field','operator','type']);
-filterConditionSchema.description='datetime literals: local ISO date+time with seconds, optional .sss; no date-only/timezone. Inner group=AND; groups=OR.';
+filterConditionSchema.description='datetime literals: local ISO date+time with seconds (2024-01-01T00:00:00), optional .sss; no date-only/timezone. Inner group=AND; groups=OR.';
 export const unionParametersSchema=object({prefixes:object({enabled:boolean,name:{type:'string',maxLength:128},label:{type:'string',maxLength:128}}),tables:array(object({port:integer(1,14),fields:array(object({source:text(128),main:{type:['string','null'],minLength:1,maxLength:128}}),1000)}),14,1)});
 export const joinKeySchema=object({left:text(128),right:text(128)});
 export const joinParametersSchema=object({keys:array(joinKeySchema,1000,1),case_sensitive:boolean,include_joined_keys:boolean},[]);
@@ -100,9 +100,9 @@ export const nodeApplyInputSchema=object({
   ...javascriptParametersSchema.properties,
   columns:{anyOf:[crossTableParametersSchema.properties.columns,javascriptParametersSchema.properties.columns]}},[]),
  mappings:array(object({direction:choice('input','output'),port:integer(0,14),autosync:boolean,
-  changes:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000),description:'Output patch; changes XOR fields per mapping.'},
-  fields:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000,1),description:'Complete ordered layout: EVERY source, including excluded:true. fields XOR changes per mapping; ordering+exclusions use fields.'}},['direction','port']),16),
- finish:{...choice('done','execute','close'),description:'Required top-level beside parameters; no default. execute=commit/run/fresh read; done=commit; close=discard. done/close: read.ports=[]. Omit read=defaults.'},
+  changes:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000),description:'Output patch. Mutually exclusive with fields per mapping.'},
+  fields:{...array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000,1),description:'Complete ordered layout: EVERY source, including excluded:true. Mutually exclusive with changes per mapping; ordering+exclusions use fields.'}},['direction','port']),16),
+ finish:{...choice('done','execute','close'),description:'Required top-level field beside parameters; no default. "finish":"execute"=commit/run/fresh read; done=commit; close=discard. done/close: read.ports=[]. Omit read=defaults.'},
  read:object({ports:{...array(integer(0,1),2),description:'execute only; done/close/text export=[]. Omit read=defaults.'},sample_rows:integer(0,100),require_exact_numbers:boolean,coverage:{...choice('full','sample'),description:'sample default=10, max100 rows/10000 cells/512 KiB UTF-8 JSON values. full: executed Collapse/CrossTable port0 (native, <=50 rows/8 columns), or installed JavaScript port0 with sample_rows=100, require_exact_numbers=true; refuses unproven complete bounded preview, no native-byte provenance.'}},['ports','sample_rows','require_exact_numbers']),
  budgets:{...object({
   configure_ms:{...integer(1,1800000),description:'All setup: source/workflow/mappings/finish; wide imports may exceed 120s.'},
