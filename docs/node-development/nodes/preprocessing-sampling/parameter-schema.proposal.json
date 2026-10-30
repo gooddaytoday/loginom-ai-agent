@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "count": {"type": "integer", "minimum": 0, "description": "Explicit sample size in rows."},
+    "position": {"type": "string", "enum": ["first", "last"], "description": "Sequential selection from the start or end; retain input order."},
+    "field": {"type": "string", "description": "Biased method: exact discrete input field name."},
+    "factors": {
+      "type": "array",
+      "maxItems": 32,
+      "description": "Biased method only: explicit factors for observed field values; acceptance pending.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "string", "description": "Exact non-NULL field value."},
+          "factor": {"type": "number", "exclusiveMinimum": 0, "description": "Positive native bias factor; not a row offset."}
+        },
+        "required": ["value", "factor"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["count"],
+  "additionalProperties": false
+}

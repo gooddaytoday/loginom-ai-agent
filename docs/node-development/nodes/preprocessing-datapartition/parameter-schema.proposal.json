@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "train_count": {"type": "integer", "minimum": 0, "description": "Explicit training size in rows; train plus test must not exceed input size."},
+    "test_count": {"type": "integer", "minimum": 0, "description": "Explicit test size in rows."},
+    "order": {"type": "string", "enum": ["test_train_unused", "train_test_unused", "unused_train_test"], "description": "Sequential allocation order; preserve original row order within each output."},
+    "test_priority": {"type": "string", "enum": ["none", "first", "last"], "description": "Explicit native test priority and placement. No random allocation."}
+  },
+  "required": ["train_count", "test_count", "order", "test_priority"],
+  "additionalProperties": false
+}
