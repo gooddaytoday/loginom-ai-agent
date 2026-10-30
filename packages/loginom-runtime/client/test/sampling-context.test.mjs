@@ -26,17 +26,25 @@ function fixture(change=()=>{},nested=false,method='Последовательн
   groups:{el:{dom:grids[1]},getStore:()=>stores[1],getSelectionModel:()=>({getSelection:()=>[]})},
   absolute:{el:{dom:abs},getValue:()=>controls.absolute_size,isDisabled:()=>controls.absolute_disabled},
   relative:{el:{dom:rel},isDisabled:()=>controls.relative_disabled}};
- change({stores,sizes,groups,controls,components,tids});
+ const observedRefs={document:null,ids:new WeakMap([[icon,'ui-owned-icon']]),refs:new Map([['ui-owned-icon',{deref:()=>icon}]])};
+ change({stores,sizes,groups,controls,components,tids,observedRefs,icon});
  const document={querySelectorAll:s=>{if(s==='[data-tid]')return Object.values(tids).flat();
   if(s.startsWith('[data-tid$=')){const suffix=JSON.parse(s.slice(11,-1));return Object.entries(tids).filter(([tid])=>tid.endsWith(suffix)).flatMap(([,es])=>es);}
   return tids[JSON.parse(s.slice(10,-1))]??[];}};
- return JSON.parse(JSON.stringify(vm.runInContext('('+readSamplingBrowser.toString()+')',vm.createContext({document,Ext:{getCmp:id=>components[id]}}))(prefix)));
+ observedRefs.document=document;
+ const context=vm.createContext({document,Ext:{getCmp:id=>components[id]}});
+ context[Symbol.for('loginom-dock.workspace-ui.identity.v1')]=observedRefs;
+ return JSON.parse(JSON.stringify(vm.runInContext('('+readSamplingBrowser.toString()+')',context)(prefix)));
 }
 test('serialized observer binds native size-path rows to the complete owned UI controls without invoking remote getters',()=>{
  const result=fixture(({sizes})=>Object.defineProperty(sizes[0].data,'Remote',{enumerable:true,get(){throw Error('remote getter accessed');}}));
  assert.equal(result.verified,true);assert.equal(result.sizes[0].values.SizePath,'Sampling.SamplingRecordCount');
  assert.equal(result.units[0].absolute_size,10);assert.equal(result.units[0].unit,'rows');
  assert.equal(result.units[0].record_id,'size');assert.equal(result.sequence.length,2);assert.equal(result.settings_applied,false);
+ assert.equal(result.units[0].icon_ref,'ui-owned-icon');
+});
+test('observer binds the actual size-row icon to its existing observed reference and refuses stale or absent references',()=>{
+ for(const change of [f=>f.observedRefs.ids=new WeakMap(),f=>f.observedRefs.refs.clear(),f=>f.observedRefs.refs.set('ui-owned-icon',{deref:()=>({})})])assert.equal(fixture(change).verified,false);
 });
 test('observer admits the actual initial method before its sequence form exists, and requires that grid after selecting sequential',()=>{
  const r=fixture(()=>{},false,'Случайный',false);

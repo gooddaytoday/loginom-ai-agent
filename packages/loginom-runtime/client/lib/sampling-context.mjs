@@ -47,6 +47,11 @@ export function readSamplingBrowser(prefix){
   const cells=exact(sizeGrid.base+';colSizeType_'+index).filter(e=>shell.contains(e)&&e.querySelectorAll('img[role=button]').length===1);
   if(cells.length!==1)return null;
   const icon=cells[0].querySelector('img[role=button]'),row=cells[0].closest('[data-recordid]');if(!row)return null;
+  // Partition's summary repeats colSizeType_1. Reuse the reference already
+  // assigned by workspace.observe to this exact row's image; never allocate
+  // one here or infer it from the ambiguous cell's identity anchor.
+  const observed=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')],iconRef=observed?.document===document?observed.ids?.get(icon):null;
+  if(typeof iconRef!=='string'||observed.refs?.get(iconRef)?.deref()!==icon)return null;
   const controls=role=>[...row.querySelectorAll('[data-tid]')].filter(e=>new RegExp(';col'+role+'Size;FloatPropEdit(?:-[0-9]+)?;PropContainer;ValueContainer;ValueControl$').test(e.getAttribute('data-tid')??''));
   const absolute=controls('Absolute'),relative=controls('Relative');
   if(absolute.length!==1||relative.length!==1)return null;
@@ -55,7 +60,7 @@ export function readSamplingBrowser(prefix){
   const value=ac.getValue(),absoluteSize=typeof value==='number'?value:typeof value==='string'&&/^\d+$/.test(value)?Number(value):NaN;
   const ad=ac.isDisabled(),rd=rc.isDisabled();
   if(!Number.isSafeInteger(absoluteSize)||absoluteSize<0||typeof ad!=='boolean'||typeof rd!=='boolean'||ad===rd)return null;
-  return {index,record_id:row.getAttribute('data-recordid'),tid:cells[0].getAttribute('data-tid'),absolute_size:absoluteSize,absolute_control_tid:absolute[0].getAttribute('data-tid'),unit:ad?'percent':'rows',
+  return {index,record_id:row.getAttribute('data-recordid'),tid:cells[0].getAttribute('data-tid'),icon_ref:iconRef,absolute_size:absoluteSize,absolute_control_tid:absolute[0].getAttribute('data-tid'),unit:ad?'percent':'rows',
    text:cells[0].textContent.trim(),title:icon.getAttribute('title')??'',tooltip:icon.getAttribute('data-qtip')??'',class_name:icon.getAttribute('class')??''};
  });
  if(units.some(u=>u===null))return fail('sampling_size_units',{size_rows:sizes});

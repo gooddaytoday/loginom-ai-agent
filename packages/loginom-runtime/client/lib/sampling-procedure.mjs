@@ -36,9 +36,8 @@ export async function configureSampling(channel,p,{request,inputMapping}){
  for(const [index,count] of counts.entries()){
   if(count===undefined)continue;
   // Unit icon and editable cell are bound to the actual observed row tid.
-  const row=sizesBase+'colSizeType_'+index;
   s=await observe('sampling size unit');
-  const unit=s.ui.elements.filter(e=>(e.tid===row||e.identity?.anchor_tid===row)&&e.signature?.tag==='img'&&e.role==='button'&&e.allowed_actions.includes('click'));
+  const unit=s.ui.elements.filter(e=>e.ref===s.node_sampling.units[index].icon_ref&&e.signature?.tag==='img'&&e.role==='button'&&e.allowed_actions.includes('click'));
   need(unit.length===1,'unique size unit icon required');
   const observed=s.node_sampling.units[index];
   need(['rows','percent'].includes(observed.unit),'native size unit required');

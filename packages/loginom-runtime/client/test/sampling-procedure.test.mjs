@@ -7,10 +7,12 @@ function fixture(partition=false){
  const labels={sample:'Выбранные',unused:'Неиспользуемые',train:'Обучающее множество',test:'Тестовое множество'};
  const editor=i=>base+'SizeGridForm;colAbsoluteSize;FloatPropEdit'+(i?'-'+i:'')+';PropContainer;ValueContainer;ValueControl';
  const snapshot=()=>({prepared_node_context:owner,wizard:{stage:state.stage,root_tid:'W'},node_sampling:{verified:true,inventory_complete:true,node_context:owner,base,kind:partition?'data_partition':'sampling',method:state.method,sequence_materialized:state.method==='Последовательный',
-  sizes:state.counts.map((_,index)=>({record_id:'size'+index,values:{SizePath:'Sampling.'+index}})),units:state.counts.map((count,index)=>({record_id:'size'+index,absolute_size:count,absolute_control_tid:editor(index),unit:state.units[index],text:'',title:'',tooltip:'',class_name:''})),
+  sizes:state.counts.map((_,index)=>({record_id:'size'+index,values:{SizePath:'Sampling.'+index}})),units:state.counts.map((count,index)=>({record_id:'size'+index,icon_ref:'unit'+index,absolute_size:count,absolute_control_tid:editor(index),unit:state.units[index],text:'',title:'',tooltip:'',class_name:''})),
   sequence:(state.method==='Последовательный'?state.groups:[]).map(group=>({record_id:group+':'+state.generation,text:labels[group],values:{Name:labels[group]},tids:[base+'group_'+group],selected:state.selected===group}))},
   ui:{elements:[{ref:'method',tid:base+'pedSamplingMethod;ValueControl;trg_picker',allowed_actions:['click']},{ref:'sequential',tid:base+'pedSamplingMethod;ValueControl;boundlist;Последовательный',role:'option',label:'Последовательный',allowed_actions:['click']},...state.counts.flatMap((_,index)=>[
-   {ref:'unit'+index,identity:{anchor_tid:base+'SizeGridForm;colSizeType_'+index},signature:{tag:'img'},role:'button',allowed_actions:['click']},
+   // Partition's summary repeats colSizeType_1, so the actual second-row
+   // image is anchored at the unique table, not the duplicated cell tid.
+   {ref:'unit'+index,identity:index?{anchor_tid:base+'SizeGridForm;grdDataSet;tbl',path:[0,1,0,0,1,0,0]}:{anchor_tid:base+'SizeGridForm;colSizeType_'+index,path:[0,0]},signature:{tag:'img'},role:'button',allowed_actions:['click']},
    {ref:'edit'+index,tid:editor(index),allowed_actions:['fill','press']}]),
    ...state.groups.map(group=>({ref:group,tid:base+'group_'+group,allowed_actions:['click']})),
    {ref:'up',tid:base+'SequenceMethodForm;btnGroupPositionUp',allowed_actions:['click']},
@@ -36,9 +38,11 @@ test('production procedure binds embedded row editors and moves the observed unu
  assert.equal(r.validation.status,'accepted_by_loginom_next');
 });
 test('partition edits train and test separately, verifies test-first allocation and retains source schema',async()=>{
- const f=fixture(true),r=await f.run({train_count:10,test_count:5,allocation_order:'test_train_unused'});
+ const f=fixture(true);f.state.units=['percent','percent'];
+ const r=await f.run({train_count:10,test_count:5,allocation_order:'test_train_unused'});
  assert.deepEqual(r.configuration.counts,[10,5]);assert.deepEqual(r.configuration.groups,['test','train','unused']);
  assert.deepEqual(f.actions.filter(a=>a.verb==='fill').map(a=>a.ref),['edit0','edit1']);
+ assert.deepEqual(f.actions.filter(a=>a.ref.startsWith('unit')).map(a=>a.ref),['unit0','unit1']);
  assert.equal(r.configuration.input_fields[0].type,'integer');
 });
 test('an omitted size remains unchanged and Close performs no edits or validation',async()=>{
