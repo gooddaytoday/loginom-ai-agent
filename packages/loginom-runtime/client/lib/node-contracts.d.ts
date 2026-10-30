@@ -139,16 +139,22 @@ export type ReplacementRule = {
   field: {kind: 'input_field'; name: string};
   pairs: Array<{from: ReplacementValue; to: ReplacementValue}>;
   other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue};
-} & ({type: 'string'; case_sensitive?: boolean} | {type: 'integer' | 'real'; precision: 0});
+} & ({type: 'string'; case_sensitive: boolean} | {type: 'integer' | 'real'; precision: 0});
+export interface RegexReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string';
+  pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
+  other: {mode: 'keep' | 'null'};
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: ReplacementRule[];
+  rules?: Array<ReplacementRule | RegexReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact' | 'regex'; rules: ReplacementRule[]; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }

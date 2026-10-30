@@ -73,11 +73,14 @@ const sortingConfigurationReadback=object({kind:values('sorting'),scope:values('
 const replacementValue=object({type:values('string','integer','real'),value:{type:['string','number','null']}});
 const replacementRule=object({field:object({kind:values('input_field'),name:str}),type:values('string','integer','real'),pairs:{...array(object({from:replacementValue,to:replacementValue})),maxItems:256},other:object({mode:values('keep','null','value'),value:replacementValue},['mode']),case_sensitive:bool,precision:{const:0}},['field','type','pairs','other']);
 const replacementConfigurationReadback=object({kind:values('replacement'),scope:values('observed_before_verified_finish'),node:ref,
- receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('exact','regex'),
+ receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('exact'),
  rules:{...array(replacementRule),minItems:1,maxItems:128},output_mode:values('replace','add'),
  input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
  package_persistence_verified:{type:'boolean',const:false}});
+const regexReplacementValue=object({type:values('string'),value:str});
+const regexReplacementRule=object({field:object({kind:values('input_field'),name:str}),type:values('string'),pairs:{...array(object({from:regexReplacementValue,to:regexReplacementValue})),minItems:1,maxItems:256},other:object({mode:values('keep','null')})});
+const regexReplacementConfigurationReadback=object({...replacementConfigurationReadback.properties,mode:values('regex'),rules:{...array(regexReplacementRule),minItems:1,maxItems:128}});
 const collapseConfigurationReadback=object({kind:values('collapse'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('unpivot'),
  information:{...array(object({name:str,label:str,type:str,order:integer})),maxItems:128},
@@ -185,7 +188,7 @@ const linRegressionConfigurationReadback=object({kind:values('lin_regression'),s
  receipt_ids:clusteringConfigurationReadback.properties.receipt_ids,mode:values('enter','apply'),input_fields:{...array(str),minItems:1,maxItems:128},target_field:str,intercept:{type:'boolean',const:true},normalization:values('none'),
  training:clusteringConfigurationReadback.properties.training,package_persistence_verified:{type:'boolean',const:false}});
 const excelConfigurationReadback=object({kind:values('excel_import'),scope:values('observed_before_verified_finish'),node:ref,values_are:values('observed_ui_values'),source:object({source_path:str,sheet_method:str,sheet:str,header_rows:integer,whole_sheet:bool,blank_rows:str}),auto_detect:values('Нет'),columns:array(object({name:str,label:str,type:str,data_kind:str,used:bool})),receipt_ids:array(str),package_persistence_verified:{const:false}});
-const configurationReadback={anyOf:[restConfigurationReadback,excelConfigurationReadback,linRegressionConfigurationReadback,clusteringConfigurationReadback,crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptDeclaredDoneReadback,javascriptExecutedConfigurationReadback,javascriptDeclaredConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+const configurationReadback={anyOf:[regexReplacementConfigurationReadback,restConfigurationReadback,excelConfigurationReadback,linRegressionConfigurationReadback,clusteringConfigurationReadback,crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptDeclaredDoneReadback,javascriptExecutedConfigurationReadback,javascriptDeclaredConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),

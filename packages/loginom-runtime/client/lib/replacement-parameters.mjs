@@ -31,6 +31,7 @@ export function validateReplacementParameters(p,mode,r){
    if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
     'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires precision zero (precision=0) and forbids case_sensitive'));
    need(Array.isArray(rule.pairs)&&rule.pairs.length<=256,'Replacement table exceeds supported bound');
+   if(mode==='regex')need(rule.pairs.length>0,'Regex requires at least one pattern');
    const seen=new Set();
    for(const pair of rule.pairs){
     need(keys(pair,['from','to']),'Invalid replacement pair');validateReplacementValue(pair.from,rule.type);validateReplacementValue(pair.to,rule.type);
