@@ -10,6 +10,7 @@ import * as workspace from '../../lib/workspace.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
+import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -150,9 +151,11 @@ for(const scenario of ['opened-clean','opened-dirty','opened-uncertain'])
     if(scenario==='opened-clean'){
       assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
       assert.ok(f.events.indexOf('node-drained')<f.events.indexOf('package-cleanup'));
+      await closeManagedResources({bridge},[]);
     }else{
       assert.notEqual(cleanup.package_closed,true);assert.notEqual(cleanup.logged_out,true);
       assert.equal(cleanup.reason,scenario==='opened-dirty'?'UNSAVED_CHANGES':'CLEANUP_OR_OPERATION_UNCONFIRMED');
+      await assert.rejects(closeManagedResources({bridge},[]),/LOGINOM_RUNTIME_CLEANUP_FAILED/);
     }
   }finally{
     f.finish.resolve();await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
