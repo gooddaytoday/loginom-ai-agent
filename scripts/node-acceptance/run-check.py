@@ -91,6 +91,9 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name == 'n21':
+        src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
