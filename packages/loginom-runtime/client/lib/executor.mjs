@@ -1327,7 +1327,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       node = node.ParentNode;
     }
-    throw new Error('Active workflow has no verified cached package identity');
+    throw new Error('Active navigation has no verified cached package identity. Call dock_prepare with intent:"existing_workflow" and the latest runtime workflow_ref including document_id (use saved workflow_continuations after Save), then retry Save with a new operation_id. After LOGINOM_FILE_CHANGED this restores navigation only; full-source execution still requires a new download and exact scan.');
   });
   const normalizeStoredPath = value => {
     if (typeof value !== 'string' || !value.trim()) return null;
