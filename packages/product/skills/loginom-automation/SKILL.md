@@ -159,6 +159,18 @@ JS-узлы не удаляй автоматически; их наличие н
 
 Первые/последние N строк выбирай узлом `preprocessing.sampling`, `mode:"sequential"`, `parameters:{count:N,position:"first"}` или `position:"last"`. Последовательное разбиение выполняй `preprocessing.data_partition`, `mode:"sequential"`, `parameters:{train_count:N,test_count:M,allocation_order:"test_train_unused"}`. Размеры — в строках; порядок выделения задаётся `allocation_order`. Обычный `finish:"execute"`, без обучения. Читай порты `[0,1,2]`: общий/train/test; общий содержит сначала train, затем test и первое поле `IsTestSet` boolean (false/train, true/test). Для полного малого результата укажи `sample_rows:100,require_exact_numbers:true` и проверь полноту. При экспорте результатов этих узлов задавай маркер NULL отдельно: если пользователь не указал его для экспорта, используй `parameters:{null_marker:""}` у `exports.text`. Для полей `datetime`, если пользователь не задал формат экспорта, у `exports.text` явно укажи `date_format:"yyyy/mm/dd",date_separator:"-",time_format:"hh:nn:ss.zzz",time_separator:":"`: пустые настройки используют локальный формат даты. Для этих операций выбирай указанные узлы; Калькулятор и JavaScript не нужны. Случайные режимы и отбор со смещением этим контрактом не поддержаны.
 
+Для бинарной строковой цели и вероятности события используй
+`loginom_dock_node_apply` с `target.type:"datamining.log_regression"`,
+`mode:"enter"`, `parameters:{logistic:{input_fields:[...],target_field:"...",event:"...",threshold:...}}`.
+Укажи точную метку события и явный порог: событие при `p >= threshold`.
+`finish:"execute"` обучает на всех строках текущего входа и выполняет модель;
+`read.ports:[0]` возвращает класс, вероятность и исходные поля.
+`input_fields` содержит только числовые факторы; идентификаторы и комментарии
+сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для этого
+поддерживаемого обучения выбирай Логистическую регрессию; Калькулятор и
+JavaScript не нужны. Режим apply, веса, отбор, валидация, коэффициенты и
+выход переменных пока недоступны. Сначала запроси `parameter_schema` узла.
+
 Для прогноза LinReg на новых данных используй `mode:"apply"` на уже обученном узле с сохранёнными `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; `enter` обучает или переобучает модель.
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или

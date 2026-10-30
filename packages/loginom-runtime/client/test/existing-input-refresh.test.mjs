@@ -89,7 +89,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
  const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:contract.NODE_READ_MODE,
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
- for(const name of ['Sampling','DataPartition','ExcelImport','LinRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
+ for(const name of ['Sampling','DataPartition','ExcelImport','LinRegression','LogRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
   'DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
    nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
