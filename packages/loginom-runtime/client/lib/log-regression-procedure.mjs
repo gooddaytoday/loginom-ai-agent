@@ -68,11 +68,10 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
  const partition=state.node_logregression.values;
  await next('learn_partition','lin_regression');
  state=await observe('parameters','complete logistic parameters and classes');
- const classes=state.node_logregression.classes;
- need(classes.length===2&&classes.every(c=>c.label.length>0)&&new Set(classes.map(c=>c.label)).size===2,'exactly two nonempty binary target classes are required');
- const event=classes.find(c=>c.label===p.event);need(event,'event label must match one of the two observed target categories');
+ const nativeClasses=state.node_logregression.classes;
+ need(nativeClasses.length===2&&new Set(nativeClasses.map(c=>c.index)).size===2,'exactly two binary target classes are required');
  need(Object.values(state.node_logregression.switches).every(v=>v===false),'variable-driven logistic settings are outside stage 1');
- const control=(s,key,verb)=>one(s,e=>e.tid===s.wizard.root_tid+';'+(s.wizard.stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key&&e.allowed_actions.includes(verb),'Logistic control unavailable: '+key);
+ const control=(s,key,verb)=>one(s,e=>{const tid=s.wizard.root_tid+';'+(s.wizard.stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key;return (e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb);},'Logistic control unavailable: '+key);
  const act=async(kind,condition,key,action)=>channel.perform({condition,initialObservation:state,ready:ready(kind),identity:s=>s.prepared_node_context,resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
  const choose=async(key,label,value)=>{
   if(state.node_logregression.values[key]===value)return;
@@ -83,10 +82,23 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
   state=await observe('parameters','logistic '+key+' readback');need(state.node_logregression.values[key]===value,'native logistic option differs: '+key);
  };
  await choose('pedEventType','Задано явно',4);
- await choose('pedEventId',event.option_label??event.index+' ('+event.label+')',event.index);
+ // The cached EventId store exposes numeric captions until its native picker
+ // renders the category labels (LAB-554 run1, execution-events:345–347).
+ // Bind each rendered label to its observed native index, never CSV order.
+ await act('parameters','open observed logistic categories','pedEventId;ValueControl;trg_picker',{verb:'click'});
+ const categoryOptions=s=>s.ui.elements.filter(e=>e.tid?.startsWith(s.wizard.root_tid+';LogRegressionWizard;pedEventId;ValueControl;boundlist;')&&e.allowed_actions.includes('click'));
+ state=await channel.observe({condition:'two rendered logistic categories',readLogRegression:true,ready:s=>ready('parameters')(s)&&categoryOptions(s).length===2});
+ const classes=categoryOptions(state).map(e=>{const m=e.label.match(/^([0-9]+) \((.+)\)$/s);need(m,'event category caption must contain its observed index and label');return {index:Number(m[1]),label:m[2]};});
+ need(new Set(classes.map(c=>c.label)).size===2&&new Set(classes.map(c=>c.index)).size===2&&classes.every(c=>nativeClasses.some(n=>n.index===c.index&&n.label===c.label)),'rendered categories differ from the complete native class inventory');
+ const event=classes.find(c=>c.label===p.event);need(event,'event label must match one of the two observed target categories');
+ await channel.perform({condition:'select exact observed logistic event',initialObservation:state,ready:s=>ready('parameters')(s)&&categoryOptions(s).length===2,
+  identity:s=>({node:s.prepared_node_context,classes:s.node_logregression.classes}),
+  resolve:s=>({verb:'click',ref:one(s,e=>categoryOptions(s).includes(e)&&e.label===event.index+' ('+event.label+')','Unique event category unavailable').ref})});
+ state=await observe('parameters','explicit logistic category readback');need(state.node_logregression.values.pedEventId===event.index,'event selection differs from the observed category');
  if(state.node_logregression.values.pedAutoMethod){await act('parameters','disable automatic logistic method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual logistic method');}
  await choose('pedRegressionMethod','Enter (Принудительное включение)',0);
  if(!state.node_logregression.values.pedUseDetailedSettings){await act('parameters','show logistic details','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','logistic details enabled');}
+ need(state.node_logregression.values.pedUseScoring===false&&state.node_logregression.values.pedSetupCalibration===false,'scoring and calibration overrides are outside stage 1');
  need(state.node_logregression.values.pedDenormalize===true&&state.node_logregression.values.pedAutoMethod===false
   &&state.node_logregression.values.pedRegressionMethod===0&&state.node_logregression.values.pedEventType===4&&state.node_logregression.values.pedEventId===event.index,'manual Enter and explicit event must be observed');
  await next('lin_regression','lin_regression_details');
@@ -94,9 +106,13 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
  need(state.node_logregression.values.pedIntercept===true&&Object.values(state.node_logregression.switches).every(v=>v===false),'fixed intercept without variable bindings required');
  for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold]]){
   if(state.node_logregression.values[key]!==value){
-   await act('details','fill logistic '+key,key+';ValueControl;InputEl',{verb:'fill',text:String(value)});
+   // Native number fields strip e and minus from scientific notation:
+   // 1e-10 became 110 in the owned diagnostic, so enter decimal digits.
+   const [coefficient,exponent]=String(value).split('e-');
+   const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
+   await act('details','fill logistic '+key,key+';ValueControl',{verb:'fill',text});
    state=await observe('details','logistic numeric input');
-   await act('details','commit logistic '+key,key+';ValueControl;InputEl',{verb:'press',key:'Tab'});
+   await act('details','commit logistic '+key,key+';ValueControl',{verb:'press',key:'Tab'});
    state=await observe('details','logistic numeric readback');
   }
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);

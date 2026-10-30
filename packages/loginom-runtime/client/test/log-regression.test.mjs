@@ -35,22 +35,24 @@ test('logistic roles keep identifiers and comments and require a discrete string
  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,target_field:'x'}},'enter'));
 });
 
-function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}]}={}){
+function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)']}={}){
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
- const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedCorrectionType:0};
+ const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
  const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true};
  let stage='input_mapping',picker=null;const actions=[];
- const state=()=>({prepared_node_context:{...node,verified:true},wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
-  ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>['DisplayEl','trg_picker','InputEl'].map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl;'+part,ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
-  ...(picker?[{label:picker==='pedRegressionMethod'?'Enter (Принудительное включение)':picker==='pedEventType'?'Задано явно':'2 (yes)',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
+ const rawState=()=>({prepared_node_context:{...node,verified:true},wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
+  ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
+  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?'Enter (Принудительное включение)':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
   node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{}})}});
+ const state=()=>{const s=rawState();if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
  const channel={async observe({ready,condition}){const s=state();assert.ok(ready(s),condition);return s;},async perform({ready,resolve,initialObservation}){
   const s=initialObservation??state();assert.ok(ready(s));const a=resolve(s);actions.push(a);
   if(a.verb==='wizard_step'){validateUiAction(a,s);stage=a.expected_stage;return;}
   const key=a.ref.split(':')[0],target=stage==='lin_regression_details'?details:values;
   if(a.verb==='set_checked')target[key]=a.checked;
   else if(a.verb==='fill')target[key]=Number(a.text);
+  else if(a.ref.startsWith('event-')){target.pedEventId=classes[Number(a.ref.slice(6))].index;picker=null;}
   else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?0:picker==='pedEventType'?4:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
@@ -61,13 +63,14 @@ test('Enter resolves event from observed classes, sets explicit threshold/epsilo
  const f=fixture(),result=await f.run();
  assert.equal(f.values.pedEventId,2);assert.equal(f.values.pedEventType,4);assert.equal(f.values.pedAutoMethod,false);assert.equal(f.values.pedRegressionMethod,0);
  assert.equal(f.details.pedEpsilon,1e-10);assert.equal(f.details.pedThreshold,0.8);
+ assert.equal(f.actions.find(a=>a.verb==='fill'&&a.ref.startsWith('pedEpsilon:')).text,'0.0000000001');
  assert.equal(result.configuration.event,'yes');assert.equal(result.configuration.threshold,0.8);assert.equal(result.configuration.intercept,true);
  assert.deepEqual(result.configuration.classes,[{index:7,label:'no'},{index:2,label:'yes'}]);
  assert.equal(f.actions.at(-1).expected_stage,'done');
 });
 
 test('missing event and nonbinary classes refuse before selecting any method or committing settings',async()=>{
- for(const classes of [[{index:0,label:'no'}],[{index:0,label:'no'},{index:1,label:'maybe'}],[{index:0,label:'no'},{index:1,label:'yes'},{index:2,label:'third'}]]){
+ for(const classes of [[{index:0,label:'0'}],[{index:0,label:'0'},{index:1,label:'1'},{index:2,label:'2'}]]){
   const f=fixture({classes});await assert.rejects(f.run(),/two|event|binary/);
   assert.ok(f.actions.every(a=>a.verb==='wizard_step'));assert.ok(!f.actions.some(a=>a.expected_stage==='done'));
  }

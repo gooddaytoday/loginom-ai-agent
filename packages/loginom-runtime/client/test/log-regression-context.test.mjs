@@ -41,6 +41,30 @@ test('logregression ownership must remain stable across the complete read',async
  for(const extra of [{input_port:{}},{output_port:{}},{surface:'graph'}])assert.equal((await readLogRegressionContext({}, {},async()=>({verified:true,surface:'wizard',...extra}))).reason,'logregression_node_surface');
 });
 
+function eventFixture(classes){
+ const base='MF;TF;WizrdMCF;LogRegressionWizard',elements=[],components={};
+ const element=tid=>{const e={id:'e'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);return e;};
+ element(base);
+ const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedShowRefCoeffs:true,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
+ const records=classes.map(([index,label])=>({get:key=>key==='value'?index:key==='Description'?label.slice(String(index).length+1):String(index)}));
+ const store={getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
+ for(const [name,value] of Object.entries(values)){
+  const e=element(base+';'+name+';ValueControl');components[e.id]={el:{dom:e},getValue:()=>value,
+   ...(name==='pedEventId'?{getStore:()=>store,valueField:'value',displayField:'text'}:{})};
+ }
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ return {store,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)))};
+}
+test('native class reader retains observed indexes and exact labels instead of CSV row order',()=>{
+ const f=eventFixture([[7,'7 (no)'],[2,'2 (yes)']]),r=f.read();
+ assert.equal(r.verified,true);assert.deepEqual(r.classes,[{index:7,label:'no',option_label:'7 (no)'},{index:2,label:'yes',option_label:'2 (yes)'}]);
+ f.store.isLoading=()=>true;assert.equal(f.read().verified,false);
+});
+test('native class reader refuses incomplete inventory and duplicate indexes or labels',()=>{
+ for(const classes of [[[1,'1 (yes)'],[1,'1 (no)']],[[1,'1 (yes)'],[2,'2 (yes)']]])assert.equal(eventFixture(classes).read().verified,false);
+ const f=eventFixture([[1,'1 (yes)'],[0,'0 (no)']]);f.store.getCount=()=>3;assert.equal(f.read().verified,false);
+});
+
 
 test('the native Enter method picker is actionable through the serialized workspace observer',async()=>{
  const {Page}=await import('./support/workspace-ui-fixture.mjs');

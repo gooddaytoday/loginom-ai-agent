@@ -20,7 +20,7 @@ export function readLogRegressionBrowser(prefix) {
  const exactValue=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);return c?.el?.dom===es[0]&&typeof c.getValue==='function'?c:null;};
  const active=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],e=es[0],b=e?.getBoundingClientRect();return es.length===1&&e.checkVisibility({checkVisibilityCSS:true})&&b.width>0&&b.height>0&&b.x>=0&&b.y>=0&&b.x<innerWidth&&b.y<innerHeight;};
  for(const [kind,card,names] of [
-  ['parameters','LogRegressionWizard',['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId']],
+  ['parameters','LogRegressionWizard',['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId','pedUseScoring','pedSetupCalibration']],
   ['details','LogRegressionWizard-1',['pedEpsilon','pedIntercept','pedThreshold']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
@@ -34,8 +34,9 @@ export function readLogRegressionBrowser(prefix) {
    if(store?.isLoading?.()||!Array.isArray(records)||records.length!==store.getCount?.()||records.length>1000)return {verified:false,reason:'logregression_classes'};
    for(const r of records){const index=r.get(c.valueField),caption=r.get(c.displayField);
     if(!Number.isInteger(index)||index<0||typeof caption!=='string')return {verified:false,reason:'logregression_class_record'};
-    const match=caption.match(/^([0-9]+) \((.*)\)$/s),label=match&&Number(match[1])===index?match[2]:caption;
-    classes.push({index,label,option_label:caption});
+    const description=r.get('Description'),match=typeof description==='string'&&description.match(/^\((.*)\)$/s);
+    if(!match||caption!==String(index))return {verified:false,reason:'logregression_class_description'};
+    classes.push({index,label:match[1],option_label:caption+' '+description});
    }
    if(new Set(classes.map(c=>c.index)).size!==classes.length||new Set(classes.map(c=>c.label)).size!==classes.length)return {verified:false,reason:'logregression_class_identity'};
   }
