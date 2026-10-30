@@ -1,5 +1,16 @@
 # Eval harness
 
+## Автономные кампании
+
+Текущие команды, standing/wakeup инструкции EvalOps и обязательный отдельный
+финальный ответ EvalRunner — в [runbook](docs/autonomous-campaigns.md).
+Обычные batches ведёт существующая служба; default periodic новых кампаний
+задаёт только runbook, действующий интервал — поручение и scoped wakeups.
+Итог публикуется до архива; periodic отключается после read-back итога,
+а `published`/`in_review` требуют проверенного архива и ответа исполнителя.
+Исторические планы и незавершённый LAB-170 сохраняются; изменение кода не
+подтверждает его установку или применение живых инструкций Multica.
+
 ## Пользовательские слоты
 
 Правила — [контракт](docs/parallel-users-contract.md); команды —
@@ -15,6 +26,7 @@ Proc-denial tests запускаются только с `EVAL_PROCESS_DENIAL_TE
 - Весь код harness живёт здесь; вне него меняются только затронутые документы и явно разрешённый владельцем judge launcher в отдельном репозитории. Runtime-зависимостей нет; dev-зависимости ставятся `bun install` в этом каталоге.
 - Разработка строго по TDD (`/tdd`): один падающий тест поведения → минимальная реализация → зелёный → коммит. Тесты через публичные интерфейсы модулей из спеки; без моков и `globalThis.*`. Внешние процессы подменяются только `EVAL_CLI_MODE=fake`, `EVAL_ARTIFACT_SOURCE=dir:`, `EVAL_JUDGE_COMMAND`.
 - Команды выполняются из `evals/`: `bun test`, `bun typecheck`, `bun run src/run.ts`. Из корня репозитория тесты не запускать.
+- Supervisor unit fixtures копируют Node.js из `PATH` для проверки изменения argv браузера. При отсутствии Node Bun 1.3.14 подставляет свой shim, который не меняет `/proc/.../cmdline` как Node и даёт ложные падения; обеспечить настоящий Node в тестовом `PATH`, не меняя среду и pins живого CLI/судьи.
 - Контракт данных (статусы, `judge_status`, `failure_kind`, поля `summary.json`) описан в `docs/superpowers/specs/2026-09-18-evals-design.md`; при расхождении сначала правится спека.
 - Секреты не попадают в `results/`, логи и сообщения ошибок. `results/`, `.profile/`, `.bundle/`, `.env` — gitignored.
 - Живой судья (`codex exec`) в тестах не вызывается; проверяется через `fixtures/fake-codex.ts`.

@@ -1,15 +1,17 @@
-import {browserFailureCategory} from './browser-failure.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry} from './storage-policy.mjs';
+import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
-import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode} from './artifact-discovery.mjs';
+import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
+import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
+import {join} from 'node:path';
 import { requireCapability } from './capability-registry.mjs';
 import { actionDescribeTool, actionRunTool, assertActionOutcome, validateActionParameters } from './action-catalog.mjs';
 import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspace-ui.mjs';
@@ -58,7 +60,7 @@ const artifactVerifyTool={name:'dock_artifact_verify',
   annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}};
 export const executorTools = [actionDescribeTool, actionRunTool, operationInspectTool, operationRecoverTool, uiActionTool];
 
-async function browserArtifactUpload(page,task,observe,resolveConflict) {
+async function browserArtifactUpload(page,task,observe,resolveConflict,guardDialog) {
   let phase='preconditions',effect=false,input;
   const trace=[];
   const outcome=(status,code,output={})=>({status,action_key:'artifact.upload',action_revision:'1',operation_id:task.operation_id,
@@ -118,6 +120,7 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
     }
     trace.push({event:'upload_preconditions_verified',destination:task.artifact.upload.destination});
     const inputTimeout=remaining(15000);
+    await guardDialog(page,task,'install');
     phase='submitting';effect=true;
     await input.setInputFiles(task.upload_path,{timeout:inputTimeout});
     phase='submitted';trace.push({event:'upload_input_submitted'});
@@ -157,13 +160,16 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
       artifact_id:task.artifact.artifact_id,upload_grant_id:task.artifact.upload.grant_id,destination:task.artifact.upload.destination,
       bytes:task.artifact.bytes,sha256:task.artifact.sha256,verification_required:true});
   } catch {return outcome(effect?'AMBIGUOUS':'NOT_APPLIED',effect?'UPLOAD_SUBMISSION_UNCERTAIN':'UPLOAD_PREFLIGHT_FAILED');}
-  finally {if(input)try{await input.dispose();}catch{}}
+  finally {
+    if(!task.large_upload||!effect){const dialog=await guardDialog(page,task,'release');if(dialog.dismissed)trace.push({event:'upload_debug_dialog_dismissed',count:dialog.dismissed});}
+    if(input)try{await input.dispose();}catch{}
+  }
 }
 
 export function makeArtifactUploadCode(options) {
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.snapshot?.observation_root?.ref,
     expected_build:options.expected_build,expected_origin:options.expected_origin});
-  return `async (page) => (${browserArtifactUpload.toString()})(page,${JSON.stringify(options)},${observe},${resolveArtifactUploadConflict.toString()})`;
+  return `async (page) => (${browserArtifactUpload.toString()})(page,${JSON.stringify(options)},${observe},${resolveArtifactUploadConflict.toString()},${guardUploadDebugDialog.toString()})`;
 }
 
 async function browserArtifactReveal(page,task,snapshot) {
@@ -199,7 +205,84 @@ async function browserArtifactReveal(page,task,snapshot) {
   },{task:{file_ref:task.file_ref,artifact:{name:task.artifact.name}},snapshot});
 }
 
-async function browserArtifactDownload(page,task,observe,act,reveal) {
+// Listen on the existing authenticated context. Keep Playwright's configured
+// download directory and behavior; only enable CDP events for this listener.
+export async function browserServerDownloadProgress(page,task) {
+  const session=await page.context().newCDPSession(page);
+  let native,closed=false,chromiumBytes=0;
+  try {
+    // Loginom receives the file into native Blob chunks over its WebSocket
+    // before emitting Download. Retain this controller privately, without
+    // replacing handlers or writing anything into the application.
+    if(task.server_source_binding.account&&typeof page.evaluateHandle==='function')native=await page.evaluateHandle(task=>{
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      if(!main)return null;
+      const controller=main.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+      const manager=controller?.FFileSenderManager;
+      if(!manager||main.FMapTree?.FServerConnection?.UserName!==task.server_source_binding.account)
+        throw Error('Server download native owner differs');
+      const loaders=manager.FDownloadViewController?.FFileLoaders??[];
+      if(!Array.isArray(loaders)||loaders.some(l=>l.FFullFileName===task.server_source_binding.destination))
+        throw Error('Server download already has a native receiver');
+      return {controller,manager,loader:null,bytes:0};
+    },task);
+    const {targetInfo}=await session.send('Target.getTargetInfo');
+    const {frameTree}=await session.send('Page.getFrameTree');
+    const progress={bytes:0,guid:null,url:null,failed:false,
+      sample:async()=>{
+        if(closed||!native||progress.failed)return;
+        try{
+          const bytes=await native.evaluate((owner,task)=>{
+            if(!owner)return 0;
+            const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+            const controller=main?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+            if(location.origin!==task.expected_origin||controller!==owner.controller
+              ||controller.FFileSenderManager!==owner.manager
+              ||main.FMapTree?.FServerConnection?.UserName!==task.server_source_binding.account)
+              throw Error('Server download native owner changed');
+            const loaders=owner.manager.FDownloadViewController?.FFileLoaders??[];
+            if(!Array.isArray(loaders))throw Error('Server download native receivers unavailable');
+            const matching=loaders.filter(l=>l.FFullFileName===task.server_source_binding.destination);
+            if(matching.length>1)throw Error('Server download native receiver ambiguous');
+            if(!matching.length)return owner.bytes;
+            const loader=matching[0];
+            if(owner.loader&&owner.loader!==loader||loader.FFileName!==task.artifact.name
+              ||loader.FFileDirectory!==task.server_source_binding.directory+'/'
+              ||loader.FFileSize!==task.server_source_binding.bytes||!Array.isArray(loader.FFileBlobs))
+              throw Error('Server download native receiver changed');
+            owner.loader=loader;
+            const bytes=loader.FFileBlobs.reduce((sum,blob)=>{
+              if(!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<0)
+                throw Error('Server download native chunk invalid');
+              return sum+blob.size;
+            },0);
+            if(!Number.isSafeInteger(bytes)||bytes<owner.bytes||bytes>task.server_source_binding.bytes)
+              throw Error('Server download native bytes invalid');
+            owner.bytes=bytes;return bytes;
+          },task);
+          progress.bytes=Math.max(progress.bytes,bytes);
+        }catch{if(!closed)progress.failed=true;}
+      },
+      close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
+    session.on('Browser.downloadWillBegin',event=>{
+      if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
+      if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
+      if(progress.guid){progress.failed=true;return;}
+      progress.guid=event.guid;progress.url=event.url;
+    });
+    session.on('Browser.downloadProgress',event=>{
+      if(event.guid!==progress.guid||progress.failed)return;
+      if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<chromiumBytes
+        ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
+      chromiumBytes=event.receivedBytes;progress.bytes=Math.max(progress.bytes,chromiumBytes);
+    });
+    await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
+      browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
+    return progress;
+  }catch(error){try{await native?.dispose();}finally{await session.detach();}throw error;}
+}
+
+async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   let browserStep='preconditions';
   const failureEvidence=error=>{
     const causes=[];const seen=new Set();
@@ -211,18 +294,19 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     return {step:browserStep,causes,page_closed:typeof page.isClosed==='function'?page.isClosed():null};
   };
-  let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false;
-  const trace=[],destination=task.output_binding??task.artifact.upload;
+  let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false,progress,retained=false;
+  const trace=[],destination=task.server_source_binding??task.output_binding??task.artifact.upload;
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
     error:code?{code,message:code}:null,trace});
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  const contextMatches=current=>current.authenticated && current.origin===task.expected_origin
+  const contextMatches=(current,allowBlockers=false)=>current.authenticated && current.origin===task.expected_origin
     && current.loginom_build===task.expected_build && same(current.workflow_ref,task.snapshot.workflow_ref)
     && current.dom_epoch?.document===task.snapshot.dom_epoch?.document
     && current.active_tab_ref===task.snapshot.active_tab_ref && same(current.package_identity,task.snapshot.package_identity)
     && current.file_storage?.status==='observed' && current.file_storage.directory===destination.directory
-    && current.ui.dialogs.length===0 && current.ui.masks.length===0;
+    && Array.isArray(current.ui?.dialogs)&&Array.isArray(current.ui?.masks)
+    && (allowBlockers||current.ui.dialogs.length===0&&current.ui.masks.length===0);
   try {
     let before=await observe(page);
     if(before.status!=='SUCCEEDED' || !contextMatches(before.output)
@@ -239,6 +323,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     }
     const original=task.snapshot.ui.elements.find(e=>e.ref===task.file_ref);
     const target=current=>current.ui.elements.find(e=>e.ref===task.file_ref && e.tid===original.tid && e.label===task.artifact.name);
+    if(task.server_source_binding){
+      const entry=target(before.output)?.storage_entry;
+      if(entry?.bytes_source!=='native_file_store'||entry.path!==destination.destination
+        ||entry.bytes!==destination.bytes||entry.mtime!==destination.mtime)return result('NOT_APPLIED','LOGINOM_FILE_CHANGED');
+    }
     if(['outside_viewport','point_not_observed'].includes(original.interaction?.state)) {
       if(!original.scroll?.ref)return result('NOT_APPLIED','DOWNLOAD_REVEAL_OWNER_MISSING');
       const fresh=target(before.output);
@@ -288,8 +377,22 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
+    if(task.server_source_binding&&task.browser_downloads_path){
+      progress=await track(page,task);
+      const job=page[Symbol.for('loginom-dock.server-downloads.v1')]?.get(task.operation_id);
+      if(job)job.progress=progress;
+    }
     let eventPending=true;
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>{eventPending=false;return value;},error=>{
+    // Large server files can emit the event after the small artifact window.
+    // Consume the host job's existing deadline; do not start a new allowance.
+    const eventTimeout=task.server_source_binding?task.deadline_at-Date.now():15000;
+    if(eventTimeout<=0)return result(gesture?'AMBIGUOUS':'NOT_APPLIED','LOGINOM_DOWNLOAD_DEADLINE');
+    event=page.waitForEvent('download',{timeout:eventTimeout}).then(value=>{
+      eventPending=false;
+      const job=page[Symbol.for('loginom-dock.server-downloads.v1')]?.get(task.operation_id);
+      if(job){job.download=value;if(job.cancel_requested)value.cancel().catch(()=>{});}
+      return value;
+    },error=>{
       eventPending=false;
       trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
     });
@@ -370,16 +473,137 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       await download.cancel();completed=true;
       return result('AMBIGUOUS','DOWNLOAD_FILENAME_MISMATCH');
     }
+    if(progress&&(progress.failed||!progress.guid||progress.url!==url)){
+      await download.cancel();completed=true;
+      return result('AMBIGUOUS','DOWNLOAD_PROGRESS_BINDING_MISMATCH');
+    }
     phase='downloading';
     browserStep='download.saveAs';
+    if(task.server_source_binding) {
+      const key=Symbol.for('loginom-dock.server-downloads.v1');
+      const jobs=page[key]??=(new Map());
+      const retainedJob=jobs.get(task.operation_id);
+      if(retainedJob?.accepted){
+        retained=true;
+        if(retainedJob.cancel_requested){await download.cancel();completed=true;return result('AMBIGUOUS','DOWNLOAD_CANCELLED');}
+        await download.saveAs(task.download_path);
+        completed=true;
+        if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        return result('SUCCEEDED',null,{download_completed:true});
+      }
+      if(retainedJob)throw Error('Server download already started');
+      const entry={download,state:'running',failed:false,progress};jobs.set(task.operation_id,entry);retained=true;
+      // This promise belongs to the retained runtime job. It never carries bytes
+      // over MCP; Chromium and saveAs stream the file to their disk destinations.
+      // MCP's unsafe-code VM provides page, but no Node timer globals. The
+      // host registry owns the original deadline and drains this job on abort.
+      entry.completion=(async()=>{
+        try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
+        catch(error){entry.failed=true;entry.failure={reason:'save_failed',
+          ...( ['EACCES','EPERM','ENOSPC','ENOENT','EISDIR'].includes(error.code)?{code:error.code}:{})};}
+        finally{
+          try{await progress?.close();}catch{entry.failed=true;}
+          entry.state='settled';
+        }
+      })();
+      completed=true;
+      return result('SUCCEEDED',null,{download_started:true});
+    }
     await download.saveAs(task.download_path);
     browserStep='download.failure';
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
     browserStep='post_download_observation';
-    const after=await observe(page);
-    if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
-      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    let after=await observe(page),toastRefused=false;
+    const downloadToast=current=>current.ui?.dialogs?.length===1
+      &&same(current.ui.dialogs[0].identity,{anchor_tid:'toast',path:[]});
+    const ownedToast=after.status==='SUCCEEDED'&&downloadToast(after.output);
+    const settledContext=current=>contextMatches({...current,ui:{...current.ui,dialogs:[]}})
+      &&(!task.output_binding||target(current)?.storage_entry?.bytes===task.expected_bytes);
+    if(after.status==='SUCCEEDED'&&downloadToast(after.output)&&settledContext(after.output)
+      &&Number.isFinite(task.deadline_at)&&Date.now()<task.deadline_at){
+      // Loginom's completed-download notification is an Ext window, so the
+      // global dialog guard still sees it until its own close timer fires.
+      // Bind that exact native toast; never dismiss it or repeat the download.
+      const binding=await page.evaluateHandle(function bindDownloadToast(){
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=matches[0];
+        if(matches.length!==1||!element.isConnected||typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c))
+          ||element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return null;
+        const box=element.getBoundingClientRect(),style=getComputedStyle(element);
+        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return null;
+        return {document,element,classes:element.className};
+      });
+      const inspect=()=>page.evaluate(function inspectDownloadToast(b){
+        const changed=predicate=>({state:'changed',predicate});
+        if(!b)return changed('binding_present');
+        if(document!==b.document)return changed('same_document');
+        const matches=document.querySelectorAll('[data-tid="toast"]');
+        if(!b.element.isConnected&&matches.length===0)return {state:'closed'};
+        if(matches.length!==1)return changed('unique_toast');
+        if(matches[0]!==b.element)return changed('same_element');
+        if(b.element.className!==b.classes)return changed('same_classes');
+        if(b.element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return changed('download_text');
+        const box=b.element.getBoundingClientRect(),style=getComputedStyle(b.element);
+        return {state:box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none'?'closed':'waiting'};
+      },binding);
+      const refused=(guard,predicate,observed)=>trace.push({event:'download_toast_guard_refused',guard,predicate,observed});
+      try{
+        const initial=await inspect();
+        if(initial.state==='waiting'||initial.state==='closed'){
+          toastRefused=true;
+          const ref=after.output.ui.dialogs[0].ref;
+          trace.push({event:'download_toast_wait_started',tid:'toast',deadline_at:task.deadline_at});
+          while(Date.now()<task.deadline_at){
+            await page.waitForTimeout(Math.min(100,task.deadline_at-Date.now()));
+            after=await observe(page);
+            if(Date.now()>task.deadline_at){refused('deadline','within_original_deadline',false);break;}
+            if(after.status!=='SUCCEEDED'){refused('observation','observation_succeeded',false);break;}
+            if(!settledContext(after.output)){refused('context','same_context_without_dialogs',false);break;}
+            const state=await inspect();
+            if(after.output.ui.dialogs.length===0&&state.state==='closed'){
+              toastRefused=false;
+              trace.push({event:'download_toast_settled',tid:'toast'});break;
+            }
+            if(!downloadToast(after.output)){refused('dialogs','only_owned_download_toast',false);break;}
+            if(after.output.ui.dialogs[0].ref!==ref){refused('dialog_reference','same_dialog_ref',false);break;}
+            // The bound native toast can close after observe captured it.
+            // Keep reading until both reads confirm closure; its disappearance
+            // is settlement, while replacement or another dialog still refuses.
+            if(state.state==='changed'){refused('native_toast',state.predicate,state.state);break;}
+          }
+        }else refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+      }finally{await binding.dispose();}
+    }
+    if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
+    const postStarted=Date.now(),postDeadline=task.deadline_at??postStarted+15000;
+    // The owned native toast has its stricter DOM binding/closure proof above.
+    // Other post-copy blockers settle through unchanged workspace observations.
+    let quiet=0,previousEpoch=null;
+    for(let sample=0;sample<100&&!ownedToast&&Date.now()<postDeadline;sample++){
+      if(after.status!=='SUCCEEDED'||!contextMatches(after.output,true)
+        ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)break;
+      const ready=contextMatches(after.output),epoch=after.output.dom_epoch;
+      quiet=ready?(same(epoch,previousEpoch)?quiet+1:1):0;previousEpoch=epoch;
+      if(quiet>=2){trace.push({event:'download_post_observation_settled',samples:sample+1,elapsed_ms:Date.now()-postStarted});break;}
+      await page.waitForTimeout(Math.min(200,Math.max(1,postDeadline-Date.now())));
+      after=await observe(page);
+    }
+    if(toastRefused || !ownedToast&&quiet<2 || Date.now()>=postDeadline || after.status!=='SUCCEEDED' || !contextMatches(after.output)
+      ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
+      const current=after.output??{};
+      trace.push({event:'download_post_context_refused',observation_status:after.status,
+        observation_error:/^[A-Z][A-Z0-9_]{1,100}$/.test(after.error?.code??'')?after.error.code:null,
+        checks:{authenticated:current.authenticated===true,origin:current.origin===task.expected_origin,
+          build:current.loginom_build===task.expected_build,workflow:same(current.workflow_ref,task.snapshot.workflow_ref),
+          document:current.dom_epoch?.document===task.snapshot.dom_epoch?.document,tab:current.active_tab_ref===task.snapshot.active_tab_ref,
+          package:same(current.package_identity,task.snapshot.package_identity),
+          storage:current.file_storage?.status==='observed'&&current.file_storage.directory===destination.directory,
+          dialogs:current.ui?.dialogs?.length===0,masks:current.ui?.masks?.length===0,
+          output_bytes:!task.output_binding||Array.isArray(current.ui?.elements)&&target(current)?.storage_entry?.bytes===task.expected_bytes},
+        masks:(current.ui?.masks??[]).map(m=>({kind:m.kind,target_tid:m.target_tid}))});
+      return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
+    }
     phase='downloaded';
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
@@ -393,7 +617,59 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
     }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
+  }finally{if(progress&&!retained)await progress.close();}
+}
+
+// These controls retain Playwright's Download in its owning Page, never in
+// Loginom JS. Cancellation drains saveAs before the local partial is removed.
+export async function browserServerDownloadControl(page,task) {
+  const jobs=page[Symbol.for('loginom-dock.server-downloads.v1')],job=jobs?.get(task.operation_id);
+  const base={action_key:'storage.download',action_revision:'1',operation_id:task.operation_id,
+    phase:'downloading',effect_possible:false,trace:[],cleanup_complete:true};
+  if(!job)return {...base,status:'FAILED',output:{},error:{code:'LOGINOM_DOWNLOAD_MISSING',message:'Original browser download is missing'}};
+  if(task.mode==='status'&&job.state==='running')await job.progress?.sample?.();
+  if(task.mode==='cancel'){
+    job.cancel_requested=true;
+    if(job.download){await job.download.cancel();await job.completion;}
   }
+  const output={state:job.state,failed:job.failed||job.progress?.failed===true,bytes:job.progress?.bytes??0,
+    expired:job.expired===true,...(job.failure?{failure:job.failure}:{}),...(job.outcome?{outcome:job.outcome}:{})};
+  if(task.mode==='release'){
+    if(job.state!=='settled')throw Error('Cannot release a running download');
+    await job.download?.delete();jobs.delete(task.operation_id);
+  }
+  return {...base,status:'SUCCEEDED',output,error:null};
+}
+
+export function makeServerSourceDownloadCode(options) {
+  const b=options.server_source_binding,s=options.snapshot,m=s?.ui?.elements?.filter(e=>e.ref===options.file_ref)??[];
+  const name=options.artifact?.name;
+  if(!b||!Number.isSafeInteger(b.bytes)||b.bytes<0||typeof b.mtime!=='string'||!b.mtime
+    ||!Number.isSafeInteger(options.deadline_at)||options.deadline_at<=Date.now()
+    ||!name||!/\.(csv|tsv|txt|xlsx)$/i.test(name)||b.destination!==b.directory+'/'+name
+    ||s.file_storage?.directory!==b.directory||m.length!==1||m[0].label!==name
+    ||m[0].tid!==s.workflow_ref?.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)
+    ||m[0].storage_entry?.bytes!==b.bytes||m[0].storage_entry?.mtime!==b.mtime
+    ||m[0].storage_entry?.path!==b.destination||m[0].storage_entry?.bytes_source!=='native_file_store')
+    throw Error('Server download requires its exact native file row');
+  const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
+  const transfer=`(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()},${browserServerDownloadProgress.toString()})`;
+  if(!options.browser_downloads_path)return `async page=>${transfer}`;
+  return `async page=>{
+    const jobs=page[Symbol.for('loginom-dock.server-downloads.v1')]??=new Map();
+    if(jobs.has(${JSON.stringify(options.operation_id)}))throw Error('Server download already started');
+    const job={accepted:true,state:'running',failed:false,download:null};
+    jobs.set(${JSON.stringify(options.operation_id)},job);
+    job.completion=(async()=>{
+      try{job.outcome=await ${transfer};job.failed=job.outcome.status!=='SUCCEEDED';}
+      catch{job.failed=true;}
+      finally{try{await job.progress?.close();}catch{job.failed=true;}job.state='settled';}
+    })();
+    return {status:'SUCCEEDED',action_key:'artifact.download',action_revision:'1',operation_id:${JSON.stringify(options.operation_id)},
+      phase:'requesting',effect_possible:true,cleanup_complete:false,output:{download_started:true},error:null,trace:[]};
+  }`;
 }
 
 // Host-owned native export only; shares the exact download gesture and cleanup.
@@ -1092,10 +1368,31 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(!last.tid.startsWith(parent.tid+'>'))throw Error('Saved workflow parent is not addressable');
     const suffix=last.tid.slice(parent.tid.length);
     const control=page.locator('[data-tid='+cssString(parent.tid)+']');
-    if(await control.count()!==1||!await control.isVisible()||(await control.innerText()).trim()!==parent.label)
-      throw Error('Saved workflow parent changed');
-    await interact(timeout=>control.click({timeout}));
-    record('saved_navigation_parent_entered',{parent_tid:parent.tid,workflow_id:binding.workflow_id});
+    const count=await control.count(),visible=count===1&&await control.isVisible();
+    const label=count===1?(visible?(await control.innerText()).trim():await control.evaluate(e=>e.textContent.trim())):null;
+    record('saved_navigation_parent_observed',{parent_tid:parent.tid,count,visible,label_matches:label===parent.label});
+    if(count!==1||label!==parent.label)throw Error('Saved workflow parent changed');
+    if(visible)await interact(timeout=>control.click({timeout}));
+    else {
+      // A long saved name can hide this ancestor in the navigation overflow.
+      // Rebind the native workflow before using its visible, one-level Up control.
+      const rebound=await packageContinuations(binding);
+      if(!rebound.some(value=>same(value,current)))throw Error('Saved workflow navigation changed');
+      const up=page.locator('[data-tid='+cssString(binding.prefix+';up')+']');
+      if(await up.count()!==1||!await up.isVisible()||!await up.isEnabled()
+        ||!await up.evaluate((e,binding)=>{
+          const component=globalThis.Ext?.getCmp?.(e.id),app=globalThis.bg?.app;
+          const active=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
+          const last=document.querySelectorAll('[data-tid='+JSON.stringify(binding.navigation_path.at(-1).tid)+']');
+          if(!app?.WorkFlowTreeNode||!(active instanceof app.WorkFlowTreeNode)||last.length!==1
+            ||globalThis.Ext?.getCmp?.(last[0].id)?._node?.data?.node!==active)return false;
+          return component?.el?.dom===e&&component.disabled!==true&&e.getAttribute('data-qtip')==='Вверх'
+            &&!!e.closest('[data-tid='+JSON.stringify(binding.prefix+';NavigationBar')+']')
+            &&e.querySelectorAll('.navigation-icon-up').length===1;
+        },binding))throw Error('Saved workflow Up control unavailable');
+      await interact(timeout=>up.click({timeout}));
+    }
+    record('saved_navigation_parent_entered',{parent_tid:parent.tid,workflow_id:binding.workflow_id,via:visible?'breadcrumb':'up'});
     const updated=await poll(async()=>{
       const rows=await page.evaluate(prefix=>[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')]
         .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()})),binding.prefix);
@@ -1471,19 +1768,29 @@ export function withBrowserReceipt(body, options) {
 }
 
 export function parseCapabilityResult(response) {
-  if (response?.isError) throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']');
+  if (response?.isError) {
+    const details=browserFailureDetails(response);
+    // Keep the original cause private; upload journals it through its
+    // redactor while callers retain the fixed public refusal.
+    const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+      .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
+    throw Object.assign(new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
+      {cause:new Error(message)}),{code:browserFailureCategory(response)});
+  }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const match = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  throw new Error('Pinned browser capability returned no typed result');
+  const error=new Error('Pinned browser capability returned no typed result');
+  if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
+  throw error;
 }
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = false }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -1491,6 +1798,59 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const auxiliary = new Map();
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
+  let storageNavigating=false;
+  const inspectServerSource=(ref,{signal,deadline}={})=>serverSources.inspect(ref,options=>{
+    signal?.throwIfAborted();const timeout=Math.min(35000,deadline===undefined?35000:deadline-now());
+    if(timeout<=0)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+    return execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
+      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout});
+  });
+  const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
+  const drainServerDownload=async id=>{
+    const cancelled=await controlServerDownload(id,'cancel');
+    if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
+    const released=await controlServerDownload(id,'release');
+    if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
+  };
+  const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
+    download:async({source,path,operation_id,signal,deadline,onProgress})=>{
+      const roots=await runtime.observe({scope:'roots',storageName:source.destination.slice(source.destination.lastIndexOf('/')+1)});
+      const row=roots.output.ui.elements.find(e=>e.tid===roots.output.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(source.destination.slice(source.destination.lastIndexOf('/')+1)));
+      if(!row)throw Error('LOGINOM_FILE_CHANGED');
+      const observed=await runtime.observe({rootRef:row.ref,observationId:roots.output.observation_id});
+      const snapshot=observations.get(observed.output.observation_id);
+      const file=snapshot?.ui?.elements?.find(e=>e.storage_entry?.path===source.destination);
+      if(!file)throw Error('LOGINOM_FILE_CHANGED');
+      const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
+        server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
+        download_path:path,browser_downloads_path:join(cacheDirectory,'..','browser-downloads'),
+        deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
+      signal.throwIfAborted();
+      const code=makeServerSourceDownloadCode(options);
+      let started;
+      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now())});}
+      catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      await onRecord({phase:'storage_download_started',operation_id,outcome:started});
+      if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
+        const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
+        error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
+      }
+      try {
+        while(true) {
+          signal.throwIfAborted();
+          const current=await controlServerDownload(operation_id,'status');
+          if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
+          onProgress(current.output.bytes);
+          if(current.output.state==='settled'){
+            if(current.output.outcome)await onRecord({phase:'storage_download_transfer',operation_id,outcome:current.output.outcome});
+            if(current.output.failed||current.output.expired)throw Object.assign(Error(current.output.expired?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_FAILED'),
+              {details:current.output.failure??{reason:'browser_transfer_failed'}});
+            break;
+          }
+          await new Promise(resolve=>setTimeout(resolve,250));
+        }
+      }finally{try{await drainServerDownload(operation_id);}catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}}
+    } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
   let recoverySequence = 0;
@@ -2317,6 +2677,176 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
+    serverDownload(request,name,{signal}={}) {
+      if(!serverDownloads)throw Error('Server download cache is unavailable');
+      if(name==='dock_storage_source')return (async()=>{
+        if(storageNavigating||serverDownloads.unsettled||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+          throw Error('Resolve the pending Dock operation before locating a server source');
+        checkId(request.operation_id);
+        const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
+        if(!/\.(csv|tsv|txt|xlsx)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX');
+        const id=request.operation_id,signature='storage.source:'+path;
+        if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
+        if(auxiliary.has(id)){
+          const previous=auxiliary.get(id);
+          if(previous.signature!==signature||!previous.outcome)throw Error('Original storage navigation requires inspection; do not repeat');
+          return structuredClone(previous.outcome);
+        }
+        auxiliary.set(id,{signature});storageNavigating=true;
+        const deadline=now()+120000;let step=0;
+        const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
+        const readPages=async options=>{
+          guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
+          if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
+          const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
+          for(let page=0;cursor;page++){
+            if(page>=32)throw Error('Server storage observation page limit');
+            const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
+            if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
+            output.ui.elements.push(...next.output.ui.elements);cursor=next.output.page?.next_cursor;
+          }
+          return output;
+        };
+        const read=async options=>{
+          const original=options.rootRef?observations.get(options.observationId):null;
+          const root=original?.ui.elements.find(e=>e.ref===options.rootRef);
+          for(let attempt=0;;attempt++){
+            guard();
+            if(attempt&&root){
+              const fresh=await read({scope:'roots',...(options.storageName?{storageName:options.storageName}:{})});
+              const matches=fresh.ui.elements.filter(e=>e.tid===root.tid);
+              if(fresh.dom_epoch.document!==original.dom_epoch.document
+                ||JSON.stringify(fresh.workflow_ref)!==JSON.stringify(original.workflow_ref)||matches.length!==1)
+                throw Object.assign(Error('Server storage observation root changed'),{code:'UI_ROOT_STALE'});
+              options={...options,rootRef:matches[0].ref,observationId:fresh.observation_id};
+            }
+            try{return await readPages(options);}catch(error){
+              if(!String(error.message).startsWith('Workspace changed between observation pages;'))throw error;
+              guard();await new Promise(resolve=>setTimeout(resolve,100));
+            }
+          }
+        };
+        const roots=()=>read({scope:'roots'});
+        const one=(entries,control='storage_control')=>{if(entries.length!==1)throw Object.assign(Error('Server storage control is missing or ambiguous'),
+          {code:'STORAGE_CONTROL_UNAVAILABLE',storageControl:control});return entries[0];};
+        const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
+        const act=async(s,e,verb='click',extra={})=>{
+          // Scrolling detaches virtual rows. Preserve the original grid root
+          // so the post-gesture observation can confirm this one scroll.
+          if(verb==='scroll'){
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
+            return;
+          }
+          const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+          const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
+          const original=binding(s);let quiet=null;
+          for(let attempt=0;attempt<3;attempt++){
+            let previous=null;
+            s=await ready(async()=>{
+              const fresh=await read({rootRef:e.ref,observationId:s.observation_id});
+              const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+              if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
+              const item=matches[0],stamp=[fresh.dom_epoch,item.bounding_box,item.interaction];
+              quiet=item.interaction?.state==='point_observed'&&same(stamp,previous);previous=stamp;
+              return fresh;
+            },()=>quiet===true);
+            e=one(s.ui.elements.filter(item=>item.tid===e.tid));
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            if(result.status==='SUCCEEDED'&&result.cleanup_complete===true)return;
+            if(result.status!=='NOT_APPLIED'||result.phase!=='preconditions'||result.effect_possible!==false
+              ||result.cleanup_complete!==true||result.error?.code!=='UI_EPOCH_CHANGED'||attempt===2
+              ||!Array.isArray(result.trace)||result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event)))
+              throw Error('Server storage navigation requires inspection: '+result.operation_id);
+          }
+        };
+        const ready=async(probe,predicate)=>{
+          const end=Math.min(deadline,now()+15000);
+          for(let attempt=0;attempt<100&&now()<end;attempt++){
+            const state=await probe();if(state&&predicate(state)&&!(state.ui.masks??[]).length&&!(state.ui.dialogs??[]).length)return state;
+            await new Promise(resolve=>setTimeout(resolve,100));
+          }
+          throw Error('Server storage UI is not ready');
+        };
+        const directory=expected=>ready(async()=>{
+          const s=await roots();
+          // The confirmed Files click can precede its tab/region mounting.
+          // Reading the previous graph's NavigationPanel races its detach.
+          if(!s.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;')))return null;
+          const bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
+          if(bars.length!==1)return null;
+          try{return await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
+        },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
+        try{
+          const initial=await roots();
+          if(!initial.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))){
+            const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
+            await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
+          }
+          let current=await directory();const destination=path.slice(0,path.lastIndexOf('/'));
+          if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
+            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
+            current=await directory('/');
+          }
+          const row=async name=>{
+            const parent=current;let last;
+            return findNativeStorageRow({name,guard,roots:async()=>{last=await roots();return last;},
+              read:async options=>{
+                const state=options.root_ref?await read({rootRef:options.root_ref,observationId:last.observation_id}):await read({scope:'roots',storageName:options.storage_name});
+                if(state.dom_epoch.document!==parent.dom_epoch.document||JSON.stringify(state.workflow_ref)!==JSON.stringify(parent.workflow_ref))throw Error('Server storage owner changed');
+                last=state;return state;
+              },ready:(probe,predicate)=>ready(probe,predicate),act});
+          };
+          for(const part of destination.slice(current.file_storage.directory==='/'?0:current.file_storage.directory.length).split('/').filter(Boolean)){
+            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
+            await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
+          }
+          if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          const state=await row(path.slice(path.lastIndexOf('/')+1));
+          const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
+          const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
+          auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
+        }catch(error){
+          await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
+          // Keep a bounded diagnostic in the tool result. Throwing through the
+          // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
+          const reason=error.code==='UI_ROOT_STALE'?'observation_root_changed'
+            :String(error.message).startsWith('Workspace changed between observation pages;')?'observation_changed'
+            :String(error.message).includes('deadline')?'navigation_deadline'
+            :String(error.message).startsWith('Server storage navigation requires inspection:')?'navigation_unconfirmed'
+            :'storage_observation_refused';
+          const unsettled=!!pending||running;
+          const result={result_version:'user-v1',operation_id:id,status:unsettled?'AMBIGUOUS':'FAILED',
+            action_key:'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
+            output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason,
+              ...(/^[A-Z_]{1,80}$/.test(error.code??'')?{code:error.code}:{}),
+              ...(['main_toolbar','files_button','files_root','folder','source_file','storage_control'].includes(error.storageControl)?{control:error.storageControl}:{})}}};
+          auxiliary.get(id).outcome=structuredClone(result);return result;
+        }finally{storageNavigating=false;}
+      })();
+      if(name==='dock_storage_download_start'){
+        if(!serverSourceCache){
+          checkId(request.operation_id);
+          return {result_version:'user-v1',operation_id:request.operation_id,status:'FAILED',action_key:'storage.download',
+            phase:'admission',effect_possible:false,cleanup_complete:true,output:{},
+            error:{code:'SERVER_CACHE_DISABLED',message:'Автоматическое скачивание серверного источника в cache отключено: для серверного файла точная сверка N недоступна. Доступны ограниченный preview и выбор существующего серверного источника без upload. Цикл sample→full не начат.'}};
+        }
+        if(storageNavigating||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+          throw Error('Resolve the pending Dock operation before downloading');
+        if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)&&auxiliary.get(request.operation_id).signature!=='storage.download:'+request.server_source_ref
+          ||nodeJobs.has(request.operation_id)||sourceReads.has(request.operation_id))
+          throw Error('Server download ID conflicts with another operation');
+        const result=serverDownloads.start(request);
+        auxiliary.set(request.operation_id,{signature:'storage.download:'+request.server_source_ref});
+        return result;
+      }
+      if(name==='dock_storage_download_status')return serverDownloads.status(request.operation_id);
+      if(name==='dock_storage_download_wait')return serverDownloads.wait(request.operation_id,{timeoutMs:request.timeout_ms??1000,signal});
+      if(name==='dock_storage_download_cancel')return serverDownloads.cancel(request.operation_id);
+      if(name==='dock_storage_download_cleanup')return serverDownloads.cleanup(request.operation_id);
+      throw Error('Unknown server download tool');
+    },
+    cleanupServerCache:()=>serverDownloads?.cleanup(),
     startNodeApply:(request,options)=>{
       if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
       if(sourceReads.has(request.operation_id))throw Error('Operation ID belongs to a JavaScript read');
@@ -2342,7 +2872,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
-    tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
+    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools.map(tool=>!serverSourceCache&&tool.name==='dock_storage_download_start'
+      ?{...tool,description:'Server source cache is disabled in this release. No download or sample→full cycle starts. For a server file exact N verification is unavailable; use bounded preview and the existing storage source without upload. Native exports.text file_artifacts are downloaded by their ordinary export path.'}:tool):[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
       if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
@@ -2615,7 +3146,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return outcome;
       } finally { running = false; }
     },
-    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,largeUpload=false,deadline}={}) {
+    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,largeUpload=false,deadline,uploadLease}={}) {
       signal?.throwIfAborted();checkId(operationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact upload is available only in an authorized candidate session');
       const artifact=artifactStore.getUploadGrant(artifactId,grantId);
@@ -2636,7 +3167,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         throw new Error('Observe the exact authorized Loginom storage directory before uploading. Open the main Файлы (Files) workspace and enter the directory from the upload grant; require file_storage.status=observed and an exact directory match. The import file-selection dialog cannot receive this upload: cancel that dialog through its observed control, then open Files and observe again. No file was staged or submitted.');
       running=true;
       try {
-        const lease=await artifactStore.stageUpload(artifactId);
+        const lease=uploadLease??await artifactStore.stageUpload(artifactId);
         const operation={id:operationId,signature,uploadLease:lease,action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},
           deliveryOperationId,parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
           checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:packageCompletion||largeUpload?deadline:now()+30000};
@@ -2661,7 +3192,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }else outcome=raw;
           if(outcome.operation_id!==operationId || outcome.action_key!=='artifact.upload' || outcome.action_revision!=='1')
             throw new Error('Upload receipt identity mismatch');
-        } catch {operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
+        } catch(error) {
+          try{await onRecord({phase:'artifact_upload_transport_failed',operation_id:operationId,cause:operationFailureDiagnostic(error,{uploadCause:true})});}catch{}
+          // MCP can return early when the owned toast confirm appears. The
+          // exact-dialog guard dismisses it; read the original receipt only.
+          // Never resend the upload or give it a new deadline.
+          if(error.code==='UPLOAD_DEBUG_DIALOG'){
+            for(let attempt=0;attempt<20&&now()<operation.deadline;attempt++){
+              await new Promise(resolve=>setTimeout(resolve,100));
+              try{
+                const state=await readReceipt(operation);
+                if(state.state==='completed'){outcome=state.receipt;await remember(operation,'upload_receipt_recovered',outcome);break;}
+                if(state.state!=='running')break;
+              }catch(recoveryError){if(recoveryError.code!=='UPLOAD_DEBUG_DIALOG')break;}
+            }
+          }
+          if(!outcome){operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
+        }
         operation.cleanupConfirmed=!operation.transportUncertain && outcome.cleanup_complete===true;
         operation.outcome=outcome;
         await remember(operation,'completed',outcome);
@@ -2678,12 +3225,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const task={operation_id:operationId,artifact,snapshot,binding,expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline};
       const key=fingerprint('large-file-reuse',[binding.loginom_account,targetOrigin,artifact.upload.directory,artifact.name,artifact.bytes,artifact.sha256]);
       const state={task,submitted:false,bound:false,settled:false,verified:false};largeTasks.set(operationId,state);
-      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       try {
         signal?.throwIfAborted();
-        const bound=await native('bind',{receipt:largeReceipts.get(key)});state.bound=true;
+        state.sourceLease=await artifactStore.stageUpload(artifactId);
+        await state.sourceLease.verify();
+        const bound=await native('bind',{receipt:artifact.sha256===null?undefined:largeReceipts.get(key)});state.bound=true;
         if(bound.reused){
-          const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
+          await state.sourceLease.verify();signal?.throwIfAborted();
+          const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:artifact.bytes,source_sha256:artifact.sha256,source_unchanged_verified:true,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true,reused:true};
           const saved=await onRecord({phase:'large_upload_reused',operation_id:operationId,result});
           if(saved?.phase!=='large_upload_reused'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
           const outcome={status:'SUCCEEDED',action_key:'artifact.upload',action_revision:'1',operation_id:operationId,phase:'completed',effect_possible:false,cleanup_complete:true,
@@ -2693,14 +3243,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},deliveryOperationId:options.deliveryOperationId,
             parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:options.observationId,destination:artifact.upload.destination,overwrite:'reject'},
             checkpoint:{artifact,workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage},deadline,outcome,cleanupConfirmed:true});
-          state.settled=true;state.verified=true;return result;
+          await state.sourceLease.release();state.settled=true;state.verified=true;return result;
         }
         signal?.throwIfAborted();state.submitted=true;
-        const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true});
-        if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        const upload=await runtime.upload({...options,largeUpload:true,decideConflicts:true,uploadLease:state.sourceLease});
+        await state.sourceLease.verify();
+        if(upload.output?.upload_submitted!==true||upload.cleanup_complete!==true){
+          try{await onRecord({phase:'large_upload_submission_refused',operation_id:operationId,status:upload.status,
+            upload_submitted:upload.output?.upload_submitted===true,cleanup_complete:upload.cleanup_complete===true,
+            cause:operationFailureDiagnostic({code:upload.error?.code})});}catch{}
+          throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        }
         state.operation=operations.get(operationId);
         while(now()<deadline){
           signal?.throwIfAborted();
+          await state.sourceLease.verify();
           const progress=await native('poll');
           onProgress?.({bytes:progress.bytes,phase:progress.quiet?'verifying_size':'uploading'});
           if(progress.error)throw Error('LOGINOM_UPLOAD_FAILED');
@@ -2711,7 +3268,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(proof.waiting)throw Error('LOGINOM_UPLOAD_DEADLINE');
             await state.operation.uploadLease.verify();signal?.throwIfAborted();
             if(now()>=deadline)throw Error('LOGINOM_UPLOAD_DEADLINE');
-            const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:proof.bytes,source_sha256:artifact.sha256,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
+            const result={status:'SUCCEEDED',artifact_id:artifactId,upload_operation_id:operationId,destination:artifact.upload.destination,bytes:proof.bytes,source_sha256:artifact.sha256,source_unchanged_verified:true,bytes_source:'native_file_store',upload_completion_verified:true,cleanup_complete:true};
             const saved=await onRecord({phase:'large_upload_completed',operation_id:operationId,result,native_row:proof.row,account:binding.loginom_account,origin:targetOrigin,directory:artifact.upload.directory});
             if(saved?.phase!=='large_upload_completed'||saved.operation_id!==operationId)throw Error('LOGINOM_UPLOAD_UNCERTAIN');
             await state.operation.uploadLease.release();
@@ -2723,17 +3280,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           await new Promise(resolve=>{const timer=setTimeout(done,1000);function done(){signal?.removeEventListener('abort',done);clearTimeout(timer);resolve();}signal?.addEventListener('abort',done,{once:true});});
         }
         throw Error('LOGINOM_UPLOAD_DEADLINE');
-      }catch(error){if(!state.bound&&!state.submitted){state.settled=true;}throw error;}
+      }catch(error){
+        try{await onRecord({phase:'large_upload_failed',operation_id:operationId,cause:operationFailureDiagnostic(error,{uploadCause:true})});}catch{}
+        state.sourceChanged=error.message==='LOGINOM_FILE_CHANGED';if(!state.bound&&!state.submitted){await state.sourceLease?.release();state.settled=true;}throw error;
+      }
     },
     async cancelLargeArtifact({operationId,deadline}) {
       const state=largeTasks.get(operationId);
       if(!state)return false;
       if(state.settled)return state.verified!==true;
-      if(!state.submitted){state.settled=true;return true;}
-      const task={...state.task,deadline_at:deadline};
-      const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID'});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      if(!state.submitted){await state.sourceLease?.release();state.settled=true;return true;}
+      const task={...state.task,deadline_at:deadline,source_changed:state.sourceChanged===true};
+      const native=async mode=>{const result=await execute(makeLargeUploadCode({...task,mode}),{timeout:Math.max(1,Math.min(10000,deadline-now()))});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
       while(now()<deadline){
         const progress=await native('cancel');
+        if(progress.gesture||progress.quiet)await onRecord({phase:'large_upload_cleanup_step',operation_id:operationId,
+          active:progress.active,quiet:progress.quiet,gesture:progress.gesture?.kind??null,server_delete_confirmed:progress.server_delete_confirmed===true});
         if(progress.quiet)break;
         await new Promise(resolve=>setTimeout(resolve,200));
       }
@@ -2749,6 +3311,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!cleanup.clean||now()>=deadline)return false;
       const operation=operations.get(operationId);
       if(operation){await operation.uploadLease.release();operation.cleanupConfirmed=true;operation.outcome={...operation.outcome,status:'FAILED',cleanup_complete:true,error:{code:'LOGINOM_UPLOAD_CANCELLED',message:'Upload stopped and owned destination removed'}};if(pending===operation)pending=null;}
+      else await state.sourceLease?.release();
       const saved=await onRecord({phase:'large_upload_cleanup',operation_id:operationId,cleanup_complete:true});
       if(saved?.phase!=='large_upload_cleanup'||saved.operation_id!==operationId)return false;
       state.settled=true;observations.clear();return true;
@@ -2814,7 +3377,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
-        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
+        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path,deadline_at:attempt.deadline});}
         catch(error){await lease.release();throw error;}
         operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
@@ -2937,8 +3500,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
-            resolveStorageSource:ref=>serverSources.inspect(ref,options=>execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-              ...options,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000})),
+            resolveStorageSource:async ref=>{
+              const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
+              return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
+            },
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3175,6 +3740,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
+      if((storageNavigating||serverDownloads?.unsettled)&&!['serverDownload','cleanupServerCache'].includes(name)){
+        const error=Error('Server download retains the browser; use download status/wait/cancel');
+        if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;
+      }
       if(leased&&!readOnly.has(name)){const error=Error('Browser recovery holds the page; finish or stop it before further Dock actions');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if(delivery.busy||delivery.blocksMutations){const error=Error('Artifact delivery is in progress or uncertain');
@@ -3188,8 +3757,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
-    hasUnsettledWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasActiveWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),

@@ -6,8 +6,8 @@ import {readLinRegressionOutputs,configureLinRegressionOutputs} from './linregre
 import {linRegressionParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('LinRegression: '+message);};
-export function createLinRegressionNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'datamining.lin_regression',mode:'enter',revision:'linregression-v1-internal-1',parameterSchema:linRegressionParametersSchema,
+export function createLinRegressionNodeSupport(config){const support=createTabularTransformNodeSupport(config,{
+ type:'datamining.lin_regression',modes:['enter','apply'],revision:'linregression-v1-internal-2',parameterSchema:linRegressionParametersSchema,
  validate:validateLinRegressionParameters,validateInput:(p,resolved,native)=>resolveLinRegressionRoles(p,resolved.fields??native.target_fields),readback:linRegressionConfigurationReadback,
  configurationObservation:{condition:'linregression feature roles',readLinRegression:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_linregression?.verified===true},
  async configure(channel,p,context){
@@ -19,6 +19,7 @@ export function createLinRegressionNodeSupport(config){return createTabularTrans
  },
  configureAllOutputs:configureLinRegressionOutputs,
  async beforeGraphExecute(options,ctx,configuration,channel){
+  if(options.operation.nodeApply.request.mode==='apply')return {};
   const request={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref};
   const graph=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
   const source=graph.links.filter(e=>e.target===ctx.node.node_id).map(e=>({node:graph.nodes.find(n=>n.ref.node_id===e.source)?.ref,output:e.output,input:e.input}));
@@ -29,4 +30,19 @@ export function createLinRegressionNodeSupport(config){return createTabularTrans
   return {training:{...training,source}};
  },
  readOutputs:readLinRegressionOutputs,
-});}
+});return {...support,nodeApplyDriverFactory:options=>{
+ const drivers=support.nodeApplyDriverFactory(options);
+ if(options.operation.parameters.mode!=='apply')return drivers;
+ return {...drivers,
+  async mapPorts(mappings,ctx){
+   if(ctx.receipt_id===options.operation.id+':input_mapping')return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false};
+   return drivers.mapPorts(mappings,ctx);
+  },
+  async finish(mode,ctx){
+   // Close the inspected draft: committing even unchanged settings can
+   // invalidate a learned model. Execution remains a separate graph action.
+   return drivers.finish('close',ctx);
+  },
+  async finishGraph(mode,ctx){return {...await drivers.finishGraph(mode,ctx),settings_applied:false};},
+ };
+}};}

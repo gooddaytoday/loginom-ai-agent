@@ -14,7 +14,7 @@ export class NodeReleaseBlocked extends Error {
 }
 
 // Proves that a stopped node operation no longer holds the workspace: the last
-// browser call settled with confirmed cleanup, only this operation's own draft
+// browser call settled, only this operation's own draft
 // or output Table view was cleaned up, and the same unlocked node rests on an
 // unchanged, quiet graph. The proof says nothing about the node's settings or
 // execution; the caller reports those as unknown unless already verified.
@@ -24,20 +24,46 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement;
+ let settleWizard,beforeSettlement,draftReceipt=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
-  requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,
+  const r=response?.receipt;
+  // REST configure never commits Done/Execute. Its completed failure receipt
+  // can truthfully retain cleanup=false because the draft is still open.
+  // Permit only the existing owned-wizard cancellation and quiet-graph proof;
+  // this does not replay configure or accept unknown transport completion.
+  const restDraft=state.pending.phase==='configure'&&state.request.target?.type==='integration.rest_request'
+   &&typeof operation.lastReceipt.operation_id==='string'&&r?.operation_id===operation.lastReceipt.operation_id
+   &&operation.lastReceipt.action_key==='node.rest.configure.internal'&&r.action_key===operation.lastReceipt.action_key
+   &&r.phase==='configure'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='REST_STEP_UNCONFIRMED';
+  const gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+  const exportDraft=state.pending.phase==='configure'&&state.request.target?.type==='exports.text'
+   &&operation.lastReceipt.action_key==='node.export.next'&&r?.action_key==='node.export.next'
+   &&r.phase==='export_next'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&['EXPORT_NEXT_UNCONFIRMED','EXPORT_NEXT_UNSETTLED'].includes(r.error?.code);
+  const wizardDraft=state.pending.phase==='configure'&&operation.lastReceipt.action_key==='ui.act'&&r?.action_key==='ui.act'
+   &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&sameNode(r.output?.prepared_node_context,node)&&r.output.prepared_node_context.surface==='wizard'
+   &&r.output.wizard?.status==='observed'&&r.output.wizard.root_ref&&gestures.length===1
+   &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
+   &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
+  const draft=restDraft||exportDraft||wizardDraft;
+  draftReceipt=draft;
+  requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft),
    'The last browser gesture of this operation has no confirmed cleanup');
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
-  const r=response.receipt,n=r.output?.prepared_node_context,w=r.output?.wizard;
-  const gestures=r.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+  const n=r.output?.prepared_node_context,w=r.output?.wizard;
+  if(draft){
+   requireValue(typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id,
+    'The completed draft receipt identity changed');
+  }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
-  if(r.action_key==='ui.act'&&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id
+  if(!draft&&r.action_key==='ui.act'&&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id
     &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&n?.verified===true&&sameNode(n,node)
     &&(n.surface==='wizard'&&w?.status==='observed'&&w.root_ref||graphReturn)
     &&Number.isFinite(state.deadline)&&Number.isFinite(state.pending.deadline)
@@ -47,6 +73,12 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    settleWizard={root_ref:w.root_ref,graph_only:graphReturn,node:n,deadline:Math.min(deadline,state.deadline,state.pending.deadline)};
    beforeSettlement=await readReleaseGraph(operation,node,settleWizard.deadline,now);
   }
+  // A settled browser call can return to its graph before Preview's own
+  // loading mask disappears. The existing observer admits only that node's
+  // native graph-loading owner, never a dialog or a foreign mask.
+  if(!settleWizard&&sameNode(n,node)&&n.surface==='graph'&&w?.status==='absent')
+   settleWizard={graph_only:true,node:n,deadline};
+  if(wizardDraft)settleWizard={root_ref:w.root_ref,node:n,deadline};
  }
  const cleanup={wizard_closed:false,read_view_restored:false,views_returned:false};
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
@@ -56,8 +88,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   ready:s=>['absent','observed'].includes(s.wizard?.status)}).catch(error=>{
    throw new NodeReleaseBlocked('The Loginom workspace could not be observed for release: '+String(error.message).slice(0,300),
     'Warn the user that unsaved settings of the open wizard will be lost, ask them to close any open Loginom wizard or dialog with its Cancel button and return to this scenario graph.'+retry);});
- if(settleWizard)requireValue(same(beforeSettlement,await readReleaseGraph(operation,node,settleWizard.deadline,now)),
+ if(beforeSettlement)requireValue(same(beforeSettlement,await readReleaseGraph(operation,node,settleWizard.deadline,now)),
   'The graph changed while the original wizard gesture settled; no cleanup was authorized');
+ if(draftReceipt)requireValue(current.ui?.dialogs?.length===0&&current.ui?.masks?.length===0,
+  'The stopped draft has a blocking dialog or mask');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

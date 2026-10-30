@@ -546,6 +546,20 @@ for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files 
 });
 
 
+test('large delivery journals the first browser failure before failed cancellation replaces it',async()=>{
+ const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Error('Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)');};
+ f.runtime.cancelLargeArtifact=async()=>{throw Error('LOGINOM_UPLOAD_DEADLINE');};
+ await f.service.deliver(request);await f.service.drain();
+ assert.equal(f.service.status(request.operation_id).error.code,'LOGINOM_UPLOAD_UNCERTAIN');
+ const primary=f.events.findIndex(e=>e.phase==='large_upload_failed');
+ const cleanup=f.events.findIndex(e=>e.phase==='large_upload_cleanup_failed');
+ assert.ok(primary>=0&&cleanup>primary);
+ assert.equal(f.events[primary].cause.code,'LOGINOM_DISCONNECTED');
+ assert.equal(f.events[primary].cause.detail,'reason=owner');
+ assert.equal(f.events[cleanup].cause.code,'LOGINOM_UPLOAD_DEADLINE');
+});
+
 test('large delivery starts asynchronously, reports progress and never downloads its bytes',async()=>{
  const f=fixture();f.artifact.bytes=2**32+1048576;f.artifact.upload.overwrite='reject';
  let done;const gate=new Promise(resolve=>{done=resolve;});

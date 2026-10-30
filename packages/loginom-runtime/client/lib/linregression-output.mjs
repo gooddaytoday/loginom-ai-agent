@@ -9,6 +9,10 @@ export function linRegressionOutputColumns(configuration,port){
 }
 export async function configureLinRegressionOutputs(channel,configuration,p,mappings,finishWizard){
  need(mappings.length===0,'mapping overrides are outside stage 1');
+ // Inactive intrinsic outputs may expose only exclusions. Preserve them;
+ // verify the actual prediction/coefficient schemas after native Execute.
+ if(configuration.mode==='apply')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
+  ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  await channel.openOutputPort(1);
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
  const observe=condition=>channel.observe({condition,readMappings:true,ready});

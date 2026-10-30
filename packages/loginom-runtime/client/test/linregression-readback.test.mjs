@@ -18,6 +18,16 @@ test('ordinary execution alone cannot claim a trained model',()=>{
   assert.throws(()=>linRegressionConfigurationReadback(input),/training on the connected source/);
  }
 });
+test('apply reports preserved settings and never claims a new training execution',()=>{
+ const input=candidate();input.phases[1].value.configuration.mode='apply';
+ Object.assign(input.phases[2].value,{settings_applied:false,draft_discarded:true});
+ input.phases.at(-1).value.settings_applied=false;
+ delete input.phases.at(-1).value.training;
+ const result=linRegressionConfigurationReadback(input);
+ assert.equal(result.mode,'apply');assert.equal(result.training.status,'not_requested');
+ input.phases.at(-1).value.training={status:'trained'};
+ assert.throws(()=>linRegressionConfigurationReadback(input),/apply must never train/);
+});
 test('Done commits settings without claiming training and foreign settings refuse',()=>{
  const input=candidate();input.phases.at(-1).value.mode='done';delete input.phases.at(-1).value.training;
  assert.equal(linRegressionConfigurationReadback(input).training.status,'not_requested');

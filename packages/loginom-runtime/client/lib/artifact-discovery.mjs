@@ -412,17 +412,19 @@ export async function largeUploadNative(page, task) {
     &&Number.isSafeInteger(r.Size)&&r.Size===t.artifact.bytes;
   if(t.mode==='bind'){
    if(jobs.has(t.operation_id))fail();
+   if([...document.querySelectorAll('.x-message-box')].some(visible))fail();
    if(!form.FFileInput?.isConnected||form.FFileInput.files.length||sender.FActiveLoadersCount!==0
      ||sender.FLastConflictResult!==undefined||Object.keys(sender.FCurrentUploadFilePaths??{}).length)fail();
    const before=inventory(),existing=before.filter(matches);
    // Same size/name is never proof of local origin. The receipt comes only
    // from this runtime's acknowledged private completion journal.
-   const reused=existing.length===1&&exact(existing[0])&&t.receipt
+   const reused=existing.length===1&&exact(existing[0])&&typeof t.artifact.sha256==='string'&&t.receipt
      &&t.receipt.sha256===t.artifact.sha256&&t.receipt.account===t.binding.loginom_account&&t.receipt.origin===t.expected_origin
      &&t.receipt.directory===t.artifact.upload.directory&&JSON.stringify(t.receipt.row)===JSON.stringify(existing[0]);
    if(existing.length&&!reused)throw Error('UPLOAD_PATH_CONFLICT');
    jobs.set(t.operation_id,{document,prep,main,card,controller:card.Controller,form,sender,input:form.FFileInput,grid:grid[0],tab:tab[0],component,store,before,
-    loadCount:store.loadCount,artifact:JSON.stringify(t.artifact),reused,cancelClicked:false});
+    loadCount:store.loadCount,artifact:JSON.stringify(t.artifact),reused,cancelClicked:false,
+    errorInfo:globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance?.FErrorMessageInfo});
    return {active:0,bytes:reused?t.artifact.bytes:0,reused:!!reused,row:reused?existing[0]:null};
   }
   const b=jobs.get(t.operation_id);
@@ -440,13 +442,51 @@ export async function largeUploadNative(page, task) {
   const quiet=sender.FActiveLoadersCount===0&&paths.length===0&&b.input.files?.length===0&&sender.FLastConflictResult===undefined;
   const gesture=(tid,kind)=>{const elements=all(tid);if(elements.length!==1)fail();b.gesture={tid,element:elements[0]};return {tid,kind};};
   if(t.mode==='poll')return {active:sender.FActiveLoadersCount,bytes,quiet,error:errors.length>0};
-  if(t.mode==='cancel'&&quiet)return {active:0,bytes,quiet:true};
+  if(t.mode==='cancel'&&quiet){
+   // OnDispose decrements active before the awaited DeleteFile and OnLoadEnd
+   // refresh finish. active=0 alone cannot authorize the next refresh.
+   if((t.source_changed===true&&b.loader?.IsDisposed===true&&b.loader.FFileDeleted!==true)
+     ||store.isLoading?.()!==false)return {active:0,bytes,quiet:false,waiting:true};
+   const dialogs=[...document.querySelectorAll('.x-message-box')].filter(visible);
+   if(dialogs.length){
+    // FileReader errors first Dispose/delete the owned uploader, then open a
+    // native ErrorMsg. It covers Refresh even after sender active reaches zero.
+    // Acknowledge only a new error of this metadata-changed, deleted source.
+    const instance=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance;
+    const root=dialogs[0],message=instance?.FMessageBox,body=instance?.FMessages?.el?.dom;
+    const text=body?.textContent?.trim(),tid=root?.getAttribute('data-tid');
+    if(t.source_changed!==true||dialogs.length!==1||b.loader?.IsDisposed!==true||b.loader.FFileDeleted!==true
+      ||instance?.FErrorMessageInfo===b.errorInfo||message?.el?.dom!==root||globalThis.Ext?.getCmp?.(root.id)!==message
+      ||!body||!root.contains(body)||!visible(body)||!/^Ошибка загрузки файла(?:: [^\r\n]{1,512})?$/.test(text??'')
+      ||!/^msgbox(?:-\d+)?$/.test(tid??''))fail();
+    if(b.errorAck){
+     if(b.errorAck.root!==root||b.errorAck.info!==instance.FErrorMessageInfo||b.errorAck.text!==text)fail();
+     return {active:0,bytes,quiet:false,waiting:true};
+    }
+    const buttons=[...document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';tlb;')+']')]
+      .filter(e=>visible(e)&&/;(ok|yes|no|cancel)$/.test(e.getAttribute('data-tid')??''));
+    const ok=all(tid+';tlb;ok'),control=ok[0]&&globalThis.Ext?.getCmp?.(ok[0].id);
+    if(ok.length!==1||buttons.length!==1||buttons[0]!==ok[0]||!root.contains(ok[0])||!visible(ok[0])
+      ||ok[0].innerText?.trim()!=='OK'||control?.el?.dom!==ok[0]||control.disabled!==false)fail();
+    let parent=control;const seen=new Set();
+    for(let i=0;parent&&parent!==message&&i<16&&!seen.has(parent);i++){seen.add(parent);parent=parent.ownerCt;}
+    if(parent!==message)fail();
+    b.errorAck={root,body,instance,message,info:instance.FErrorMessageInfo,text};
+    return {active:0,bytes,quiet:false,server_delete_confirmed:true,gesture:gesture(tid+';tlb;ok','acknowledge_source_error')};
+   }
+   return {active:0,bytes,quiet:true};
+  }
   if(t.mode==='cancel'&&!quiet){
    if(b.cancelClicked)return {active:sender.FActiveLoadersCount,bytes,quiet:false};
+   if(loader?.IsDisposed===true)return {active:sender.FActiveLoadersCount,bytes,quiet:false,waiting:true};
    if(!loader?.Container?.el?.dom?.isConnected)return {active:sender.FActiveLoadersCount,bytes,quiet:false};
    const container=loader.Container,items=container.items?.items,button=items?.[3],el=button?.el?.dom,tid=el?.getAttribute('data-tid');
-   if(!Array.isArray(items)||items.length!==4||!container.el.dom.contains(el)||!visible(el)||!tid||all(tid).length!==1||button.disabled
+   if(!Array.isArray(items)||items.length!==4||!container.el.dom.contains(el)
       ||!el.querySelector('.bg-icon-cancel-negative'))fail();
+   // FileReader failure can dispose this exact loader while cancellation is
+   // being captured. Without a data-tid, wait only; never select a substitute.
+   if(!tid||!visible(el)||button.disabled)return {active:sender.FActiveLoadersCount,bytes,quiet:false,waiting:true};
+   if(all(tid).length!==1)fail();
    b.cancelClicked=true;return {active:sender.FActiveLoadersCount,bytes,quiet:false,gesture:gesture(tid,'cancel')};
   }
   if(!quiet)fail();
@@ -492,16 +532,53 @@ export async function largeUploadNative(page, task) {
  },task);
  if(read.gesture){
   const target=page.locator('[data-tid='+JSON.stringify(read.gesture.tid)+']');
-  if(await target.count()!==1||!await target.isVisible()||!await target.isEnabled())throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+  if(await target.count()!==1||!await target.isVisible()||!await target.isEnabled()){
+   if(read.gesture.kind==='cancel')return {...read,gesture:undefined,quiet:false,waiting:true};
+   throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+  }
   const handle=await target.elementHandle();
   try{
-   if(!handle||!await handle.evaluate((el,t)=>{const b=globalThis[Symbol.for('loginom-dock.large-upload.v1')]?.get(t.id);const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;return b&&document===b.document&&form===b.form&&form.FFileSenderManager===b.sender&&form.FFileInput===b.input&&b.gesture?.element===el&&b.gesture.tid===t.tid&&el.isConnected&&el.getAttribute('data-tid')===t.tid;},{id:task.operation_id,tid:read.gesture.tid}))throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+   if(!handle||!await handle.evaluate((el,t)=>{const b=globalThis[Symbol.for('loginom-dock.large-upload.v1')]?.get(t.id);const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+    if(t.kind==='acknowledge_source_error'){
+     const e=b?.errorAck,instance=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance;
+     if(!e||instance!==e.instance||instance.FMessageBox!==e.message||instance.FErrorMessageInfo!==e.info
+       ||instance.FMessages?.el?.dom!==e.body||e.message.el?.dom!==e.root||!e.root.contains(el)
+       ||e.body.textContent?.trim()!==e.text||b.loader?.IsDisposed!==true||b.loader.FFileDeleted!==true
+       ||b.sender.FActiveLoadersCount!==0||Object.keys(b.sender.FCurrentUploadFilePaths??{}).length||b.input.files?.length)return false;
+    }
+    return b&&document===b.document&&form===b.form&&form.FFileSenderManager===b.sender&&form.FFileInput===b.input&&b.gesture?.element===el&&b.gesture.tid===t.tid&&el.isConnected&&el.getAttribute('data-tid')===t.tid;},{id:task.operation_id,tid:read.gesture.tid,kind:read.gesture.kind})){
+    if(read.gesture.kind==='cancel')return {...read,gesture:undefined,quiet:false,waiting:true};
+    throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+   }
    await handle.click({timeout:Math.max(1,Math.min(5000,task.deadline_at-Date.now()))});
   }finally{await handle?.dispose();}
  }
  return read;
 }
 
+// A 7.4.2 toast layout assertion asks whether to enter the debugger. Dismiss
+// only this observed confirm while our upload owns the page; do not patch Debug
+// or application code, and leave every other native dialog to normal handling.
+export async function guardUploadDebugDialog(page,task,mode) {
+ const key=Symbol.for('loginom-dock.upload-debug-dialog.v1');
+ let state=page[key];
+ if(mode==='install'){
+  if(state){if(state.id!==task.operation_id)throw Error('UPLOAD_DIALOG_OWNER_CHANGED');return;}
+  state={id:task.operation_id,dismissed:0,failed:false,pending:[]};
+  state.handler=dialog=>{state.pending.push((async()=>{
+   const message=`Assert failed: at LoadView.CorrectWindowPosition (${task.expected_origin}/app/bg/filestorage/LoadView.js:94:23)\n\nBreak into debugger?`;
+   if(task.expected_build!=='7.4.2'||await dialog.type()!=='confirm'
+     ||(await page.url()).split('/').slice(0,3).join('/')!==task.expected_origin||await dialog.message()!==message)return;
+   await dialog.dismiss();state.dismissed++;
+  })().catch(()=>{state.failed=true;}));};
+  page.on('dialog',state.handler);page[key]=state;return;
+ }
+ if(!state||state.id!==task.operation_id)return {dismissed:0,failed:false};
+ await Promise.all(state.pending);
+ if(mode==='release'){page.off('dialog',state.handler);delete page[key];}
+ return {dismissed:state.dismissed,failed:state.failed};
+}
+
 export function makeLargeUploadCode(task) {
- return `async page=>{const task=${JSON.stringify(task)};try{const output=await (${largeUploadNative.toString()})(page,task);return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!!output.gesture,cleanup_complete:true,output,error:null,trace:[]};}catch(error){const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error.message)?error.message:'LARGE_UPLOAD_NATIVE_REFUSED';return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!['bind','poll','verify'].includes(task.mode),cleanup_complete:false,output:{},error:{code,message:code},trace:[]};}}`;
+ return `async page=>{const task=${JSON.stringify(task)};try{const output=await (${largeUploadNative.toString()})(page,task);const dialog=await (${guardUploadDebugDialog.toString()})(page,task,task.mode==='verify'&&!output.waiting||task.mode==='cleanup'&&output.clean?'release':'status');return {status:'SUCCEEDED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!!output.gesture,cleanup_complete:true,output:{...output,debug_dialog_dismissed:dialog.dismissed},error:null,trace:[]};}catch(error){const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error.message)?error.message:'LARGE_UPLOAD_NATIVE_REFUSED';return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:task.operation_id,phase:task.mode,effect_possible:!['bind','poll','verify'].includes(task.mode),cleanup_complete:false,output:{failure:{name:String(error.name??'Error').slice(0,80),code:String(error.code??'').slice(0,100),message:String(error.message??error).slice(0,2048)}},error:{code,message:code},trace:[]};}}`;
 }

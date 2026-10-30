@@ -31,7 +31,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
-import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
+import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
@@ -171,6 +171,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
       actionRuntime = createActionRuntime({ pinned,
+        cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
@@ -194,7 +195,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:tool.name==='dock_node_read'
           ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties,
               ...javascriptContextReceiptSchema.properties,kind:{enum:['source','context']}},
-            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:userActionTool(tool));
+            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:isServerDownloadTool(tool.name)?{...tool,outputSchema:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);
     if (actionRuntime) {
@@ -204,6 +205,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       for (const name of ['dock_operation_inspect', 'dock_operation_recover', 'dock_ui_action', 'dock_artifact_upload', 'dock_artifact_verify'])
         if(catalog.tools.some(t=>t.name===name))catalog.routes.set(name,'action');
       for(const tool of actionRuntime.tools.filter(tool=>isNodeApiTool(tool.name)))catalog.routes.set(tool.name,'action');
+      for(const tool of actionRuntime.tools.filter(tool=>isServerDownloadTool(tool.name)))catalog.routes.set(tool.name,'action');
     }
     await session.save(catalog);
     // The recovery lease is a temporary part of the catalog outside its hashed static tools.
@@ -370,19 +372,22 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
                   code:privatePackage?withStorageIdentity(code,session.metadata.storageBinding):code,
                 } }, undefined, { timeout: privatePackage?remaining()+1000:125000 });
-                const state = parseWorkspacePreparation(response);
+                const state = structuredClone(redactor.redact(parseWorkspacePreparation(response)));
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
                     sessionId: session.metadata.sessionId, origin: new URL(config.loginomUrl).origin,
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
                   });
-                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-                    code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
+                  const geometryCode = makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
                       operation_id: state.operation_id, document_id: state.document_id,
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
-                      workflow_ref: state.workflow_ref }),
+                      workflow_ref: state.workflow_ref });
+                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                    // Capture the connected owner before local profiling can
+                    // leave the first delivery without a recovery baseline.
+                    code: config.storageDirectories ? withStorageIdentity(geometryCode,session.metadata.storageBinding) : geometryCode,
                   } }, undefined, { timeout: privatePackage?Math.min(15000,remaining()+1000):15000 });
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
@@ -424,6 +429,14 @@ export async function createBridge(config, session, { browserTransport: managedB
           }) }] };
         }
         if (owner === 'action') {
+          if(isServerDownloadTool(request.params.name)) {
+            requirePreparedWorkspace(session.metadata);
+            const args=request.params.arguments??{};
+            validateActionParameters(actionRuntime.tools.find(t=>t.name===request.params.name).inputSchema,args);
+            const result=await actionRuntime.serverDownload(args,request.params.name,{signal:extra.signal});
+            await logResult(request.params.name,result);
+            return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+          }
           if(isNodeApiTool(request.params.name)) {
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
@@ -602,7 +615,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           const reply=actionReply(failure,{userProfile});
           // A rejected request is not a job snapshot. Preserve its recovery data
           // as an MCP error; outputSchema applies to successful tool responses.
-          if(isNodeApiTool(request.params.name))reply.isError=true;
+          if(isNodeApiTool(request.params.name)||isServerDownloadTool(request.params.name))reply.isError=true;
           return reply;
         }
         return { isError: true, content: [{ type: 'text', text: message }] };
@@ -633,8 +646,32 @@ export async function createBridge(config, session, { browserTransport: managedB
       shutdownStarted = true;
       closing ??= (async () => {
         await actionRuntime?.closeArtifactDeliveries();
+        await actionRuntime?.cleanupServerCache();
         await recovery.close();
+        if(config.storageDirectories&&actionRuntime){
+          // Diagnostics are read without the connection guard, including after
+          // a disconnect. They never certify package or transport cleanup.
+          try{
+            const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+              code:`async page=>page.evaluate(()=>{
+                const timeline=globalThis.__loginomConnectionTimelineV1;
+                if(!Array.isArray(timeline?.samples))return null;
+                return {resolution_ms:1000,dropped:Number.isSafeInteger(timeline.dropped)?timeline.dropped:0,
+                  samples:timeline.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
+                    at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
+                    remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
+                  }))};
+              })`,
+            }},undefined,{timeout:1000});
+            await recordExecution({phase:'native_connection_timeline',timeline:parseCapabilityResult(response)});
+          }catch{ /* Diagnostic availability cannot change shutdown. */ }
+        }
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
+        // MCP cancellation settles the caller before the admitted browser task.
+        // Read its final receipt only after that task has left the shared gate.
+        if (normalCleanup && session.metadata.workspaceReady !== true
+          && session.metadata.workspacePreparation?.attempted && !session.metadata.workspacePreparation.state)
+          await browserGate(async () => {});
         const prepared = session.metadata.workspacePreparation;
         const preparationRequest = prepared?.identity ? JSON.parse(prepared.identity) : null;
         // A refusal in a fresh continuation has no Save receipt. Its confirmed
@@ -644,6 +681,14 @@ export async function createBridge(config, session, { browserTransport: managedB
           && preparationRequest?.intent === 'open_package' && prepared.state?.status === 'READY'
           && prepared.state.created_draft === false && prepared.state.package_ref?.persisted === true
           && prepared.state.package_ref.path === preparationRequest.package_path ? prepared.state.package_ref.path : null;
+        const unsavedDraft = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'new_draft'
+          && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
+            || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
+              && prepared.state.target_verified === true && prepared.state.ownership_verified === true)
+          && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
+          && prepared.state.created_draft === true && prepared.state.package_ref?.persisted === false
+          && prepared.state.package_ref.path === null;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
@@ -655,7 +700,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-              if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId && !openedPackage
+              if (session.metadata.workspaceReady !== true && !unsavedDraft || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
                   || normalCleanup && lastSavedPackage && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
@@ -666,8 +711,8 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
-                  packagePath, loginomUrl:config.loginomUrl,
-                  loginomBuild:session.metadata.targetIdentity.loginom_build,
+                  packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
+                  loginomBuild:session.metadata.targetIdentity?.loginom_build ?? prepared.state.target?.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
@@ -676,7 +721,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
-            ...(normalCleanup ? {package_path:packagePath ?? null, policy:openedPackage?'opened_saved_package':'last_confirmed_own_save'} : {})};
+            ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage?'opened_saved_package':'last_confirmed_own_save'} : {})};
           try {
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
             await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});

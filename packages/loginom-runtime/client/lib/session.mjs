@@ -25,7 +25,7 @@ export async function createSession(config, { headless = false, managed = null }
   const profile = join(directory, 'browser-profile');
   const artifacts = join(directory, 'artifacts');
   await privateDirectory(config.stateDir);
-  for (const path of [directory, profile, artifacts]) {
+  for (const path of [directory, profile, artifacts, join(directory,'browser-downloads')]) {
     await mkdir(path, { recursive: true, mode: 0o700 });
   }
   const browserRoot = managed?.browserRoot ?? join(config.stateDir, 'runtime', 'browsers');
@@ -71,7 +71,7 @@ export async function createSession(config, { headless = false, managed = null }
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
     browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
-      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}),
+      launchOptions: { executablePath, headless, downloadsPath:join(directory,'browser-downloads'), ...(managed ? { chromiumSandbox: true } : {}),
         args: ['--no-proxy-server', ...launch.args] }, contextOptions: { viewport: browserViewport } },
     // Keep the browser catalog independent of page-provided WebMCP tools.
     webmcp: false,

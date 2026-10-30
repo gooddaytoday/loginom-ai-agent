@@ -7,6 +7,9 @@ import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
 import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {runRestStep} from '../lib/rest-step.mjs';
+import {runExportNext} from '../lib/text-export-procedure.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
@@ -41,6 +44,41 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
+});
+test('release waits for its own returned graph mask within a separate finite release deadline',async()=>{
+ const s=surface(),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:true,
+  status:'SUCCEEDED',output:{prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}}}};
+ operation.nodeApply.deadline=1;operation.nodeApply.pending.deadline=1;
+ let settled=false;const observe=s.channel.observe;
+ s.channel.observe=async options=>{
+  if(!settled){assert.equal(options.releaseWizard,true);assert.equal(options.settleWizard.graph_only,true);
+   assert.equal(options.settleWizard.deadline,operation.deadline);assert.equal(options.settleWizard.node.node_id,node.node_id);settled=true;}
+  return observe(options);
+ };
+ assert.equal((await release(operation,s.channel)).cleanup_complete,true);assert.equal(settled,true);assert.deepEqual(s.gestures,[]);
+});
+for(const fault of [null,'foreign','wizard','persistent'])test('release observer settles only its returned graph mask: '+fault,async()=>{
+ let time=1,gestures=0;
+ const operation=stopped();operation.deadline=30000;operation.action={action_key:'node.apply',revision:'1'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ const context={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Source',locked:false};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true,
+  output:{prepared_node_context:context,wizard:{status:'absent'}}}};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+  prepared_node_context:context,wizard:{status:'absent'},ui:{elements:[],dialogs:[],
+   masks:[{kind:'busy',ref:'model',target_tid:'MF;TF-1;ModelForm',graph_loading_owner_ref:'model',dialog_ref:null}],
+   truncated:{elements:false,dialogs:false,masks:false}}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},
+  targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>time,monotonicNow:()=>time,
+  wait:async ms=>{time+=ms;if(!fault&&time>=20000)state.ui.masks=[];
+   if(fault==='foreign')state.ui.masks[0].target_tid='foreign';
+   if(fault==='wizard'){state.prepared_node_context={...context,surface:'wizard'};state.wizard={status:'observed',root_ref:'other',root_tid:'Other'};}},
+  execute:async()=>({status:'SUCCEEDED',output:structuredClone(state)}),record:async e=>structuredClone(e),wrapMutation:()=>{gestures++;}});
+ const run=()=>releasePendingNode({operation,channel,deadline:30000,now:()=>time,readReceipt:async()=>operation.receipt});
+ if(fault)await assert.rejects(run());else{assert.equal((await run()).cleanup_complete,true);assert.ok(time>=20000);}
+ assert.equal(gestures,0);assert.equal(operation.deadline,30000);
 });
 test('release graph reads retain the explicitly supplied deadline and clock',async()=>{
  for(const fault of [null,'before_first','after_first','before_second','after_second']) {
@@ -98,9 +136,59 @@ test('release cancels only the stopped node\'s own wizard draft',async()=>{
  const s=surface({wizard:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(proof.cleanup.wizard_closed,true);assert.equal(proof.effect_possible,true);
 });
+
+// A completed REST configure call can leave its uncommitted wizard open.
+// Cleanup is the purpose of release, not proof that the browser call is running.
+for(const fault of [null,'pending','transport','receipt','action','phase','type','successful','foreign'])
+test('stopped REST configure release: '+(fault??'owned draft'),async()=>{
+ const s=surface({wizard:true,foreign:fault==='foreign'}),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'node.rest.configure.internal'};
+ operation.nodeApply.request.target={type:fault==='type'?'programming.javascript':'integration.rest_request'};
+ if(fault==='phase')operation.nodeApply.pending.phase='finish';
+ if(fault==='transport')operation.transportUncertain=true;
+ operation.receipt={state:fault==='pending'?'pending':'completed',receipt:{
+  operation_id:fault==='receipt'?'other':'apply:n7',action_key:fault==='action'?'node.rest.connection.internal':'node.rest.configure.internal',
+  phase:'configure',status:fault==='successful'?'SUCCEEDED':'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+  output:{verified:false,effect_possible:true,cleanup_complete:false,error:'REST request: operation deadline exceeded'},
+  error:{code:'REST_STEP_UNCONFIRMED',message:'REST request: operation deadline exceeded'},
+ }};
+ if(fault){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ else{
+  const proof=await release(operation,s.channel);
+  assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);
+  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);
+ }
+});
 test('release leaves the stopped node\'s visualizers through the observed scenario control',async()=>{
  const s=surface({views:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-nav'}]);assert.equal(proof.cleanup.views_returned,true);assert.equal(proof.effect_possible,true);
+});
+
+for(const fault of [null,'pending','transport','identity','action','phase','foreign','dialog','graph'])
+test('completed Export Next permits only owned draft cancellation: '+fault,async()=>{
+ const s=surface({wizard:true,foreign:fault==='foreign'}),operation=stopped();
+ operation.nodeApply.request.target={type:'exports.text'};
+ operation.lastReceipt={id:'apply:export-next',operation_id:'apply:export-next',action_key:'node.export.next'};
+ operation.receipt={state:fault==='pending'?'running':'completed',receipt:{
+  action_key:fault==='action'?'artifact.upload':'node.export.next',operation_id:fault==='identity'?'other':'apply:export-next',
+  phase:'export_next',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{},trace:[],error:{code:'EXPORT_NEXT_UNCONFIRMED'}}};
+ if(fault==='transport')operation.transportUncertain=true;
+ if(fault==='phase')operation.nodeApply.pending.phase='finish';
+ if(fault==='dialog'){const observe=s.channel.observe;s.channel.observe=async o=>({...await observe(o),ui:{dialogs:[{}],masks:[]}});}
+ if(fault==='graph'){let reads=0;operation.nodeTargetAdapter.observe=async()=>{const g=graphOf();if(reads++)g.links.push({source:'foreign'});return g;};}
+ if(fault){await assert.rejects(release(operation,s.channel));assert.equal(s.gestures.length,fault==='graph'?1:0);}
+ else{const proof=await release(operation,s.channel);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);}
+});
+
+for(const verb of ['wizard_step','set_wizard_field','finish_wizard','execute_wizard'])
+test('completed uncertain wizard draft never admits a commit gesture: '+verb,async()=>{
+ const s=surface({wizard:true}),operation=stopped();operation.nodeApply.request.target={type:'transform.sort'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',phase:'postconditions',
+  status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,error:{code:verb==='set_wizard_field'?'WIZARD_FIELD_NOT_CONFIRMED':'WIZARD_STEP_NOT_CONFIRMED'},
+  output:{prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',root_ref:'ui-w'}},trace:[{event:'ui_gesture_applied',verb}]}};
+ if(['finish_wizard','execute_wizard'].includes(verb)){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ else{assert.equal((await release(operation,s.channel)).cleanup.wizard_closed,true);assert.equal(s.gestures.length,1);}
 });
 test('release restores a stopped read view before checking the graph',async()=>{
  const s=surface(),order=[];
@@ -136,7 +224,7 @@ test('release refuses a graph that changes between quiet reads',async()=>{
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({release:releaseDriver}={}) {
+function fixture({release:releaseDriver,type='imports.text',execute=async()=>{throw Error('Unexpected public transport');}}={}) {
  const calls=[],events=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
   reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:node,
@@ -149,10 +237,11 @@ function fixture({release:releaseDriver}={}) {
   readOutput:ok('read',{status:'complete',execution_id:'exec',evidence_ref:'evidence',ports:[]}),verifyContinuation:async()=>true,
   ...(releaseDriver?{releasePending:async state=>{calls.push('release:'+state.pending.phase);return releaseDriver(state);}}:{})};
  const handler={revision:'1',modes:['delimited'],validate:()=>{},configure:ok('configure')};
- const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute:async()=>{throw Error('Unexpected public transport');},
-  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([['imports.text',handler]]),nodeApplyDriverFactory:()=>drivers,
+ let context;
+ const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,
+  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([[type,handler]]),nodeApplyDriverFactory:value=>{context=value;return drivers;},
   onRecord:async e=>{events.push(e);return e;}});
- return {runtime,calls,events,drivers,handler};
+ return {runtime,calls,events,drivers,handler,context:()=>context};
 }
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
  node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
@@ -164,6 +253,69 @@ const stop=async(f,phase)=>{
  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(job.outcome.output.pending_phase,phase);
  return job;
 };
+
+for(const classified of [false,true])test('a completed REST configure failure releases its draft and admits the next node operation (automatic='+classified+')',async()=>{
+ const ui=surface({wizard:true});
+ const receipt={status:'AMBIGUOUS',action_key:'node.rest.configure.internal',action_revision:'1',operation_id:'apply:n1',
+  phase:'configure',effect_possible:true,cleanup_complete:false,trace:[],
+  output:{verified:false,cleanup_complete:false,effect_possible:true,error:'REST request: requested query bindings timed out',
+   ...(classified?{failure:{code:'REST_CONFIGURE_STEP_TIMEOUT',step:'requested query bindings',control:'W;ParamLinks'}}:{})},
+  error:{code:'REST_STEP_UNCONFIRMED',message:'REST request: operation deadline exceeded'}};
+ const f=fixture({type:'integration.rest_request',execute:async code=>code.includes('"receipt_read":true')
+  ?{status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'observed',effect_possible:false,
+    error:null,trace:[],output:{state:'completed',receipt}}
+  :{status:'SUCCEEDED',output:{value:receipt}},
+  release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,
+    readReceipt:f.context().readReceipt,deadline:Date.now()+10000})});
+ f.handler.configure=(_parameters,_mode,ctx)=>runRestStep(f.context(),{...ctx,document_id:'doc',workflow_ref:workflow,node,
+  deadline:Date.now()+10000},'configure',()=> 'async()=>({})',{},{});
+ const r=request();r.target.type='integration.rest_request';
+ f.runtime.startNodeApply(r);
+ const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ if(classified){
+  assert.equal(stopped.outcome.status,'FAILED',JSON.stringify(stopped));
+  assert.equal(stopped.outcome.output.pending_phase,null);
+  assert.equal(stopped.outcome.output.error.code,'REST_CONFIGURE_STEP_TIMEOUT');
+  assert.equal(stopped.outcome.output.configuration.status,'discarded');
+  assert.equal(stopped.outcome.cleanup_complete,true);assertJob(stopped);
+ }else{
+  assert.equal(stopped.outcome.output.pending_phase,'configure');assert.equal(stopped.outcome.cleanup_complete,false);
+  assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-rest'});
+  assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));
+  assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+ }
+ assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+ assert.equal(f.runtime.hasUnsettledWork(),false);f.runtime.assertPreparationAllowed();
+ f.handler.configure=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ f.runtime.startNodeApply({...r,operation_id:'next',target:{kind:'existing',type:'integration.rest_request',ref:node},finish:'done'});
+ assert.equal((await f.runtime.waitNodeApply('next',{timeoutMs:1000})).outcome.status,'SUCCEEDED');
+ assert.equal(f.events.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='rest_configure').length,1);
+});
+
+test('a completed Export Next refusal automatically releases its own draft and admits another node',async()=>{
+ const ui=surface({wizard:true});
+ const receipt={status:'AMBIGUOUS',action_key:'node.export.next',action_revision:'1',operation_id:'apply:export-next',
+  phase:'export_next',effect_possible:true,cleanup_complete:false,trace:[],output:{},error:{code:'EXPORT_NEXT_UNCONFIRMED',message:'EXPORT_NEXT_UNCONFIRMED'}};
+ const f=fixture({type:'exports.text',execute:async code=>code.includes('"receipt_read":true')
+  ?{status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'observed',effect_possible:false,error:null,trace:[],output:{state:'completed',receipt}}
+  :{status:'SUCCEEDED',output:{value:receipt}},
+  release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,readReceipt:f.context().readReceipt,deadline:Date.now()+10000})});
+ f.handler.configure=async(_p,_m,ctx)=>{
+  await runExportNext({operation_id:'apply:export-next',deadline:Date.now()+10000},ctx,f.context());
+  throw Error('Export Next or overwrite decision uncertain');
+ };
+ const r=request();r.target.type='exports.text';f.runtime.startNodeApply(r);
+ const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(job.outcome.status,'FAILED',JSON.stringify(job));assert.equal(job.outcome.output.pending_phase,null);
+ assert.equal(job.outcome.output.configuration.status,'unknown');assert.equal(job.outcome.output.execution.status,'unknown');
+ assert.equal(job.outcome.output.next_step.tool,'dock_action_run');assert.equal(job.outcome.output.package_saved,false);
+ assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(f.runtime.hasUnsettledWork(),false);f.runtime.assertPreparationAllowed();
+ f.handler.configure=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ f.runtime.startNodeApply({...r,operation_id:'next',target:{kind:'existing',type:'exports.text',ref:node},finish:'done'});
+ assert.equal((await f.runtime.waitNodeApply('next',{timeoutMs:1000})).outcome.status,'SUCCEEDED');
+ assert.equal(f.events.filter(e=>e.phase==='text_export_next_prepared').length,1);
+});
 
 test('a stopped finish is released once and unblocks preparation, saving and new node work',async()=>{
  const f=fixture({release:proved()});await stop(f,'finish');

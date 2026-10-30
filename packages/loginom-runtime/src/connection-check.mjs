@@ -5,11 +5,22 @@ import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
+import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
-export function browserEnvironment(profile, environment = process.env) {
-  return { ...environment, CHROME_LOG_FILE: join(profile, "chrome-debug.log") }
+export function browserEnvironment(profile, environment = process.env, platform = process.platform) {
+  const env = { ...environment, CHROME_LOG_FILE: join(profile, "chrome-debug.log") }
+  if (platform === "win32") return env
+  // SingletonSocket lives in Chromium's private temp directory, symlinked
+  // from the profile. Reserve 64 bytes for its generated name, socket and NUL
+  // within the conservative sockaddr_un SDK budget (104 bytes on macOS,
+  // 108 on Linux). Count UTF-8 bytes. macOS Chromium has its own override.
+  const temporary = (platform === "darwin" && environment.MAC_CHROMIUM_TMPDIR) || environment.TMPDIR || "/tmp"
+  const safe = temporary.startsWith("/") && Buffer.byteLength(temporary) + 64 <= (platform === "darwin" ? 104 : 108)
+    ? temporary : "/tmp"
+  return { ...env, TMPDIR: safe, TMP: safe, TEMP: safe,
+    ...(platform === "darwin" ? { MAC_CHROMIUM_TMPDIR: safe } : {}) }
 }
 
 export function browserLoggingArguments(profile) {
@@ -159,7 +170,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated,
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
   deadline = Date.now() + 150_000, onRetry }) {
   signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
@@ -175,6 +186,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
+      ...(downloadsPath?{downloadsPath}:{}),
       timeout: Math.max(1, Math.min(30_000, deadline - Date.now())),
       headless,
       chromiumSandbox: true,
@@ -217,6 +229,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
+    if (keepOpen) await context.addInitScript({ content: connectionTimelineScript(candidate.url) })
     await context.addInitScript(() => {
       // A human can interact with the headed startup page before host login.
       // Once that happens, failing startup is safer than reloading their state.

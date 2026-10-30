@@ -1,26 +1,29 @@
 import { randomBytes } from "node:crypto"
-import { lstat, mkdir, realpath, rm, writeFile } from "node:fs/promises"
+import { lstat, readFile, readdir, realpath, rm, rmdir } from "node:fs/promises"
 import { basename, isAbsolute, join } from "node:path"
 import {
   verifyReferenceFile,
   type FileReference,
-  type ReferenceSlot,
+  type ReferenceSnapshot,
 } from "../../loginom-runtime/client/lib/file-reference.mjs"
 
 export {
   inspectReferenceFile,
-  stageReferenceFile,
   verifyReferenceFile,
   referenceUploadBudget,
 } from "../../loginom-runtime/client/lib/file-reference.mjs"
-export type { FileIdentity, FileReference, ReferenceSlot } from "../../loginom-runtime/client/lib/file-reference.mjs"
+export type {
+  FileIdentity,
+  FileReference,
+  ReferenceSnapshot,
+} from "../../loginom-runtime/client/lib/file-reference.mjs"
 
 export type ReferenceOwner = { chat: string; userMessage: string; generation: number; run: string }
 
-// A random identifier alone grants nothing: it must match an in-process Host
-// reservation, original input, generation, owner and the exact private path.
+// Only private backend authorization can reserve an original-file grant. No
+// local copy, directory, receipt file, chmod or fsync is needed for admission.
 export function fileReferences(root: string) {
-  const slots = new Map<string, { owner: ReferenceOwner; slot: ReferenceSlot; committed?: FileReference }>()
+  const slots = new Map<string, { owner: ReferenceOwner; reference: FileReference; committed: boolean }>()
   const active = new Set<Promise<unknown>>()
   let closing = false
   async function tracked<T>(run: () => Promise<T>) {
@@ -45,10 +48,67 @@ export function fileReferences(root: string) {
     return entry
   }
   return {
-    reserve(owner: ReferenceOwner, name: string) {
+    // Called at Host startup, before runtimes exist, under its profile guard.
+    // Recognize only the previous private staging layout; never follow paths
+    // from a legacy manifest or delete an unrecognized directory/file.
+    async cleanup() {
+      if (!isAbsolute(root)) throw Error("LOGINOM_INPUT_INVALID")
+      const info = await lstat(root).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error
+        return null
+      })
+      if (
+        !info ||
+        !info.isDirectory() ||
+        info.isSymbolicLink() ||
+        (await realpath(root)) !== root ||
+        (process.platform !== "win32" && ((info.mode & 0o777) !== 0o700 || info.uid !== process.getuid?.()))
+      )
+        return
+      for (const grant of await readdir(root)) {
+        if (!/^[a-f0-9]{64}$/.test(grant)) continue
+        const directory = join(root, grant),
+          current = await lstat(directory)
+        if (
+          !current.isDirectory() ||
+          current.isSymbolicLink() ||
+          (process.platform !== "win32" && (current.uid !== info.uid || (current.mode & 0o777) !== 0o700))
+        )
+          continue
+        const manifest = await lstat(join(directory, "grant.json")).catch(() => null)
+        if (!manifest?.isFile() || manifest.isSymbolicLink()) continue
+        const slot = await readFile(join(directory, "grant.json"), "utf8")
+          .then((text) => JSON.parse(text))
+          .catch(() => null)
+        if (
+          slot?.version !== 1 ||
+          slot.grant !== grant ||
+          slot.directory !== directory ||
+          typeof slot.name !== "string" ||
+          basename(slot.name) !== slot.name ||
+          !slot.name.startsWith(grant + "-") ||
+          slot.path !== join(directory, slot.name)
+        )
+          continue
+        const names = await readdir(directory)
+        if (names.some((name) => !["grant.json", "receipt.json", slot.name].includes(name))) continue
+        const files = await Promise.all(names.map((name) => lstat(join(directory, name))))
+        if (
+          files.some(
+            (file) =>
+              !file.isFile() || file.isSymbolicLink() || (process.platform !== "win32" && file.uid !== info.uid),
+          )
+        )
+          continue
+        await rm(directory, { recursive: true })
+      }
+      await rmdir(root).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOTEMPTY" && error.code !== "EEXIST") throw error
+      })
+    },
+    reserve(owner: ReferenceOwner, name: string, snapshot: ReferenceSnapshot) {
       return tracked(async () => {
         if (
-          !isAbsolute(root) ||
           !owner.chat ||
           !owner.userMessage ||
           !owner.run ||
@@ -56,92 +116,43 @@ export function fileReferences(root: string) {
           owner.generation < 0 ||
           typeof name !== "string" ||
           !name ||
-          /[\x00-\x1f\x7f]/.test(name)
+          /[\x00-\x1f\x7f]/.test(name) ||
+          name !== basename(snapshot?.canonical_path ?? "")
         )
           throw Error("LOGINOM_INPUT_INVALID")
         if (slots.size >= 8) throw Error("LOGINOM_INPUT_INVALID")
-        await mkdir(root, { recursive: true, mode: 0o700 })
-        const info = await lstat(root)
-        if (
-          !info.isDirectory() ||
-          info.isSymbolicLink() ||
-          (process.platform !== "win32" && (info.mode & 0o777) !== 0o700)
-        )
-          throw Error("LOGINOM_INPUT_INVALID")
-        const grant = randomBytes(32).toString("hex")
-        const directory = join(await realpath(root), grant)
-        const safe = basename(name.replaceAll("\\", "/"))
-          .replace(/[\\/:<>"|?*%#\x00-\x1f\x7f]|[. ]+$/g, "_")
-          .slice(-120)
-        if (!safe || /\.lgp$/i.test(safe)) throw Error("LOGINOM_SCOPE_DENIED")
-        const unique = grant + "-" + safe
-        const slot = {
-          grant,
+        if (/\.lgp$/i.test(name)) throw Error("LOGINOM_SCOPE_DENIED")
+        await verifyReferenceFile(snapshot)
+        const reference = {
+          grant: randomBytes(32).toString("hex"),
           chat: owner.chat,
           userMessage: owner.userMessage,
           generation: owner.generation,
-          name: unique,
-          directory,
-          path: join(directory, unique),
+          name,
+          snapshot: structuredClone(snapshot),
         }
-        await mkdir(directory, { mode: 0o700 })
-        try {
-          await writeFile(join(directory, "grant.json"), JSON.stringify({ version: 1, ...owner, ...slot }), {
-            flag: "wx",
-            mode: 0o600,
-          })
-        } catch (error) {
-          await rm(directory, { recursive: true, force: true })
-          throw error
-        }
-        slots.set(grant, { owner: { ...owner }, slot })
-        return structuredClone(slot)
+        slots.set(reference.grant, { owner: { ...owner }, reference, committed: false })
+        return structuredClone(reference)
       })
     },
     commit(owner: ReferenceOwner, reference: FileReference) {
       return tracked(async () => {
         const entry = owned(owner, reference?.grant)
-        const slot = entry.slot
-        if (
-          !reference.snapshot ||
-          reference.snapshot.canonical_path !== slot.path ||
-          reference.name !== slot.name ||
-          reference.chat !== slot.chat ||
-          reference.userMessage !== slot.userMessage ||
-          reference.generation !== slot.generation ||
-          Object.keys(reference).sort().join(",") !== "chat,generation,grant,name,snapshot,userMessage"
-        )
-          throw Error("LOGINOM_INPUT_INVALID")
-        const directory = await lstat(slot.directory)
-        if (
-          !directory.isDirectory() ||
-          directory.isSymbolicLink() ||
-          (await realpath(slot.directory)) !== slot.directory ||
-          (process.platform !== "win32" && (directory.mode & 0o777) !== 0o700)
-        )
-          throw Error("LOGINOM_INPUT_INVALID")
-        if (entry.committed && JSON.stringify(entry.committed) !== JSON.stringify(reference))
-          throw Error("LOGINOM_FILE_CHANGED")
-        await verifyReferenceFile(reference.snapshot)
-        entry.committed = structuredClone(reference)
-        await writeFile(join(slot.directory, "receipt.json"), JSON.stringify(reference), { mode: 0o600 })
-        return structuredClone(reference)
+        if (JSON.stringify(entry.reference) !== JSON.stringify(reference)) throw Error("LOGINOM_INPUT_INVALID")
+        await verifyReferenceFile(entry.reference.snapshot)
+        entry.committed = true
+        return structuredClone(entry.reference)
       })
     },
     discard(owner: ReferenceOwner, grant: string) {
       return tracked(async () => {
-        const entry = owned(owner, grant)
-        if (entry.committed) throw Error("LOGINOM_INPUT_IDENTITY_CONFLICT")
-        await rm(entry.slot.directory, { recursive: true, force: true })
+        if (owned(owner, grant).committed) throw Error("LOGINOM_INPUT_IDENTITY_CONFLICT")
         slots.delete(grant)
       })
     },
-    // Caller must close the runtime/browser first. Never delete a snapshot that
-    // an unconfirmed browser may still be consuming.
     async close() {
       closing = true
       await Promise.allSettled([...active])
-      for (const entry of slots.values()) await rm(entry.slot.directory, { recursive: true, force: true })
       slots.clear()
     },
   }

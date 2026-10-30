@@ -18,11 +18,13 @@ const waitForFile = (file: string) =>
   Effect.promise(async () => {
     while (true) {
       try {
-        return await fs.readFile(file, "utf8")
+        // File creation is visible before writeFileSync finishes writing its contents.
+        const content = await fs.readFile(file, "utf8")
+        if (content) return content
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-        await new Promise<void>((resolve) => setTimeout(resolve, 10))
       }
+      await new Promise<void>((resolve) => setTimeout(resolve, 10))
     }
   })
 
@@ -159,7 +161,7 @@ describe("AppProcess", () => {
           (directory) => {
             const ready = path.join(directory, "ready")
             const settled = path.join(directory, "settled")
-            const script = `const fs=require('fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(settled)},'settled');process.exit(0)});setInterval(()=>{},60000)`
+            const script = `const fs=require('fs');process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(settled)},'settled');process.exit(0)});fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));setInterval(()=>{},60000)`
             return Effect.gen(function* () {
               const svc = yield* AppProcess.Service
               const exit = yield* Effect.exit(svc.run(cmd("-e", script), { timeout: "250 millis" }))
@@ -180,7 +182,7 @@ describe("AppProcess", () => {
           (directory) => {
             const ready = path.join(directory, "ready")
             const settled = path.join(directory, "settled")
-            const script = `const fs=require('fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(settled)},'settled');process.exit(0)});setInterval(()=>{},60000)`
+            const script = `const fs=require('fs');process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(settled)},'settled');process.exit(0)});fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));setInterval(()=>{},60000)`
             return Effect.gen(function* () {
               const svc = yield* AppProcess.Service
               const fiber = yield* svc.run(cmd("-e", script)).pipe(Effect.forkChild)

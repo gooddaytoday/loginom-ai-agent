@@ -18,6 +18,30 @@ import time
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
+D87 = {
+    'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
+    'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
+    'E2': dict(attachment='file', generator=['--min-bytes', '1000000000'], heavy=False),
+    'E3': dict(attachment='path', generator=['--boundary', '32'], heavy=True),
+    'X1': dict(attachment='path', generator=['--format', 'xlsx', '--rows', '500000'], heavy=True,
+               pending='ожидает LAB-413: XLSX-переключение'),
+}
+
+
+def pair_login(config, source):
+    directory = config.get('package_directory') or config.get('personal_folder')
+    login = config.get('loginom', config)
+    if not isinstance(directory, str) or not directory.startswith('/') or not isinstance(login, dict) or not login.get('username'):
+        raise ValueError(f'{source}: expected loginom.username and package_directory or personal_folder; keys: ' + ', '.join(sorted(config)))
+    return dict(login, package_directory=directory)
+
+
+def scenario_names(value, case_root=None):
+    names = [case for name in value.split(',') for case in (['E1', 'E2'] if name == 'D87' and not case_root else [name])]
+    if len(names) != len(set(names)): raise ValueError('Duplicate scenario')
+    for name in names:
+        if not case_root and D87.get(name, {}).get('pending'): raise ValueError(D87[name]['pending'])
+    return names
 
 
 def read(path):
@@ -35,19 +59,28 @@ def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
 
-def scenario(name, case_root=None):
+def scenario(name, case_root=None, *, cases=None):
+    # Operator fixtures (including private large-file oracles) stay outside Git.
+    # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
+    if cases and re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name):
+        src = Path(cases).resolve() / name
+        if (src / 'task.md').is_file():
+            assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
+            return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
     if case_root is not None:
         if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
         src = Path(case_root).resolve() / name
         config = read(src / 'case.json')
-        if set(config) != {'source_path', 'attachment'} or config['attachment'] not in ['path', 'file']:
+        if set(config) - {'source_path', 'attachment', 'upload_only'} or not {'source_path', 'attachment'} <= set(config) or config['attachment'] not in ['path', 'file'] or type(config.get('upload_only', False)) is not bool:
             raise ValueError('External case requires source_path and attachment path/file')
         source = Path(config['source_path'])
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    local_file=source, attachment=config['attachment'])
+                    local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in D87:
+        return dict(D87[name], base=None, generated=True)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -70,7 +103,10 @@ def scenario(name, case_root=None):
               src / ('prompt-demo.md' if (src / 'prompt-demo.md').exists() else 'prompt.md'))
     data = (base / 'data' if isinstance(base, Path) else
             scenario(base)['data'] if base and not (src / 'data').is_dir() else src / 'data')
-    return dict(source=src, prompt=prompt, data=data, base=base)
+    # These business requests prescribe CSV display labels; native names remain
+    # independent (in particular s8 binds its export by export_destination).
+    return dict(source=src, prompt=prompt, data=data, base=base,
+                csv_header='labels' if name in ['s8', 'q6', 'p24'] else 'names')
 
 
 def expected_for(case, package):
@@ -95,6 +131,7 @@ def arguments(argv=None):
     start.add_argument('--scenarios', required=True)
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
+    start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
@@ -123,14 +160,25 @@ def summary(report):
             '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
-        rows.append('| ' + ' | '.join([r['scenario'], r.get('status', 'RUNNING'),
+        rows.append('| ' + ' | '.join([r['scenario'], 'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'),
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
+        if r.get('dataset-cleanup'):
+            rows.append('\nD87 ' + r['scenario'] + ': ' + r['dataset-cleanup'])
         if r.get('status') == 'FAIL':
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
                         f"профиль: {r.get('profile')}")
+    timings = report.get('phase_timings', [])
+    if timings:
+        rows += ['\n| сценарий | фаза | queue, с | выполнение, с |', '|---|---|---|---|']
+        now = time.time()
+        for t in timings:
+            end = t.get('finished', now)
+            queue = t.get('queue_seconds', (t['started'] if t['started'] is not None else end) - t['queued'])
+            duration = t.get('duration_seconds', end - t['started'] if t['started'] is not None else 0)
+            rows.append(f"| {t['scenario'] or '—'} | {t['name']} | {queue:.1f} | {duration:.1f} |")
     return '\n'.join(rows) + '\n'
 
 
@@ -225,12 +273,16 @@ def records(path):
         except ValueError: continue
 
 
-def ports(value):
+def ports(value, receipt=None):
     if isinstance(value, dict):
-        if 'port' in value and 'schema' in value and 'sample' in value: yield value
-        for item in value.values(): yield from ports(item)
+        # inspect may wrap an action and its read receipt. Keep each port with
+        # the receipt that owns output.ports, never the outer inspect cleanup.
+        if isinstance(value.get('output'), dict) and 'ports' in value['output']:
+            receipt = value
+        if 'port' in value and 'schema' in value and 'sample' in value: yield receipt or {}, value
+        for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
-        for item in value: yield from ports(item)
+        for item in value: yield from ports(item, receipt)
 
 
 def port_path(reply, port):
@@ -259,7 +311,7 @@ def port_path(reply, port):
 
 
 def port_failure(replies, journal):
-    delivered = [(n, o, p) for n, o in replies for p in ports(o)]
+    delivered = [(n, owner, p) for n, o in replies for owner, p in ports(o)]
     invalid = [n for n, o, p in delivered if port_path(o, p) is None]
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
 
@@ -313,39 +365,51 @@ class Runner:
         journal.write_text(json.dumps(result, ensure_ascii=False) + '\n')
 
     def phase(self, name, command, folder, timeout=1800, stdin=None, env=None, cwd=None):
-        self.report['phase'] = name
+        timing = dict(name=name, scenario=self.current['scenario'] if self.current else None,
+                      queued=time.time(), started=None)
+        self.report.setdefault('phase_timings', []).append(timing)
+        self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
         self.save()
-        while not load_ready(os.getloadavg(), self.options['host_load_max']) or time.time() - self.last_start < self.options['spacing']:
-            if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
-            time.sleep(1)
-        self.last_start = time.time()
-        if self.current is not None:
-            self.current.setdefault('start_load', list(os.getloadavg()))
-        self.save()
-        with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
-            child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
-            self.report['child_pid'] = child.pid
+        try:
+            while True:
+                if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
+                if load_ready(os.getloadavg(), self.options['host_load_max']) and time.time() - self.last_start >= self.options['spacing']: break
+                time.sleep(1)
+            self.last_start = timing['started'] = time.time()
+            self.report['phase'] = name
+            if self.current is not None:
+                self.current.setdefault('started', timing['started'])
+                self.current.setdefault('start_load', list(os.getloadavg()))
             self.save()
-            if stdin:
-                child.stdin.write(stdin.encode())
-                child.stdin.close()
-            end = min(self.deadline, time.time() + timeout)
-            while child.poll() is None:
-                loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
-                loads.flush()
-                if time.time() >= end:
-                    daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
-                    assert child.pid != daemon['pid'], 'Cannot terminate daemon'
-                    os.killpg(child.pid, signal.SIGINT)
-                    try: child.wait(timeout=40)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(child.pid, signal.SIGKILL)
-                        child.wait()
-                    raise TimeoutError(name + ' deadline')
-                try: child.wait(timeout=1)
-                except subprocess.TimeoutExpired: pass
-            assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+            with (folder / (name + '.stdout')).open('wb') as stdout, (folder / (name + '.stderr')).open('wb') as stderr, (folder / 'loads.jsonl').open('a') as loads:
+                child = subprocess.Popen(list(map(str, command)), cwd=cwd or folder, env=env or self.env, stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+                self.report['child_pid'] = child.pid
+                self.save()
+                if stdin:
+                    child.stdin.write(stdin.encode())
+                    child.stdin.close()
+                end = min(self.deadline, time.time() + timeout)
+                while child.poll() is None:
+                    loads.write(json.dumps({'at': time.time(), 'phase': name, 'load': os.getloadavg(), 'rss_bytes': self.memory(child.pid)}) + '\n')
+                    loads.flush()
+                    if time.time() >= end:
+                        daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
+                        assert child.pid != daemon['pid'], 'Cannot terminate daemon'
+                        os.killpg(child.pid, signal.SIGINT)
+                        try: child.wait(timeout=40)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(child.pid, signal.SIGKILL)
+                            child.wait()
+                        raise TimeoutError(name + ' deadline')
+                    try: child.wait(timeout=1)
+                    except subprocess.TimeoutExpired: pass
+                assert child.returncode == 0, f'{name} exit={child.returncode}: {folder / (name + ".stderr")}:1'
+        finally:
+            timing['finished'] = time.time()
+            timing['queue_seconds'] = (timing['started'] if timing['started'] is not None else timing['finished']) - timing['queued']
+            timing['duration_seconds'] = timing['finished'] - timing['started'] if timing['started'] is not None else 0
+            self.save()
 
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
@@ -368,23 +432,107 @@ class Runner:
         self.save()
         return build
 
+    def prepare_d87(self, name, folder):
+        spec = scenario(name)
+        fixtures = folder / 'fixtures'
+        fixtures.mkdir()
+        (fixtures / 'data').mkdir()
+        source = fixtures / ('d87-' + str(time.time_ns()) + '-' + name + ('.xlsx' if name == 'X1' else '.csv'))
+        # Register ownership before generation, so interrupted generation is cleaned too.
+        self.current['dataset'] = str(source)
+        self.phase('generate', ['nice', '-n', '19', sys.executable, '-B',
+                   REPO / 'scripts/node-acceptance/large-dataset-gen.py', '--output', source,
+                   '--manifest', fixtures / 'manifest.json', *spec['generator']], folder)
+        manifest = read(fixtures / 'manifest.json')
+        if spec.get('upload_only'):
+            write(fixtures / 'expected.json', {'nodes': [], 'outputs': []})
+            (fixtures / 'task.md').write_text('Загрузи ' + str(source) + ' в Loginom.\n')
+            return dict(spec, source=fixtures, prompt=fixtures / 'task.md', data=fixtures / 'data', local_file=source)
+        write(fixtures / 'expected.json', {
+            'nodes': [], 'outputs': [{'output_node_type': 'export_input', 'ordered': False,
+            'columns': [{'name': 'region', 'label_any': True, 'type': 'string'},
+                        {'name': 'amount_sum', 'name_any': True, 'label_any': True, 'type': 'real', 'tolerance': {'abs': .01}},
+                        {'name': 'row_count', 'name_any': True, 'label_any': True, 'type': 'integer'}],
+            'rows': [{'region': region, 'amount_sum': total / 100,
+                      'row_count': manifest['records_by_region'][region]}
+                     for region, total in manifest['sums_minor_by_region'].items()]}]})
+        prompt = ('В файле ' + str(source) + ' продажи по регионам. '
+                  'Загрузи исходный файл в свою личную папку без переименования. '
+                  'Построй группировку по region: сумма amount и количество всех строк (считай непустой region). '
+                  'В итоге нужны ровно три поля: region, сумма и количество; имена двух мер свободные. '
+                  'Не заменяй исходные данные агрегатами и не обрабатывай их внешним кодом. ')
+        if name == 'X1':
+            prompt += 'Excel XLSX, лист Sales, одна строка заголовка; типы: region строка, amount вещественный, date дата/время, note строка. '
+        else:
+            prompt += ('CSV UTF-8, разделитель точка с запятой, десятичный разделитель запятая, '
+                       'кавычка двойная, маркер пропуска NULL, первая строка заголовок. '
+                       'Типы: region строка, amount вещественный, note строка. ')
+        (fixtures / 'task.md').write_text(prompt + 'Выгрузи и скачай результат в result.csv.\n')
+        return dict(spec, source=fixtures, prompt=fixtures / 'task.md', data=fixtures / 'data', local_file=source)
+
+    def cleanup_d87(self, folder, login, build):
+        source = Path(self.current['dataset'])
+        try:
+            names = {source.name}
+            manifest = folder / 'fixtures/manifest.json'
+            size = read(manifest)['bytes'] if manifest.exists() else None
+            def destinations(value):
+                if isinstance(value, dict):
+                    upload = value.get('upload')
+                    destination = value.get('destination') or (upload.get('destination') if isinstance(upload, dict) else None)
+                    if value.get('bytes') == size and isinstance(destination, str):
+                        path = Path(destination)
+                        if str(path.parent) != login['package_directory'].rstrip('/') or not re.fullmatch(r'(?:[a-f0-9]{64}-(?:[0-9]+-)?)?' + re.escape(source.name), path.name):
+                            raise ValueError('D87 receipt destination is outside the owned source naming/directory')
+                        names.add(path.name)
+                    for item in value.values(): destinations(item)
+                if isinstance(value, list):
+                    for item in value: destinations(item)
+            for journal in folder.glob('*/model.stdout'):
+                for _, event in records(journal):
+                    part = event.get('part', {})
+                    state = part.get('state', {})
+                    if event.get('type') != 'tool_use' or state.get('status') != 'completed' or not part.get('tool', '').startswith('loginom_'): continue
+                    try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
+                    except (ValueError, TypeError): continue
+                    destinations(reply)
+            config = folder / 'dataset-cleanup-config.json'
+            write(config, dict(login=login, names=sorted(names)))
+            self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
+                       REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
+                       config, folder / 'dataset-cleanup'], folder, timeout=180)
+            self.current['dataset-cleanup'] = 'storage PASS'
+        finally:
+            # Only files owned by this run; preserve private manifest and fail logs.
+            for file in folder.rglob('*'):
+                if file.is_file() and not file.is_symlink() and (file == source or file.stat().st_size >= 1000000000):
+                    file.unlink()
+            self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
+
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
-        spec = (dict(source=case, prompt=case / 'task.md', data=case / 'data')
-                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root')))
+        spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
+                dict(source=case, prompt=case / 'task.md', data=case / 'data')
+                if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
+                    cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
         expected = expected_for(spec, package)
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
-        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
-                                     and name != (spec.get('local_file').name if spec.get('local_file') else None)))
-        if not exports:
+        exports = ([Path(output['export_destination']).name for output in expected['outputs']]
+                   if spec.get('external') else
+                   list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
+                                        and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('external'):
+            assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
+        if not exports and not spec.get('upload_only'):
             count = 2 if src.parent.name == 'datamining-clustering' else 1
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
-        prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+        if not spec.get('upload_only'):
+            prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
@@ -420,9 +568,29 @@ class Runner:
             try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
             except (ValueError, TypeError): continue
             if isinstance(reply, dict): replies.append((n, reply))
+        if spec.get('upload_only'):
+            calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
+                     if event.get('type') == 'tool_use']
+            assert not any(c.get('tool') == 'loginom_dock_action_run'
+                and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
+                for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
+            assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
+            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
+            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+                       and o.get('state') == 'settled' and o.get('cleanup_complete') is True
+                       and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
+                       and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'
+            cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+            acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                and c.get('package_path') is None and c.get('save_operation_id') is None
+                and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+            assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+            self.current.update(save='0', cleanup='main PASS', upload='ready', cold='—', csv='—')
+            return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
-        paths = {port_path(o, p) for _, o in replies for p in ports(o)} - {None}
+        paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         invalid = port_failure(replies, folder / 'model.stdout')
         if invalid:
@@ -434,7 +602,7 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
-        header = 'labels' if case in ['q6', 'p24'] else 'names'
+        header = spec.get('csv_header', 'names')
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
@@ -448,15 +616,19 @@ class Runner:
             delimiter = check_csv(actual, expected['outputs'][index], header,
                                   column_order='any' if isinstance(case, Path) else None)
         self.current['csv'] = 'PASS'
-        return session, expected, delimiter
+        return session, expected, actual, delimiter
 
     def run(self):
         try:
             build = self.build()
             account = read(Path(self.options['pair']) / 'worker.json')
-            login = dict(account['loginom'], package_directory=account['package_directory'])
+            login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
                 self.current = r
+                if time.time() >= self.deadline:
+                    r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
+                    self.save()
+                    continue
                 folder = self.out / r['scenario']
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
@@ -464,29 +636,42 @@ class Runner:
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp')
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
+                    if r['scenario'] in D87 and not self.options.get('case_root'):
+                        self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'], apiKey=login['api_key'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    base = scenario(case, self.options.get('case_root'))['base']
+                    spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):
                         r.update(csv='—', save='—', cleanup='—')
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
-                        session, expected, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                    if self.options['cold']:
+                        session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                    if self.options['cold'] and not spec.get('upload_only'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', stage / 'actual.csv', '--csv-delimiter', delimiter, '--csv-header', 'labels' if case in ['q6', 'p24'] else 'names'], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         r.update(cold='PASS', cleanup='both PASS')
                     r['status'] = 'FAIL' if r.get('failure_class') else 'PASS'
                 except Exception as error:
-                    self.failure(r, error, folder)
+                    if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
+                        r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
+                    else:
+                        self.failure(r, error, folder)
+                finally:
+                    if r.get('dataset'):
+                        try: self.cleanup_d87(folder, login, build)
+                        except Exception as error:
+                            # Retain the original model failure if cleanup also fails.
+                            r['dataset_cleanup_error'] = str(error)
+                            if r.get('status') != 'FAIL': self.failure(r, error, folder)
                 self.save()
         except Exception as error:
             for r in self.report['runs']:
@@ -508,23 +693,22 @@ def main():
                 print(summary(report), end='')
                 return 0 if all(r['status'] == 'PASS' for r in report['runs']) else 1
             if time.monotonic() >= end:
-                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN'] for r in report['runs'])
+                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
-    names = args.scenarios.split(',')
-    assert len(names) == len(set(names)), 'Duplicate scenario'
+    names = scenario_names(args.scenarios, args.case_root)
     for name in names:
-        spec = scenario(name, args.case_root)
+        spec = scenario(name, args.case_root, cases=args.cases)
+        if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
         assert args.case_root or (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
         expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
-        config = read(pair / (role + '.json'))
-        assert config['loginom']['username'] and config['package_directory'], 'Invalid pair configuration'
+        pair_login(read(pair / (role + '.json')), role + '.json')
     build = args.build.expanduser().resolve() if args.build else None
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
@@ -532,6 +716,8 @@ def main():
     # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
     # default short enough even when the checkout is in a deep task directory.
     out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
+    if not args.case_root and any(name in D87 for name in names) and (out == REPO or REPO in out.parents):
+        raise ValueError('D87 result directory and generated data must be outside Git checkout')
     out.mkdir(parents=True)
     temporary = out / 'tmp'
     temporary.mkdir()
@@ -539,7 +725,9 @@ def main():
     # Set this before spawning so direct children (including oracles) inherit it.
     env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
     env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
-    request = vars(args) | {'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None, 'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
+    request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out),
+                            'cases': str(args.cases.expanduser().resolve()) if args.cases else None,
+                            'case_root': str(args.case_root.expanduser().resolve()) if args.case_root else None}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:

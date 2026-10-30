@@ -21,20 +21,19 @@ import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Global } from "@opencode-ai/core/global"
 import {
   inspectReferenceFile,
-  stageReferenceFile,
   type FileReference,
-  type ReferenceSlot,
+  type ReferenceSnapshot,
 } from "@loginom-ai-agent/loginom-host/file-reference"
 import { exactFileDigest } from "./loginom-file-profile-core"
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
 
-// Large files cross private IPC only as immutable Host-reserved references.
+// Large files cross private IPC only as backend-authorized original references.
 export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")(function* (
   path: string,
   ctx: Tool.Context,
   host: {
-    reserveReference(userMessage: string, name: string): Promise<ReferenceSlot>
+    reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference>
     admitReference(reference: FileReference): Promise<unknown>
     discardReference(grant: string): Promise<unknown>
   },
@@ -49,21 +48,16 @@ export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")
       if (identity.canonical_path !== source.canonicalPath) throw Error("LOGINOM_FILE_CHANGED")
       const sha256 = await exactFileDigest(identity, join(Global.Path.data, "file-profiles", ctx.sessionID))
       if (abort.aborted) throw Error("LOGINOM_UPLOAD_CANCELLED")
-      const slot = await host.reserveReference(userMessage, basename(source.canonicalPath))
-      const reference = await stageReferenceFile(source.sourcePath, identity, slot, { sha256, signal: abort }).catch(
-        async (error) => {
-          // No upload was dispatched. Keep the original typed file/cancel cause;
-          // Host shutdown retains responsibility for an unremoved reservation.
-          await host.discardReference(slot.grant).catch(() => undefined)
-          throw error
-        },
-      )
+      const reference = await host.reserveReference(userMessage, basename(source.canonicalPath), {
+        ...identity,
+        sha256: sha256 ?? null,
+      })
       if (abort.aborted) {
-        await host.discardReference(slot.grant)
+        await host.discardReference(reference.grant)
         throw Error("LOGINOM_UPLOAD_CANCELLED")
       }
-      // Once commit starts its reply may be lost. Retain the snapshot for an
-      // exact retry or confirmed Host shutdown rather than deleting it here.
+      // Once commit starts its reply may be lost. Retain the grant for an
+      // exact retry or confirmed Host shutdown rather than discarding it here.
       const artifact = await host.admitReference(reference)
       return { sourcePath: source.sourcePath, artifact }
     },

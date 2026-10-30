@@ -118,6 +118,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
     &&dialog.identity?.anchor_tid===state.node_preview_schema.root_tid
     &&state.node_preview_schema.node_id===preparedNodeContext?.node.node_id;
+  const allowedCalculatorPreview=(dialog,state)=>state.prepared_node_context?.surface==='wizard'
+    &&state.wizard?.stage==='calculator'&&state.wizard.calculator_preview?.status==='observed'
+    &&dialog.ref===state.wizard.calculator_preview.root_ref
+    &&dialog.identity?.anchor_tid===state.wizard.root_tid+';CalcPreviewForm';
   const pendingPreviewDialog=(dialog,state)=>{
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
@@ -157,7 +161,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.node_clustering.kind==='normalization'&&state.node_clustering.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
-  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -244,7 +248,28 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
         targetOrigin,targetBuild,deadline:operation.deadline};
       const read=mode=>execute(makeJavascriptOutputPreviewCode({...task,mode}),{timeout:Math.max(5000,operation.deadline-now()+5000)});
-      let expected=await read('capture');
+      const captureKey='node.javascript.preview.capture.internal',captureSignature=digest([task,'capture']);
+      let expected;
+      try{expected=await execute(wrapMutation(makeJavascriptOutputPreviewCode({...task,mode:'capture'}),
+        {id:task.operation_id,signature:captureSignature,action_key:captureKey}),
+        {timeout:Math.max(5000,operation.deadline-now()+5000)});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      if(expected?.status==='NOT_APPLIED'){
+        if(expected.operation_id!==task.operation_id||expected.action_key!==captureKey||expected.action_revision!=='1'
+          ||expected.phase!=='capture'||expected.effect_possible!==false||expected.cleanup_complete!==true
+          ||expected.output?.lease_disposed!==true||expected.output.execution_started!==false
+          ||expected.output.port_guid!==port.port_guid
+          ||!['document_id','workflow_id','node_id'].every(k=>expected.output.node_context?.[k]===task.owner[k]))
+          throw Error('Managed preview capture receipt identity differs');
+        const event={lease_operation_id:task.operation_id,owner:task.owner,port_guid:port.port_guid,
+          reference:structuredClone(operation.lastReceipt),receipt:structuredClone(expected)};
+        const saved=await entry('node_preview_capture_refused',event);
+        if(JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))
+          throw Error('Managed preview capture refusal was not durably acknowledged');
+        if(operation.groupingPreview?.managed===true)Object.assign(operation.groupingPreview,
+          {failed:true,capture_refused:true,lease_disposed:true,reference:event.reference,receipt:event.receipt});
+        throw Error(expected.error?.message??'Managed preview capture refused');
+      }
       snapshot=null;evidenceSnapshot=null;
       try{
         for(const mode of ['select','open']){
@@ -493,7 +518,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(expressionEditors.length>1)throw Error('Calculator expression editor is ambiguous');
         // This is read-only root selection. The subsequent full read must prove
         // its native ownership before any dialog or mutation is admitted.
-        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref:undefined;
+        const previewRoot=readPreview?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;PreviewWindow')?.ref
+          :wizard?.stage==='calculator'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';CalcPreviewForm')?.ref:undefined;
         const filterDialogs=readFilter&&wizard?.stage==='row_filter'?(roots.output.ui?.elements??[]).filter(e=>
           [';ModalWindow_BetweenValuesEditor',';ModalWindow_ValueListEditor'].some(suffix=>e.tid===wizard.root_tid+suffix)):[];
         if(filterDialogs.length>1)throw Error('Filter dialog is ambiguous');
@@ -788,7 +814,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
       if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
-        || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!==(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
+        || !(snapshotWizardConfirmation.kind==='close'&&!mappingConflict
+          ? /^msgbox(?:-1)?;tlb;yes$/.test(snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid??'')
+          : snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid===(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes'))))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
@@ -866,7 +894,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -978,6 +1006,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
+          const graphBusyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&typeof refreshGraphBusy==='function'&&refreshGraphBusy({receipt:r,observation:observed,action})===true;
           const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
           const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
           // An opting-in picker may wait for its own late loading mask only
@@ -998,7 +1028,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
             &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
           if(busyRefusal)assertContext(masked,true);
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal&&!graphBusyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -1011,6 +1041,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
             ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
             ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
+            ...(graphBusyRefusal?{reason:'owned_graph_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

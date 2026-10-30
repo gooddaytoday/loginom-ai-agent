@@ -22,7 +22,12 @@ export function sortingConfigurationReadback({node,phases,operation_id}){
   linked.add(source.record_id);
   return {...pick(f,['index','name','label','type','data_kind','excluded']),source_name:source.name};
  });
- need(linked.size===m.source_fields.length,'derived source coverage');
+ // A fixed output retains its saved projection when upstream fields return.
+ // Its available sources must still describe the current configured input.
+ need(typeof m.autosync==='boolean'&&m.source_fields.length===c.input_fields.length
+  &&new Set(m.source_fields.map(s=>s.name)).size===c.input_fields.length
+  &&m.source_fields.every(s=>c.input_fields.some(f=>f.name===s.name&&f.label===s.label&&f.type===s.type))
+  &&(!m.autosync||linked.size===m.source_fields.length),'derived source coverage');
  return {kind:'sorting',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'keys',
   keys:c.keys.map(f=>pick(f,['name','label','type','order','direction','case_sensitive'])),comparison:structuredClone(c.comparison),
   options:structuredClone(c.options),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mapping:{port:0,autosync:m.autosync,fields:output},package_persistence_verified:false};

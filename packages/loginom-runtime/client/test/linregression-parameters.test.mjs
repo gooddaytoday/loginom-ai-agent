@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {validateLinRegressionParameters,resolveLinRegressionRoles} from '../lib/linregression-parameters.mjs';
+
+test('apply preserves an existing connected model and cannot create or reconnect one',()=>{
+ const p={input_fields:['X'],target_field:'Y'},request={target:{kind:'existing'},inputs:[],mappings:[],read:{ports:[0,1]},finish:'execute'};
+ assert.doesNotThrow(()=>validateLinRegressionParameters(p,'apply',request));
+ for(const change of [{target:{kind:'new'}},{inputs:[{input:0}]},{finish:'done'}])
+  assert.throws(()=>validateLinRegressionParameters(p,'apply',{...request,...change}),/apply/);
+});
 const fields=[{name:'RowID',type:'integer',data_kind:'Непрерывный',usage_type:3},{name:'X',type:'real',data_kind:'Непрерывный',usage_type:0},{name:'Y',type:'real',data_kind:'Непрерывный',usage_type:0},{name:'IsTest',type:'boolean',data_kind:'Дискретный',usage_type:4}];
 const p={input_fields:['X'],target_field:'Y'};
 test('the response has a separate role and unlisted columns are retained but ignored',()=>{

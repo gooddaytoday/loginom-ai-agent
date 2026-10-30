@@ -145,7 +145,7 @@ export async function readGraph(page, task) {
 }
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
-// pre-effect snapshot must still match immediately before the gesture.
+// pre-effect graph must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
   let gestureBefore=task.effect.before;
@@ -170,7 +170,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const p=await locator.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
       const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw new Error('Target is covered');return{x,y};});return p;
   };
-  const drag=async(source,to)=>{const from=await point(source);remaining();if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
+  const drag=async(source,to)=>{const from=await point(source);remaining();const current=await read(page,task);
+    // Deselection can replace node SVG after its first readback. Only moves
+    // permit fresh node drawing epochs; root/document and all graph data match.
+    if(task.effect.kind==='move'?!sameGraph(gestureBefore,current):JSON.stringify(current)!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');
+    await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
   try {
     const before=await read(page,task);
@@ -246,7 +250,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const deselected=await read(page,task);
       if(!sameGraph(gestureBefore,deselected))throw new Error('Graph changed while deselecting');
       // Selection can redraw SVG. Rebind only drawing epochs after the full
-      // native graph comparison; drag still requires this exact fresh snapshot.
+      // native graph comparison; drag rechecks it even if another repaint lands.
       gestureBefore=deselected;
       const source=find(tid),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
@@ -403,10 +407,58 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
   const root=page.locator('[data-tid='+JSON.stringify(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
+  const maskDeadline=Math.min(task.deadline,Date.now()+15000);
   let point;
   for(let attempt=0;attempt<10;attempt++){
-    point=await source.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
-      return b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))?{x,y}:null;});
+    if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+    point=await source.evaluate(async(e,{request,origin,build,deadline})=>{
+      const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+      const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+      let element=e;
+      const point=()=>{const e=element,b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
+        return {x,y,hit,reachable:b.width>0&&b.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))};};
+      const initial=point(),mask=initial.hit?.closest('.bg-mask-message');
+      // Native Preview/graph refresh can mask ModelForm after readGraph has
+      // returned. Wait read-only for this exact owner; never replay a gesture.
+      if(!initial.reachable&&mask?.getAttribute('data-tid')===request.workflow_ref.prefix+';ModelForm'){
+        const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+        const receipt=prep&&[...prep.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
+        const card=app?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller.FController;
+        const contextChanged=()=>{
+          if(location.origin!==origin||app?.Version!==build||globalThis.__loginomDockPreparationV1!==prep
+            ||prep?.document!==document||prep.id!==request.document_id)return 'document';
+          if(receipt?.phase!=='verified'||receipt.workflowId!==request.workflow_ref.workflow_id
+            ||![...prep.receipts.values()].includes(receipt))return 'receipt';
+          if(app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()!==card||card.Controller.FController!==model
+            ||!app.ModelForm||!(model instanceof app.ModelForm)
+            ||!receipt.nodeTargetWorkflowNode||card.Controller.Node?.data?.node!==receipt.nodeTargetWorkflowNode)return 'owner';
+          const tabs=exact(request.workflow_ref.tab_tid),roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram'),masks=exact(request.workflow_ref.prefix+';ModelForm');
+          if(tabs.length!==1||tabs[0]!==receipt.tab||!tabs[0].isConnected||!tabs[0].classList.contains('x-tab-active'))return 'tab';
+          if(masks.length!==1||model.FView?.el?.dom!==masks[0]||!visible(masks[0]))return 'model_form';
+          if(roots.length!==1||model.FDiagram?.FmxGraph?.container!==roots[0]||!masks[0].contains(roots[0]))return 'graph';
+          const sources=exact(e.getAttribute('data-tid'));
+          if(sources.length!==1||!roots[0].contains(sources[0]))return 'source';
+          // Rebind only DOM drawings still owned by the same native controller,
+          // workflow receipt and active tab. The full graph is checked before hover.
+          element=sources[0];
+          if([...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(n=>visible(n)&&n!==masks[0]))return 'blocker';
+          return null;
+        };
+        for(;;){
+          const changed=contextChanged();
+          // A browser-side exception is indistinguishable from transport loss.
+          // These read-only refusals precede every hover/link gesture.
+          if(changed)return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+            error:'MODELFORM_MASK_CONTEXT_CHANGED: '+changed};
+          if(Date.now()>=deadline)return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+            error:'MODELFORM_MASK_TIMEOUT: owned graph mask did not clear before link hover'};
+          if(!model.FView.el.dom.classList.contains('bg-mask-message'))break;
+          await new Promise(resolve=>setTimeout(resolve,50));
+        }
+      }
+      const current=point();return current.reachable?{x:current.x,y:current.y}:null;
+    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline});
+    if(point?.status==='NOT_APPLIED')return point;
     if(point)break;
     await page.waitForTimeout(50);
   }
@@ -442,6 +494,8 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     throw refusal;
   }
   if(!sameGraph(before,await observe()))throw Error('Graph changed before link hover gesture');
+  if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+  if(Date.now()>=task.deadline)throw Error('Link hover deadline elapsed');
   await page.mouse.move(point.x,point.y);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const after=await observe();
@@ -588,6 +642,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
         graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
+        if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
           source_port:{kind:'data',index:bound.source.index},target_port:{kind:'data',index:bound.target.index}};

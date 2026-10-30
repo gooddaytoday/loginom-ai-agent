@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureCalculator} from '../lib/calculator-procedure.mjs';
+import {configureCalculator,previewCalculator} from '../lib/calculator-procedure.mjs';
 
 // A UI model with per-Apply uniqueness and a clipped expression grid. It rejects
 // clicks outside the visible page and retains records through edits and moves.
@@ -54,4 +54,18 @@ test('explicit order reveals and moves the retained far record',async()=>{
 });
 test('a blocked scroller fails without attempting a hidden row click',async()=>{
  const f=fixture(Array.from({length:40},(_,i)=>'E'+i),{stuck:true});await assert.rejects(configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'E39'},formula:'2'}]}),/no progress/);assert.deepEqual(f.calls.map(c=>c.verb),['scroll']);
+});
+
+test('valid formulas complete one owned Preview and close it before returning to configuration',async()=>{
+ const calls=[],base='MF;TF;WizrdMCF',expression={name:'Revenue',formula:'2',type:'integer'};
+ let opened=false;
+ const snapshot=()=>({prepared_node_context:{node_id:'n'},wizard:{stage:'calculator',root_tid:base,
+  ...(opened?{calculator_preview:{status:'observed',root_ref:'preview',errors:[]}}:{})},
+  ui:{dialogs:opened?[{}]:[],elements:[{tid:base+(opened?';CalcPreviewForm;p.h;close':';CalcDataWizard;btnPreview'),ref:opened?'close':'preview',allowed_actions:['click']}]},
+  node_calculator:{verified:true,expressions:[expression]}});
+ const channel={observe:async({ready})=>{const s=snapshot();assert.ok(ready(s));return structuredClone(s)},
+  perform:async({ready,resolve})=>{const s=snapshot();assert.ok(ready(s));calls.push(resolve(s));opened=!opened;}};
+ assert.equal((await previewCalculator(channel)).status,'accepted_by_loginom_preview');
+ assert.deepEqual(calls,[{verb:'click',ref:'preview'},{verb:'click',ref:'close'}]);
+ assert.equal(opened,false);
 });

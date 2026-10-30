@@ -99,6 +99,9 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
       await prepareRun(client, "one")
+      const exited = ending === "kill"
+        ? (await host.runtime(1, createHash("sha256").update("chat").digest("hex"))).exited
+        : undefined
       expect(await call("start")).toEqual({ action: "start" })
       expect(host.journal.pending()).toEqual([])
       expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(1)
@@ -124,6 +127,8 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       }
       if (ending === "disconnect" || ending === "kill")
         await expect(call(ending)).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      // IPC disconnect can precede exit; wait for the killed runtime to retire before teardown.
+      await exited
       expect(host.journal.pending().length).toBeGreaterThanOrEqual(2)
       expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending().sort()).toEqual(
         host.journal.pending().sort(),

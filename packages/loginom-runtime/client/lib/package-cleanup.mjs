@@ -5,17 +5,18 @@ import {withBrowserReceipt} from './executor.mjs';
 // Loginom's own close guard remains
 // enabled: CloseAllPackages(true, false) from E2E would bypass that guard.
 export function makePackageCleanupCode(options) {
-  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false} = options;
+  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false, unsavedDraft = false} = options;
   if (![sessionId, documentId, account, tabTid].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)
-      || typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
-      || packagePath.split('/').some(p => p === '.' || p === '..') || loginomBuild !== '7.4.2'
+      || (unsavedDraft ? packagePath !== null : typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
+      || packagePath.split('/').some(p => p === '.' || p === '..')) || loginomBuild !== '7.4.2'
+      || typeof unsavedDraft !== 'boolean' || unsavedDraft && (diagnosticDiscard || diagnosticReadOnly || diagnosticWaitForIdle)
       || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean'
       || typeof diagnosticWaitForIdle !== 'boolean' || diagnosticWaitForIdle && !diagnosticDiscard
       || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
   // Match the existing bridge cleanup call's 30000 ms budget, including dispatch.
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle})},${Date.now()+30000})`;
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
 }
 
 // Cold-only reconciliation of an unsuccessful Open. It never promotes prepare
@@ -158,7 +159,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
             return result;
           },options),
         ]);
-      } catch {}
+      } catch(error) {receipt.logout_menu_readback={status:'unavailable',error_class:error?.name==='TimeoutError'?'timeout':'read_failed'};}
     }
     // Private journal evidence, after the decision. Never retry Close, answer
     // a prompt, or promote its outcome from this diagnostic readback.
@@ -220,6 +221,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
+      if(o.unsavedDraft && (JSON.parse(prepared.request).intent!=='new_draft'
+        || prepared.phase!=='verified' || prepared.packageInventoryBefore!==0))return {reason:'DRAFT_OWNER_UNCONFIRMED'};
       if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
         ||state.open_error_dismiss_started)) {
         if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
@@ -249,11 +252,17 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         const errors=[...document.querySelectorAll('.bg-error-messages')].filter(visible);
         if(errors.length&&(!errorBound||errors.length!==1||errors[0]!==error.element))return {reason:'DIALOG_OR_OPERATION_OPEN'};
         if(blockers.some(e=>!loading(e)&&!(errorBound&&(e===error.root||error.root.contains(e)))))return {reason:'DIALOG_OR_OPERATION_OPEN'};
-        if(state.open_error_dismiss_started&&!errorBound)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        // After our one OK, the native window may hide its contents or release
+        // its controls before the next layout settles. Read only its retained
+        // window until it disappears; visible replacements still fail above.
+        if(state.open_error_dismiss_started) {
+          if(!error)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          if(visible(error.root))return {reason:errorBound?'OWNED_OPEN_ERROR_CLOSING':'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          if(visible(error.element))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        }
         if(errorBound&&visible(error.root)) {
           const tid=error.root.getAttribute('data-tid');
           if(!/^msgbox(?:-\d+)?$/.test(tid??'')||!visible(error.element))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
-          if(state.open_error_dismiss_started)return {reason:'OWNED_OPEN_ERROR_CLOSING'};
           const buttons=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid+';tlb;ok')+']')];
           const button=buttons.length===1&&buttons[0],control=button&&globalThis.Ext?.getCmp?.(button.id);
           const choices=[...document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';tlb;')+']')]
@@ -285,7 +294,6 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
           button.click();
           return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
         }
-        if(state.open_error_dismiss_started&&(visible(error?.root)||visible(error?.element)))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
         if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
         // This callback is only for OK. If its owned error vanished in transit,
         // leave Close to the ordinary path and its fresh native guards.
@@ -347,7 +355,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       }
       // A lost/late acknowledgement is never permission to click OK again.
       if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
-      before=ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
+      before=ready.gesture_returned===true?{reason:'OWNED_OPEN_ERROR_CLOSING'}:
+        ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
     }
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
@@ -468,9 +477,10 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     receipt.logged_out = true;
     receipt.stage = 'complete';
     return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
-  } catch {
+  } catch(error) {
     // Fixed private stage only: retain refusal and never persist raw errors,
     // credentials, DOM contents or an inferred logout from browser closure.
+    receipt.failure_class=error?.name==='TimeoutError'?'ui_timeout':'step_failed';
     return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
   }
 }

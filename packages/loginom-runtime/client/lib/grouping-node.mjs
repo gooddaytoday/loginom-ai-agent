@@ -26,12 +26,16 @@ export function createGroupingNodeSupport(config){return createTabularTransformN
 export async function prepareGroupingInput(options,ctx,{channel}){
  const request=options.operation.nodeApply.request;
  if(request.target.kind!=='existing'||request.finish!=='execute'||request.inputs.length!==0)return;
+ // Empty parameters/mappings preserve the just-configured chain. Its owned
+ // input/configuration readers still verify the complete schema below; do not
+ // execute it once here and again after reopening those unchanged settings.
  const state=await channel.observe({condition:'existing grouping before input schema refresh',readOutputs:true,
   ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k])
    &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
  if(state.node_outputs.ports.length!==1||state.node_outputs.ports[0].index!==0||typeof state.node_outputs.ports[0].active!=='boolean')
   throw Error('Existing grouping output activity is incomplete');
+ if(Object.keys(request.parameters).length===0&&request.mappings.length===0)return;
  if(state.node_outputs.ports[0].active)return;
  // Refresh the unchanged saved node and its ancestors before opening input
  // mappings: their persisted fields do not imply an active source table.

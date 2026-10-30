@@ -59,6 +59,52 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
+
+test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{
+ const {createLinRegressionNodeSupport}=await import('../lib/linregression-node.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';p.parameters={input_fields:['X'],target_field:'Y'};
+ f.handlers.set(p.target.type,createLinRegressionNodeSupport({}).nodeApplyHandlers.get(p.target.type));
+ f.drivers.configureCalculator=async()=>({verified:true,cleanup_complete:true,configuration:{verified:true,mode:'apply',node_context:node,
+  fields:[{name:'X',usage_type:3},{name:'Y',usage_type:4}],target_field:'Y',intercept:true},validation:{status:'accepted_by_loginom_next'}});
+ f.drivers.finish=async mode=>{assert.equal(mode,'done');return {verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false};};
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:false,execution_id:'execution1'});
+ const result=await f.run(p);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(result.configuration.readback.mode,'apply');assert.equal(result.configuration.readback.training.status,'not_requested');
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'done',settings_applied:true,execution_started:false});
+ const bad=fixture();bad.handlers=f.handlers;
+ const rejected=await applyNode({request:p,operation:bad.operation,handlers:f.handlers,drivers:f.drivers,record:async e=>e,now:()=>1});
+ assert.equal(rejected.status,'AMBIGUOUS');assert.match(rejected.error.message,/must discard/);
+});
+
+for(const phase of ['configure','output_mapping'])test('known LinRegression apply refusal keeps the same graph usable: '+phase,async()=>{
+ const {linRegressionApplyRefusal}=await import('../lib/linregression-procedure.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';
+ const refusal=()=>{throw linRegressionApplyRefusal('saved model unavailable',{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:{...node,verified:true}},phase);};
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',
+  configure:phase==='configure'?refusal:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=()=>assert.fail('refused apply cannot execute');
+ if(phase==='output_mapping')f.drivers.mapPorts=async(_,ctx)=>ctx.receipt_id.endsWith(':output_mapping')?refusal():{verified:true,cleanup_complete:true};
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(f.operation.nodeApply.pending,null);
+ assert.ok(!f.calls.includes('execute'));
+});
+
+test('native missing-model failure ends apply without reading output or requesting training',async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'datamining.lin_regression',ref:node};p.mode='apply';
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',
+  configure:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',settings_applied:false,execution_id:'doc:root:group'});
+ f.drivers.waitExecution=async()=>({verified:true,cleanup_complete:true,status:'failed',failure_verified:true,output_refreshed:false,
+  execution_id:'doc:root:group',node,root_id:'root',group_id:'group',group_record_id:'record',
+  error:{code:'NODE_EXECUTION_FAILED',message:'Модель не построена. Необходимо обучить узел перед применением'}});
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);
+ assert.equal(result.execution.status,'failed');assert.match(result.error.message,/Модель не построена/);
+ assert.ok(!f.calls.includes('read'));assert.equal(f.operation.nodeApply.pending,null);
+});
 for(const expired of [false,true])test('host configuration beyond five minutes retains the original shared total deadline '+expired,async()=>{
  const f=fixture(),bindings=createUserWorkflowBindings(),p=request();
  bindings.remember({document_id:p.document_id,workflow_ref:p.workflow_ref});delete p.budgets;
@@ -125,8 +171,9 @@ test('configuration projection uses accepted receipts once and survives replay',
 });
 test('failed configuration projection cannot create a successful checkpoint',async()=>{
  const f=fixture();f.handlers.get('imports.text').configurationReadback=()=>{throw Error('Incomplete observed settings')};
- const result=await f.run();assert.equal(result.status,'AMBIGUOUS');
- assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
+ const result=await f.run();assert.equal(result.status,'FAILED');
+ assert.equal(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 test('unsupported parameters reject before journal or graph',async()=>{
  const f=fixture(),p=request();p.parameters.unsupported=true;await assert.rejects(f.run(p),/unsupported/);assert.equal(f.calls.length,0);assert.equal(f.records.length,0);
@@ -687,4 +734,32 @@ for(const mode of ['done','close'])test('actual generic JS lifecycle '+mode+' om
  assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});assert.equal(result.output.status,'not_refreshed');
  assert.deepEqual(result.output.ports,[]);
  assert.ok(result.phases.every(p=>!['materialization_start','materialization_execute','output_mapping','execute','read'].includes(p.phase)));
+});
+
+for(const finish of ['done','execute'])test('final configuration readback failure checkpoints verified effects without stranding the operation: '+finish,async()=>{
+ const f=fixture(),p=request();p.finish=finish;if(finish==='done')p.read.ports=[];
+ let reads=0;
+ f.handlers.get('imports.text').configurationReadback=()=>{reads++;throw Error('Sorting readback: derived source coverage');};
+ const result=await f.run(p);
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ assert.equal(result.error.message,'Sorting readback: derived source coverage');
+ assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.deepEqual(result.configuration,{status:'applied'});
+ assert.equal(result.execution.status,finish==='execute'?'completed':'not_requested');
+ assert.equal(result.output.status,finish==='execute'?'complete':'not_refreshed');
+ assert.equal(result.checkpoint_kind,'local_node_failed');
+ assert.equal(f.operation.nodeApply.pending,null);assert.deepEqual(f.operation.nodeApply.result,result);
+ assert.equal(f.records.at(-1).phase,'node_checkpoint');assert.deepEqual(f.records.at(-1).result,result);
+ assert.ok(result.phases.every(p=>p.status==='verified'));
+ assert.match(result.next_step.instruction,/Do not resume/);
+ const calls=[...f.calls];assert.deepEqual(await f.run(p),result);assert.deepEqual(f.calls,calls);assert.equal(reads,1);
+});
+test('failed final readback cannot certify settlement without an exact durable checkpoint ACK',async()=>{
+ for(const corrupt of [false,true]){
+  const f=fixture({failJournal:corrupt?undefined:'node_checkpoint'});
+  f.handlers.get('imports.text').configurationReadback=()=>{throw Error('readback rejected');};
+  const result=await f.run(request(),corrupt?{record:async e=>e.phase==='node_checkpoint'?{...e,result:{...e.result,status:'SUCCEEDED'}}:e}:{});
+  assert.equal(result.status,'AMBIGUOUS');assert.match(result.error.message,/disk unavailable|acknowledgement differs/);
+  assert.equal(f.operation.nodeApply.result,undefined);
+ }
 });

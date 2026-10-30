@@ -7,6 +7,62 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
+test('Excel opening waits only for its native spreadsheet LoadMask message',async()=>{
+ for(const fault of [null,'foreign_target','foreign_mask','dialog','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview','changed_node','changed_stage','expired']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let path='',waits=0,maskRoot,preview,grid;
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;Excel','',undefined,graph);
+  page.add('span',base+'Graph;Excel;Label;Label','Excel',undefined,body);
+  page.add('g',base+'Graph;Excel;Setting','',{x:500,y:300,width:30,height:30},graph);
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',
+   node_id:fault==='changed_node'&&waits?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
+   tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;Excel'),...(!page.events.includes('click')?{locked:false}:{})});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,kind:'workspace-ui',opening_timeout_ms:2000,
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},binding));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);graph.remove();
+   const wizard=page.add('div',base+'WizrdMCF');
+   page.add('input',base+'WizrdMCF;ImportExcelFilePreviewWizard;edtFileName','',undefined,wizard);
+   const tid=base+'WizrdMCF;ImportExcelFilePreviewWizard;frmSpreadSheetsPreview';
+   preview=page.add('div',tid,'',undefined,fault==='outside_preview'?page.document.body:wizard);
+   if(fault==='duplicate_preview')page.add('div',tid,'',undefined,wizard);
+   grid=page.add('div',tid+';frmPreviewExcelFile;grdSheet','',undefined,preview);grid.attrs.class='bg-excel-spreadsheet';grid.id='excel-grid';
+   maskRoot=page.add('div',null,'');maskRoot.attrs.class='x-mask';maskRoot.id='excel-mask';
+   const message=page.add('div',null,'Загрузка...',undefined,maskRoot);message.attrs.class='x-mask-msg';
+   const target={el:{dom:fault==='foreign_target'?page.document.body:grid}},mask={
+    $className:fault==='wrong_component'?'Ext.Component':'Ext.LoadMask',isLoadMask:true,target,ownerCt:target,
+    el:{dom:fault==='wrong_mask'?page.document.body:maskRoot},msgWrapEl:{dom:fault==='wrong_message'?maskRoot:message}};
+   page.context.Ext={getCmp:id=>id==='excel-mask'?mask:id==='excel-grid'?target:null};
+   const node=page.add('a',base+'cnrNaviMode;b.s_'+path+'>Excel','Excel',undefined,panel);
+   page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-importexcel';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>Excel>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+   if(fault==='detached_target')grid.remove();
+  };
+  page.waitForTimeout=async ms=>{clock.advance(ms);waits++;
+   if(fault==='foreign_mask'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(fault==='dialog'&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
+   if(fault==='changed_stage'&&waits===1){
+    page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF;ImportExcelFilePreviewWizard;edtFileName"]')[0].remove();
+    page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,preview);
+   }
+   if(fault!=='expired'&&waits===3)maskRoot.remove();
+  };
+  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',String(fault)+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  if(!fault){assert.equal(waits,3);assert.equal(result.trace.find(e=>e.event==='ui_mask_wait_started').masks[0].import_preview_owner_ref,result.output.wizard.root_ref);}
+  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(['foreign_target','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview'].includes(fault))assert.equal(waits,0,fault);
+ }
+});
+
 function tabBarFixture(options) {
   const page=new Page(options),base='MF;cntMain;cntWorkspace;Workspace;t.br';
   const bar=page.add('div',base,'',{x:10,y:5,width:400,height:30});
@@ -363,6 +419,33 @@ test('stable SVG DOM geometry dispatches the checked point even when Playwright 
     assert.equal(result.status, 'SUCCEEDED'); assert.equal(page.playwrightBoxReads, 0);
     assert.deepEqual(page.clickedPoints, [{ x: 648, y: 410, clickCount: verb === 'click' ? 1 : 2 }]);
     assert.equal(page.document.activeElement, shape);
+  }
+});
+
+test('graph body clicks use the observed point and recheck it before dispatch', async () => {
+  // L491-r5b cold:68: centre (1212.5,540) is covered; the reader sees
+  // (1212.5,557.75) on the same owned 38x71 body below its hover controls.
+  for (const mode of ['center', 'lower', 'covered']) {
+    const page = new Page(), tid = 'MF;TF-1;Graph;CSV_echo_address';
+    page.context.innerWidth = 1280; page.context.innerHeight = 800;
+    page.viewportSize = () => ({ width: 1280, height: 800 });
+    const graph = page.add('div', 'MF;TF-1;ModelForm;cmpDiagram', '', { x: 48, y: 100, width: 1232, height: 700 });
+    const body = page.add('g', tid, '', { x: 1193.5, y: 504.5, width: 38, height: 71 }, graph);
+    page.add('span', tid + ';Label;Label', 'CSV echo address', { x: 1160, y: 480, width: 110, height: 20 }, graph);
+    const overlay = page.add('g', tid + ';NodesControls', '', { x: 1193.5, y: 504.5, width: 38, height: mode === 'center' ? 0 : 50 }, graph);
+    const snapshot = await page.observe(), element = snapshot.ui.elements.find(e => e.tid === tid);
+    assert.equal(element.graph_node.part, 'body');
+    assert.equal(element.interaction.state, 'point_observed');
+    assert.deepEqual(element.interaction.point, { x: 1212.5, y: mode === 'center' ? 540 : 557.75 });
+    if (mode === 'covered') page.beforeHandleGeometry = target => { if (target === body) overlay.box.height = 71; };
+    const result = await page.act({ verb: 'click', ref: element.ref }, snapshot);
+    assert.equal(result.status, mode === 'covered' ? 'NOT_APPLIED' : 'SUCCEEDED', mode + ': ' + JSON.stringify(result.error));
+    assert.deepEqual(page.clickedPoints, mode === 'covered' ? [] : [{ ...element.interaction.point, clickCount: 1 }]);
+    if (mode === 'covered') {
+      assert.equal(result.error.code, 'UI_REFERENCE_OBSCURED');
+      assert.equal(result.effect_possible, false);
+      assert.equal(result.cleanup_complete, true);
+    }
   }
 });
 
@@ -1530,6 +1613,101 @@ function wizardStepFixture(page,direction='next') {
   const advance=()=>{marker.remove();page.add('div',base+';TuneDataSourceInputPortWizard;btnAddMappingColumn','',undefined,form);};
   return {base,form,marker,button,advance};
 }
+
+test('calculator Preview rejects a native formula error before Next or Done',async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+ page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+ const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+  async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+ const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+  page.add('button',c.base+';btnError','Error',undefined,c.form).attrs['data-qtip']='Ошибка в выражении Revenue: неожиданное завершение выражения';};
+ page.waitForTimeout=async ms=>page.clock.advance(ms);
+ const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+ assert.equal(result.error?.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+ assert.match(result.error.message,/Revenue/);
+ assert.ok(result.trace.some(e=>e.event==='wizard_calculator_validation_failed'));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(result.output.wizard.stage,'calculator');
+});
+
+test('calculator Preview accepts only its native modal and closes with an observed ref',async()=>{
+ for(const fault of ['none','console_error','foreign_form','foreign_owner','loading','incomplete']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard';c.marker.id='calc-page';
+  page.add('button',c.base+';CalcDataWizard;btnAddExpr','',undefined,c.marker);
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.marker);
+  const model={},view={el:{dom:c.marker}},components={'calc-page':view};
+  class CalcDataWizard{};
+  const controller=Object.assign(new CalcDataWizard(),{FWizardForm:model});
+  model.FWizardItems={FItems:[{FPages:[view],FWizard:controller}]};
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}};
+  page.context.Ext={getCmp:id=>components[id]};
+  page.context.bg.TBGCodeConsoleMessageType={cmtError:2};
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
+  let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+   if(popup){popup.remove();return;}
+   popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
+   page.add('div',c.base+';CalcPreviewForm;p.h;close','',{x:650,y:110,width:30,height:30},popup).attrs.class='x-tool';
+   const records=fault==='console_error'?[{isModel:true,data:{Text:'Revenue: неверный аргумент',MessageType:2}}]:[];
+   const previewView={el:{dom:popup}},store={isLoading:()=>fault==='loading',getData:()=>({items:records}),getCount:()=>fault==='incomplete'?1:records.length};
+   const form={FView:previewView,FCodeConsole:{FConsoleStore:store}};previewView.Controller=form;
+   controller.FPreviewForm=form;components.preview=previewView;
+   if(fault==='foreign_form')previewView.Controller={};
+   if(fault==='foreign_owner')controller.FWizardForm={};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault==='console_error') {
+   assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+   assert.equal(result.output.wizard.calculator_validation.source,'loginom_calculator_preview_console');
+  }
+  if(fault!=='none')continue;
+  const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
+  const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
+  assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));
+  assert.equal(closed.output.wizard.calculator_preview.status,'absent');
+ }
+});
+
+test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+ for(const fault of ['none','foreign_message','other_field']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+  const message='Loginom '+build+' Настройка прервана. Ошибка разбора выражения "Twice". Неправильное выражение: "VALUE+". OK';
+  const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output;
+  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'Twice'}]};
+  const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);
+   if(dialog){dialog.remove();return;}
+   dialog=page.add('div','msgbox','',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('div',null,message,undefined,dialog);
+   page.add('a','msgbox;tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=box;
+   page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.error.code,fault==='none'?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
+  if(fault==='none') {
+   assert.equal(result.output.wizard.calculator_validation.field_name,'Twice');
+   assert.equal(result.output.wizard.calculator_validation.message,message);
+   assert.equal(result.output.ui.dialogs.length,0);
+  }
+ }
+});
 
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {
@@ -4665,6 +4843,52 @@ test('tabular input0 keeps Done and close bound to the native node icon when its
  }
 });
 
+test('D52b long saved path keeps input0 Done only with exact native opening and ancestor context',async()=>{
+ // LAB-415 D2/execution-events.jsonl:842: Group input0 remains native-bound
+ // after the long Save, but owner context and finish_wizard are absent.
+ // The journal has no ancestor rectangles: exercise each early overflow slot.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','unbound','d52_no_navigation','d52_foreign_path','d52_no_guid','d52_no_opening','d52_other_port','d52_other_index','wrong_native_icon','path','label','duplicate','visibility','opacity','attribute','clipped','workflow_icon','panel','mode']) {
+  const {page,binding}=await joinInputPortOverflowFixture(fault==='unbound'||fault.startsWith('d52_')?fault:'d52_valid',0,'group');
+  if(fault==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='d2_d52long2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c] of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Число_точек_в_группе');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Число точек в группе';
+  }
+  if(binding.navigation_node)binding.navigation_node={tid:crumbs[5].attrs['data-tid']+(fault==='d52_foreign_path'?'-foreign':''),label:crumbs[5].textContent.trim()};
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  for(const i of [hidden,5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0],c=mappingCoverageFixture(page,5);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]){
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='label')crumbs[hidden].ownText+=' foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='clipped'){crumbs[hidden].style.display='block';crumbs[hidden].box={x:1300,y:41,width:100,height:24};}
+  if(fault==='workflow_icon')crumbs[4].children[0].attrs.class='maptree-icon-modelinputports';
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  if(fault==='mode')c.tableMode.attrs.class='';
+  const r=await page.execute({mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}}),output_column_page:{offset:0,limit:8}});
+  const allowed=r.output?.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true;
+  assert.equal(allowed,fault==='none',hidden+':'+fault);
+  if(fault==='none'){
+   assert.equal(r.output.wizard.input_port_context.status,'observed');
+   assert.deepEqual(clone(r.output.wizard.input_port_context.node_path.slice(0,5).map(({tid,label})=>({tid,label}))),path);
+   assert.ok(r.output.ui.elements.filter(e=>crumbs.some(c=>c.attrs['data-tid']===e.tid)&&!e.visible).every(e=>e.allowed_actions.length===0));
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D52 hidden tabular node requires exact native opening and known mode',async()=>{
  for(const vendor of ['group','clustering','linregression'])for(const mode of ['d52_valid','d52_foreign_node','d52_foreign_path','d52_no_opening','d52_no_guid','d52_other_port','d52_other_index','d52_unknown_mode','d52_both_modes','d52_missing_chain']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
@@ -4732,11 +4956,111 @@ async function calculatorNodeOverflowFixture() {
   return {page,crumbs,nodeTree,component,wizard,binding};
 }
 
+test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
+ // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','binding','component','visibility','opacity','duplicate','panel']){
+  const {page,crumbs,wizard,binding,nodeTree,component}=await calculatorNodeOverflowFixture();
+  delete binding.input_port;
+  const guid='d6677c45-99d0-46f2-889c-be24a51bff13',name='l443f_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(crumbs[2].ownText,name).replaceAll('amount_double','Число_точек_в_группах');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек в группах';binding.node_id=guid;nodeTree.FGuid=guid;
+  for(const c of crumbs.slice(6))c.remove();
+  for(const c of [...wizard.children])c.remove();
+  page.add('div','MF;TF-5;WizrdMCF;GroupDataWizard;grdUsedFields;tbl','',undefined,wizard);
+  const settings=page.add('a',crumbs[5].attrs['data-tid']+'>Настройка','Настройка',{x:1190,y:41,width:85,height:24},crumbs[5].parentElement);
+  page.add('span',null,'',{x:1191,y:42,width:16,height:16},settings).attrs.class='maptree-icon-wizard';
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='native')nodeTree.FGuid='foreign';
+  if(fault==='binding')binding.node_id='foreign';
+  if(fault==='component')component.el.dom={};
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const r=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  assert.equal(r.output.wizard.stage,'grouping');
+  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='none',hidden+':'+fault);
+  if(fault==='none')assert.deepEqual(r.output.wizard.owner_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('Calculator input Done keeps the exact native node hidden by the admitted package breadcrumb',async()=>{
   const {page}=await calculatorNodeOverflowFixture(),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.input_port_context.status,'observed');
   assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));
   assert.deepEqual(page.events,[]);
+});
+
+test('D84 calculator token caption is metadata only for the exact native breadcrumb owner',async()=>{
+ for(const fault of ['none','guid','dom','missing_opening','foreign_navigation','secret_attribute','editable','link']) {
+  const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace('amount_double','Точные_токены_товаров');
+  crumbs[5].ownText='Точные токены товаров';
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.input_port.opening_operation_id;
+  if(fault==='foreign_navigation')binding.navigation_node.label+=' foreign';
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='editable')crumbs[5].attrs.contenteditable='true';
+  if(fault==='link')crumbs[5].attrs.href='https://example.test/';
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.input_port_context.status==='observed',fault==='none',fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D84 Calculator token caption retains the native default output socket owner',async()=>{
+ for(const caption of ['Выходной набор данных','Результат'])for(const fault of ['none','guid','dom','missing_opening','secret_attribute','foreign_caption']) {
+  const {page,crumbs,nodeTree,component,wizard,binding}=await calculatorNodeOverflowFixture();
+  for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+   .replace('amount_double','Полные_токены_и_индикаторы_корзин')
+   .replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных',caption.replaceAll(' ','_'))
+   .replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  crumbs[5].ownText='Полные токены и индикаторы корзин';crumbs[6].ownText='Выходные порты';crumbs[7].ownText=caption;
+  crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].children.at(-1).attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  binding.output_port={...binding.input_port,direction:'output'};delete binding.input_port;
+  if(fault==='guid')nodeTree.FGuid='foreign';
+  if(fault==='dom')component.el.dom={};
+  if(fault==='missing_opening')delete binding.output_port.opening_operation_id;
+  if(fault==='secret_attribute')crumbs[5].attrs['aria-label']='password';
+  if(fault==='foreign_caption')for(const c of crumbs.slice(7)) {
+   c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),'Foreign');if(c===crumbs[7])c.ownText='Foreign';
+  }
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.port_context.status==='observed',fault==='none',caption+':'+fault);
+  assert.equal(r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault==='none',caption+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D84 Calculator token graph caption stays visible only for its exact prepared native owner',async()=>{
+ for(const fault of ['none','guid','icon','foreign_dom','secret_attribute','unbound','duplicate']) {
+  const page=new Page(),tid='MF;TF-1;Graph;Точные_токены_Bread_и_Milk';
+  const body=page.add('g',tid,'',{x:100,y:200,width:150,height:80});
+  page.add('span',tid+';Label;Label','Точные токены Bread и Milk',{x:110,y:220,width:120,height:30},body);
+  page.add('g',tid+';Input_Data-0','',{x:90,y:220,width:10,height:10},body);
+  const f=page.graphModels.get(body.parentElement),owner=f.byTid.get(tid);
+  owner.FGuid='node';owner.FIconCls='bg-vendor-icon-calcdata';
+  if(fault==='guid')owner.FGuid='foreign';if(fault==='icon')owner.FIconCls='bg-vendor-icon-importtext';
+  if(fault==='foreign_dom')f.states.set(owner.FCell,{shape:{node:page.document.body}});
+  if(fault==='secret_attribute')body.attrs['aria-label']='password';
+  if(fault==='duplicate')page.add('g',tid,'',body.box,body.parentElement);
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}})},
+   async()=>({verified:true,node_id:'node',surface:'graph',tid}));
+  assert.equal(result.status,'SUCCEEDED',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid&&e.graph_node?.part==='body'),fault==='none',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid+';Label;Label'),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
 });
 
 test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
@@ -4784,6 +5108,45 @@ test('Calculator output Done keeps its exact overflow node and output folder own
   const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.port_context.status,'observed');assert.equal(r.output.wizard.port_context.node.label,'amount_double');
   assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));assert.deepEqual(page.events,[]);
+});
+
+test('D52b output0 retains long saved ancestry through Done only with a verified native owner',async()=>{
+ // l443h-d52b2/execution-events.jsonl:1066-1069,1335: Group output0 is
+ // native verified, but overflow loses port_context and calculator Done times out.
+ for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','unverified','foreign_node','visibility','opacity','duplicate','panel']) {
+  const {page,crumbs,wizard,nodeTree}=await calculatorNodeOverflowFixture();
+  const name='l443h_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  const old=crumbs[2].ownText;
+  for(const c of crumbs)c.attrs['data-tid']=c.attrs['data-tid'].replace(old,name).replaceAll('amount_double','Число_точек_по_группам');
+  crumbs[2].ownText=name;crumbs[5].ownText='Число точек по группам';crumbs[5].children[0].attrs.class='bg-vendor-icon-groupdata';
+  for(const e of [wizard,...wizard.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  for(const c of crumbs.slice(6))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных','Результат');
+  crumbs[6].ownText='Выходные порты';crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].ownText='Результат';crumbs[7].children[0].attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='foreign_node')nodeTree.FGuid='foreign';
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,crumbs[hidden].parentElement);
+  if(fault==='panel')crumbs[0].parentElement.style.display='none';
+  const port={direction:'output',port:0,native_index:0,port_guid:'output0',opening_operation_id:'count-points:output0',node_icon_class:'bg-vendor-icon-groupdata'};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:fault!=='unverified',surface:'wizard',node_id:'node',output_port:port})));
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output?.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,fault==='none',hidden+':'+fault);
+  if(fault==='none') {
+   assert.equal(r.output.wizard.port_context.status,'observed');
+   assert.deepEqual(r.output.wizard.port_context.path.slice(0,5).map(({tid,label})=>({tid,label})),path);
+   const narrow=await page.execute({mode:'observe',root_ref:r.output.wizard.root_ref,output_column_page:{offset:0,limit:8}});
+   assert.deepEqual(narrow.output.wizard.port_context,r.output.wizard.port_context);
+  }
+  assert.deepEqual(page.events,[]);
+ }
 });
 
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
@@ -4929,9 +5292,9 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
     }
     const context=settings?result.output?.wizard?.owner_context:result.output?.wizard?.input_port_context;
     assert.equal(result.output.wizard.stage,stage,stage+':'+mode);
-    assert.equal(context?.status==='observed',mode==='valid',stage+':'+mode);
-    if(mode==='valid')assert.equal(context.node.label,'Выгрузка с русскими заголовками');
-    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),mode==='valid',stage+':'+mode);
+    assert.equal(context?.status==='observed',['valid','hidden_workflow'].includes(mode),stage+':'+mode);
+    if(['valid','hidden_workflow'].includes(mode))assert.equal(context.node.label,'Выгрузка с русскими заголовками');
+    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),['valid','hidden_workflow'].includes(mode),stage+':'+mode);
     assert.deepEqual(page.events,[]);
   }
 });
@@ -5032,8 +5395,8 @@ test('D47b native REST input0/index2 keeps hidden node and folder context',async
   if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-restclient';
   if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
-  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',mode==='valid',mode);
-  else assert.notEqual(mode,'valid',mode);
+  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',['valid','hidden_workflow'].includes(mode),mode);
+  else assert.ok(!['valid','hidden_workflow'].includes(mode),mode);
   assert.deepEqual(page.events,[]);
  }
 });
@@ -5081,7 +5444,7 @@ test('input port context rejects foreign duplicated hidden and incomplete breadc
 test('native process console joins bounded grids and keeps ownership and execution unverified',async()=>{
   const {readFileSync}=await import('node:fs');
   const source=JSON.parse(readFileSync(new URL('./fixtures/process-console-run15.json',import.meta.url),'utf8'));
-  for(const mode of ['complete','hidden','overflow','record','unknown_state','duplicate','hidden_filter','foreign_bound','two_selected','unknown_menu']) {
+  for(const mode of ['complete','sensitive_caption','hidden','overflow','record','unknown_state','duplicate','hidden_filter','foreign_bound','two_selected','unknown_menu']) {
     const page=new Page();page.context.innerWidth=1440;page.context.innerHeight=1000;
     const panel=page.add('div','ConsoleForm','',{x:48,y:397,width:1392,height:603});
     const grids=[];
@@ -5091,7 +5454,7 @@ test('native process console joins bounded grids and keeps ownership and executi
       const container=page.add('div',null,'',g.containers[0].rect,grid);container.attrs.class='x-grid-item-container';container.style.transform='none';
       for(const r of g.rows) {
         const row=page.add('table',null,'',r.rect,container);Object.assign(row.attrs,r.attributes,{class:'x-grid-item'});
-        for(const c of r.cells){const cell=page.add('td',c.attributes['data-tid'],c.text,c.rect,row);cell.attrs.class=c.classes;}
+        for(const c of r.cells){const cell=page.add('td',mode==='sensitive_caption'?c.attributes['data-tid'].replace('Root>','Root>Точные_токены_'):c.attributes['data-tid'],c.text,c.rect,row);cell.attrs.class=c.classes;}
       }
       grids.push({grid,container});
     }
@@ -5235,8 +5598,77 @@ async function inputPortFinishFixture(mode='valid') {
   if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
     async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
-  return {...f,done,waits:()=>waits};
+  return {...f,done,crumbs,waits:()=>waits};
 }
+
+test('D52b2/b3 native graph keeps the long workflow path before opening input0',async()=>{
+ // l427f-d52b2:903 and l427f-d52b3:949 precede the input0 opening.
+ // Native graph/node are verified; the journal does not include crumb geometry.
+ for(const run of ['d52b2','d52b3'])for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','duplicate','visibility','opacity','attribute','icon','panel','native','node','unbound']){
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1';
+  const guid=run==='d52b2'?'9f9356ac-f499-4b3d-b4f0-512d723ff69a':'d2eba62e-ff33-4092-bb77-93dffba4109d';
+  const label=run==='d52b2'?'Количество точек в группе':'Число точек по группам';
+  const panel=page.add('div',prefix+';NavigationBar;NavigationPanel','',{x:0,y:30,width:1000,height:40});
+  const labels=['Сервер','Пакеты','l427f_'+run+'_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох','Модуль1','Сценарий'];
+  const crumbs=labels.map((label,i)=>page.add('a',prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),label,{x:10+i*100,y:40,width:90,height:20},panel));
+  const icon=page.add('span',null,'',{x:415,y:41,width:16,height:16},crumbs[4]);icon.attrs.class='maptree-icon-workflow';
+  const path=crumbs.map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[hidden].style.display='none';crumbs[hidden].box={x:0,y:0,width:0,height:0};
+  const body=page.add('g',prefix+';Graph;'+label.replaceAll(' ','_'),'',{x:100,y:200,width:60,height:60});
+  page.add('span',body.attrs['data-tid']+';Label;Label',label,{x:90,y:170,width:100,height:20},body);
+  page.add('g',body.attrs['data-tid']+';Setting','',{x:130,y:205,width:20,height:20},body.parentElement);
+  const model=page.graphModels.get(body.parentElement),native=model.byTid.get(body.attrs['data-tid']);native.FGuid=guid;native.FIconCls='bg-vendor-icon-groupdata';
+  if(fault==='visible_label')crumbs[(hidden+1)%5].ownText+=' foreign';
+  if(fault==='path')path[hidden].tid+='-foreign';
+  if(fault==='duplicate')page.add('a',crumbs[hidden].attrs['data-tid'],crumbs[hidden].ownText,crumbs[hidden].box,panel);
+  if(fault==='visibility')crumbs[hidden].style.visibility='hidden';
+  if(fault==='opacity')crumbs[hidden].style.opacity='0';
+  if(fault==='attribute')crumbs[hidden].attrs.hidden='';
+  if(fault==='icon'){crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};icon.style.visibility='hidden';}
+  if(fault==='panel')panel.style.display='none';
+  if(fault==='native')model.model.FDiagram.FmxGraph.container={};
+  const options={expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:guid},workflow_ref:{prefix,navigation_path:path}}})};
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,options,
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:fault==='node'?'foreign':guid,surface:'graph',tid:body.attrs['data-tid']})));
+  const accepted=fault==='none';
+  assert.equal(result.output.workflow_navigation?.status==='observed',accepted,run+':'+hidden+':'+fault);
+  assert.equal(JSON.stringify(result.output.navigation_context?.path)===JSON.stringify(path),accepted,run+':'+hidden+':'+fault);
+  if(fault!=='unbound')assert.equal(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting')?.allowed_actions.includes('begin_wizard')===true,accepted,run+':'+hidden+':'+fault);
+  if(accepted){
+   assert.ok(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting').allowed_actions.includes('open_wizard'),JSON.stringify(result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+';Setting')));
+   assert.ok(result.output.ui.elements.filter(e=>e.tid===crumbs[hidden].attrs['data-tid']).every(e=>!e.allowed_actions.length));
+   const narrow=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{...options,root_ref:result.output.graph_identity.container_ref},
+    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:guid,surface:'graph',tid:body.attrs['data-tid']})));
+   assert.deepEqual(narrow.output.navigation_context.path,path);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D52b input0 Done retains its exact hidden workflow ancestor through one native graph return',async()=>{
+ for(const fault of ['none','node','workflow','visibility','icon','guid','opening']){
+  const {page,owner,crumbs}=await inputPortFinishFixture();
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};crumbs[4].children[0].box={x:0,y:0,width:0,height:0};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:!owner.isConnected&&fault==='node'?'foreign':'node',surface:owner.isConnected?'wizard':'graph',tid:owner.isConnected?'MF;TF-5;WizrdMCF':'MF;TF-5;Graph;Revenue',
+    ...(owner.isConnected?{input_port:{direction:'input',port:0,native_index:0,port_guid:fault==='guid'?'':'input-0',opening_operation_id:fault==='opening'?'':'open-input',node_icon_class:'bg-vendor-icon-calcdata'},navigation_node:{tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()}}:{})})));
+  const snapshot=await page.observe(),done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  if(['guid','opening'].includes(fault)){assert.equal(done,undefined,fault);continue;}
+  assert.ok(done,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(fault==='workflow')crumbs[4].ownText='Другой сценарий';
+   if(fault==='visibility')crumbs[4].style.visibility='hidden';
+   if(fault==='icon')crumbs[4].children[0].style.visibility='hidden';
+  };
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(r.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(r.trace.some(e=>e.event==='input_port_finish_verified'),fault==='none',fault);
+ }
+});
 
 test('typed input-port finish is offered only with full mapping and exact owner evidence',async()=>{
   for(const mode of ['valid','missing_context','missing_mapping','duplicate_done']){
@@ -5733,6 +6165,22 @@ test('D47b hidden JS output0 node keeps its owned socket context and typed Close
   assert.equal(!!yes?.wizard_close_confirmation?.output_port,mode==='valid',mode);
   assert.deepEqual(page.events,[]);
  }
+});
+
+test('the observed second native cancellation dialog offers typed Close after a Preview error',async()=>{
+ const {page}=outputPortFinishFixture();
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node',output_port:{direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'}})));
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+ page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox-1;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox-1;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ const snapshot=(await page.observe()),yes=snapshot.ui.elements.find(e=>e.tid==='msgbox-1;tlb;yes');
+ assert.ok(yes.wizard_close_confirmation);
+ assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+ assert.deepEqual(page.events,[]);
 });
 
 test('typed output-port finish confirms one gesture and quiet return to the exact graph',async()=>{
@@ -6433,7 +6881,7 @@ test('scrolled process window offers native-bound rows without claiming complete
 });
 
 test('native process captions containing code tokens remain process controls, not editors',async()=>{
- for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor']){
+ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor','Точные токены Bread и Milk','Token count','Проверка пароля','secret report','api_key statistics']){
   const f=scrolledProcessWindowFixture(prefix),path='Root>'+name.replace(/\s/g,'_');
   for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']=prefix+';ProgressForm;'+column+path;
   f.cell.ownText=name;
@@ -6444,6 +6892,31 @@ test('native process captions containing code tokens remain process controls, no
   assert.ok(!row.allowed_actions.includes('fill'));assert.ok(!row.allowed_actions.includes('double_click'));
   const result=await f.page.act({verb:'right_click',ref:row.ref},s);
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ }
+});
+
+test('process caption keywords preserve secret field and session value redaction',async()=>{
+ const {createRedactor}=await import('../lib/redact.mjs');
+ for(const mode of ['safe','name','id','aria-label','autocomplete','ancestor','password','hidden','file']){
+  const f=scrolledProcessWindowFixture(),path='Root>Точные_токены_Bread_и_Milk';
+  for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']='ConsoleForm;ProgressForm;'+column+path;
+  f.cell.ownText='Точные токены Bread и Milk';
+  if(['name','id','aria-label','autocomplete'].includes(mode))f.cell.attrs[mode]='password';
+  if(mode==='ancestor')f.rows[0].attrs['aria-label']='secret';
+  if(['password','hidden','file'].includes(mode)){
+   f.cell.tagName='INPUT';f.cell.attrs.type=mode;
+  }
+  const observed=await f.page.observe();
+  if(mode!=='safe'){
+   assert.equal(observed.ui.elements.some(e=>e.process_row),false,mode);continue;
+  }
+  assert.ok(observed.ui.elements.some(e=>e.process_row));
+  const secret='session-sensitive-value',key='sk-'+ 'a'.repeat(24);
+  f.cell.ownText+=' '+secret+' '+key;
+  const redactor=createRedactor([secret]),clean=redactor.redact(await f.page.observe());
+  assert.ok(clean.ui.elements.some(e=>e.process_row));
+  assert.ok(!JSON.stringify(clean).includes(secret));assert.ok(!JSON.stringify(clean).includes(key));
+  assert.ok(JSON.stringify(clean).includes('Точные токены'));
  }
 });
 
@@ -7332,4 +7805,42 @@ test('D70 blocking window diagnostics retain native visibility and geometry with
  root.remove();const replacement=page.add('div','OpenDialogForm','',root.box);replacement.attrs.class='x-window';
  assert.equal((await run()).windows[0].status,'incarnation_changed');
  assert.equal(page.events.filter(e=>e==='click').length,0);
+});
+
+// LAB-454 nav-preflight:2332-2342: Join input0 Close keeps nine exact
+// native breadcrumbs, but Scenario, node and input ancestry all overflow.
+test('D2 Join long native ancestry keeps typed Close for both input roles',async()=>{
+ for(const port of [0,1])for(const fault of ['none','visible_label','native','component','icon','mode','guid','opening']) {
+  const {page,binding}=await joinInputPortOverflowFixture('d52_valid',port);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='l454t_d52b2_Проверка_длинного_пути_пакета_кластеризации_и_повторной_настройки_входного_порта_после_сох';
+  for(const [i,c]of crumbs.entries()){
+   c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','Центры_и_число_точек');
+   if(i===2)c.ownText=name;if(i===5)c.ownText='Центры и число точек';
+   if(i>=4){c.style.display='none';c.box={x:0,y:0,width:0,height:0};for(const icon of c.children)icon.box={...c.box};}
+  }
+  const path=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.textContent.trim()}));
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  page.add('span',null,'',crumbs[6].box,crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable','',undefined,wizard).attrs.class=fault==='mode'?'':'x-form-cb-checked';
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks','',undefined,wizard);
+  class ModelNodeTreeNode{};const native=new ModelNodeTreeNode();native.FGuid=fault==='native'?'foreign':'node';
+  page.app.ModelNodeTreeNode=ModelNodeTreeNode;
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:native}}}})}}}}};
+  crumbs[5].id='join-node';page.context.Ext={getCmp:id=>id===crumbs[5].id&&fault!=='component'?{el:{dom:crumbs[5]},_node:{data:{node:native}}}:null};
+  if(fault==='visible_label')crumbs[3].ownText='Другой модуль';
+  if(fault==='icon')crumbs[5].children[0].style.visibility='hidden';
+  if(fault==='guid')binding.input_port.port_guid='';
+  if(fault==='opening')binding.input_port.opening_operation_id='';
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const result=await page.execute({mode:'observe',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}});
+  const yes=result.output.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,fault==='none',port+':'+fault);
+  assert.deepEqual(page.events,[]);
+ }
 });

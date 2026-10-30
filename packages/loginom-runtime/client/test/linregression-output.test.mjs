@@ -1,10 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {linRegressionOutputColumns,configureLinRegressionOutputs} from '../lib/linregression-output.mjs';
+import {linRegressionOutputColumns,configureLinRegressionOutputs,readLinRegressionOutputs} from '../lib/linregression-output.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 const configuration={fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},{name:'Factor',label:'Фактор',type:'real',usage_type:3},{name:'Response',label:'Цель',type:'real',usage_type:4}]};
+
+test('saved-model application defers intrinsic output schemas until execution without opening a wizard',async()=>{
+ const channel={openOutputPort:()=>assert.fail('apply must not open the inactive coefficient wizard'),
+  observe:()=>assert.fail('apply must not read an unmaterialized coefficient inventory'),perform:()=>assert.fail('apply must preserve output settings')};
+ const before=structuredClone(configuration);
+ for(let i=0;i<2;i++){
+  const result=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail('no commit'));
+  assert.equal(result.verified,true);assert.equal(result.effect_possible,false);assert.equal(result.deferred_schema,true);
+  assert.deepEqual(result.ports,[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)})));
+  assert.deepEqual(configuration,before);
+ }
+});
+
+test('apply still refuses changed coefficient fields when reading the fresh executed output',async()=>{
+ const mapped={ports:[{port:1,schema:linRegressionOutputColumns(configuration,1)}]};
+ const actual={port:1,schema:[{name:'Name',label:'Имена входных полей',type:'string'},{name:'Different',label:'Цель|Коэффициенты',type:'real'}]};
+ const channel={readOutputPort:async()=>({output:actual})};
+ await assert.rejects(readLinRegressionOutputs(channel,{ports:[1],sample_rows:10,require_exact_numbers:true},
+  {portExecution:{},execution:{execution_id:'fresh'},receipt_id:'read'},mapped));
+});
 
 function configuredCoefficients(){
  const columns=[['Name','Имена входных полей','string'],['DisplayName','Метки входных полей','string'],['UniqueValues','Уникальные значения','string'],['Response_coefficients','Цель|Коэффициенты','real'],...['stdError','TStat','PValue','lowerBound','upperBound'].map(s=>['Response_'+s,'Цель|'+s,'real'])];

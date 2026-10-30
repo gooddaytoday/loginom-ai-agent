@@ -3,12 +3,14 @@ from contextlib import redirect_stdout
 import csv
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -18,6 +20,275 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 's-server-a'
+            source.mkdir()
+            (source / 'task.md').write_text('Сумма продаж по регионам')
+            (source / 'data').mkdir()
+            case = runner.scenario('s-server-a', cases=root)
+            self.assertEqual(case['prompt'], source / 'task.md')
+            self.assertIsNone(case['base'])
+            self.assertTrue(case['external'])
+            self.assertEqual(list(case['data'].iterdir()), [])
+            with self.assertRaises(ValueError):
+                runner.scenario('../s-server-a', cases=root)
+
+    def test_flat_pair_preserves_the_assigned_account(self):
+        config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}
+        self.assertEqual(runner.pair_login(config, 'worker.json'), config)
+    def make_runner(self, root, names=('s1',)):
+        runner.write(root / 'request.json', {'pair': str(root / 'pair'), 'cold': True,
+                                           'host_load_max': 8, 'spacing': 60})
+        (root / 'pair').mkdir()
+        runner.write(root / 'pair/worker.json', {'package_directory': '/test', 'loginom': {
+            'username': 'test', 'password': 'test', 'url': 'https://example.test', 'api_key': 'test'}})
+        runner.write(root / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
+            'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
+        return runner.Runner(root)
+
+    def test_gate_and_setup_times_are_separate(self):
+        for exhausted in [False, True]:
+            with self.subTest(exhausted=exhausted), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                instance = self.make_runner(root)
+                instance.current = instance.report['runs'][0]
+                clock = [100.0]
+                instance.deadline = 102 if exhausted else 1000
+                instance.last_start = 43
+                saved = []
+                save = instance.save
+                def capture():
+                    saved.append(copy.deepcopy(instance.report))
+                    save()
+                def sleep(seconds):
+                    self.assertEqual(instance.report['phase'], 'gate:setup')
+                    clock[0] += seconds
+                child = unittest.mock.Mock(pid=12345, returncode=0)
+                child.poll.side_effect = [None, 0]
+                child.wait.side_effect = lambda **kw: clock.__setitem__(0, clock[0] + 5)
+                with patch.object(runner.time, 'time', side_effect=lambda: clock[0]), \
+                     patch.object(runner.time, 'sleep', side_effect=sleep), \
+                     patch.object(runner.os, 'getloadavg', side_effect=lambda: (9, 9, 9) if clock[0] < 102 else (0, 0, 0)), \
+                     patch.object(runner.subprocess, 'Popen', return_value=child) as popen, \
+                     patch.object(instance, 'memory', return_value={}), \
+                     patch.object(instance, 'save', side_effect=capture):
+                    if exhausted:
+                        with self.assertRaises(TimeoutError): instance.phase('setup', ['unused'], root)
+                        popen.assert_not_called()
+                    else:
+                        instance.phase('setup', ['unused'], root)
+                timing = instance.report['phase_timings'][0]
+                self.assertEqual(timing['queue_seconds'], 2 if exhausted else 3)
+                self.assertEqual(timing['duration_seconds'], 0 if exhausted else 5)
+                self.assertEqual(timing['started'], None if exhausted else 103)
+                self.assertEqual(saved[0]['phase'], 'gate:setup')
+                self.assertIn('queue', runner.summary(instance.report))
+
+    def test_expired_batch_does_not_launch_later_scenarios(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = self.make_runner(root, ('s1', 's2', 'E1'))
+            calls = []
+            def phase(name, command, folder, **kwargs):
+                calls.append((name, folder.name))
+                instance.deadline = 0
+                instance.report['phase'] = name
+                raise TimeoutError('setup deadline')
+            with patch.object(instance, 'build', return_value=root / 'build'), \
+                 patch.object(instance, 'phase', side_effect=phase), \
+                 patch.object(instance, 'prepare_d87') as prepare:
+                instance.run()
+            self.assertEqual(calls, [('setup', 's1')])
+            prepare.assert_not_called()
+            runs = instance.report['runs']
+            self.assertEqual([r['status'] for r in runs], ['UNKNOWN', 'NOT_RUN', 'NOT_RUN'])
+            self.assertTrue(all('failure_class' not in r and 'profile' not in r for r in runs[1:]))
+            self.assertIn('не запущен (бюджет пакета)', runner.summary(instance.report))
+
+    def test_batch_budget_expires_in_setup_gate_without_a_setup_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = self.make_runner(root, ('s1', 'E1'))
+            instance.deadline = 102
+            clock = [100.0]
+            def sleep(seconds): clock[0] += seconds
+            with patch.object(instance, 'build', return_value=root / 'build'), \
+                 patch.object(runner.time, 'time', side_effect=lambda: clock[0]), \
+                 patch.object(runner.time, 'sleep', side_effect=sleep), \
+                 patch.object(runner.os, 'getloadavg', return_value=(9, 9, 9)), \
+                 patch.object(runner.subprocess, 'Popen') as popen, \
+                 patch.object(instance, 'prepare_d87') as prepare:
+                instance.run()
+            popen.assert_not_called()
+            prepare.assert_not_called()
+            self.assertEqual([r['status'] for r in instance.report['runs']], ['NOT_RUN', 'NOT_RUN'])
+            self.assertTrue(all('failure_class' not in r for r in instance.report['runs']))
+            timing = instance.report['phase_timings'][0]
+            self.assertEqual((timing['queue_seconds'], timing['duration_seconds']), (2, 0))
+            self.assertFalse((root / 's1/setup.stdout').exists())
+            with patch.object(sys, 'argv', ['run-check.py', 'wait', str(root), '--timeout', '0']), redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.main(), 1)
+
+    def test_header_modes_follow_the_export_contract(self):
+        for name in ['s8', 'q6', 'p24', 's1', 'p17', 'p25']:
+            self.assertEqual(runner.scenario(name)['csv_header'], 'labels' if name in ['s8', 'q6', 'p24'] else 'names', name)
+
+    def test_s8_csv_header_contract_reaches_stock_cold_matcher(self):
+        # LAB-446 s8-A/cold-1-execution-events.jsonl:260: native names
+        # Region/Category/Revenue, saved CSV uses the required Russian labels.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = self.make_runner(root, ('s8',))
+            def phase(name, command, folder, **kwargs):
+                instance.report['phase'] = name
+                profile = root / 's8/profile'
+                if name == 'setup':
+                    (profile / 'data').mkdir(parents=True)
+                    (profile / 'config').mkdir()
+                    runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                if name == 'model':
+                    expected = runner.read(folder / 'expected.json')['outputs'][0]
+                    events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                        'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                        {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                        {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                            'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                    (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                    runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                    runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                    destination = Path(expected['export_destination']).name
+                    with (profile / destination).open('w') as file:
+                        writer = csv.writer(file)
+                        writer.writerow([c['label'] if folder.name == 's8' else c['name'] for c in expected['columns']])
+                        writer.writerows([[r[c['name']] for c in expected['columns']] for r in expected['rows']])
+                if name == 'cold':
+                    command = list(map(str, command))
+                    mode = command[command.index('--csv-header') + 1]
+                    expected = command[command.index('--expected') + 1]
+                    actual = command[command.index('--csv') + 1]
+                    script = """
+import {readFileSync} from 'node:fs';
+import {matchExpectedOutputs,parseExportCsvHeader} from './scripts/node-acceptance/expected-outputs.mjs';
+const [expected,csv,header]=process.argv.slice(1),want=JSON.parse(readFileSync(expected)).outputs[0];
+const node={node_id:'rename'},schema=want.columns.map(c=>({name:c.name,label:c.label,type:c.type}));
+const data={schema,row_count:want.rows.length,sample_complete:true,precision:{numbers_verified:true},
+ sample:want.rows.map(r=>schema.map(c=>({type:c.type,is_null:false,value:r[c.name]})))};
+matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}],[want],{
+ exportInput:{node:{ref:node},output_port:0,destination:want.export_destination,
+ input_fields:schema.map(c=>({...c,source_name:c.name}))},
+ exportCsv:{columns:parseExportCsvHeader(readFileSync(csv,'utf8')),header}});
+"""
+                    result = subprocess.run(['node', '--input-type=module', '-e', script, expected, actual, mode],
+                                            cwd=runner.REPO, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(mode, 'labels')
+                    (folder / 'cold').mkdir()
+                    runner.write(folder / 'cold/result.json', {'status': 'PASS', 'settingsReapplied': False,
+                        'cleanup': {'package_closed': True, 'logged_out': True}})
+            with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                instance.run()
+            self.assertEqual(instance.report['runs'][0]['status'], 'PASS', instance.report['runs'][0])
+
+
+    def test_pair_directory_formats_and_unknown_key(self):
+        for key in ['package_directory', 'personal_folder']:
+            with self.subTest(key=key):
+                login = runner.pair_login({'loginom': {'username': 'test'}, key: '/test'}, 'worker.json')
+                self.assertEqual(login['package_directory'], '/test')
+        with self.assertRaisesRegex(ValueError, 'worker.json.*package_directory.*personal_folder.*mystery'):
+            runner.pair_login({'loginom': {'username': 'test'}, 'mystery': '/test'}, 'worker.json')
+
+    def test_d87_catalog_and_default_excludes_heavy(self):
+        self.assertEqual(runner.scenario_names('D87'), ['E1', 'E2'])
+        self.assertEqual(runner.scenario_names('E3'), ['E3'])
+        self.assertEqual(runner.scenario_names('X1', '/external-cases'), ['X1'])
+        for name in ['E1', 'E2', 'E3', 'X1']:
+            case = runner.scenario(name)
+            self.assertEqual(case['heavy'], name in ['E3', 'X1'])
+        with self.assertRaisesRegex(ValueError, 'LAB-413'):
+            runner.scenario_names('X1')
+
+    def test_d87_real_generator_manifest_oracle_and_model_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def generate(phase, command, folder):
+                subprocess.run(list(map(str, command)), check=True, capture_output=True)
+            with patch.dict(runner.D87['E1'], generator=['--rows', '233']):
+                with patch.object(instance, 'phase', side_effect=generate):
+                    instance.prepared_case = instance.prepare_d87('E1', root)
+            spec = instance.prepared_case
+            manifest = runner.read(spec['source'] / 'manifest.json')
+            expected = runner.expected_for(spec, '/test/result.lgp')
+            self.assertEqual(sum(r['row_count'] for r in expected['outputs'][0]['rows']), 233)
+            self.assertEqual({r['region']: round(r['amount_sum'] * 100) for r in expected['outputs'][0]['rows']}, manifest['sums_minor_by_region'])
+            for mode in ['E1', 'E2']:
+                workspace, folder = root / (mode + '-workspace'), root / (mode + '-model')
+                workspace.mkdir(); folder.mkdir()
+                instance.prepared_case = dict(spec, attachment=runner.D87[mode]['attachment'])
+                with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                    with self.assertRaises(InterruptedError):
+                        instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
+                                       {'package_directory': '/test'}, root / 'build')
+                command = list(map(str, phase.call_args.args[1]))
+                attached = [command[i+1] for i, v in enumerate(command) if v == '--file']
+                self.assertEqual(attached, [str(spec['local_file'])] if mode == 'E2' else [])
+                self.assertEqual(list(workspace.iterdir()), [])
+                self.assertNotIn('sums_minor', command[-1])
+                for row in expected['outputs'][0]['rows']:
+                    self.assertNotIn(str(row['amount_sum']), command[-1])
+
+    def test_d87_cleanup_uses_prefixed_receipt_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'd87-123-E1.csv'
+            source.write_text('input')
+            (root / 'fixtures').mkdir()
+            runner.write(root / 'fixtures/manifest.json', {'bytes': 5})
+            stage = root / 'E1'
+            stage.mkdir()
+            name = 'a' * 64 + '-' + source.name
+            reply = {'artifact': {'bytes': 5, 'upload': {'destination': '/test/' + name}}}
+            (stage / 'model.stdout').write_text(json.dumps({'type': 'tool_use', 'part': {
+                'tool': 'loginom_file_admit', 'state': {'status': 'completed', 'output': json.dumps(reply)}}}) + '\n')
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.current = {'dataset': str(source)}
+            with patch.object(instance, 'phase', side_effect=InterruptedError):
+                with self.assertRaises(InterruptedError):
+                    instance.cleanup_d87(root, {'package_directory': '/test'}, root / 'build')
+            config = runner.read(root / 'dataset-cleanup-config.json')
+            self.assertIn(name, config['names'])
+            self.assertIn(source.name, config['names'])
+
+    def test_d87_cleanup_removes_owned_inputs_even_on_storage_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'd87-test-E1.csv'
+            source.write_text('input')
+            manifest = root / 'manifest.json'
+            manifest.write_text('{}')
+            profile = root / 'profile'
+            profile.mkdir()
+            large = profile / 'opaque-attachment'
+            with large.open('wb') as f: f.truncate(1000000001)
+            outside = root.parent / (root.name + '-unrelated.csv')
+            outside.write_text('keep')
+            try:
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.current = {'dataset': str(source)}
+                with patch.object(instance, 'phase', side_effect=RuntimeError('storage failed')):
+                    with self.assertRaisesRegex(RuntimeError, 'storage failed'):
+                        instance.cleanup_d87(root, {'package_directory': '/test'}, root / 'build')
+                self.assertFalse(source.exists())
+                self.assertFalse(large.exists())
+                self.assertTrue(outside.exists())
+                self.assertTrue(manifest.exists())
+                self.assertEqual(instance.current['dataset-cleanup'], 'storage FAIL; disk PASS')
+            finally: outside.unlink()
+
     def test_all_87_model_commands_attach_initial_data_and_not_repeat_inputs(self):
         names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
                   for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
@@ -67,10 +338,10 @@ class RunCheckTests(unittest.TestCase):
             expected = {'nodes': [], 'outputs': [{'output_node_type': 'export_input',
                 'ordered': False, 'columns': [{'name': 'region', 'type': 'string'}, {'name': 'amount', 'type': 'real'}],
                 'rows': [{'region': 'North', 'amount': 123456789}]}]}
-            for mode in ['path', 'file']:
+            for mode in ['path', 'file', 'E1']:
                 case = root / mode
                 (case / 'data').mkdir(parents=True)
-                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': mode})
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path' if mode == 'E1' else mode})
                 runner.write(case / 'expected.json', expected)
                 (case / 'task.md').write_text('В файле ' + str(source) + ' продажи. Построй сумму продаж по регионам')
                 instance = runner.Runner.__new__(runner.Runner)
@@ -90,6 +361,86 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(runner.read(folder / 'expected.json')['outputs'][0]['rows'][0]['amount'], 123456789)
             with self.assertRaisesRegex(ValueError, 'Invalid external case name'):
                 runner.scenario('../path', root)
+
+    def test_upload_only_external_request_does_not_add_save_or_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'input.csv'
+            source.write_text('a\n1\n')
+            case = root / 'upload'
+            (case / 'data').mkdir(parents=True)
+            runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path', 'upload_only': True})
+            runner.write(case / 'expected.json', {'nodes': [], 'outputs': []})
+            prompt = 'Загрузи ' + str(source) + ' в Loginom'
+            (case / 'task.md').write_text(prompt)
+            workspace, folder = root / 'workspace', root / 'run'
+            workspace.mkdir(); folder.mkdir()
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options = root, {}, {'case_root': str(root)}
+            with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                with self.assertRaises(InterruptedError):
+                    instance.model('upload', folder, root / 'profile', workspace, '/test/result.lgp',
+                                   {'package_directory': '/test'}, root / 'build')
+            command = list(map(str, phase.call_args.args[1]))
+            self.assertEqual(command[-1], prompt)
+            self.assertNotIn('--file', command)
+            self.assertEqual(list(workspace.iterdir()), [])
+            # Observed user-v1 CLI delivery envelope, not the internal job snapshot.
+            profile = root / 'profile'
+            profile.mkdir()
+            cleanup = {'package_closed': True, 'logged_out': True, 'package_path': None,
+                       'save_operation_id': None, 'unsaved_changes_discarded': False}
+            runner.write(profile / 'saved-package-cleanup.json', cleanup)
+            runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+            reply = {'upload_status': 'ready', 'state': 'settled', 'status': 'SUCCEEDED',
+                     'cleanup_complete': True, 'output': {'bytes': source.stat().st_size,
+                     'upload_completion_verified': True}}
+            for fault in [None, 'wrong-size', 'not-ready', 'unconfirmed', 'unsettled', 'duplicate', 'save', 'node', 'dirty', 'no-ack']:
+                with self.subTest(fault=fault):
+                    sample = copy.deepcopy(reply)
+                    if fault == 'wrong-size': sample['output']['bytes'] += 1
+                    if fault == 'not-ready': sample['upload_status'] = 'uploading'
+                    if fault == 'unconfirmed': sample['cleanup_complete'] = False
+                    if fault == 'unsettled': sample['state'] = 'running'
+                    events = [{'type': 'tool_use', 'sessionID': 'own-session', 'part': {
+                        'tool': 'loginom_dock_artifact_deliver',
+                        'state': {'status': 'completed', 'output': runner.json.dumps(sample)}}}]
+                    if fault == 'duplicate': events += copy.deepcopy(events)
+                    if fault in ['save', 'node']:
+                        events.append({'type': 'tool_use', 'part': {
+                            'tool': 'loginom_dock_action_run' if fault == 'save' else 'loginom_dock_node_apply',
+                            'state': {'status': 'error', 'input': {'action_key': 'package.save_checkpoint'}}}})
+                    runner.write(profile / 'saved-package-cleanup.json', dict(cleanup,
+                        package_closed=fault != 'dirty', logged_out=fault != 'dirty'))
+                    runner.write(profile / 'runtime-close-1.json', {'closed_ack': fault != 'no-ack'})
+                    def output(*args, **kwargs):
+                        (folder / 'model.stdout').write_text('\n'.join(map(runner.json.dumps, events)) + '\n')
+                    instance.current = {}
+                    with patch.object(instance, 'phase', side_effect=output):
+                        if fault:
+                            with self.assertRaisesRegex(AssertionError, {'duplicate': 'UPLOAD_COUNT', 'save': 'UNEXPECTED_SAVE', 'node': 'UNEXPECTED_NODE', 'dirty': 'MAIN_CLEANUP_UNCONFIRMED', 'no-ack': 'RUNTIME_CLOSE_ACK_MISSING'}.get(fault, 'UPLOAD_NOT_READY')):
+                                instance.model('upload', folder, profile, workspace, '/test/result.lgp',
+                                               {'package_directory': '/test'}, root / 'build')
+                        else:
+                            instance.model('upload', folder, profile, workspace, '/test/result.lgp',
+                                           {'package_directory': '/test'}, root / 'build')
+                            self.assertEqual(instance.current['cleanup'], 'main PASS')
+                            self.assertEqual(instance.current['save'], '0')
+
+    def test_upload_only_generated_case_uses_64_mib_and_plain_request(self):
+        self.assertEqual(runner.scenario('upload_only')['generator'], ['--min-bytes', '67108864'])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def generate(phase, command, folder):
+                subprocess.run(list(map(str, command)), check=True, capture_output=True)
+            with patch.dict(runner.D87['upload_only'], generator=['--rows', '10']):
+                with patch.object(instance, 'phase', side_effect=generate):
+                    spec = instance.prepare_d87('upload_only', root)
+            self.assertEqual(spec['prompt'].read_text(), 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n')
+            self.assertEqual(runner.expected_for(spec, '/test/result.lgp')['outputs'], [])
+            self.assertTrue(spec['upload_only'])
 
     def test_memory_observation_is_scoped_to_its_exact_process(self):
         instance = runner.Runner.__new__(runner.Runner)
@@ -354,6 +705,107 @@ class RunCheckTests(unittest.TestCase):
         reply['cleanup_complete'] = False
         self.assertEqual(runner.port_failure([(44, reply)], 'model.stdout'), 'model.stdout:44')
 
+    def test_inspect_uses_the_nested_port_receipt(self):
+        # Reduced shape from LAB-416 fail-logs/l416-c-jscombined/jscombined/model.stdout:265.
+        # inspect.output.outcome is the public action; its output is the read receipt.
+        receipt = {'cleanup_complete': True, 'output': {'ports': [{
+            'port': 0, 'schema': [], 'sample': [],
+            'freshness_basis': 'completed_execution_port_source'}]}}
+        reply = {'status': 'SUCCEEDED', 'action_key': 'operation.inspect', 'output': {
+            'cleanup_confirmed': True, 'outcome': {'status': 'SUCCEEDED',
+                'action_key': 'node.apply', 'cleanup_complete': True, 'output': receipt}}}
+        self.assertIsNone(runner.port_failure([(265, reply)], 'model.stdout'))
+        reads = list(runner.ports(reply))
+        self.assertEqual([runner.port_path(owner, port) for owner, port in reads], ['port'])
+        for cleanup in [False, None]:
+            receipt['cleanup_complete'] = cleanup
+            with self.subTest(cleanup=cleanup):
+                self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+        # A successful sibling or outer wrapper cannot attest this read's cleanup.
+        reply['cleanup_complete'] = True
+        reply['output']['sibling'] = self.native_reply()
+        self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+        receipt.clear()
+        receipt.update(self.native_reply())
+        self.assertIsNone(runner.port_failure([(265, reply)], 'model.stdout'))
+        self.assertEqual({runner.port_path(owner, port) for owner, port in runner.ports(reply)}, {'native'})
+        receipt['execution']['execution_id'] = 'other'
+        self.assertEqual(runner.port_failure([(265, reply)], 'model.stdout'), 'model.stdout:265')
+
+    def test_cold_receives_the_last_checked_export_and_its_delimiter(self):
+        # LAB-414 repeat/cold.stderr:5: actual.csv was absent; the downloads
+        # were actual-1.csv (assignments) and actual-2.csv (centers).
+        for count, corrupt in [(1, None), (2, None), (2, 0), (2, 1)]:
+            with self.subTest(exports=count, corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'points.csv'
+                source.write_text('X,Y,RowID\n0,20,1\n')
+                case = root / 'cases/repeat'
+                (case / 'data').mkdir(parents=True)
+                names = ['assignments.csv', 'centers.csv'][:count]
+                (case / 'task.md').write_text('Выгрузи ' + ' и '.join(names))
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                columns = [
+                    [{'name': name, 'type': 'real'} for name in ['Cluster', 'Distance', 'RowID', 'X', 'Y']],
+                    [{'name': name, 'type': 'real'} for name in ['Cluster', 'X', 'Y']]][:count]
+                rows = [{'Cluster': 2, 'Distance': 0.14142135623730953, 'RowID': 1, 'X': -0.1, 'Y': -0.1},
+                        {'Cluster': 0, 'X': 0, 'Y': 20}][:count]
+                runner.write(case / 'expected.json', {'package_path': '/test/result.lgp', 'nodes': [],
+                    'outputs': [{'output_node_type': 'datamining.clustering', 'output_port': i,
+                        'columns': cols, 'rows': [rows[i]]} for i, cols in enumerate(columns)]})
+                out = root / 'run'
+                out.mkdir()
+                runner.write(out / 'request.json', {'case_root': str(root / 'cases'), 'pair': str(root / 'pair'), 'cold': True})
+                (root / 'pair').mkdir()
+                runner.write(root / 'pair/worker.json', {'package_directory': '/test', 'loginom': {
+                    'username': 'test', 'password': 'test', 'url': 'https://example.test', 'api_key': 'test'}})
+                runner.write(out / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
+                    'started': time.time(), 'runs': [{'scenario': 'repeat', 'status': 'PENDING'}]})
+                instance = runner.Runner(out)
+                cold_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    instance.report['phase'] = name
+                    profile = out / 'repeat/profile'
+                    if name == 'setup':
+                        (profile / 'data').mkdir(parents=True)
+                        (profile / 'config').mkdir()
+                        runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                    if name == 'model':
+                        # Replace the process boundary; model still parses events
+                        # and validates every downloaded CSV itself.
+                        events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                            'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                            {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                            {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                                'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                        (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                        runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                        runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                        for i, cols in enumerate(columns):
+                            delimiter = ',' if i == 0 else ';'
+                            (profile / ('run-repeat-' + names[i])).write_text(
+                                delimiter.join(c['name'] for c in cols) + '\n' +
+                                delimiter.join('999' if i == corrupt and j == 0 else str(rows[i][col['name']])
+                                               for j, col in enumerate(cols)) + '\n')
+                    if name == 'cold':
+                        command = list(map(str, command))
+                        actual = Path(command[command.index('--csv') + 1])
+                        cold_calls.append(actual.name)
+                        self.assertTrue(actual.is_file(), str(actual))
+                        self.assertEqual(actual.name, 'actual.csv' if count == 1 else 'actual-2.csv')
+                        self.assertEqual(command[command.index('--csv-delimiter') + 1], ',' if count == 1 else ';')
+                        self.assertEqual(len(runner.read(Path(command[command.index('--expected') + 1]))['outputs']), count)
+                        (folder / 'cold').mkdir()
+                        runner.write(folder / 'cold/result.json', {'status': 'PASS', 'settingsReapplied': False,
+                            'cleanup': {'package_closed': True, 'logged_out': True}})
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                    instance.run()
+                result = runner.read(out / 'results.json')['runs'][0]
+                self.assertEqual(result['status'], 'PASS' if corrupt is None else 'FAIL', result)
+                self.assertEqual(len(cold_calls), 1 if corrupt is None else 0)
+
     def native_reply(self):
         # Public shape observed in smoke-4/q7/s5/model.stdout:48 on v0.3.3.
         return {'cleanup_complete': True, 'node': {'document_id': 'doc', 'workflow_id': 'flow', 'node_id': 'node'},
@@ -445,7 +897,7 @@ class RunCheckTests(unittest.TestCase):
                 pair = path / 'pair'
                 pair.mkdir()
                 for role in ['worker', 'reviewer']:
-                    runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, 'package_directory': '/test'})
+                    runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, ('package_directory' if exists else 'personal_folder'): '/test'})
                 out = path / ('results' if exists else '.cache/loginom-runs/123')
                 argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 's1', '--pair', str(pair), '--spacing', '0', '--host-load-max', '1000000']
                 if exists: argv += ['--out', str(out)]

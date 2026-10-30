@@ -246,14 +246,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.javascript_wizard_refusal=structuredClone(refusal.proof);
       }
       const importClosed=refusal?.proof?.closed;
-      if(request.target.type==='imports.text'&&request.parameters.source_switch&&refusal?.phase===name
+      if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source_switch&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&(refusal.verification==='text_import_source_switch_schema_refused'&&['configure','output_mapping','finish'].includes(name)
+        &&(refusal.verification===(request.target.type==='imports.excel'?'excel_import_source_switch_schema_refused':'text_import_source_switch_schema_refused')&&['configure','output_mapping','finish'].includes(name)
           &&refusal.execution_started===false&&importClosed?.verified===true&&importClosed.cleanup_complete===true
           &&importClosed.draft_discarded===true&&importClosed.execution_started===false
           &&importClosed.node_context?.surface==='graph'&&importClosed.node_context?.verified===true
           &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])
-          ||refusal.verification==='text_import_full_count_refused'&&name==='read'&&state.execution.status==='completed'
+          ||refusal.verification===(request.target.type==='imports.excel'?'excel_import_full_count_refused':'text_import_full_count_refused')&&name==='read'&&state.execution.status==='completed'
           &&refusal.execution_id===state.execution.execution_id&&Number.isSafeInteger(refusal.expected_records)&&refusal.expected_records>=0
           &&Number.isSafeInteger(refusal.actual_records)&&refusal.actual_records>=0&&refusal.port===0
           &&refusal.freshness_basis==='completed_execution_port_source')){
@@ -300,6 +300,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
+      const regressionRefusal=request.target.type==='datamining.lin_regression'&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification==='linregression_apply_preserved'
+        &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
+        &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
+        &&replacementClosed.node_context?.verified===true
+        &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
       const replacementRefusal=name==='configure'&&request.target.type==='transform.replace_columns'
         &&refusal?.verification==='replacement_effective_preflight_completed'
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
@@ -307,7 +313,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
-          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal)
+          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal||regressionRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
       ){
@@ -399,7 +405,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
+      if(request.target.type==='datamining.lin_regression'&&request.mode==='apply')requireValue(value.mode==='close'
+        &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
+        'Applying a saved regression must discard the inspected draft without committing or training');
+      else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
         &&value.settings_applied===true&&value.execution_started===null&&value.execution_id==null
         &&value.explicit_execute_requested===false&&value.wizard_commit_verified===true
         &&value.graph_owner_verified===true&&value.source_readback_verified===true&&value.owned_done_settled===true,
@@ -452,6 +461,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       state.output=output;
     }
     check();
+    if(request.target.type==='imports.text'&&request.parameters.preview_only===true&&request.finish==='close'&&finish.server_profile)
+      state.output={status:'partial',evidence_ref:operation.id+':finish',ports:[],server_profile:finish.server_profile};
     const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,
       warnings:request.target.type==='imports.text'&&typeof finish.node_label==='string'
@@ -460,13 +471,40 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'use a NEW dock_node_apply operation_id on this SAME existing node with target.label set to the requested caption, '
           +'parameters:{settings:{}}, inputs:[], mappings:[], finish:"execute" and read.ports:[0]. This preserves the saved import configuration without uploading again. '
           +'Otherwise report this actual caption.']:[],
-      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',
-        ...(!readingOnly&&request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
-          node:state.node,phases:state.phases,operation_id:operation.id})}:{})},
+      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
+      try{
+        result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
+      }catch(error){
+        // Projection uses only accepted receipts. Its failure cannot make the
+        // completed UI phases uncertain or strand a quiet node without a phase.
+        result.status='FAILED';result.checkpoint_kind='local_node_failed';result.pending_phase=null;
+        result.error={code:'NODE_CONFIGURATION_READBACK_FAILED',message:String(error.message).slice(0,1000)};
+        result.next_step={tool:'dock_action_run',original_operation_id:operation.id,
+          instruction:'All node phases and cleanup are verified, but the final configuration readback failed. The execution and output receipts are retained. '
+            +'Do not resume this operation, repeat Execute, or recreate the node. Saving or another action is allowed; '
+            +'use package.save_checkpoint with a NEW operation_id and the task package path to save the current scenario, and report the readback failure.'};
+      }
+    }
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    // A completed configure refusal cancels only its own uncommitted draft
+    // through the same receipt/owner/quiet-graph proof as manual release.
+    // Unknown browser completion and a failed cleanup remain pending.
+    if(state.pending?.phase==='configure'&&!operation.transportUncertain
+      &&(error.restConfigureFailure||request.target.type==='exports.text'&&operation.lastReceipt?.action_key==='node.export.next')){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
+      catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
+    }
+    // A cancelled output reread has no unresolved launch. Release only after
+    // its driver proves settled browser cleanup and the same quiet graph.
+    if(readingOnly&&request.mode===NODE_READ_MODE&&request.target.type==='programming.javascript'
+      &&state.pending?.phase==='read'&&signal?.aborted&&error===signal.reason){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,cancelledRead:true});}
+      catch { /* Unconfirmed cleanup or its journal ACK keeps the original phase pending. */ }
+    }
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
     if(readingOnly&&state.pending?.phase==='read'&&error.code==='NODE_READ_SCHEMA_CHANGED')state.read_schema_changed=true;
@@ -506,8 +544,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
  * release proof clears the phase; verified phases keep their facts, while an
  * unverified commit or launch is reported as unknown rather than inferred.
  */
-export async function releaseNodeApply({operation,handlers,drivers,record,signal,releaseBeforeTarget}) {
+export async function releaseNodeApply({operation,handlers,drivers,record,signal,releaseBeforeTarget,failure,cancelledRead=false}) {
   const state=operation.nodeApply,pending=state?.pending??(!state?.node&&state?.target_reconciled?{phase:'target'}:null),request=state?.request;
+  requireValue(!cancelledRead||pending?.phase==='read'&&request?.mode===NODE_READ_MODE
+    &&request.target.type==='programming.javascript','Only a stopped JavaScript output reread can complete as cancelled');
   if(pending&&!state.node&&!state.result&&['source','workflow','target'].includes(pending.phase)&&releaseBeforeTarget){
     validateNodeApplyRequest(request,handlers);
     const proof=await releaseBeforeTarget();
@@ -567,7 +607,8 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       ...(proof.cleanup.views_returned?[readingOnly?'The node visualizers were left during release.'
         :'The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
     configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
-    error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
+    error:failure??(cancelledRead?{code:'NODE_READ_CANCELLED',message:'The local output read was cancelled after confirmed cleanup on the same quiet graph; the completed execution is retained.'}
+      :{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'}),
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,
       instruction:'The stopped text export was released, but its settings, execution and file output remain unverified. '
         +'Do not resume this operation, repeat the export or recreate the node: a file may already have been written. '

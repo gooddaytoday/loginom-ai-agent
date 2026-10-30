@@ -1,7 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {parseCapabilityResult} from '../lib/executor.mjs';
 import {withStorageIdentity,createStorageBinding} from '../lib/storage-policy.mjs';
+import {connectionTimelineScript} from '../lib/connection-recovery.mjs';
+
+test('passive connection timeline timestamps native loss without a server call or gesture',()=>{
+ let at=1000,tick,intervals=0;
+ const connection={Connected:true,FRemoteSession:{},FSession:{}};
+ const form={FMapTree:{FServerConnection:connection},FReconnecting:false};
+ const context=vm.createContext({location:{origin:'https://loginom.invalid'},
+  document:{querySelector:()=>null},bg:{app:{Application:{FInstance:{FMainForm:form}}}},
+  Date:{now:()=>at},setInterval:(callback,ms)=>{assert.equal(ms,1000);intervals++;tick=callback;}});
+ const script=connectionTimelineScript('https://loginom.invalid/app/');
+ vm.runInContext(script,context);vm.runInContext(script,context);assert.equal(intervals,1);
+ at=30000;tick();assert.equal(context.__loginomConnectionTimelineV1.samples.length,1);
+ at=121000;connection.Connected=false;form.FReconnecting=true;tick();
+ const samples=context.__loginomConnectionTimelineV1.samples;
+ assert.equal(samples.length,2);assert.equal(samples[1].at,121000);assert.equal(samples[1].connected,false);
+ assert.equal(samples[1].local_session,true);assert.equal(samples[1].remote_session,true);
+ for(let i=0;i<200;i++){connection.Connected=!connection.Connected;tick();}
+ assert.equal(samples.length,128);assert.equal(context.__loginomConnectionTimelineV1.dropped,74);
+});
 
 function fixture(){
  const c={Connected:true,UserName:'mimo',FRemoteSession:{},FSession:{}};
@@ -53,4 +73,13 @@ test('caller failure is never replayed by connection guard',async()=>{
  const f=fixture();await f.run();f.c.Connected=false;
  f.page.effect=()=>{f.state.effects++;throw Error('uncertain original gesture');};
  await assert.rejects(f.run(),/uncertain original gesture/);assert.equal(f.state.effects,2);assert.equal(f.state.clicks,1);
+});
+
+test('serialized connection guard refusal keeps its cause through the browser error boundary',async()=>{
+ const f=fixture();await f.run();f.c.Connected=false;f.c.FSession={};
+ let response;
+ try{await f.run();}catch(error){response={isError:true,content:[{type:'text',text:String(error)}]};}
+ assert.ok(response);
+ assert.throws(()=>parseCapabilityResult(response),{message:'Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)'});
+ assert.equal(f.state.effects,1);assert.equal(f.state.clicks,0);
 });

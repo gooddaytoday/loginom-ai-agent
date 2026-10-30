@@ -46,20 +46,26 @@ export async function restRequestCapability(page,t,readContext){
  const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
  const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',base=root+';RESTRequestWizard;ParamLinks;';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
- let effect=false;
+ let effect=false,step='owned wizard',control=root;
  try{
   const guard=async()=>{remaining();const b=await readContext(page,binding);need(b.verified&&b.surface==='wizard'&&b.node_id===t.node.node_id,'owned node wizard changed');need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
-  const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
+  const wait=async(label,read)=>{
+   step=label;const deadline=Math.min(t.deadline,Date.now()+30000);
+   while(Date.now()<deadline){await guard();const v=await read();if(Date.now()>=deadline)break;if(v)return v;await page.waitForTimeout(Math.min(80,deadline-Date.now()));}
+   throw Object.assign(Error('REST request: '+label+' timed out (30000 ms maximum); control '+control),{code:'REST_CONFIGURE_STEP_TIMEOUT'});
+  };
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
-  const point=async tid=>{need(await find(tid).count()===1,'control is ambiguous');return find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable');return{x,y};});};
-  const click=async tid=>{await quiet();await guard();const p=await point(tid);effect=true;await page.mouse.click(p.x,p.y);};
-  const title=()=>find(root+';cardWizardPanel;p.h;p.t').innerText();
+  const point=async tid=>{control=tid;const count=await find(tid).count();if(count!==1)throw Object.assign(Error('REST request: control is ambiguous: '+tid+'; count='+count),{code:'REST_CONFIGURE_CONTROL_AMBIGUOUS'});return find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable');return{x,y};});};
+  const click=async tid=>{control=tid;await quiet();await guard();const p=await point(tid);effect=true;await page.mouse.click(p.x,p.y);};
+  const title=()=>find(root+';cardWizardPanel;p.h;p.t').innerText({timeout:5000});
   const panel=()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().id);
   const advance=async()=>{const before=await panel();await click(root+';btnNext');await wait('wizard page transition',async()=>{
    const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error((await error.getAttribute('data-qtip'))??'Loginom refused this wizard page');
    return await panel()!==before;
   });await quiet();};
+  let inputPages=0;
   while(!await find(root+';RESTRequestWizard;ParamLinks').isVisible()){
+   need(inputPages++<3,'input wizard page bound exceeded');
    need((await title()).trim()==='Настройка входных столбцов','unexpected page before request');await advance();
   }
   const read=async()=>{
@@ -100,7 +106,7 @@ export async function restRequestCapability(page,t,readContext){
      await quiet();await guard();const source=await point(base+'colColumnName_'+columns[0].index),target=await point(base+'colParam_'+q.name);effect=true;
      await page.mouse.move(source.x,source.y);await page.mouse.down();try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
     }
-    current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});
+    control=base+'pnlLinkGrid';current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});
    }
   }
   const configuration={verified:true,node_context:{...t.node,verified:true},method:'GET',query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
@@ -111,5 +117,15 @@ export async function restRequestCapability(page,t,readContext){
    need(allowed.includes(caption),'unexpected REST wizard page: '+caption);await advance();
   }
   throw Error('REST wizard page bound exceeded');
- }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
+ }catch(error){
+  const failure={code:error.code??'REST_CONFIGURE_REJECTED',step,control};
+  try{failure.wizard=await page.evaluate(root=>{
+   const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden';};
+   const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(root+';cardWizardPanel;p.h;p.t')+']')];
+   return {caption:es.length===1?es[0].textContent.trim().slice(0,200):null,
+    masks:[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible).length,
+    dialogs:[...document.querySelectorAll('.x-window')].filter(visible).length};
+  },root);}catch{failure.wizard={unavailable:true};}
+  return {verified:false,cleanup_complete:!effect,effect_possible:effect,failure,error:(String(error.message)+'; '+JSON.stringify(failure)).slice(0,1000)};
+ }
 }
