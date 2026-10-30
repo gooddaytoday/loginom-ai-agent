@@ -9,6 +9,7 @@ const checkId=id=>{if(typeof id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(id)
 // operation. The original runtime retains the mutation gate through cleanup.
 export function createNodeOperationRunner({run,validate,progress,admitResume}) {
  const jobs=new Map();
+ let closing=false;
  const find=id=>{checkId(id);const job=jobs.get(id);if(!job)throw Error('Unknown node operation');return job;};
  const snapshot=job=>structuredClone({operation_id:job.id,attempt:job.attempt,state:job.state,
   cancel_requested:job.controller.signal.aborted,server_stop_requested:job.stopController.signal.aborted,
@@ -39,6 +40,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
   get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'
     ||job.outcome?.effect_possible===true&&job.outcome?.cleanup_complete!==true);},
   start(request,{resume=false,scanReceipt}={}) {
+   if(closing)throw Error('Node operation runner is closing');
    request=structuredClone(request);checkId(request.operation_id);
    if(resume&&Object.keys(request).length===1)request=structuredClone(find(request.operation_id).request);
    const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);
@@ -92,6 +94,14 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    const job=find(id);
    if(job.state==='running')job.controller.abort(new Error('Local node cancellation requested'));
    return snapshot(job);
+  },
+  async close() {
+   closing=true;
+   const active=[...jobs.values()].filter(job=>job.state==='running');
+   // Local cancellation never sends native Stop or settles an unknown effect.
+   // The worker retains its original deadline and gate until its receipt lands.
+   for(const job of active)job.controller.abort(new Error('Local node shutdown requested'));
+   await Promise.all(active.map(job=>job.completion));
   },
  });
 }

@@ -3753,6 +3753,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    // Host lifecycle cleanup must bypass the user mutation facade. A retained
+    // node/recovery gate still blocks package cleanup; it cannot block draining
+    // the owned worker or removing its private local download cache.
+    closeNodeOperations:()=>nodeJobs.close(),
+    cleanupServerCache:runtime.cleanupServerCache,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global

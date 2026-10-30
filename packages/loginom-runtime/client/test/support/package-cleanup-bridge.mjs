@@ -66,8 +66,23 @@ mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClie
 mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
-mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
-  const f=current;return {tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
+  const f=current;
+  if(f.realExecutor){
+    // Only the external node driver is controlled. Keep the production facade,
+    // job runner, cache cleanup and bridge close path intact for this regression.
+    f.runtime=executor.createActionRuntime({...options,
+      nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate(){},configure(){}}]]),
+      nodeApplyDriverFactory:()=>({mapPorts:async()=>{},openWizard:async()=>{},finish:async()=>{},
+        waitExecution:async()=>{},readOutput:async()=>{},verifyContinuation:async()=>true,verifySource:async()=>{
+        f.entered.resolve();await f.finish.promise;
+        f.events.push('node-drained');
+        if(f.scenario==='opened-uncertain')throw Error('Browser reply lost');
+        return {verified:true,cleanup_complete:true,effect_possible:false};
+      }})});
+    return f.runtime;
+  }
+  return {tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
       return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
@@ -90,6 +105,61 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const scenario of ['opened-clean','opened-dirty','opened-uncertain'])
+ test('real executor shutdown drains an owned node job: '+scenario,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-node-job-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,realExecutor:true,events:[],saves:0,path,catalog,
+    entered:Promise.withResolvers(),finish:Promise.withResolvers()};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'node-job-cleanup',version:'1'});
+  let closing;
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}});
+    assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+    f.runtime.startNodeApply({operation_id:'apply',contract_revision:'1.0.0',document_id:'own-doc',
+      workflow_ref:{workflow_id:'own-workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+      target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',
+      parameters:{},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+      budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+    await f.entered.promise;
+    assert.equal(f.runtime.nodeApplyStatus('apply').state,'running');
+    await assert.rejects(f.runtime.run('package.save_checkpoint',{}),/background node operation/);
+    // Observe rejection immediately too, so the red case has no unhandled error.
+    closing=bridge.close().then(value=>({value}),error=>({error}));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.ifError((await Promise.race([closing,Promise.resolve(null)]))?.error);
+    assert.equal(f.runtime.nodeApplyStatus('apply').cancel_requested,true);
+    assert.equal(f.events.includes('package-cleanup'),false);
+    assert.equal(f.events.includes('browser-close'),false);
+    f.finish.resolve();
+    const closed=await closing;
+    assert.ifError(closed.error);
+    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+    assert.equal(f.runtime.nodeApplyStatus('apply').state,'settled');
+    assert.equal(closed.value.browser_transport_closed,true);
+    assert.equal(cleanup.status,scenario==='opened-clean'?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.filter(e=>e==='package-cleanup').length,scenario==='opened-uncertain'?0:1);
+    if(scenario==='opened-clean'){
+      assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+      assert.ok(f.events.indexOf('node-drained')<f.events.indexOf('package-cleanup'));
+    }else{
+      assert.notEqual(cleanup.package_closed,true);assert.notEqual(cleanup.logged_out,true);
+      assert.equal(cleanup.reason,scenario==='opened-dirty'?'UNSAVED_CHANGES':'CLEANUP_OR_OPERATION_UNCONFIRMED');
+    }
+  }finally{
+    f.finish.resolve();await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+    await closing;await client.close();await bridge.close().catch(()=>{});
+    await rm(directory,{recursive:true,force:true});
+  }
+ });
 
 for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
  test('normal shutdown of an opened package without Save: '+scenario,async t=>{
