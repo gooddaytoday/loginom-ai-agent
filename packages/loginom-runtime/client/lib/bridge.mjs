@@ -645,9 +645,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
-        await actionRuntime?.closeArtifactDeliveries();
-        await actionRuntime?.cleanupServerCache();
-        await recovery.close();
+        let lifecycleCleanupFailed=false;
+        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries(),()=>actionRuntime?.closeNodeOperations?.(),
+          ()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
+          try{await cleanup();}catch{lifecycleCleanupFailed=true;}
+        }
         if(config.storageDirectories&&actionRuntime){
           // Diagnostics are read without the connection guard, including after
           // a disconnect. They never certify package or transport cleanup.
@@ -693,11 +695,12 @@ export async function createBridge(config, session, { browserTransport: managedB
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
-          if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
+          if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
+          else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
-              // Refuse unsettled background node jobs before waiting on the
-              // browser gate. Shutdown never cancels them to force a close.
+              // Draining a locally cancelled worker does not resolve an unknown
+              // effect. Keep every unsettled-work and native dirty-state guard.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
               if (session.metadata.workspaceReady !== true && !unsavedDraft || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
@@ -746,6 +749,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         // A failed transport close does not prove that an unconfirmed paste has
         // stopped. Retain leases while this process lives; process exit still
         // releases kernel locks and is not cross-process recovery evidence.
+        if(lifecycleCleanupFailed&&!cleanup)throw Error('Runtime lifecycle cleanup is unconfirmed');
         return { browser_transport_closed: browserTransportClosed,
           browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size,
           ...(cleanup ? {package_cleanup:cleanup} : {}) };

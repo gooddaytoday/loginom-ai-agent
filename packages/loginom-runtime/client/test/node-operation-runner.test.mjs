@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import {createNodeOperationRunner} from '../lib/node-operation-runner.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 
+test('shutdown cancels locally, drains the original worker and preserves uncertainty',async()=>{
+ const finish=Promise.withResolvers();let signal,stopSignal;
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
+  run:async(_request,options)=>{signal=options.signal;stopSignal=options.stopSignal;await finish.promise;
+   return {status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false};}});
+ runner.start({operation_id:'own'});
+ let closed=false;const closing=runner.close().then(()=>{closed=true;});
+ assert.equal(signal.aborted,true);assert.equal(stopSignal.aborted,false);
+ assert.equal(runner.status('own').state,'running');assert.equal(closed,false);
+ assert.throws(()=>runner.start({operation_id:'other'}),/closing/);
+ assert.throws(()=>runner.start({operation_id:'own'},{resume:true}),/closing/);
+ finish.resolve();await closing;
+ assert.equal(runner.status('own').state,'settled');assert.equal(runner.unsettled,true);
+ assert.equal(runner.status('own').outcome.status,'AMBIGUOUS');
+ await runner.close();assert.equal(stopSignal.aborted,false);
+});
+
 test('rejected resume preserves the original unresolved outcome and recovery route',async()=>{
  const outcome={status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
   error:{code:'NODE_APPLY_STOPPED',message:'source field missing'},
