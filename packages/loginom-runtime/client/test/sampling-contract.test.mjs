@@ -57,8 +57,8 @@ test('group binding follows observed group labels rather than current row positi
  assert.equal(sequentialGroup({text:'Обучающее множество',values:{}},true),'train');
  assert.equal(sequentialGroup({text:'Неиспользуемые',values:{}},false),'unused');
  assert.throws(()=>sequentialGroup({text:'unknown',values:{Index:0}},false));
- assert.deepEqual(sequentialSizes({kind:'data_partition',sizes:[{values:{AbsoluteSize:10}},{values:{AbsoluteSize:5}},{values:{Summary:15}}]}),[10,5]);
- assert.throws(()=>sequentialSizes({kind:'sampling',sizes:[{values:{AbsoluteSize:NaN}}]}));
+ assert.deepEqual(sequentialSizes({kind:'data_partition',sizes:[{record_id:'train'},{record_id:'test'}],units:[{record_id:'train',absolute_size:10},{record_id:'test',absolute_size:5}]}),[10,5]);
+ assert.throws(()=>sequentialSizes({kind:'sampling',sizes:[{record_id:'s'}],units:[{record_id:'s',absolute_size:NaN}]}));
 });
 test('readback refuses missing/foreign receipts and cannot claim package persistence',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'n'},owner={verified:true,...node};
