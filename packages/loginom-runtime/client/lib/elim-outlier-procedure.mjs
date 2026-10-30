@@ -82,7 +82,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
  need(same(s.node_elim_outlier.fields.filter(f=>f.used).map(f=>f.name),baseline.fields.filter(f=>selected.includes(f.name)).map(f=>f.name)),'selected field set differs');
  const configuration={...s.node_elim_outlier,field_settings:after};
  await channel.perform({condition:'validate outlier detect settings',initialObservation:s,ready,identity:s=>s.prepared_node_context,
-  resolve:s=>({verb:'press',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('press'),'Outlier Next unavailable').ref,key:'Enter'})});
+  resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Outlier Next unavailable').ref,expected_stage:'done'})});
  const done=await channel.observe({condition:'outlier detect accepted by Loginom',ready:s=>s.wizard?.stage==='done'});
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
