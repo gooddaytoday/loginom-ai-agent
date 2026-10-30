@@ -177,8 +177,12 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
         let timer;
         const arm=()=>{
           clearTimeout(timer);
-          const deadline=Math.min(job.deadline,job.lastProgress+120000);
-          const code=job.deadline<=job.lastProgress+120000?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
+          // Native Blob bytes can be complete while Chromium/saveAs still
+          // finalizes the copy. Keep the original absolute deadline then;
+          // no further byte growth is possible or required for this stage.
+          const stalledAt=job.bytes===job.source.bytes?job.deadline:job.lastProgress+120000;
+          const deadline=Math.min(job.deadline,stalledAt);
+          const code=job.deadline<=stalledAt?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
           if(now()>=deadline){job.controller.abort(Error(code));return;}
           timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
         };

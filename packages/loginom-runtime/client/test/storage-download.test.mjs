@@ -133,6 +133,41 @@ test('unchanged byte reports cannot renew the no-progress deadline; late growth 
   assert.equal(result.cleanup_complete,true);assert.deepEqual(await readdir(join(f.root,'stalled')),[]);
  }
 });
+test('complete native bytes allow cache finalization under the original absolute deadline',async t=>{
+ const f=await fixture(t);let clock=0;
+ const native={...source(),bytes:2*1024**3};
+ const registry=createServerDownloadRegistry({directory:join(f.root,'finalizing'),now:()=>clock,inspect:async()=>native,
+  download:async({path,onProgress,signal})=>{
+   clock=60000;onProgress(native.bytes);
+   clock=190000;onProgress(native.bytes);signal.throwIfAborted();
+   await writeFile(path,'');await truncate(path,native.bytes);
+  }});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.progress.deadline_at,serverDownloadBudget(native.bytes));
+ assert.equal(result.progress.elapsed_ms,190000);
+ assert.equal((await stat(result.output.path)).size,native.bytes);await registry.cleanup();
+});
+test('complete native bytes never extend the absolute deadline or authorize an unverified cache',async t=>{
+ for(const fault of ['deadline','native','copy']){
+  const f=await fixture(t);let clock=0,reads=0;
+  const native={...source(),bytes:2*1024**3};
+  const registry=createServerDownloadRegistry({directory:join(f.root,'finalizing-'+fault),now:()=>clock,
+   inspect:async()=>({...native,mtime:++reads>1&&fault==='native'?'changed':native.mtime}),
+   download:async({path,onProgress,signal})=>{
+    clock=60000;onProgress(native.bytes);
+    clock=fault==='deadline'?serverDownloadBudget(native.bytes):190000;
+    onProgress(native.bytes);signal.throwIfAborted();
+    await writeFile(path,'');await truncate(path,native.bytes-(fault==='copy'?1:0));
+   }});
+  registry.start(f.request);const result=await settled(registry);
+  assert.equal(result.status,'FAILED',JSON.stringify(result));
+  assert.equal(result.error.code,fault==='deadline'?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_FILE_CHANGED');
+  assert.equal(result.progress.deadline_at,serverDownloadBudget(native.bytes));
+  assert.equal(result.cleanup_complete,true);
+  assert.deepEqual(await readdir(join(f.root,'finalizing-'+fault)),[]);
+ }
+});
 test('no-progress timer cancels and drains a stalled transfer even without status reports',async t=>{
  const f=await fixture(t);t.mock.timers.enable({apis:['Date','setTimeout'],now:0});
  let started=false;
