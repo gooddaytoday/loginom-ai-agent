@@ -1,30 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isWindowsCryptoRequest, isWindowsCryptSvcOwner} from './support/windows-crypto-probe.mjs';
+import {isWindowsSystemOwner, observeWindowsCryptSvc} from './support/windows-crypto-probe.mjs';
 
-const request = {method:'GET', url:'http://crl.microsoft.com/pki/crl/products/MicRooCerAut2011_2011_03_22.crl',
-  headers:{'user-agent':'Microsoft-CryptoAPI/10.0'}};
 const owner = {pid:3248, name:'svchost.exe', path:'C:\\Windows\\system32\\svchost.exe', parentName:'services.exe',
-  servicePid:3248, serviceName:'CryptSvc', serviceState:'Running'};
+  parentPath:'C:\\Windows\\System32\\services.exe', services:[{pid:3248, name:'CryptSvc', state:'Running'}]};
 
-test('recognizes only the two observed CryptoAPI GET requests', () => {
-  assert.equal(isWindowsCryptoRequest(request), true);
-  assert.equal(isWindowsCryptoRequest({...request, url:'http://crl.microsoft.com/pki/crl/products/MicRooCerAut_2010-06-23.crl'}), true);
+test('requires a live service PID, system image and system service parent together', () => {
+  assert.equal(isWindowsSystemOwner(owner, 'C:\\Windows'), true);
+  assert.equal(isWindowsSystemOwner({...owner, path:'c:\\WINDOWS\\System32\\svchost.exe'}, 'C:\\Windows'), true);
+  assert.equal(isWindowsSystemOwner({...owner, services:[{pid:3248, name:'wlidsvc', state:'Running'}]}, 'C:\\Windows'), true);
   for (const changed of [
-    {method:'CONNECT'}, {method:'POST'}, {headers:{}}, {headers:{'user-agent':'Chrome/154'}},
-    {url:request.url + '?other=1'}, {url:request.url.replace('crl.microsoft.com', 'crl.microsoft.com.example.org')},
-    {url:'http://example.org/app/'},
-  ]) assert.equal(isWindowsCryptoRequest({...request, ...changed}), false);
+    {pid:0}, {pid:3249}, {pid:'3248'}, {services:undefined}, {services:[]},
+    {services:[{pid:3248, name:'CryptSvc', state:'Stopped'}]},
+    {services:[{pid:3248, name:'', state:'Running'}]},
+    {services:[{pid:3249, name:'CryptSvc', state:'Running'}]},
+    {name:'chrome.exe'}, {path:'C:\\Temp\\svchost.exe'}, {path:undefined},
+    {parentName:'chrome.exe'}, {parentPath:'C:\\Temp\\services.exe'}, {parentPath:undefined},
+  ]) assert.equal(isWindowsSystemOwner({...owner, ...changed}, 'C:\\Windows'), false);
+  assert.equal(isWindowsSystemOwner(undefined, 'C:\\Windows'), false);
+  assert.equal(isWindowsSystemOwner(owner, undefined), false);
 });
 
-test('requires the live service PID, system image and service parent together', () => {
-  assert.equal(isWindowsCryptSvcOwner(owner, 'C:\\Windows'), true);
-  assert.equal(isWindowsCryptSvcOwner({...owner, path:'c:\\WINDOWS\\System32\\svchost.exe'}, 'C:\\Windows'), true);
-  for (const changed of [
-    {pid:0, servicePid:0}, {pid:3249}, {pid:'3248'}, {servicePid:undefined},
-    {serviceName:'OtherService'}, {serviceState:'Stopped'}, {name:'chrome.exe'},
-    {path:'C:\\Temp\\svchost.exe'}, {path:undefined}, {parentName:'chrome.exe'},
-  ]) assert.equal(isWindowsCryptSvcOwner({...owner, ...changed}, 'C:\\Windows'), false);
-  assert.equal(isWindowsCryptSvcOwner(undefined, 'C:\\Windows'), false);
-  assert.equal(isWindowsCryptSvcOwner(owner, undefined), false);
+test('missing TCP endpoints retain the attribution failure', async () => {
+  await assert.rejects(observeWindowsCryptSvc({}), /Missing live TCP endpoint/);
+  await assert.rejects(observeWindowsCryptSvc({remotePort:0, localPort:1234, remoteAddress:'127.0.0.1', localAddress:'127.0.0.1'}), /Missing live TCP endpoint/);
 });
