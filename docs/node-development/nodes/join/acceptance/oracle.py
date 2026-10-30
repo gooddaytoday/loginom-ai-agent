@@ -57,7 +57,7 @@ def expected(mode, package='{{PACKAGE_PATH}}', include_keys=True, case_sensitive
         'nodes': [{'type': 'imports.text'}, {'type': 'imports.text'},
                   {'type': 'transform.join_data'}, {'type': 'exports.text'}],
         'outputs': [{
-            'output_node_type': 'transform.join_data', 'output_port': 0,
+            'output_node_type': 'export_input', 'export_destination': '/' + mode + '-result.csv',
             'ordered': False, 'column_order': 'any',
             'columns': [{'name': n, 'type': 'string', 'label_any': True} for n in names],
             'rows': rows,
