@@ -4,7 +4,10 @@ import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-test.skipIf(process.platform !== "linux")("resume oracle activates automation for the new user task", async () => {
+const missingDisplay = process.platform === "linux" && !process.env.DISPLAY && !process.env.CI
+if (missingDisplay) console.warn("Skipping resume oracle: native window observation requires DISPLAY (required in CI)")
+
+test.skipIf(process.platform !== "linux" || missingDisplay)("resume oracle activates automation for the new user task", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-resume-driver-test-"))
   const original = join(root, "original")
   const profile = join(original, "cli/fixture-A/profile")

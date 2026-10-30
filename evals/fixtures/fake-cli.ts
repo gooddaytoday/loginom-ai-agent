@@ -81,6 +81,7 @@ if (command === "run" && process.env.EVAL_FAKE_BROWSER_BUNDLE) {
   const child = spawn(path.join(process.env.EVAL_FAKE_BROWSER_BUNDLE, "chrome"), [...(process.env.EVAL_FAKE_BROWSER_SCRIPT ? [process.env.EVAL_FAKE_BROWSER_SCRIPT] : []), `--user-data-dir=${process.env.EVAL_FAKE_BROWSER_DATA_DIR ?? `${directory}/browser-profile`}`],
     { detached: true, stdio: "ignore", env: { PATH: process.env.PATH ?? "", EVAL_FAKE_BROWSER_CLEAR_TITLE: process.env.EVAL_FAKE_BROWSER_CLEAR_TITLE ?? "",
       EVAL_FAKE_BROWSER_HELPER_PID_FILE: process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE ?? "", EVAL_FAKE_BROWSER_HELPER_DETACHED: process.env.EVAL_FAKE_BROWSER_HELPER_DETACHED ?? "",
+      EVAL_FAKE_BROWSER_STOP_FILE: process.env.EVAL_FAKE_BROWSER_STOP_FILE ?? "",
       EVAL_FAKE_BROWSER_HEARTBEAT: process.env.EVAL_FAKE_BROWSER_HEARTBEAT ?? "", EVAL_FAKE_BROWSER_SCRIPT: process.env.EVAL_FAKE_BROWSER_SCRIPT ?? "",
       EVAL_FAKE_BROWSER_HELPER_DELAY_MS: process.env.EVAL_FAKE_BROWSER_HELPER_DELAY_MS ?? "" } })
   await Bun.write(process.env.EVAL_FAKE_BROWSER_PID_FILE!, String(child.pid))
