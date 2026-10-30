@@ -20,7 +20,7 @@ export async function configureSampling(channel,p,{request,inputMapping}){
  let s=await observe('complete sequential selection settings'),before=s.node_sampling;
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,draft_edits_skipped:true};
  need(inputMapping?.verified&&inputMapping.inventory_complete,'complete input mapping required');
- const partition=before.kind==='data_partition',base=before.base;
+ const partition=before.kind==='data_partition',base=before.base,sizesBase=(before.sizes_base??base+'SizeGridForm')+';',sequenceBase=(before.sequence_base??base+'SequenceMethodForm')+';';
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const act=async(condition,predicate,action)=>{s=await observe(condition);await channel.perform({condition,initialObservation:s,ready,identity:s=>s.prepared_node_context,resolve:s=>({...action,ref:one(s,predicate,condition+' control unavailable').ref})});};
  const tid=(key,verb)=>e=>(e.tid===base+key||e.identity?.anchor_tid===base+key)&&e.allowed_actions.includes(verb);
@@ -34,19 +34,19 @@ export async function configureSampling(channel,p,{request,inputMapping}){
  for(const [index,count] of counts.entries()){
   if(count===undefined)continue;
   // Unit icon and editable cell are bound to the actual observed row tid.
-  const row=base+'SizeGridForm;colSizeType_'+index;
+  const row=sizesBase+'colSizeType_'+index;
   s=await observe('sampling size unit');
-  const unit=s.ui.elements.filter(e=>(e.tid===row||e.identity?.anchor_tid===row)&&e.tag==='img'&&e.role==='button'&&e.allowed_actions.includes('click'));
+  const unit=s.ui.elements.filter(e=>(e.tid===row||e.identity?.anchor_tid===row)&&e.signature?.tag==='img'&&e.role==='button'&&e.allowed_actions.includes('click'));
   need(unit.length===1,'unique size unit icon required');
   const observed=s.node_sampling.units[index],unitLabel=[observed.text,observed.title,observed.tooltip,observed.class_name].join(' ');
   if(/%|процент|percent/i.test(unitLabel))await act('switch sampling size to rows',e=>e.ref===unit[0].ref,{verb:'click'});
   else need(/строк|абсолют|absolute|number|numeric|rows|integer/i.test(unitLabel),'size unit is not observed as rows: '+JSON.stringify(observed));
   s=await observe('sampling absolute size cell');
   const settledUnit=s.node_sampling.units[index];need(/строк|абсолют|absolute|number|numeric|rows|integer/i.test([settledUnit.text,settledUnit.title,settledUnit.tooltip,settledUnit.class_name].join(' ')),'size unit did not settle to rows');
-  const editorTid=base+'SizeGridForm;colAbsoluteSize;FloatPropEdit'+(index?'-'+index:'')+';ValueControl';
+  const editorTid=sizesBase+'colAbsoluteSize;FloatPropEdit'+(index?'-'+index:'')+';ValueControl';
   const editor=e=>(e.tid===editorTid||e.identity?.anchor_tid===editorTid)&&e.allowed_actions.includes('fill');
   if(!s.ui.elements.some(editor)){
-   const size=s.ui.elements.filter(e=>e.tid===base+'SizeGridForm;colAbsoluteSize_'+index&&e.allowed_actions.includes('double_click'));
+   const size=s.ui.elements.filter(e=>e.tid===sizesBase+'colAbsoluteSize_'+index&&e.allowed_actions.includes('double_click'));
    need(size.length===1,'unique absolute size row required');
    await act('edit sampling row count',e=>e.ref===size[0].ref,{verb:'double_click'});
   }
@@ -65,7 +65,7 @@ export async function configureSampling(channel,p,{request,inputMapping}){
    await act('select exact sequential group',e=>e.tid===row.tids.find(tid=>s.ui.elements.some(e=>e.tid===tid&&e.allowed_actions.includes('click')))&&e.allowed_actions.includes('click'),{verb:'click'});
    s=await observe('sequential group selected');need(s.node_sampling.sequence.filter(r=>r.selected).length===1&&s.node_sampling.sequence.find(r=>r.selected).record_id===row.record_id,'group selection differs');
    const old=s.node_sampling.sequence.map(r=>r.record_id),at=old.indexOf(row.record_id);[old[at-1],old[at]]=[old[at],old[at-1]];
-   await act('move sequential group up',tid('SequenceMethodForm;btnGroupPositionUp','click'),{verb:'click'});
+   await act('move sequential group up',e=>e.tid===sequenceBase+'btnGroupPositionUp'&&e.allowed_actions.includes('click'),{verb:'click'});
    s=await observe('group order readback');need(same(s.node_sampling.sequence.map(r=>r.record_id),old),'group movement differs');
   }
  }

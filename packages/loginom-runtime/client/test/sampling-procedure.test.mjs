@@ -10,7 +10,7 @@ function fixture(partition=false){
   sizes:state.counts.map((AbsoluteSize,index)=>({record_id:'size'+index,values:{AbsoluteSize}})),units:state.counts.map((_,index)=>({record_id:'size'+index,text:'строк',title:'',tooltip:'',class_name:'rows'})),
   sequence:state.groups.map(group=>({record_id:group,text:labels[group],values:{Name:labels[group]},tids:[base+'group_'+group],selected:state.selected===group}))},
   ui:{elements:[...state.counts.flatMap((_,index)=>[
-   {ref:'unit'+index,identity:{anchor_tid:base+'SizeGridForm;colSizeType_'+index},tag:'img',role:'button',allowed_actions:['click']},
+   {ref:'unit'+index,identity:{anchor_tid:base+'SizeGridForm;colSizeType_'+index},signature:{tag:'img'},role:'button',allowed_actions:['click']},
    {ref:'edit'+index,tid:editor(index),allowed_actions:['fill','press']}]),
    ...state.groups.map(group=>({ref:group,tid:base+'group_'+group,allowed_actions:['click']})),
    {ref:'up',tid:base+'SequenceMethodForm;btnGroupPositionUp',allowed_actions:['click']},

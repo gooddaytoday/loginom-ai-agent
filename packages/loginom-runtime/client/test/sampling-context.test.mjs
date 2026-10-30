@@ -2,17 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readSamplingBrowser,readSamplingContext} from '../lib/sampling-context.mjs';
-function fixture(change=()=>{}){
+function fixture(change=()=>{},nested=false){
  const prefix='MF;TF-1',base=prefix+';WizrdMCF;SamplingComponentWizard';
+ const sizesBase=(nested?prefix+';WizrdMCF':base)+';SizeGridForm',sequenceBase=(nested?prefix+';WizrdMCF':base)+';SequenceMethodForm';
  const root={checkVisibility:()=>true,contains:()=>true};
  const sizes=[{internalId:'size',data:{AbsoluteSize:5,Name:'Выбранные'}}],groups=[{internalId:'sample',data:{Name:'Выбранные'}},{internalId:'unused',data:{Name:'Неиспользуемые'}}];
  const store=items=>({$className:'Ext.data.Store',getData:()=>({items}),getCount:()=>items.length,isLoading:()=>false});
  const stores=[store(sizes),store(groups)];
  change({stores,sizes,groups});
  const grids=[{id:'sizes',querySelectorAll:()=>[]},{id:'groups',querySelectorAll:()=>[]}];
- const icon={getAttribute:key=>key==='class'?'rows':''},cell={querySelectorAll:()=>[icon],querySelector:()=>icon,getAttribute:()=>base+';SizeGridForm;colSizeType_0',textContent:'строк',closest:()=>({getAttribute:()=> 'size'})};
+ const icon={getAttribute:key=>key==='class'?'rows':''},cell={querySelectorAll:()=>[icon],querySelector:()=>icon,getAttribute:()=>sizesBase+';colSizeType_0',textContent:'строк',closest:()=>({getAttribute:()=> 'size'})};
  const method={id:'method'};
- const document={querySelectorAll:s=>{const tid=JSON.parse(s.slice(10,-1));return ({[base]:[root],[base+';pedSamplingMethod;ValueControl']:[method],[base+';SizeGridForm;grdDataSet']:[grids[0]],[base+';SequenceMethodForm;grdSequence']:[grids[1]],[base+';SizeGridForm;colSizeType_0']:[cell]})[tid]??[];}};
+ const tids={[base]:[root],[base+';pedSamplingMethod;ValueControl']:[method],[sizesBase+';grdDataSet']:[grids[0]],[sequenceBase+';grdSequence']:[grids[1]],[sizesBase+';colSizeType_0']:[cell]};
+ for(const [tid,es] of Object.entries(tids))for(const e of es){e.tid=tid;const old=e.getAttribute;e.getAttribute=key=>key==='data-tid'?tid:old?.(key);}
+ const document={querySelectorAll:s=>{if(s==='[data-tid]')return Object.values(tids).flat();if(s.startsWith('[data-tid$=')){const suffix=JSON.parse(s.slice(11,-1));return Object.entries(tids).filter(([tid])=>tid.endsWith(suffix)).flatMap(([,es])=>es);}const tid=JSON.parse(s.slice(10,-1));return tids[tid]??[];}};
  const Ext={getCmp:id=>id==='method'?{el:{dom:method},getRawValue:()=> 'Последовательный'}:{el:{dom:grids[id==='sizes'?0:1]},getStore:()=>stores[id==='sizes'?0:1],getSelectionModel:()=>({getSelection:()=>[]})}};
  return JSON.parse(JSON.stringify(vm.runInContext('('+readSamplingBrowser.toString()+')',vm.createContext({document,Ext}))(prefix)));
 }
@@ -29,4 +32,8 @@ test('sequential observer refuses a separate port wizard or an owner change',asy
  const owner={verified:true,surface:'wizard',node_id:'A'},page={evaluate:async()=>({verified:true})};let n=0;
  assert.equal((await readSamplingContext(page,{workflow_ref:{prefix:'x'}},async()=>({...owner,node_id:++n===1?'A':'B'}))).verified,false);
  assert.equal((await readSamplingContext(page,{workflow_ref:{prefix:'x'}},async()=>({...owner,input_port:{port:0}}))).verified,false);
+});
+
+test('native nested forms bind their unique data-tid inside the owned wizard, without invented component ancestry',()=>{
+ const r=fixture(()=>{},true);assert.equal(r.verified,true);assert.equal(r.sizes_base,'MF;TF-1;WizrdMCF;SizeGridForm');assert.equal(r.sequence_base,'MF;TF-1;WizrdMCF;SequenceMethodForm');
 });
