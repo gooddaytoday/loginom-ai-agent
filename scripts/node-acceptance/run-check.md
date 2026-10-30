@@ -216,6 +216,10 @@ Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 age/pressure business task). Fixtures and independent expected tables are in
 `docs/node-development/nodes/research-corranalysis/acceptance`; each model run
 receives only its named input CSV and user task. Other coefficients are deferred.
+`outlier-sd` и `outlier-iqr` — Редактирование выбросов, detect/keep/keep,
+из `docs/node-development/nodes/preprocessing-elimoutlier/acceptance/`
+и его `iqr/`. Три CSV в порядке: данные, выбросы, экстремальные значения;
+cold сверяет каждый output_port того же узла с отдельным expected.
 
 `n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
 `docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,

@@ -10,7 +10,8 @@ import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
 test('full apply schema plus unregistered v0.3.8 types stays below 46000 UTF-8 bytes',t=>{
  for(const [type,mode] of [['research.corr_analysis','pearson'],['transform.sliding_window','lag'],
-  ['datamining.log_regression','enter'],['preprocessing.sampling','sequential'],['preprocessing.data_partition','sequential']]){
+  ['datamining.log_regression','enter'],['preprocessing.sampling','sequential'],['preprocessing.data_partition','sequential'],
+  ['preprocessing.elim_outlier','detect']]){
   assert.ok(full.inputSchema.properties.target.properties.type.enum.includes(type),type);
   assert.ok(full.inputSchema.properties.mode.enum.includes(mode),mode);
  }

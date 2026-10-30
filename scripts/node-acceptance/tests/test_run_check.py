@@ -784,6 +784,20 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
 
+    def test_outlier_scenarios_resolve_frozen_tasks_and_all_three_ports(self):
+        for name, method, counts in [('outlier-sd', 'стандартного отклонения', [22, 0, 1]),
+                                     ('outlier-iqr', 'интерквартильной ширины', [22, 1, 1])]:
+            case = runner.scenario(name)
+            self.assertIn(method, case['prompt'].read_text())
+            self.assertEqual(case['export_count'], 3)
+            self.assertTrue((case['source'] / 'oracle.py').is_file())
+            self.assertEqual(len(list(case['data'].glob('*.csv'))), 1)
+            expected = runner.expected_for(case, '/test.lgp')
+            self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertTrue(all(c.get('label_any') for o in expected['outputs'] for c in o['columns']))
+
     def test_n19_file_oracle_accepts_labels_but_rejects_bad_centers_and_extra_rows(self):
         case = runner.scenario('n19')
         output = runner.expected_for(case, '/test.lgp')['outputs'][0]

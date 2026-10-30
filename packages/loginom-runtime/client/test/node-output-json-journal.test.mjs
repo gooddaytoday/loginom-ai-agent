@@ -68,7 +68,7 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
   const before=structuredClone(raw),redactor=createRedactor(),calls=[];
   // Replace browser driver dependencies only; execute the actual product dispatch.
   const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
-  for(const name of ['CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
+  for(const name of ['ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
    'DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>assert.fail('Wrong driver')});
   const configureJavascript=()=>{};
@@ -103,7 +103,7 @@ test('shared ordinary product output is normalized before durable ACK without mu
   const original=structuredClone(raw),native={ports:[{exact_table:{complete:true}}]};
   let returned=raw;
   const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
-  for(const name of ['CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
+  for(const name of ['ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
    'DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({readOutput:async()=>returned})});
   const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)({redactor});
