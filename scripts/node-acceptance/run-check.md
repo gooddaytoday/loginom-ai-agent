@@ -207,3 +207,8 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+`outlier-sd` и `outlier-iqr` — Редактирование выбросов, detect/keep/keep,
+из `docs/node-development/nodes/preprocessing-elimoutlier/acceptance/`
+и его `iqr/`. Три CSV в порядке: данные, выбросы, экстремальные значения;
+cold сверяет каждый output_port того же узла с отдельным expected.

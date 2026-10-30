@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'preprocessing.elim_outlier' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -316,4 +316,11 @@ export interface LinRegressionConfigurationReadback {
   node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply'; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
+}
+
+export interface ElimOutlierConfigurationReadback {
+ kind:'elim_outlier';scope:'observed_before_verified_finish';values_are:'observed_ui_values';node:NodeRef;receipt_ids:string[];mode:'detect';
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep';extreme_policy:'keep'}>;
+ ordered:boolean;training_basis:'current_input';training:ClusteringConfigurationReadback['training'];
+ output_mappings:Array<{port:number;fields:Array<{index:number;name:string;label:string;type:string;data_kind:string;source_name:string}>}>;package_persistence_verified:false;
 }

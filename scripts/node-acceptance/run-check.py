@@ -83,6 +83,10 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['outlier-sd', 'outlier-iqr']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
+        if name == 'outlier-iqr': src = src / 'iqr'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
     stability = DATA / 'stability-2026-10-20'
@@ -535,9 +539,10 @@ class Runner:
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
         if not exports and not spec.get('upload_only'):
-            count = 2 if src.parent.name == 'datamining-clustering' else 1
+            count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
