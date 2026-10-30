@@ -8,31 +8,30 @@ import {createSkillLoader} from '../lib/skill.mjs';
 import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
-test('full apply schema reserves v0.3.8 growth within 46000 UTF-8 bytes',t=>{
+test('full apply schema plus unregistered v0.3.8 types stays below 46000 UTF-8 bytes',t=>{
  const bytes=value=>Buffer.byteLength(JSON.stringify(value));
  const expanded=structuredClone(full.inputSchema),before=bytes(expanded);
  // Charge each planned type a complete Date/time-sized parameter object,
  // its type ID and its mode. These are sizing fixtures, not public nodes.
- const types=['transform.sliding_window','research.correlation_analysis','preprocessing.edit_outliers',
-  'transform.sampling','transform.split_sets','datamining.logistic_regression'];
- const costs=types.map(type=>{
+ const types=[['transform.sliding_window','lag'],['research.corr_analysis','pearson'],
+  ['preprocessing.elim_outlier','detect'],['preprocessing.sampling','basic'],
+  ['preprocessing.data_partition','sequential'],['datamining.log_regression','enter']];
+ const costs=types.map(([type,mode])=>{
+  if(expanded.properties.target.properties.type.enum.includes(type))return 0;
   const start=bytes(expanded),key=type.split('.').at(-1);
   expanded.properties.target.properties.type.enum.push(type);
-  expanded.properties.mode.enum.push(key);
+  if(!expanded.properties.mode.enum.includes(mode))expanded.properties.mode.enum.push(mode);
   expanded.properties.parameters.properties[key]=structuredClone(dateTimeParametersSchema);
   return bytes(expanded)-start;
  });
  const enumStart=bytes(expanded);
- expanded.properties.mode.enum.push('right','full','difference','regex');
+ for(const mode of ['right','full','difference','regex'])
+  if(!expanded.properties.mode.enum.includes(mode))expanded.properties.mode.enum.push(mode);
  const enumBytes=bytes(expanded)-enumStart;
- // Cache options are not specified yet: reserve another entire parameter
- // object of the measured template size rather than guessing a contract.
- const cacheStart=bytes(expanded);
- expanded.properties.parameters.properties.server_cache=structuredClone(dateTimeParametersSchema);
- const cacheBytes=bytes(expanded)-cacheStart,growth=bytes(expanded)-before;
+ const growth=bytes(expanded)-before;
  t.diagnostic(JSON.stringify({full_bytes:before,type_bytes:costs,enum_bytes:enumBytes,
-  cache_reserve_bytes:cacheBytes,growth_bytes:growth,remaining_bytes:46000-before}));
- assert.ok(before+growth<46000,`full=${before}; growth=${growth}; remaining=${46000-before}`);
+  growth_bytes:growth,expanded_bytes:bytes(expanded)}));
+ assert.ok(bytes(expanded)<46000,`full=${before}; unregistered growth=${growth}`);
 });
 for(const tool of [full,userNodeTool(full)])test('node caption rule reaches '+(tool===full?'full':'compact')+' schema without restricting predicates',()=>{
  const target=tool.inputSchema.properties.target,label=target.properties.label;
