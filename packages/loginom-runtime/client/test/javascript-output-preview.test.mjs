@@ -194,7 +194,7 @@ function preflightFixture(type){
       ?{groups:[[{field:{kind:'input_field',name:'annual_revenue'},type:'real',operator:'>=',value:100}]]}
       :{keys:[{field:{kind:'input_field',name:'annual_revenue'},direction:'DESC'}]}}};
  const options={operation,nodeHistory:()=>[f.history],onRecord:async r=>structuredClone(r),
-  receiptOptions:()=>assert.fail('no mutation before private capture'),execute:async code=>{
+  receiptOptions:(id,action_key)=>{assert.equal(action_key,'node.javascript.preview.capture.internal');return {};},execute:async code=>{
    calls.push(code);
    if(code.includes('runManagedJavascriptSelectionRead'))return code.includes('"mode":"dispose"')?{disposed:true}:{ready:true,node_tid:context.tid};
    if(code.includes('runJavascriptOutputPreview'))throw Error('reached owned preview capture');
@@ -319,7 +319,7 @@ for(const type of ['transform.group_data','transform.sorting','transform.calcula
 });
 test('foreign managed gesture receipt cannot mark preview cleanup confirmed',async()=>{
  const f=channelFixture(),execute=f.options.execute;
- f.options.execute=async code=>{const result=await execute(code);return typeof code==='string'?result:
+ f.options.execute=async code=>{const result=await execute(code);return typeof code==='string'||code.options.action_key==='node.javascript.preview.capture.internal'?result:
   {...result,output:{...result.output,node_context:{...result.output.node_context,node_id:'foreign'}}};};
  await assert.rejects(createNodeProcedure(f.options).openJavascriptPreview(f.task.output),/did not confirm/);
  assert.equal(f.operation.cleanupConfirmed,false);assert.deepEqual(f.events,['click']);
@@ -471,10 +471,10 @@ test('Join denies unsettled JS history before preview or graph mutation',async()
  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
 });
 
-for(const inputPort of [0,1])test('Join input '+inputPort+' selects its JS producer before strict native port capture',async()=>{
- const f=preflightFixture('join_input_'+inputPort),browser=channelFixture(),records=[];
+for(const inputPort of [0,1,'group'])test('C1/Join '+inputPort+' selects its JS producer before strict native port capture',async()=>{
+ const f=preflightFixture(inputPort==='group'?'transform.group_data':'join_input_'+inputPort),browser=channelFixture(),records=[];
  const previousSourceCell={};
- if(inputPort===1){
+ if(inputPort===1||inputPort==='group'){
   browser.selected.push(previousSourceCell);
   assert.throws(()=>browser.inspect(null,true),/Managed preview native port changed/);
   assert.deepEqual(browser.events,[]);
@@ -527,4 +527,28 @@ test('lost producer body selection does not capture or open a JS port preview',a
  assert.equal(f.options.operation.cleanupConfirmed,false);
  assert.equal(records.filter(r=>r.phase==='javascript_managed_body_prepared').length,1);
  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
+});
+
+
+test('C1 capture refusal is a completed no-gesture receipt with disposed handles',async()=>{
+ const f=channelFixture();f.selected.push({});
+ f.operation.groupingPreview={managed:true};
+ await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/Managed preview native port changed/);
+ assert.deepEqual(f.events,[]);
+ assert.equal(f.operation.transportUncertain,undefined);
+ assert.equal(f.operation.groupingPreview.capture_refused,true);
+ assert.equal(f.operation.groupingPreview.receipt.status,'NOT_APPLIED');
+ assert.equal(f.operation.groupingPreview.receipt.effect_possible,false);
+ assert.equal(f.operation.groupingPreview.receipt.cleanup_complete,true);
+ assert.equal(f.operation.groupingPreview.lease_disposed,true);
+ assert.equal(f.page[Symbol.for('loginom-dock.javascript-output-preview-v1')].size,0);
+ assert.equal(f.records.filter(r=>r.phase==='node_preview_capture_refused').length,1);
+});
+test('C1 lost capture response cannot authorize release',async()=>{
+ const f=channelFixture();f.operation.groupingPreview={managed:true};
+ f.options.execute=async()=>{throw Error('lost capture response');};
+ await assert.rejects(createNodeProcedure(f.options).openJavascriptPreview(f.task.output),/lost capture response/);
+ assert.equal(f.operation.transportUncertain,true);
+ assert.equal(f.operation.groupingPreview.capture_refused,undefined);
+ assert.deepEqual(f.events,[]);
 });

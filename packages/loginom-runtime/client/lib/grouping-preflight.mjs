@@ -1,4 +1,5 @@
 import {managedJavascriptPreviewAdmission} from './javascript-output-preview.mjs';
+import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody} from './javascript-managed-selection.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {createNodeProcedure,NodeProcedureStepError,NodeReadinessTimeout} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
@@ -110,9 +111,13 @@ export async function releaseNodeSchemaPreview(options,ctx,config){
   &&operation.nodeApply.pending?.phase==='target'&&same(operation.lastReceipt,p.reference),
   'Grouping preview has no releasable original F3 receipt');
  const saved=await options.readReceipt(p.reference),r=saved?.receipt;
+ const capture=p.managed===true&&p.capture_refused===true&&p.lease_disposed===true
+  &&r?.action_key==='node.javascript.preview.capture.internal'&&r.status==='NOT_APPLIED'
+  &&r.effect_possible===false&&r.cleanup_complete===true&&r.output?.lease_disposed===true
+  &&same(r.output.node_context,p.binding.node)&&r.output.port_guid===p.port.port_guid;
  need(saved?.state==='completed'&&same(r,p.receipt)&&['AMBIGUOUS','SUCCEEDED','NOT_APPLIED','FAILED'].includes(r.status)
   &&(r.cleanup_complete===true||p.managed===true&&p.lease_disposed===true&&r.action_key==='node.javascript.preview.open.internal')
-  &&['ui.act','node.javascript.preview.open.internal'].includes(r.action_key),'Original F3 browser completion is unconfirmed');
+  &&(capture||['ui.act','node.javascript.preview.open.internal'].includes(r.action_key)),'Original F3 browser completion is unconfirmed');
  const previous=operation.deadline;operation.deadline=ctx.deadline;
  try{
   const channel=createNodeProcedure({operation,execute,record:onRecord,now,...config,signal:ctx.signal,preparedNodeContext:p.binding,
@@ -134,6 +139,7 @@ export async function releaseNodeSchemaPreview(options,ctx,config){
     if(!(error instanceof NodeReadinessTimeout)||error.condition!==condition||now()>=ctx.deadline)throw error;
    }
   }
+  need(!capture||!owned(s)&&s.ui.dialogs.length===0&&s.ui.masks.length===0,'Capture refusal cannot own an opened preview');
   if(owned(s))await channel.perform({condition:'close original grouping preview after failed F3',initialObservation:s,
    ready:owned,identity:()=>({node:p.binding.node,port_guid:p.port.port_guid,root:s.node_preview_schema.root_tid}),
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.node_preview_schema.root_tid+';p.h;close'&&e.allowed_actions.includes('click'));
@@ -178,7 +184,30 @@ export async function preflightGroupingSource(options,ctx,config){
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
  const admission=script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
  let preview;
- if(admission)preview=await openNodeSchemaPreview(options,ctx,config,channel,binding,port,s,{managed:true});
+ if(admission){
+  // C1 can leave another REST branch's JS selected. Use the existing owned
+  // body gesture before strict native-port capture, as Sort/Join already do.
+  const task={operation_id:operation.id+':source-select-0',owner:binding.node,
+   workflow_ref:{prefix:binding.workflow_ref.prefix,tab_tid:binding.workflow_ref.tab_tid},
+   targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,deadline:operation.deadline};
+  const before=await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'capture'}));
+  try{
+   let selected=before;
+   if(before.ready!==true){
+    operation.cleanupConfirmed=false;
+    let result;
+    try{result=await dispatchManagedJavascriptBody({task,before,execute,record:onRecord,receiptOptions});}
+    catch(error){operation.transportUncertain=true;operation.nodeEffectPossible=true;throw error;}
+    operation.nodeEffectPossible ||= result.effect_possible===true;
+    operation.cleanupConfirmed=result.cleanup_complete===true;
+    need(result.status==='SUCCEEDED','Managed JavaScript source selection refused');
+    selected=result.output?.selection;
+   }
+   need(selected?.ready===true&&selected.node_tid===s.prepared_node_context.tid,
+    'Managed JavaScript source selection unconfirmed');
+  }finally{if(!operation.transportUncertain)await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}));}
+  preview=await openNodeSchemaPreview(options,ctx,config,channel,binding,port,s,{managed:true});
+ }
  if(!admission){
   const portControl=s=>s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes('click'));
   need(portControl(s).length===1,'Upstream port is not interactable');
