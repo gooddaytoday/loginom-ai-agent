@@ -10,6 +10,7 @@ import argparse
 import csv
 import json
 import math
+from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,22 +55,34 @@ def fit(rows):
     raise AssertionError("MLE did not converge")
 
 
-def expected(package_path, holdout=False):
+def expected(package_path, holdout=False, threshold=0.8):
     train = source("train.csv")
     a, b = fit(train)
     assert abs(a) < 1e-12 and abs(b - math.log(3)) < 1e-12
     columns = [
-        {"name": "Target_regression", "type": "string", "label_any": True},
-        {"name": "Target_probability", "type": "real", "label_any": True,
+        {"name": "PredictionEvent", "type": "boolean", "label_any": True},
+        {"name": "PredictionProbability", "type": "real", "label_any": True,
          "tolerance": {"abs": 1e-8, "rel": 1e-10}},
+        {"name": "ActualEvent", "type": "boolean", "label_any": True},
+        {"name": "Target_predicted", "type": "string", "label_any": True},
         *[{"name": name, "type": kind, "label": name} for name, kind in
           [("X", "real"), ("Target", "string"), ("RowID", "integer"), ("Note", "string")]],
     ]
+    # Exact group odds at X=1 provide a rational solution for integer X.
+    # Cross-check every training group against the independent Newton fit.
+    group = [r for r in train if r["X"] == 1]
+    events = sum(r["Target"] == "yes" for r in group)
+    odds = Fraction(events, len(group) - events)
+    assert odds == 3
     rows = []
     for row in source("holdout.csv") if holdout else train:
-        p = probability(a, b, row["X"])
-        rows.append({"Target_regression": "yes" if p > 0.8 else "no",
-                     "Target_probability": p, **row})
+        assert row["X"].is_integer()
+        q = odds ** int(row["X"])
+        p = float(q / (1 + q))
+        assert abs(p - probability(a, b, row["X"])) < 1e-12
+        rows.append({"PredictionEvent": p >= threshold, "PredictionProbability": p,
+                     "ActualEvent": None if row["Target"] is None else row["Target"] == "yes",
+                     "Target_predicted": "yes" if p >= threshold else "no", **row})
     return {"package_path": package_path,
             "nodes": [{"type": "imports.text"}, {"type": "datamining.log_regression"},
                       {"type": "exports.text"}],
@@ -77,9 +90,53 @@ def expected(package_path, holdout=False):
                          "ordered": True, "column_order": "exact", "columns": columns, "rows": rows}]}
 
 
+def check_csv(path):
+    """Runner convention: oracle.py ACTUAL.csv; all cells, source row order."""
+    output = expected("{{PACKAGE_PATH}}")['outputs'][0]
+    with Path(path).open(encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        assert reader.fieldnames and len(reader.fieldnames) == len(output['columns'])
+        assert set(reader.fieldnames) == {c['name'] for c in output['columns']}
+        rows = list(reader)
+    assert len(rows) == len(output['rows'])
+    for actual, wanted in zip(rows, output['rows']):
+        for column in output['columns']:
+            name, kind = column['name'], column['type']
+            text, value = actual[name], wanted[name]
+            if value is None:
+                assert text in ['', '?'], (name, text, value)
+                continue
+            if kind == 'boolean':
+                assert text.casefold() in ['true', 'false'], (name, text)
+                assert (text.casefold() == 'true') == value, (name, text, value)
+                continue
+            if kind in ['real', 'integer']:
+                number = float(text)
+                assert math.isfinite(number)
+                tolerance = column.get('tolerance', {})
+                assert abs(number - value) <= max(tolerance.get('abs', 0),
+                                                  tolerance.get('rel', 0) * abs(value)), (name, text, value)
+                continue
+            assert text == value, (name, text, value)
+    print(f"CSV PASS: {len(rows)} rows, {len(output['columns'])} columns")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("actual_csv", nargs="?", type=Path)
     parser.add_argument("--package-path", default="{{PACKAGE_PATH}}")
     parser.add_argument("--holdout", action="store_true", help="research only: saved model, no retraining")
+    parser.add_argument("--threshold", type=float, default=0.8)
+    parser.add_argument("--check", action="store_true", help="verify authored expectations and model input copy")
     args = parser.parse_args()
-    print(json.dumps(expected(args.package_path, args.holdout), ensure_ascii=False, indent=2))
+    if args.actual_csv:
+        check_csv(args.actual_csv)
+    elif args.check:
+        for name, holdout, threshold in [('expected.json', False, 0.8),
+                                         ('holdout-expected.json', True, 0.8),
+                                         ('threshold-half-expected.json', False, 0.5)]:
+            assert json.loads((ROOT / 'acceptance' / name).read_text()) == expected('{{PACKAGE_PATH}}', holdout, threshold)
+        assert (ROOT / 'fixtures/train.csv').read_bytes() == (ROOT / 'acceptance/data/train.csv').read_bytes()
+        print('Oracle / expectations / model input: PASS')
+    else:
+        print(json.dumps(expected(args.package_path, args.holdout, args.threshold), ensure_ascii=False, indent=2))

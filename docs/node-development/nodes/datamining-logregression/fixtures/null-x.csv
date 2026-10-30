@@ -1,2 +1,6 @@
 RowID,X,Target,Note
-24,?,yes,null predictor
+101,-1.0,no,synthetic
+102,-1.0,yes,synthetic
+103,1.0,no,synthetic
+104,1.0,yes,synthetic
+105,?,yes,null predictor
