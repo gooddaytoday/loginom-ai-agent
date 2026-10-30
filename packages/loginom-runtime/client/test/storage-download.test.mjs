@@ -6,6 +6,64 @@ import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
 import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
+import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
+
+async function sourceNavigation(t,fault) {
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[],deadlines=[];
+ let epoch=0,checks=0,opened=false,refreshed=false;
+ const toolbar='MF;cntMain;tlbMainToolbar',button=toolbar+';btnFilestorage';
+ const element=tid=>({ref:page.uiReference(tid),tid,kind:'control',scope:'workspace',label:'',enabled:true,visible:true,
+  identity:{anchor_tid:tid,path:[]},signature:{tag:'button',tid},bounding_box:{x:10,y:10,width:20,height:20},
+  interaction:{state:'point_observed',point:{x:20,y:20}},allowed_actions:['click']});
+ const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page);
+ page.elements=()=>[...elements(),page.element(button)];
+ page.click=async()=>{opened=true;};
+ page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('return {document:state.epoch,revision:state.revision}')){
+   if(++checks===1){epoch++;if(fault==='replaced')page.uiRefs.set(button,'ui-replaced-button');}
+   return {...base.dom_epoch,revision:epoch};
+  }
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);state.dom_epoch.revision=epoch;
+  if(arg.discoverRoots)state.observation_kind='roots';
+  if(epoch&&arg.discoverRoots)refreshed=true;
+  if(!opened){state.ui.elements=[element(toolbar),element(button)];
+   if(refreshed&&fault==='owner')state.package_identity={name:'foreign',path:'/foreign.lgp'};
+   if(refreshed&&fault==='directory')state.file_storage={status:'observed',directory:'/foreign'};
+   if(refreshed&&fault==='target')state.ui.elements[1].signature.tag='foreign';
+   if(arg.discoverRoots){state.ui.elements=[element(toolbar)];delete state.package_identity;}
+   else state.observation_root={ref:arg.rootRef,identity:element(arg.rootRef===page.uiReference(toolbar)?toolbar:button).identity};
+  }else{
+   const nav=element(page.prefix+';NavigationBar;NavigationPanel'),file=element(page.prefix+';FileStorageForm;colName_full.csv');
+   file.label='full.csv';file.storage_entry={kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'};
+   state.ui.elements=[nav,element(page.prefix+';FileStorageForm;pnlFileStorage;tbl'),file];
+   state.file_storage={status:'observed',directory:'/worker'};
+  }
+  return state;
+ };
+ const r=runtime(page,{cacheDirectory:join(f.root,'navigation'),onRecord:async record=>records.push(record),
+  execute:code=>{for(const match of code.matchAll(/"deadline_at":(\d+)/g))deadlines.push(Number(match[1]));return page.execute(code);},
+  getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const result=await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source');
+ return {result,records,deadlines,page,refreshed};
+}
+
+for(const fault of [undefined,'replaced'])test('source navigation reissues observation/ref after proven no-effect epoch refusal: '+fault,async t=>{
+ const f=await sourceNavigation(t,fault);
+ assert.equal(f.result.status,'SUCCEEDED',JSON.stringify(f.records.find(r=>r.phase==='storage_source_failed')??f.result));
+ const actions=f.records.filter(r=>r.phase==='completed'&&r.action_key==='ui.act');
+ assert.equal(actions.length,2);assert.equal(actions[0].outcome.error.code,'UI_EPOCH_CHANGED');
+ assert.equal(actions[0].outcome.effect_possible,false);assert.equal(actions[1].outcome.status,'SUCCEEDED');
+ assert.notEqual(actions[0].parameters.observation_id,actions[1].parameters.observation_id);
+ if(fault==='replaced')assert.notEqual(actions[0].parameters.action.ref,actions[1].parameters.action.ref);
+ assert.equal(f.page.events.filter(e=>e==='mouse_click').length,1);assert.equal(f.refreshed,true);
+ assert.ok(f.deadlines.length);assert.ok(f.deadlines.every(d=>d-1000<runtimeCallTimeout('dock_storage_source',{})));
+});
+for(const fault of ['owner','directory','target'])test('source epoch refresh refuses changed '+fault,async t=>{
+ const f=await sourceNavigation(t,fault);assert.equal(f.result.status,'FAILED');
+ assert.equal(f.page.events.filter(e=>e==='mouse_click').length,0);
+ assert.equal(f.records.filter(r=>r.phase==='completed'&&r.action_key==='ui.act').length,1);
+});
 
 const source=()=>({verified:true,kind:'storage',server_source_ref:'storage-one',destination:'/worker/full.csv',
  bytes:3,mtime:'2026-10-28T00:00:00Z',origin:'https://app.loginom.ai',account:'worker',document_id:'doc'});
