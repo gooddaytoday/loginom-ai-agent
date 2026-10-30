@@ -252,11 +252,17 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         const errors=[...document.querySelectorAll('.bg-error-messages')].filter(visible);
         if(errors.length&&(!errorBound||errors.length!==1||errors[0]!==error.element))return {reason:'DIALOG_OR_OPERATION_OPEN'};
         if(blockers.some(e=>!loading(e)&&!(errorBound&&(e===error.root||error.root.contains(e)))))return {reason:'DIALOG_OR_OPERATION_OPEN'};
-        if(state.open_error_dismiss_started&&!errorBound)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        // After our one OK, the native window may hide its contents or release
+        // its controls before the next layout settles. Read only its retained
+        // window until it disappears; visible replacements still fail above.
+        if(state.open_error_dismiss_started) {
+          if(!error)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          if(visible(error.root))return {reason:errorBound?'OWNED_OPEN_ERROR_CLOSING':'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          if(visible(error.element))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        }
         if(errorBound&&visible(error.root)) {
           const tid=error.root.getAttribute('data-tid');
           if(!/^msgbox(?:-\d+)?$/.test(tid??'')||!visible(error.element))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
-          if(state.open_error_dismiss_started)return {reason:'OWNED_OPEN_ERROR_CLOSING'};
           const buttons=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid+';tlb;ok')+']')];
           const button=buttons.length===1&&buttons[0],control=button&&globalThis.Ext?.getCmp?.(button.id);
           const choices=[...document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';tlb;')+']')]
@@ -288,7 +294,6 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
           button.click();
           return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
         }
-        if(state.open_error_dismiss_started&&(visible(error?.root)||visible(error?.element)))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
         if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
         // This callback is only for OK. If its owned error vanished in transit,
         // leave Close to the ordinary path and its fresh native guards.
@@ -350,7 +355,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       }
       // A lost/late acknowledgement is never permission to click OK again.
       if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
-      before=ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
+      before=ready.gesture_returned===true?{reason:'OWNED_OPEN_ERROR_CLOSING'}:
+        ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
     }
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
