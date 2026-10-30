@@ -264,7 +264,10 @@ test("direct Desktop host keeps Help readiness browser-free and validation quiet
   ])
 })
 
-test("normal guarded cleanup can acknowledge after the old five-second resource budget", async () => {
+test.each([
+  { closeSavedPackageOnShutdown: true },
+  { acceptanceCleanupPackage: "/user/acceptance.lgp" },
+])("guarded cleanup can acknowledge after the old five-second resource budget: %j", async (policy) => {
   const directory = await mkdtemp(join(fixture.directory, "close-"))
   const entry = join(directory, "runtime.mjs")
   await Bun.write(
@@ -283,7 +286,7 @@ test("normal guarded cleanup can acknowledge after the old five-second resource 
     chat: "chat",
     endpoint: "https://example.test/mcp",
     connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" },
-    closeSavedPackageOnShutdown: true,
+    ...policy,
   })
   const first = runtime.close()
   expect(runtime.close()).toBe(first)

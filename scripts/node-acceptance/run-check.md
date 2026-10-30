@@ -99,7 +99,7 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: upload_only, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: upload_only, logreg-enter, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
@@ -217,3 +217,10 @@ receives only its named input CSV and user task. Other coefficients are deferred
 `n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
 `docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
 независимый expected.json; точный порядок строк и полей, все значения, типы и NULL.
+
+`logreg-enter`: Логистическая регрессия, бинарный Enter, `event=yes`, порог 0.8,
+32 строки, точные типы/NULL/порядок, CSV/Save/cold. Источник —
+`docs/node-development/nodes/datamining-logregression/acceptance/task.md`,
+только `data/train.csv` передаётся модели. CSV проверяет независимый
+`oracle.py`; холодный порт 0 — отдельный `expected.json` с допуском
+вероятности abs=1e-8/rel=1e-10 и точным порядком полей.

@@ -92,6 +92,9 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name=expected, input_files=[data])
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'logreg-enter':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -631,7 +634,7 @@ class Runner:
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
-            if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
+            if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)
