@@ -2,7 +2,7 @@ import {importSourceSchema,validateImportSource} from './storage-policy.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
- source_path:{...text(2048),description:'Verified delivery .xlsx path; original workbook, no CSV conversion.'},
+ source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion.'},
  sheet_name:{...text(120),description:'Exact sheet; omit=first initially, preserve during source_switch. No named ranges.'},
  header_rows:{type:'integer',minimum:1,maximum:10,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
  columns:{type:'array',minItems:1,maxItems:8,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
