@@ -591,7 +591,20 @@ class Runner:
                 and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
                 for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
             assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
-            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
+            uploads = []
+            for call in calls:
+                if call.get('tool') != 'loginom_dock_artifact_deliver': continue
+                state = call.get('state', {})
+                # Validation failures with no possible effect never reach the browser.
+                try: rejected = json.JSONDecoder().raw_decode(state.get('error', ''))[0]
+                except (ValueError, TypeError): rejected = None
+                if (state.get('status') == 'error' and isinstance(rejected, dict)
+                        and rejected.get('request_rejected') is True and rejected.get('effect_possible') is False
+                        and rejected.get('status') == 'NOT_APPLIED' and rejected.get('state') == 'settled'
+                        and rejected.get('action_key') == 'request.validate'):
+                    continue
+                uploads.append(call)
+            assert len(uploads) == 1, 'UPLOAD_COUNT'
             assert any(o.get('upload_status', 'ready') == 'ready' and o.get('status') == 'SUCCEEDED'
                        and o.get('state') == 'settled' and o.get('cleanup_complete') is True
                        and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size

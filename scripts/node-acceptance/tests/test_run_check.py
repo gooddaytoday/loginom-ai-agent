@@ -64,6 +64,32 @@ class RunCheckTests(unittest.TestCase):
                                   status='completed', output=json.dumps(reply)))]
                 self.upload_model(Path(directory), reply, calls=calls)
 
+    def test_upload_count_excludes_only_proven_prebrowser_rejections(self):
+        # LAB-549 Sseed/model.stdout:20 rejects budget_ms before any browser effect.
+        receipt = dict(status='SUCCEEDED', state='settled', upload_status='ready', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        rejected = dict(status='NOT_APPLIED', state='settled', action_key='request.validate',
+                        phase='request_rejected', request_rejected=True, effect_possible=False,
+                        error=dict(code='REQUEST_REJECTED', parameter_path='budget_ms'))
+        cases = [('prebrowser', rejected, True), ('possible effect', dict(rejected, effect_possible=True), False),
+                 ('unknown effect', {k: v for k, v in rejected.items() if k != 'effect_possible'}, False),
+                 ('unproven rejection', dict(rejected, request_rejected=False), False),
+                 ('runtime error', dict(state='settled', status='FAILED'), False),
+                 ('malformed', None, False), ('second upload', receipt, False)]
+        for name, prior, accepted in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed' if name == 'second upload' else 'error',
+                             **{'output' if name == 'second upload' else 'error':
+                                json.dumps(prior) if prior else 'not JSON'})),
+                         dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed', output=json.dumps(receipt)))]
+                if accepted:
+                    self.upload_model(Path(directory), receipt, calls=calls)
+                else:
+                    with self.assertRaisesRegex(AssertionError, 'UPLOAD_COUNT'):
+                        self.upload_model(Path(directory), receipt, calls=calls)
+
     def test_upload_only_keeps_verification_requirements(self):
         receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
                        output=dict(bytes=16, upload_completion_verified=True))
