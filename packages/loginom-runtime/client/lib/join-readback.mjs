@@ -7,7 +7,7 @@ export function joinConfigurationReadback({node,phases,operation_id}){
  const receipt=name=>{const xs=phases.filter(p=>p.phase===name),p=xs[0];need(xs.length===1&&p.status==='verified'&&p.receipt_id===operation_id+':'+name&&p.value?.verified===true&&p.value.cleanup_complete===true,'verified '+name);return p;};
  const input=receipt('input_mapping'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
  const c=configured.value.configuration,m=mapped.value.native_mapping;
- need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.keys?.length&&['inner','left'].includes(c.mode),'configuration owner');
+ need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.keys?.length&&['inner','left','right','full','difference'].includes(c.mode),'configuration owner');
  need(typeof c.case_sensitive==='boolean'&&typeof c.include_joined_keys==='boolean'&&Array.isArray(c.input_fields)&&c.input_fields.length===2,'explicit options and input schemas');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)

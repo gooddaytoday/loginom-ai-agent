@@ -136,7 +136,7 @@ test('D46 unchanged execution predicate excludes every configuration edit and ot
  }
 });
 
-for(const mode of ['inner','left'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
+for(const mode of ['inner','left','right','full','difference'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
  const f=fixture('transform.join_data',{savedMode:mode,mode,initialStage:'input_mapping'}),result=await f.run();
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  assert.deepEqual(f.calls,['select','open','next','close','baseline','Execute']);

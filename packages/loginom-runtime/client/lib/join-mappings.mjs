@@ -26,7 +26,7 @@ export async function configureJoinInputs(channel,mappings,ctx,request,finishWiz
  try{
   if(request.parameters.keys){
    resolveJoinKeys(request.parameters,observations.map(o=>o.fields));
-   const fields=joinOutputFields({input_fields:observations.map(o=>o.fields),...request.parameters});
+   const fields=joinOutputFields({input_fields:observations.map(o=>o.fields),...request.parameters,mode:request.mode});
    need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field explicitly');
    const output=request.mappings.find(m=>m.direction==='output');
    if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Join output mapping is incomplete');
