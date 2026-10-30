@@ -513,7 +513,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(usage['runtime'], 0)
 
     def test_all_regression_names_resolve_real_inputs(self):
-        names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 26)]
+        names = ([f'n{i}' for i in range(1, 22)] + [f'p{i}' for i in range(1, 26)]
                  + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
                  + [f's{i}' for i in range(1, 9)]
                  + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
@@ -523,7 +523,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 self.assertTrue(case['prompt'].is_file())
                 self.assertTrue((case['source'] / 'oracle.py').is_file())
                 self.assertTrue(case['data'].is_dir())
-        for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n21', 'q11', 's9', '../n1', 'clustering']:
+        for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n22', 'q11', 's9', '../n1', 'clustering']:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
 
@@ -742,6 +742,20 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         for text in ['Number\n0\n2\n', 'Number\n2\n""\n', 'Number\n""\n3\n']:
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, text, header='labels')
+
+    def test_csv_null_marker_is_explicit_and_preserves_other_values(self):
+        output = {'columns': [{'name': 'Value', 'type': 'real'},
+                              {'name': 'Text', 'type': 'string'}],
+                  'rows': [{'Value': None, 'Text': '?'}, {'Value': 0, 'Text': ''}],
+                  'ordered': True}
+        self.csv_result(output, 'Value,Text\n,?\n0,\n')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'Value,Text\n?,?\n0,\n')
+        self.csv_result(output, 'Value,Text\n?,?\n0,\n', null_marker='?')
+        for text in ['Value,Text\n,?\n0,\n', 'Value,Text\n0,?\n0,\n',
+                     'Value,Text\n?,?\n?,\n', 'Value,Text\n?,\n0,\n']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, text, null_marker='?')
 
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
