@@ -125,6 +125,8 @@ def expected_for(case, package):
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
+        if case['expected_name'] == 'expected-age-pressure.json':
+            expected['outputs'].reverse()  # One final CSV; cold still checks both tables.
     elif re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:

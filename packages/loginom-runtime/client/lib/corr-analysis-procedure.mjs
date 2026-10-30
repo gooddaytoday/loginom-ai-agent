@@ -18,7 +18,7 @@ export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
   const wanted=name==='pearson';if(current.coefficients[name]===wanted)continue;
   state=await observe('coefficient before edit');check(state);
   await channel.perform({condition:'set correlation coefficient '+name,initialObservation:state,ready,identity:s=>s.prepared_node_context,
-   resolve:s=>({verb:'set_checked',ref:one(s,s.wizard.root_tid+';CorrAnalysisWizard;'+key,'set_checked').ref,checked:wanted})});
+   resolve:s=>({verb:'set_checked',ref:one(s,s.wizard.root_tid+';CorrAnalysisWizard;'+key+';DisplayEl','set_checked').ref,checked:wanted})});
   current.coefficients[name]=wanted;state=await observe('coefficient readback');check(state);edits++;
  }
  for(const field of expected)for(const [key,column] of [['first_set','colChkFirstSet_'],['second_set','colChkSecondSet_']]){

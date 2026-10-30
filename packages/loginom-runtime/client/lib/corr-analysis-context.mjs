@@ -15,8 +15,10 @@ export function readCorrAnalysisBrowser(prefix){
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
  const roots=exact(base),root=roots[0],view=roots.length===1&&globalThis.Ext?.getCmp?.(root.id);
  if(!root?.checkVisibility({checkVisibilityCSS:true})||view?.el?.dom!==root)return fail('correlation_root');
- const controller=view.Controller,store=controller?.FColumnsStore,records=store?.getData?.()?.items,proxy=store?.getProxy?.();
- if(controller?.FView!==view||store?.$className!=='Ext.data.Store'||proxy?.$className!=='bg.ext.CollectionProxy'||store.isLoading?.()||store.isBufferedStore
+ const grids=exact(base+';grdColumns'),grid=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id);
+ if(grid?.el?.dom!==grids[0]||!root.contains(grids[0]))return fail('correlation_grid');
+ const store=grid.getStore?.(),records=store?.getData?.()?.items,proxy=store?.getProxy?.();
+ if(store?.$className!=='Ext.data.Store'||proxy?.$className!=='bg.ext.CollectionProxy'||store.isLoading?.()||store.isBufferedStore
   ||!Array.isArray(records)||records.length>1000||store.getCount?.()!==records.length||store.getRemoteFilter?.()===true||store.getRemoteSort?.()===true
   ||proxy.pendingOperations&&Object.keys(proxy.pendingOperations).length)return fail('correlation_inventory');
  const fields=[];

@@ -10,10 +10,11 @@ s=importlib.util.spec_from_file_location('run_check',p); m=importlib.util.module
 for name,rows in [('corr-pairs',4),('corr-null',4),('corr-age',1)]:
  c=m.scenario(name); e=m.expected_for(c,'/own/test.lgp')
  assert e['package_path']=='/own/test.lgp'
- assert len(e['outputs'][0]['rows'])==rows
- assert e['outputs'][0]['output_node_type']=='research.corr_analysis'
- assert e['outputs'][0]['ordered'] is True
- assert e['outputs'][0]['columns'][-1]['name']=='Pirson'
+ native=next(o for o in e['outputs'] if o['output_node_type']=='research.corr_analysis')
+ assert len(native['rows'])==rows
+ assert native['ordered'] is True
+ assert native['columns'][-1]['name']=='Pirson'
+ if name=='corr-age': assert e['outputs'][0]['output_node_type']=='export_input'
  assert len(c['input_files'])==1 and (c['data']/c['input_files'][0]).is_file()
  assert c['prompt'].is_file()
 print('PASS')`;
