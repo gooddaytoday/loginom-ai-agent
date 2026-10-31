@@ -114,6 +114,9 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'rest-get-plain':
+        src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name in ['regex-add', 'regex-replace']:
         node = REPO / 'docs/node-development/nodes/replacement'
         return dict(source=node / 'acceptance/regex',

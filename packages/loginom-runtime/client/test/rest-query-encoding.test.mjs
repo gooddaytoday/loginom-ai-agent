@@ -10,6 +10,18 @@ const request=()=>({operation_id:'rest',contract_revision:'1.0.0',document_id:'d
  inputs:[{source:{document_id:'doc',workflow_id:'flow',node_id:'import'},output:0,input:0}],
  parameters:{query_parameters:[{name:'Key',field:'Key'}]},budgets:{total_ms:600000}});
 
+test('plain GET with a table reaches connection validation without creating a query encoder',async()=>{
+ const r={...request(),target:{kind:'new',type:'integration.rest_request'},
+  parameters:{connection:{name:'Plain',base_url:'https://httpbin.org/status/200'},query_parameters:[]}};
+ const operation={id:r.operation_id,parameters:r},events=[];
+ const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>{events.push(e);return e;},receiptOptions:()=>({}),
+  execute:async code=>{assert.match(code,/rest_connection/);throw Error('connection validation reached');}});
+ await assert.rejects(drivers.beforeTarget({deadline:Date.now()+60000}),/connection validation reached/);
+ assert.equal(operation.restQueryEncoder,undefined);
+ assert.equal(events.some(e=>e.operation_id?.startsWith('rest-url-')),false);
+});
+
 function encode(source,rows){
  const output=[];
  const InputTable={RowCount:rows.length,Get:(row,name)=>rows[row][name]};
