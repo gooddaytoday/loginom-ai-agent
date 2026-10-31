@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('private cold window support adds zero bytes to full and compact model schemas',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,92926,'e2a1ef6b4280fe159642e9c9ae341f278e0a57d57154a24c86759a0510e5ab17'],
-  [nodeApiTools.map(userNodeTool),17820,'3b90cf08b438eb0cd5f885fdc2182f9d76cc090ea71916decc631d8d4b74e8df'],
+  [nodeApiTools,94646,'3f9e4ef2ecccfd96eee340ee71224c05b1eb2ca853ee11e048027c16791b6cc3'],
+  [nodeApiTools.map(userNodeTool),17855,'febe4fd29857bf384c160efdb751d8a194c878f1918fd17caafb33b1e30998aa'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

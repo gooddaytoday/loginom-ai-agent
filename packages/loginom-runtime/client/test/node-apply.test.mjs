@@ -60,6 +60,18 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 
+for(const [type,mode,preserve] of [['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','k_means',false]])
+for(const close of [true,false])test('saved-model intermediate finish guard '+type+'/'+mode+' close='+close,async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type,ref:node};p.mode=mode;
+ f.handlers.set(type,{revision:'guard-test',modes:[mode],validate:()=>{},output_wizard:'separate',configure:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:close?'close':'done',settings_applied:!close,draft_discarded:close,execution_started:false});
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:!preserve,execution_id:'execution1'});
+ const result=await f.run(p);
+ assert.equal(result.status,close===preserve?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+ if(close!==preserve){assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('execute'));}
+});
+
 test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{
  const {createLinRegressionNodeSupport}=await import('../lib/linregression-node.mjs');
  const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};

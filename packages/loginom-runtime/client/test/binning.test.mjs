@@ -2,8 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateBinningParameters,resolveBinningField} from '../lib/binning-parameters.mjs';
 import {binningOutputColumns,readBinningOutputs} from '../lib/binning-output.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+import {binningBeforeGraphExecute} from '../lib/binning-node.mjs';
+import {binningConfigurationReadback} from '../lib/binning-readback.mjs';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const parameters={binning:{field:'X',method:'count',size:2,limits:[0,20]}};
 const fields=[{name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный'},{name:'X',label:'X',type:'real',data_kind:'Непрерывный'},{name:'Note',label:'Note',type:'string',data_kind:'Дискретный'}];
+test('binning handler is installed for internal/apply and apply never enters training',async()=>{
+ const handler=createCandidateNodeSupport({}).nodeApplyHandlers.get('preprocessing.binning');
+ assert.deepEqual(handler.modes,['internal','apply']);assert.equal(handler.output_wizard,'separate');
+ assert.deepEqual(await binningBeforeGraphExecute({operation:{nodeApply:{request:{mode:'apply'}}}},null,null,null),{});
+});
+test('readback requires a separately trained materialized model or an uncommitted saved-model inspection',()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'bins'},intervals=[{number:0,lower:0,upper:20,label:'[0..20]',lower_included:true,upper_included:true}];
+ const c={verified:true,node_context:node,mode:'internal',field:'X',type:'real',method:'count',size:1,limits:[0,20],state:'settings',intervals:[]};
+ const values={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{ports:[0,1].map(port=>({port,schema:binningOutputColumns({fields,field:'X',type:'real'},port).map(f=>({...f,label:f.label??f.name,data_kind:'Непрерывный'}))}))},finish:{mode:'execute',settings_applied:true,execution_id:'execute',training:{status:'trained',node,execution_id:'train',source:[{node:{...node,node_id:'import'},output:0,input:0}],model:{state:'materialized',intervals}}}};
+ const candidate=()=>({node,operation_id:'bins',phases:Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:'bins:'+phase,value:{verified:true,cleanup_complete:true,...value}}))});
+ const trained=binningConfigurationReadback(candidate());assert.equal(trained.state,'materialized');assert.deepEqual(trained.intervals,intervals);
+ const configurationSchema=nodeApplyResultSchema.properties.configuration.properties.readback;
+ const validate=new AjvJsonSchemaValidator().getValidator(configurationSchema);assert.equal(validate(trained).valid,true,JSON.stringify(validate(trained)));
+ values.finish.training.execution_id='execute';assert.throws(()=>binningConfigurationReadback(candidate()),/separate training/);
+ c.mode='apply';c.state='materialized';c.intervals=intervals;values.node_finish={settings_applied:false,draft_discarded:true};values.finish={mode:'execute',settings_applied:false,execution_id:'apply'};
+ const applied=binningConfigurationReadback(candidate());assert.equal(applied.training.status,'not_requested');assert.equal(validate(applied).valid,true);
+ c.state='settings';c.intervals=[];assert.throws(()=>binningConfigurationReadback(candidate()),/materialized/);
+});
 test('binning rejects unsupported combinations before mutation',()=>{
  assert.doesNotThrow(()=>validateBinningParameters(parameters,'internal'));
  for(const patch of [{size:0},{size:2.5},{size:Infinity},{limits:[20,0]},{limits:[0,NaN]},{method:'sd'},{rounding:true},{field:' '}])

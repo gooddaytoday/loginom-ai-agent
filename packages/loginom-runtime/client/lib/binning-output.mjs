@@ -1,3 +1,5 @@
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 const need=(v,m)=>{if(!v)throw Error('Binning output: '+m);};
 export function binningOutputColumns(c,port){
  const column=(name,type)=>({name,type});
@@ -5,6 +7,21 @@ export function binningOutputColumns(c,port){
  need(port===0,'only ports 0 and 1 supported');
  return c.fields.flatMap(f=>[{name:f.name,label:f.label,type:f.type,data_kind:f.data_kind},...(f.name===c.field?[
   ['BinsID','string'],['Number','integer'],['Label','string'],['LowBound',c.type],['UppBound',c.type],['LowBoundIncl','boolean'],['UppBoundIncl','boolean'],['LowLimOpen','boolean'],['UppLimOpen','boolean'],['OutOfBins','integer']].map(([n,t])=>column(f.name+'_'+n,t)):[])]);
+}
+export async function configureBinningOutputs(channel,c,p,mappings){
+ need(mappings.length===0,'mapping overrides unsupported');const ports=[];
+ for(const port of [0,1]){
+  await channel.openOutputPort(port);
+  const s=await channel.observe({condition:'complete native binning output '+port,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified&&s.node_mapping.inventory_complete});
+  const m=s.node_mapping,expected=binningOutputColumns(c,port),fields=m.target_fields.filter(f=>!f.excluded);
+  need(m.source_identity_verified&&fields.length===expected.length&&fields.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type&&f.source),'native output schema/order differs');
+  const definition=await readOutputDefinitionPages(channel,{expectedCount:m.target_fields.length});
+  need(definition.fields.length===fields.length&&definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===fields[i][k])),'rendered output definition differs');
+  ports.push({port,schema:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}))});
+  // Output inspection must not commit a wizard and invalidate learned bins.
+  await closePreparedWizard(channel);
+ }
+ return {verified:true,cleanup_complete:true,effect_possible:false,ports};
 }
 export async function readBinningOutputs(channel,read,ctx,mapped){
  need(JSON.stringify(read.ports)==='[0,1]','both output ports required');const ports=[];
