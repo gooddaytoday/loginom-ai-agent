@@ -1,3 +1,5 @@
+import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
+import {execFileSync} from 'node:child_process'
 import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
@@ -19,6 +21,8 @@ const args = parseArgs({
     expected: { type: "string" },
     output: { type: "string" },
     csv: { type: "string" },
+    xlsx: { type: "string" },
+    "xlsx-expected": { type: "string" },
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'exact-port-windows': { type: 'boolean', default: false },
@@ -54,7 +58,13 @@ const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
-const expected = JSON.parse(await readFile(args.expected, "utf8"))
+const rawExpected = JSON.parse(await readFile(args.expected, "utf8"))
+const excelExpected=excelColdExpected(rawExpected)
+if(excelExpected){
+ if(!args.xlsx||!args["xlsx-expected"])throw Error("COLD_XLSX_REQUIRED")
+ execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
+}
+const expected = excelExpected??rawExpected
 const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
@@ -193,8 +203,9 @@ page = context.pages()[0]
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
+  if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
-  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
+  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }

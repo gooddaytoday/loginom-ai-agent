@@ -1,3 +1,4 @@
+import {createExcelExportNodeSupport} from './exports-excel-node.mjs';
 import {createSamplingNodeSupport} from './sampling-node.mjs';
 import {createDataPartitionNodeSupport} from './data-partition-node.mjs';
 import {createLogRegressionNodeSupport} from './log-regression-node.mjs';
@@ -39,6 +40,7 @@ export function nodeOutputForJournal(value,redactor){
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
+ const excelExport=createExcelExportNodeSupport(config);
  const slidingWindow=createSlidingWindowNodeSupport(config);
  const elimOutlier=createElimOutlierNodeSupport(config);
  const logregression=createLogRegressionNodeSupport(config),correlation=createCorrAnalysisNodeSupport(config),linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
@@ -47,7 +49,7 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...excelExport.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
@@ -64,6 +66,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='research.corr_analysis')return correlation.nodeApplyDriverFactory(options);
   if(type==='datamining.clustering')return clustering.nodeApplyDriverFactory(options);
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);
+  if(type==='exports.excel')return excelExport.nodeApplyDriverFactory(options);
   if(type==='exports.text')return exports.nodeApplyDriverFactory(options);
   if(type==='transform.collapse_columns')return collapse.nodeApplyDriverFactory(options);
   if(type==='transform.sliding_window')return slidingWindow.nodeApplyDriverFactory(options);
