@@ -96,7 +96,7 @@ test('readback binds training, event and cutoff to committed settings and separa
 });
 
 for(const mode of ['forward','backward','stepwise'])for(const criterion of ['deviance','aic','aicc','bic','hqic'])test(mode+' / '+criterion+' selects observed controls and reports applicable cutoffs',async()=>{
- const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:1e-9}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
+ const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:0}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
  assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,selection}},mode));
  const f=fixture({mode,selection}),r=await f.run();
  assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise'].indexOf(mode));
@@ -105,10 +105,11 @@ for(const mode of ['forward','backward','stepwise'])for(const criterion of ['dev
  const edited=f.actions.filter(a=>a.verb==='fill').map(a=>a.ref.split(':')[0]);
  assert.equal(edited.includes('pedAddSignificance'),criterion==='deviance'&&mode!=='backward');
  assert.equal(edited.includes('pedRemoveSignificance'),criterion==='deviance'&&mode!=='forward');
+ if(criterion==='deviance'&&mode!=='backward')assert.equal(f.actions.find(a=>a.verb==='fill'&&a.ref.startsWith('pedAddSignificance')).text,'0');
 });
 
 test('selection rejects missing, inapplicable, unknown and unordered cutoffs before UI',()=>{
- for(const [mode,selection] of [['enter',{criterion:'aic'}],['forward',undefined],['stepwise',{}],['forward',{criterion:'unknown'}],['forward',{criterion:'deviance',entry_significance:0}],['backward',{criterion:'deviance',removal_significance:1}],['forward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['backward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['stepwise',{criterion:'deviance',entry_significance:0.2,removal_significance:0.1}],['stepwise',{criterion:'aic',entry_significance:0.01}],['stepwise',{criterion:'aic',unexpected:true}]])
+ for(const [mode,selection] of [['enter',{criterion:'aic'}],['forward',undefined],['stepwise',{}],['forward',{criterion:'unknown'}],['forward',{criterion:'deviance',entry_significance:-1e-9}],['backward',{criterion:'deviance',removal_significance:0}],['backward',{criterion:'deviance',removal_significance:1}],['forward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['backward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['stepwise',{criterion:'deviance',entry_significance:0.2,removal_significance:0.1}],['stepwise',{criterion:'aic',entry_significance:0.01}],['stepwise',{criterion:'aic',unexpected:true}]])
   assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,...(selection?{selection}:{})}},mode));
 });
 

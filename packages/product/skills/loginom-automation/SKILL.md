@@ -227,7 +227,7 @@ JS-узлы не удаляй автоматически; их наличие н
 `input_fields` содержит только числовые факторы; идентификаторы и комментарии
 сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для этого
 поддерживаемого обучения выбирай Логистическую регрессию; Калькулятор и
-JavaScript не нужны. Для отбора факторов используй тот же узел с `mode:"forward"`, `"backward"` или `"stepwise"` и `logistic.selection:{criterion:"deviance"|"aic"|"aicc"|"bic"|"hqic"}`. При Deviance Forward требует `entry_significance`, Backward — `removal_significance`, Stepwise — оба: `0 < entry_significance < removal_significance < 1`. При информационном критерии пороги отбора не передавай. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Для отбора также выбирай Логистическую регрессию. Режим apply, веса, валидация, коэффициенты и
+JavaScript не нужны. Для отбора факторов используй тот же узел с `mode:"forward"`, `"backward"` или `"stepwise"` и `logistic.selection:{criterion:"deviance"|"aic"|"aicc"|"bic"|"hqic"}`. При Deviance Forward требует `entry_significance`, Backward — `removal_significance`, Stepwise — оба: `0 <= entry_significance < removal_significance < 1`. При информационном критерии пороги отбора не передавай. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Для отбора также выбирай Логистическую регрессию. Режим apply, веса, валидация, коэффициенты и
 выход переменных пока недоступны. Сначала запроси `parameter_schema` узла.
 
 Для прогноза LinReg на новых данных используй `mode:"apply"` на уже обученном узле с сохранёнными `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; `enter` обучает или переобучает модель.

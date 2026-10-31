@@ -66,7 +66,7 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 
 | Task | Настройка | Expected / независимый результат |
 |---|---|---|
-| `task-stepwise-strict.md` | Deviance / entry=1e-9, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
+| `task-stepwise-strict.md` | Deviance / entry=0, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
 | `task-stepwise-permissive.md` | Deviance / 0.95, 0.99 | `expected-permissive.json`, X+Noise |
 
 Строгий случай отличает слишком высокий/умолчательный entry; мягкий —
@@ -77,7 +77,7 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 python3 oracle.py --check
 python3 oracle.py --diagnostic
 python3 oracle.py actual.csv
-python3 oracle.py --entry 0.000000001 --removal 0.2 actual.csv
+python3 oracle.py --entry 0 --removal 0.2 actual.csv
 python3 oracle.py --entry 0.95 --removal 0.99 actual.csv
 node schema-size.mjs
 ```
@@ -97,9 +97,10 @@ stock CSV oracle вычисляет тот же результат; `--check` п
 Прежние четыре обязательных logistic-поля и Enter сохраняют свой смысл.
 Для новых режимов criterion обязателен. При Deviance Forward требует только
 entry_significance, Backward — только removal_significance, Stepwise — оба,
-0 < entry < removal < 1. Для информационных критериев p-поля запрещены.
-UI допускает 0..1; сужение до открытого интервала — **предлагаемая** граница
-первого среза, не якобы наблюдённый отказ Loginom на 0/1.
+0 <= entry < removal < 1. Для информационных критериев p-поля запрещены.
+По разрешению владельца в LAB-657 строгий entry изменён с 1e-9 на 0:
+независимый oracle и эталон остаются прежними. Removal сохраняет открытый
+интервал (0,1); явный entry=0 проверяется живым сценарием.
 Пустые/неприменимые/некорректные параметры должны отклоняться до мутации;
 не выбирать вместо неизвестного метода Enter, другой критерий или auto.
 

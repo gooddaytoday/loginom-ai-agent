@@ -16,7 +16,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
   need(['deviance','aic','aicc','bic','hqic'].includes(selection.criterion),'unknown selection criterion');
   for(const [key,applicable] of [['entry_significance',mode!=='backward'],['removal_significance',mode!=='forward']]){
    const value=selection[key];
-   need(selection.criterion==='deviance'&&applicable?typeof value==='number'&&Number.isFinite(value)&&value>0&&value<1:value===undefined,'missing or inapplicable '+key);
+   need(selection.criterion==='deviance'&&applicable?typeof value==='number'&&Number.isFinite(value)&&(key==='entry_significance'?value>=0:value>0)&&value<1:value===undefined,'missing or inapplicable '+key);
   }
   if(mode==='stepwise'&&selection.criterion==='deviance')need(selection.entry_significance<selection.removal_significance,'entry_significance must be below removal_significance');
  }

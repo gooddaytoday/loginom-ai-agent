@@ -173,7 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--diagnostic", action="store_true")
     args = parser.parse_args()
-    assert 0 < args.entry < 1 and 0 < args.removal < 1
+    assert 0 <= args.entry < 1 and 0 < args.removal < 1
     if args.mode == "stepwise" and args.criterion == "deviance":
         assert args.entry < args.removal
     result = expected(args.mode, args.criterion, args.entry, args.removal)
@@ -190,9 +190,9 @@ if __name__ == "__main__":
         full = fit(source(), FACTORS)
         selected, _ = select(source())
         assert max(abs(a - b) for a, b in zip(full["probabilities"], selected["probabilities"])) > 0.01
-        assert select(source(), entry=1e-9, removal=0.2)[0]["factors"] == []
+        assert select(source(), entry=0, removal=0.2)[0]["factors"] == []
         assert select(source(), entry=0.95, removal=0.99)[0]["factors"] == list(FACTORS)
-        for name, entry, removal in [("expected-strict.json", 1e-9, 0.2),
+        for name, entry, removal in [("expected-strict.json", 0, 0.2),
                                      ("expected-permissive.json", 0.95, 0.99)]:
             assert json.loads((Path(__file__).parent / name).read_text()) == expected(entry=entry, removal=removal)
         print("PASS: 15 mode/criterion combinations, fixture copy, Enter distinction, threshold sensitivity")

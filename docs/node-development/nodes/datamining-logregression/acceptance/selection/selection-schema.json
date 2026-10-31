@@ -8,7 +8,7 @@
     },
     "entry_significance": {
       "type": "number",
-      "exclusiveMinimum": 0,
+      "minimum": 0,
       "exclusiveMaximum": 1,
       "description": "Deviance forward/stepwise only: include a factor when its likelihood-ratio p-value is below this cutoff."
     },
