@@ -26,3 +26,10 @@ test('HP resolves continuous numeric fields, omission, replacement and output co
  assert.throws(()=>smoothingOutputOrigins({input_fields:fields,fields:resolved},sources.slice(0,-1)));
  sources.at(-1).type='integer';assert.throws(()=>smoothingOutputOrigins({input_fields:fields,fields:resolved},sources));
 });
+
+test('published HP rules pass production structural validation before handler preflight',async()=>{
+ const {smoothingParametersSchema}=await import('../lib/node-api.mjs');
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');
+ for(const p of [parameters,{smoothing:[]},{smoothing:[{field:'X',lambda:0.0625}]},{smoothing:[{field:'R',period:20000}]}])assert.doesNotThrow(()=>validateActionParameters(smoothingParametersSchema,p));
+ for(const p of [{smoothing:[{field:'X'}]},{smoothing:[{field:'X',lambda:1,period:6}]},{smoothing:[{field:'X',lambda:0.01}]},{smoothing:[{field:'X',period:20001}]}])assert.throws(()=>validateActionParameters(smoothingParametersSchema,p));
+});
