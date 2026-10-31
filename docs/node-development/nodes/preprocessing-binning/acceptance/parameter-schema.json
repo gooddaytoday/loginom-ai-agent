@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "properties": {
+    "field": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Exact Integer/Real input name; only this field is binned."
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "count",
+        "width",
+        "frequency"
+      ],
+      "description": "Equal width by count/width, or equal row frequencies; frequency ties go to next bin."
+    },
+    "size": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "count/frequency: integer bin count; width: positive interval width."
+    },
+    "limits": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Required count/width [lower,upper], lower<upper; frequency omits limits."
+    }
+  },
+  "required": [
+    "field",
+    "method",
+    "size"
+  ],
+  "additionalProperties": false,
+  "description": "New internal requires binning. Existing apply takes no edits. No rounding/open ends; preserve other fields."
+}

@@ -1,0 +1,48 @@
+{
+  "status": "stage_0_proposal_pending_owner_approval",
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "first_line_as_title": true,
+    "null_marker": "?",
+    "text_qualifier": "\""
+  },
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "X",
+      "type": "real"
+    },
+    {
+      "name": "Note",
+      "type": "string"
+    }
+  ],
+  "oracle": "Python 3 standard library, Decimal; no Loginom/runtime imports",
+  "fixtures": {
+    "values.csv": "count/width; boundary tie and NULL/empty string",
+    "real.csv": "same with final X=5.25",
+    "frequency.csv": "six distinct values, three equal-frequency bins",
+    "frequency-ties.csv": "duplicate at next-bin cut: independent expected 0,1,1,1,2,2",
+    "holdout.csv": "outside -1/+1, NULL, boundary",
+    "update.csv": "shifted source; RowID 201..206",
+    "empty.csv": "diagnostic only: schema-only source; output/refusal not established",
+    "dates.csv": "future DateTime discovery, RowID integer/X datetime; outside proposed stage 1"
+  },
+  "column_overrides": {
+    "dates.csv": [
+      {
+        "name": "RowID",
+        "type": "integer"
+      },
+      {
+        "name": "X",
+        "type": "datetime"
+      }
+    ]
+  }
+}
