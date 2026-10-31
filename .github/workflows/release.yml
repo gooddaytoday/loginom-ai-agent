@@ -356,7 +356,7 @@ jobs:
     name: build (macos)
     needs: verify
     if: vars.LOGINOM_RELEASE_SKIP_MACOS != 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}

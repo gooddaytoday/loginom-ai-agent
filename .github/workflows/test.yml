@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       macos:
-        description: "Include the macos-14 matrix entries; release.yml turns them off with LOGINOM_RELEASE_SKIP_MACOS"
+        description: "Include the macos-15 matrix entries; release.yml turns them off with LOGINOM_RELEASE_SKIP_MACOS"
         type: boolean
         default: true
 
@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         # Push and pull_request runs have no inputs, so macOS stays in unless a caller passes macos: false.
-        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04"]' || '["ubuntu-24.04","macos-14"]') }}
+        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04"]' || '["ubuntu-24.04","macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
@@ -89,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-14"]') }}
+        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
