@@ -297,7 +297,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           await executionDriver.prepare();
         }
         let s=await channel.observe({condition:'prepared import graph ready',ready:s=>s.prepared_node_context?.surface==='graph' && s.wizard?.status==='absent'});
-        await selectPreparedGraphNode(channel,s,'bound import graph selection available',{settleGraph:true});
+        await selectPreparedGraphNode(channel,s,'bound import graph selection available',{settleGraph:true,refreshReplacedBody:true});
         if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
