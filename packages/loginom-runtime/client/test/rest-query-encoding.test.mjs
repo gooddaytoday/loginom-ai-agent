@@ -10,6 +10,34 @@ const request=()=>({operation_id:'rest',contract_revision:'1.0.0',document_id:'d
  inputs:[{source:{document_id:'doc',workflow_id:'flow',node_id:'import'},output:0,input:0}],
  parameters:{query_parameters:[{name:'Key',field:'Key'}]},budgets:{total_ms:600000}});
 
+function savedPlainInput(connected=false,foreign=false){
+ const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
+ const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:node},
+  mode:'request',parameters:{},inputs:[],mappings:[],finish:'execute',read:{ports:[]}};
+ const calls=[],graph={complete:true,document_id:foreign?'foreign':'doc',workflow_ref:r.workflow_ref,
+  nodes:[{ref:node,type:'integration.rest_request'}],links:connected?[{source:'source',output:0,target:'rest',input:0}]:[],foreign_links:[]};
+ const operation={id:r.operation_id,parameters:r,deadline:Date.now()+60000,nodeApply:{request:r,node},
+  nodeTargetAdapter:{observe:async()=>{calls.push('graph');return graph;}}};
+ const drivers=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation,
+  now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),execute:async()=>{calls.push('open port');throw Error('native port mapping reached');}});
+ return {calls,run:()=>drivers.mapPorts([],{receipt_id:'rest:input_mapping',document_id:'doc',workflow_ref:r.workflow_ref,node,deadline:operation.deadline})};
+}
+test('saved parameterless REST with no data link skips the unconnected port wizard',async()=>{
+ const f=savedPlainInput(),result=await f.run();
+ assert.equal(result.verified,true);assert.equal(result.not_applicable,true);
+ assert.deepEqual(f.calls,['graph']);
+});
+test('saved REST with an existing table still uses the native port mapping',async()=>{
+ const f=savedPlainInput(true);
+ await assert.rejects(f.run(),/native port mapping reached/);
+ assert.equal(f.calls.includes('open port'),true);
+});
+test('absence of a REST data link requires the complete owned graph',async()=>{
+ const f=savedPlainInput(false,true);
+ await assert.rejects(f.run(),/owned graph/);
+ assert.deepEqual(f.calls,['graph']);
+});
+
 test('plain GET with a table reaches connection validation without creating a query encoder',async()=>{
  const r={...request(),target:{kind:'new',type:'integration.rest_request'},
   parameters:{connection:{name:'Plain',base_url:'https://httpbin.org/status/200'},query_parameters:[]}};
