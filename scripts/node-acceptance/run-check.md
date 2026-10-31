@@ -277,3 +277,7 @@ runner допускает два ограничения нативного CSV w
 Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
 Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
+
+`smoothing-hp`: Сглаживание HP Lambda=1 для X/R, series → update на прежнем узле,
+фиксированный порядок RowID,X,R,Tag,X_S,R_S через autosync=false;
+приёмочный комплект `preprocessing-smoothing/acceptance`, ordered CSV/Save/cold.

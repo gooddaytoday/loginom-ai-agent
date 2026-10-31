@@ -1,0 +1,68 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "header": true,
+  "null_marker": "?",
+  "column_order": [
+    "RowID",
+    "X",
+    "R",
+    "Tag"
+  ],
+  "types": {
+    "RowID": "integer",
+    "X": "integer",
+    "R": "real",
+    "Tag": "string"
+  },
+  "data_kind": {
+    "RowID": "continuous",
+    "X": "continuous",
+    "R": "continuous",
+    "Tag": "discrete"
+  },
+  "oracle": "Python >=3.9 stdlib fractions.Fraction; no external dependencies",
+  "files": [
+    {
+      "name": "all-null.csv",
+      "bytes": 86,
+      "sha256": "bde615b81758c7e1eb3d76e01c5836f6236f3cbdc871f9248d7f5bac4cefecf0"
+    },
+    {
+      "name": "constant.csv",
+      "bytes": 102,
+      "sha256": "403f386babc085f97ad3ee210b3c3d0231ab4dbd467014d2142cd429e3057160"
+    },
+    {
+      "name": "edge-null.csv",
+      "bytes": 101,
+      "sha256": "df9a87255802c2b9adf9f6a33cebcbbf7aef0963bd3426a501407acadc7e9613"
+    },
+    {
+      "name": "empty.csv",
+      "bytes": 14,
+      "sha256": "774b77410999a35d3f29a818c440dbe36e88f0baa55aa6c16a6d7601b1e458d9"
+    },
+    {
+      "name": "linear.csv",
+      "bytes": 106,
+      "sha256": "09838f46751d0e7622f108b5fe7a3a3116938b4e8b2aadeb3b32e0d0daa31f77"
+    },
+    {
+      "name": "null.csv",
+      "bytes": 103,
+      "sha256": "eb4359baae6a48944a6627cb771bcf650f2bad9ed85c039a48d4454a7292e727"
+    },
+    {
+      "name": "series.csv",
+      "bytes": 105,
+      "sha256": "577aa237598feb6c7a8456a435c3db0b8513d618b604a0ce23a7f9de070ff805"
+    },
+    {
+      "name": "update.csv",
+      "bytes": 106,
+      "sha256": "faf60fb78c8e025bb7683ea046387217763ca2dd936e9a9c31559cbc8ddc3f6f"
+    }
+  ]
+}

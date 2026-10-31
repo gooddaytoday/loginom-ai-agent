@@ -5064,9 +5064,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Этап 0: LAB-642. Владелец утверждает HP-критерии из discovery/acceptance перед отдельным назначением этапа 1; runtime не реализован.",
       "plan": "nodes/preprocessing-smoothing/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.programming.JavaScript",

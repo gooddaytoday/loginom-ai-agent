@@ -1,0 +1,132 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.smoothing"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.smoothing",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "R_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 1,
+          "R": 0.25,
+          "Tag": "r1",
+          "X_S": 1.2741398446170922,
+          "R_S": 0.31853496115427304
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "R": 0.5,
+          "Tag": "r2",
+          "X_S": 3.253479040382481,
+          "R_S": 0.8133697600956202
+        },
+        {
+          "RowID": 3,
+          "X": 8,
+          "R": 2.0,
+          "Tag": "r3",
+          "X_S": 4.9586783915307775,
+          "R_S": 1.2396695978826944
+        },
+        {
+          "RowID": 4,
+          "X": 4,
+          "R": 1.0,
+          "Tag": "r4",
+          "X_S": 4.86211901306241,
+          "R_S": 1.2155297532656024
+        },
+        {
+          "RowID": 5,
+          "X": 5,
+          "R": 1.25,
+          "Tag": "r5",
+          "X_S": 4.477503628447025,
+          "R_S": 1.1193759071117562
+        },
+        {
+          "RowID": 6,
+          "X": 2,
+          "R": 0.5,
+          "Tag": "r6",
+          "X_S": 4.4564159480918635,
+          "R_S": 1.1141039870229659
+        },
+        {
+          "RowID": 7,
+          "X": 7,
+          "R": 1.75,
+          "Tag": "r7",
+          "X_S": 5.972936053957142,
+          "R_S": 1.4932340134892854
+        },
+        {
+          "RowID": 8,
+          "X": 8,
+          "R": 2.0,
+          "Tag": "r8",
+          "X_S": 7.7447280799112095,
+          "R_S": 1.9361820199778024
+        }
+      ]
+    }
+  ]
+}
