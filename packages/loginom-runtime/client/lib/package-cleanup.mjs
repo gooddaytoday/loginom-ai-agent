@@ -202,8 +202,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     return {...receipt,...extra,status,reason,completed_at:new Date().toISOString()};
   };
   const at = tid => page.locator('[data-tid='+JSON.stringify(tid)+']');
-  const remaining = () => {
-    const ms = Math.min(timeoutMs, deadline-Date.now());
+  const remaining = (limit = timeoutMs) => {
+    const ms = Math.min(limit, deadline-Date.now());
     if (ms <= 0) throw Error('Cleanup deadline exceeded');
     return ms;
   };
@@ -448,6 +448,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       // A timed-out click may already have opened the menu. Observe before
       // retrying once; never toggle it closed or extend the cleanup call.
       receipt.logout_menu_step='observe_after_timeout';
+      // Lazy first menu loading may outlast the click's step cap. Observe
+      // read-only using the original cleanup remainder, never a new deadline.
       const observed = await page.waitForFunction(o => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
         const m = app?.Application?.FInstance?.FMainForm?.FMapTree;
@@ -463,7 +465,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         if ([...document.querySelectorAll('.x-mask')].some(visible)) return false;
         const avatar = [...document.querySelectorAll('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')].filter(visible);
         return avatar.length === 1 ? {safe:true, menu:false} : false;
-      }, options, {timeout:remaining()});
+      }, options, {timeout:remaining(30000)});
       const state = await observed.jsonValue();
       await observed.dispose();
       if (!state?.safe) return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');

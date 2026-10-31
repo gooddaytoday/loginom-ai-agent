@@ -13,6 +13,8 @@ import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
+import {createServer} from 'node:http';
+import {chromium} from 'playwright-core';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -54,6 +56,10 @@ class ExternalClient {
     }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
+      if(this.f.page){
+        this.f.cleanup=await Function('return ('+code+')')()(this.f.page);
+        return {content:[{type:'text',text:JSON.stringify(this.f.cleanup)}]};
+      }
       if(this.f.scenario==='product-native-error')throw Error('native response lost');
       if(this.f.scenario==='product-native-malformed')return {content:[{type:'text',text:'invalid native receipt'}]};
       const [options,deadline]=JSON.parse('['+code.slice(code.lastIndexOf(')(page,')+7,-1)+']');
@@ -114,6 +120,102 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+// External Loginom fixture only: a synchronous first menu fetch stalls the real
+// renderer just like lazy menu loading. The bridge serializes production cleanup
+// and the ordinary managed resource closer decides whether it can acknowledge.
+if(process.env.LOGINOM_DOCK_TEST_BROWSER)for(const [fault,delay] of [
+  ['slow18',18000],['slow22',22000],['disconnect',9000],['session',9000],
+  ['account',9000],['mask',9000],['expired',32000],
+])test('Chromium managed cleanup with lazy menu: '+fault,{timeout:45000},async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-chromium-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  let timer;
+  const http=createServer((request,response)=>{
+    if(request.url==='/menu'){
+      timer=setTimeout(()=>response.end('loaded'),delay);return;
+    }
+    response.end(`<!doctype html><style>[hidden]{display:none}button,section{width:160px;height:40px}</style>
+      <div data-tid="own-tab">owned</div>
+      <button data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">test-2</button>
+      <section data-tid="MF;AppMenuForm" hidden>
+        <span data-tid="MF;AppMenuForm;p.h;p.t">test-2</span>
+        <button data-tid="MF;AppMenuForm;btnLogOut">logout</button>
+      </section>
+      <div data-tid="LoginForm;Login;edtUsername" hidden><input></div>
+      <script>
+        const fault=${JSON.stringify(fault)},at=tid=>document.querySelector('[data-tid="'+tid+'"]');
+        window.gestures={close:0,avatar:0,logout:0};
+        const tab=at('own-tab'),node={PackageFileName:${JSON.stringify(path)},ReadOnly:false,Package:{},HasRunningNodes:()=>false};
+        const map={PackageNodes:{Count:1,Items:()=>node},HasRunningNodes:()=>false,
+          FServerConnection:{UserName:'test-2',Connected:true,Session:{IsPackageModified:async()=>false}},
+          ClosePackage:async()=>{gestures.close++;map.PackageNodes.Count=0;tab.remove();return true;}};
+        window.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:map}}}}};
+        window.__loginomDockPreparationV1={document,id:'own-doc',receipts:new Map([
+          ['prepare',{request:JSON.stringify({session:'own-session'}),packageNode:node,tab}]])};
+        at('MF;cntMain;tlbMainToolbar;btnAvatar').onclick=()=>{
+          gestures.avatar++;
+          const xhr=new XMLHttpRequest();xhr.open('GET','/menu',false);xhr.send();
+          if(fault==='disconnect')map.FServerConnection.Connected=false;
+          if(fault==='session')map.FServerConnection.Session={};
+          if(fault==='account')map.FServerConnection.UserName='foreign';
+          if(fault==='mask'){
+            const mask=document.createElement('div');mask.className='x-mask-msg';
+            mask.style='position:fixed;inset:0;background:white';document.body.append(mask);
+          }
+          at('MF;AppMenuForm').hidden=false;
+        };
+        at('MF;AppMenuForm;btnLogOut').onclick=()=>{
+          gestures.logout++;at('MF;AppMenuForm').hidden=true;
+          at('MF;cntMain;tlbMainToolbar;btnAvatar').hidden=true;
+          at('LoginForm;Login;edtUsername').hidden=false;
+        };
+      </script>`);
+  });
+  await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
+  const url=`http://127.0.0.1:${http.address().port}/app`;
+  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,
+    headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
+  let client,bridge;
+  t.after(async()=>{
+    await client?.close();await browser.close();clearTimeout(timer);
+    http.closeAllConnections();await new Promise(resolve=>http.close(resolve));
+    await rm(directory,{recursive:true,force:true});
+  });
+  const page=await browser.newPage();await page.goto(url);
+  const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog,page};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',
+    stateDir:directory,loginomUrl:url,replayBootstrap:false,replayLoginUser:null,closeSavedPackageOnShutdown:true},session);
+  client=new AgentClient({name:'chromium-cleanup',version:'1'});
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}});
+  assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  let ackAt;
+  const closing=closeManagedResources({bridge},[]).then(()=>{ackAt=Date.now();return null;},error=>error);
+  const error=await closing;
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  const success=fault.startsWith('slow');
+  assert.equal(cleanup.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
+  assert.equal(cleanup.package_closed,true);
+  assert.equal(cleanup.logged_out,success);
+  assert.equal(cleanup.logout_menu_step,'observe_after_timeout');
+  assert.equal(Date.parse(cleanup.deadline_at)-Date.parse(cleanup.started_at)<=30000,true);
+  assert.ok(Date.parse(cleanup.completed_at)<=Date.parse(cleanup.deadline_at)+250);
+  if(success){
+    assert.ifError(error);assert.ok(ackAt<Date.parse(cleanup.deadline_at));
+    assert.equal(await page.locator('[data-tid="LoginForm;Login;edtUsername"] input').isVisible(),true);
+  }else{
+    assert.match(error?.message??'',/LOGINOM_RUNTIME_CLEANUP_FAILED/);assert.equal(ackAt,undefined);
+  }
+  // Expiry returns while the renderer is still blocked; wait only to inspect
+  // the fixture's gesture counters, never to promote the cleanup decision.
+  assert.deepEqual(await page.evaluate(()=>gestures),{close:1,avatar:1,logout:success?1:0});
+  assert.equal(f.events.filter(e=>e==='package-cleanup').length,1);
+});
 
 for(const scenario of ['opened-clean','opened-dirty','opened-uncertain'])
  test('real executor shutdown drains an owned node job: '+scenario,async t=>{
