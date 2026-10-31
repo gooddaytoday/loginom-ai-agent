@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureDateTime} from '../lib/date-time-procedure.mjs';
 const flags={DoDateTimeFirst:'first',DoDateTimeLast:'last',DoNumber:'number',DoString:'string'};
+test('calendar and ISO flags use the exact native tuple and preserve the second field',async()=>{
+ const f=fixture(),before=structuredClone(f.matrices.B);
+ const operations=['year','iso_year','iso_week','iso_week_start','day_of_week'];
+ await configureDateTime(f.channel,{fields:[{field:{kind:'input_field',name:'A'},transformations:operations.map(operation=>({operation,name:operation,label:operation}))}]},{inputMapping:f.inputMapping});
+ const enabled=f.matrices.A.flatMap(r=>Object.values(flags).filter(key=>r[key]).map(key=>[r.func,r.iso,key]));
+ assert.deepEqual(enabled,[[4,false,'number'],[11,false,'number'],[2,true,'first'],[4,true,'number'],[7,true,'number']]);
+ await configureDateTime(f.channel,{fields:[{field:{kind:'input_field',name:'A'},transformations:[{operation:'iso_week',name:'Week',label:'Week'}]}]},{inputMapping:f.inputMapping});
+ assert.deepEqual(f.matrices.A.filter(r=>Object.values(flags).some(key=>r[key])).map(r=>[r.func,r.iso]),[[7,true]]);
+ assert.deepEqual(f.matrices.B,before);
+});
 function fixture({loseReply=false,staleCount=false,collateralChange=false}={}){
  const fields=['A','B'].map(name=>({name,label:'Дата',type:'datetime',record_id:name,count:0}));
  const matrices=Object.fromEntries(fields.map(f=>[f.name,[...Array.from({length:19},(_,func)=>({func,iso:false})),...[0,1,2,4,5,6,7,8,10,18].map(func=>({func,iso:true}))].map((r,index)=>({...r,index,record_id:String(index),first:false,last:false,number:false,string:false,string_format:'untouched'}))]));

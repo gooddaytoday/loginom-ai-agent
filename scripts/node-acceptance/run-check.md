@@ -277,3 +277,8 @@ runner допускает два ограничения нативного CSV w
 Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
 Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
+
+`date-time-iso` и `date-time-iso-empty`: четыре операции ISO-календаря в «Дата и время»,
+утверждённые task-iso-weeks*.md и независимый Python expected из
+`docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
+из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.

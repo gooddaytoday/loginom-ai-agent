@@ -120,6 +120,14 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name in ['date-time-iso', 'date-time-iso-empty']:
+        node = REPO / 'docs/node-development/nodes/date-time'
+        empty = name.endswith('-empty')
+        return dict(source=node / 'acceptance',
+                    prompt=node / 'acceptance' / ('task-iso-weeks-empty.md' if empty else 'task-iso-weeks.md'),
+                    data=node / 'fixtures', base=None,
+                    expected_name='expected-iso-weeks-empty.json' if empty else 'expected.json',
+                    input_files=['iso-weeks-empty.csv' if empty else 'iso-weeks.csv'])
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

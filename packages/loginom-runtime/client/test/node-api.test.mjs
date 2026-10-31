@@ -5,9 +5,9 @@ import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('private cold window support adds zero bytes to full and compact model schemas',()=>{
+test('model schema inventory pins ISO-calendar registration and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,84569,'c47f6be0803e9ddf9446328156d449a63e2e1a11b1783eb9da218f0f01e39bbb'],
+  [nodeApiTools,84675,'2788f986db1b537f4cf0e2ef16a5f625909663633820cf1c8ecacddb9a9cad8b'],
   [nodeApiTools.map(userNodeTool),17054,'72646bec3f47f3a23d03d032848ab965490ece39fa2c859d1be28e0156ef3561'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
