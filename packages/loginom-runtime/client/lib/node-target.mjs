@@ -225,7 +225,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         }
         state.targetId = existing.ref.node_id;
       }
-let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular_inputs:node(graph,state.targetId).inputs.length;
+let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular_inputs+(NODE_TYPES[request.target.type].tree_inputs??0):node(graph,state.targetId).inputs.length;
       for(const input of request.inputs.map(i=>i.input).filter(i=>i>=capacity).sort((a,b)=>a-b)){
         if(!NODE_TYPES[request.target.type].additional_tabular_inputs||input!==capacity)throw new Error('Additional tabular inputs must be contiguous');
         capacity++;
