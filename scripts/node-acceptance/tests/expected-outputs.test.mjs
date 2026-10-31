@@ -4,6 +4,14 @@ import {parseExpectedOutputs,matchExpectedOutputs} from '../expected-outputs.mjs
 const columns=[{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'A|Amount|Сумма',type:'real'}];
 const report=value=>({output_node_type:'transform.cross_table',columns,rows:[{Region:'North',Amount:value}]});
 const actual=(id,value)=>({node:{node_id:id},type:'transform.cross_table',execution:{execution_id:id},data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'North'},{type:'real',is_null:false,value}]]}});
+test('native binary64 decimal preserves signed zero across the browser JSON boundary',()=>{
+ const a=actual('zero',0),cell=a.data.sample[0][1];
+ Object.assign(cell,{representation:'binary64',precision:'17_significant_digits',decimal:'-0'});
+ assert.equal(matchExpectedOutputs([JSON.parse(JSON.stringify(a))],[report(-0)]).length,1);
+ for(const value of [1,-1,1e-300]){const bad=structuredClone(a);bad.data.sample[0][1].value=value;
+  assert.throws(()=>matchExpectedOutputs([bad],[report(-0)]));}
+ cell.decimal='0';assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
+});
 test('label_any skips only the opted-in column label with either column order policy',()=>{
  for(const column_order of ['any','exact']){
   const want=structuredClone({...report(10),column_order});want.columns[1].label_any=true;

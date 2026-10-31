@@ -2,6 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {nodeApiTools,deliveryApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
+import {userNodeTool} from '../lib/user-workflow.mjs';
+import {createHash} from 'node:crypto';
+
+test('private cold window support adds zero bytes to full and compact model schemas',()=>{
+ for(const [tools,bytes,hash] of [
+  [nodeApiTools,92926,'e2a1ef6b4280fe159642e9c9ae341f278e0a57d57154a24c86759a0510e5ab17'],
+  [nodeApiTools.map(userNodeTool),17820,'3b90cf08b438eb0cd5f885fdc2182f9d76cc090ea71916decc631d8d4b74e8df'],
+ ]){
+  const json=JSON.stringify(tools.map(t=>t.inputSchema));
+  assert.equal(Buffer.byteLength(json),bytes);
+  assert.equal(createHash('sha256').update(json).digest('hex'),hash);
+ }
+});
+
+for(const key of ['rowOffset','row_offset'])test('model read tool rejects internal window parameter '+key,async()=>{
+ let calls=0;const runtime={tools:nodeApiTools,startNodeRead(){calls++;}};
+ const base={operation_id:'read',source_operation_id:'source',read:{sample_rows:100,require_exact_numbers:true}};
+ for(const request of [{...base,[key]:1},{...base,read:{...base.read,[key]:1}}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_read',request),/unknown|Invalid/);
+ await dispatchNodeApi(runtime,'dock_node_read',base);
+ assert.equal(calls,1);
+});
 const fixture=()=>{
  const calls=[];
  const runtime={tools:[...nodeApiTools,...deliveryApiTools]};

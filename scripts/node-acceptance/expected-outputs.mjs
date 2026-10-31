@@ -200,6 +200,13 @@ function matchesCell(cell,column,want){
  }else if((cell.type==='real'||column.type==='variant'&&type==='real')&&cell.precision==='exact_native'){
   if(typeof value!=='string'||!Number.isFinite(Number(value)))return false;
   value=Number(value);
+ }else if(cell.type==='real'&&cell.representation==='binary64'&&cell.precision==='17_significant_digits'){
+  // Browser transport JSON loses the sign of numeric zero. The production
+  // decoder's round-trip decimal retains it; reject contradictory evidence.
+  if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
+   ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value
+   ||cell.decimal!==(cell.decimal==='-0'?'-0':String(value)))return false;
+  value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof want!=='number'||!Number.isFinite(want))return false;

@@ -1277,6 +1277,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                                                for j, col in enumerate(cols)) + '\n')
                     if name == 'cold':
                         command = list(map(str, command))
+                        self.assertIn('--exact-port-windows', command)
                         actual = Path(command[command.index('--csv') + 1])
                         cold_calls.append(actual.name)
                         self.assertTrue(actual.is_file(), str(actual))
