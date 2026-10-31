@@ -39,6 +39,7 @@ RULES = (
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17',)),
+    ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'text-import-*.mjs', C + 'imports-excel-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
 )
