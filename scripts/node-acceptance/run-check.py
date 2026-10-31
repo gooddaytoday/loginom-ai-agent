@@ -254,10 +254,60 @@ def csv_delimiter(path):
         raise
 
 
-def check_csv(path, expected, header='names', *, column_order=None, null_marker='', scenario_name=None, d76=None):
+def export_null_marker(events, destination):
+    # Requests identify the exact export file. Existing-node patches can retain
+    # omitted settings, so only their correlated final UI readback is authoritative.
+    readbacks = {}
+    def collect(value):
+        if isinstance(value, dict):
+            configuration = value.get('configuration', {})
+            if (value.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
+                    and configuration.get('readback', {}).get('kind') == 'text_export'):
+                readbacks[value.get('operation_id')] = configuration['readback']
+            for item in value.values(): collect(item)
+        if isinstance(value, list):
+            for item in value: collect(item)
+    for _, event in events:
+        state = event.get('part', {}).get('state', {})
+        if event.get('type') != 'tool_use' or state.get('status') != 'completed': continue
+        try: collect(json.JSONDecoder().raw_decode(state.get('output', ''))[0])
+        except (ValueError, TypeError): continue
+    found, marker, node = False, None, None
+    for _, event in events:
+        part = event.get('part', {})
+        state = part.get('state', {})
+        request = state.get('input', {})
+        if (event.get('type') != 'tool_use' or part.get('tool') != 'loginom_dock_node_apply'
+                or state.get('status') != 'completed' or request.get('target', {}).get('type') != 'exports.text'
+                or request.get('finish') == 'close'): continue
+        parameters = request.get('parameters', {})
+        readback = readbacks.get(request.get('operation_id'), {})
+        if request.get('target', {}).get('kind') == 'new':
+            if parameters.get('destination') != destination: continue
+            found, marker = 'null_marker' in parameters, parameters.get('null_marker')
+            node = readback.get('node')
+        elif ((readback.get('destination') or parameters.get('destination')) == destination
+              or node is not None and request.get('target', {}).get('ref') == node):
+            settings = readback.get('settings', {})
+            found = readback.get('destination') == destination and 'null_marker' in settings
+            marker, node = settings.get('null_marker'), readback.get('node', node)
+    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or correlated patch readback required for ' + str(destination)
+    assert isinstance(marker, str) and marker in ['', '?', 'null', 'NULL'], 'CSV_NULL_MARKER_UNSUPPORTED'
+    return marker
+
+
+def check_csv(path, expected, header='names', *, column_order=None, null_marker='', scenario_name=None, d76=None,
+              export_events=(), destination=None):
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
+    infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
+    if infer_marker:
+        null_marker = export_null_marker(export_events, destination)
+        assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
+                       for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
+    elif null_marker is None:
+        null_marker = ''
     assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
     assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
     assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
@@ -276,6 +326,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
         return None
 
     def equal(value, col, target):
+        if target is None: return value == null_marker
+        if infer_marker and value == null_marker: return False
         if limitation(value, col, target): return True
         if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
             try:
@@ -287,7 +339,6 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
         if col.get('category_labels_any'): return bool(value.strip())
-        if target is None: return value == null_marker
         if col['type'] in ['integer', 'real']:
             try:
                 number = float(value.replace(',', '.'))
@@ -802,7 +853,8 @@ class Runner:
             counts = {}
             delimiter = check_csv(actual, expected['outputs'][index], header,
                                   column_order='any' if isinstance(case, Path) else None,
-                                  null_marker=expected.get('null_marker', ''), scenario_name=case, d76=counts)
+                                  null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
+                                  export_events=events, destination=destination)
             if counts: self.current['d76'] = counts
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
