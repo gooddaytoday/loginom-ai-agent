@@ -563,7 +563,15 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('local_file') and spec['attachment'] == 'path':
+            prompt = prompt.replace('{{SOURCE_PATH}}', str(spec['local_file']))
+            if spec.get('upload_only') and str(spec['local_file']) not in prompt:
+                # Seed identity comes from case.json, never a copied task's old host path.
+                prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
+        rejection = expected.get('rejection')
+        if rejection is not None:
+            assert rejection == dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data') and expected['outputs'] == [], 'INVALID_REJECTION_ORACLE'
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
         exports = ([Path(output['export_destination']).name for output in expected['outputs']]
                    if spec.get('external') else
@@ -571,7 +579,8 @@ class Runner:
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
-        if not exports and not spec.get('upload_only'):
+        if spec.get('upload_only') or rejection: exports = []
+        if not exports and not spec.get('upload_only') and not rejection:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -580,7 +589,8 @@ class Runner:
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
-            prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+            prompt += f'\nСохрани пакет как {package}.'
+            if not rejection: prompt += ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
@@ -652,9 +662,48 @@ class Runner:
             return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
+        if rejection:
+            overwritten, guarded = False, None
+            requests = {}
+            for n, event in events:
+                part = event.get('part', {})
+                state = part.get('state', {})
+                if event.get('type') != 'tool_use' or state.get('status') not in ['completed', 'error']: continue
+                request = state.get('input', {})
+                if part.get('tool') == 'loginom_dock_node_apply' and request.get('operation_id'):
+                    requests[request['operation_id']] = request
+                try: reply = json.JSONDecoder().raw_decode(state.get('output' if state['status'] == 'completed' else 'error', ''))[0]
+                except (ValueError, TypeError): continue
+                if not isinstance(reply, dict): continue
+                if reply.get('action_key') == 'operation.inspect':
+                    reply = reply.get('output', {}).get('outcome', {})
+                if reply.get('state') == 'running': continue
+                request = requests.get(reply.get('operation_id'), request)
+                if (request.get('target', {}).get('type') == 'exports.text'
+                        and request.get('parameters', {}).get('overwrite') == 'replace'
+                        and request.get('finish') == 'execute' and reply.get('status') == 'SUCCEEDED'):
+                    overwritten = True
+                if overwritten and request.get('target', {}).get('type') == rejection['node_type']:
+                    result = reply['output'] if 'execution' in reply.get('output', {}) else reply
+                    assert (request.get('finish') == 'execute' and reply.get('status') == 'NOT_APPLIED'
+                            and reply.get('error', {}).get('code') == rejection['code']
+                            and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True
+                            and result.get('execution', {}).get('status') == 'not_requested'
+                            and result.get('output', {}).get('status') == 'not_refreshed'
+                            and result.get('output', {}).get('ports') == []), 'TAMPER_REJECTION_INVALID'
+                    guarded = n
+                if guarded:
+                    # A later successful read must never turn stale rows into PASS.
+                    assert not any(ports(reply)), 'TAMPER_STALE_ROWS'
+            assert guarded is not None, 'TAMPER_REJECTION_MISSING'
+            assert any(n > guarded and o.get('status') == 'SUCCEEDED'
+                       and o.get('action_key') in ['package.save_checkpoint', 'package.save_as']
+                       and o.get('output', {}).get('save_completed') is True for n, o in replies), 'SAVE_AFTER_REJECTION_MISSING'
+            self.current['rejection'] = 'PASS'
+            self.current['rejection_location'] = str(folder / 'model.stdout') + ':' + str(guarded)
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
-        invalid = port_failure(replies, folder / 'model.stdout')
+        invalid = port_failure(replies, folder / 'model.stdout') if not rejection or any(ports([o for _, o in replies])) else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -664,6 +713,9 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if rejection:
+            self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
+            return session, expected, None, None
         header = spec.get('csv_header', 'names')
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
@@ -714,7 +766,7 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                    if self.options['cold'] and not spec.get('upload_only'):
+                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
