@@ -19,8 +19,8 @@ export function connectionTimelineScript(url) {
  }.toString()})(${JSON.stringify(new URL(url).origin)})`;
 }
 
-export async function guardLoginomConnection(page, binding) {
- const inspect=mode=>page.evaluate(({b,mode})=>{
+export async function guardLoginomConnection(page, binding, storageSession) {
+ const inspect=mode=>page.evaluate(({b,mode,storageSession})=>{
   const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
   const form=app?.Application?.FInstance?.FMainForm,map=form?.FMapTree,c=map?.FServerConnection;
   const same=location.origin===b.origin&&app?.Version===b.loginom_build
@@ -30,10 +30,13 @@ export async function guardLoginomConnection(page, binding) {
   const packages=map.PackageNodes;
   const proof=!!c.FRemoteSession&&!!c.FSession&&Number.isInteger(packages?.Count)&&packages.Count<=32;
   const current=proof?Array.from({length:packages.Count},(_,i)=>{const node=packages.Items(i);return {node,path:node.PackageFileName};}):null;
-  const store=prep.connectionGuard??(prep.connectionGuard=new Map());
+  // A download keeps its original native session through final verification.
+  // Ordinary UI calls may refresh their baseline after legitimate graph edits.
+  const store=storageSession?(prep.downloadConnectionGuard??=new Map()):(prep.connectionGuard??=new Map());
   let a=store.get(b.session_id);
   const unchanged=()=>a&&a.document===document&&a.connection===c&&a.remote===c.FRemoteSession&&a.session===c.FSession
    &&current&&a.packages.length===current.length&&a.packages.every((p,i)=>p.node===current[i].node&&p.path===current[i].path);
+  if(storageSession==='verify'&&!unchanged())return {reason:'owner'};
   if(a?.pending||mode==='verify'||mode==='reserve'){
    if(!unchanged())return {reason:'owner'};
    if(mode==='reserve'){
@@ -52,7 +55,7 @@ export async function guardLoginomConnection(page, binding) {
   }
   if(!unchanged())return {reason:'owner'};
   return {connected:false};
- },{b:binding,mode});
+ },{b:binding,mode,storageSession});
  const fail=reason=>{if(reason==='identity')throw Error('Loginom account or document changed; prepare the workspace again');
   throw Error('Loginom connection is disconnected; original session recovery unverified ('+reason+'); inspect the pending operation before continuing');};
  const before=await inspect('observe');
