@@ -1835,7 +1835,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if(operation_id)await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});
     throw error;
   });
-  const controlServerDownload=(operation_id,mode,options)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`,{...options,storageSession:'download-control'});
+  const controlServerDownload=(operation_id,mode,options)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`,{storageSession:'download-control',...options});
   const drainServerDownload=async(id,options={})=>{
     const cancelled=await controlServerDownload(id,'cancel',options);
     if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
@@ -1865,12 +1865,26 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
         error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
       }
-      let primary;
+      let primary,connectionWaiting=false;
       try {
         while(true) {
           signal.throwIfAborted();
-          const current=await waitDownloadConnection(()=>controlServerDownload(operation_id,'status',
-            {signal,timeout:Math.max(1,deadline-now())}),{signal,deadline,operation_id});
+          if(now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          let current;
+          try{
+            current=await controlServerDownload(operation_id,'status',
+              {signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});
+            connectionWaiting=false;
+          }catch(error){
+            const diagnostic=operationFailureDiagnostic(error);
+            if(diagnostic.code!=='LOGINOM_DISCONNECTED'
+              ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+            if(!connectionWaiting)await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});
+            connectionWaiting=true;
+            // Keep the normal recovery attempt even mid-transfer, but always
+            // account for already received bytes while that attempt is pending.
+            current=await controlServerDownload(operation_id,'status',{signal,timeout:Math.max(1,deadline-now())});
+          }
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           onProgress(current.output.bytes);
           if(current.output.state==='settled'){

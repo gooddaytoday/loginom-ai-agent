@@ -115,7 +115,7 @@ test('server event and RPC consume the original operation deadline instead of th
  await r.cleanupServerCache();
 });
 
-for(const fault of ['restored','session','mtime','bytes','partial','unconfirmed','cleanup','deadline','cancel'])test('server cache retains one production download across connection loss: '+fault,async t=>{
+for(const fault of ['restored','midstream','session','mtime','bytes','partial','unconfirmed','cleanup','deadline','cancel'])test('server cache retains one production download across connection loss: '+fault,async t=>{
  const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),root=await mkdtemp(join(tmpdir(),'server-reconnect-'));
  t.after(()=>rm(root,{recursive:true,force:true}));f.page.clock=Date.now();
  const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
@@ -126,26 +126,29 @@ for(const fault of ['restored','session','mtime','bytes','partial','unconfirmed'
    PackageNodes:{Count:0,Items:()=>assert.fail('No package')}}}}}}}};
  const binding={session_id:'s',document_id:'d',origin:'https://loginom.invalid',loginom_build:'7.4.2',loginom_account:'worker',
   directories:{inputs:'/test',packages:'/test',exports:'/test'}};
- const listeners=new Map(),records=[];let disconnected=0,copied=false,deadline,releaseCopy;
+ const listeners=new Map(),records=[];let disconnected=0,copied=false,copyPending=false,deadline,releaseCopy;
  const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),off:event=>listeners.delete(event),
   send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
  f.page.waitForEvent=async()=>{
   listeners.get('Browser.downloadWillBegin')?.({guid:'owned',frameId:'frame',suggestedFilename:'sales.csv',url:f.download.url()});
-  listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:3});return f.download;
+  listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:fault==='midstream'?1:3});return f.download;
  };
  f.download.saveAs=async path=>{
-  f.calls.push('save');await new Promise(resolve=>{releaseCopy=resolve;});
-  await writeFile(path,fault==='partial'?'ab':'abc');copied=true;connection.Connected=false;
+  f.calls.push('save');if(fault==='midstream'){copyPending=true;connection.Connected=false;}
+  await new Promise(resolve=>{releaseCopy=resolve;});
+  await writeFile(path,fault==='partial'?'ab':'abc');copied=true;if(fault!=='midstream')connection.Connected=false;
   if(fault==='mtime')native.mtime='changed';
   if(fault==='bytes')native.bytes=4;
   if(fault==='unconfirmed')throw Error('saveAs did not confirm completion');
  };
+ f.download.cancel=async()=>{f.calls.push('cancel');releaseCopy?.();};
  f.download.delete=async()=>{f.calls.push('delete');if(fault==='cleanup'||fault==='unconfirmed')throw Error('cleanup secondary error');};
  const evaluate=f.page.evaluate.bind(f.page),locator=f.page.locator.bind(f.page);
  f.page.evaluate=async(fn,arg)=>{
   if(!fn.toString().includes('const same=location.origin===b.origin'))return evaluate(fn,arg);
-  if(copied&&!connection.Connected&&++disconnected===3){
+  if((copied||copyPending)&&!connection.Connected&&++disconnected===3){
    connection.Connected=true;
+   if(fault==='midstream')listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:3});
    if(fault==='session')connection.FSession={};
    if(fault==='deadline')f.page.clock=deadline;
   }
@@ -162,7 +165,10 @@ for(const fault of ['restored','session','mtime','bytes','partial','unconfirmed'
     if(!f.page.context)await f.page.execute('async page=>null');
     const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
     const result=structuredClone(await vm.runInContext('('+withStorageIdentity(code,binding,options?.storageSession)+')',f.page.context)(page));
-    if(code.includes('"mode":"status"')&&result.output.bytes===3)releaseCopy?.();
+    if(code.includes('"mode":"status"')){
+     if(fault==='midstream'&&!connection.Connected)f.page.clock+=30000;
+     if(result.output.bytes===3)releaseCopy?.();
+    }
     return result;
    }catch(error){return parseCapabilityResult({isError:true,content:[{type:'text',text:String(error)}]});}
   }});
@@ -179,7 +185,7 @@ for(const fault of ['restored','session','mtime','bytes','partial','unconfirmed'
  }while(result.state==='running');
  assert.equal(result.operation_id,request.operation_id);assert.equal(result.progress.deadline_at,deadline);
  assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(f.calls.filter(c=>c==='save').length,1);
- if(fault==='restored'){
+ if(['restored','midstream'].includes(fault)){
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.phase,'cached');
   assert.equal(createHash('sha256').update(await readFile(result.output.path)).digest('hex'),createHash('sha256').update('abc').digest('hex'));
   assert.equal((await stat(result.output.path)).size,3);assert.ok(disconnected>=3);
