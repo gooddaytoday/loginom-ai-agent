@@ -33,3 +33,18 @@ test('published HP rules pass production structural validation before handler pr
  for(const p of [parameters,{smoothing:[]},{smoothing:[{field:'X',lambda:0.0625}]},{smoothing:[{field:'R',period:20000}]}])assert.doesNotThrow(()=>validateActionParameters(smoothingParametersSchema,p));
  for(const p of [{smoothing:[{field:'X'}]},{smoothing:[{field:'X',lambda:1,period:6}]},{smoothing:[{field:'X',lambda:0.01}]},{smoothing:[{field:'X',period:20001}]}])assert.throws(()=>validateActionParameters(smoothingParametersSchema,p));
 });
+
+test('HP production preflight accepts Preview metadata while input mapping still requires continuous kind',async()=>{
+ const {createSmoothingNodeSupport}=await import('../lib/smoothing-node.mjs');
+ const parameterModule=await import('../lib/smoothing-parameters.mjs');
+ const {runInNewContext}=await import('node:vm');
+ const preview=fields.map(({data_kind,...field})=>field);
+ const context={...parameterModule,createTabularTransformNodeSupport:(_,implementation)=>implementation,smoothingParametersSchema:{},
+  configureSmoothing:()=>{},configureSmoothingOutput:()=>{},smoothingConfigurationReadback:()=>{},
+  preflightTabularSource:(options,ctx,config,policy)=>{assert.equal(policy.label,'smoothing');return policy.resolve(parameters,preview);}};
+ const implementation=runInNewContext('('+createSmoothingNodeSupport.toString()+')',context)({});
+ assert.doesNotThrow(()=>implementation.preflight({operation:{parameters:{parameters}}},{},{}));
+ assert.throws(()=>parameterModule.validateSmoothingInputParameters(parameters,{fields:preview},{}),/continuous/);
+ assert.doesNotThrow(()=>parameterModule.validateSmoothingInputParameters(parameters,{fields},{}));
+ assert.throws(()=>parameterModule.validateSmoothingInputParameters(parameters,{fields:fields.map(f=>f.name==='X'?{...f,data_kind:'Дискретный'}:f)},{}),/continuous/);
+});

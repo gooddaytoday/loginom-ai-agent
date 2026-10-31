@@ -14,13 +14,18 @@ export function validateSmoothingParameters(p,mode,request){
   need(Number.isFinite(value)&&value>=(key==='lambda'?0.0625:2)&&value<=(key==='lambda'?102659800000000:20000),'invalid '+key+' range');
  }
 }
-export function resolveSmoothingParameters(p,inputs){
+// Preview omits DataKind; the owned input mapping validates it before Done.
+export function validateSmoothingPreview(p,inputs){
  need(Array.isArray(inputs)&&new Set(inputs.map(f=>f.name)).size===inputs.length,'unique input schema required');
  for(const rule of p.smoothing??[]){
   const field=inputs.find(f=>f.name===rule.field);need(field,'unknown field '+rule.field);
-  need(['integer','real'].includes(field.type)&&field.data_kind==='Непрерывный','continuous integer/real field required: '+rule.field);
+  need(['integer','real'].includes(field.type),'continuous integer/real field required: '+rule.field);
   need(!inputs.some(f=>f.name.toLowerCase()===(rule.field+'_S').toLowerCase()),'generated output collision: '+rule.field+'_S');
  }
+}
+export function resolveSmoothingParameters(p,inputs){
+ validateSmoothingPreview(p,inputs);
+ for(const rule of p.smoothing??[])need(inputs.find(f=>f.name===rule.field).data_kind==='Непрерывный','continuous integer/real field required: '+rule.field);
  return inputs.map(f=>{
   if(p.smoothing===undefined)return {...f};
   const rule=p.smoothing.find(r=>r.field===f.name);

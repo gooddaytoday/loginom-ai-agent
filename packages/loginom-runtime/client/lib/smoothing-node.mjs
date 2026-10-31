@@ -1,5 +1,5 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
-import {validateSmoothingParameters,resolveSmoothingParameters,validateSmoothingInputParameters} from './smoothing-parameters.mjs';
+import {validateSmoothingParameters,validateSmoothingPreview,validateSmoothingInputParameters} from './smoothing-parameters.mjs';
 import {smoothingParametersSchema} from './node-api.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 import {configureSmoothing} from './smoothing-procedure.mjs';
@@ -8,7 +8,7 @@ import {smoothingConfigurationReadback} from './smoothing-readback.mjs';
 export function createSmoothingNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'preprocessing.smoothing',mode:'hodrick_prescott',fullUiOutput:true,revision:'smoothing-v1-internal-1',parameterSchema:smoothingParametersSchema,
  readback:smoothingConfigurationReadback,validate:validateSmoothingParameters,validateInput:validateSmoothingInputParameters,
- preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.smoothing!==undefined,resolve:resolveSmoothingParameters,label:'smoothing'}),
+ preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.smoothing!==undefined,resolve:validateSmoothingPreview,label:'smoothing'}),
  configurationObservation:{condition:'smoothing settings',readSmoothing:true,ready:s=>s.wizard?.stage==='smoothing'&&s.node_smoothing?.verified===true},
  async configure(channel,p,{request,inputMapping}){
   if(request.finish==='close'){
