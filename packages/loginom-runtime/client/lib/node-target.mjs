@@ -206,6 +206,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       for (const input of request.inputs) {
         const source = node(graph, input.source.node_id);
         if (!source.outputs.includes(input.output)) throw new Error('Source tabular output does not exist');
+        const targetKind=NODE_TYPES[request.target.type].input_kinds?.[input.input]??'data';
+        const sourceKind=source.output_kinds?.[input.output]??'data';
+        if(!['data','tree'].includes(sourceKind)||sourceKind!==targetKind)throw Error('Incompatible source and target port kinds');
+        if(request.target.kind==='existing'&&(node(graph,request.target.ref.node_id).input_kinds?.[input.input]??'data')!==targetKind)
+          throw Error('Observed target port kind differs from its contract');
       }
       if (request.target.kind === 'existing') {
         const existing = node(graph, request.target.ref.node_id);
