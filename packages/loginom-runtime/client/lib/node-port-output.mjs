@@ -6,26 +6,29 @@ import {readOutputContext} from './node-output-context.mjs';
 export async function readTreePortSource(source,call,track,decode) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
- const acquire=async fn=>{let proxy;await call(async()=>{proxy=track(await fn());return proxy;});return proxy;};
+ const rpc=async(name,fn)=>{try{return await call(fn);}catch(error){
+  if(/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))throw error;throw Error('tree_rpc_'+name);
+ }};
+ const acquire=async(name,fn)=>{let proxy;await rpc(name,async()=>{proxy=track(await fn());return proxy;});return proxy;};
  const pointer=name=>name.replaceAll('~','~0').replaceAll('/','~1');
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
  const visit=async(def,parent,path,depth)=>{
   need(depth<=16,'tree_depth_limit');need(schema.length<256,'tree_schema_limit');
   const index=schema.length;
-  const name=await call(()=>def.get_Name()),label=await call(()=>def.get_DisplayName());
-  const container=await call(()=>def.get_IsContainer()),array=await call(()=>def.get_IsArray());
+  const name=await rpc('schema_name',()=>def.get_Name()),label=await rpc('schema_label',()=>def.get_DisplayName());
+  const container=await rpc('schema_container',()=>def.get_IsContainer()),array=await rpc('schema_array',()=>def.get_IsArray());
   need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
    &&typeof container==='boolean'&&typeof array==='boolean'&&(!array||container),'tree_schema_metadata');
-  const type=container?'object':types[await call(()=>def.get_DataType())];
+  const type=container?'object':types[await rpc('schema_type',()=>def.get_DataType())];
   need(type&&(!['variant','datetime'].includes(type)),'tree_scalar_type');
   const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
   schema.push(item);definitions.push(def);
   if(container){
-   const children=await acquire(()=>def.get_SubNodes()),count=await call(()=>children.get_Count());
+   const children=await acquire('schema_children',()=>def.get_SubNodes()),count=await rpc('schema_count',()=>children.get_Count());
    need(Number.isInteger(count)&&count>=0&&count<=256-schema.length,'tree_schema_limit');
    const names=new Set();
    for(let i=0;i<count;i++){
-    const child=await acquire(()=>children.getItem(i)),childName=await call(()=>child.get_Name());
+    const child=await acquire('schema_child',()=>children.getItem(i)),childName=await rpc('schema_child_name',()=>child.get_Name());
     need(typeof childName==='string'&&childName.length>0&&!names.has(childName),'tree_schema_names');names.add(childName);
     const childIndex=await visit(child,index,path+'/'+pointer(childName),depth+1);
     need(schema[childIndex].name===childName,'tree_schema_changed');item.children.push(childIndex);
@@ -33,15 +36,15 @@ export async function readTreePortSource(source,call,track,decode) {
   }
   return index;
  };
- const root=await acquire(()=>source.get_RootNodeDef());await visit(root,null,'',0);
- const reader=await acquire(()=>source.GetReader(definitions));
+ const root=await acquire('root',()=>source.get_RootNodeDef());await visit(root,null,'',0);
+ const reader=await acquire('reader',()=>source.GetReader(definitions));
  let nodeCount=0,maxDepth=0;
  const count=depth=>{need(++nodeCount<=256,'tree_instance_limit');need(depth<=16,'tree_depth_limit');maxDepth=Math.max(maxDepth,depth);};
  const bytes=tree=>need(new TextEncoder().encode(JSON.stringify(tree)).length<=1024*1024,'tree_response_byte_limit');
  const instance=async(index,row,path,depth,arrayItem=false)=>{
   const def=schema[index];count(depth);
   if(def.is_array&&!arrayItem){
-   const start={$:0},size={$:0};await call(()=>reader.GetRowRange(index,row,start,size));
+   const start={$:0},size={$:0};await rpc('row_range',()=>reader.GetRowRange(index,row,start,size));
    need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
     &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
    const children=[];
@@ -49,16 +52,16 @@ export async function readTreePortSource(source,call,track,decode) {
    const value={schema_index:index,path,type:'array',children};bytes(value);return value;
   }
   if(def.is_container){
-   need(await call(()=>reader.GetContainerExists(index,row))===true,'tree_absent_container');
+   need(await rpc('container',()=>reader.GetContainerExists(index,row))===true,'tree_absent_container');
    const children=[];
    for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
    const value={schema_index:index,path,type:'object',children};bytes(value);return value;
   }
-  const decoded=decode(await call(()=>reader.AsVariant(index,row)),def.type);
+  const decoded=decode(await rpc('value',()=>reader.AsVariant(index,row)),def.type);
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- const rows=await call(()=>reader.GetRowCount(0));need(rows===1,'tree_document_count');
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0));need(rows===1,'tree_document_count');
  const document=await instance(0,0,'',0);
  const instances=[];
  const flatten=(node,parent)=>{
@@ -265,7 +268,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){if(target.kind==='tree'&&/^tree_|integer_|unsupported_type/.test(error?.message??''))reason=error.message;result=undefined;
+  }catch(error){if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;result=undefined;
   }finally{
    for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
   }

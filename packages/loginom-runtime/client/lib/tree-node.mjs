@@ -115,7 +115,7 @@ export function createTreeNodeSupport(config,{json}){
     if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
    }
    const configuration=structuredClone(s.node_tree);
-   await step(s,json?'tree_output_mapping':['output_mapping','done']);
+   await step(s,json?['tree_output_mapping','done']:['output_mapping','done']);
    s=await channel.observe({condition:'tree output mapping or completion',ready:s=>owned(s)&&['tree_output_mapping','output_mapping','done'].includes(s.wizard?.stage)});
    if(s.wizard.stage!=='done'){await step(s,'done');s=await channel.observe({condition:'tree completion',ready:s=>owned(s)&&s.wizard?.stage==='done'});}
    return {verified:true,cleanup_complete:true,effect_possible:true,configuration,validation:{status:'accepted_by_loginom_next',node_context:s.prepared_node_context}};

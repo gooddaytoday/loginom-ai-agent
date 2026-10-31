@@ -1,4 +1,5 @@
 import test from 'node:test';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateTreeJsonScope,validateTreeParameters,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
@@ -60,4 +61,26 @@ test('tree source preflight binds semantic node identity, port GUID and the same
  port.execution_id='stale';await assert.rejects(driver.beforeTarget(ctx),/same execution/);
  port.execution_id='exec';options.execute=async()=>({verified:true,ports:[{index:0,active:true,port_guid:'foreign'}]});
  await assert.rejects(driver.beforeTarget(ctx),/inactive or changed/);
+});
+
+for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'saved direct completion':'new output mapping and completion')+' without repeating Next',async()=>{
+ const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
+ const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
+  createTabularTransformNodeSupport:(_config,implementation)=>implementation,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,treeConfigurationReadback,
+  need,owned,ready:s=>owned(s)&&s.node_tree?.verified,
+  one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,
+ });
+ const implementation=factory({}, {json:true}),steps=[];
+ const state={prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'json_tree',root_tid:'W'},
+  node_tree:{verified:true,inventory_complete:true,json_field:'Document',auto_structure:true,strict:true,exclude_root:false,root_mode:'auto'},
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
+ const channel={observe:async options=>{assert.ok(options.ready(state));return structuredClone(state);},perform:async options=>{
+  const action=options.resolve(state),next=steps.length===0&&!saved?'tree_output_mapping':'done';
+  assert.equal(action.verb,'wizard_step');assert.ok(Array.isArray(action.expected_stage)?action.expected_stage.includes(next):action.expected_stage===next);
+  steps.push(next);state.wizard.stage=next;
+ }};
+ const result=await implementation.configure(channel,{json_field:'Document'},{request:{finish:'execute'}});
+ assert.equal(result.verified,true);assert.equal(result.validation.status,'accepted_by_loginom_next');
+ assert.deepEqual(steps,saved?['done']:['tree_output_mapping','done']);
 });
