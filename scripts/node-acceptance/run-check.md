@@ -277,3 +277,11 @@ runner допускает два ограничения нативного CSV w
 Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
 Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
+
+`binning-count`, `binning-width`, `binning-frequency`, `binning-frequency-ties`,
+`binning-real`, `binning-integer`, `binning-apply`, `binning-retrain`, `binning-holdout`
+используют утверждённые task*.md/expected*.json из
+`docs/node-development/nodes/preprocessing-binning/acceptance`. Каждый запускается
+с отдельными входами, двумя CSV и cold-чтением обоих портов; apply/retrain заменяют
+источник того же импорта внутри одного сценария. NULL/пустая строка, типы, порядок
+полей и строк точны, Real abs/rel 1e-12.

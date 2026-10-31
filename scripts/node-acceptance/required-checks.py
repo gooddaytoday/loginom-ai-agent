@@ -34,6 +34,7 @@ RULES = (
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
+    ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter',)),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
