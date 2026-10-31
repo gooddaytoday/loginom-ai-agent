@@ -94,6 +94,9 @@ def scenario(name, case_root=None, *, cases=None):
         if set(config) - {'source_path', 'attachment', 'upload_only'} or not {'source_path', 'attachment'} <= set(config) or config['attachment'] not in ['path', 'file'] or type(config.get('upload_only', False)) is not bool:
             raise ValueError('External case requires source_path and attachment path/file')
         source = Path(config['source_path'])
+        if not source.is_absolute() and source.suffix.lower() == '.xlsx':
+            source = (src / source).resolve()
+            if not source.is_relative_to(src): raise ValueError('XLSX source must remain inside its case')
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,

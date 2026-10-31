@@ -27,3 +27,11 @@ test('cold XLSX checks the saved sink settings and independently reads its upstr
   assert.throws(()=>verifyExcelColdSettings([{destination:expected.export_destination,excel_settings:{...settings,[key]:value}}],expected));
  assert.equal(excelColdExpected({output_node_type:'exports.text'}),null);
 });
+
+test('Excel import stage1 case resolves its original workbook and leaves unspecified labels free',()=>{
+ const r=spawnSync('python3',['-c',`import importlib.util
+s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('stage1',case_root='docs/node-development/nodes/imports-excel/acceptance');assert c['local_file'].name=='sales.xlsx';assert c['local_file'].is_file()
+e=m.expected_for(c,'/worker/import.lgp');assert all(x['label_any'] for x in e['outputs'][0]['columns'])
+`],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});assert.equal(r.status,0,r.stderr);
+});
