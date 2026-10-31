@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 const need=(v,m)=>{if(!v)throw Error('SAMPLING_'+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function makeSamplingExpected(proposal,mode,package_path){
- need(['random','stratified'].includes(mode),'MODE_UNSUPPORTED');
+ need(['random','stratified','biased'].includes(mode),'MODE_UNSUPPORTED');
  need(['preprocessing.sampling','preprocessing.data_partition'].includes(proposal?.node_type),'TYPE_UNSUPPORTED');
  const partition=proposal.node_type==='preprocessing.data_partition',source=proposal.source?.rows;
  need(Array.isArray(source)&&source.length>0&&source.length<=100&&proposal.source.row_count===source.length,'SOURCE_INCOMPLETE');
@@ -13,12 +13,15 @@ export function makeSamplingExpected(proposal,mode,package_path){
  const columns=[{name:'RowID',type:'integer',label_any:true},{name:'Class',type:'string',label_any:true},{name:'Value',type:'integer',label_any:true}];
  need(same(proposal.columns,columns),'SOURCE_SCHEMA');
  need(Number.isInteger(proposal.seed)&&proposal.seed>=0,'SEED_INVALID');
- const sizes=proposal.requested_sizes,keys=partition?['train','test']:['sample'];
+ // The approved biased business task requests 14 (the random proposal says 8).
+ // Counts configure the node; decision 1 does not assert biased cardinalities.
+ const sizes=mode==='biased'&&!partition?{sample:14}:proposal.requested_sizes,keys=partition?['train','test']:['sample'];
  need(sizes&&same(Object.keys(sizes),keys)&&keys.every(k=>Number.isInteger(sizes[k])&&sizes[k]>=0)&&keys.reduce((n,k)=>n+sizes[k],0)<=source.length,'SIZES_INVALID');
  if(mode==='stratified')need(same(proposal.stratified?.fields,['Class']),'STRATA_UNSUPPORTED');
  const ports=partition?[0,1,2]:[0];
  return {package_path,nodes:[{type:'imports.text'},{type:proposal.node_type},{type:'exports.text'}],
-  sampling_modes:{version:1,mode,node_type:proposal.node_type,seed:proposal.seed,source,requested_sizes:sizes},
+  sampling_modes:{version:1,mode,node_type:proposal.node_type,seed:proposal.seed,source,requested_sizes:sizes,
+   ...(mode==='biased'?{bias_field:'Class',bias_factors:[{value:'A',factor:0.4},{value:'B',factor:1}]}:{})},
   // Empty rows are a read plan, never an exact-row oracle. This envelope is
   // consumed only by the explicit sampling adapter, not the stock matcher.
   outputs:ports.map(port=>({output_node_type:proposal.node_type,output_port:port,ordered:true,column_order:'exact',
@@ -115,14 +118,14 @@ function checkRound(expected,records){
  const partition=c.node_type==='preprocessing.data_partition';
  const subsets=partition?[['train',rows(1)],['test',rows(2)]]:[['sample',rows(0)]];
  for(const [key,subset] of subsets){
-  need(subset.length===c.requested_sizes[key],'ROW_COUNT');
+  if(c.mode!=='biased')need(subset.length===c.requested_sizes[key],'ROW_COUNT');
   if(c.mode==='stratified')for(const cls of new Set(c.source.map(r=>r.Class))){
    const quota=c.requested_sizes[key]*c.source.filter(r=>r.Class===cls).length/c.source.length;
    need(Number.isInteger(quota)&&subset.filter(r=>r.Class===cls).length===quota,'CLASS_QUOTA');
   }
-  need(subset.every((r,i)=>i===0||c.source.findIndex(s=>s.RowID===subset[i-1].RowID)<c.source.findIndex(s=>s.RowID===r.RowID)),'ROW_ORDER');
+  if(c.mode!=='biased')need(subset.every((r,i)=>i===0||c.source.findIndex(s=>s.RowID===subset[i-1].RowID)<c.source.findIndex(s=>s.RowID===r.RowID)),'ROW_ORDER');
  }
- if(partition){
+ if(partition&&c.mode!=='biased'){
   need(!rows(1).some(r=>rows(2).some(s=>s.RowID===r.RowID)),'TRAIN_TEST_OVERLAP');
   need(same(rows(0),[...rows(1).map(r=>({IsTestSet:false,...r})),...rows(2).map(r=>({IsTestSet:true,...r}))]),'COMBINED_RELATION');
  }
@@ -158,6 +161,7 @@ export function checkSamplingMain(expected,replies,csvs){
  for(const {readback:r} of configs){
   need(r.mode===c.mode&&r.seed===c.seed&&same(r.counts,Object.values(c.requested_sizes))&&r.test_priority===false,'CONFIGURATION_CHANGED');
   need(same(r.strata_fields,c.mode==='stratified'?['Class']:[]),'STRATA_CHANGED');
+  if(c.mode==='biased')need(r.bias_field===c.bias_field&&same(r.bias_factors,c.bias_factors),'BIAS_CHANGED');
  }
  for(const reply of receipts(replies))if(reply.node.node_id===node){
   need(reply.cleanup_complete===true,'MAIN_CLEANUP');
@@ -183,7 +187,7 @@ export function checkSamplingCold(expected,actual,baseline){
  need(baseline?.version===1&&same(baseline.contract,expected.sampling_modes)&&baseline.node_id===result.node_id,'COLD_BASELINE_IDENTITY');
  need(same(baseline.ports,result.ports),'COLD_MAIN_MISMATCH');
  const first=normalized.filter(a=>a.execution.execution_id===result.execution_ids[0]);
- return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:true,native_column_order:true,
+ return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:expected.sampling_modes.mode!=='biased',native_column_order:true,
    output_definitions:first.map(a=>({port:a.output_port,columns:a.sampling_mapping.columns,settings_applied:false}))},
   correspondence:expected.outputs.map((want,index)=>{const a=first.find(a=>a.output_port===want.output_port);return {expected_index:index,node:a.node,output_port:a.output_port,execution:a.execution};})};
 }

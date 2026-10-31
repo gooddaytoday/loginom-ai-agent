@@ -8,8 +8,9 @@ const proposal=slug=>JSON.parse(readFileSync(new URL('../../../docs/node-develop
 function fixture(partition=false,mode='stratified'){
  const p=proposal(partition?'preprocessing-datapartition':'preprocessing-sampling');
  const expected=makeSamplingExpected(p,mode,'/test/sample.lgp'),source=p.source.rows;
- const train=[...source.slice(0,4),...source.slice(10,14)],held=[...source.slice(4,6),...source.slice(14,16)];
- const tables=partition?[[...train.map(r=>({IsTestSet:false,...r})),...held.map(r=>({IsTestSet:true,...r}))],train,held]:[train];
+ const train=mode==='biased'?source.slice(0,3).reverse():[...source.slice(0,4),...source.slice(10,14)],held=mode==='biased'?source.slice(0,2):[...source.slice(4,6),...source.slice(14,16)];
+ const combined=mode==='biased'?source.slice(8,13).map(r=>({IsTestSet:false,...r})):[...train.map(r=>({IsTestSet:false,...r})),...held.map(r=>({IsTestSet:true,...r}))];
+ const tables=partition?[combined,train,held]:[train];
  const actual=['first','second'].flatMap(execution_id=>expected.outputs.map((want,i)=>({
   node:{document_id:'doc',workflow_id:'flow',node_id:'sample'},type:p.node_type,output_port:want.output_port,execution:{status:'completed',execution_id},
   sampling_mapping:{verified:true,node:{document_id:'doc',workflow_id:'flow',node_id:'sample'},port:want.output_port,
@@ -20,12 +21,13 @@ function fixture(partition=false,mode='stratified'){
    sample:tables[i].map(r=>want.columns.map(c=>({type:c.type,value:c.type==='integer'?String(r[c.name]):r[c.name],is_null:false})))}})));
  const replies=['first','second'].map(execution_id=>({status:'SUCCEEDED',node:{node_id:'sample'},cleanup_complete:true,
   execution:{status:'completed',execution_id},configuration:{readback:{kind:partition?'data_partition':'sampling',mode,seed:42,
-   counts:Object.values(p.requested_sizes),strata_fields:mode==='stratified'?['Class']:[],test_priority:false}},
+   counts:Object.values(expected.sampling_modes.requested_sizes),strata_fields:mode==='stratified'?['Class']:[],test_priority:false,
+   ...(mode==='biased'?{bias_field:'Class',bias_factors:[{value:'A',factor:0.4},{value:'B',factor:1}]}:{})}},
   output:{ports:actual.filter(r=>r.execution.execution_id===execution_id).map(r=>r.data)}}));
  const csvs=[0,1].flatMap(()=>expected.outputs.map((want,i)=>[want.columns.map(c=>c.name),...tables[i].map(r=>want.columns.map(c=>String(r[c.name])))]));
  return {expected,actual,replies,csvs};
 }
-for(const partition of [false,true])for(const mode of ['random','stratified'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
+for(const partition of [false,true])for(const mode of ['random','stratified','biased'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
  const {expected,actual,replies,csvs}=fixture(partition,mode);
  assert.equal(parseSamplingExpected(expected).sample_rows,20);
  const baseline=checkSamplingMain(expected,[{output:{outcome:replies}},...replies],csvs);
@@ -41,7 +43,21 @@ test('proposal remains rejected by stock parser; ordinary exact expectations ret
  assert.equal(matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs).length,1);
  exact.outputs[0].rows[0].Value=999;
  assert.throws(()=>matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs));
- assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'biased','/test/x.lgp'),/MODE_UNSUPPORTED/);
+ assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'uniform','/test/x.lgp'),/MODE_UNSUPPORTED/);
+});
+test('biased decision 1 checks repeatability and typed membership, without size, quota or partition relations',()=>{
+ for(const partition of [false,true]){
+  const f=fixture(partition,'biased');
+  assert.equal(f.expected.sampling_modes.requested_sizes[partition?'train':'sample'],partition?8:14);
+  const baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+  assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,false);
+  for(const mutate of [r=>r[1].output.ports[0].sample.reverse(),
+   r=>r[0].output.ports[0].sample[0][partition?1:0].value='999',
+   r=>r[0].output.ports[0].sample[0][partition?3:2].type='string',
+   r=>r[0].configuration.readback.bias_factors[0].factor=0.5]){
+   const bad=structuredClone(f.replies);mutate(bad);assert.throws(()=>checkSamplingMain(f.expected,bad,f.csvs));
+  }
+ }
 });
 test('invariants reject missing or conflicting executions, foreign rows, values/types, ordering, quota, CSV and cleanup',()=>{
  const mutations=[

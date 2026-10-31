@@ -1,7 +1,7 @@
 Run live acceptance without repeatedly reading live logs:
 
 Owner-approved #612 invariant cases: `sampling-random`, `sampling-stratified`,
-`partition-random`, `partition-stratified`. These alone translate their proposal
+`partition-random`, `partition-stratified`, `sampling-biased`, `partition-biased`. These alone translate their proposal
 into an explicit `sampling_modes` envelope. The model receives the unchanged
 business task and `modes.csv`, never the oracle. Main requires two distinct
 completed executions and checks every downloaded CSV against exact typed source
@@ -13,7 +13,11 @@ and cancels each native output-definition wizard after confirmed activation, req
 the exact saved column order. Only a Table presentation permutation may then
 be normalized by those verified names/types; missing or changed definitions
 remain failures. Normal Save, cleanup and
-port proofs remain mandatory. Biased and uniform modes are not registered here.
+port proofs remain mandatory. For biased, owner decision 1 requires repeatability
+and exact typed source membership only; sizes, Class quotas, source row order and
+partition relations are not acceptance assertions. Its unchanged business task
+still configures Class factors A=0.4, B=1, seed 42, sampling count 14 or partition
+counts 8/4, verified in main readback. Uniform is not registered here.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh
