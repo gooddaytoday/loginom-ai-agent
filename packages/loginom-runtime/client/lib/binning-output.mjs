@@ -14,7 +14,16 @@ export async function configureBinningOutputs(channel,c,p,mappings){
   await channel.openOutputPort(port);
   const s=await channel.observe({condition:'complete native binning output '+port,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified&&s.node_mapping.inventory_complete});
   const m=s.node_mapping,expected=binningOutputColumns(c,port),fields=m.target_fields.filter(f=>!f.excluded);
-  need(m.source_identity_verified&&fields.length===expected.length&&fields.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type&&f.source),'native output schema/order differs');
+  const n=m.node_context,b=n?.output_port,current=s.prepared_node_context;
+  need(n?.verified===true&&current?.verified===true&&n.surface==='wizard'&&current.surface==='wizard'
+   &&['document_id','workflow_id','node_id'].every(k=>n[k]===c.node_context?.[k]&&n[k]===current[k])
+   &&b?.direction==='output'&&b.port===port&&b.native_index===port&&b.node_icon_class==='bg-vendor-icon-binning'
+   &&typeof b.port_guid==='string'&&b.port_guid.length>0&&typeof b.opening_operation_id==='string'&&b.opening_operation_id.length>0
+   &&['direction','port','native_index','port_guid','opening_operation_id','node_icon_class'].every(k=>b[k]===current.output_port?.[k]),'native output port owner differs');
+  // Derived Binning definitions have no ConnectedRecord/source collection.
+  // Their identity comes from the owned native output port, not input links.
+  need(m.mapping_wizard==='DerivedDataSourceOutputSocketWizard'&&m.source_fields?.length===0
+   &&fields.length===expected.length&&fields.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type&&f.source===null),'native output schema/order differs');
   const definition=await readOutputDefinitionPages(channel,{expectedCount:m.target_fields.length});
   need(definition.fields.length===fields.length&&definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===fields[i][k])),'rendered output definition differs');
   ports.push({port,schema:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}))});
