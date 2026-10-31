@@ -77,7 +77,7 @@ export function buildNodeReadRequest(args,source){
  const javascript=request.target.type==='programming.javascript';
  const readback=node.configuration?.readback;
  if(javascript)need(readback?.kind==='javascript', 'JavaScript output reread requires source-bound admission');
- const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema}))??[];
+ const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.port_kind==='tree'?p.tree.schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.

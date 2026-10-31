@@ -1,6 +1,75 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {readOutputContext} from './node-output-context.mjs';
 
+// The native reader indexes the ordered list passed to GetReader; array row
+// ranges are bound to their parent row, rather than inferred from leaf counts.
+export async function readTreePortSource(source,call,track,decode) {
+ const need=(ok,reason)=>{if(!ok)throw Error(reason);};
+ const schema=[],definitions=[];
+ const acquire=async fn=>{let proxy;await call(async()=>{proxy=track(await fn());return proxy;});return proxy;};
+ const pointer=name=>name.replaceAll('~','~0').replaceAll('/','~1');
+ const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
+ const visit=async(def,parent,path,depth)=>{
+  need(depth<=16,'tree_depth_limit');need(schema.length<256,'tree_schema_limit');
+  const index=schema.length;
+  const name=await call(()=>def.get_Name()),label=await call(()=>def.get_DisplayName());
+  const container=await call(()=>def.get_IsContainer()),array=await call(()=>def.get_IsArray());
+  need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
+   &&typeof container==='boolean'&&typeof array==='boolean'&&(!array||container),'tree_schema_metadata');
+  const type=container?'object':types[await call(()=>def.get_DataType())];
+  need(type&&(!['variant','datetime'].includes(type)),'tree_scalar_type');
+  const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
+  schema.push(item);definitions.push(def);
+  if(container){
+   const children=await acquire(()=>def.get_SubNodes()),count=await call(()=>children.get_Count());
+   need(Number.isInteger(count)&&count>=0&&count<=256-schema.length,'tree_schema_limit');
+   const names=new Set();
+   for(let i=0;i<count;i++){
+    const child=await acquire(()=>children.getItem(i)),childName=await call(()=>child.get_Name());
+    need(typeof childName==='string'&&childName.length>0&&!names.has(childName),'tree_schema_names');names.add(childName);
+    const childIndex=await visit(child,index,path+'/'+pointer(childName),depth+1);
+    need(schema[childIndex].name===childName,'tree_schema_changed');item.children.push(childIndex);
+   }
+  }
+  return index;
+ };
+ const root=await acquire(()=>source.get_RootNodeDef());await visit(root,null,'',0);
+ const reader=await acquire(()=>source.GetReader(definitions));
+ let nodeCount=0,maxDepth=0;
+ const count=depth=>{need(++nodeCount<=256,'tree_instance_limit');need(depth<=16,'tree_depth_limit');maxDepth=Math.max(maxDepth,depth);};
+ const bytes=tree=>need(new TextEncoder().encode(JSON.stringify(tree)).length<=1024*1024,'tree_response_byte_limit');
+ const instance=async(index,row,path,depth,arrayItem=false)=>{
+  const def=schema[index];count(depth);
+  if(def.is_array&&!arrayItem){
+   const start={$:0},size={$:0};await call(()=>reader.GetRowRange(index,row,start,size));
+   need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
+    &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
+   const children=[];
+   for(let i=0;i<size.$;i++)children.push(await instance(index,start.$+i,path+'/'+i,depth+1,true));
+   const value={schema_index:index,path,type:'array',children};bytes(value);return value;
+  }
+  if(def.is_container){
+   need(await call(()=>reader.GetContainerExists(index,row))===true,'tree_absent_container');
+   const children=[];
+   for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
+   const value={schema_index:index,path,type:'object',children};bytes(value);return value;
+  }
+  const decoded=decode(await call(()=>reader.AsVariant(index,row)),def.type);
+  need(decoded.limitations.length===0,'tree_unverified_precision');
+  const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
+ };
+ const rows=await call(()=>reader.GetRowCount(0));need(rows===1,'tree_document_count');
+ const document=await instance(0,0,'',0);
+ const instances=[];
+ const flatten=(node,parent)=>{
+  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(children?{children:[]}: {})};
+  instances.push(record);if(children)for(const child of children)record.children.push(flatten(child,index));return index;
+ };flatten(document,null);
+ const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,
+  limits:{max_nodes:256,max_depth:16,max_bytes:1024*1024}};
+ bytes(result);return result;
+}
+
 // Serialized into the native callback; keep this decoder independent of module closures.
 export function decodePortCell(raw,type) {
  if(raw===null||raw===undefined)return {cell:{type,is_null:true,value:null,precision:'exact_null'},limitations:[]};
@@ -62,19 +131,19 @@ export function makeNodePortOutputCode(binding,request,options) {
   ||typeof request.execution.execution_id!=='string'||typeof request.execution.process_id!=='string'||typeof request.execution.process_record_id!=='string'
   ||!options||Object.keys(options).sort().join(',')!=='build,deadline,origin'
   ||typeof options.origin!=='string'||typeof options.build!=='string'||!Number.isSafeInteger(options.deadline))throw Error('Exact bounded completed port read required');
- return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()})`;
+ return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()})`;
 }
 
 // One dispatch retains native identity and owns only the proxies acquired here.
-export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell) {
+export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource) {
  const before=await readNode(page,binding);
  if(before.verified!==true||before.surface!=='graph')return {verified:false,cleanup_complete:false,reason:'node_context'};
  const inventory=await readOutputs(page,binding,readNode);
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
- const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder})=>{
-  const decode=eval(' ('+decoder+')');
+ const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader})=>{
+  const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
@@ -99,12 +168,12 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const candidates=[];
    for(const list of node.FPorts){need(Array.isArray(list.FCollection)&&list.FCollection.length<=100,'port_bound');candidates.push(...list.FCollection);}
    const ports=candidates.filter(p=>p.FGuid===target.port_guid);need(ports.length===1,'port_changed');
-   const port=ports[0],dom=graph.view.getState(port.FCell)?.shape?.node,tid=before.tid+';Output_Data-'+target.native_index;
-   need(port.parent===node&&port.data&&port.FType===1&&port.FSubType===1&&port.FStatus===1
+   const port=ports[0],dom=graph.view.getState(port.FCell)?.shape?.node,tid=before.tid+';Output_'+(target.kind==='tree'?'DataTree-':'Data-')+target.native_index;
+   need(port.parent===node&&(target.kind!=='tree'||port.FCell.parent===node.FCell)&&port.data&&port.FType===1&&port.FSubType===(target.kind==='tree'?target.native_subtype:1)&&port.FStatus===1
     &&(port.FPortIndex===undefined||port.FPortIndex===target.native_index)&&dom?.getAttribute('data-tid')===tid
     &&roots[0].contains(dom)&&exact(tid).filter(e=>roots[0].contains(e)).length===1,'port_binding_changed');
    const images=[...dom.querySelectorAll('image')],icon=images.length===1?(images[0].getAttribute('href')??images[0].getAttribute('xlink:href'))?.split('/').at(-1):null;
-   need(['output_table_active.svg','output_table_active_no_automapping.svg'].includes(icon),'inactive_output');
+   need(target.kind==='tree'?images.length===1&&typeof icon==='string':['output_table_active.svg','output_table_active_no_automapping.svg'].includes(icon),'inactive_output');
    const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(prefix=>exact(prefix+';ProgressForm;trpProgress;treepanel;tree'));
    need(trees.length===1,'execution_tree');
    const store=Ext.getCmp(trees[0].id)?.getStore(),root=store?.getRoot();
@@ -122,14 +191,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    let ancestor=parents.get(children[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);need(ancestor===groups[0],'execution_owner');
    const relevant=[groups[0],...own];
    return {prep,receipt,tab:tabs[0],workflow,packageNode,model,diagram,node,nodeData:node.data,nodeCell:node.FCell,port,portData:port.data,portCell:port.FCell,portGuid:port.FGuid,
-    nodeSession:value(node.data,'$S'),nodeIdentity:value(node.data,'$'),nodeOwner:value(value(node.data,'$'),'$OW'),nodeObject:value(value(node.data,'$'),'$O'),
+    portSubtype:port.FSubType,nodeSession:value(node.data,'$S'),nodeIdentity:value(node.data,'$'),nodeOwner:value(value(node.data,'$'),'$OW'),nodeObject:value(value(node.data,'$'),'$O'),
     portSession:value(port.data,'$S'),portIdentity:value(port.data,'$'),portOwner:value(value(port.data,'$'),'$OW'),portObject:value(value(port.data,'$'),'$O'),
     store,root,records:relevant.map(r=>r),fingerprint:JSON.stringify(relevant.map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.loaded,r.data.ModelNode===node.data]))};
   };
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
-   need(helper&&value(helper,'FBaseProxy')===dataSource&&identity&&value(identity,'$I')===116,'source_binding');
+   need(identity&&value(identity,'$I')===(target.kind==='tree'?141:116)
+    &&(target.kind==='tree'||helper&&value(helper,'FBaseProxy')===dataSource),'source_binding');
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
    return {helper,identity,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
@@ -138,7 +208,14 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   try {
    live();baseline=snapshot();
    output=await baseline.portData.get_Output();live();stable();
-   dataSource=await output.QueryInterface(bg.IBGDataSource);live();sourceBaseline=source();stable();
+   dataSource=await output.QueryInterface(target.kind==='tree'?bg.IBGDataTree:bg.IBGDataSource);live();sourceBaseline=source();stable();
+   if(target.kind==='tree'){
+    need(q.rowOffset===undefined,'tree_row_offset');
+    const call=async read=>{live();stable();const result=await read();live();stable();return result;};
+    const tree=await readTree(dataSource,call,proxy=>{items.push(proxy);return proxy;},decode);
+    result={port:q.port,port_guid:baseline.portGuid,port_kind:'tree',fresh:true,execution_id:q.execution.execution_id,
+     freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
+   }else{
    const rowCount=await dataSource.get_RowCount();live();stable();
    need(Number.isSafeInteger(rowCount)&&rowCount>=0,'row_count');
    const offset=q.rowOffset??0;
@@ -186,8 +263,9 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    if(q.rowOffset!==undefined)Object.assign(result,{row_offset:offset,next_row_offset:offset+sample.length,
     window_binding:{document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
-   need(new TextEncoder().encode(JSON.stringify(result)).length<=4*1024*1024,'response_byte_budget');
-  }catch{result=undefined;
+   }
+   need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
+  }catch(error){if(target.kind==='tree'&&/^tree_|integer_|unsupported_type/.test(error?.message??''))reason=error.message;result=undefined;
   }finally{
    for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
   }
@@ -195,7 +273,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason};
   return {verified:true,cleanup_complete:true,output:result};
- },{binding,request,options,before,target,decoder:decodeCell.toString()});
+ },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString()});
  const after=await readNode(page,binding);
  if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
  return result.verified?{...result,node_context:after}:result;
