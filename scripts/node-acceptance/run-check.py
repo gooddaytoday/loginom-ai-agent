@@ -304,9 +304,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
     if infer_marker:
         null_marker = export_null_marker(export_events, destination)
-        if null_marker:
-            assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
-                           for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
+        assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
+                       for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
     elif null_marker is None:
         null_marker = ''
     assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
@@ -328,7 +327,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
 
     def equal(value, col, target):
         if target is None: return value == null_marker
-        if infer_marker and null_marker and value == null_marker: return False
+        if infer_marker and value == null_marker: return False
         if limitation(value, col, target): return True
         if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
             try:

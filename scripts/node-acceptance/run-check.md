@@ -69,10 +69,10 @@ marker. Otherwise, for outputs containing NULL, the CSV check uses the explicit
 `parameters.null_marker` of the `exports.text` request for that exact destination.
 Existing-node patches require the correlated successful configuration readback
 (including retained settings), also through wait/inspect receipts. Supported
-markers are `''`, `?`, `null`, and `NULL`; a nonempty marker matching any non-NULL
-value in that output fails `CSV_NULL_MARKER_COLLISION`. An empty marker retains
-the legacy CSV comparison, including outputs with both NULL and empty strings.
-Missing export evidence
+markers are `''`, `?`, `null`, and `NULL`; a marker matching any non-NULL value
+in that output fails `CSV_NULL_MARKER_COLLISION`. An empty marker therefore fails
+when the output contains both NULL and empty strings; it still passes when
+there are no empty strings. Missing export evidence
 fails `CSV_NULL_MARKER_MISSING`; unsupported markers fail
 `CSV_NULL_MARKER_UNSUPPORTED`. Every NULL cell still must match the chosen marker.
 

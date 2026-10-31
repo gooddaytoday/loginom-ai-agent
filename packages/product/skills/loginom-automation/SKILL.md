@@ -112,6 +112,13 @@ Execute вычисляющих узлов ради чтения, ответа и
 Округление значений и дополнительные узлы для него добавляй только по явной
 просьбе пользователя; формат отображения числа сам по себе этого не требует.
 
+## Экспорт
+
+Если в выгружаемых данных есть NULL и пустые строки, а пользователь не задал маркер выгрузки,
+для `exports.text` явно передай в параметре `null_marker` непустой маркер,
+не совпадающий с не-NULL значениями. По умолчанию выбери тот же непустой маркер, что при импорте,
+если он был задан; иначе `NULL`. Назови выбранный маркер пользователю.
+
 ## Выбор узлов
 
 Для корреляции Пирсона числовых полей используй `dock_node_apply` с
@@ -209,7 +216,7 @@ JS-узлы не удаляй автоматически; их наличие н
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
-Первые/последние N строк выбирай узлом `preprocessing.sampling`, `mode:"sequential"`, `parameters:{count:N,position:"first"}` или `position:"last"`. Последовательное разбиение выполняй `preprocessing.data_partition`, `mode:"sequential"`, `parameters:{train_count:N,test_count:M,allocation_order:"test_train_unused"}`. Размеры — в строках; порядок выделения задаётся `allocation_order`. Обычный `finish:"execute"`, без обучения. Читай порты `[0,1,2]`: общий/train/test; общий содержит сначала train, затем test и первое поле `IsTestSet` boolean (false/train, true/test). Для полного малого результата укажи `sample_rows:100,require_exact_numbers:true` и проверь полноту. При экспорте результатов этих узлов задавай маркер NULL отдельно: если пользователь не указал его для экспорта, используй `parameters:{null_marker:""}` у `exports.text`. Для полей `datetime`, если пользователь не задал формат экспорта, у `exports.text` явно укажи `date_format:"yyyy/mm/dd",date_separator:"-",time_format:"hh:nn:ss.zzz",time_separator:":"`: пустые настройки используют локальный формат даты. Для этих операций выбирай указанные узлы; Калькулятор и JavaScript не нужны. Случайные режимы и отбор со смещением этим контрактом не поддержаны.
+Первые/последние N строк выбирай узлом `preprocessing.sampling`, `mode:"sequential"`, `parameters:{count:N,position:"first"}` или `position:"last"`. Последовательное разбиение выполняй `preprocessing.data_partition`, `mode:"sequential"`, `parameters:{train_count:N,test_count:M,allocation_order:"test_train_unused"}`. Размеры — в строках; порядок выделения задаётся `allocation_order`. Обычный `finish:"execute"`, без обучения. Читай порты `[0,1,2]`: общий/train/test; общий содержит сначала train, затем test и первое поле `IsTestSet` boolean (false/train, true/test). Для полного малого результата укажи `sample_rows:100,require_exact_numbers:true` и проверь полноту. Маркер NULL для экспорта выбирай по правилу раздела «Экспорт». Для полей `datetime`, если пользователь не задал формат экспорта, у `exports.text` явно укажи `date_format:"yyyy/mm/dd",date_separator:"-",time_format:"hh:nn:ss.zzz",time_separator:":"`: пустые настройки используют локальный формат даты. Для этих операций выбирай указанные узлы; Калькулятор и JavaScript не нужны. Случайные режимы и отбор со смещением этим контрактом не поддержаны.
 
 Для бинарной строковой цели и вероятности события используй
 `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`,
