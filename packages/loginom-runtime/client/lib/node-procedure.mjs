@@ -742,13 +742,25 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(settleProcessConsole&&(settleProcessConsole.quiet||settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
-          const owned=state.prepared_node_context?.surface==='graph'&&typeof state.prepared_node_context.locked==='boolean'&&state.ui.dialogs.length===0
-            &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
-            &&buttons[0].enabled===true&&buttons[0].allowed_actions.includes('click')
-            &&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature))
-            &&state.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
-              &&m.target_tid===preparedNodeContext.workflow_ref.prefix+';ModelForm');
-          if(!owned)throw Error('Owned process console settlement context changed');
+          const checks={
+            node_surface:state.prepared_node_context?.surface==='graph',
+            node_lock:typeof state.prepared_node_context?.locked==='boolean',
+            dialogs_absent:state.ui.dialogs.length===0,
+            wizard_absent:state.wizard?.status==='absent',
+            progress_unique:buttons.length===1,
+            progress_ref:buttons.length===1&&buttons[0].ref===settleProcessConsole.ref,
+            progress_enabled:buttons.length===1&&buttons[0].enabled===true,
+            progress_click:buttons.length===1&&buttons[0].allowed_actions.includes('click'),
+            progress_signature:buttons.length===1&&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature)),
+            masks_owned:state.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+              &&m.target_tid===preparedNodeContext.workflow_ref.prefix+';ModelForm')
+          };
+          if(Object.values(checks).some(ok=>!ok)){
+            await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+              reason:'Owned process console settlement context changed',
+              failed_conditions:Object.keys(checks).filter(key=>!checks[key]),outcome:structuredClone(result)});
+            throw Error('Owned process console settlement context changed');
+          }
           // Only the confirmed launch's own loading mask may outlive the local
           // readiness window. Keep the parent deadline and authorize no action.
           if(state.ui.masks.length||state.prepared_node_context.locked){settlingConsole=true;deadline=operation.deadline;}
