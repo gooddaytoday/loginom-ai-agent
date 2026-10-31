@@ -391,6 +391,30 @@ class RunCheckTests(unittest.TestCase):
             'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
         return runner.Runner(root)
 
+    def test_prepare_only_verifies_build_without_setup_or_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = self.make_runner(Path(directory), ('r6',))
+            instance.options['prepare_only'] = True
+            with patch.object(instance, 'build', return_value=Path(directory) / 'cli') as build, \
+                 patch.object(instance, 'phase') as phase, patch.object(instance, 'model') as model:
+                instance.run()
+            build.assert_called_once()
+            phase.assert_not_called()
+            model.assert_not_called()
+            self.assertEqual(instance.report['runs'][0]['status'], 'NOT_RUN')
+            self.assertEqual(instance.report['runs'][0]['reason'], 'PREPARE_ONLY')
+            self.assertTrue(instance.report['runs'][0]['preparation_only'])
+            self.assertEqual(instance.report['phase'], 'complete')
+            command = [sys.executable, str(Path(runner.__file__)), 'wait', directory, '--timeout', '0']
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('| r6 | подготовка |', result.stdout)
+            for status, reason in [('NOT_RUN', 'BATCH_BUDGET_EXHAUSTED'), ('FAIL', 'PREPARE_ONLY')]:
+                instance.report['runs'][0].update(status=status, reason=reason)
+                instance.save()
+                result = subprocess.run(command, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
+
     def test_gate_and_setup_times_are_separate(self):
         for exhausted in [False, True]:
             with self.subTest(exhausted=exhausted), tempfile.TemporaryDirectory() as directory:

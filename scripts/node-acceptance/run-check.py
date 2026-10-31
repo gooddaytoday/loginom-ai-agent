@@ -4,6 +4,7 @@ import argparse
 import csv
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+import fcntl
 import io
 import json
 import math
@@ -63,6 +64,18 @@ def write(path, value):
 
 def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
+
+
+def restore_source_modes(source):
+    # Bun marks workspace bin targets executable. Repair modes only; Git must
+    # still reject edited, staged, deleted and untracked source contents.
+    for entry in git('ls-files', '--stage', '-z', cwd=source).split('\0'):
+        if not entry: continue
+        info, name = entry.split('\t', 1)
+        mode, _, stage = info.split()
+        path = source / name
+        if mode in ['100644', '100755'] and stage == '0' and path.is_file() and not path.is_symlink():
+            os.chmod(path, int(mode, 8) & 0o777)
 
 
 def scenario(name, case_root=None, *, cases=None):
@@ -174,6 +187,7 @@ def arguments(argv=None):
     start.add_argument('--scenarios', required=True)
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
+    start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
@@ -203,7 +217,9 @@ def summary(report):
             '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
-        rows.append('| ' + ' | '.join([r['scenario'], 'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'),
+        outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
+                   'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
+        rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
@@ -496,19 +512,40 @@ class Runner:
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
         build = Path(self.options['build']) if self.options['build'] else cache / 'cli'
-        if not (build / 'cli-manifest.json').exists():
-            assert not self.options['build'], 'Provided build has no manifest'
-            cache.mkdir(parents=True, exist_ok=True)
-            source = cache / 'source'
-            if not source.exists(): git('worktree', 'add', '--detach', str(source), self.report['head'])
-            assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
-            bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-            env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
-            self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
-            os.chmod(source / 'packages/cli/bin/lildax.cjs', int(git('ls-files', '--stage', 'packages/cli/bin/lildax.cjs', cwd=source).split()[0], 8) & 0o777)
-            assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
-            self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
-        meta = read(build / 'cli-manifest.json')['metadata']
+        cache.mkdir(parents=True, exist_ok=True)
+        # Same-SHA runs share both source/node_modules and the final artifact.
+        # Lock before checking either, and let the OS release it on worker exit.
+        with (cache / 'prepare.lock').open('a') as lock:
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() >= self.deadline: raise TimeoutError('build preparation lock deadline')
+                    time.sleep(1)
+            if not (build / 'cli-manifest.json').exists():
+                assert not self.options['build'], 'Provided build has no manifest'
+                source = cache / 'source'
+                if not source.exists(): git('worktree', 'add', '--detach', str(source), self.report['head'])
+                restore_source_modes(source)
+                assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
+                bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
+                # Keep Bun's shared warm cache; serialize installations across
+                # SHAs on this host, releasing the lock before compilation.
+                with (cache.parent / 'bun-install.lock').open('a') as install_lock:
+                    while True:
+                        try:
+                            fcntl.flock(install_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            break
+                        except BlockingIOError:
+                            if time.time() >= self.deadline: raise TimeoutError('bun install lock deadline')
+                            time.sleep(1)
+                    self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
+                restore_source_modes(source)
+                assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
+                self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
+            meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
         self.report.update(build=str(build), metadata=meta)
         self.save()
@@ -773,6 +810,10 @@ class Runner:
     def run(self):
         try:
             build = self.build()
+            if self.options.get('prepare_only'):
+                for result in self.report['runs']:
+                    result.update(status='NOT_RUN', reason='PREPARE_ONLY', preparation_only=True)
+                return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
@@ -844,7 +885,7 @@ def main():
             report = read(args.directory / 'results.json')
             if report.get('finished'):
                 print(summary(report), end='')
-                return 0 if all(r['status'] in ['PASS', D76_STATUS] for r in report['runs']) else 1
+                return 0 if all(r['status'] in ['PASS', D76_STATUS] or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
             if time.monotonic() >= end:
                 ready = sum(r['status'] in ['PASS', D76_STATUS, 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
