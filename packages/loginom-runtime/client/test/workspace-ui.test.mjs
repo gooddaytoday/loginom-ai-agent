@@ -6900,6 +6900,31 @@ test('scrolled process window offers native-bound rows without claiming complete
  assert.ok(row?.allowed_actions.includes('right_click'));assert.equal(row.process_row.record_index,4);
 });
 
+test('issue579 retains the exact process row when the two console views renumber history separately',async()=>{
+ // execution-events.jsonl:5990,6016,6028: history evicts group 1 at launch 21.
+ // Left process retains Activation-20 while right controls use Activation-19;
+ // viewport 1920x945, tree (50,769,325,174), final scrollTop/max_top=691.
+ for(const fault of [null,'caption','record','index','view','duplicate']){
+  const f=scrolledProcessWindowFixture(),base='ConsoleForm;ProgressForm;',name='Выручка_себестоимость_валовая_прибыль';
+  f.page.context.innerWidth=1920;f.page.context.innerHeight=945;
+  f.grids[0].box={x:50,y:769,width:325,height:174};f.grids[1].box={x:361,y:769,width:1557,height:174};
+  f.grids.forEach(g=>Object.assign(g,{scrollTop:691,scrollHeight:865,clientHeight:174}));
+  f.cell.box={x:110,y:919,width:250,height:23};f.id.ownText='21.1';f.model.data.id='21.1';
+  const left='Root>Активация_узлов-20>'+name,right='Root>Активация_узлов-19>'+name;
+  f.cell.attrs['data-tid']=base+'colProcess_'+left;f.id.attrs['data-tid']=base+'colId_'+left;
+  f.progress.attrs['data-tid']=base+'colProgress_'+(fault==='caption'?right+'Other':right);
+  if(fault==='record')f.rows[1].attrs['data-recordid']='foreign';
+  if(fault==='index')f.rows[1].attrs['data-recordindex']='3';
+  if(fault==='view')f.rows[1].attrs['data-boundview']='foreign';
+  if(fault==='duplicate')f.page.add('td',f.progress.attrs['data-tid'],'',undefined,f.rows[1]);
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.process_row?.record_id==='record-5');
+  if(fault){assert.equal(row,undefined,fault);continue;}
+  assert.equal(s.process_console.status,'rendered_process_window');
+  assert.equal(row.tid,base+'colProcess_'+left);assert.ok(row.allowed_actions.includes('right_click'));
+  assert.equal(row.process_row.record_index,4);assert.equal(s.process_console.top_level_complete,false);
+ }
+});
+
 test('native process captions containing code tokens remain process controls, not editors',async()=>{
  for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor','Точные токены Bread и Milk','Token count','Проверка пароля','secret report','api_key statistics']){
   const f=scrolledProcessWindowFixture(prefix),path='Root>'+name.replace(/\s/g,'_');
