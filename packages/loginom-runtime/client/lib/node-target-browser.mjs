@@ -199,13 +199,25 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       gestureBefore=await read(page,task);
       if(!sameGraph(before,gestureBefore))throw Error('Graph changed after placement navigation');
       placementNavigation.rebound_node_epochs=gestureBefore.nodes.filter(n=>before.nodes.find(b=>b.ref.node_id===n.ref.node_id)?.dom_epoch!==n.dom_epoch).map(n=>({node_id:n.ref.node_id,dom_epoch:n.dom_epoch}));
-      const origin=await canvas.boundingBox(),target=placementNavigation.point;
-      const reachable=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{
-        const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);
+      const origin=await canvas.boundingBox();
+      const reachable=await canvas.evaluate((e,{point,scale,prefix})=>{
+        const b=e.getBoundingClientRect();let p=point,hit=document.elementFromPoint(p.x,p.y);
+        // At minimum zoom Chromium can hit the collapsed workarea splitter
+        // for a fractional point just inside the canvas (793.978 vs 794).
+        // Use an actual event pixel only when it remains in the SAME model
+        // grid cell and hits this canvas. Foreign windows never authorize it.
+        const pixel={x:Math.floor(p.x),y:Math.floor(p.y)};
+        if(hit?.closest?.('[data-tid]')?.getAttribute('data-tid')===prefix+';ModelForm;pnlWorkarea;bordersplitter-1'
+          &&!hit.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg')&&Number.isFinite(scale)&&scale>0
+          &&Math.abs(pixel.x-p.x)<4*scale&&Math.abs(pixel.y-p.y)<4*scale){
+          const candidate=document.elementFromPoint(pixel.x,pixel.y);
+          if(candidate&&(candidate===e||e.contains(candidate))&&!candidate.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg')){p=pixel;hit=candidate;}
+        }
         return {reachable:p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&!!hit&&(hit===e||e.contains(hit)),
           graph_rect:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight},screen_point:p,hit_inside:!!hit&&(hit===e||e.contains(hit))};
-      },target);
+      },{point:placementNavigation.point,scale:placementNavigation.view?.scale,prefix:task.request.workflow_ref.prefix});
       if(!reachable.reachable){placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};throw new Error('Requested drop surface is not reachable');}
+      const target=reachable.screen_point;placementNavigation.point=target;
       if(p.type==='exports.text'){
         const args={owner_tid:task.request.workflow_ref.prefix+';ModelForm;pnlVendors;tree',item_tid:palette};
         const owner=find(args.owner_tid);if(await owner.count()!==1)throw Error('Export palette owner is ambiguous');
