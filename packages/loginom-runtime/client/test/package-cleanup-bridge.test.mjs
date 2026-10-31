@@ -8,5 +8,5 @@ test('package cleanup preserves the bridge shutdown contract',async()=>{
   let result;
   try{result=await promisify(execFile)(process.execPath,['--experimental-test-module-mocks','--test',fileURLToPath(new URL('./support/package-cleanup-bridge.mjs',import.meta.url))],{env,timeout:240000});}
   catch(error){assert.fail(String(error.stdout)+'\n'+String(error.stderr));}
-  assert.match(result.stdout,new RegExp('pass '+(env.LOGINOM_DOCK_TEST_BROWSER?80:73)+'\\b'));assert.match(result.stdout,/fail 0/);
+  assert.match(result.stdout,new RegExp('pass '+(env.LOGINOM_DOCK_TEST_BROWSER?92:85)+'\\b'));assert.match(result.stdout,/fail 0/);
 });

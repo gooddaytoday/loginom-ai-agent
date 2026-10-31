@@ -19,12 +19,14 @@ export function makePackageCleanupCode(options) {
   return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
 }
 
-// Cold-only reconciliation of an unsuccessful Open. It never promotes prepare
+// Reconciliation of an unsuccessful Open. It never promotes prepare
 // to READY: bind just the newly opened native package before the SAME close guard.
 export function makeFailedOpenCleanupCode(options) {
-  makePackageCleanupCode({...options,documentId:'unbound',tabTid:'unbound',diagnosticDiscard:false,diagnosticWaitForIdle:false});
+  makePackageCleanupCode({...options,account:options.bindOnly===true?'unbound':options.account,
+    documentId:'unbound',tabTid:'unbound',diagnosticDiscard:false,diagnosticWaitForIdle:false});
   if(typeof options.operationId!=='string'||!/^[a-zA-Z0-9_.:-]{1,128}$/.test(options.operationId))throw Error('Exact Open operation required');
-  const o={sessionId:options.sessionId,account:options.account,packagePath:options.packagePath,
+  const o={sessionId:options.sessionId,account:options.account,documentId:options.documentId,
+    bindOnly:options.bindOnly===true,packagePath:options.packagePath,
     origin:new URL(options.loginomUrl).origin,loginomBuild:options.loginomBuild,operationId:options.operationId,
     timeoutMs:options.timeoutMs??8000,diagnosticDiscard:false,diagnosticWaitForIdle:false};
   const gesture=withBrowserReceipt('perform()',{
@@ -41,6 +43,7 @@ export function makeFailedOpenCleanupCode(options) {
         const bound=await page.evaluate(${bindFailedOpen.toString()},{...o,deadline});
         if(Date.now()>=deadline)return blocked('CLEANUP_DEADLINE_EXCEEDED');
         if(!bound)return blocked('FAILED_OPEN_OWNER_UNCONFIRMED');
+        if(o.bindOnly)return {...bound,session_id:o.sessionId,operation_id:o.operationId,package_path:o.packagePath};
         return (${closeOwnedPackage.toString()})(page,{...o,documentId:bound.document_id,tabTid:bound.tab_tid,
           diagnosticReadOnly:bound.read_only,failedOpenOperation:o.operationId},Math.min(deadline,bound.cleanup_deadline),
           perform=>(${gesture})(page));
@@ -49,14 +52,30 @@ export function makeFailedOpenCleanupCode(options) {
   }`;
 }
 
+export function parseFailedOpenBinding(response, expected) {
+  if (response?.isError) throw Error('Failed Open binding failed');
+  for (const block of response?.content ?? []) {
+    if (block.type !== 'text') continue;
+    let value;
+    try { value = JSON.parse(block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text); } catch { continue; }
+    if (value?.session_id === expected.sessionId && value.operation_id === expected.operationId
+        && value.package_path === expected.packagePath
+        && [value.document_id,value.account].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)) return value;
+  }
+  throw Error('Original Open binding missing');
+}
+
 function bindFailedOpen(o) {
   const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree;
   const prep=globalThis.__loginomDockPreparationV1,r=prep?.receipts?.get(o.operationId);
-  if(location.origin!==o.origin||app?.Version!==o.loginomBuild||prep?.document!==document
+  const account=o.bindOnly?r?.openAccount:o.account;
+  if(typeof account!=='string'||!account||account.length>200
+    ||location.origin!==o.origin||app?.Version!==o.loginomBuild||prep?.document!==document
+    ||o.documentId&&prep.id!==o.documentId
     ||typeof prep.id!=='string'||!r||r.phase!=='effect_possible'||r.openSubmitted!==true
-    ||r.packageInventoryBefore!==0||r.openAccount!==o.account||r.openConnection!==m?.FServerConnection
+    ||r.packageInventoryBefore!==0||r.openAccount!==account||r.openConnection!==m?.FServerConnection
     ||!r.openServerSession||r.openServerSession!==m?.FServerConnection?.Session
-    ||m?.FServerConnection?.Connected!==true||m.FServerConnection.UserName!==o.account
+    ||m?.FServerConnection?.Connected!==true||m.FServerConnection.UserName!==account
     ||m.PackageNodes?.Count!==1||!Array.isArray(r.before)||Date.now()>=o.deadline)return null;
   let request;try{request=JSON.parse(r.request);}catch{return null;}
   if(request.session!==o.sessionId||request.intent!=='open_package'||request.packagePath!==o.packagePath)return null;
@@ -73,7 +92,7 @@ function bindFailedOpen(o) {
   r.failedOpenCleanupDeadline=Math.min(r.failedOpenCleanupDeadline??o.deadline,o.deadline);
   if(Date.now()>=r.failedOpenCleanupDeadline)return null;
   r.tab=tab;r.packageNode=node;r.failedOpenCleanup=true;
-  return {document_id:prep.id,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly,cleanup_deadline:r.failedOpenCleanupDeadline};
+  return {document_id:prep.id,account,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly,cleanup_deadline:r.failedOpenCleanupDeadline};
 }
 
 // Journal snapshot only: no preparation binding or native mutations.

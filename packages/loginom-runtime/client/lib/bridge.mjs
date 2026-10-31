@@ -29,7 +29,7 @@ import { createHostArtifactAdmission, codexInputIdentity } from './host-artifact
 import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
-import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
+import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
@@ -683,6 +683,12 @@ export async function createBridge(config, session, { browserTransport: managedB
           && preparationRequest?.intent === 'open_package' && prepared.state?.status === 'READY'
           && prepared.state.created_draft === false && prepared.state.package_ref?.persisted === true
           && prepared.state.package_ref.path === preparationRequest.package_path ? prepared.state.package_ref.path : null;
+        const failedOpen = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'open_package' && prepared?.operation_id === preparationRequest.operation_id
+          && prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'PACKAGE_OPEN_REJECTED'
+          && prepared.state.effect_possible === true && prepared.state.created_draft === false
+          && prepared.state.operation_id === preparationRequest.operation_id
+          && prepared.state.session_id === session.metadata.sessionId;
         const unsavedDraft = normalCleanup && !lastSavedPackage
           && preparationRequest?.intent === 'new_draft'
           && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
@@ -691,7 +697,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
           && prepared.state.created_draft === true && prepared.state.package_ref?.persisted === false
           && prepared.state.package_ref.path === null;
-        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
+        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage ?? (failedOpen ? preparationRequest.package_path : null) : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
@@ -703,12 +709,24 @@ export async function createBridge(config, session, { browserTransport: managedB
               // effect. Keep every unsettled-work and native dirty-state guard.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-              if (session.metadata.workspaceReady !== true && !unsavedDraft || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
+              if (session.metadata.workspaceReady !== true && !unsavedDraft && !failedOpen || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft && !failedOpen
                   || normalCleanup && lastSavedPackage && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
                 if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+                if (failedOpen) {
+                  const options = {sessionId:session.metadata.sessionId, operationId:preparationRequest.operation_id,
+                    packagePath, loginomUrl:config.loginomUrl, loginomBuild:prepared.state.target?.loginom_build};
+                  // NOT_READY has no account/document. Bind them inside the same
+                  // browser gate to the original Open receipt and server session.
+                  const binding = parseFailedOpenBinding(await browser.callTool({name:'browser_run_code_unsafe',
+                    arguments:{code:makeFailedOpenCleanupCode({...options, bindOnly:true})}}, undefined, {timeout:30000}), options);
+                  const cleanupOptions = {...options, documentId:binding.document_id, account:binding.account};
+                  const response = await browser.callTool({name:'browser_run_code_unsafe',
+                    arguments:{code:makeFailedOpenCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
+                  return parsePackageCleanupResult(response, cleanupOptions);
+                }
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup
@@ -724,7 +742,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
-            ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage?'opened_saved_package':'last_confirmed_own_save'} : {})};
+            ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage||failedOpen?'opened_saved_package':'last_confirmed_own_save'} : {})};
           try {
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
             await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
