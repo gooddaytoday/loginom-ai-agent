@@ -103,7 +103,7 @@ function fixture(overrides = {}) {
       return vm.runInContext('('+fn.toString()+')',context)(arg);
     },
     async waitForFunction(fn,arg,settings){
-      assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      assert.ok(settings.timeout > 0 && settings.timeout <= (fn.toString().includes('const menu =')?state.deadline-state.clock:(state.timeoutMs??options.timeoutMs)));
       timed(fn.toString().includes('const menu =')?'logout_observe':fn.toString().includes('globalThis.__loginomDockCleanupV1?.done === true')?'discard_close_wait':'close_wait',settings);
       if(fn.toString().includes('const menu =')){
         events.push('logout-observe'); state.observeTimeout=settings.timeout;
