@@ -41,11 +41,20 @@ async function chooseMethod(channel,baseline,index,code){
  s=await observeBinning(channel,'observed native binning method option',s=>editing(s)&&s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
  await channel.perform({condition:'select native binning method',initialObservation:s,ready:s=>binningReady(s)&&editing(s),identity:()=>record,
   resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'unique method option required').ref})});
- s=await observeBinning(channel,'native method choice returned to its field');
+ const editorInputs=s=>{
+  const editor=s.node_binning.method_editor;
+  return editor?.record_id===record.record_id?s.ui.elements.filter(e=>e.identity?.anchor_tid===editor.root_tid+';cbx'&&e.signature?.tag==='input'&&e.allowed_actions.includes('press')):[];
+ };
+ const choiceReady=s=>s.node_binning.selected?.record_id===record.record_id&&s.node_binning.selected.method_code===code
+  &&(!s.node_binning.method_editor||editorInputs(s).length===1);
+ // Method changes can replace the editor DOM before its cached context settles.
+ // Await an actionable input (or completed closure) within the existing window.
+ s=await observeBinning(channel,'native method choice returned to its field',choiceReady);
  if(s.node_binning.method_editor){
   need(editing(s),'method editor moved to another field');
-  await channel.perform({condition:'commit selected native binning method',initialObservation:s,ready:s=>binningReady(s)&&editing(s),identity:()=>record,
-   resolve:s=>({verb:'press',key:'Enter',ref:one(s,e=>e.identity?.anchor_tid===owner&&e.signature?.tag==='input'&&e.allowed_actions.includes('press'),'owned method editor input required').ref})});
+  await channel.perform({condition:'commit selected native binning method',initialObservation:s,ready:s=>binningReady(s)&&choiceReady(s)&&editing(s),
+   identity:s=>({field:record.record_id,editor:s.node_binning.method_editor.root_tid}),
+   resolve:s=>({verb:'press',key:'Enter',ref:editorInputs(s)[0].ref})});
  }
  return observeBinning(channel,'binning method committed',s=>!s.node_binning.method_editor&&s.node_binning.selected?.record_id===record.record_id&&s.node_binning.selected.method_code===code);
 }
