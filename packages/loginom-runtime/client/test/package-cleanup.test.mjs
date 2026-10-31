@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
@@ -620,7 +621,7 @@ function failedOpenFixture(fault='none') {
  root.matches=()=>f.state.mask;root.contains=e=>e===root;
  error.contains=e=>[error,body,ok].includes(e);
  for(const e of [error,body,ok])e.getBoundingClientRect=()=>({x:100,y:100,width:f.state.openError?200:0,height:f.state.openError?100:0});
- const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,Controller:{Node:{data:{node}}}};
+ const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,closable:true,Controller:{Node:{data:{node}}}};
  const message={el:{dom:error}},messages={el:{dom:body}},info={};
  const instance={FMessageBox:message,FMessages:messages,FErrorMessageInfo:info};
  const button={el:{dom:ok},disabled:false,ownerCt:message};
@@ -652,12 +653,24 @@ function failedOpenFixture(fault='none') {
   if(fault==='late modal'){f.state.openError=false;f.state.mask=false;}
   if(fault==='session after wait')m.FServerConnection.Session={};
   if(fault==='late wait')f.state.clock+=30000;
+  if(fault==='unclosable tab'){native.closable=f.events.filter(e=>e==='idle-wait').length>=2;}
+  if(fault==='vanished package'){f.state.count=0;f.state.tab=false;}
  };
  ok.click=()=>{f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
   if(fault==='lost click')throw Error('lost OK reply');
   if(fault==='late click')f.state.clock+=30000;
  };
  f.page.mouse={async click(){return ok.click();}};
+ if(['unclosable tab','permanent unclosable'].includes(fault)){
+  native.closable=false;
+  const running=node.HasRunningNodes;
+  node.HasRunningNodes=()=>{if(!native.closable)throw TypeError("Cannot read properties of undefined (reading 'HasRunningNodes')");return running();};
+ }
+ if(fault==='vanished package'){
+  const query=c.document.querySelectorAll;
+  c.document.querySelectorAll=q=>!f.state.tab&&(q.startsWith('[data-tid^=\"MF;cntMain;cntWorkspace')||q==='[data-tid=\"MF;TF-1\"]')?[]:query(q);
+  c.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>f.state.tab?native:null;
+ }
  return {...f,runFailed:async()=>{
   const {makeFailedOpenCleanupCode}=await import(process.env.D78_CLEANUP_MODULE??'../lib/package-cleanup.mjs');
   const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
@@ -918,3 +931,78 @@ for(const mode of ['clean','dirty','foreign-intent','persisted','foreign-tab','r
     {sessionId:options.sessionId,documentId:options.documentId,account:options.account,packagePath:null});
   }
  });
+
+// LAB-610 cold A:1–2 / cleanup:10–20 proves one owned package and OK,
+// but the original catch lost the post-OK exception. The unclosable native
+// transition here is a hypothesis; the mask and four-button modal are observed.
+for(const fault of ['unclosable tab','vanished package'])test('D78 post-OK settlement: '+fault,async()=>{
+ const f=failedOpenFixture(fault),r=await f.runFailed();
+ assert.equal(r.status,'SUCCEEDED',JSON.stringify(r));
+ assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.equal(r.unsaved_changes_discarded,false);assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.filter(e=>e==='close').length,fault==='vanished package'?0:1);
+ if(fault==='unclosable tab')assert.ok(f.events.filter(e=>e==='idle-wait').length>=2);
+});
+
+test('D78 preserves a safe original exception code/message/step in its private receipt',async()=>{
+ const f=fixture(),evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('m.ClosePackage(node, false, true)'))
+   throw Object.assign(TypeError("Cannot read properties of undefined (reading 'HasRunningNodes')\nAuthorization: Bearer SYNTHETIC_SECRET_CANARY"),{code:'ERR_NATIVE_STATE'});
+  return evaluate(fn,arg);
+ };
+ const r=await f.run();
+ assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');
+ assert.equal(r.error.code,'ERR_NATIVE_STATE');assert.equal(r.error.name,'TypeError');
+ assert.equal(r.error.step,'close_request');
+ assert.equal(r.error.message,"Cannot read properties of undefined (reading 'HasRunningNodes')");
+ assert.doesNotMatch(JSON.stringify(r),/SYNTHETIC_SECRET_CANARY|Authorization|Bearer/);
+});
+
+test('D78 cold helper runs the production post-OK settlement without changing the Open failure',async()=>{
+ const source=await readFile(new URL('../../../../scripts/node-acceptance/cold-check.mjs',import.meta.url),'utf8');
+ const body=source.slice(source.indexOf('} finally {\n  // Cold teardown:')+11,source.indexOf('\nasync function loadSaved'));
+ const run=new (Object.getPrototypeOf(async function(){}).constructor)('f',
+  `const {state,saved,session,config,makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,rawExecute,record,page,writeFile,join,args,context}=f;const signals=[],handlers=[];const process={off(){}};${body.slice(0,body.lastIndexOf('}'))}`);
+ const {makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode}=await import('../lib/package-cleanup.mjs');
+ const f=failedOpenFixture('unclosable tab'),prep=f.context.__loginomDockPreparationV1;
+ f.state.timeoutMs=8000;
+ prep.receipts.set('cold-open',prep.receipts.get('prepare'));prep.receipts.delete('prepare');
+ const writes=new Map(),state={prepared:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',effect_possible:true},
+  openFailure:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED'},failure:'COLD_PACKAGE_OPEN_NOT_READY'};
+ await run({state,saved:{path:options.packagePath},session:options.sessionId,config:{loginom_url:options.loginomUrl,workflow_profile:{loginom_user:options.account}},
+  makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,page:f.page,
+  rawExecute:async code=>{
+   const deadline=code.match(/deadline=(\d+)/)?.[1];
+   if(deadline){f.state.deadline=Number(deadline);f.state.clock=f.state.deadline-30000;}
+   f.context.Date=class extends Date {static now(){return f.state.clock;}};
+   return vm.runInContext('('+code+')',f.context)(f.page);
+  },record:async()=>{},writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),
+  join:(...p)=>p.join('/'),args:{output:'cold'},context:{close:async()=>{}}});
+ assert.equal(writes.get('cold/cleanup.json').status,'SUCCEEDED',JSON.stringify(writes.get('cold/cleanup.json')));
+ assert.equal(writes.get('cold/result.json').reason,'PACKAGE_OPEN_REJECTED');
+ assert.equal(writes.get('cold/result.json').status,'FAIL');
+ assert.equal(f.state.dismissals,1);assert.equal(f.events.filter(e=>e==='close').length,1);
+ assert.equal(f.events.filter(e=>e==='logout').length,1);
+});
+
+test('D78 an unfinished close control cannot renew the original deadline',async()=>{
+ const f=failedOpenFixture('permanent unclosable'),r=await f.runFailed();
+ assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'OWNED_OPEN_LOADING');
+ assert.equal(f.state.clock,f.state.deadline);assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+for(const change of ['session','receipt','tab'])test('D78 absent package retains owner guard: '+change,async()=>{
+ const f=failedOpenFixture('vanished package'),evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.gesture_returned===true){
+   if(change==='session')f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={};
+   if(change==='receipt'){const receipts=f.context.__loginomDockPreparationV1.receipts;receipts.set('prepare',{...receipts.get('prepare')});}
+   if(change==='tab')f.context.document.contains=()=>true;
+  }
+  return value;
+ };
+ const r=await f.runFailed();
+ assert.equal(r.status,'BLOCKED');assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
