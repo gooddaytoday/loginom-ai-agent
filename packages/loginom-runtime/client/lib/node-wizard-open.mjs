@@ -66,7 +66,9 @@ export function wizardDeactivationDialogOwner(state,binding) {
   &&(state.wizard_pending_owner.node?.tid===binding.opening?.workflow_path?.at(-1)?.tid+'>'+binding.opening?.node?.node_label
     ||n.pending_wizard_node?.tid===state.wizard_pending_owner.node?.tid
       &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label===state.wizard_pending_owner.node?.label)
-  &&same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
+  &&(same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
+    ||typeof n.pending_wizard_node?.tid==='string'
+      &&same(state.wizard_pending_owner.path?.map(({tid,label})=>({tid,label})),[...binding.opening.workflow_path,n.pending_wizard_node]))
   &&Array.isArray(ui?.dialogs)&&ui.dialogs.length===1&&Array.isArray(ui.masks)
   &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===binding.graph_tid.split(';Graph;')[0]&&m.dialog_ref===null);
 }
