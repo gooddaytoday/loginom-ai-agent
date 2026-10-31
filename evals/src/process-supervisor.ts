@@ -641,7 +641,8 @@ export async function superviseProcess(input: {
     // Keep it unadmitted until CLI identity or native admission resolves it.
     // PF_FORKNOEXEC identifies a CLI clone before its first exec. Retain its
     // birth/ancestry, but grant no signal authority over that provisional image.
-    const awaitingExec = via !== "launcher" && entry.forked &&
+    // Sandbox wrappers retain their separate receipt/session gates below.
+    const awaitingExec = !input.sandbox && via !== "launcher" && entry.forked &&
       (via === "cli" || entry.device === cliInfo.dev && entry.inode === cliInfo.ino)
     const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry), awaitingExec,
       admission: awaitingExec || browser && via === "subreaper" ? "pending" : "allowed" }
@@ -729,10 +730,10 @@ export async function superviseProcess(input: {
             : parent.pid === namespacePid || parent.pid === root?.pid && entry.pid !== cliPid ? "subreaper" : "parent"
           : entry.pid === cliPid && parent.pid === root?.pid ? "cli" : parent.pid === root?.pid ? "subreaper" : "parent"
         track(entry, via, parent)
-        if (input.sandbox && !ledger.get(key(entry))!.awaitingExec && isWrapper(entry) && (entry.pid === cliPid || entry.pid === namespacePid))
+        if (input.sandbox && isWrapper(entry) && (entry.pid === cliPid || entry.pid === namespacePid))
           ledger.get(key(entry))!.admission = "allowed"
         if (input.sandbox && via === "cli") cleanup.launcher!.cli_pid = entry.pid
-        if (input.sandbox && !ledger.get(key(entry))!.awaitingExec && entry.pid === cliPid && parent.pid === root?.pid &&
+        if (input.sandbox && entry.pid === cliPid && parent.pid === root?.pid &&
           (entry.device !== wrapper!.dev || entry.inode !== wrapper!.ino)) {
           ledger.get(key(entry))!.admission = "refused"; cleanup.error ??= `Sandbox executable identity differs PID ${entry.pid}`
         }
@@ -753,7 +754,7 @@ export async function superviseProcess(input: {
     // The private receipt may arrive after the first ancestry observation.
     // Only the two identified wrapper processes can leave pending this way.
     if (input.sandbox) for (const entry of ledger.values()) {
-      if (entry.origin && entry.admission === "pending" && !entry.awaitingExec && isWrapper(entry.process) &&
+      if (entry.origin && entry.admission === "pending" && isWrapper(entry.process) &&
         [cliPid, namespacePid].includes(entry.process.pid) && live.some((current) => sameIdentity(current, entry.process)))
         entry.admission = "allowed"
     }
