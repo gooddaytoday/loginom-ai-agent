@@ -1,3 +1,4 @@
+import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph} from './sampling-modes.mjs'
 import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
@@ -22,6 +23,7 @@ const args = parseArgs({
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'exact-port-windows': { type: 'boolean', default: false },
+    'sampling-baseline': { type: 'string' },
   },
   strict: true,
 }).values
@@ -55,7 +57,11 @@ const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 const expected = JSON.parse(await readFile(args.expected, "utf8"))
-const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
+const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(expected)
+if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
+if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
+const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baseline'],'utf8')):null
+const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected)
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -152,6 +158,7 @@ page = context.pages()[0]
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
@@ -201,7 +208,8 @@ page = context.pages()[0]
 
   const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   const actual=[],ownedExecutions=[];
-  for(const [outputIndex,{node:target,ports}] of reads.entries()){
+  const readPlans=sampling?[...reads,...reads]:reads;
+  for(const [outputIndex,{node:target,ports}] of readPlans.entries()){
   const node=target.ref;
 
   const operation = {
@@ -318,7 +326,7 @@ page = context.pages()[0]
   const precision = await configureTablePrecision(channel, opened.table)
   const readSettings = await prepareTableRead(channel, opened.table, {openFilter:args=>openColdTableFilter(channel,args,{node,operation,readReceipt,record})})
   const raw = await readTableOutputPages(channel, opened.table, {
-    sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
+    sampleRows: sampling?.sample_rows??Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
   })
   const observedColumns=precision.fields.map(f=>({name:f.key,label:f.label,type:f.type}));
   data = decodeTableOutput(raw, {
@@ -357,7 +365,8 @@ page = context.pages()[0]
    if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
+  const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
@@ -393,6 +402,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {
       package_closed: cleanup.package_closed === true,
       logged_out: cleanup.logged_out === true,

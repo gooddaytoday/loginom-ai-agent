@@ -123,6 +123,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-random', 'sampling-stratified', 'partition-random', 'partition-stratified']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        mode = name.rsplit('-', 1)[1]
+        root = REPO / 'docs/node-development/nodes' / slug
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-' + mode + '.md'),
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None,
+                    sampling_mode=mode)
     if name in ['sampling-modes-smoke', 'partition-modes-smoke']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         root = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
@@ -168,6 +175,10 @@ def scenario(name, case_root=None, *, cases=None):
 
 def expected_for(case, package):
     src = case['source']
+    # The owner-approved sampling envelope is separate from stock exact rows.
+    if case.get('sampling_mode'):
+        return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
+            'expected', str(src / 'modes/expected.json'), case['sampling_mode'], package]))
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
@@ -845,9 +856,14 @@ class Runner:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
         header = spec.get('csv_header', 'names')
+        sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
+            if expected.get('sampling_modes'):
+                delimiter = csv_delimiter(actual)
+                sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))
+                continue
             if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
@@ -861,6 +877,11 @@ class Runner:
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
             if counts: self.current['d76'] = counts
+        if expected.get('sampling_modes'):
+            write(folder / 'sampling-replies.json', [o for _, o in replies])
+            write(folder / 'sampling-csvs.json', sampling_csvs)
+            self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
+                'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
@@ -905,7 +926,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names'), *(['--exact-port-windows'] if case == 'types300' else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names'), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

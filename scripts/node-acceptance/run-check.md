@@ -1,5 +1,17 @@
 Run live acceptance without repeatedly reading live logs:
 
+Owner-approved #612 invariant cases: `sampling-random`, `sampling-stratified`,
+`partition-random`, `partition-stratified`. These alone translate their proposal
+into an explicit `sampling_modes` envelope. The model receives the unchanged
+business task and `modes.csv`, never the oracle. Main requires two distinct
+completed executions and checks every downloaded CSV against exact typed source
+rows, requested sizes, Class quotas for stratification, row/column order and
+partition port relations. Cold validates the direct import → requested node →
+export graph, executes twice without reapplying settings, reads all ports in full,
+and compares their invariant-checked values with main. Normal Save, cleanup and
+port proofs remain mandatory. Biased and uniform modes are not registered here.
+Stock expected parsing, exact matching and existing scenarios are unchanged.
+
 ```sh
 python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n1,q7 --pair ~/.config/loginom-multica/cards/PAIR --cold
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
