@@ -51,11 +51,6 @@
           "label_any": true
         },
         {
-          "name": "A_WeekEnd",
-          "type": "datetime",
-          "label_any": true
-        },
-        {
           "name": "B_Year",
           "type": "integer",
           "label_any": true
@@ -72,11 +67,6 @@
         },
         {
           "name": "B_WeekStart",
-          "type": "datetime",
-          "label_any": true
-        },
-        {
-          "name": "B_WeekEnd",
           "type": "datetime",
           "label_any": true
         },

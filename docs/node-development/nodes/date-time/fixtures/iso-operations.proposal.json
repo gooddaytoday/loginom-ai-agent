@@ -4,7 +4,6 @@
     {"operation": "iso_year", "func": 4, "iso": true, "flag": "DoNumber", "label": "Год", "suffix": "Y", "type": "integer"},
     {"operation": "iso_week", "func": 7, "iso": true, "flag": "DoNumber", "label": "Неделя", "suffix": "WY", "type": "integer"},
     {"operation": "iso_week_start", "func": 2, "iso": true, "flag": "DoDateTimeFirst", "label": "Год + Неделя", "suffix": "YW", "type": "datetime"},
-    {"operation": "iso_week_end", "func": 2, "iso": true, "flag": "DoDateTimeLast", "label": "Год + Неделя", "suffix": "YW", "type": "datetime"},
     {"operation": "day_of_week", "func": 11, "iso": false, "flag": "DoNumber", "label": "День недели", "suffix": "DW", "type": "integer"}
   ]
 }

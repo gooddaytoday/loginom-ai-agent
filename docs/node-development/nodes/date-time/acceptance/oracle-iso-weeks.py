@@ -1,8 +1,8 @@
 """ISO-week proposal, independent of Loginom: Python standard library only.
 
 Run with --write to reproduce expected.json, expected-iso-weeks-empty.json and
-fixtures/iso-manifest.json. --check detects stale artifacts. Expectations deliberately
-retain the ISO Sunday even where the native DateReformWizard gives a prior Sunday.
+fixtures/iso-manifest.json. --check detects stale artifacts. Only the four approved
+operations are added to the existing calendar year; week end is outside v0.3.9.
 """
 import argparse
 import csv
@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OPERATIONS = ["Year", "ISOYear", "ISOWeek", "WeekStart", "WeekEnd", "Weekday"]
+OPERATIONS = ["Year", "ISOYear", "ISOWeek", "WeekStart", "Weekday"]
 
 
 def values(raw):
@@ -25,7 +25,6 @@ def values(raw):
     monday = stamp.date() - timedelta(days=iso.weekday - 1)
     return dict(zip(OPERATIONS, [stamp.year, iso.year, iso.week,
         datetime.combine(monday, time()).isoformat(timespec="milliseconds"),
-        datetime.combine(monday + timedelta(days=6), time()).isoformat(timespec="milliseconds"),
         iso.weekday]))
 
 
@@ -38,7 +37,7 @@ def expected(empty=False):
             if field == "A" and operation == "Weekday":
                 continue  # Final user edit removes only this generated output.
             columns.append({"name": field + "_" + operation,
-                            "type": "datetime" if operation in ["WeekStart", "WeekEnd"] else "integer",
+                            "type": "datetime" if operation == "WeekStart" else "integer",
                             "label_any": True})
     rows = []
     fixture = ROOT / "fixtures" / ("iso-weeks-empty.csv" if empty else "iso-weeks.csv")

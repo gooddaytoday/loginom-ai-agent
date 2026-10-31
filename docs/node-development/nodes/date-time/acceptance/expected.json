@@ -51,11 +51,6 @@
           "label_any": true
         },
         {
-          "name": "A_WeekEnd",
-          "type": "datetime",
-          "label_any": true
-        },
-        {
           "name": "B_Year",
           "type": "integer",
           "label_any": true
@@ -76,11 +71,6 @@
           "label_any": true
         },
         {
-          "name": "B_WeekEnd",
-          "type": "datetime",
-          "label_any": true
-        },
-        {
           "name": "B_Weekday",
           "type": "integer",
           "label_any": true
@@ -95,12 +85,10 @@
           "A_ISOYear": 2015,
           "A_ISOWeek": 53,
           "A_WeekStart": "2015-12-28T00:00:00.000",
-          "A_WeekEnd": "2016-01-03T00:00:00.000",
           "B_Year": 2016,
           "B_ISOYear": 2016,
           "B_ISOWeek": 1,
           "B_WeekStart": "2016-01-04T00:00:00.000",
-          "B_WeekEnd": "2016-01-10T00:00:00.000",
           "B_Weekday": 1
         },
         {
@@ -111,12 +99,10 @@
           "A_ISOYear": 2015,
           "A_ISOWeek": 53,
           "A_WeekStart": "2015-12-28T00:00:00.000",
-          "A_WeekEnd": "2016-01-03T00:00:00.000",
           "B_Year": 2015,
           "B_ISOYear": 2015,
           "B_ISOWeek": 53,
           "B_WeekStart": "2015-12-28T00:00:00.000",
-          "B_WeekEnd": "2016-01-03T00:00:00.000",
           "B_Weekday": 4
         },
         {
@@ -127,12 +113,10 @@
           "A_ISOYear": 2015,
           "A_ISOWeek": 53,
           "A_WeekStart": "2015-12-28T00:00:00.000",
-          "A_WeekEnd": "2016-01-03T00:00:00.000",
           "B_Year": 2016,
           "B_ISOYear": 2016,
           "B_ISOWeek": 1,
           "B_WeekStart": "2016-01-04T00:00:00.000",
-          "B_WeekEnd": "2016-01-10T00:00:00.000",
           "B_Weekday": 1
         },
         {
@@ -143,12 +127,10 @@
           "A_ISOYear": 2016,
           "A_ISOWeek": 1,
           "A_WeekStart": "2016-01-04T00:00:00.000",
-          "A_WeekEnd": "2016-01-10T00:00:00.000",
           "B_Year": 2016,
           "B_ISOYear": 2015,
           "B_ISOWeek": 53,
           "B_WeekStart": "2015-12-28T00:00:00.000",
-          "B_WeekEnd": "2016-01-03T00:00:00.000",
           "B_Weekday": 7
         },
         {
@@ -159,12 +141,10 @@
           "A_ISOYear": 2019,
           "A_ISOWeek": 1,
           "A_WeekStart": "2018-12-31T00:00:00.000",
-          "A_WeekEnd": "2019-01-06T00:00:00.000",
           "B_Year": 2019,
           "B_ISOYear": 2019,
           "B_ISOWeek": 1,
           "B_WeekStart": "2018-12-31T00:00:00.000",
-          "B_WeekEnd": "2019-01-06T00:00:00.000",
           "B_Weekday": 2
         },
         {
@@ -175,12 +155,10 @@
           "A_ISOYear": 2020,
           "A_ISOWeek": 53,
           "A_WeekStart": "2020-12-28T00:00:00.000",
-          "A_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Year": 2021,
           "B_ISOYear": 2020,
           "B_ISOWeek": 53,
           "B_WeekStart": "2020-12-28T00:00:00.000",
-          "B_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Weekday": 7
         },
         {
@@ -191,12 +169,10 @@
           "A_ISOYear": 2020,
           "A_ISOWeek": 53,
           "A_WeekStart": "2020-12-28T00:00:00.000",
-          "A_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Year": 2021,
           "B_ISOYear": 2021,
           "B_ISOWeek": 1,
           "B_WeekStart": "2021-01-04T00:00:00.000",
-          "B_WeekEnd": "2021-01-10T00:00:00.000",
           "B_Weekday": 1
         },
         {
@@ -207,12 +183,10 @@
           "A_ISOYear": 2020,
           "A_ISOWeek": 53,
           "A_WeekStart": "2020-12-28T00:00:00.000",
-          "A_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Year": 2020,
           "B_ISOYear": 2020,
           "B_ISOWeek": 53,
           "B_WeekStart": "2020-12-28T00:00:00.000",
-          "B_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Weekday": 1
         },
         {
@@ -223,12 +197,10 @@
           "A_ISOYear": 2021,
           "A_ISOWeek": 1,
           "A_WeekStart": "2021-01-04T00:00:00.000",
-          "A_WeekEnd": "2021-01-10T00:00:00.000",
           "B_Year": 2021,
           "B_ISOYear": 2020,
           "B_ISOWeek": 53,
           "B_WeekStart": "2020-12-28T00:00:00.000",
-          "B_WeekEnd": "2021-01-03T00:00:00.000",
           "B_Weekday": 5
         },
         {
@@ -239,12 +211,10 @@
           "A_ISOYear": 2024,
           "A_ISOWeek": 9,
           "A_WeekStart": "2024-02-26T00:00:00.000",
-          "A_WeekEnd": "2024-03-03T00:00:00.000",
           "B_Year": 2024,
           "B_ISOYear": 2024,
           "B_ISOWeek": 9,
           "B_WeekStart": "2024-02-26T00:00:00.000",
-          "B_WeekEnd": "2024-03-03T00:00:00.000",
           "B_Weekday": 7
         },
         {
@@ -255,12 +225,10 @@
           "A_ISOYear": 2025,
           "A_ISOWeek": 1,
           "A_WeekStart": "2024-12-30T00:00:00.000",
-          "A_WeekEnd": "2025-01-05T00:00:00.000",
           "B_Year": 2025,
           "B_ISOYear": 2025,
           "B_ISOWeek": 1,
           "B_WeekStart": "2024-12-30T00:00:00.000",
-          "B_WeekEnd": "2025-01-05T00:00:00.000",
           "B_Weekday": 3
         },
         {
@@ -271,12 +239,10 @@
           "A_ISOYear": null,
           "A_ISOWeek": null,
           "A_WeekStart": null,
-          "A_WeekEnd": null,
           "B_Year": 2025,
           "B_ISOYear": 2025,
           "B_ISOWeek": 1,
           "B_WeekStart": "2024-12-30T00:00:00.000",
-          "B_WeekEnd": "2025-01-05T00:00:00.000",
           "B_Weekday": 7
         },
         {
@@ -287,12 +253,10 @@
           "A_ISOYear": 2025,
           "A_ISOWeek": 2,
           "A_WeekStart": "2025-01-06T00:00:00.000",
-          "A_WeekEnd": "2025-01-12T00:00:00.000",
           "B_Year": null,
           "B_ISOYear": null,
           "B_ISOWeek": null,
           "B_WeekStart": null,
-          "B_WeekEnd": null,
           "B_Weekday": null
         }
       ]
