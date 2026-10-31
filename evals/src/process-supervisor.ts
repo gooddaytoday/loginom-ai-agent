@@ -10,11 +10,12 @@ export type ProcessIdentity = {
   pid: number; starttime: string; uid: number; parent: number; group: number; session: number
   executable: string; device: number; inode: number
 }
-type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string }
+type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string; forked: boolean }
 type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
 type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
   binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean
+  awaitingExec?: boolean
 }
 export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: string }
 export type WriterIdentity = { device: number; inode: number; owner: string }
@@ -272,7 +273,8 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     if (final[19] !== fields[19]) throw Error("Process birth changed during read")
     // /proc files are separate observations. Avoid recording pre-exec argv with
     // a post-exec executable, or a PGID sampled before detached spawn settles.
-    if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[1] !== fields[1] || final[2] !== fields[2] || final[3] !== fields[3]) {
+    if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[1] !== fields[1] || final[2] !== fields[2] || final[3] !== fields[3] ||
+      (Number(final[6]) & 0x40) !== (Number(fields[6]) & 0x40)) {
       if (retries) {
         await Bun.sleep(20)
         return processView(pid, relevant, owners, retries - 1, strictNative)
@@ -281,7 +283,7 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     }
     return { pid, uid: owner.uid, starttime: fields[19]!, parent: Number(fields[1]),
       group: Number(fields[2]), session: Number(fields[3]), executable, device: info.dev, inode: info.ino,
-      name, args,
+      name, args, forked: Boolean(Number(fields[6]) & 0x40),
       cwd: await readlink(path.join(directory, "cwd")) }
   } catch (error) {
     if (gone(error)) return undefined
@@ -634,11 +636,16 @@ export async function superviseProcess(input: {
     cleanup.error ??= "Launcher identity unavailable after dispatch"
     return undefined
   }) : undefined
-  const track = (entry: ProcessIdentity, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
+  const track = (entry: ProcessView, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
     // Adoption retains launcher ownership, but loses the browser parent chain.
     // Keep it unadmitted until CLI identity or native admission resolves it.
-    const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry),
-      admission: browser && via === "subreaper" ? "pending" : "allowed" }
+    // PF_FORKNOEXEC identifies a CLI clone before its first exec. Retain its
+    // birth/ancestry, but grant no signal authority over that provisional image.
+    // Sandbox wrappers retain their separate receipt/session gates below.
+    const awaitingExec = !input.sandbox && via !== "launcher" && entry.forked &&
+      (via === "cli" || entry.device === cliInfo.dev && entry.inode === cliInfo.ino)
+    const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry), awaitingExec,
+      admission: awaitingExec || browser && via === "subreaper" ? "pending" : "allowed" }
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
@@ -677,6 +684,20 @@ export async function superviseProcess(input: {
     for (const entry of ledger.values()) {
       if (!entry.origin) continue
       const current = live.find((candidate) => candidate.pid === entry.process.pid)
+      if (current && entry.awaitingExec && entry.admission !== "refused") {
+        if (key(current) !== key(entry.process) || current.uid !== entry.process.uid || !root || !await hasOwnedAncestry(current.pid, [root])) {
+          entry.admission = "refused"
+          cleanup.error ??= `Process identity changed PID ${entry.process.pid}`
+          continue
+        }
+        if (current.forked) continue
+        entry.process = identity(current)
+        entry.awaitingExec = false
+        entry.admission = browser && entry.origin.via === "subreaper" ? "pending" : "allowed"
+        if (entry.origin.via === "cli" && (current.device !== cliInfo.dev || current.inode !== cliInfo.ino)) {
+          entry.admission = "refused"; cleanup.error ??= `CLI executable identity differs PID ${current.pid}`
+        }
+      }
       if (current && !sameIdentity(current, entry.process)) {
         entry.admission = "refused"
         cleanup.error ??= `Process identity changed PID ${entry.process.pid}`
@@ -716,7 +737,7 @@ export async function superviseProcess(input: {
           (entry.device !== wrapper!.dev || entry.inode !== wrapper!.ino)) {
           ledger.get(key(entry))!.admission = "refused"; cleanup.error ??= `Sandbox executable identity differs PID ${entry.pid}`
         }
-        if (via === "cli" && (entry.device !== cliInfo.dev || entry.inode !== cliInfo.ino)) {
+        if (via === "cli" && !ledger.get(key(entry))!.awaitingExec && (entry.device !== cliInfo.dev || entry.inode !== cliInfo.ino)) {
           ledger.get(key(entry))!.admission = "refused"; cleanup.error ??= `CLI executable identity differs PID ${entry.pid}`
         }
       })
@@ -728,7 +749,7 @@ export async function superviseProcess(input: {
     if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin!.via !== "cli") {
       if (input.sandbox) cleanup.launcher!.cli_pid = cli.pid
       ledger.get(key(cli))!.origin!.via = "cli"
-      if (ledger.get(key(cli))!.admission === "pending") ledger.get(key(cli))!.admission = "allowed"
+      if (ledger.get(key(cli))!.admission === "pending" && !ledger.get(key(cli))!.awaitingExec) ledger.get(key(cli))!.admission = "allowed"
     }
     // The private receipt may arrive after the first ancestry observation.
     // Only the two identified wrapper processes can leave pending this way.
@@ -777,6 +798,7 @@ export async function superviseProcess(input: {
         if (existing.has(key(current))) continue
         const entry = ledger.get(key(current)) ?? { process: identity(current), admission: "pending" as const }
         ledger.set(key(current), entry)
+        if (entry.awaitingExec) continue
         if (!sameIdentity(current, entry.process)) {
           entry.admission = "refused"; cleanup.error ??= `Process identity changed PID ${current.pid}`
           continue

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
@@ -9,6 +9,25 @@ import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-reso
 
 
 import { superviseProcess } from "../src/process-supervisor"
+
+function completedFrames(text: string) {
+  // writeFile may take several writes; only the newline commits a whole frame.
+  return text.slice(0, text.lastIndexOf("\n") + 1).split("\n").filter(Boolean).map(line => JSON.parse(line))
+}
+
+test("resource fixture waits for the JSONL newline before parsing a frame", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-partial-"))
+  const file = path.join(root, "resources.jsonl")
+  try {
+    await Bun.write(file, '{"sequence":1}\n{"sequence":')
+    expect(completedFrames(await Bun.file(file).text())).toEqual([{ sequence: 1 }])
+    await appendFile(file, "2}")
+    expect(completedFrames(await Bun.file(file).text())).toEqual([{ sequence: 1 }])
+    await appendFile(file, "\n")
+    expect(completedFrames(await Bun.file(file).text())).toEqual([{ sequence: 1 }, { sequence: 2 }])
+    expect(() => completedFrames("invalid\n")).toThrow()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-owned-"))
@@ -54,17 +73,17 @@ test("resource sampling observes two admitted supervisors and retains B after dr
       signal: abortCollector.signal, processes: sampleSupervisedResources })
     try {
       const collectorDeadline = Date.now() + 8000
-      while (!await Bun.file(out).exists() || !(await Bun.file(out).text()).includes("\n")) {
+      while (!await Bun.file(out).exists() || !completedFrames(await Bun.file(out).text()).length) {
         if (Date.now() > collectorDeadline) throw Error("Owned process frames did not arrive")
         await Bun.sleep(10)
       }
       const startedAt = new Date().toISOString()
-      while ((await Bun.file(out).text()).split("\n").filter(Boolean).length < 2) {
+      while (completedFrames(await Bun.file(out).text()).length < 2) {
         if (Date.now() > collectorDeadline) throw Error("Owned process frames did not arrive")
         await Bun.sleep(10)
       }
       const finishedAt = new Date().toISOString()
-      while ((await Bun.file(out).text()).trim().split("\n").map(line => JSON.parse(line)).at(-1).host.observed_at < finishedAt) {
+      while (completedFrames(await Bun.file(out).text()).at(-1).host.observed_at < finishedAt) {
         if (Date.now() > collectorDeadline) throw Error("Owned process bracket frame did not arrive")
         await Bun.sleep(10)
       }
