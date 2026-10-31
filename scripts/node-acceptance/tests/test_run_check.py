@@ -21,6 +21,62 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_types300_d76_exact_forms_and_strict_other_cells(self):
+        # LAB-583 types300-checks.jsonl:1: 15 negative zeros and 14 midnight dates.
+        columns = [{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'},
+                   {'name': 'BigID', 'type': 'integer'}]
+        expected = dict(columns=columns, ordered=True, column_order='exact', rows=[
+            dict(SmallReal=-0.0, EventAt='2027-01-01T00:00:00.001', BigID='9007199254740993')])
+        trials = [
+            ('0', '2027-01-01', '9007199254740993', True, 1, 1),
+            ('-0', '2027-01-01 00:00:00.001', '9007199254740993', True, 0, 0),
+            ('0.0', '2027-01-01', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-02', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-01 00:00:00.000', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-01', '9007199254740992', False, 0, 0)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            for real, date, integer, ok, zeros, dates in trials:
+                with self.subTest(real=real, date=date, integer=integer):
+                    path.write_text('SmallReal,EventAt,BigID\n' + ','.join([real, date, integer]) + '\n')
+                    counts = {}
+                    if ok:
+                        self.assertEqual(runner.check_csv(path, expected, scenario_name='types300', d76=counts), ',')
+                        self.assertEqual(counts, {'negative_zero': zeros, 'midnight_date': dates})
+                    else:
+                        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                            runner.check_csv(path, expected, scenario_name='types300', d76=counts)
+            for goal, actual in [(0.1, '0'), (-12.5, '0')]:
+                want = dict(columns=columns[:1], ordered=True, rows=[dict(SmallReal=goal)])
+                path.write_text('SmallReal\n' + actual + '\n')
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, want, scenario_name='types300')
+            for actual in ['2027-01-01', '2027-01-01 12:00:00']:
+                want = dict(columns=columns[1:2], ordered=True,
+                            rows=[dict(EventAt='2027-01-01T12:00:00.001')])
+                path.write_text('EventAt\n' + actual + '\n')
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, want, scenario_name='types300')
+
+    def test_types300_observed_100_rows_count_15_zeros_and_14_dates(self):
+        columns = [{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'}]
+        rows = [dict(SmallReal=-0.0 if i % 7 == 0 else 0.1,
+                     EventAt='2027-01-01T00:00:00.001' if i % 7 == 4 else '2027-01-01T12:00:00.001')
+                for i in range(100)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            with path.open('w') as stream:
+                writer = csv.writer(stream)
+                writer.writerow(['SmallReal', 'EventAt'])
+                writer.writerows([['0' if i % 7 == 0 else row['SmallReal'],
+                                  '2027-01-01' if i % 7 == 4 else row['EventAt']]
+                                 for i, row in enumerate(rows)])
+            expected = dict(columns=columns, rows=rows, ordered=True)
+            with self.assertRaises(AssertionError): runner.check_csv(path, expected)
+            counts = {}
+            runner.check_csv(path, expected, scenario_name='types300', d76=counts)
+            self.assertEqual(counts, dict(negative_zero=15, midnight_date=14))
+
     def test_sequential_node_scenarios_resolve_approved_oracles(self):
         for name, count, ports in [('sampling', 2, [0, 0]), ('data-partition', 3, [0, 1, 2])]:
             case = runner.scenario(name)
@@ -1046,6 +1102,79 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 result = runner.read(out / 'results.json')['runs'][0]
                 self.assertEqual(result['status'], 'PASS' if corrupt is None else 'FAIL', result)
                 self.assertEqual(len(cold_calls), 1 if corrupt is None else 0)
+
+    def test_types300_d76_requires_successful_cold(self):
+        for count, corrupt in [(1, None), (1, 'cold'), (1, 'exact'), (1, 'disabled')]:
+            with self.subTest(exports=count, corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'points.csv'
+                source.write_text('X,Y,RowID\n0,20,1\n')
+                case = root / 'cases/types300'
+                (case / 'data').mkdir(parents=True)
+                names = ['assignments.csv', 'centers.csv'][:count]
+                (case / 'task.md').write_text('Выгрузи ' + ' и '.join(names))
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                columns = [[{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'}]]
+                rows = [dict(SmallReal=-0.0, EventAt='2027-01-01T00:00:00.001')]
+                runner.write(case / 'expected.json', {'package_path': '/test/result.lgp', 'nodes': [],
+                    'outputs': [{'output_node_type': 'datamining.clustering', 'output_port': i,
+                        'columns': cols, 'rows': [rows[i]]} for i, cols in enumerate(columns)]})
+                out = root / 'run'
+                out.mkdir()
+                runner.write(out / 'request.json', {'case_root': str(root / 'cases'), 'pair': str(root / 'pair'), 'cold': corrupt != 'disabled'})
+                (root / 'pair').mkdir()
+                runner.write(root / 'pair/worker.json', {'package_directory': '/test', 'loginom': {
+                    'username': 'test', 'password': 'test', 'url': 'https://example.test', 'api_key': 'test'}})
+                runner.write(out / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
+                    'started': time.time(), 'runs': [{'scenario': 'types300', 'status': 'PENDING'}]})
+                instance = runner.Runner(out)
+                cold_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    instance.report['phase'] = name
+                    profile = out / 'types300/profile'
+                    if name == 'setup':
+                        (profile / 'data').mkdir(parents=True)
+                        (profile / 'config').mkdir()
+                        runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                    if name == 'model':
+                        # Replace the process boundary; model still parses events
+                        # and validates every downloaded CSV itself.
+                        events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                            'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                            {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                            {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                                'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                        (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                        runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                        runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                        for i, cols in enumerate(columns):
+                            delimiter = ',' if i == 0 else ';'
+                            (profile / ('run-types300-' + names[i])).write_text(
+                                delimiter.join(c['name'] for c in cols) + '\n' +
+                                delimiter.join(str(rows[i][col['name']]) if corrupt == 'exact' else ('0' if j == 0 else '2027-01-01')
+                                               for j, col in enumerate(cols)) + '\n')
+                    if name == 'cold':
+                        command = list(map(str, command))
+                        actual = Path(command[command.index('--csv') + 1])
+                        cold_calls.append(actual.name)
+                        self.assertTrue(actual.is_file(), str(actual))
+                        self.assertEqual(actual.name, 'actual.csv' if count == 1 else 'actual-2.csv')
+                        self.assertEqual(command[command.index('--csv-delimiter') + 1], ',' if count == 1 else ';')
+                        self.assertEqual(len(runner.read(Path(command[command.index('--expected') + 1]))['outputs']), count)
+                        (folder / 'cold').mkdir()
+                        runner.write(folder / 'cold/result.json', {'status': 'FAIL' if corrupt == 'cold' else 'PASS', 'settingsReapplied': False,
+                            'cleanup': {'package_closed': True, 'logged_out': True}})
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                    instance.run()
+                result = runner.read(out / 'results.json')['runs'][0]
+                self.assertEqual(result['status'], runner.D76_STATUS if corrupt is None else 'PASS' if corrupt == 'exact' else 'FAIL', result)
+                self.assertIn(result['status'], runner.summary(instance.report))
+                if corrupt is None:
+                    self.assertEqual(result['d76'], dict(negative_zero=1, midnight_date=1))
+                    self.assertIn('negative_zero=1; midnight_date=1', runner.summary(instance.report))
+                self.assertEqual(len(cold_calls), 0 if corrupt == 'disabled' else 1)
 
     def native_reply(self):
         # Public shape observed in smoke-4/q7/s5/model.stdout:48 on v0.3.3.
