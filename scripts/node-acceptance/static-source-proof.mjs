@@ -206,20 +206,39 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
  const destinations=[];
  for(const target of graph.nodes.filter(n=>n.type==='exports.text')){
   const channel=channelFor(target.ref,(includeInputFields?'export-input-':'export-destination-')+target.ref.node_id);
-  const observeSelection=()=>channel.observe({condition:'cold exact export selection',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
-  let selected=await observeSelection();
   const owned=s=>s.prepared_node_context?.verified===true
    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===target.ref[k]);
+  const observeSelection=()=>channel.observe({condition:'cold exact export selection',
+   ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'&&s.ui.masks.length===0,
+   confirmIdentity:s=>({owner:s.prepared_node_context,epoch:s.dom_epoch,elements:s.ui.elements.map(e=>({tid:e.tid,ref:e.ref,interaction:e.interaction}))})});
+  let selected=await observeSelection();
   need(owned(selected),'export selection owner');
   // A clipped body can have a selection point while its Setting is offscreen.
-  // Reveal the body, then select only the freshly observed same owner.
-  await channel.revealGraphNode({target:'body'});
-  selected=await observeSelection();
-  need(owned(selected),'export selection owner');
+  // Avoid unnecessary zoom: Loginom can apply its graph mask asynchronously.
+  const settings=s=>s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'));
+  if(!selected.ui.elements.some(e=>e.tid===selected.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.interaction?.state==='point_observed')
+   ||settings(selected).some(e=>e.interaction?.state!=='point_observed')){
+   await channel.revealGraphNode({target:'body'});
+   selected=await observeSelection();
+   need(owned(selected),'export selection owner');
+  }
   await selectPreparedGraphNode(channel,selected,'cold select saved export',{refreshReplacedBody:true});
-  await channel.observe({condition:'cold export scenario title settled',
+  const controls=await channel.observe({condition:'cold export scenario title settled',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
-    &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
+    &&s.active_identity===s.workflow_navigation.path.at(-1)?.label&&settings(s).length===1});
+  need(owned(controls),'export selection owner');
+  // An unselected node has no Setting yet; check its point after selection too.
+  if(settings(controls)[0].interaction?.state!=='point_observed'){
+   await channel.revealGraphNode({target:'body'});
+   selected=await observeSelection();
+   need(owned(selected),'export selection owner');
+   await selectPreparedGraphNode(channel,selected,'cold select revealed saved export',{refreshReplacedBody:true});
+  }
+  await channel.observe({condition:'cold export settings settled',
+   ready:s=>owned(s)&&s.prepared_node_context.surface==='graph'&&s.wizard?.status==='absent'
+    &&s.ui.masks.length===0&&s.ui.dialogs.length===0&&settings(s).length===1&&settings(s)[0].interaction?.state==='point_observed'
+    &&s.workflow_navigation?.status==='observed'&&s.active_identity===s.workflow_navigation.path.at(-1)?.label,
+   confirmIdentity:s=>({owner:s.prepared_node_context,epoch:s.dom_epoch,setting:settings(s)[0]})});
   try{
    if(includeInputFields)await channel.openInputPort(0);else await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold saved export destination page',ready:s=>['input_mapping','text_export_params'].includes(s.wizard?.stage)});
