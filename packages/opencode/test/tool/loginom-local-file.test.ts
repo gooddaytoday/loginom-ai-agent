@@ -7,7 +7,10 @@ import { pathToFileURL } from "node:url"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { expect } from "bun:test"
-import { open } from "node:fs/promises"
+import { open, mkdir, rm, rename, symlink, writeFile } from "node:fs/promises"
+import { basename, join } from "node:path"
+import { Global } from "@opencode-ai/core/global"
+import { profileFile, sampleFile } from "@/tool/loginom-file-profile-core"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -337,6 +340,134 @@ for (const mode of ["stable", "changed", "deleted", "deny"] as const) {
             deny: "LOGINOM_FILE_ACCESS_DENIED",
           }[mode],
         )
+    }),
+  )
+}
+
+for (const mode of [
+  "own",
+  "other-session",
+  "parent",
+  "unissued",
+  "traversal",
+  "symlink",
+  "directory-symlink",
+  "changed",
+  "malformed",
+  "deny",
+  "case",
+] as const) {
+  it.instance(`sample authorization: ${mode}`, () =>
+    Effect.gen(function* () {
+      if (mode === "case" && process.platform !== "win32") return
+      const instance = yield* TestInstance
+      const sessions = yield* Session.Service
+      const ctx = yield* context
+      const other = yield* context
+      const owner = mode === "other-session" ? other : ctx
+      const dir = join(Global.Path.data, "file-profiles", owner.sessionID)
+      yield* Effect.addFinalizer(() => Effect.promise(() => rm(dir, { recursive: true, force: true })))
+      const outside = dir + "-outside"
+      yield* Effect.promise(() => mkdir(outside, { recursive: true }))
+      yield* Effect.addFinalizer(() => Effect.promise(() => rm(outside, { recursive: true, force: true })))
+      const external = join(outside, "input.csv")
+      yield* Effect.promise(() => writeFile(external, "outside"))
+      const source = join(instance.directory, "input.csv")
+      const sample = yield* Effect.promise(async () => {
+        await writeFile(source, "region;amount\nNorth;25\nSouth;50\n")
+        const profile = await profileFile(source, dir)
+        return sampleFile(profile.profile_id, dir, { max_records: 1 })
+      })
+      yield* sessions.updateMessage({
+        id: owner.messageID,
+        sessionID: owner.sessionID,
+        role: "assistant",
+        parentID: MessageID.ascending(),
+        agent: "build",
+        mode: "build",
+        modelID: ModelV2.ID.make("test"),
+        providerID: ProviderV2.ID.make("test"),
+        path: { cwd: instance.directory, root: instance.directory },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        time: { created: Date.now() },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        sessionID: owner.sessionID,
+        messageID: owner.messageID,
+        type: "tool",
+        tool: "loginom_file_sample",
+        callID: "sample",
+        state: {
+          status: "completed",
+          input: {},
+          title: "loginom_file_sample",
+          metadata: {},
+          output: mode === "malformed" ? "invalid JSON" : JSON.stringify(sample),
+          time: { start: 0, end: 1 },
+        },
+      })
+      const path =
+        mode === "parent"
+          ? join(dir, "..", basename(sample.path))
+          : mode === "unissued"
+            ? join(dir, "unissued.csv")
+            : mode === "traversal"
+              ? dir + "/../" + owner.sessionID + "/" + basename(sample.path)
+              : mode === "case"
+                ? sample.path.toUpperCase()
+                : sample.path
+      if (mode === "parent" || mode === "unissued") {
+        yield* Effect.promise(() => writeFile(path, "region;amount\nNorth;25\n"))
+        yield* Effect.addFinalizer(() => Effect.promise(() => rm(path, { force: true })))
+      }
+      if (mode === "symlink")
+        yield* Effect.promise(async () => {
+          await rm(sample.path)
+          await symlink(external, sample.path)
+        })
+      if (mode === "directory-symlink")
+        yield* Effect.promise(async () => {
+          const moved = join(outside, "moved")
+          await rename(dir, moved)
+          await symlink(moved, dir, process.platform === "win32" ? "junction" : "dir")
+        })
+      if (mode === "changed") yield* Effect.promise(() => writeFile(sample.path, "changed"))
+      if (mode === "deny")
+        yield* sessions.setPermission({
+          sessionID: ctx.sessionID,
+          permission: [{ permission: "external_directory", pattern: "*", action: "deny" }],
+        })
+      const asks: string[] = []
+      const result = yield* admitLoginomLocalFile(
+        path,
+        {
+          ...ctx,
+          ask: (request) =>
+            Effect.sync(() => {
+              asks.push(request.permission)
+            }),
+        },
+        {
+          admit: async () => [{ artifact_id: "sample" }],
+          reserveReference: async () => {
+            throw Error("Small sample must use byte admission")
+          },
+          admitReference: async () => {
+            throw Error("Small sample must use byte admission")
+          },
+          discardReference: async () => {},
+        },
+        "sample-message",
+      ).pipe(Effect.exit)
+      if (mode === "deny") {
+        expect(Exit.isFailure(result)).toBe(true)
+        expect(asks).toEqual([])
+        return
+      }
+      expect(Exit.isSuccess(result)).toBe(true)
+      expect(asks.includes("external_directory")).toBe(mode !== "own" && mode !== "case")
     }),
   )
 }
