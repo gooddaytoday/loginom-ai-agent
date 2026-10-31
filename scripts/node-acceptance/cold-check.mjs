@@ -87,7 +87,7 @@ const record = createExecutionJournal({
   metadata,
   knownSecrets: [config.api_key, loginPassword].filter(Boolean),
 })
-const state = { prepared: undefined, closed: false, cleanupAttempted: false, excelSink:excelExpected?(rawExpected.outputs?.[0]??rawExpected):null }
+const state = { prepared: undefined, closed: false, cleanupAttempted: false }
 let context, page
 const rawExecute = (code) => new Function("page", `return (${code})(page)`)(page)
 const execute = (code) => {
@@ -203,9 +203,9 @@ page = context.pages()[0]
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
-  if(state.excelSink)verifyExcelColdSettings(destinations,state.excelSink);
+  if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
-  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(state.excelSink?{type:'exports.excel'}:{})}):null;
+  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }

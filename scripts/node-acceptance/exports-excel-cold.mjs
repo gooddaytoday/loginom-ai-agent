@@ -4,7 +4,7 @@ export function excelColdExpected(expected){
  const sink=expected.outputs?.[0]??expected;
  if(sink.output_node_type!=='exports.excel'||sink.format!=='xlsx')return null;
  if(sink.output_port!==null||expected.outputs&&expected.outputs.length!==1)throw Error('XLSX_SINK_EXPECTED');
- return {package_path:expected.package_path,nodes:expected.nodes,outputs:[{
+ return {package_path:expected.package_path,nodes:expected.nodes,xlsx_sink:sink,outputs:[{
   output_node_type:'export_input',export_destination:sink.export_destination,ordered:true,
   columns:sink.columns.map(c=>{const {tolerance,...column}=c;return c.type==='datetime'?column:c;}),
   rows:sink.rows.map(row=>Object.fromEntries(sink.columns.map((c,i)=>[c.name,row[i]])))

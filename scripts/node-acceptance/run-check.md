@@ -277,3 +277,11 @@ runner допускает два ограничения нативного CSV w
 Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
 Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
+
+`exports-excel` runs the approved XLSX sink task and cells.csv fixture from
+`nodes/exports-excel/acceptance`, retains `output_port:null`, and verifies the
+download with that node’s independent ZIP/XML oracle. `--cold` additionally
+checks the saved Excel destination/sheet/header/general format and freshly
+reads the connected table for native types, values and field order. It does
+not overwrite or reexecute the existing file sink. CSV/TSV cases retain their
+existing reader and `--csv` cold path.
