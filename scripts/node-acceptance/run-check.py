@@ -215,7 +215,9 @@ def summary(report):
             '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
-        rows.append('| ' + ' | '.join([r['scenario'], 'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'),
+        outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
+                   'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
+        rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
@@ -493,10 +495,18 @@ class Runner:
                 restore_source_modes(source)
                 assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
                 bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-                # Different SHAs may install concurrently, without mutating a
-                # shared Bun extraction cache (including hardlinked bin modes).
-                env = dict(self.env, BUN_INSTALL_CACHE_DIR=str(cache / 'bun-cache'), LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
-                self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
+                # Keep Bun's shared warm cache; serialize installations across
+                # SHAs on this host, releasing the lock before compilation.
+                with (cache.parent / 'bun-install.lock').open('a') as install_lock:
+                    while True:
+                        try:
+                            fcntl.flock(install_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            break
+                        except BlockingIOError:
+                            if time.time() >= self.deadline: raise TimeoutError('bun install lock deadline')
+                            time.sleep(1)
+                    self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
                 restore_source_modes(source)
                 assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
                 self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
@@ -765,7 +775,7 @@ class Runner:
             build = self.build()
             if self.options.get('prepare_only'):
                 for result in self.report['runs']:
-                    result.update(status='PASS', preparation_only=True)
+                    result.update(status='NOT_RUN', reason='PREPARE_ONLY', preparation_only=True)
                 return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
@@ -837,7 +847,7 @@ def main():
             report = read(args.directory / 'results.json')
             if report.get('finished'):
                 print(summary(report), end='')
-                return 0 if all(r['status'] == 'PASS' for r in report['runs']) else 1
+                return 0 if all(r['status'] == 'PASS' or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
             if time.monotonic() >= end:
                 ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])

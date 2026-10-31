@@ -2,7 +2,6 @@ import importlib.util
 import json
 import multiprocessing
 from pathlib import Path
-import subprocess
 import tempfile
 import time
 import unittest
@@ -13,7 +12,7 @@ runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
 
-def prepare(repo, home, head, out, started=None, mutate=False):
+def prepare(repo, home, head, out, started=None, mutate=False, builds=None):
     instance = runner.Runner.__new__(runner.Runner)
     instance.options = {'build': None}
     instance.report = {'head': head}
@@ -24,7 +23,7 @@ def prepare(repo, home, head, out, started=None, mutate=False):
     def phase(name, command, cache, **kwargs):
         if name == 'dependencies':
             # A real competing process must never see an in-progress install.
-            busy = cache / 'installing'
+            busy = cache.parent / 'installing'
             with busy.open('x'):
                 if started: started.set()
                 time.sleep(.3)
@@ -34,6 +33,7 @@ def prepare(repo, home, head, out, started=None, mutate=False):
                 if mutate: path.write_text('changed by install\n')
             busy.unlink()
         if name == 'build':
+            if builds: builds.wait(timeout=5)
             source = kwargs['cwd'].parents[1]
             assert not runner.git('status', '--porcelain', cwd=source)
             build = cache / 'cli'
@@ -91,8 +91,28 @@ class BuildPreparationTests(unittest.TestCase):
                 self.fail('preparation did not finish')
             self.assertEqual(process.exitcode, 0)
         self.assertEqual([out.get(timeout=1) for _ in processes], [None, None])
-        env = runner.read(self.cache / 'install-env.json')
-        self.assertEqual(env.get('BUN_INSTALL_CACHE_DIR'), str(self.cache / 'bun-cache'))
+
+    def test_host_install_lock_serializes_two_shas_but_not_their_builds(self):
+        (self.repo / 'other.txt').write_text('second revision\n')
+        runner.git('commit', '-qam', 'second fixture', cwd=self.repo)
+        other = runner.git('rev-parse', 'HEAD', cwd=self.repo)
+        context = multiprocessing.get_context('fork')
+        out, started, builds = context.Queue(), context.Event(), context.Barrier(2)
+        processes = [context.Process(target=prepare, args=(self.repo, self.home, head, out, started),
+                                     kwargs={'builds': builds}) for head in [self.head, other]]
+        for index, process in enumerate(processes):
+            process.start()
+            if index == 0: self.assertTrue(started.wait(5))
+        for process in processes:
+            process.join(12)
+            if process.is_alive():
+                process.terminate(); process.join()
+                self.fail('preparation did not finish')
+            self.assertEqual(process.exitcode, 0)
+        self.assertEqual([out.get(timeout=1) for _ in processes], [None, None])
+        for head in [self.head, other]:
+            env = runner.read(self.cache.parent / head / 'install-env.json')
+            self.assertNotIn('BUN_INSTALL_CACHE_DIR', env)
 
     def test_permissions_recovered_but_changed_content_is_rejected(self):
         source = self.source()
