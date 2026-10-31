@@ -20,6 +20,7 @@ function fixture(fault) {
  }})})};
  const ui=async(p,options)=>{
   const s=structuredClone(snapshot);
+  if(fault==='download_toast'&&downloads>0)assert.equal(options.download_toast_observation,true);
   if(options.root_ref==='nav')directoryReads++;
   if(fault?.startsWith('refresh_busy')&&directoryReads===2){
    s.ui.masks=[{kind:'busy',target_tid:prefix+';FileStorageForm',dialog_ref:null}];
@@ -32,7 +33,8 @@ function fixture(fault) {
   if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };
- const download=async(p,t)=>{downloads++;assert.equal(t.file_ref,'file');assert.equal(t.snapshot.ui.elements[0].label,name);
+ const download=async(p,t,read)=>{downloads++;
+  if(fault==='download_toast')await read(p);assert.equal(t.file_ref,'file');assert.equal(t.snapshot.ui.elements[0].label,name);
   if(fault==='lost_download')throw Error('Lost downloader response');
   return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,trace:[{event:'download_saved'}]};};
  const ready=async(p,t,deadline,trace,minimum=null,refresh=null)=>{
@@ -108,6 +110,10 @@ test('readiness timeout before any gesture is no-effect; timeout after refresh r
   assert.equal(r.status,fault==='readiness_timeout'?'NOT_APPLIED':'AMBIGUOUS');
   assert.equal(r.effect_possible,fault==='refresh_timeout');assert.equal(f.refreshes,fault==='refresh_timeout'?1:0);
  }
+});
+test('discovered download preserves the private toast observation when delegating the file read',async()=>{
+ const f=fixture('download_toast'),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED');assert.equal(f.downloads,1);
 });
 test('private discovery reveals a buffered authorized row and delegates exactly one download',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.deepEqual(f.moves,[700,1400]);assert.equal(f.downloads,1);
