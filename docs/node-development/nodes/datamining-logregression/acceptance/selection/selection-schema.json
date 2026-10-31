@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "criterion": {
+      "type": "string",
+      "enum": ["deviance", "aic", "aicc", "bic", "hqic"],
+      "description": "Explicit factor selection criterion; significance cutoffs apply only to deviance."
+    },
+    "entry_significance": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1,
+      "description": "Deviance forward/stepwise only: include a factor when its likelihood-ratio p-value is below this cutoff."
+    },
+    "removal_significance": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1,
+      "description": "Deviance backward/stepwise only: remove a factor when its likelihood-ratio p-value exceeds this cutoff; stepwise requires entry < removal."
+    }
+  },
+  "required": ["criterion"],
+  "additionalProperties": false
+}
