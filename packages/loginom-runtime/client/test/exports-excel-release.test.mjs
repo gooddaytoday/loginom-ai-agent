@@ -1,21 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {releaseNodeApply} from '../lib/node-apply.mjs';
-import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
-import {createActionRuntime} from '../lib/executor.mjs';
-import {actions} from './support/executor-fixture.mjs';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {createExecutionJournal} from '../lib/execution-journal.mjs';
 
 const node={document_id:'doc',workflow_id:'flow',node_id:'export'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
  navigation_path:[{tid:'path',label:'Scenario'}]};
 const phases=['input_mapping','open','configure','output_mapping','finish','execute'];
-const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
 
 function fixture(phase='configure',fault,{wizard=true,executionStatus='pending',confirmation=false,wizardStage='excel_export'}={}) {
  let open=wizard,question=false,action,graphReads=0,clock=Date.now();const gestures=[],events=[];

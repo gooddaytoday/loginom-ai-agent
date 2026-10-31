@@ -11,7 +11,7 @@ export async function configureExcelExport(channel,p,ctx,options){
  const readUi=()=>channel.observe({condition:'bound Excel export',ready:s=>s.wizard?.stage==='excel_export'});
  const one=xs=>{need(xs.length===1,'Unique Excel export control required');return xs[0];};
  let current=await native();const initial=current;
- const settings={file_type:1,number_format:0,...p};
+ const settings=options.operation.nodeApply.request.target.kind==='new'?{file_type:1,number_format:0,...p}:p;
  for(const [key,value]of Object.entries(settings)){
   if(key==='overwrite')continue;
   const expected=key==='header'?{none:0,names:1,labels:2}[value]:value;
@@ -33,7 +33,13 @@ export async function configureExcelExport(channel,p,ctx,options){
   current=after;
  }
  const configured={excel_export:current};
- if(ctx.finish!=='close')validateNativeExcelExport(current.values,options.storageDirectories);
+ if(ctx.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{initial,configured,destination:current.values.destination.value}};
+ try{validateNativeExcelExport(current.values,options.storageDirectories);}
+ catch(error){
+  guard();const closed=await options.close(channel);guard();
+  need(closed.cleanup_complete===true&&closed.draft_discarded===true&&closed.settings_applied===false,'Unsupported Excel export draft was not discarded');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};throw error;
+ }
  const destination=validateExcelExportDestination(current.values.destination.value,options.storageDirectories);
  const result=await runExcelExportNext({binding,before:current,destination,overwrite:'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
  need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel export Next uncertain');
