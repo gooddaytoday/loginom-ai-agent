@@ -1,0 +1,105 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Code_Replace",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Code_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Code": "AB-12",
+          "Code_Replace": "SKU-$1",
+          "Code_Replaced": true,
+          "Keep": "one"
+        },
+        {
+          "Id": 2,
+          "Code": "ab-34",
+          "Code_Replace": "ab-34",
+          "Code_Replaced": false,
+          "Keep": "two"
+        },
+        {
+          "Id": 3,
+          "Code": "AB-12 AB-34",
+          "Code_Replace": "SKU-$1",
+          "Code_Replaced": true,
+          "Keep": "three"
+        },
+        {
+          "Id": 4,
+          "Code": "xAB-56y",
+          "Code_Replace": "SKU-$1",
+          "Code_Replaced": true,
+          "Keep": "four"
+        },
+        {
+          "Id": 5,
+          "Code": "NO",
+          "Code_Replace": "NO",
+          "Code_Replaced": false,
+          "Keep": "five"
+        },
+        {
+          "Id": 6,
+          "Code": null,
+          "Code_Replace": null,
+          "Code_Replaced": false,
+          "Keep": "six"
+        },
+        {
+          "Id": 7,
+          "Code": "",
+          "Code_Replace": "",
+          "Code_Replaced": false,
+          "Keep": "seven"
+        },
+        {
+          "Id": 8,
+          "Code": "AB-00",
+          "Code_Replace": "SKU-$1",
+          "Code_Replaced": true,
+          "Keep": "eight"
+        }
+      ]
+    }
+  ]
+}

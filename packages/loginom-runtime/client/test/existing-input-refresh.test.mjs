@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {applyNode} from '../lib/node-apply.mjs';
 import {createCandidateNodeSupport,nodeOutputForJournal} from '../lib/node-support.mjs';
+import {verifyDeferredTextImportSources} from '../lib/text-import-node.mjs';
 import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
@@ -86,11 +87,11 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   configurationObservation:{condition:'owned settings fixture',ready:s=>s.wizard.status==='observed'},
   configureOutput:async()=>({verified:true,cleanup_complete:true,native_mapping:{target_fields:[]}}),
  });
- const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:contract.NODE_READ_MODE,
+ const context={createRedactor,nodeOutputForJournal,verifyDeferredTextImportSources,NODE_READ_MODE:contract.NODE_READ_MODE,
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
- for(const name of ['ExcelImport','LinRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
-  'DateTime','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
+ for(const name of ['ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','LinRegression','LogRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
+  'DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
    nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
  const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)(config);
@@ -136,7 +137,7 @@ test('D46 unchanged execution predicate excludes every configuration edit and ot
  }
 });
 
-for(const mode of ['inner','left'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
+for(const mode of ['inner','left','right','full','difference'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
  const f=fixture('transform.join_data',{savedMode:mode,mode,initialStage:'input_mapping'}),result=await f.run();
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  assert.deepEqual(f.calls,['select','open','next','close','baseline','Execute']);

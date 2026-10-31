@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { evalsRoot } from "../src/config"
-import { observeWriterReleaseSettlement, superviseProcess } from "../src/process-supervisor"
+import { observeWriterReleaseSettlement, supervisedProcesses, superviseProcess } from "../src/process-supervisor"
 
 // Successful settlement and later validation branches require a clean native stand.
 // Foreign-process rejection is covered below and must still run on a busy host.
@@ -22,9 +22,22 @@ async function fixture() {
   await Bun.write(path.join(profile, ".writer/owner"), "fixture-original-owner")
   const writer = await stat(path.join(profile, ".writer"))
   const acquired = new Date().toISOString()
-  const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100);process.exit(0)"], cwd: evalsRoot,
-    env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5_000 })
+  // A short-lived CLI can exit before the source proof captures its ancestry.
+  const input = new TransformStream<Uint8Array, Uint8Array>()
+  const writerInput = input.writable.getWriter()
+  const pending = superviseProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: evalsRoot,
+    env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5_000, outDir: root, stdin: input.readable, owner: { kind: "command", id: root } })
+  try {
+    const deadline = Date.now() + 5000
+    while (!supervisedProcesses().scopes.some(scope => scope.owner.id === root && scope.processes?.some(entry =>
+      entry.pid !== scope.launcher.pid && entry.executable === process.execPath))) {
+      if (Date.now() > deadline) throw Error("Writer fixture CLI admission did not arrive")
+      await Bun.sleep(10)
+    }
+  } finally { await writerInput.close(); await pending }
+  const run = await pending
   expect(run.processCleanup.status).toBe("confirmed")
+  expect(run.processCleanup.origins?.map(entry => entry.via)).toContain("cli")
   // Synthetic historical error only in this fixture; identities and ancestry are actual captures.
   const original = { ...run.processCleanup, status: "failed" as const, error: "Writer owner unavailable",
     runtimeDirectories: [runtime], writer: { device: writer.dev, inode: writer.ino, owner: "fixture-original-owner" } }

@@ -341,7 +341,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(['replace','reject'].includes(artifact.upload.overwrite),'Unsupported upload conflict policy');
    admit(request.operation_id,signature);
    const largeUpload=!packageUpload&&artifact.bytes>16*1024*1024,controller=new AbortController();
-   const job={artifact:structuredClone(artifact),resumeRequests:new Map(),id:request.operation_id,uploadId:request.operation_id+':upload',signature,state:'running',phase:'prepared',deadline:now()+(largeUpload?referenceUploadBudget(artifact.bytes):request.budget_ms),packageUpload,largeUpload,controller,started:now(),status:'authorizing',bytes:0};
+   const job={artifact:structuredClone(artifact),resumeRequests:new Map(),id:request.operation_id,uploadId:request.operation_id+':upload',signature,state:'running',phase:'prepared',deadline:now()+(largeUpload?referenceUploadBudget(artifact.bytes):packageUpload?request.budget_ms:Math.max(request.budget_ms,referenceUploadBudget(artifact.bytes))),packageUpload,largeUpload,controller,started:now(),status:'authorizing',bytes:0};
    jobs.set(job.id,job);active=job;
    // The worker owns cancellation after admission; a completed start request's
    // transport signal must not end a background transfer. Shutdown drains it.
@@ -361,9 +361,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(job.uploadStarted===true||job.preUploadResume===true,'Delivery stopped before upload; inspect navigation before a new request');
    const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
    requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Admitted artifact changed');
-   requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');
+   const renew=!job.packageUpload&&job.preUploadResume===true&&job.uploadStarted===undefined
+     &&job.outcome?.cleanup_complete===true&&job.outcome.inspection_required===false&&!job.deadlineRenewed;
+   requireValue(renew||now()<job.deadline,'Artifact delivery deadline elapsed');
    admitResume(job.uploadId,request.resume_id,signature,{preUpload:job.preUploadResume===true,deliveryId:job.id});
-   job.deadline=Math.min(job.deadline,now()+request.budget_ms);job.state='running';job.error=null;active=job;
+   const deadline=now()+(job.packageUpload?request.budget_ms:Math.max(request.budget_ms,referenceUploadBudget(artifact.bytes)));
+   job.deadline=renew?Math.max(job.deadline,deadline):Math.min(job.deadline,deadline);
+   if(renew)job.deadlineRenewed=true;
+   job.state='running';job.error=null;active=job;
    const promise=run(job,artifact,signal,request.resume_id);
    job.resumeRequests.set(request.resume_id,{signature,promise});return promise;
   },

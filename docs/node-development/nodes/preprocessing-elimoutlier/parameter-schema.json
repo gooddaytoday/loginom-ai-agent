@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "description": "Detect outliers; keep original values on all outputs.",
+  "properties": {
+    "fields": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "description": "Complete list of continuous numeric field names; ignore other fields."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["sd", "iqr"],
+      "description": "SD around mean, or IQR fences around quartiles."
+    },
+    "outlier_factor": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Explicit nonnegative outlier multiplier."
+    },
+    "extreme_factor": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Explicit extreme multiplier, at least outlier_factor."
+    },
+    "ordered": {
+      "type": "boolean",
+      "description": "True only if input values are already ordered; does not sort rows."
+    }
+  },
+  "required": ["fields", "method", "outlier_factor", "extreme_factor", "ordered"],
+  "additionalProperties": false
+}

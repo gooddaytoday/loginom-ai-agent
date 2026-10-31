@@ -4,6 +4,34 @@ import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 
+test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
+  for (const action of ['package.save_checkpoint', 'package.save_as']) {
+    const page = linkPage(), workspace = page.app.Application.FInstance.FMainForm.Items.Workspace;
+    const activeWorkflow = workspace.getActiveTab;
+    // Source validation can leave the tab on Files after LOGINOM_FILE_CHANGED.
+    // Its navigation node has no PackageTreeNode ancestor.
+    workspace.getActiveTab = () => ({ Controller: { Node: { data: { node: {} } } } });
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => { clicked.push(item.symbol); return click(item); };
+    const parameters = { path: '/user/data/packages/after-source-refusal.lgp', conflict_policy: 'fail' };
+    const refused = await run(page, action, parameters);
+    assert.equal(refused.status, 'FAILED', JSON.stringify(refused));
+    assert.equal(refused.error.code, 'CAPABILITY_ERROR');
+    assert.equal(refused.effect_possible, false);
+    assert.equal(refused.cleanup_complete, true);
+    assert.deepEqual(clicked, []);
+    assert.equal(page.storage.size, 0);
+    assert.match(refused.error.message, /dock_prepare.*existing_workflow.*workflow_ref.*document_id/);
+    assert.match(refused.error.message, /saved workflow_continuations/);
+    assert.match(refused.error.message, /LOGINOM_FILE_CHANGED.*full.*execution/i);
+    // Returning to the prepared workflow restores Save, not full-source authority.
+    workspace.getActiveTab = activeWorkflow;
+    const saved = await run(page, action, parameters);
+    assert.equal(saved.status, 'SUCCEEDED', JSON.stringify(saved));
+    assert.ok(page.storage.has(parameters.path));
+  }
+});
+
 test('both saves refuse a read-only native package self-path before any gesture', async () => {
   for (const action of ['package.save_checkpoint','package.save_as']) {
     const page = linkPage(); page.packagePath = '\\user\\data\\packages\\locked.lgp';

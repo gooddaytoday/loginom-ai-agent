@@ -1026,6 +1026,200 @@
       "runtime": "0.0.0-dev-202610022103",
       "platform": "Ubuntu x64 / Loginom7.4.2 Linux / headed Chromium",
       "scope": "Историческая приёмка child candidate15: original code/declared CLI pair13, source 6f6a66eb62. Перенос документации не подтверждает текущий SHA; integration/release не выполнены. Подробная матрица в completion-audit.md."
+    },
+    "clustering-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/clustering-node.mjs",
+      "sha256": "32d65393bac5dec8a581effc37b838ebcf6dd9bffda351b74aa2cadc6ac7760b",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "5093834370d970cae611dab63459af6102528953",
+      "runtime": null,
+      "platform": null,
+      "scope": "Обработчик k-means (LAB-87, PR #102 в nodes-wave2, PR #133 в demo-022); файл не менялся с принятого SHA; статическое чтение без исполнения."
+    },
+    "clustering-parameters": {
+      "path": "../../packages/loginom-runtime/client/lib/clustering-parameters.mjs",
+      "sha256": "bb717521720ba47292065a35607224796918f0d674798c64f8382344d2476890",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "5093834370d970cae611dab63459af6102528953",
+      "runtime": null,
+      "platform": null,
+      "scope": "Параметры k-means: features, clusters, seed, normalization=none; статическое чтение без исполнения."
+    },
+    "clustering-discovery": {
+      "path": "nodes/datamining-clustering/discovery.md",
+      "sha256": "74cb83588b48726ad23fdd5809276ebade57a973186763a6fffa3da0072e2e50",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "6d2699963c68e7e38e5ec16dd82e0b7794ec5fbd",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Discovery этапа 0 (LAB-84), принят владельцем 17.10.2026; контракт фиксированного k-means."
+    },
+    "clustering-acceptance-task": {
+      "path": "nodes/datamining-clustering/acceptance/task.md",
+      "sha256": "089830ca5bba0311f11f3261ff5ebe2b36e9c73ebe42c1219dcf82141d690e95",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "5093834370d970cae611dab63459af6102528953",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Бизнес-задание этапа 1. PR #102 (LAB-87): на 5093834370 Манки 3/3 и Ловец 3/3 model+cold PASS, приёмка принята владельцем; свидетельства во вложениях карточки."
+    },
+    "clustering-oracle": {
+      "path": "nodes/datamining-clustering/acceptance/oracle.py",
+      "sha256": "2bf55830f03437b9ff307419ca12881957c6f7c4207ca54f82e76cedcaac6b5b",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "5093834370d970cae611dab63459af6102528953",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Независимый геометрический oracle → expected.json; cold-check обоих выходов PASS в приёмке LAB-87 (PR #102)."
+    },
+    "linregression-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/linregression-node.mjs",
+      "sha256": "bc5831f1be8ed8b97e03b9581472ccb466236b096bae49269f1362448e134b4c",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Обработчик Enter (LAB-89, PR #106 и W PR #107) и apply сохранённой модели (LAB-421, PR #499); статическое чтение без исполнения."
+    },
+    "linregression-parameters": {
+      "path": "../../packages/loginom-runtime/client/lib/linregression-parameters.mjs",
+      "sha256": "6f0b81e98aee1be4b4699767afe31ee0601004bf721fc995ea677a712e5fc6e6",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Параметры input_fields/target_field, режимы enter и apply; статическое чтение без исполнения."
+    },
+    "linregression-discovery": {
+      "path": "nodes/datamining-linregression/discovery.md",
+      "sha256": "06d19abe93c7c066e73ece28d476b8c8a76ea62d15e8888bdbf75843d50c3f0d",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "6d2699963c68e7e38e5ec16dd82e0b7794ec5fbd",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Discovery этапа 0 (LAB-85), принят владельцем по PR #100; native-наблюдения Enter и сохранённого применения."
+    },
+    "linregression-acceptance-task": {
+      "path": "nodes/datamining-linregression/acceptance/task.md",
+      "sha256": "79c2ffa0094d708ba5036b54f37a6ce1b95af94249bc73be6095f98ee6e174c3",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "60cc6451ae2e19f0e4ce0ddcec9990702f05cf5a",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Бизнес-задание этапа 1 (Enter). PR #106 (LAB-89): worker 2/3 и независимый reviewer 2/3 на дереве 91a8671f (60cc6451ae = 95d2c77586); повторные прогоны сняты владельцем после сверки дерева."
+    },
+    "linregression-oracle": {
+      "path": "nodes/datamining-linregression/acceptance/oracle.py",
+      "sha256": "40742c931bb030e07e2621cc14fb37d9e170ed05d700be41cfa818c8e3da15d4",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "60cc6451ae2e19f0e4ce0ddcec9990702f05cf5a",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Независимый OLS-oracle → expected.json; cold-check обоих выходов и шести прогнозов PASS в приёмке LAB-89 (PR #106)."
+    },
+    "rest-request-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/rest-request-node.mjs",
+      "sha256": "328782b7a003fc6019302e0bd878f1bc1d60838ab7941197e5c029b27c710ed0",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Обработчик GET с параметрами строки запроса и REST-подключением (LAB-88/LAB-91, PR #101 в nodes-wave2, PR #133 в demo-022); статическое чтение без исполнения."
+    },
+    "rest-request-parameters": {
+      "path": "../../packages/loginom-runtime/client/lib/rest-request-parameters.mjs",
+      "sha256": "11ab03e468ae7704da5073ebb965da4d6a6d361918f8cfc67ad17719755f418d",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Параметры connection и query_parameters режима request; статическое чтение без исполнения."
+    },
+    "rest-request-discovery": {
+      "path": "nodes/integration-restrequest/discovery.md",
+      "sha256": "19c25f9540751dce7a6432f02570560a4d2fa88fa9a6c3adf95d7ee755e59dd8",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": null,
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2"
+      },
+      "scope": "Discovery этапа 0 (LAB-86), принят владельцем по PR #95; наблюдения этапа 2 r03 (LAB-94)."
+    },
+    "excel-import-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/imports-excel-node.mjs",
+      "sha256": "f095a766eefc179e4b8d4c9e7c03fde6a68e797066c448cddf9da91be0de776d",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Импорт одного листа XLSX с явными типами (LAB-96, PR #135 в demo-022); статическое чтение без исполнения."
+    },
+    "excel-import-parameters": {
+      "path": "../../packages/loginom-runtime/client/lib/imports-excel-parameters.mjs",
+      "sha256": "18bbb6478eb0bbeb97b0e30fd991fe0b9fd13c2efd13f71b233f1e4b61b47640",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+      "runtime": null,
+      "platform": null,
+      "scope": "Параметры source и excel режима xlsx, source_switch существующего импорта; статическое чтение без исполнения."
+    },
+    "excel-import-discovery": {
+      "path": "nodes/imports-excel/discovery.md",
+      "sha256": "f233ca328cc915b2b470db8ce443463f62b08026514ddd46eb5fb6052d267ced",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": null,
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux x64",
+        "loginom": "7.4.2/Enterprise Linux"
+      },
+      "scope": "Checkpoint исследования этапа 0: мастер Excel на Loginom 7.4.2 Server Linux; сам документ не объявляет этап 0 принятым."
+    },
+    "release-v032": {
+      "path": "../../docs/testing/loginom-ai-agent/reports/2026-10-20-v0.3.2-release.md",
+      "sha256": "1fb25c1d9ddfdcf459a28b566e0f34240af1212693fa56cf8a1750e3fe618e82",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "c130548bbe19515ea226796054786574ed2fc4a2",
+      "runtime": "0.3.2",
+      "platform": "Linux (стенды сквадов)",
+      "scope": "GitHub pre-release v0.3.2 из loginom@c130548b; финальная регрессия, включая этапы Кластеризации, Регрессии и REST, PASS по бизнес-критерию. Excel в отчёте не перечислен; установленные Desktop macOS/Windows не проверялись."
     }
   },
   "nodes": [
@@ -2842,13 +3036,21 @@
       "name": "Кластеризация",
       "slug": "datamining-clustering",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "datamining.clustering",
+        "modes": [
+          "k_means"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/clustering-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/clustering-parameters.mjs"
+      },
       "card": "nodes/datamining-clustering/README.md",
       "initial_scope": "Один наблюдённый алгоритм на чистых числовых данных с заданным числом кластеров и чтением всех выходов.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Только фиксированный k-means: непрерывные числовые признаки, k 2–1000, seed, нормализация «Нет», один вход; выходы 0 (назначения) и 1 (центры), без переопределения mappings.",
+        "g-means и нормализация — этап 2; полный native fulltype и расширенная матрица не проверены."
       ],
       "prerequisites": [
         "accepted_base",
@@ -2863,38 +3065,53 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "clustering-handler",
+            "clustering-parameters",
+            "clustering-discovery"
+          ],
+          "note": "Регистрация в node-support.mjs и node-contracts.mjs; PR #102 (LAB-87)."
         },
         "historical_acceptance": {
           "status": "not_accepted",
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "standalone_cli_accepted",
+          "evidence": [
+            "clustering-acceptance-task",
+            "clustering-oracle"
+          ],
+          "standalone_status": "accepted_5093834370",
+          "note": "Этап 1: Манки 3/3 и Ловец 3/3 model+cold PASS на 5093834370 (PR #102, LAB-87); текущий SHA не перепроверялся."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
+          "status": "independent_oracle_pass",
+          "evidence": [
+            "clustering-oracle"
+          ],
           "historical_scope_preserved": false
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "clustering-handler"
+          ],
+          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+          "note": "PR #133 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
         },
         "release": {
-          "status": "not_released",
-          "evidence": []
+          "status": "prerelease_v0.3.2",
+          "evidence": [
+            "release-v032"
+          ],
+          "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Этап 1 принят (LAB-87); g-means и нормализация — отдельным назначением этапа 2.",
       "plan": "nodes/datamining-clustering/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "accepted"
     },
     {
       "component_id": "component.dataMining.EmClust",
@@ -2960,13 +3177,23 @@
       "name": "Линейная регрессия",
       "slug": "datamining-linregression",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "datamining.lin_regression",
+        "modes": [
+          "enter",
+          "apply"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/linregression-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/linregression-parameters.mjs"
+      },
       "card": "nodes/datamining-linregression/README.md",
       "initial_scope": "Простой закон на чистых самостоятельных данных: роли полей, обучение, коэффициенты и прогноз новых строк.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Enter с константой без нормализации; непрерывные числовые предикторы и цель, один вход; выходы 0 (прогнозы) и 1 (коэффициенты), без переопределения mappings.",
+        "apply сохранённой модели (D27, LAB-421, PR #499) реализован без зафиксированной живой приёмки; выпущен только в v0.3.7.",
+        "Варианты переобучения, валидация, полная статистика и W4 — этапы 2+."
       ],
       "prerequisites": [
         "accepted_base",
@@ -2982,38 +3209,53 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "linregression-handler",
+            "linregression-parameters",
+            "linregression-discovery"
+          ],
+          "note": "Регистрация в node-support.mjs и node-contracts.mjs; enter — PR #106 (LAB-89), apply — PR #499 (LAB-421)."
         },
         "historical_acceptance": {
           "status": "not_accepted",
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "standalone_cli_accepted",
+          "evidence": [
+            "linregression-acceptance-task",
+            "linregression-oracle"
+          ],
+          "standalone_status": "accepted_60cc6451ae",
+          "note": "Этап 1 Enter: worker 2/3 и reviewer 2/3 на дереве 91a8671f (PR #106, LAB-89); apply и текущий SHA не перепроверялись."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
+          "status": "independent_oracle_pass",
+          "evidence": [
+            "linregression-oracle"
+          ],
           "historical_scope_preserved": false
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "linregression-handler"
+          ],
+          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+          "note": "PR #133 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
         },
         "release": {
-          "status": "not_released",
-          "evidence": []
+          "status": "prerelease_v0.3.2",
+          "evidence": [
+            "release-v032"
+          ],
+          "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Этап 1 принят (LAB-89); живая приёмка apply и этапы 2+ — отдельными назначениями.",
       "plan": "nodes/datamining-linregression/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "accepted"
     },
     {
       "component_id": "component.dataMining.LogRegression",
@@ -3733,13 +3975,21 @@
       "name": "Импорт — Excel файл",
       "slug": "imports-excel",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "imports.excel",
+        "modes": [
+          "xlsx"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/imports-excel-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/imports-excel-parameters.mjs"
+      },
       "card": "nodes/imports-excel/README.md",
       "initial_scope": "Импорт xlsx: один явно выбранный лист и диапазон, заголовки, типы и пропуски; без расширения на xls или макросы.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Один XLSX: первый лист или лист по имени, 1–10 строк заголовка, 1–8 колонок с явными типами string/integer/real/datetime; автоопределение типов выключено.",
+        "XLS/XLSM, named ranges, несколько листов и книг, динамическая схема — вне среза (этап 2)."
       ],
       "prerequisites": [
         "accepted_base",
@@ -3754,11 +4004,13 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "excel-import-handler",
+            "excel-import-parameters",
+            "excel-import-discovery"
+          ],
+          "note": "Регистрация в node-support.mjs и node-contracts.mjs; PR #135 (LAB-96)."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -3767,7 +4019,8 @@
         "client_technical_validation": {
           "status": "not_validated",
           "evidence": [],
-          "standalone_status": "not_revalidated"
+          "standalone_status": "not_revalidated",
+          "note": "PR #135: worker 3/4 (последние три 2/3) на 94ca8b7d7e (LAB-96); независимая приёмка проверяющего не зафиксирована."
         },
         "analytical_validation": {
           "status": "not_revalidated_standalone",
@@ -3775,17 +4028,24 @@
           "historical_scope_preserved": false
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "excel-import-handler"
+          ],
+          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+          "note": "PR #135 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
         },
         "release": {
-          "status": "not_released",
-          "evidence": []
+          "status": "prerelease_v0.3.2",
+          "evidence": [
+            "release-v032"
+          ],
+          "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Реализован этап 1; независимая приёмка на текущем SHA и этап 2 — отдельными назначениями.",
       "plan": "nodes/imports-excel/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "implemented_pending_revalidation"
     },
     {
       "component_id": "component.imports.Kafka",
@@ -4266,13 +4526,21 @@
       "name": "REST-запрос",
       "slug": "integration-restrequest",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "integration.rest_request",
+        "modes": [
+          "request"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/rest-request-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/rest-request-parameters.mjs"
+      },
       "card": "nodes/integration-restrequest/README.md",
       "initial_scope": "Чтение контролируемого HTTP-сервиса по ограниченным входным строкам, параметры запроса и все результаты/ошибки.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Этап 1: GET с параметрами строки запроса из одной входной таблицы и REST-подключением; Content-Type ответа application/json или text/html.",
+        "Прочие методы, сегменты и замена URL, тело, заголовки, retry и auth/TLS — этапы 2+."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4288,11 +4556,13 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "rest-request-handler",
+            "rest-request-parameters",
+            "rest-request-discovery"
+          ],
+          "note": "Регистрация в node-support.mjs и node-contracts.mjs; PR #101 (LAB-88/LAB-91)."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -4301,7 +4571,8 @@
         "client_technical_validation": {
           "status": "not_validated",
           "evidence": [],
-          "standalone_status": "not_revalidated"
+          "standalone_status": "not_revalidated",
+          "note": "PR #101: worker 2/3 на 9f2611040b (LAB-86/LAB-91); кворум независимого проверяющего на том же SHA не зафиксирован."
         },
         "analytical_validation": {
           "status": "not_revalidated_standalone",
@@ -4309,17 +4580,24 @@
           "historical_scope_preserved": false
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "rest-request-handler"
+          ],
+          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
+          "note": "PR #133 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
         },
         "release": {
-          "status": "not_released",
-          "evidence": []
+          "status": "prerelease_v0.3.2",
+          "evidence": [
+            "release-v032"
+          ],
+          "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Реализован этап 1; независимая приёмка на текущем SHA и этапы 2+ — отдельными назначениями.",
       "plan": "nodes/integration-restrequest/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "implemented_pending_revalidation"
     },
     {
       "component_id": "component.integration.SoapRequest",
@@ -4611,9 +4889,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-533: этап 0 завершён с оговоркой «NULL/empty — проверяется на этапе 1 по oracle»; критерии последовательного режима и оговорка — на утверждение владельцу, затем отдельное назначение этапа 1.",
       "plan": "nodes/preprocessing-datapartition/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.preprocessing.Elimoutlier",
@@ -4681,7 +4959,7 @@
       "queue_class": "backlog",
       "handler": null,
       "card": "nodes/preprocessing-sampling/README.md",
-      "initial_scope": "Два отдельных детерминированных метода: Последовательный и Отбор со смещением; размер и параметры каждого заданы отдельно. Случайные/стратифицированные режимы — последующие расширения.",
+      "initial_scope": "Только Последовательный с явным размером в строках; смещение исключено из v0.3.8 решением LAB-533. Остальные методы — следующие этапы.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
         "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
@@ -4727,9 +5005,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-533: этап 0 завершён с оговоркой «NULL/empty — проверяется на этапе 1 по oracle»; критерии последовательного режима и оговорка — на утверждение владельцу, затем отдельное назначение этапа 1.",
       "plan": "nodes/preprocessing-sampling/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.preprocessing.Smoothing",

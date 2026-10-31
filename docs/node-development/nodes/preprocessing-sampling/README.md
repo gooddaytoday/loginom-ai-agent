@@ -1,23 +1,15 @@
 # Сэмплинг
 
-Устойчивый ID: `component.preprocessing.Sampling`. Slug: `preprocessing-sampling`. Исторический номер не назначен.
+Component ID: `component.preprocessing.Sampling`. Runtime proposal:
+`preprocessing.sampling`. Обработчика нет; подплан `ready_for_development`.
 
-[Подплан](plan.md) · [реестр](../../registry.json).
+[Подплан](plan.md) · [Discovery](discovery.md) · [Приёмочный комплект](acceptance/README.md).
 
-## Состояние
-
-Обработчика нет; `discovery_required`. Следующая карточка Multica — этап 0 (живое исследование), отдельно от реализации. Назначение этапа 1 требует закреплённого контракта и решения владельца по общим изменениям: нет.
-Живые наблюдения, CLI и численная приёмка не выполнялись; готовность реестра не менялась.
-
-## Планируемый объём по этапам
-
-- Этап 1 — Последовательный и базовый случайный отбор.
-- Этап 2 — Стратификация и смещение.
-
-Общие изменения: нет в объявленном срезе.
-
-## Источники
-
-- [Сэмплинг](https://help.loginom.ru/userguide/processors/preprocessing/sampling.html) — `loginom-help@353e506b:data/processors/preprocessing/sampling.md`.
-- `e2e-tests@486caef44:tests/toreview/acceptance/wizards/preprocessing/sampling/sampling.ts:202-478 — random/uniform/stratified/sequential/bias; :toreview` — прочитанные исходники, не результат выполнения.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; обработчика нет.
+В v0.3.8 только «Последовательный». Native engine, основные типы, параметры,
+численные результаты и порты подтверждены в UI Loginom 7.4.2. Этап 0 завершён
+с разрешённой оговоркой: **NULL/empty — проверяется на этапе 1 по oracle**;
+четыре новые сессии не дали подтверждённых выходов этих случаев.
+Готовность подплана не означает подтверждение NULL/empty или приёмку обработчика.
+Смещение и случайные/стратифицированные методы — следующие этапы.
+CLI не собирался; run-check/cold NOT_RUN. Критерии и оговорку утверждает владелец
+до этапа 1.

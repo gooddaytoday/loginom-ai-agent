@@ -3,6 +3,8 @@
 import argparse
 import csv
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
+import fcntl
 import io
 import json
 import math
@@ -18,6 +20,11 @@ import time
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
+SCENARIOS = {
+    'C1': dict(model_timeout=2700),
+    '5-REST': dict(model_timeout=2700),
+}
+D76_STATUS = 'PASS с ограничением платформы D76'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -59,16 +66,28 @@ def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
 
+def restore_source_modes(source):
+    # Bun marks workspace bin targets executable. Repair modes only; Git must
+    # still reject edited, staged, deleted and untracked source contents.
+    for entry in git('ls-files', '--stage', '-z', cwd=source).split('\0'):
+        if not entry: continue
+        info, name = entry.split('\t', 1)
+        mode, _, stage = info.split()
+        path = source / name
+        if mode in ['100644', '100755'] and stage == '0' and path.is_file() and not path.is_symlink():
+            os.chmod(path, int(mode, 8) & 0o777)
+
+
 def scenario(name, case_root=None, *, cases=None):
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
-    if cases and re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name):
+    if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
         src = Path(cases).resolve() / name
         if (src / 'task.md').is_file():
             assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
-            return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
+            return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
     if case_root is not None:
-        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
+        if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
         src = Path(case_root).resolve() / name
         config = read(src / 'case.json')
@@ -77,10 +96,43 @@ def scenario(name, case_root=None, *, cases=None):
         source = Path(config['source_path'])
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
-        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+        return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['corr-pairs', 'corr-null', 'corr-age']:
+        src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
+        task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
+                                'corr-null': ('task-null.md', 'expected-null.json', 'null.csv'),
+                                'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
+        return dict(source=src, prompt=src / task, data=src / 'data', base=None,
+                    expected_name=expected, input_files=[data])
+    if name in ['outlier-sd', 'outlier-iqr']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
+        if name == 'outlier-iqr': src = src / 'iqr'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'logreg-enter':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['regex-add', 'regex-replace']:
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/regex',
+                    prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
+                    data=node / 'fixtures/regex', base=None,
+                    expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name == 'n21':
+        src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling', 'data-partition', 'sampling-null', 'sampling-empty', 'data-partition-null', 'data-partition-empty']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        variant = next((v for v in ['null', 'empty'] if name.endswith('-' + v)), None)
+        src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'),
+                    data=src / ('data-' + variant if variant else 'data'), base=None,
+                    expected_name='expected-' + variant + '.json' if variant else 'expected.json')
+    if name in ['join-right', 'join-full', 'join-difference']:
+        src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     stability = DATA / 'stability-2026-10-20'
     base = None
     if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
@@ -112,7 +164,11 @@ def scenario(name, case_root=None, *, cases=None):
 def expected_for(case, package):
     src = case['source']
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
-    if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
+    if case.get('expected_name'):
+        expected = read(src / case['expected_name'])
+        if case['expected_name'] == 'expected-age-pressure.json':
+            expected['outputs'].reverse()  # One final CSV; cold still checks both tables.
+    elif re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
@@ -131,6 +187,7 @@ def arguments(argv=None):
     start.add_argument('--scenarios', required=True)
     start.add_argument('--pair', type=Path, required=True)
     start.add_argument('--build', type=Path)
+    start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
@@ -160,10 +217,15 @@ def summary(report):
             '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
-        rows.append('| ' + ' | '.join([r['scenario'], 'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'),
+        outcome = ('подготовка' if r.get('status') == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' else
+                   'не запущен (бюджет пакета)' if r.get('status') == 'NOT_RUN' else r.get('status', 'RUNNING'))
+        rows.append('| ' + ' | '.join([r['scenario'], outcome,
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
+        if r.get('d76'):
+            rows.append(f"\nD76 {r['scenario']}: negative_zero={r['d76']['negative_zero']}; "
+                        f"midnight_date={r['d76']['midnight_date']}")
         if r.get('dataset-cleanup'):
             rows.append('\nD87 ' + r['scenario'] + ': ' + r['dataset-cleanup'])
         if r.get('status') == 'FAIL':
@@ -192,17 +254,91 @@ def csv_delimiter(path):
         raise
 
 
-def check_csv(path, expected, header='names', *, column_order=None):
+def export_null_marker(events, destination):
+    # Requests identify the exact export file. Existing-node patches can retain
+    # omitted settings, so only their correlated final UI readback is authoritative.
+    readbacks = {}
+    def collect(value):
+        if isinstance(value, dict):
+            configuration = value.get('configuration', {})
+            if (value.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
+                    and configuration.get('readback', {}).get('kind') == 'text_export'):
+                readbacks[value.get('operation_id')] = configuration['readback']
+            for item in value.values(): collect(item)
+        if isinstance(value, list):
+            for item in value: collect(item)
+    for _, event in events:
+        state = event.get('part', {}).get('state', {})
+        if event.get('type') != 'tool_use' or state.get('status') != 'completed': continue
+        try: collect(json.JSONDecoder().raw_decode(state.get('output', ''))[0])
+        except (ValueError, TypeError): continue
+    found, marker, node = False, None, None
+    for _, event in events:
+        part = event.get('part', {})
+        state = part.get('state', {})
+        request = state.get('input', {})
+        if (event.get('type') != 'tool_use' or part.get('tool') != 'loginom_dock_node_apply'
+                or state.get('status') != 'completed' or request.get('target', {}).get('type') != 'exports.text'
+                or request.get('finish') == 'close'): continue
+        parameters = request.get('parameters', {})
+        readback = readbacks.get(request.get('operation_id'), {})
+        if request.get('target', {}).get('kind') == 'new':
+            if parameters.get('destination') != destination: continue
+            found, marker = 'null_marker' in parameters, parameters.get('null_marker')
+            node = readback.get('node')
+        elif ((readback.get('destination') or parameters.get('destination')) == destination
+              or node is not None and request.get('target', {}).get('ref') == node):
+            settings = readback.get('settings', {})
+            found = readback.get('destination') == destination and 'null_marker' in settings
+            marker, node = settings.get('null_marker'), readback.get('node', node)
+    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or correlated patch readback required for ' + str(destination)
+    assert isinstance(marker, str) and marker in ['', '?', 'null', 'NULL'], 'CSV_NULL_MARKER_UNSUPPORTED'
+    return marker
+
+
+def check_csv(path, expected, header='names', *, column_order=None, null_marker='', scenario_name=None, d76=None,
+              export_events=(), destination=None):
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
+    infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
+    if infer_marker:
+        null_marker = export_null_marker(export_events, destination)
+        assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
+                       for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
+    elif null_marker is None:
+        null_marker = ''
     assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
     assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
     assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
 
+    def limitation(value, col, target):
+        # Owner-approved D76 forms are code-owned and only apply to types300.
+        if scenario_name != 'types300': return None
+        if (col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
+                and math.copysign(1, target) < 0 and value == '0'):
+            return 'negative_zero'
+        if col['type'] == 'datetime' and isinstance(target, str):
+            goal = datetime.fromisoformat(target)
+            if (goal.hour == goal.minute == goal.second == 0 and goal.microsecond != 0
+                    and value == goal.date().isoformat()):
+                return 'midnight_date'
+        return None
+
     def equal(value, col, target):
+        if target is None: return value == null_marker
+        if infer_marker and value == null_marker: return False
+        if limitation(value, col, target): return True
+        if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
+            try:
+                if col['type'] == 'integer':
+                    number = Decimal(value)
+                    return number.is_finite() and number == Decimal(str(target))
+                number, goal = float(value), float(target)
+                return (math.isfinite(number) and math.isfinite(goal) and number == goal
+                        and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
+            except (ValueError, InvalidOperation, OverflowError): return False
         if col.get('category_labels_any'): return bool(value.strip())
-        if target is None: return value == ''
         if col['type'] in ['integer', 'real']:
             try:
                 number = float(value.replace(',', '.'))
@@ -264,6 +400,13 @@ def check_csv(path, expected, header='names', *, column_order=None):
             key, value = expected['rows'][want][columns[i]['name']], rows[actual + 1][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
+    if scenario_name == 'types300' and d76 is not None:
+        counts = dict(negative_zero=0, midnight_date=0)
+        for want, actual in enumerate(pairs):
+            for i, col in enumerate(columns):
+                kind = limitation(rows[actual + 1][indices[i]], col, expected['rows'][want][col['name']])
+                if kind: counts[kind] += 1
+        d76.update(counts)
     return delimiter
 
 
@@ -396,11 +539,17 @@ class Runner:
                     if time.time() >= end:
                         daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))
                         assert child.pid != daemon['pid'], 'Cannot terminate daemon'
-                        os.killpg(child.pid, signal.SIGINT)
-                        try: child.wait(timeout=40)
+                        # The CLI owns runtime close/ACK. Let it close children
+                        # before interrupting the whole process group.
+                        child.send_signal(signal.SIGINT)
+                        # Host teardown already allows up to 90 seconds.
+                        try: child.wait(timeout=100)
                         except subprocess.TimeoutExpired:
-                            os.killpg(child.pid, signal.SIGKILL)
-                            child.wait()
+                            os.killpg(child.pid, signal.SIGINT)
+                            try: child.wait(timeout=40)
+                            except subprocess.TimeoutExpired:
+                                os.killpg(child.pid, signal.SIGKILL)
+                                child.wait()
                         raise TimeoutError(name + ' deadline')
                     try: child.wait(timeout=1)
                     except subprocess.TimeoutExpired: pass
@@ -414,19 +563,40 @@ class Runner:
     def build(self):
         cache = Path.home() / '.cache/loginom-run-check' / socket.gethostname() / self.report['head']
         build = Path(self.options['build']) if self.options['build'] else cache / 'cli'
-        if not (build / 'cli-manifest.json').exists():
-            assert not self.options['build'], 'Provided build has no manifest'
-            cache.mkdir(parents=True, exist_ok=True)
-            source = cache / 'source'
-            if not source.exists(): git('worktree', 'add', '--detach', str(source), self.report['head'])
-            assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
-            bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-            env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
-            self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
-            os.chmod(source / 'packages/cli/bin/lildax.cjs', int(git('ls-files', '--stage', 'packages/cli/bin/lildax.cjs', cwd=source).split()[0], 8) & 0o777)
-            assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
-            self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
-        meta = read(build / 'cli-manifest.json')['metadata']
+        cache.mkdir(parents=True, exist_ok=True)
+        # Same-SHA runs share both source/node_modules and the final artifact.
+        # Lock before checking either, and let the OS release it on worker exit.
+        with (cache / 'prepare.lock').open('a') as lock:
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() >= self.deadline: raise TimeoutError('build preparation lock deadline')
+                    time.sleep(1)
+            if not (build / 'cli-manifest.json').exists():
+                assert not self.options['build'], 'Provided build has no manifest'
+                source = cache / 'source'
+                if not source.exists(): git('worktree', 'add', '--detach', str(source), self.report['head'])
+                restore_source_modes(source)
+                assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
+                bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
+                # Keep Bun's shared warm cache; serialize installations across
+                # SHAs on this host, releasing the lock before compilation.
+                with (cache.parent / 'bun-install.lock').open('a') as install_lock:
+                    while True:
+                        try:
+                            fcntl.flock(install_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            break
+                        except BlockingIOError:
+                            if time.time() >= self.deadline: raise TimeoutError('bun install lock deadline')
+                            time.sleep(1)
+                    self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
+                restore_source_modes(source)
+                assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
+                self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
+            meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
         self.report.update(build=str(build), metadata=meta)
         self.save()
@@ -516,7 +686,15 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('local_file') and spec['attachment'] == 'path':
+            prompt = prompt.replace('{{SOURCE_PATH}}', str(spec['local_file']))
+            if spec.get('upload_only') and str(spec['local_file']) not in prompt:
+                # Seed identity comes from case.json, never a copied task's old host path.
+                prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
+        rejection = expected.get('rejection')
+        if rejection is not None:
+            assert rejection == dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data') and expected['outputs'] == [], 'INVALID_REJECTION_ORACLE'
         filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
         exports = ([Path(output['export_destination']).name for output in expected['outputs']]
                    if spec.get('external') else
@@ -524,15 +702,18 @@ class Runner:
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
-        if not exports and not spec.get('upload_only'):
-            count = 2 if src.parent.name == 'datamining-clustering' else 1
+        if spec.get('upload_only') or rejection: exports = []
+        if not exports and not spec.get('upload_only') and not rejection:
+            count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
-            prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+            prompt += f'\nСохрани пакет как {package}.'
+            if not rejection: prompt += ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
@@ -546,6 +727,7 @@ class Runner:
         # README exceptions: p14 tests Excel, and the regression base uses only
         # train.csv; its other fixtures belong to later operator scenarios.
         if case == 'p14': files = [spec['data'] / 'exhibits.xlsx']
+        if spec.get('input_files'): files = [spec['data'] / name for name in spec['input_files']]
         if isinstance(case, Path) and src.parent.name == 'datamining-linregression':
             files = [spec['data'] / 'train.csv']
         if spec.get('local_file'):
@@ -558,7 +740,7 @@ class Runner:
             shutil.copyfile(file, target)
             command += ['--file', target]
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
-        self.phase('model', command + ['--', prompt], folder, env=env, cwd=workspace)
+        self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = []
@@ -575,8 +757,21 @@ class Runner:
                 and c.get('state', {}).get('input', {}).get('action_key') in ['package.save_checkpoint', 'package.save_as']
                 for c in calls) and not any(o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] for _, o in replies), 'UNEXPECTED_SAVE'
             assert not any(c.get('tool') == 'loginom_dock_node_apply' for c in calls), 'UNEXPECTED_NODE'
-            assert sum(c.get('tool') == 'loginom_dock_artifact_deliver' for c in calls) == 1, 'UPLOAD_COUNT'
-            assert any(o.get('upload_status') == 'ready' and o.get('status') == 'SUCCEEDED'
+            uploads = []
+            for call in calls:
+                if call.get('tool') != 'loginom_dock_artifact_deliver': continue
+                state = call.get('state', {})
+                # Validation failures with no possible effect never reach the browser.
+                try: rejected = json.JSONDecoder().raw_decode(state.get('error', ''))[0]
+                except (ValueError, TypeError): rejected = None
+                if (state.get('status') == 'error' and isinstance(rejected, dict)
+                        and rejected.get('request_rejected') is True and rejected.get('effect_possible') is False
+                        and rejected.get('status') == 'NOT_APPLIED' and rejected.get('state') == 'settled'
+                        and rejected.get('action_key') == 'request.validate'):
+                    continue
+                uploads.append(call)
+            assert len(uploads) == 1, 'UPLOAD_COUNT'
+            assert any(o.get('upload_status', 'ready') == 'ready' and o.get('status') == 'SUCCEEDED'
                        and o.get('state') == 'settled' and o.get('cleanup_complete') is True
                        and o.get('output', {}).get('bytes') == spec['local_file'].stat().st_size
                        and o.get('output', {}).get('upload_completion_verified') is True for _, o in replies), 'UPLOAD_NOT_READY'
@@ -590,9 +785,48 @@ class Runner:
             return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
+        if rejection:
+            overwritten, guarded = False, None
+            requests = {}
+            for n, event in events:
+                part = event.get('part', {})
+                state = part.get('state', {})
+                if event.get('type') != 'tool_use' or state.get('status') not in ['completed', 'error']: continue
+                request = state.get('input', {})
+                if part.get('tool') == 'loginom_dock_node_apply' and request.get('operation_id'):
+                    requests[request['operation_id']] = request
+                try: reply = json.JSONDecoder().raw_decode(state.get('output' if state['status'] == 'completed' else 'error', ''))[0]
+                except (ValueError, TypeError): continue
+                if not isinstance(reply, dict): continue
+                if reply.get('action_key') == 'operation.inspect':
+                    reply = reply.get('output', {}).get('outcome', {})
+                if reply.get('state') == 'running': continue
+                request = requests.get(reply.get('operation_id'), request)
+                if (request.get('target', {}).get('type') == 'exports.text'
+                        and request.get('parameters', {}).get('overwrite') == 'replace'
+                        and request.get('finish') == 'execute' and reply.get('status') == 'SUCCEEDED'):
+                    overwritten = True
+                if overwritten and request.get('target', {}).get('type') == rejection['node_type']:
+                    result = reply['output'] if 'execution' in reply.get('output', {}) else reply
+                    assert (request.get('finish') == 'execute' and reply.get('status') == 'NOT_APPLIED'
+                            and reply.get('error', {}).get('code') == rejection['code']
+                            and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True
+                            and result.get('execution', {}).get('status') == 'not_requested'
+                            and result.get('output', {}).get('status') == 'not_refreshed'
+                            and result.get('output', {}).get('ports') == []), 'TAMPER_REJECTION_INVALID'
+                    guarded = n
+                if guarded:
+                    # A later successful read must never turn stale rows into PASS.
+                    assert not any(ports(reply)), 'TAMPER_STALE_ROWS'
+            assert guarded is not None, 'TAMPER_REJECTION_MISSING'
+            assert any(n > guarded and o.get('status') == 'SUCCEEDED'
+                       and o.get('action_key') in ['package.save_checkpoint', 'package.save_as']
+                       and o.get('output', {}).get('save_completed') is True for n, o in replies), 'SAVE_AFTER_REJECTION_MISSING'
+            self.current['rejection'] = 'PASS'
+            self.current['rejection_location'] = str(folder / 'model.stdout') + ':' + str(guarded)
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
-        invalid = port_failure(replies, folder / 'model.stdout')
+        invalid = port_failure(replies, folder / 'model.stdout') if not rejection or any(ports([o for _, o in replies])) else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -602,25 +836,36 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if rejection:
+            self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
+            return session, expected, None, None
         header = spec.get('csv_header', 'names')
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
-            if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
+            if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)
                 continue
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
+            counts = {}
             delimiter = check_csv(actual, expected['outputs'][index], header,
-                                  column_order='any' if isinstance(case, Path) else None)
-        self.current['csv'] = 'PASS'
+                                  column_order='any' if isinstance(case, Path) else None,
+                                  null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
+                                  export_events=events, destination=destination)
+            if counts: self.current['d76'] = counts
+        self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
     def run(self):
         try:
             build = self.build()
+            if self.options.get('prepare_only'):
+                for result in self.report['runs']:
+                    result.update(status='NOT_RUN', reason='PREPARE_ONLY', preparation_only=True)
+                return
             account = read(Path(self.options['pair']) / 'worker.json')
             login = pair_login(account, 'worker.json')
             for r in self.report['runs']:
@@ -651,15 +896,16 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
-                    if self.options['cold'] and not spec.get('upload_only'):
+                    assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
+                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names'), *(['--exact-port-windows'] if case == 'types300' else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         r.update(cold='PASS', cleanup='both PASS')
-                    r['status'] = 'FAIL' if r.get('failure_class') else 'PASS'
+                    r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
                         r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
@@ -691,15 +937,16 @@ def main():
             report = read(args.directory / 'results.json')
             if report.get('finished'):
                 print(summary(report), end='')
-                return 0 if all(r['status'] == 'PASS' for r in report['runs']) else 1
+                return 0 if all(r['status'] in ['PASS', D76_STATUS] or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
             if time.monotonic() >= end:
-                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
+                ready = sum(r['status'] in ['PASS', D76_STATUS, 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
+    assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         spec = scenario(name, args.case_root, cases=args.cases)
         if spec.get('generated'): continue

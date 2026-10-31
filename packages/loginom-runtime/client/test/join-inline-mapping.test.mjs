@@ -26,3 +26,22 @@ test('Join conditional output refuses invented exclusion sources or inherited fi
   const {configuration,native}=fixture();mutate(native);assert.throws(()=>validateJoinInlineSources(configuration,native));
  }
 });
+
+test('Join full to difference prunes only obsolete right fields and difference to full restores their sources',()=>{
+ const {configuration}=fixture();configuration.mode='difference';
+ const [left,right]=configuration.input_fields;
+ const target=(source,index)=>({...source,index,group_index:index,source,exclusion_source:null,excluded:false,inherited:false});
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,node_context:{node_id:'owned'},
+  source_fields:left,target_fields:[...left.map(target),{...target(right[1],2),source:null}]};
+ const obsolete=validateJoinInlineSources(configuration,native);
+ assert.deepEqual(obsolete.map(f=>f.name),['RValue']);
+ const after={...native,target_fields:native.target_fields.slice(0,2)};
+ assert.equal(verifyGroupingStaleRemoval(native,after,obsolete[0]),true);
+ assert.deepEqual(validateJoinInlineSources(configuration,after),[]);
+ configuration.mode='full';
+ const expanded={...after,source_fields:[...left,right[1]]};
+ assert.deepEqual(validateJoinInlineSources(configuration,expanded),[]);
+ assert.equal(expanded.source_fields.length,3);assert.equal(expanded.target_fields.length,2);
+ const synced={...expanded,target_fields:expanded.source_fields.map(target)};
+ assert.deepEqual(validateJoinInlineSources(configuration,synced),[]);
+});

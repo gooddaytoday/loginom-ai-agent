@@ -8,32 +8,35 @@ const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
 
-function coveredImport({existing=false,foreign=false,unknown=false}={}) {
+function coveredImport({existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={}}={}) {
  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
- const actions=[];let covered=true,opened=false,pending;
+ const actions=[],records=[];let covered=!repaint,opened=false,pending,generation=0;
  const graphTid='MF;TF-1;Graph;Import';
- const state=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+ const state=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,graph_identity:{status:'observed',container_ref:'graph'},dom_epoch:{document:'dom',revision:1},scan:{complete:true},
   prepared_node_context:{...node,node_id:foreign&&!covered?'foreign':node.node_id,verified:true,surface:opened?'wizard':'graph',tid:graphTid,locked:false},
   wizard:opened?{status:'observed',stage:'text_import_file',root_tid:'wizard',root_ref:'wizard',
    owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:'node',label:'Import'},{tid:'wizard',label:'Wizard'}]},
    import_source:{fields:Object.fromEntries(Object.entries({source_path:'',connection:'file',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}).map(([k,value])=>[k,{status:'observed',value}]))}}:{status:'absent'},
   ui:{masks:[],dialogs:[],truncated:{masks:false,dialogs:false},elements:[
-   {ref:'ui-body',tid:graphTid,graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:covered?'point_not_observed':'point_observed',...(covered?{covering:[{anchor_tid:graphTid+';NodesControls'}]}:{})}},
+   {ref:'ui-body'+(generation?'-'+generation:''),tid:graphTid,scope:'graph',identity:{anchor_tid:graphTid,path:[]},signature:{tag:'g'},graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:covered?'point_not_observed':'point_observed',...(covered?{covering:[{anchor_tid:graphTid+';NodesControls'}]}:{})}},
    {ref:'ui-label',tid:graphTid+';Label;Label',label:'Import',graph_node:{part:'label'},allowed_actions:['click'],interaction:{state:'point_observed'}},
    {ref:'ui-settings',tid:graphTid+';Setting',allowed_actions:['open_wizard','begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:workflow.navigation_path},interaction:{state:'point_observed'}}]}});
  const support=createTextImportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
  const driver=support.nodeApplyDriverFactory({operation:{id:'import',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{...request(),target:{kind:existing?'existing':'new'},parameters:params()}}},
-  now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{if(e.phase==='node_step_prepared')pending=e;return e;},execute:async()=>{
+  now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{records.push(e);if(e.phase==='node_step_prepared')pending=e;return e;},execute:async()=>{
    if(!pending)return {status:'SUCCEEDED',output:state()};
    const step=pending;pending=null;const a=step.action;actions.push(a);
-   const refused=a.ref==='ui-body'&&covered;
+   const stale=repaint&&a.ref.startsWith('ui-body')&&generation<refusals;
+   if(stale)generation++;
+   const refused=stale||a.ref==='ui-body'&&covered;
    if(a.ref==='ui-label')covered=false;
    if(a.ref==='ui-settings')opened=true;
    return {operation_id:step.internal_operation_id,action_key:'ui.act',status:unknown&&a.ref==='ui-label'?'AMBIGUOUS':refused?'NOT_APPLIED':'SUCCEEDED',
     phase:refused?'preconditions':'completed',effect_possible:!refused,cleanup_complete:!unknown,
-    error:refused?{code:'UI_REFERENCE_OBSCURED',message:'The observed control has no verified visible interaction point'}:null,trace:[]};
+    error:refused?{code:stale?'UI_REFERENCE_STALE':'UI_REFERENCE_OBSCURED',message:'The observed control is replaced or covered'}:null,trace:[],
+    ...(stale?{output:state(),...receiptChange}:{})};
   }});
- return {actions,run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
+ return {actions,records,run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
 }
 for(const existing of [false,true])test('import opens through its label when hover controls cover the body, existing: '+existing,async()=>{
  const f=coveredImport({existing});assert.equal((await f.run()).verified,true);
@@ -42,6 +45,20 @@ for(const existing of [false,true])test('import opens through its label when hov
 test('import selection stops after an unknown label gesture or changed native owner',async()=>{
  for(const options of [{unknown:true},{foreign:true}]){
   const f=coveredImport(options);await assert.rejects(f.run());assert.deepEqual(f.actions.map(a=>a.ref),['ui-label']);
+ }
+});
+for(const existing of [false,true])test('import opening refreshes one replaced graph body, existing: '+existing,async()=>{
+ const f=coveredImport({existing,repaint:true});assert.equal((await f.run()).verified,true);
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-body','ui-body-1','ui-settings']);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,1);
+ const retry=f.records.findIndex(e=>e.phase==='node_step_refresh_authorized');
+ assert.ok(f.records.slice(retry+1).some(e=>e.phase==='node_observation_completed'));
+});
+test('import opening refuses a second replacement or an uncertain first click',async()=>{
+ for(const options of [{refusals:2},{receiptChange:{effect_possible:true}},{receiptChange:{cleanup_complete:false}},
+  {receiptChange:{status:'AMBIGUOUS'}},{receiptChange:{trace:[{event:'ui_gesture_applied'}]}}]){
+  const f=coveredImport({repaint:true,...options});await assert.rejects(f.run());
+  assert.equal(f.actions.length,options.refusals===2?2:1);
  }
 });
 const persistedImport=()=>({operation_id:'activate-import',contract_revision:'1.0.0',document_id:'doc',

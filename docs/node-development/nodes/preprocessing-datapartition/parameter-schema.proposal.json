@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "train_count": {"type": "integer", "minimum": 0, "description": "Explicit training size in rows; train plus test must not exceed input size."},
+    "test_count": {"type": "integer", "minimum": 0, "description": "Explicit test size in rows."},
+    "order": {"type": "string", "enum": ["test_train_unused", "train_test_unused"], "description": "Sequential allocation order. Combined port 0 is train then test, prefixed by Boolean IsTestSet; ports 1/2 retain input fields and row order."}
+  },
+  "required": ["train_count", "test_count", "order"],
+  "additionalProperties": false
+}

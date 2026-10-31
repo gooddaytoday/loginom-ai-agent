@@ -43,11 +43,12 @@ export function readReplacementBrowser(prefix){
   }
   return null;
  };
- const pairs=[],seen=new Set();for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
+ const pairs=[],seen=new Set(),groups=new Set();for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||seen.has(id)||![0,1].includes(d?.CollectionID))return fail('replacement_table_record');seen.add(id);
-  if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType'))continue; // Empty group placeholder.
-  if(d.CollectionID!==0||types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type)return fail('replacement_unsupported_rule');
-  const from=typed(d.ValueRender,field.type),to=typed(d.ReplaceRender,field.type);
+  if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType')&&!Object.hasOwn(d,'RegularExpression')&&!Object.hasOwn(d,'ReplacementType'))continue; // Empty group placeholder.
+  groups.add(d.CollectionID);if(groups.size>1)return fail('replacement_mixed_exact_regex');
+  if(d.CollectionID===0?(types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type):(field.type!=='string'||d.ReplacementType!==0||typeof d.RegularExpression!=='string'||typeof d.Replacement!=='string'))return fail('replacement_unsupported_rule');
+  const from=typed(d.CollectionID===1?d.RegularExpression:d.ValueRender,field.type),to=typed(d.CollectionID===1?d.Replacement:d.ReplaceRender,field.type);
   if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.index===d.Index))return fail('replacement_typed_value');
   pairs.push({record_id:id,index:d.Index,from,to});
  }
@@ -63,5 +64,5 @@ export function readReplacementBrowser(prefix){
   to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
   other:separator('edtReplaceOtherFloat'),
  }:null;
- return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,pairs,other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
+ return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
 }

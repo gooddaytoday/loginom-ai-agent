@@ -208,8 +208,12 @@ async function browserArtifactReveal(page,task,snapshot) {
 // Listen on the existing authenticated context. Keep Playwright's configured
 // download directory and behavior; only enable CDP events for this listener.
 export async function browserServerDownloadProgress(page,task) {
-  const session=await page.context().newCDPSession(page);
-  let native,closed=false,chromiumBytes=0;
+  // Chromium resets the context's download permission when the session that
+  // set it detaches. Reuse one Page-owned session until the context closes;
+  // per-transfer close removes listeners and native handles only.
+  const key=Symbol.for('loginom-dock.download-progress-session.v1');
+  const session=page[key]??=await page.context().newCDPSession(page);
+  let native,closed=false,chromiumBytes=0,onBegin,onProgress;
   try {
     // Loginom receives the file into native Blob chunks over its WebSocket
     // before emitting Download. Retain this controller privately, without
@@ -263,23 +267,30 @@ export async function browserServerDownloadProgress(page,task) {
           progress.bytes=Math.max(progress.bytes,bytes);
         }catch{if(!closed)progress.failed=true;}
       },
-      close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
-    session.on('Browser.downloadWillBegin',event=>{
+      close:async()=>{if(closed)return;closed=true;
+        session.off('Browser.downloadWillBegin',onBegin);session.off('Browser.downloadProgress',onProgress);
+        await native?.dispose();}};
+    onBegin=event=>{
       if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
       if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
       if(progress.guid){progress.failed=true;return;}
       progress.guid=event.guid;progress.url=event.url;
-    });
-    session.on('Browser.downloadProgress',event=>{
+    };
+    onProgress=event=>{
       if(event.guid!==progress.guid||progress.failed)return;
       if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<chromiumBytes
         ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
       chromiumBytes=event.receivedBytes;progress.bytes=Math.max(progress.bytes,chromiumBytes);
-    });
+    };
+    session.on('Browser.downloadWillBegin',onBegin);session.on('Browser.downloadProgress',onProgress);
     await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
       browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
     return progress;
-  }catch(error){try{await native?.dispose();}finally{await session.detach();}throw error;}
+  }catch(error){
+    if(onBegin)session.off('Browser.downloadWillBegin',onBegin);
+    if(onProgress)session.off('Browser.downloadProgress',onProgress);
+    await native?.dispose();throw error;
+  }
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
@@ -525,18 +536,33 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       // Loginom's completed-download notification is an Ext window, so the
       // global dialog guard still sees it until its own close timer fires.
       // Bind that exact native toast; never dismiss it or repeat the download.
-      const binding=await page.evaluateHandle(function bindDownloadToast(){
-        const matches=document.querySelectorAll('[data-tid="toast"]'),element=matches[0];
-        if(matches.length!==1||!element.isConnected||typeof element.className!=='string'
-          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c))
-          ||element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return null;
+      const binding=await page.evaluateHandle(function bindDownloadToast(observed){
+        const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=state?.refs?.get(observed.ref)?.deref();
+        // Keep the observed incarnation, including after its close timer detached
+        // it. An absent selector alone cannot prove that an unknown toast closed.
+        const refused=predicate=>({refused:predicate,diagnostic:{count:matches.length,
+          class_name:typeof (matches[0]??element)?.className==='string'?(matches[0]??element).className.slice(0,512):null,
+          text:typeof (matches[0]??element)?.textContent==='string'?(matches[0]??element).textContent.slice(0,512):null}});
+        if(state?.document!==document||!element)return refused('observed_element');
+        if(typeof observed.class_name!=='string'||typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>observed.class_name.split(/\s+/).includes(c)
+            &&element.className.split(/\s+/).includes(c)))return refused('download_classes');
+        if(typeof observed.text!=='string'||observed.text.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return refused('download_text');
+        // LAB-625: Loginom clears the detached toast's text before binding.
+        // Its observed text and native classes still belong to this exact ref.
+        if(!element.isConnected&&matches.length===0
+          &&element.className.split(/\s+/).some(c=>c==='x-hidden-offsets'||c==='x-hidden'))return {document,element,classes:element.className};
+        if(element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return refused('download_text');
+        if(matches.length!==1||matches[0]!==element||!element.isConnected)return refused('same_element');
         const box=element.getBoundingClientRect(),style=getComputedStyle(element);
-        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return null;
+        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return refused('visible');
         return {document,element,classes:element.className};
-      });
+      },after.output.ui.dialogs[0]);
       const inspect=()=>page.evaluate(function inspectDownloadToast(b){
         const changed=predicate=>({state:'changed',predicate});
         if(!b)return changed('binding_present');
+        if(b.refused)return {...changed(b.refused),diagnostic:b.diagnostic};
         if(document!==b.document)return changed('same_document');
         const matches=document.querySelectorAll('[data-tid="toast"]');
         if(!b.element.isConnected&&matches.length===0)return {state:'closed'};
@@ -572,7 +598,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
             // is settlement, while replacement or another dialog still refuses.
             if(state.state==='changed'){refused('native_toast',state.predicate,state.state);break;}
           }
-        }else refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+        }else {
+          refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+          if(initial.diagnostic)trace.push({event:'download_toast_binding_diagnostic',...initial.diagnostic});
+        }
       }finally{await binding.dispose();}
     }
     if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
@@ -653,7 +682,7 @@ export function makeServerSourceDownloadCode(options) {
     ||m[0].storage_entry?.path!==b.destination||m[0].storage_entry?.bytes_source!=='native_file_store')
     throw Error('Server download requires its exact native file row');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
-  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
   const transfer=`(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()},${browserServerDownloadProgress.toString()})`;
   if(!options.browser_downloads_path)return `async page=>${transfer}`;
@@ -682,7 +711,7 @@ export function makeNativeOutputDownloadCode(options){
    ||matches[0].storage_entry?.bytes!==options.expected_bytes||s.file_storage?.directory!==b.directory)throw Error('Native output download binding differs');
  requireExportDestination(b.destination,options.storage_directories);
  const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
- const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+ const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
  const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
  return `async page=>(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }
@@ -702,7 +731,7 @@ export function makeArtifactDownloadCode(options) {
   // Upload may have observed the folder tree. Verification owns the separately
   // issued exact CSV/TSV/TXT/XLSX ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
-  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
   return `async (page) => (${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }
@@ -1316,7 +1345,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       node = node.ParentNode;
     }
-    throw new Error('Active workflow has no verified cached package identity');
+    throw new Error('Active navigation has no verified cached package identity. Call dock_prepare with intent:"existing_workflow" and the latest runtime workflow_ref including document_id (use saved workflow_continuations after Save), then retry Save with a new operation_id. After LOGINOM_FILE_CHANGED this restores navigation only; full-source execution still requires a new download and exact scan.');
   });
   const normalizeStoredPath = value => {
     if (typeof value !== 'string' || !value.trim()) return null;
@@ -1790,7 +1819,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = false }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -1799,17 +1828,36 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   let storageNavigating=false;
-  const inspectServerSource=(ref,{signal,deadline}={})=>serverSources.inspect(ref,options=>{
+  const waitDownloadConnection=async(call,{signal,deadline,operation_id})=>{
+    let recorded=false;
+    while(true){
+      signal?.throwIfAborted();
+      if(deadline!==undefined&&now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+      try{return await call();}catch(error){
+        const diagnostic=operationFailureDiagnostic(error);
+        // Only the existing guard's bounded, same-session recovery is retryable.
+        // Identity loss, a missing job and unknown browser effects remain fatal.
+        if(deadline===undefined||diagnostic.code!=='LOGINOM_DISCONNECTED'
+          ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+        if(!recorded){await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});recorded=true;}
+        await new Promise(resolve=>setTimeout(resolve,Math.min(250,Math.max(1,deadline-now()))));
+      }
+    }
+  };
+  const inspectServerSource=(ref,{signal,deadline,storageSession,operation_id}={})=>waitDownloadConnection(()=>serverSources.inspect(ref,options=>{
     signal?.throwIfAborted();const timeout=Math.min(35000,deadline===undefined?35000:deadline-now());
     if(timeout<=0)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
     return execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout});
+      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout,storageSession});
+  }),{signal,deadline,operation_id}).catch(async error=>{
+    if(operation_id)await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});
+    throw error;
   });
-  const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
-  const drainServerDownload=async id=>{
-    const cancelled=await controlServerDownload(id,'cancel');
+  const controlServerDownload=(operation_id,mode,options)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`,{storageSession:'download-control',...options});
+  const drainServerDownload=async(id,options={})=>{
+    const cancelled=await controlServerDownload(id,'cancel',options);
     if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
-    const released=await controlServerDownload(id,'release');
+    const released=await controlServerDownload(id,'release',options);
     if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
   };
   const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
@@ -1828,17 +1876,33 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
       let started;
-      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now())});}
-      catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});}
+      catch(error){await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});error.cleanupUnconfirmed=true;throw error;}
       await onRecord({phase:'storage_download_started',operation_id,outcome:started});
       if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
         const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
         error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
       }
+      let primary,connectionWaiting=false;
       try {
         while(true) {
           signal.throwIfAborted();
-          const current=await controlServerDownload(operation_id,'status');
+          if(now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          let current;
+          try{
+            current=await controlServerDownload(operation_id,'status',
+              {signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});
+            connectionWaiting=false;
+          }catch(error){
+            const diagnostic=operationFailureDiagnostic(error);
+            if(diagnostic.code!=='LOGINOM_DISCONNECTED'
+              ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+            if(!connectionWaiting)await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});
+            connectionWaiting=true;
+            // Keep the normal recovery attempt even mid-transfer, but always
+            // account for already received bytes while that attempt is pending.
+            current=await controlServerDownload(operation_id,'status',{signal,timeout:Math.max(1,deadline-now())});
+          }
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           onProgress(current.output.bytes);
           if(current.output.state==='settled'){
@@ -1849,7 +1913,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           await new Promise(resolve=>setTimeout(resolve,250));
         }
-      }finally{try{await drainServerDownload(operation_id);}catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}}
+      }catch(error){
+        primary=error;await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});throw error;
+      }finally{
+        try{await drainServerDownload(operation_id);}
+        catch(error){
+          await onRecord({phase:'storage_download_cleanup_failed',operation_id,error:operationFailureDiagnostic(error)});
+          if(primary)primary.cleanupUnconfirmed=true;
+          else{error.cleanupUnconfirmed=true;throw error;}
+        }
+      }
     } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
@@ -2677,10 +2750,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name,{signal}={}) {
+    serverDownload(request,name,{signal,sourceOperation,deadlineAt}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
       if(name==='dock_storage_source')return (async()=>{
-        if(storageNavigating||serverDownloads.unsettled||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+        if(storageNavigating||serverDownloads.unsettled||running||pending
+          ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
@@ -2693,13 +2767,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(previous.outcome);
         }
         auxiliary.set(id,{signature});storageNavigating=true;
-        const deadline=now()+120000;let step=0;
+        const deadline=Math.min(now()+90000,deadlineAt??Infinity);let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const readPages=async options=>{
+          const original=options.rootRef?observations.get(options.observationId):null;
+          const scrollOnly=original?.ui.elements.some(e=>e.ref===options.rootRef
+            &&e.tid===original.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl');
+          const hasScrollAnchor=output=>scrollOnly&&output.file_storage?.status==='observed'
+            &&output.ui.elements.some(e=>e.tid?.startsWith(output.workflow_ref.prefix+';FileStorageForm;colName_')
+              &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
+            // The table probe needs a delivered scroll owner, not every row.
+            // Targeted row reads still consume all pages for their witness.
+            if(hasScrollAnchor(output))break;
             if(page>=32)throw Error('Server storage observation page limit');
             const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
             if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
@@ -2740,7 +2823,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
-          const original=binding(s);let quiet=null;
+          const original=binding(s),rootIdentity=s.observation_root?.identity??e.identity??{anchor_tid:e.tid,path:[]};let quiet=null;
           for(let attempt=0;attempt<3;attempt++){
             let previous=null;
             s=await ready(async()=>{
@@ -2758,6 +2841,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               ||result.cleanup_complete!==true||result.error?.code!=='UI_EPOCH_CHANGED'||attempt===2
               ||!Array.isArray(result.trace)||result.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event)))
               throw Error('Server storage navigation requires inspection: '+result.operation_id);
+            // uiAct consumes the issued observation even for a no-effect
+            // refusal. Reissue the same owner/target before the next read.
+            const discovered=await read({scope:'roots',...(e.storage_entry?{storageName:e.label}:{})});
+            if(!same(binding(discovered).slice(0,4),original.slice(0,4)))throw Error('Server storage owner changed');
+            const root=one(discovered.ui.elements.filter(item=>same(item.identity??{anchor_tid:item.tid,path:[]},rootIdentity)));
+            const fresh=await detail(discovered,root);
+            const matches=fresh.ui.elements.filter(item=>item.tid===e.tid&&same(item.identity,e.identity)&&same(item.signature,e.signature));
+            if(!same(binding(fresh),original)||matches.length!==1)throw Error('Server storage navigation target changed');
+            s=fresh;e=matches[0];
           }
         };
         const ready=async(probe,predicate)=>{
@@ -3482,12 +3574,45 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
+      const admissionDeadline=operation?.deadline??now()+request.budgets.total_ms;
+      const nodeHistory=()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
+        .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
+          source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
+      let admissionSources=null,admissionFailure=null;
+      if(!operation&&serverDownloads){
+        const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
+        const resolve=async(ref,receipt=scanReceipt)=>{
+          if(!proofs.has(ref)){
+            // Restore Files before claiming the node gate. Compare the old
+            // witness; a new reference from navigation cannot approve drift.
+            const source=serverSources.peek(ref);
+            const located=await runtime.serverDownload({operation_id:randomUUID(),path:source.path},'dock_storage_source',
+              {signal,sourceOperation:operationId,deadlineAt:deadline});
+            if(located.status!=='SUCCEEDED')throw Error('Server source navigation requires inspection before node admission');
+            proofs.set(ref,await inspectServerSource(ref,{signal,deadline}));
+          }
+          return serverDownloads.bind(proofs.get(ref),receipt);
+        };
+        try{
+          const history=nodeHistory();
+          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+            await verifyDeferredTextImportSources(request,history,resolve);
+          }
+          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+        }catch(error){
+          if(pending||running)throw error;
+          error.nodePhaseRefusal??={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+          admissionFailure=error;
+        }
+        admissionSources=proofs;
+      }
       running=true;
       try {
         if(!operation){
-          operation={id:operationId,signature,parameters:request,
+          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -3500,10 +3625,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
-            resolveStorageSource:async ref=>{
-              const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
-              return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
+            resolveStorageSource:async(ref,receipt=scanReceipt)=>{
+              const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
+              return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
+            resolveDeliveredSource:path=>admissionSources?.get(serverSources.referenceForPath(path))
+              ??inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3515,8 +3642,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             },
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
-            nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
-              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed})),
+            nodeHistory,
             uploadHistory:()=>({complete:true,records:[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o.action.capability==='artifact.upload')
               .map(({o,sequence})=>structuredClone({sequence,operation_id:o.id,destination:o.parameters.destination,artifact:o.checkpoint.artifact,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed===true,transport_uncertain:o.transportUncertain===true}))}),
             exclusiveNodeOperation:()=>running===true&&pending===operation&&operation.nodeApply?.pending?.phase==='read',
@@ -3527,7 +3653,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(typeof operation.nodeApplyDrivers?.[name]!=='function')throw new Error('Local node driver missing: '+name);
           // Reuse the accepted graph driver directly, under this operation ID.
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
+          const originalSource=operation.nodeApplyDrivers.verifySource;
           operation.nodeApplyDrivers={...operation.nodeApplyDrivers,
+            verifySource:async(...args)=>{
+              try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
+              // Admission observations are valid for this initial source phase
+              // only. Resume/continuation must obtain fresh native evidence.
+              finally{admissionSources=null;admissionFailure=null;}
+            },
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
                 const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
@@ -3608,7 +3741,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume});}
+          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.
@@ -3753,6 +3886,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    // Host lifecycle cleanup must bypass the user mutation facade. A retained
+    // node/recovery gate still blocks package cleanup; it cannot block draining
+    // the owned worker or removing its private local download cache.
+    closeNodeOperations:()=>nodeJobs.close(),
+    cleanupServerCache:runtime.cleanupServerCache,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global

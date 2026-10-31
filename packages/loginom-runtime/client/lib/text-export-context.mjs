@@ -9,10 +9,12 @@ export async function readTextExportContext(page,binding,readNode=readPreparedNo
  return {...result,node_context:after};
 }
 export function readTextExportBrowser({prefix,fields}){
- const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;';
+ let stage;
+ const fail=reason=>({verified:false,reason,...(stage?{stage}:{})}),base=prefix+';WizrdMCF;';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const roots=['ExportTextFileParamsWizard','ExportTextFilePreviewWizard'].flatMap(name=>exact(base+name).filter(e=>e.checkVisibility({checkVisibilityCSS:true})).map(e=>({name,e})));
  if(roots.length!==1)return fail('export_page');const {name,e:root}=roots[0];
+ stage=name==='ExportTextFileParamsWizard'?'text_export_params':'text_export_format';
  const cmp=tid=>{const es=exact(tid);if(es.length!==1||!root.contains(es[0]))return null;const c=globalThis.Ext?.getCmp?.(es[0].id);return c?.el?.dom===es[0]?c:null;};
  const values={};
  for(const [key,[card,id]]of Object.entries(fields)){
@@ -28,5 +30,5 @@ export function readTextExportBrowser({prefix,fields}){
   const c=cmp(base+name+';edtFormatType;ValueControl'),v=c?.getValue?.(),sw=cmp(base+name+';edtFormatType;SwitchButton');
   if(!v||Object.values(v).length!==1||String(Object.values(v)[0])!=='0'||sw?.pressed!==false)return fail('export_fixed_width_or_variable');
  }
- return {verified:true,stage:name==='ExportTextFileParamsWizard'?'text_export_params':'text_export_format',values,connection:'Локальное',format:'delimited',settings_applied:false};
+ return {verified:true,stage,values,connection:'Локальное',format:'delimited',settings_applied:false};
 }

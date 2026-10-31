@@ -200,6 +200,12 @@ function matchesCell(cell,column,want){
  }else if((cell.type==='real'||column.type==='variant'&&type==='real')&&cell.precision==='exact_native'){
   if(typeof value!=='string'||!Number.isFinite(Number(value)))return false;
   value=Number(value);
+ }else if(cell.type==='real'&&cell.representation==='binary64'&&cell.precision==='17_significant_digits'){
+  // Browser transport JSON loses the sign of numeric zero. The production
+  // decoder's round-trip decimal retains it; reject contradictory evidence.
+  if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
+   ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value)return false;
+  value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof want!=='number'||!Number.isFinite(want))return false;
@@ -208,6 +214,7 @@ function matchesCell(cell,column,want){
   return Number.isFinite(difference)?difference<=Math.max(abs,rel*Math.abs(want))
    :Math.abs(value/2-want/2)<=Math.max(abs/2,rel*(Math.abs(want)/2));
  }
+ if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
 }
 export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv}={}){

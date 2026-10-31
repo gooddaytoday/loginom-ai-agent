@@ -28,6 +28,12 @@ test('real editor separators come from the exact owned local controls',()=>{
  assert.deepEqual(JSON.parse(JSON.stringify(absent.read().real_decimal_separators)),{from:null,to:null,other:null});
 });
 test('cached rules retain Null, empty and literal null without invoking remote getters',()=>{const r=fixture().read();assert.equal(r.verified,true);assert.deepEqual(Array.from(r.pairs,p=>p.from.value),[null,'','null']);assert.equal(r.pairs.length,3);assert.equal(r.input_fields[1].name,'Other');});
+test('regex group reads ordered literal constants and refuses mixed or nonconstant tables',()=>{
+ const f=fixture();f.pairs.splice(0,f.pairs.length,...['(?i)AB-([0-9]{2})','^AB-00$'].map((pattern,i)=>({isModel:true,internalId:'r'+i,data:{Index:i,CollectionID:1,RegularExpression:pattern,Replacement:'SKU-$1',ReplacementType:0,ValueRender:pattern,ReplaceRender:'SKU-$1'}})));
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.mode,'regex');assert.deepEqual(Array.from(r.pairs,p=>p.from.value),['(?i)AB-([0-9]{2})','^AB-00$']);assert.equal(r.pairs[0].to.value,'SKU-$1');
+ f.pairs[0].data.ReplacementType=1;assert.equal(f.read().verified,false);f.pairs[0].data.ReplacementType=0;
+ f.pairs.push({isModel:true,internalId:'exact',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:5,ValueRender:'x',ReplaceRender:'y'}});assert.equal(f.read().verified,false);
+});
 test('exact Int64 native BigInt is serialized as a decimal string',()=>{const f=fixture();f.fields[0].data.DataType=4;f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:4,ReplaceByType:4,ValueRender:1,ReplaceRender:9223372036854775807n}});assert.equal(f.read().pairs[0].to.value,'9223372036854775807');});
 test('reader refuses loading, pending responses, foreign selection and unsupported rules',()=>{
  for(const change of [f=>f.table.isLoading=()=>true,f=>f.pairProxy.pendingOperations.x={},f=>f.input.getCount=()=>99,f=>f.selected.splice(0,1,{}),f=>f.pairs[0].data.CollectionID=1,f=>f.pairs[0].data.ReplaceByType=4,f=>f.fields[0].data.ReplaceMode=2,f=>f.values.cbxReplaceOther=3,f=>f.masks.push({checkVisibility:()=>true}),f=>f.fields[1].data.Name='CATEGORY',f=>f.pairs[1].internalId=f.pairs[0].internalId]){const f=fixture();change(f);assert.equal(f.read().verified,false);}

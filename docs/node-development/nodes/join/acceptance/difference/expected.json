@@ -1,0 +1,55 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.join_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/difference-result.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "LKey",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LPart",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LValue",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "LKey": "B",
+          "LPart": "X",
+          "LValue": "only-left"
+        },
+        {
+          "LKey": "A",
+          "LPart": "Y",
+          "LValue": "left-other-part"
+        }
+      ]
+    }
+  ]
+}
