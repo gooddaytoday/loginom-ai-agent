@@ -21,6 +21,103 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_path_seed_uses_case_source_instead_of_stale_task_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                           output=dict(bytes=16, upload_completion_verified=True))
+            self.upload_model(root, receipt)
+            task = (root / 'run/task.md').read_text()
+            self.assertIn(str(root / 'input.csv'), task)
+            self.assertNotIn('/obsolete/seed.csv', task)
+
+    def tamper_model(self, root, calls, rejection=None):
+        case = root / 'cases/S-tamper'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Проверь отказ после подмены и сохрани пакет.')
+        runner.write(case / 'expected.json', dict(nodes=[], outputs=[], rejection=rejection or dict(
+            code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')))
+        folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
+        folder.mkdir(); workspace.mkdir(); profile.mkdir()
+        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True,
+                     unsaved_changes_discarded=False))
+        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        instance = runner.Runner.__new__(runner.Runner)
+        instance.out, instance.env, instance.current = root, {}, {}
+        instance.options = dict(cases=str(case.parent))
+        def phase(*args, **kwargs):
+            (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(
+                type='tool_use', sessionID='session', part=part)) for part in calls))
+        with patch.object(instance, 'phase', side_effect=phase):
+            result = instance.model('S-tamper', folder, profile, workspace, '/test/run.lgp',
+                                    dict(package_directory='/test'), root / 'build')
+        self.assertEqual(instance.current['rejection'], 'PASS')
+        self.assertEqual(instance.current['cleanup'], 'main PASS')
+        self.assertEqual(instance.current['save'], 'PASS')
+        self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
+        self.assertEqual(result[2:], (None, None))
+
+    def tamper_calls(self):
+        def call(tool, parameters, reply):
+            return dict(tool=tool, state=dict(status='completed', input=parameters, output=json.dumps(reply)))
+        return [call('loginom_dock_node_apply', dict(target=dict(type='exports.text'),
+                      parameters=dict(overwrite='replace'), finish='execute'), dict(status='SUCCEEDED')),
+                call('loginom_dock_node_apply', dict(target=dict(type='transform.group_data'), finish='execute'),
+                     dict(status='NOT_APPLIED', effect_possible=False, cleanup_complete=True,
+                          error=dict(code='LOGINOM_FILE_CHANGED'), output=dict(
+                              execution=dict(status='not_requested'), output=dict(status='not_refreshed', ports=[])))),
+                call('loginom_dock_action_run', {}, dict(status='SUCCEEDED', action_key='package.save_checkpoint',
+                     output=dict(save_completed=True)))]
+
+    def test_tamper_accepts_only_guard_after_overwrite_without_stale_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.tamper_model(Path(directory), self.tamper_calls())
+
+    def test_tamper_accepts_correlated_async_errors_and_inspect(self):
+        for mode in ['error', 'inspect']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                calls = self.tamper_calls()
+                events = []
+                for index, call in enumerate(calls[:2]):
+                    operation = 'node-' + str(index)
+                    call['state']['input']['operation_id'] = operation
+                    reply = dict(json.loads(call['state']['output']), operation_id=operation)
+                    call['state']['output'] = json.dumps(dict(state='running', operation_id=operation))
+                    events.append(call)
+                    if index == 0:
+                        events.append(dict(tool='loginom_dock_node_wait', state=dict(status='completed',
+                            input=dict(operation_id=operation), output=json.dumps(reply))))
+                    elif mode == 'error':
+                        events.append(dict(tool='loginom_dock_node_wait', state=dict(status='error',
+                            input=dict(operation_id=operation), error=json.dumps(reply))))
+                    else:
+                        events.append(dict(tool='loginom_dock_operation_inspect', state=dict(status='completed',
+                            input=dict(operation_id=operation), output=json.dumps(dict(action_key='operation.inspect',
+                                output=dict(outcome=reply))))))
+                self.tamper_model(Path(directory), events + calls[2:])
+
+    def test_tamper_rejects_other_outcomes_and_stale_rows(self):
+        for variant in ['missing guard', 'wrong error', 'possible effect', 'execution', 'stale ports',
+                        'missing overwrite', 'wrong target', 'later rows', 'missing save', 'wrong oracle']:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                calls = self.tamper_calls()
+                reply = json.loads(calls[1]['state']['output'])
+                if variant == 'wrong error': reply['error']['code'] = 'UI_DEADLINE_EXCEEDED'
+                if variant == 'possible effect': reply['effect_possible'] = True
+                if variant == 'execution': reply['output']['execution']['status'] = 'completed'
+                if variant == 'stale ports': reply['output']['output']['ports'] = [dict(sample=[['old']])]
+                calls[1]['state']['output'] = json.dumps(reply)
+                if variant == 'missing guard': calls.pop(1)
+                if variant == 'missing overwrite': calls.pop(0)
+                if variant == 'wrong target': calls[1]['state']['input']['target']['type'] = 'exports.text'
+                if variant == 'later rows':
+                    calls.append(dict(tool='loginom_dock_node_apply', state=dict(status='completed',
+                        input=dict(target=dict(type='transform.group_data')), output=json.dumps(dict(
+                            status='SUCCEEDED', output=dict(ports=[dict(sample=[['old']])]))))))
+                if variant == 'missing save': calls.pop()
+                with self.assertRaises(AssertionError):
+                    self.tamper_model(Path(directory), calls, dict(code='OTHER') if variant == 'wrong oracle' else None)
+
     def test_sequential_node_scenarios_resolve_approved_oracles(self):
         for name, count, ports in [('sampling', 2, [0, 0]), ('data-partition', 3, [0, 1, 2])]:
             case = runner.scenario(name)
@@ -48,7 +145,7 @@ class RunCheckTests(unittest.TestCase):
         source.write_text('Id,Value\n1,test\n')
         case = root / 'cases/seed'
         (case / 'data').mkdir(parents=True)
-        (case / 'task.md').write_text('Загрузи исходник без сохранения пакета')
+        (case / 'task.md').write_text('Загрузи /obsolete/seed.csv в Loginom.')
         runner.write(case / 'case.json', dict(source_path=str(source), attachment='path', upload_only=True))
         runner.write(case / 'expected.json', dict(nodes=[], outputs=[]))
         folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
