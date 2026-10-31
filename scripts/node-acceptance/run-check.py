@@ -111,6 +111,13 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
+        acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        variant = name.removeprefix('logreg-')
+        source = acceptance / 'selection'
+        if variant in ['stepwise-strict', 'stepwise-permissive']: source = source / variant
+        return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
+                    data=acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

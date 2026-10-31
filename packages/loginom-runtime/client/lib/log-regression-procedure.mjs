@@ -43,8 +43,8 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
  return {verified:true,cleanup_complete:true,effect_possible:edits>0,baseline_configuration:baseline,configuration,applied_editors:edits,settings_applied:false};
 }
 
-export async function configureLogRegression(channel,parameters,{inputMapping}){
- const p=parameters.logistic,roles=await configureLogRegressionRoles(channel,p,inputMapping);
+export async function configureLogRegression(channel,parameters,{inputMapping,request}){
+ const mode=request?.mode??'enter',p=parameters.logistic,roles=await configureLogRegressionRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const ready=kind=>s=>s.node_logregression?.verified===true&&s.node_logregression.kind===kind;
  const observe=(kind,condition)=>channel.observe({condition,readLogRegression:true,ready:ready(kind)});
@@ -55,7 +55,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
  const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
  need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
   &&normalization.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
-   &&(p.input_fields.includes(f.name)?f.norm_type===0:Number.isInteger(f.norm_type))),
+   &&(p.input_fields.includes(f.name)?f.norm_type===0&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
   'only unnormalized continuous predictors and native categorical target encoding are supported');
  if(normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
@@ -73,13 +73,13 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
  need(Object.values(state.node_logregression.switches).every(v=>v===false),'variable-driven logistic settings are outside stage 1');
  const control=(s,key,verb)=>one(s,e=>{const tid=s.wizard.root_tid+';'+(s.wizard.stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key;return (e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb);},'Logistic control unavailable: '+key);
  const act=async(kind,condition,key,action)=>channel.perform({condition,initialObservation:state,ready:ready(kind),identity:s=>s.prepared_node_context,resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
- const choose=async(key,label,value)=>{
+ const choose=async(key,label,value,kind='parameters')=>{
   if(state.node_logregression.values[key]===value)return;
-  await act('parameters','open logistic '+key,key+';ValueControl;trg_picker',{verb:'click'});
-  state=await channel.observe({condition:'observed logistic option '+label,readLogRegression:true,ready:s=>ready('parameters')(s)&&s.ui.elements.some(e=>e.label===label&&e.allowed_actions.includes('click'))});
-  await channel.perform({condition:'select logistic '+key,initialObservation:state,ready:ready('parameters'),identity:s=>s.prepared_node_context,
+  await act(kind,'open logistic '+key,key+';ValueControl;trg_picker',{verb:'click'});
+  state=await channel.observe({condition:'observed logistic option '+label,readLogRegression:true,ready:s=>ready(kind)(s)&&s.ui.elements.some(e=>e.label===label&&e.allowed_actions.includes('click'))});
+  await channel.perform({condition:'select logistic '+key,initialObservation:state,ready:ready(kind),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.label===label&&e.allowed_actions.includes('click'),'Unique logistic option unavailable').ref})});
-  state=await observe('parameters','logistic '+key+' readback');need(state.node_logregression.values[key]===value,'native logistic option differs: '+key);
+  state=await observe(kind,'logistic '+key+' readback');need(state.node_logregression.values[key]===value,'native logistic option differs: '+key);
  };
  await choose('pedEventType','Задано явно',4);
  // The cached EventId store exposes numeric captions until its native picker
@@ -96,15 +96,32 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
   resolve:s=>({verb:'click',ref:one(s,e=>categoryOptions(s).includes(e)&&e.label===event.index+' ('+event.label+')','Unique event category unavailable').ref})});
  state=await observe('parameters','explicit logistic category readback');need(state.node_logregression.values.pedEventId===event.index,'event selection differs from the observed category');
  if(state.node_logregression.values.pedAutoMethod){await act('parameters','disable automatic logistic method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual logistic method');}
- await choose('pedRegressionMethod','Enter (Принудительное включение)',0);
+ const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)']};
+ need(methods[mode],'unsupported regression method');
+ await choose('pedRegressionMethod',methods[mode][1],methods[mode][0]);
  if(!state.node_logregression.values.pedUseDetailedSettings){await act('parameters','show logistic details','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','logistic details enabled');}
  need(state.node_logregression.values.pedUseScoring===false&&state.node_logregression.values.pedSetupCalibration===false,'scoring and calibration overrides are outside stage 1');
  need(state.node_logregression.values.pedDenormalize===true&&state.node_logregression.values.pedAutoMethod===false
-  &&state.node_logregression.values.pedRegressionMethod===0&&state.node_logregression.values.pedEventType===4&&state.node_logregression.values.pedEventId===event.index,'manual Enter and explicit event must be observed');
+  &&state.node_logregression.values.pedRegressionMethod===methods[mode][0]&&state.node_logregression.values.pedEventType===4&&state.node_logregression.values.pedEventId===event.index,'manual method and explicit event must be observed');
+ const observedMode=Object.keys(methods).find(k=>methods[k][0]===state.node_logregression.values.pedRegressionMethod);
  await next('lin_regression','lin_regression_details');
  state=await observe('details','complete logistic details');
  need(state.node_logregression.values.pedIntercept===true&&Object.values(state.node_logregression.switches).every(v=>v===false),'fixed intercept without variable bindings required');
- for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold]]){
+ let selection;
+ const cutoffs=[];
+ if(mode!=='enter'){
+  const criteria={deviance:[0,'Deviance'],aic:[1,'AIC'],aicc:[2,'AICc'],bic:[3,'BIC'],hqic:[4,'Ханнана—Куинна']};
+  const wanted=p.selection;
+  await choose('pedRegSelQuality',criteria[wanted.criterion][1],criteria[wanted.criterion][0],'details');
+  need(state.node_logregression.disabled?.pedRegSelQuality===false,'selection criterion must be editable');
+  for(const [key,name,applies] of [['pedAddSignificance','entry_significance',mode!=='backward'],['pedRemoveSignificance','removal_significance',mode!=='forward']]){
+   const applicable=wanted.criterion==='deviance'&&applies;
+   need(state.node_logregression.disabled?.[key]===!applicable,'unexpected selection cutoff availability: '+key);
+   if(applicable)cutoffs.push([key,wanted[name],name]);
+  }
+  selection={criterion:Object.keys(criteria).find(k=>criteria[k][0]===state.node_logregression.values.pedRegSelQuality)};
+ }
+ for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold],...cutoffs]){
   if(state.node_logregression.values[key]!==value){
    // Native number fields strip e and minus from scientific notation:
    // 1e-10 became 110 in the owned diagnostic, so enter decimal digits.
@@ -117,9 +134,10 @@ export async function configureLogRegression(channel,parameters,{inputMapping}){
   }
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);
  }
+ if(selection)for(const [key,,name] of cutoffs)selection[name]=state.node_logregression.values[key];
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition,classes:classes.map(({index,label})=>({index,label})),
-  target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  mode:observedMode,...(selection?{selection}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

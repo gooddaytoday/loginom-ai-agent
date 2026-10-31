@@ -950,6 +950,21 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_logreg_selection_catalog_keeps_oracle_private_and_all_cells(self):
+        for variant in ['forward', 'backward', 'stepwise', 'stepwise-aic', 'stepwise-aicc', 'stepwise-bic', 'stepwise-hqic', 'stepwise-strict', 'stepwise-permissive']:
+            case = runner.scenario('logreg-' + variant)
+            self.assertEqual(case['prompt'].name, 'task-' + variant + '.md')
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['selection.csv'])
+            self.assertIsNone(case['base'])
+            expected = runner.expected_for(case, '/test/selection.lgp')
+            output = expected['outputs'][0]
+            self.assertEqual(len(output['rows']), 64)
+            self.assertEqual(len(output['columns']), 9)
+            self.assertEqual(output['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
+            reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
+            self.assertEqual(output, reference['outputs'][0])
+
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')
         source = runner.REPO / 'evals/tasks/node-evals/crosstable-local-variable-bindings'

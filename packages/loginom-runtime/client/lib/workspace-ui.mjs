@@ -352,7 +352,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
-      ...Object.entries({LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept']}).flatMap(([card,names])=>names.flatMap(name=>{
+      ...Object.entries({LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']}).flatMap(([card,names])=>names.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
@@ -2973,7 +2973,7 @@ function readRenderedInputMapping(observation) {
       }
       return /;WizrdMCF;SlidingWindowWizard;(?:colDisplayName_[^;]+|pedIncompleteRecordsProcessing;ValueControl;(?:trg_picker|boundlist;[^;]+))$/.test(tid);
     };
-    const interesting = element => /;WizrdMCF;LogRegressionWizard;ped(?:EventType|EventId|RegressionMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const interesting = element => /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;SizeGridForm;col(?:SizeType|AbsoluteSize)_[^;]+$|;SequenceMethodForm;col[^;]+$/.test(getTid(element)??''))
