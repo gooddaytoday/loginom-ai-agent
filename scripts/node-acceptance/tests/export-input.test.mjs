@@ -199,7 +199,7 @@ test('exact destination selects renamed report while the earlier s1 export remai
  }
 });
 
-test('s8 cold selects an observed owned body despite a clipped label; hidden points still require reveal',async()=>{
+test('cold reveals the owned body before selection, preserving clipped-label selection guards',async()=>{
  const {observeExportDestinations}=await import('../static-source-proof.mjs');
  const {preparedGraphSelection}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
  for(const mode of ['body','label','hidden','foreign']){
@@ -213,11 +213,49 @@ test('s8 cold selects an observed owned body despite a clipped label; hidden poi
   if(mode==='hidden')state.ui.elements[1].interaction.state='outside_viewport';
   if(mode==='foreign')state.prepared_node_context.node_id='foreign';
   let reveals=0,selected=0;
-  const channel={observe:async()=>structuredClone(state),revealGraphNode:async()=>{reveals++;if(mode!=='hidden')throw Error('unnecessary full bbox reveal');state.ui.elements[0].interaction.state='point_observed';}};
+  const channel={observe:async()=>structuredClone(state),revealGraphNode:async options=>{assert.deepEqual(options,{target:'body'});reveals++;if(mode==='hidden')state.ui.elements[0].interaction.state='point_observed';}};
   const helpers={selectPreparedGraphNode:async(c,s)=>{assert.equal(preparedGraphSelection(s).ref,mode==='label'?'label':'body');selected++;throw Error('SELECTION_REACHED');}};
   const result=observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel});
   await assert.rejects(result,mode==='foreign'?/export selection owner/:/SELECTION_REACHED/);
-  assert.equal(reveals,mode==='hidden'?1:0);assert.equal(selected,mode==='foreign'?0:1);
+  assert.equal(reveals,mode==='foreign'?0:1);assert.equal(selected,mode==='foreign'?0:1);
+ }
+});
+
+test('cold reveals a partially visible export before its offscreen Setting and rechecks the fresh owner',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const {selectPreparedGraphNode}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
+ for(const fault of [null,'foreign-after-reveal','unknown-reveal']){
+  const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Итоговый_CSV_UTF-8',actions=[];
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},
+   active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{elements:[
+    {tid,ref:'old-body',graph_node:{part:'body'},bounding_box:{x:1256,y:214,width:42,height:78},
+     allowed_actions:['click'],interaction:{state:'point_observed',point:{x:1268,y:253}}},
+    {tid:tid+';Setting',ref:'setting',bounding_box:{x:1278,y:234,width:18,height:18},
+     allowed_actions:['begin_wizard'],interaction:{state:'point_not_observed'}}]}};
+  const channel={
+   observe:async o=>{assert.ok(o.ready(state),o.condition);actions.push('observe');return structuredClone(state);},
+   revealGraphNode:async options=>{
+    assert.deepEqual(options,{target:'body'});actions.push('reveal');
+    if(fault==='unknown-reveal')throw Error('unknown reveal effect');
+    state.ui.elements[0].ref='fresh-body';state.ui.elements[0].bounding_box.x=1100;
+    state.ui.elements[1].bounding_box.x=1122;state.ui.elements[1].interaction={state:'point_observed',point:{x:1131,y:243}};
+    if(fault==='foreign-after-reveal')state.prepared_node_context.node_id='foreign';
+   },
+   perform:async o=>{
+    assert.equal(o.initialObservation.ui.elements[0].ref,state.ui.elements[0].ref);assert.ok(o.ready(state));
+    assert.deepEqual(o.resolve(state),{verb:'click',ref:state.ui.elements[0].ref});actions.push('select');
+    return {status:'SUCCEEDED',cleanup_complete:true,output:structuredClone(state)};
+   }};
+  const helpers={selectPreparedGraphNode,openPreparedWizard:async()=>{
+   assert.equal(state.ui.elements[1].interaction.state,'point_observed','Setting must have an observed point before opening');
+   actions.push('open');throw Error('OWNED_OPEN_REACHED');
+  }};
+  await assert.rejects(observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel}),
+   fault==='foreign-after-reveal'?/export selection owner/:fault==='unknown-reveal'?/unknown reveal effect/:/OWNED_OPEN_REACHED/);
+  assert.equal(actions.filter(a=>a==='reveal').length,1);
+  assert.equal(actions.filter(a=>a==='select').length,fault?0:1);
+  assert.equal(actions.filter(a=>a==='open').length,fault?0:1);
+  if(!fault)assert.deepEqual(actions.slice(0,5),['observe','reveal','observe','select','observe']);
  }
 });
 
