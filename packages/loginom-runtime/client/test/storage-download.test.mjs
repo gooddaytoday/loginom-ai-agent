@@ -7,10 +7,13 @@ import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-
 import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
+import {createTextImportNodeSupport} from '../lib/text-import-node.mjs';
+import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
 
-async function sourceNavigation(t,fault) {
+async function sourceNavigation(t,fault,options={}) {
  const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[],deadlines=[];
  let epoch=0,checks=0,opened=false,refreshed=false;
+ const native={kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'};
  const toolbar='MF;cntMain;tlbMainToolbar',button=toolbar+';btnFilestorage';
  const element=tid=>({ref:page.uiReference(tid),tid,kind:'control',scope:'workspace',label:'',enabled:true,visible:true,
   identity:{anchor_tid:tid,path:[]},signature:{tag:'button',tid},bounding_box:{x:10,y:10,width:20,height:20},
@@ -35,18 +38,61 @@ async function sourceNavigation(t,fault) {
    else state.observation_root={ref:arg.rootRef,identity:element(arg.rootRef===page.uiReference(toolbar)?toolbar:button).identity};
   }else{
    const nav=element(page.prefix+';NavigationBar;NavigationPanel'),file=element(page.prefix+';FileStorageForm;colName_full.csv');
-   file.label='full.csv';file.storage_entry={kind:'file',path:'/worker/full.csv',bytes:3,mtime:'native-time',bytes_source:'native_file_store'};
+   file.label='full.csv';file.storage_entry={...native};
    state.ui.elements=[nav,element(page.prefix+';FileStorageForm;pnlFileStorage;tbl'),file];
    state.file_storage={status:'observed',directory:'/worker'};
   }
   return state;
  };
- const r=runtime(page,{cacheDirectory:join(f.root,'navigation'),onRecord:async record=>records.push(record),
+ const r=runtime(page,{...options,cacheDirectory:join(f.root,'navigation'),onRecord:async record=>{records.push(record);return record;},
   execute:code=>{for(const match of code.matchAll(/"deadline_at":(\d+)/g))deadlines.push(Number(match[1]));return page.execute(code);},
   getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
  const result=await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source');
- return {result,records,deadlines,page,refreshed};
+ return {result,records,deadlines,page,refreshed,runtime:r,native,showGraph:()=>{opened=false;}};
 }
+
+for(const change of ['unchanged','bytes','mtime'])test('import retry after released STALE reopens Files and rechecks the original native witness: '+change,async t=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',
+  tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
+ const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+ const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});let stale=true,opens=0;
+ const f=await sourceNavigation(t,undefined,{
+  nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,reconcile:ok,
+   activateWorkflow:async()=>{f.showGraph();return {...await ok(),status:'SUCCEEDED',document_id:'doc',workflow_ref:workflow};}}),
+  nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:ok}]]),
+  nodeApplyDriverFactory:context=>({
+   verifySource:createTextImportNodeSupport({}).nodeApplyDriverFactory(context).verifySource,
+   mapPorts:ok,openWizard:async()=>{opens++;if(stale){stale=false;throw new NodeProcedureStepError({
+    status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:{code:'UI_REFERENCE_STALE',message:'Observed control replaced'}});}return ok();},
+   finish:async mode=>({...await ok(),mode,execution_started:false}),waitExecution:ok,readOutput:()=>assert.fail('no old rows may be read'),
+   verifyContinuation:async()=>true,releasePending:async()=>({...await ok(),node_context:node,cleanup:{wizard_closed:false}}),
+  }),
+ });
+ const source=f.result.output.source,request={operation_id:'import-first',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'imports.text',ref:node},inputs:[],mode:'delimited',parameters:{source:{kind:'storage',server_source_ref:source.server_source_ref},
+   settings:{source:{source_path:'/worker/full.csv'}}},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ f.runtime.startNodeApply(request);
+ const first=await f.runtime.waitNodeApply(request.operation_id,{timeoutMs:10000});
+ assert.equal(first.outcome.error?.cause?.code,'UI_REFERENCE_STALE',JSON.stringify(first));
+ const released=await f.runtime.recover(request.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release-import'});
+ assert.equal(released.status,'SUCCEEDED');
+ if(change==='bytes')f.native.bytes++;
+ if(change==='mtime')f.native.mtime='replaced';
+ const deadline=f.page.clock+request.budgets.total_ms,click=f.page.click;
+ f.page.click=async item=>{f.page.clock+=2000;return click(item);};
+ f.runtime.startNodeApply({...request,operation_id:'import-retry'});
+ const retry=await f.runtime.waitNodeApply('import-retry',{timeoutMs:10000});
+ if(change==='unchanged'){
+  assert.equal(retry.outcome.status,'SUCCEEDED',JSON.stringify(retry));assert.equal(opens,2);
+ }else{
+  assert.equal(retry.outcome.error.code,'LOGINOM_FILE_CHANGED',JSON.stringify(retry));
+  assert.equal(retry.outcome.effect_possible,false);assert.equal(opens,1);
+  assert.deepEqual(retry.outcome.output.output.ports,[]);
+ }
+ assert.ok(f.page.events.filter(e=>e==='mouse_click').length>=2,'retry must reacquire Files through the guarded UI');
+ assert.equal(f.records.find(e=>e.operation_id==='import-retry'&&e.phase==='node_apply_prepared').deadline_at,deadline);
+});
 
 for(const fault of [undefined,'replaced'])test('source navigation reissues observation/ref after proven no-effect epoch refusal: '+fault,async t=>{
  const f=await sourceNavigation(t,fault);

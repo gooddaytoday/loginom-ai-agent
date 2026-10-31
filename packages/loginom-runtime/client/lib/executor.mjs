@@ -2688,10 +2688,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name,{signal}={}) {
+    serverDownload(request,name,{signal,sourceOperation,deadlineAt}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
       if(name==='dock_storage_source')return (async()=>{
-        if(storageNavigating||serverDownloads.unsettled||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+        if(storageNavigating||serverDownloads.unsettled||running||pending
+          ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
@@ -2704,7 +2705,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(previous.outcome);
         }
         auxiliary.set(id,{signature});storageNavigating=true;
-        const deadline=now()+90000;let step=0;
+        const deadline=Math.min(now()+90000,deadlineAt??Infinity);let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const readPages=async options=>{
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
@@ -3502,12 +3503,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
+      const admissionDeadline=operation?.deadline??now()+request.budgets.total_ms;
+      if(!operation&&serverDownloads&&request.parameters.source?.kind==='storage'){
+        // A released STALE opening leaves the workflow on its graph. Restore
+        // Files through the existing guarded navigation before claiming the
+        // node gate; source verification still compares the ORIGINAL witness,
+        // not the fresh reference minted by this navigation.
+        const source=serverSources.peek(request.parameters.source.server_source_ref);
+        const located=await runtime.serverDownload({operation_id:randomUUID(),path:source.path},'dock_storage_source',
+          {signal,sourceOperation:operationId,deadlineAt:admissionDeadline});
+        if(located.status!=='SUCCEEDED')throw Error('Server source navigation requires inspection before node admission');
+      }
       running=true;
       try {
         if(!operation){
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -3630,7 +3642,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume});}
+          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.

@@ -124,7 +124,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false}) {
+  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -176,7 +176,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     signal?.throwIfAborted();
     state={signature,handler_revision:handler.revision,request:structuredClone(request),phases:[],pending:null,
       node:null,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
-      effect_possible:false,cleanup_complete:true,resumes:0,started_at:now(),deadline:now()+request.budgets.total_ms};
+      effect_possible:false,cleanup_complete:true,resumes:0,started_at:now(),deadline:Math.min(deadlineAt,now()+request.budgets.total_ms)};
     await acknowledge({phase:'node_apply_prepared',signature,request:structuredClone(request),deadline_at:state.deadline});
     operation.nodeApply=state;
   }
