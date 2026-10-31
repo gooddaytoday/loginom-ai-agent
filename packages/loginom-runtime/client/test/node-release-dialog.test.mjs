@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {releasePendingNode} from '../lib/node-pending-release.mjs';
+import {stoppedImportOpen} from './support/stopped-import-open.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
@@ -64,4 +65,16 @@ test('release cancels the same exact question of its owned node input page witho
 });
 for(const fault of ['foreign-node','other-question','foreign-control','busy'])test('node input release keeps foreign or uncertain dialog refusal: '+fault,async()=>{
  const f=fixture('conflict',fault,true);await assert.rejects(f.run());assert.deepEqual(f.gestures,[]);
+});
+
+for(const fault of [null,'foreign-node','foreign-dialog','other-question','busy','changed-path','foreign-control','unknown-receipt','foreign-receipt','unsettled','other-gesture','lost-reply'])
+test('LAB-666 releases only its receipted deactivation question: '+fault,async()=>{
+ const operation={id:'import-update',deadline:10000,action:{action_key:'node.apply',revision:'1'},
+  nodeApply:{node,pending:{phase:'open'},request:{document_id:'doc',workflow_ref:workflow,target:{type:'imports.text'}}}};
+ const f=stoppedImportOpen(operation,fault);
+ if(fault){await assert.rejects(f.run());assert.equal(f.gestures.length,fault==='lost-reply'?1:0);}
+ else{
+  const proof=await f.run();assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,true);
+  assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-cancel'}]);assert.equal(proof.node_context.surface,'graph');
+ }
 });
