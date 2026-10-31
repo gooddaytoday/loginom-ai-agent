@@ -13,6 +13,8 @@ test('private download observation preserves toast text and classes outside the 
  toast.attrs.class='x-window bg-notify-msg-color-info';toast.attrs.role='dialog';
  const roots=await page.observe(),ref=roots.ui.elements.find(e=>e.tid===root.attrs['data-tid']).ref;
  const options={mode:'observe',root_ref:ref,expected_build:build,expected_origin:origin};
+ // Playwright serializes callbacks into another realm; do not retain closures.
+ page.evaluate=async(fn,arg)=>vm.runInContext('('+fn.toString()+')',page.context)(arg);
  const ordinary=await page.execute(options);
  assert.equal(ordinary.output.ui.dialogs[0].text,'[outside selected root]');
  assert.equal(ordinary.output.ui.dialogs[0].class_name,undefined);
