@@ -208,6 +208,7 @@ function matchesCell(cell,column,want){
   return Number.isFinite(difference)?difference<=Math.max(abs,rel*Math.abs(want))
    :Math.abs(value/2-want/2)<=Math.max(abs/2,rel*(Math.abs(want)/2));
  }
+ if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
 }
 export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv}={}){

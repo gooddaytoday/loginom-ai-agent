@@ -123,3 +123,13 @@ test('scalar civil DateTime requires exact milliseconds and calendar representat
  const nativeWant=structuredClone(want);nativeWant.rows[0].When={cell_type:'datetime',bytes_le:'000000002079e640'};
  assert.throws(()=>matchExpectedOutputs([a],[nativeWant]));
 });
+
+test('cold preserves expected negative zero including exact native decimal strings',()=>{
+ for(const native of [false,true]){
+  const a=actual('zero',native?'-0':-0);
+  if(native)a.data.sample[0][1].precision='exact_native';
+  assert.equal(matchExpectedOutputs([a],[report(-0)]).length,1);
+  a.data.sample[0][1].value=native?'0':0;
+  assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
+ }
+});

@@ -3,6 +3,7 @@
 import argparse
 import csv
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import fcntl
 import io
 import json
@@ -23,6 +24,7 @@ SCENARIOS = {
     'C1': dict(model_timeout=2700),
     '5-REST': dict(model_timeout=2700),
 }
+D76_STATUS = 'PASS с ограничением платформы D76'
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -221,6 +223,9 @@ def summary(report):
                     *[r.get(k, '—') for k in ['csv', 'save', 'cold', 'cleanup', 'port-read', 'read-path']],
                     '/'.join(f'{v:.2f}' for v in load[:2]) or '—']) + ' |')
     for r in report['runs']:
+        if r.get('d76'):
+            rows.append(f"\nD76 {r['scenario']}: negative_zero={r['d76']['negative_zero']}; "
+                        f"midnight_date={r['d76']['midnight_date']}")
         if r.get('dataset-cleanup'):
             rows.append('\nD87 ' + r['scenario'] + ': ' + r['dataset-cleanup'])
         if r.get('status') == 'FAIL':
@@ -249,7 +254,7 @@ def csv_delimiter(path):
         raise
 
 
-def check_csv(path, expected, header='names', *, column_order=None, null_marker=''):
+def check_csv(path, expected, header='names', *, column_order=None, null_marker='', scenario_name=None, d76=None):
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
@@ -257,7 +262,30 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
     assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
 
+    def limitation(value, col, target):
+        # Owner-approved D76 forms are code-owned and only apply to types300.
+        if scenario_name != 'types300': return None
+        if (col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
+                and math.copysign(1, target) < 0 and value == '0'):
+            return 'negative_zero'
+        if col['type'] == 'datetime' and isinstance(target, str):
+            goal = datetime.fromisoformat(target)
+            if (goal.hour == goal.minute == goal.second == 0 and goal.microsecond != 0
+                    and value == goal.date().isoformat()):
+                return 'midnight_date'
+        return None
+
     def equal(value, col, target):
+        if limitation(value, col, target): return True
+        if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
+            try:
+                if col['type'] == 'integer':
+                    number = Decimal(value)
+                    return number.is_finite() and number == Decimal(str(target))
+                number, goal = float(value), float(target)
+                return (math.isfinite(number) and math.isfinite(goal) and number == goal
+                        and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
+            except (ValueError, InvalidOperation, OverflowError): return False
         if col.get('category_labels_any'): return bool(value.strip())
         if target is None: return value == null_marker
         if col['type'] in ['integer', 'real']:
@@ -321,6 +349,13 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             key, value = expected['rows'][want][columns[i]['name']], rows[actual + 1][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
+    if scenario_name == 'types300' and d76 is not None:
+        counts = dict(negative_zero=0, midnight_date=0)
+        for want, actual in enumerate(pairs):
+            for i, col in enumerate(columns):
+                kind = limitation(rows[actual + 1][indices[i]], col, expected['rows'][want][col['name']])
+                if kind: counts[kind] += 1
+        d76.update(counts)
     return delimiter
 
 
@@ -764,10 +799,12 @@ class Runner:
                 continue
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
+            counts = {}
             delimiter = check_csv(actual, expected['outputs'][index], header,
                                   column_order='any' if isinstance(case, Path) else None,
-                                  null_marker=expected.get('null_marker', ''))
-        self.current['csv'] = 'PASS'
+                                  null_marker=expected.get('null_marker', ''), scenario_name=case, d76=counts)
+            if counts: self.current['d76'] = counts
+        self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
     def run(self):
@@ -807,6 +844,7 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                    assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
@@ -815,7 +853,7 @@ class Runner:
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         r.update(cold='PASS', cleanup='both PASS')
-                    r['status'] = 'FAIL' if r.get('failure_class') else 'PASS'
+                    r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
                         r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
@@ -847,15 +885,16 @@ def main():
             report = read(args.directory / 'results.json')
             if report.get('finished'):
                 print(summary(report), end='')
-                return 0 if all(r['status'] == 'PASS' or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
+                return 0 if all(r['status'] in ['PASS', D76_STATUS] or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
             if time.monotonic() >= end:
-                ready = sum(r['status'] in ['PASS', 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
+                ready = sum(r['status'] in ['PASS', D76_STATUS, 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2
             time.sleep(min(1, max(0, end - time.monotonic())))
     head = git('rev-parse', '--verify', args.head + '^{commit}')
     names = scenario_names(args.scenarios, args.case_root)
+    assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
         spec = scenario(name, args.case_root, cases=args.cases)
         if spec.get('generated'): continue
