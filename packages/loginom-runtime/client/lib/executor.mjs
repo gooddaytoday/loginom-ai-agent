@@ -536,18 +536,28 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       // Loginom's completed-download notification is an Ext window, so the
       // global dialog guard still sees it until its own close timer fires.
       // Bind that exact native toast; never dismiss it or repeat the download.
-      const binding=await page.evaluateHandle(function bindDownloadToast(){
-        const matches=document.querySelectorAll('[data-tid="toast"]'),element=matches[0];
-        if(matches.length!==1||!element.isConnected||typeof element.className!=='string'
-          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c))
-          ||element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return null;
+      const binding=await page.evaluateHandle(function bindDownloadToast(ref){
+        const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=state?.refs?.get(ref)?.deref();
+        // Keep the observed incarnation, including after its close timer detached
+        // it. An absent selector alone cannot prove that an unknown toast closed.
+        const refused=predicate=>({refused:predicate,diagnostic:{count:matches.length,
+          class_name:typeof (matches[0]??element)?.className==='string'?(matches[0]??element).className.slice(0,512):null,
+          text:typeof (matches[0]??element)?.textContent==='string'?(matches[0]??element).textContent.slice(0,512):null}});
+        if(state?.document!==document||!element)return refused('observed_element');
+        if(typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c)))return refused('download_classes');
+        if(element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return refused('download_text');
+        if(!element.isConnected&&matches.length===0)return {document,element,classes:element.className};
+        if(matches.length!==1||matches[0]!==element||!element.isConnected)return refused('same_element');
         const box=element.getBoundingClientRect(),style=getComputedStyle(element);
-        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return null;
+        if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return refused('visible');
         return {document,element,classes:element.className};
-      });
+      },after.output.ui.dialogs[0].ref);
       const inspect=()=>page.evaluate(function inspectDownloadToast(b){
         const changed=predicate=>({state:'changed',predicate});
         if(!b)return changed('binding_present');
+        if(b.refused)return {...changed(b.refused),diagnostic:b.diagnostic};
         if(document!==b.document)return changed('same_document');
         const matches=document.querySelectorAll('[data-tid="toast"]');
         if(!b.element.isConnected&&matches.length===0)return {state:'closed'};
@@ -583,7 +593,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
             // is settlement, while replacement or another dialog still refuses.
             if(state.state==='changed'){refused('native_toast',state.predicate,state.state);break;}
           }
-        }else refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+        }else {
+          refused('native_toast_initial',initial.predicate??'state_is_waiting',initial.state);
+          if(initial.diagnostic)trace.push({event:'download_toast_binding_diagnostic',...initial.diagnostic});
+        }
       }finally{await binding.dispose();}
     }
     if(toastRefused)trace.push({event:'download_toast_unsettled',deadline_elapsed:Date.now()>=task.deadline_at});
