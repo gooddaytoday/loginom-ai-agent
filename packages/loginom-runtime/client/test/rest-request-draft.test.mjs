@@ -6,7 +6,7 @@ import {restRequestCapability} from '../lib/rest-request.mjs';
 function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
- const names=['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
+ const names=options.empty?[]:['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
  const store=rows=>({loading:false,getRange:()=>rows});
@@ -45,8 +45,22 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
   draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
  return {saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
-  query_parameters:names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
+  query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
 }
+
+test('plain GET commits an empty parameter inventory without AutoLink or a data table',async()=>{
+ const f=fixture(null,false,null,{empty:true}),result=await f.run();
+ assert.equal(result.verified,true,result.error);
+ assert.deepEqual(result.configuration.query_parameters,[]);
+ assert.deepEqual(result.configuration.input_fields,[]);
+ assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:3});
+});
+test('plain GET refuses saved nonempty query definitions before changing bindings',async()=>{
+ const f=fixture(null,false,null,{query:[]}),result=await f.run();
+ assert.equal(result.verified,false);
+ assert.match(result.error,/query parameter definitions differ/);
+ assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:0});
+});
 
 for(const [stall,step] of [['loading','wizard loading'],['bindings','requested query bindings'],['transition','wizard page transition']])test('REST '+step+' has its own deadline and never repeats the pending gesture',async t=>{
  let clock=1000;t.mock.method(Date,'now',()=>clock);

@@ -112,7 +112,7 @@ export function createRestRequestNodeSupport(config){
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
-    const target_inputs=request.inputs.length?(existingInput?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
+    const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
