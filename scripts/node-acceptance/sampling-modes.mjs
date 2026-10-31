@@ -52,6 +52,42 @@ export function checkSamplingGraph(expected,graph,baseline){
    &&graph.nodes.some(n=>n.type==='exports.text'&&n.ref.node_id===l.target)),'GRAPH_LINKS');
  return true;
 }
+export async function observeSamplingColdMapping({load,channel,node,port,expected}){
+ parseSamplingExpected(expected);
+ const want=expected.outputs.find(o=>o.output_port===port);need(want,'MAPPING_PORT');
+ const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
+ const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
+ await channel.openOutputPort(port);
+ let proof;
+ try{
+  await showMissingValuesMappingTable(channel);
+  const s=await channel.observe({condition:'sampling cold unchanged output definition',readMappings:true,
+   ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
+  const m=s.node_mapping,n=m.node_context;
+  need(m.source_identity_verified===true&&['document_id','workflow_id','node_id'].every(k=>n?.[k]===node[k])
+   &&n.output_port?.direction==='output'&&n.output_port.port===port,'MAPPING_OWNER');
+  const columns=m.target_fields.map(({name,type})=>({name,type}));
+  need(m.target_fields.every(f=>!f.excluded)&&same(columns,want.columns.map(({name,type})=>({name,type}))),'NATIVE_COLUMN_ORDER');
+  proof={verified:true,node:{...node},port,columns};
+ }finally{
+  const closed=await closePreparedWizard(channel);
+  need(closed.verified===true&&closed.cleanup_complete===true&&closed.settings_applied===false,'MAPPING_CANCEL');
+ }
+ return {...proof,cleanup_complete:true,settings_applied:false};
+}
+function coldMappingData(expected,record){
+ const proof=record.sampling_mapping,want=expected.outputs.find(o=>o.output_port===record.output_port),data=record.data;
+ need(want&&proof?.verified===true&&proof.cleanup_complete===true&&proof.settings_applied===false
+  &&proof.port===record.output_port&&['document_id','workflow_id','node_id'].every(k=>typeof record.node?.[k]==='string'&&proof.node?.[k]===record.node[k])
+  &&same(proof.columns,want.columns.map(({name,type})=>({name,type}))),'COLD_MAPPING_PROOF');
+ // A Table visualizer can keep a presentation order independent of the saved
+ // output definition. Normalize only against that independently read definition.
+ need(Array.isArray(data?.schema)&&data.schema.length===proof.columns.length
+  &&new Set(data.schema.map(c=>c.name)).size===data.schema.length&&Array.isArray(data.sample),'COLD_TABLE_SCHEMA');
+ const indices=proof.columns.map(c=>data.schema.findIndex(f=>f.name===c.name&&f.type===c.type));
+ need(indices.every(i=>i>=0)&&data.sample.every(row=>Array.isArray(row)&&row.length===indices.length),'COLD_TABLE_SCHEMA');
+ return {...record,data:{...data,schema:indices.map((i,index)=>({...data.schema[i],index})),sample:data.sample.map(row=>indices.map(i=>row[i]))}};
+}
 
 function checkRound(expected,records){
  const c=expected.sampling_modes;parseSamplingExpected(expected);
@@ -142,11 +178,13 @@ export function checkSamplingMain(expected,replies,csvs){
  return baseline;
 }
 export function checkSamplingCold(expected,actual,baseline){
- const result=checkExecutions(expected,actual);
+ const normalized=actual.map(r=>coldMappingData(expected,r));
+ const result=checkExecutions(expected,normalized);
  need(baseline?.version===1&&same(baseline.contract,expected.sampling_modes)&&baseline.node_id===result.node_id,'COLD_BASELINE_IDENTITY');
  need(same(baseline.ports,result.ports),'COLD_MAIN_MISMATCH');
- const first=actual.filter(a=>a.execution.execution_id===result.execution_ids[0]);
- return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:true},
+ const first=normalized.filter(a=>a.execution.execution_id===result.execution_ids[0]);
+ return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:true,native_column_order:true,
+   output_definitions:first.map(a=>({port:a.output_port,columns:a.sampling_mapping.columns,settings_applied:false}))},
   correspondence:expected.outputs.map((want,index)=>{const a=first.find(a=>a.output_port===want.output_port);return {expected_index:index,node:a.node,output_port:a.output_port,execution:a.execution};})};
 }
 

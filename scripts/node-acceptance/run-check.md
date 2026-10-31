@@ -8,7 +8,11 @@ completed executions and checks every downloaded CSV against exact typed source
 rows, requested sizes, Class quotas for stratification, row/column order and
 partition port relations. Cold validates the direct import → requested node →
 export graph, executes twice without reapplying settings, reads all ports in full,
-and compares their invariant-checked values with main. Normal Save, cleanup and
+and compares their invariant-checked values with main. It independently reads
+and cancels each native output-definition wizard before execution, requiring
+the exact saved column order. Only a Table presentation permutation may then
+be normalized by those verified names/types; missing or changed definitions
+remain failures. Normal Save, cleanup and
 port proofs remain mandatory. Biased and uniform modes are not registered here.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 

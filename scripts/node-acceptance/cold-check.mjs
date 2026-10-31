@@ -1,4 +1,4 @@
-import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph} from './sampling-modes.mjs'
+import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
@@ -276,6 +276,12 @@ page = context.pages()[0]
    const receipt=await javascriptAdmission.admit({});
    javascriptAdmission={admission:javascriptAdmission,receipt,owner};
   }
+  const samplingMappings=new Map();
+  if(sampling)for(const {port} of ports){
+   const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
+   samplingMappings.set(port,proof);
+   await record({phase:'sampling_cold_output_definition',...proof});
+  }
   const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
   const execution = javascriptAdmission
    ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
@@ -344,6 +350,7 @@ page = context.pages()[0]
   }
 
   actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,cold_read_ceiling:coldReadCeiling,
+   ...(sampling?{sampling_mapping:samplingMappings.get(outputPort)}:{}),
    ...(content_candidate?{content_candidate:true}:{})});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
