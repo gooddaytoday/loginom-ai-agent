@@ -208,14 +208,14 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
   const channel=channelFor(target.ref,(includeInputFields?'export-input-':'export-destination-')+target.ref.node_id);
   const observeSelection=()=>channel.observe({condition:'cold exact export selection',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
   let selected=await observeSelection();
-  const owner=selected.prepared_node_context;
-  need(owner?.verified===true&&['document_id','workflow_id','node_id'].every(k=>owner[k]===target.ref[k]),'export selection owner');
-  // Reading this wizard needs an observed selection point, not every pixel
-  // of its label/ports. Keep the ordinary selection and wizard gesture guards.
-  const selectable=selected.ui.elements.some(e=>
-   (e.tid===owner.tid&&e.graph_node?.part==='body'||e.tid===owner.tid+';Label;Label'&&e.graph_node?.part==='label')
-   &&e.allowed_actions?.includes('click')&&e.interaction?.state==='point_observed');
-  if(!selectable){await channel.revealGraphNode();selected=await observeSelection();}
+  const owned=s=>s.prepared_node_context?.verified===true
+   &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===target.ref[k]);
+  need(owned(selected),'export selection owner');
+  // A clipped body can have a selection point while its Setting is offscreen.
+  // Reveal the body, then select only the freshly observed same owner.
+  await channel.revealGraphNode({target:'body'});
+  selected=await observeSelection();
+  need(owned(selected),'export selection owner');
   await selectPreparedGraphNode(channel,selected,'cold select saved export',{refreshReplacedBody:true});
   await channel.observe({condition:'cold export scenario title settled',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
