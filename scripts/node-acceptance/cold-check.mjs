@@ -287,6 +287,13 @@ page = context.pages()[0]
   }
 
   let data;
+  if(target.type==='trees.to_table'){
+   // The approved tree cold path executes the saved conversion and reads every
+   // resulting table cell through the existing completed-port reader.
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error('COLD_TREE_TABLE_INCOMPLETE');
+   data=read.output;
+  }
   if(args['exact-port-windows']){
    data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
   }else if(useNative){

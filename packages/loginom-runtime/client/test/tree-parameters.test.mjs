@@ -43,3 +43,21 @@ test('tree readback projects verified observed settings and refuses a missing co
  const result=treeConfigurationReadback({node,phases,operation_id:'op'});assert.equal(result.json_field,'Document');assert.equal(result.package_persistence_verified,false);
  assert.throws(()=>treeConfigurationReadback({node,phases:phases.slice(0,-1),operation_id:'op'}));
 });
+test('tree source preflight binds semantic node identity, port GUID and the same completed execution',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'source'},request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',
+  tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'trees.from_json'},
+  parameters:{json_field:'Document',root_mode:'auto'},inputs:[{input:0,output:0,source:{node_id:'source',workflow_id:'wf',document_id:'doc'}}]};
+ const port={port:0,port_guid:'port',fresh:true,sample_complete:true,execution_id:'exec',row_count:1,schema:[{name:'Document',type:'string'}],
+  sample:[[{is_null:false,value:'{"items":[{"sku":"A"}]}'}]]};
+ const history=[{cleanup_confirmed:true,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,
+  execution:{status:'completed',execution_id:'exec'},output:{ports:[port]}}}}];
+ const events=[],options={operation:{id:'op',parameters:request,nodeTargetAdapter:{observe:async()=>({nodes:[],links:[]})}},
+  execute:async()=>({verified:true,ports:[{index:0,active:true,port_guid:'port'}]}),nodeHistory:()=>history,now:Date.now,
+  onRecord:async event=>{events.push(event);return {...event,recorded_at:'private metadata'};}};
+ const support=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:true});
+ const driver=support.nodeApplyDriverFactory(options),ctx={deadline:Date.now()+10000};
+ assert.equal((await driver.beforeTarget(ctx)).verified,true);assert.equal(events.length,1);
+ port.execution_id='stale';await assert.rejects(driver.beforeTarget(ctx),/same execution/);
+ port.execution_id='exec';options.execute=async()=>({verified:true,ports:[{index:0,active:true,port_guid:'foreign'}]});
+ await assert.rejects(driver.beforeTarget(ctx),/inactive or changed/);
+});

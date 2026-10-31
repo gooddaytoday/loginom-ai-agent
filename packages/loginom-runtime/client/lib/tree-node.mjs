@@ -2,7 +2,9 @@ import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeParameters,validateTreeJsonScope,validateSelectedTreePaths} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
+ ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 const owned=(state)=>state.prepared_node_context?.verified===true&&state.prepared_node_context.surface==='wizard';
 const ready=s=>owned(s)&&s.node_tree?.verified===true;
 const one=(state,predicate,message)=>{const matches=state.ui.elements.filter(predicate);need(matches.length===1,message);return matches[0];};
@@ -38,7 +40,7 @@ export function createTreeNodeSupport(config,{json}){
    need(latest?.cleanup_confirmed&&outcome.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&source?.cleanup_complete===true
     &&source.execution?.status==='completed','Read/execute the same source node successfully before tree conversion');
    const port=source.output?.ports?.find(p=>p.port===input.output);
-   need(port?.fresh===true&&port.sample_complete===true,'Tree stage 1 requires complete source readback');
+   need(port?.fresh===true&&port.sample_complete===true&&port.execution_id===source.execution.execution_id,'Tree stage 1 requires complete source readback from the same execution');
    const binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
    const inventory=await options.execute(makeNodeOutputContextCode(binding),{timeout:Math.max(5000,ctx.deadline-(options.now??Date.now)()+5000)});
    const observed=inventory?.ports?.find(p=>p.index===input.output);
@@ -55,7 +57,8 @@ export function createTreeNodeSupport(config,{json}){
    }
    const event={phase:'tree_source_scope_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,
     source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree'};
-   need(same(await options.onRecord(event),event),'Tree source scope journal acknowledgement differs');
+   const ack=await options.onRecord(event);
+   need(same(Object.fromEntries(Object.keys(event).map(k=>[k,ack?.[k]])),event),'Tree source scope journal acknowledgement differs');
    return {verified:true,cleanup_complete:true,effect_possible:false};
   },
   ...(!json?{async configureInputs(_channel,mappings){need(mappings.length===0,'Tree mapping edits are deferred');return {verified:true,cleanup_complete:true,effect_possible:false,default_tree_mapping:true};}}:{}),
