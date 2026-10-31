@@ -14,6 +14,6 @@ export function samplingConfigurationReadback({node,phases,operation_id}){
   const fields=m.target_fields.filter(f=>!f.excluded).map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
   need(JSON.stringify(fields)===JSON.stringify(p.schema),'retained output schema differs');
  }
- return {kind:c.kind,scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'sequential',counts:c.counts,groups:c.groups,
+ return {kind:c.kind,scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'sequential',counts:c.counts,groups:c.groups,...(c.mode&&c.mode!=='sequential'?{seed:c.seed,strata_fields:c.strata?.rows.filter(r=>r.values.UsageFlag).map(r=>r.values.Name)??[],bias_field:c.bias_fields?.rows.find(r=>r.selected)?.values.Name??null,bias_factors:c.bias?.rows.map(r=>({value:r.values.Value,factor:r.values.Factor}))??[],test_priority:c.test_priority??false}:{}),
   output_mappings:mapped.value.ports.map(p=>({port:p.port,fields:p.schema.map((f,index)=>({...f,index,source_name:f.name}))})),package_persistence_verified:false};
 }
