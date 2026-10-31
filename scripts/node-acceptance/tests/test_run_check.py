@@ -49,8 +49,7 @@ class RunCheckTests(unittest.TestCase):
             runner.check_csv(path, expected, **options)
             for events, code in [([], 'CSV_NULL_MARKER_MISSING'),
                     (self.export_events(destination='/other/all.csv'), 'CSV_NULL_MARKER_MISSING'),
-                    (self.export_events(marker='NIL'), 'CSV_NULL_MARKER_UNSUPPORTED'),
-                    (self.export_events(marker=''), 'CSV_NULL_MARKER_COLLISION')]:
+                    (self.export_events(marker='NIL'), 'CSV_NULL_MARKER_UNSUPPORTED')]:
                 with self.subTest(code=code), self.assertRaisesRegex(AssertionError, code):
                     runner.check_csv(path, expected, **dict(options, export_events=events))
             expected['rows'][2]['Class'] = '?'
@@ -74,12 +73,24 @@ class RunCheckTests(unittest.TestCase):
             # Omitted patch fields must come from observed settings, not defaults.
             events[0][1]['part']['state']['input']['parameters'] = {}
             runner.check_csv(path, expected, export_events=events, **options)
-            for bad in [events[:1], self.export_events(kind='existing', readback='')]:
-                with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_(MISSING|COLLISION)'):
-                    runner.check_csv(path, expected, export_events=bad, **options)
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, export_events=events[:1], **options)
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                runner.check_csv(path, expected,
+                                 export_events=self.export_events(kind='existing', readback=''), **options)
             events[1][1]['part']['state']['output'] = events[1][1]['part']['state']['output'].replace('"export"', '"unrelated"')
             with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
                 runner.check_csv(path, expected, export_events=events, **options)
+
+    def test_empty_export_null_marker_preserves_legacy_comparison_with_empty_strings(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\n""\n""\n')
+            runner.check_csv(path, expected, null_marker='')
+            for events in [self.export_events(marker=''), self.export_events(kind='existing', readback='')]:
+                runner.check_csv(path, expected, null_marker=None,
+                                 destination='/test/all.csv', export_events=events)
 
     def test_export_null_markers_and_last_patch_inspect(self):
         expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='value')])
