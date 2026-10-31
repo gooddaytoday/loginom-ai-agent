@@ -125,6 +125,20 @@ the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
+For the S-tamper negative case, use `outputs: []` and
+`rejection: {"code":"LOGINOM_FILE_CHANGED","node_type":"transform.group_data"}`
+in private `expected.json`. PASS requires a successful replacement export,
+then a correlated grouping refusal with no possible effect, no execution and
+no returned ports, followed by Save and normal close/logout/ACK. Synchronous,
+wait and inspect receipts use the same checks. Returned ports after the refusal
+fail the case. CSV and cold output readback are inapplicable to this refusal;
+`--cold` still applies normally to positive cases in the batch. Rejection
+expectations never reach the model.
+
+For `--case-root` path attachments, `{{SOURCE_PATH}}` in `task.md` resolves from
+`case.json`. Upload-only seeds use that configured source even when a copied
+task contains an obsolete path; they never create exports or save a package.
+
 D87 large-file regression, one foreground command (from the repository root):
 
 ```sh
