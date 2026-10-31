@@ -14,7 +14,7 @@ export function validateAutoCorrelationParameters(p,mode,r){
 export function resolveAutoCorrelationField(p,fields){
  const field=p.autocorrelation?.field;
  need(Array.isArray(fields)&&new Set(fields.map(f=>f.name)).size===fields.length,'complete unique input fields required');
- const selected=field===undefined?fields.filter(f=>f.usage_type!==0):fields.filter(f=>f.name===field);
+ const selected=field===undefined?fields.filter(f=>f.usage_type===3):fields.filter(f=>f.name===field);
  need(selected.length===1&&['integer','real'].includes(selected[0].type),'one known integer/real series required; all other fields must be unused');
  return selected[0].name;
 }

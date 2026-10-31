@@ -39,12 +39,13 @@ export function readAutoCorrelationBrowser(prefix){
   ||!proxy.pendingOperations||Object.keys(proxy.pendingOperations).length||store.currentPage!==1||store.getRemoteFilter?.()!==false||store.getRemoteSort?.()!==false
   ||!Array.isArray(records)||records.length>1000||store.getCount?.()!==records.length||store.getTotalCount?.()!==records.length
   ||source&&(!Array.isArray(source)||source.length!==records.length||new Set(source).size!==records.length||source.some(r=>!records.includes(r))))return fail('autocorrelation_inventory');
+ // The observed editor choice Value=4 (Используемое) stores UsageType=3.
  const fields=[],ids=new Set(),fieldIds=new Set(),names=new Set(),types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},kinds={0:'Неопределенное',1:'Непрерывный',2:'Дискретный'};
  for(const [index,r] of records.entries()){
   const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||ids.has(id)||!Number.isSafeInteger(d?.ID)||d.ID<0||fieldIds.has(d.ID)||d.Index!==index
    ||typeof d.Name!=='string'||!d.Name||names.has(d.Name.toLowerCase())||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]
-   ||![0,1].includes(d.UsageType)||d.GroupField!==''||d.Broken!==false||d.ReverseBroken!==false)return fail('autocorrelation_record');
+   ||![0,3].includes(d.UsageType)||d.GroupField!==''||d.Broken!==false||d.ReverseBroken!==false)return fail('autocorrelation_record');
   ids.add(id);fieldIds.add(d.ID);names.add(d.Name.toLowerCase());
   fields.push({index,record_id:id,field_id:String(d.ID),name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],usage_type:d.UsageType});
  }

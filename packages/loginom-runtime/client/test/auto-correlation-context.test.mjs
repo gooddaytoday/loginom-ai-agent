@@ -11,7 +11,7 @@ function fixture(kind='parameters'){
   const e=element(base+';'+key+';ValueControl');components[e.id]={el:{dom:e},getValue:()=>values[key]};
   const sw=element(base+';'+key+';SwitchButton');components[sw.id]={el:{dom:sw},pressed:false};
  }
- const records=['RowID','X'].map((Name,index)=>({isModel:true,internalId:'r'+index,data:{ID:index,Index:index,Name,DisplayName:Name,DataType:index===0?4:3,DataKind:1,UsageType:index===1?1:0,GroupField:'',Broken:false,ReverseBroken:false}}));
+ const records=['RowID','X'].map((Name,index)=>({isModel:true,internalId:'r'+index,data:{ID:index,Index:index,Name,DisplayName:Name,DataType:index===0?4:3,DataKind:1,UsageType:index===1?3:0,GroupField:'',Broken:false,ReverseBroken:false}}));
  const proxy={$className:'bg.ext.CollectionProxy',pendingOperations:{}},data={items:records};
  const store={$className:'Ext.data.Store',currentPage:1,getProxy:()=>proxy,getData:()=>data,getCount:()=>records.length,getTotalCount:()=>records.length,getRemoteFilter:()=>false,getRemoteSort:()=>false,isLoading:()=>false};
  const ge=element(base+';grdTargetColumns'),grid={el:{dom:ge},getStore:()=>store};components[ge.id]=grid;
@@ -25,12 +25,12 @@ test('ACF card is unready until all asynchronous native values load',()=>{
  f.values.pedLagCount=4;f.values.pedDomainCalc=0;assert.equal(f.read().domain,'time');
 });
 test('ACF roles require the complete local bound collection and unique field identities',()=>{
- const good=fixture('roles').read();assert.equal(good.verified,true);assert.deepEqual(good.fields.map(f=>f.usage_type),[0,1]);
+ const good=fixture('roles').read();assert.equal(good.verified,true);assert.deepEqual(good.fields.map(f=>f.usage_type),[0,3]);
  for(const change of [f=>f.store.getCount=()=>99,f=>f.store.getTotalCount=()=>99,f=>f.store.isLoading=()=>true,
   f=>f.store.isBufferedStore=true,f=>f.store.getRemoteFilter=()=>true,f=>f.store.currentPage=2,
   f=>f.proxy.$className='Ajax',f=>f.proxy.pendingOperations={load:1},f=>f.data.getSource=()=>({items:[]}),
   f=>f.grid.el.dom={},f=>f.records[1].data.Name='rowid',f=>f.records[1].data.ID=0,
-  f=>f.records[1].data.UsageType=3,f=>f.records[1].data.Broken=true,f=>f.element('EditTuneColumnDefForm')]){
+  f=>f.records[1].data.UsageType=4,f=>f.records[1].data.Broken=true,f=>f.element('EditTuneColumnDefForm')]){
   const f=fixture('roles');change(f);assert.equal(f.read().verified,false);
  }
 });

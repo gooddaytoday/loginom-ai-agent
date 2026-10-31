@@ -26,11 +26,11 @@ test('new ACF requires one field and positive safe lag count; patches preserve o
  assert.throws(()=>validateAutoCorrelationParameters(parameters,'frequency',request));
 });
 test('one numeric series replaces all used roles; missing fields and unsupported saved roles refuse',()=>{
- const fields=[{name:'RowID',type:'integer',usage_type:1},{name:'X',type:'real',usage_type:0},{name:'Text',type:'string',usage_type:0}];
+ const fields=[{name:'RowID',type:'integer',usage_type:3},{name:'X',type:'real',usage_type:0},{name:'Text',type:'string',usage_type:0}];
  assert.equal(resolveAutoCorrelationField(parameters,fields),'X');
  assert.equal(resolveAutoCorrelationField({},fields),'RowID');
  for(const p of [{autocorrelation:{field:'Text'}},{autocorrelation:{field:'Unknown'}}])
   assert.throws(()=>resolveAutoCorrelationField(p,fields));
- assert.throws(()=>resolveAutoCorrelationField({},fields.map(f=>({...f,usage_type:1}))));
+ assert.throws(()=>resolveAutoCorrelationField({},fields.map(f=>({...f,usage_type:3}))));
  assert.throws(()=>resolveAutoCorrelationField({},fields.map(f=>({...f,usage_type:0}))));
 });

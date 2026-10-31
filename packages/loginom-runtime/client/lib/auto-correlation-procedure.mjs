@@ -10,7 +10,7 @@ export async function configureAutoCorrelationRoles(channel,p,inputMapping){
  const bind=s=>bindReformInput(s.node_auto_correlation,inputMapping);
  const baseline=bind(await observe('complete autocorrelation roles'));
  need(baseline.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'role schema differs from connected input');
- const field=resolveAutoCorrelationField(p,baseline.fields),expected=baseline.fields.map(f=>({...f,usage_type:f.name===field?1:0}));
+ const field=resolveAutoCorrelationField(p,baseline.fields),expected=baseline.fields.map(f=>({...f,usage_type:f.name===field?3:0}));
  let current=baseline.fields,edits=0;
  for(const wanted of expected){
   const original=current.find(f=>f.record_id===wanted.record_id);if(original.usage_type===wanted.usage_type)continue;
@@ -26,7 +26,7 @@ export async function configureAutoCorrelationRoles(channel,p,inputMapping){
   s=await channel.observe({condition:'bound autocorrelation role editor',ready:s=>editor(s)&&s.ui.elements.filter(e=>choice(e,'picker')&&e.allowed_actions.includes('click')).length===1});
   await channel.perform({condition:'open autocorrelation roles',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'click',ref:one(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click')).ref})});
-  const label=wanted.usage_type===1?'Используемое':'Не задано';
+  const label=wanted.usage_type===3?'Используемое':'Не задано';
   s=await channel.observe({condition:'exact autocorrelation role option',ready:s=>editor(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===label)});
   await channel.perform({condition:'select autocorrelation role',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'select_wizard_option',ref:one(s,e=>choice(e,'option')&&e.wizard_combo.label===label).ref})});
@@ -43,7 +43,7 @@ export async function configureAutoCorrelationRoles(channel,p,inputMapping){
 }
 export async function configureAutoCorrelation(channel,p,{request,inputMapping}){
  const roles=await configureAutoCorrelationRoles(channel,p,inputMapping);
- const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions.includes(verb));need(es.length===1,'unique control required: '+tid);return es[0];};
+ const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>(e.tid===tid||['fill','press'].includes(verb)&&e.identity?.anchor_tid===tid)&&e.allowed_actions.includes(verb));need(es.length===1,'unique control required: '+tid);return es[0];};
  const next=(stage,destination)=>channel.perform({condition:'accept autocorrelation '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,s.wizard.root_tid+';btnNext','wizard_step').ref,expected_stage:destination})});
  await next('input_mapping','auto_correlation');
