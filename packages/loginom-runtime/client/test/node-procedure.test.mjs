@@ -1131,6 +1131,16 @@ test('direct output read dispatches once and journals only confirmed bounded res
  assert.equal(f.records.at(-1).phase,'node_port_output_read');
 });
 
+test('direct tree refusal journals the bounded native diagnostic while the thrown error contains only its code',async()=>{
+ const diagnostic={stage:'container',parameters:{schema_index:0,row:0},native_response:{name:'NativeError',message:'private native reply'}};
+ const f=portReadFixture({envelope:{verified:false,cleanup_complete:true,reason:'tree_rpc_container',read_diagnostic:diagnostic}});
+ await assert.rejects(f.channel.readOutputPort(f.request),error=>{
+  assert.match(error.message,/tree_rpc_container/);assert.equal(error.message.includes('private native reply'),false);return true;
+ });
+ assert.equal(f.records.length,1);assert.equal(f.records[0].phase,'node_port_output_read_refused');
+ assert.deepEqual(f.records[0].diagnostic,diagnostic);assert.equal(f.operation.cleanupConfirmed,true);
+});
+
 test('direct output cancellation before dispatch publishes nothing and makes no call',async()=>{
  const controller=new AbortController();controller.abort(Error('cancelled'));
  for(const previous of [undefined,true,false]){

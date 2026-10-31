@@ -239,6 +239,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           :typeof result.reason==='string');
       operation.portReadCleanupComplete=operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
       checkBudget();
+      if(valid&&!result.verified&&result.read_diagnostic)await entry('node_port_output_read_refused',{reason:result.reason,diagnostic:structuredClone(result.read_diagnostic),cleanup_complete:result.cleanup_complete});
       if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
       await entry('node_port_output_read',{outcome:structuredClone(result)});
       checkBudget();

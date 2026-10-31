@@ -54,13 +54,21 @@ test('tree_io serialized reader retains completed-port ownership and disposes ev
  assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
  assert.equal(Object.hasOwn(result.output,'row_count'),false);assert.deepEqual(f.rpcCalls,[]);
 });
-test('tree_io native schema RPC failure identifies its bounded stage without exposing server text',async()=>{
+test('tree_io native schema RPC failure retains server text privately behind its bounded stage',async()=>{
  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
  f.dataSource.get_RootNodeDef=async()=>{const root=await get();root.get_Name=async()=>{throw Error('private server text');};return root;};
  const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
  assert.equal(result.verified,false);assert.equal(result.reason,'tree_rpc_schema_name');assert.equal(result.cleanup_complete,true);
- assert.equal(JSON.stringify(result).includes('private server text'),false);
+ assert.equal(result.reason.includes('private server text'),false);
+ assert.deepEqual(result.read_diagnostic,{stage:'schema_name',parameters:{},native_response:{name:'Error',message:'private server text'}});
  assert.deepEqual(f.disposed.sort(),['dataSource','output','treeRoot']);
+});
+test('tree_io bounds Saltarelle native exception messages in the private diagnostic',async()=>{
+ const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
+ f.dataSource.get_RootNodeDef=async()=>{const root=await get();root.get_Name=async()=>{throw {constructor:{__typeName:'rpc.NativeException'},get_message:()=> 'x'.repeat(2000)};};return root;};
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+ assert.equal(result.reason,'tree_rpc_schema_name');assert.equal(result.read_diagnostic.native_response.name,'rpc.NativeException');
+ assert.equal(result.read_diagnostic.native_response.message,'x'.repeat(512));assert.equal(result.cleanup_complete,true);
 });
 test('tree_io late acquired schema is disposed when the original deadline expires',async()=>{
  const clock={now:Date.now()},f=fixture({treeOutput:true,clock}),get=f.dataSource.get_RootNodeDef;

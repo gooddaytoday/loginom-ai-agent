@@ -6,9 +6,14 @@ import {readOutputContext} from './node-output-context.mjs';
 export async function readTreePortSource(source,call,track,decode) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
- const rpc=async(name,fn)=>{try{return await call(fn);}catch(error){
-  if(/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))throw error;throw Error('tree_rpc_'+name);
- }};
+ const rpc=async(name,fn,parameters={})=>call(async()=>{try{return await fn();}catch(error){
+  if(/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))throw error;
+  let message='';try{message=typeof error?.message==='string'?error.message:typeof error?.get_message==='function'?error.get_message():'';}catch{}
+  const nameValue=typeof error?.name==='string'?error.name:error?.constructor?.__typeName??error?.constructor?.name??'Error';
+  const failure=Error('tree_rpc_'+name);
+  failure.treeReadDiagnostic={stage:name,parameters,native_response:{name:String(nameValue).slice(0,128),message:String(message).slice(0,512)}};
+  throw failure;
+ }});
  const acquire=async(name,fn)=>{let proxy;await rpc(name,async()=>{proxy=track(await fn());return proxy;});return proxy;};
  const pointer=name=>name.replaceAll('~','~0').replaceAll('/','~1');
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
@@ -44,7 +49,7 @@ export async function readTreePortSource(source,call,track,decode) {
  const instance=async(index,row,path,depth,arrayItem=false)=>{
   const def=schema[index];count(depth);
   if(def.is_array&&!arrayItem){
-   const start={$:0},size={$:0};await rpc('row_range',()=>reader.GetRowRange(index,row,start,size));
+   const start={$:0},size={$:0};await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
    need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
     &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
    const children=[];
@@ -52,16 +57,18 @@ export async function readTreePortSource(source,call,track,decode) {
    const value={schema_index:index,path,type:'array',children};bytes(value);return value;
   }
   if(def.is_container){
-   need(await rpc('container',()=>reader.GetContainerExists(index,row))===true,'tree_absent_container');
+   // Root rows exist by GetRowCount; array records exist by GetRowRange.
+   // GetContainerExists is for an ordinary optional object, not those records.
+   if(index!==0&&!def.is_array)need(await rpc('container',()=>reader.GetContainerExists(index,row),{schema_index:index,row})===true,'tree_absent_container');
    const children=[];
    for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
    const value={schema_index:index,path,type:'object',children};bytes(value);return value;
   }
-  const decoded=decode(await rpc('value',()=>reader.AsVariant(index,row)),def.type);
+  const decoded=decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- const rows=await rpc('row_count',()=>reader.GetRowCount(0));need(rows===1,'tree_document_count');
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(rows===1,'tree_document_count');
  const document=await instance(0,0,'',0);
  const instances=[];
  const flatten=(node,parent)=>{
@@ -150,7 +157,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
-  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,reason='read_failed',released=true;
+  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,readDiagnostic,reason='read_failed',released=true;
   const items=[];
   const snapshot=()=>{
    const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
@@ -268,13 +275,13 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;result=undefined;
+  }catch(error){if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
   }finally{
    for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
   }
   let context=false;try{context=!!baseline&&same(baseline,snapshot());}catch{}
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
-  if(!result)return {verified:false,cleanup_complete:true,reason};
+  if(!result)return {verified:false,cleanup_complete:true,reason,...(readDiagnostic?{read_diagnostic:readDiagnostic}:{})};
   return {verified:true,cleanup_complete:true,output:result};
  },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString()});
  const after=await readNode(page,binding);

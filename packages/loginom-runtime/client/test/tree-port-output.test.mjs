@@ -5,7 +5,7 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeTreeOutputPortSchema} from '../lib/node-result-schema.mjs';
 
-function fixture({count=4,depth=0,precision=false,duplicate=false}={}){
+function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContainers=false,absentContainer=false}={}){
  const released=[],nodes=[];
  const node=(name,type,children=[],array=false)=>{
   const index=nodes.length,def={index,name,type,children,array,
@@ -17,10 +17,13 @@ function fixture({count=4,depth=0,precision=false,duplicate=false}={}){
  const id=node('id',4),flag=node('active',1),sku=node('sku',5),qty=node('qty',4),price=node('price',3),note=node('note',5);
  if(duplicate)note.get_Name=async()=> 'sku';
  const items=node('items',0,[sku,qty,price,note],true);
- let root=node('Root',0,[id,flag,items]);
+ let root=node('Root',0,absentContainer?[node('meta',0,[id,flag]),items]:[id,flag,items]);
  for(let i=0;i<depth;i++)root=node('Root',0,[root]);
  class Int64{toString(){return '9007199254740993';}}
- const reader={GetRowCount:async()=>1,GetContainerExists:async()=>true,
+ const reader={GetRowCount:async()=>1,GetContainerExists:async(index,row)=>{
+  if(nativeContainers&&(index===0||reader.definitions[index].array))throw Error('Native container query is not applicable to root or array rows');
+  return !(absentContainer&&reader.definitions[index].name==='meta');
+ },
   GetRowRange:async(index,parent,start,size)=>{assert.equal(parent,0);start.$=0;size.$=count;},
   AsVariant:async(index,row)=>{
    const name=reader.definitions[index].name;
@@ -45,6 +48,14 @@ test('tree_io reads ordered schema and every native instance with exact Int64, f
  assert.equal(result.instances.find(n=>n.path==='/items').children.length,4);
  assert.equal(value('/items/1/qty'),'0');assert.equal(value('/items/0/note'),null);
  assert.equal(value('/items/1/note'),'');assert.equal(value('/items/3/note'),null);assert.equal(value('/items/2/price'),2);
+});
+test('tree_io uses root row count and array row ranges as the existence proof for their records',async()=>{
+ const result=await read({nativeContainers:true});
+ assert.equal(result.complete,true);assert.equal(result.node_count,24);
+ assert.equal(result.instances.find(n=>n.path==='/items/3/qty').value,'1');
+});
+test('tree_io still refuses a genuinely absent ordinary object container',async()=>{
+ await assert.rejects(read({nativeContainers:true,absentContainer:true}),/tree_absent_container/);
 });
 test('tree_io refuses unsafe integer precision instead of rounding',async()=>{
  await assert.rejects(read({precision:true}),/integer_value/);
