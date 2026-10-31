@@ -95,6 +95,12 @@ export function createServerSourceRegistry({getBinding}) {
       if(!source)throw Error('Verified storage source reference is missing');
       return structuredClone(source);
     },
+    referenceForPath(path) {
+      const binding=getBinding();
+      const entry=[...sources.entries()].findLast(([,s])=>s.path===path&&JSON.stringify(s.binding)===JSON.stringify(binding));
+      if(!entry)throw Error('LOGINOM_FILE_CHANGED: observe the delivered file in Files before switching its source');
+      return entry[0];
+    },
     async inspect(ref,observe) {
       const source=this.peek(ref),name=source.path.slice(source.path.lastIndexOf('/')+1);
       const roots=await observe({discover_roots:true,storage_name:name});
@@ -177,8 +183,12 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
         let timer;
         const arm=()=>{
           clearTimeout(timer);
-          const deadline=Math.min(job.deadline,job.lastProgress+120000);
-          const code=job.deadline<=job.lastProgress+120000?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
+          // Native Blob bytes can be complete while Chromium/saveAs still
+          // finalizes the copy. Keep the original absolute deadline then;
+          // no further byte growth is possible or required for this stage.
+          const stalledAt=job.bytes===job.source.bytes?job.deadline:job.lastProgress+120000;
+          const deadline=Math.min(job.deadline,stalledAt);
+          const code=job.deadline<=stalledAt?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_DOWNLOAD_NO_PROGRESS';
           if(now()>=deadline){job.controller.abort(Error(code));return;}
           timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
         };

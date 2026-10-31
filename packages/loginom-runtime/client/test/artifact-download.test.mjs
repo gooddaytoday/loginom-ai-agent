@@ -75,7 +75,7 @@ test('server event and RPC consume the original operation deadline instead of th
  f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
  let rpc,eventTimeout,rpcStarted;
  const listeners=new Map();
- const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),detach:async()=>{},
+ const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),off:event=>listeners.delete(event),
   send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
  f.page.waitForEvent=async(type,options)=>{
   assert.equal(type,'download');eventTimeout=options.timeout;

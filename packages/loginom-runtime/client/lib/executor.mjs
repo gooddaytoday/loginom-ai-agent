@@ -208,8 +208,12 @@ async function browserArtifactReveal(page,task,snapshot) {
 // Listen on the existing authenticated context. Keep Playwright's configured
 // download directory and behavior; only enable CDP events for this listener.
 export async function browserServerDownloadProgress(page,task) {
-  const session=await page.context().newCDPSession(page);
-  let native,closed=false,chromiumBytes=0;
+  // Chromium resets the context's download permission when the session that
+  // set it detaches. Reuse one Page-owned session until the context closes;
+  // per-transfer close removes listeners and native handles only.
+  const key=Symbol.for('loginom-dock.download-progress-session.v1');
+  const session=page[key]??=await page.context().newCDPSession(page);
+  let native,closed=false,chromiumBytes=0,onBegin,onProgress;
   try {
     // Loginom receives the file into native Blob chunks over its WebSocket
     // before emitting Download. Retain this controller privately, without
@@ -263,23 +267,30 @@ export async function browserServerDownloadProgress(page,task) {
           progress.bytes=Math.max(progress.bytes,bytes);
         }catch{if(!closed)progress.failed=true;}
       },
-      close:async()=>{if(closed)return;closed=true;try{await native?.dispose();}finally{await session.detach();}}};
-    session.on('Browser.downloadWillBegin',event=>{
+      close:async()=>{if(closed)return;closed=true;
+        session.off('Browser.downloadWillBegin',onBegin);session.off('Browser.downloadProgress',onProgress);
+        await native?.dispose();}};
+    onBegin=event=>{
       if(event.frameId!==frameTree.frame.id||event.suggestedFilename!==task.artifact.name)return;
       if(!(event.url.startsWith(task.expected_origin+'/')||event.url.startsWith('blob:'+task.expected_origin+'/')))return;
       if(progress.guid){progress.failed=true;return;}
       progress.guid=event.guid;progress.url=event.url;
-    });
-    session.on('Browser.downloadProgress',event=>{
+    };
+    onProgress=event=>{
       if(event.guid!==progress.guid||progress.failed)return;
       if(!Number.isSafeInteger(event.receivedBytes)||event.receivedBytes<chromiumBytes
         ||event.receivedBytes>task.server_source_binding.bytes){progress.failed=true;return;}
       chromiumBytes=event.receivedBytes;progress.bytes=Math.max(progress.bytes,chromiumBytes);
-    });
+    };
+    session.on('Browser.downloadWillBegin',onBegin);session.on('Browser.downloadProgress',onProgress);
     await session.send('Browser.setDownloadBehavior',{behavior:'allowAndName',
       browserContextId:targetInfo.browserContextId,downloadPath:task.browser_downloads_path,eventsEnabled:true});
     return progress;
-  }catch(error){try{await native?.dispose();}finally{await session.detach();}throw error;}
+  }catch(error){
+    if(onBegin)session.off('Browser.downloadWillBegin',onBegin);
+    if(onProgress)session.off('Browser.downloadProgress',onProgress);
+    await native?.dispose();throw error;
+  }
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal,track) {
@@ -1316,7 +1327,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       node = node.ParentNode;
     }
-    throw new Error('Active workflow has no verified cached package identity');
+    throw new Error('Active navigation has no verified cached package identity. Call dock_prepare with intent:"existing_workflow" and the latest runtime workflow_ref including document_id (use saved workflow_continuations after Save), then retry Save with a new operation_id. After LOGINOM_FILE_CHANGED this restores navigation only; full-source execution still requires a new download and exact scan.');
   });
   const normalizeStoredPath = value => {
     if (typeof value !== 'string' || !value.trim()) return null;
@@ -1790,7 +1801,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = false }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -3494,7 +3505,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try {
         if(!operation){
-          operation={id:operationId,signature,parameters:request,
+          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
           operation.nodeTargetAdapter=targetAdapter(operation);
@@ -3509,10 +3520,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             return response.output.value;
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
-            resolveStorageSource:async ref=>{
+            resolveStorageSource:async(ref,receipt=scanReceipt)=>{
               const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
-              return serverDownloads?serverDownloads.bind(source,scanReceipt):source;
+              return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
+            resolveDeliveredSource:path=>inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3525,7 +3537,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
             nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
-              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed})),
+              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
+                source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt})),
             uploadHistory:()=>({complete:true,records:[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o.action.capability==='artifact.upload')
               .map(({o,sequence})=>structuredClone({sequence,operation_id:o.id,destination:o.parameters.destination,artifact:o.checkpoint.artifact,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed===true,transport_uncertain:o.transportUncertain===true}))}),
             exclusiveNodeOperation:()=>running===true&&pending===operation&&operation.nodeApply?.pending?.phase==='read',

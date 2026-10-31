@@ -77,10 +77,10 @@ async function settled(registry,id='download') {
  while(registry.status(id).state==='running')await registry.wait(id,{timeoutMs:100});
  return registry.status(id);
 }
-test('production default refuses server cache before lookup or download and retains source tools',async t=>{
+test('explicitly disabled server cache refuses before lookup or download and retains source tools',async t=>{
  const f=await fixture(t),directory=join(f.root,'disabled-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
+  allowCandidate:true,cacheDirectory:directory,serverSourceCache:false,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
  const outcome=await r.serverDownload(f.request,'dock_storage_download_start');
  assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'SERVER_CACHE_DISABLED');
  assert.match(outcome.error.message,/для серверного файла точная сверка N недоступна/);
@@ -89,11 +89,12 @@ test('production default refuses server cache before lookup or download and reta
  assert.match(r.tools.find(tool=>tool.name==='dock_storage_download_start').description,/disabled/i);
  await assert.rejects(stat(directory),{code:'ENOENT'});await r.cleanupServerCache();
 });
-test('enabled server cache requires an observed native source before any browser download',async t=>{
+test('production default enables server cache and requires an observed native source before any browser download',async t=>{
  const f=await fixture(t),directory=join(f.root,'unobserved-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,serverSourceCache:true,execute:()=>assert.fail('An unobserved reference must not reach the browser')});
- await r.serverDownload(f.request,'dock_storage_download_start');
+  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('An unobserved reference must not reach the browser')});
+ const started=await r.serverDownload(f.request,'dock_storage_download_start');
+ assert.equal(started.state,'running',JSON.stringify(started));
  const outcome=await r.serverDownload({operation_id:'download',timeout_ms:100},'dock_storage_download_wait');
  assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'LOGINOM_DOWNLOAD_FAILED');
  assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);assert.equal(r.hasActiveWork(),false);
@@ -130,6 +131,41 @@ test('unchanged byte reports cannot renew the no-progress deadline; late growth 
   registry.start(f.request);const result=await settled(registry);
   assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
   assert.equal(result.cleanup_complete,true);assert.deepEqual(await readdir(join(f.root,'stalled')),[]);
+ }
+});
+test('complete native bytes allow cache finalization under the original absolute deadline',async t=>{
+ const f=await fixture(t);let clock=0;
+ const native={...source(),bytes:2*1024**3};
+ const registry=createServerDownloadRegistry({directory:join(f.root,'finalizing'),now:()=>clock,inspect:async()=>native,
+  download:async({path,onProgress,signal})=>{
+   clock=60000;onProgress(native.bytes);
+   clock=190000;onProgress(native.bytes);signal.throwIfAborted();
+   await writeFile(path,'');await truncate(path,native.bytes);
+  }});
+ registry.start(f.request);const result=await settled(registry);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.progress.deadline_at,serverDownloadBudget(native.bytes));
+ assert.equal(result.progress.elapsed_ms,190000);
+ assert.equal((await stat(result.output.path)).size,native.bytes);await registry.cleanup();
+});
+test('complete native bytes never extend the absolute deadline or authorize an unverified cache',async t=>{
+ for(const fault of ['deadline','native','copy']){
+  const f=await fixture(t);let clock=0,reads=0;
+  const native={...source(),bytes:2*1024**3};
+  const registry=createServerDownloadRegistry({directory:join(f.root,'finalizing-'+fault),now:()=>clock,
+   inspect:async()=>({...native,mtime:++reads>1&&fault==='native'?'changed':native.mtime}),
+   download:async({path,onProgress,signal})=>{
+    clock=60000;onProgress(native.bytes);
+    clock=fault==='deadline'?serverDownloadBudget(native.bytes):190000;
+    onProgress(native.bytes);signal.throwIfAborted();
+    await writeFile(path,'');await truncate(path,native.bytes-(fault==='copy'?1:0));
+   }});
+  registry.start(f.request);const result=await settled(registry);
+  assert.equal(result.status,'FAILED',JSON.stringify(result));
+  assert.equal(result.error.code,fault==='deadline'?'LOGINOM_DOWNLOAD_DEADLINE':'LOGINOM_FILE_CHANGED');
+  assert.equal(result.progress.deadline_at,serverDownloadBudget(native.bytes));
+  assert.equal(result.cleanup_complete,true);
+  assert.deepEqual(await readdir(join(f.root,'finalizing-'+fault)),[]);
  }
 });
 test('no-progress timer cancels and drains a stalled transfer even without status reports',async t=>{

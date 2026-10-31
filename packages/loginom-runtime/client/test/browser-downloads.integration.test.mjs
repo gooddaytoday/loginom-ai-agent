@@ -74,6 +74,15 @@ test('Chromium progress tracks only the owned page transfer before saveAs comple
  await progress.sample();assert.equal(progress.failed,true);
  await progress.close();
  await progress.close();
+ // LAB-559: detaching the progress session revoked ordinary downloads.
+ // Use Chromium's next real event and saveAs, including source deletion.
+ await download.delete();
+ const exported=page.waitForEvent('download');
+ await page.locator('a').click();
+ const ordinary=await exported;
+ responses[2].end(Buffer.alloc(524288,'c'));
+ await ordinary.saveAs(join(directory,'ordinary.csv'));
+ assert.equal((await readFile(join(directory,'ordinary.csv'))).length,1048576);
  // An already running exact-path receiver cannot be adopted by a new job.
  await assert.rejects(browserServerDownloadProgress(page,{artifact:{name:'source.csv'},expected_origin:origin,
   server_source_binding:{bytes:1048576,account:'worker',directory:'/worker',destination:'/worker/source.csv'},browser_downloads_path:directory}),/already has a native receiver/);

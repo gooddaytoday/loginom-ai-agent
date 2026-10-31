@@ -8,6 +8,38 @@ import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+
+test('text source switch admits Done without executing or reading a port',()=>{
+ const parameters={source:{kind:'storage',server_source_ref:'storage-a'},settings:{source:{source_path:'/worker/full.csv'}},
+  source_switch:{profile_id:'profile-a',save_operation_id:'saved'}};
+ const request={target:{kind:'existing'},finish:'done',read:{ports:[]},mappings:[],inputs:[]};
+ assert.doesNotThrow(()=>validateTextImportNodeParameters(parameters,'delimited',request));
+ for(const patch of [{read:{ports:[0]}},{finish:'close'}])
+  assert.throws(()=>validateTextImportNodeParameters(parameters,'delimited',{...request,...patch}));
+});
+
+for(const change of ['unchanged','size','mtime','digest','cache','missing'])test('chain Execute rechecks a deferred source before using data: '+change,async()=>{
+ const identity={canonical_path:'/cache/full.csv',size:3,file_id:'1:2'};
+ const scan={basis:'backend_exact_scan',profile_id:'p',records:17,bytes:3,sha256:'a'.repeat(64),identity};
+ const source={verified:true,kind:'storage',server_source_ref:'storage-a',destination:'/worker/full.csv',bytes:3,mtime:'original',sha256:scan.sha256,
+  cache_binding:{server_source_ref:'storage-a',native_size:3,native_mtime:'original',copy_bytes:3,identity}};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'flow'},target:{kind:'existing',type:'transform.group_data'},finish:'execute',parameters:{}};
+ const switched={request:{...request,target:{kind:'existing',type:'imports.text'},finish:'done',parameters:{source_switch:{profile_id:'p',save_operation_id:'saved'}}},
+  outcome:{status:'SUCCEEDED',output:{node:{node_id:'import'}}},cleanup_confirmed:true,source,scan_receipt:scan};
+ const current=structuredClone(source),calls=[];
+ if(change==='size')current.bytes++;
+ if(change==='mtime')current.mtime='changed';
+ if(change==='digest')current.sha256='b'.repeat(64);
+ if(change==='cache')delete current.cache_binding;
+ const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const drivers=support.nodeApplyDriverFactory({operation:{id:'execute-chain',parameters:request},nodeHistory:()=>[switched],
+  resolveStorageSource:async(ref,receipt)=>{calls.push({ref,receipt});if(change==='missing')throw Error('LOGINOM_FILE_CHANGED: row missing');return current;},
+  execute:async()=>assert.fail('source phase must not execute or open a wizard'),onRecord:async event=>event,now:Date.now});
+ if(change==='unchanged'){
+  await drivers.verifySource({});assert.equal(calls.length,1);assert.equal(calls[0].ref,'storage-a');assert.deepEqual(calls[0].receipt,scan);
+ }else await assert.rejects(drivers.verifySource({}),/LOGINOM_FILE_CHANGED/);
+});
 
 const binding=()=>({session_id:'session',document_id:'doc',origin:'https://app.loginom.ai',loginom_build:'7.4.2',loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}});
 const observed=()=>({status:'SUCCEEDED',output:{file_storage:{status:'observed',directory:'/worker'},ui:{elements:[{storage_entry:{kind:'file',path:'/worker/full.csv',bytes:2148532259,bytes_source:'native_file_store',mtime:'2026-10-28T00:00:00.000Z'}}]}}});
