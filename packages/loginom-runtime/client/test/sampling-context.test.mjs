@@ -64,3 +64,33 @@ test('observer refuses a separate port wizard or an owner change',async()=>{
 test('nested forms bind their unique data-tid in the owned wizard without invented component ancestry',()=>{
  const r=fixture(()=>{},true);assert.equal(r.verified,true);assert.equal(r.sizes_base,'MF;TF-1;WizrdMCF;SizeGridForm');assert.equal(r.sequence_base,'MF;TF-1;WizrdMCF;SequenceMethodForm');
 });
+
+function addMethodGrid(f,suffix,records,cells,selected=[]){
+ const base='MF;TF-1;WizrdMCF;SamplingComponentWizard;',tid=base+suffix,id=suffix;
+ const element={id,getAttribute:()=>tid,checkVisibility:()=>true,querySelectorAll:()=>records.map((r,i)=>({getAttribute:()=>r.internalId,textContent:'',querySelectorAll:()=>cells[i]}))};
+ f.tids[tid]=[element];
+ f.components[id]={el:{dom:element},getStore:()=>({$className:'Ext.data.Store',getCount:()=>records.length,getData:()=>({items:records}),isLoading:()=>false}),getSelectionModel:()=>({getSelection:()=>selected})};
+ for(const row of cells)for(const cell of row){cell.getAttribute=()=>base+cell.suffix;f.tids[base+cell.suffix]=[cell];}
+}
+test('strata identity and selection come from rendered technical-name cells and checked native flags',()=>{
+ const result=fixture(f=>{
+  const flag={suffix:'StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_Class',querySelectorAll:()=>[{classList:{contains:c=>c==='x-grid-checkcolumn-checked'}}]};
+  const name={suffix:'StratifiedMethodForm;colDisplayName_Class'};
+  addMethodGrid(f,'StratifiedMethodForm;grdStratifiedGrid',[{internalId:'class',data:{DisplayName:'Категория'}}],[[flag,name]]);
+ },false,'Стратифицированный',false);
+ assert.equal(result.verified,true);
+ assert.equal(result.strata.rows[0].values.Name,'Class');
+ assert.equal(result.strata.rows[0].values.UsageFlag,true);
+});
+test('biased factors use the native factor column dataIndex, with string categories and selected field bound separately',()=>{
+ const result=fixture(f=>{
+  const field={internalId:'class',data:{DisplayName:'Категория'}};
+  addMethodGrid(f,'BiasedMethodForm;grdBiasedColumns',[field],[[{suffix:'BiasedMethodForm;colDisplayName_Class'}]],[field]);
+  addMethodGrid(f,'BiasedMethodForm;grdBiased',[{internalId:'A',data:{NativeFactor:0.4}}],[[{suffix:'BiasedMethodForm;colBiasedValue_0',textContent:'A'}]]);
+  const column={id:'factor'};f.tids['MF;TF-1;WizrdMCF;SamplingComponentWizard;BiasedMethodForm;colBiasedFactor']=[column];
+  f.components.factor={el:{dom:column},dataIndex:'NativeFactor'};
+ },false,'Отбор со смещением',false);
+ assert.equal(result.verified,true);
+ assert.equal(result.bias_fields.rows[0].values.Name,'Class');assert.equal(result.bias_fields.rows[0].selected,true);
+ assert.equal(result.bias.rows[0].values.Value,'A');assert.equal(result.bias.rows[0].values.Factor,0.4);
+});

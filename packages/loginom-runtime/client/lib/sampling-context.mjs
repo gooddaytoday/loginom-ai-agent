@@ -22,13 +22,13 @@ export function readSamplingBrowser(prefix){
  if(!methodControl||typeof methodControl.getRawValue!=='function')return fail('sampling_method');
  const method=methodControl.getRawValue();
  if(typeof method!=='string'||!method)return fail('sampling_method_value');
- const readGrid=suffix=>{
+ const readGrid=(suffix,limit=4)=>{
   const es=[...document.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']')].filter(e=>shell.contains(e)&&e.checkVisibility({checkVisibilityCSS:true}));
   const element=es.length===1?es[0]:null,grid=element&&globalThis.Ext?.getCmp?.(element.id);
   const store=grid?.el?.dom===element?grid.getStore?.():null,data=store?.getData?.(),items=data?.items,source=data?.getSource?.()?.items;
   const details={suffix,matches:es.length,grid_tid:element?.getAttribute('data-tid')??null,component_class:grid?.$className??null,store_class:store?.$className??null,count:store?.getCount?.()??null};
   if(!element||grid?.el?.dom!==element)return {verified:false,...details};
-  if(store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(items)||items.length>4||store.getCount?.()!==items.length||source&&(source.length!==items.length||source.some(r=>!items.includes(r))))return {verified:false,...details};
+  if(store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(items)||items.length>limit||store.getCount?.()!==items.length||source&&(source.length!==items.length||source.some(r=>!items.includes(r))))return {verified:false,...details};
   const selected=grid.getSelectionModel?.().getSelection?.();
   if(!Array.isArray(selected)||selected.some(r=>!items.includes(r)))return {verified:false,...details,selection:false};
   const rows=items.map(r=>{
@@ -65,5 +65,31 @@ export function readSamplingBrowser(prefix){
  });
  if(units.some(u=>u===null))return fail('sampling_size_units',{size_rows:sizes});
  if(sequenceGrid&&sequence.length!==(partition?3:2))return fail('sampling_group_count');
- return {verified:true,inventory_complete:true,kind:partition?'data_partition':'sampling',base,sizes_base:sizeGrid.base,sequence_base:sequenceGrid?.base??null,sequence_materialized:!!sequenceGrid,method,sizes,units,sequence,settings_applied:false};
+ const priority=exact(base+'cntTestPriority;cnt;chb;InputEl');
+ const testPriority=priority.length===1&&typeof priority[0].checked==='boolean'?priority[0].checked:null;
+ const seedControl=component(base+'RandSeedEdit;edtRandSeed;ValueControl');
+ const rawSeed=seedControl?.getValue?.(),seed=(typeof rawSeed==='number'||typeof rawSeed==='string'&&/^\d+$/.test(rawSeed))&&Number.isSafeInteger(Number(rawSeed))?Number(rawSeed):null;
+ const strata=method==='Стратифицированный'?readGrid('StratifiedMethodForm;grdStratifiedGrid',128):null;
+ const biasFields=method==='Отбор со смещением'?readGrid('BiasedMethodForm;grdBiasedColumns',128):null;
+ const bias=method==='Отбор со смещением'?readGrid('BiasedMethodForm;grdBiased',128):null;
+ for(const grid of [strata,biasFields].filter(g=>g?.verified))for(const row of grid.rows){
+  const names=row.tids.filter(t=>t.startsWith(grid.base+';colDisplayName_'));
+  if(names.length!==1)return fail('sampling_field_identity');
+  row.values.Name=names[0].slice((grid.base+';colDisplayName_').length);
+  if(grid===strata){
+   const flags=exact(grid.base+';grdStratifiedGrid;headercontainer;UsageFlag_'+row.values.Name);
+   const images=flags.length===1?flags[0].querySelectorAll('img.x-grid-checkcolumn'):[];
+   if(images.length!==1)return fail('sampling_strata_flag');
+   row.values.UsageFlag=images[0].classList.contains('x-grid-checkcolumn-checked');
+  }
+ }
+ if(bias?.verified)for(const row of bias.rows){
+  const values=row.tids.filter(t=>t.startsWith(bias.base+';colBiasedValue_'));
+  const factorColumn=component(bias.base+';colBiasedFactor');
+  if(values.length!==1||typeof factorColumn?.dataIndex!=='string'||typeof row.values[factorColumn.dataIndex]!=='number')return fail('sampling_bias_category');
+  const cells=exact(values[0]);if(cells.length!==1)return fail('sampling_bias_value');
+  row.values.Value=cells[0].textContent;row.values.Factor=row.values[factorColumn.dataIndex];
+ }
+ if(strata&&!strata.verified||biasFields&&!biasFields.verified||bias&&!bias.verified)return fail('sampling_method_grid',{strata,biasFields,bias});
+ return {verified:true,inventory_complete:true,seed,test_priority:testPriority,strata,bias_fields:biasFields,bias,kind:partition?'data_partition':'sampling',base,sizes_base:sizeGrid.base,sequence_base:sequenceGrid?.base??null,sequence_materialized:!!sequenceGrid,method,sizes,units,sequence,settings_applied:false};
 }

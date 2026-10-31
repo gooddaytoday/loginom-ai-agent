@@ -123,6 +123,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-modes-smoke', 'partition-modes-smoke']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        root = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=root / 'modes-smoke', prompt=root / 'task-modes-smoke.md',
+                    data=root / 'modes-smoke/data', base=None, expected_name='expected.json')
     if name in ['sampling', 'data-partition', 'sampling-null', 'sampling-empty', 'data-partition-null', 'data-partition-empty']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         variant = next((v for v in ['null', 'empty'] if name.endswith('-' + v)), None)
