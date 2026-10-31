@@ -2476,8 +2476,14 @@ function readRenderedInputMapping(observation) {
         if(ids.length!==1||cells.length!==1||progress.length!==1||!visibleCell(cells[0],grids[0])
           ||textOf(ids[0],true)!==String(model.data.id))continue;
         const cell=cells[0],path=getTid(cell).slice((processBase+'colProcess_').length);
+        // History eviction can renumber the two locked views independently.
+        // Their exact native record/index/view binding above owns the row;
+        // only the top group's rendered ordinal may differ, never its caption
+        // or the child path. Keep the left view's current action identity.
+        const progressPath=getTid(progress[0]).slice((processBase+'colProgress_').length);
+        const captionPath=value=>value.replace(/^(Root>[^>]+)-[0-9]+(?=>|$)/,'$1');
         if(!path.startsWith('Root>')||(tids.get(getTid(cell))??[]).length!==1
-          ||getTid(progress[0])!==processBase+'colProgress_'+path)continue;
+          ||captionPath(progressPath)!==captionPath(path))continue;
         const row={record_id:id,path,ordinal:String(model.data.id),process_cell_ref:refOf(cell),
           selected:leftRow.classList.contains('x-grid-item-selected'),record_index:index};
         rows.push(row);processCells.set(row.process_cell_ref,{record_id:id,path,record_index:index,
