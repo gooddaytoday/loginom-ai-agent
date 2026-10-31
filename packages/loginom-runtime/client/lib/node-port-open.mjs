@@ -162,7 +162,30 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
     if(x>=0&&y>=0&&x<width&&y<height&&hit&&(hit===dom||dom.contains(hit)))point??={x,y};
    }
-   if(!point)fail('Port has no observed interaction point');
+   if(!point){
+    let detail='';
+    // Failure-only DOM identity: a covered port remains a refusal. Never read
+    // text/values or grant the covering layer an actionable UI reference.
+    try{
+     const hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
+     const describe=e=>e?{tag:e.tagName?.toLowerCase().slice(0,16)??null,
+      tid:e.getAttribute('data-tid')?.slice(0,64)??null,role:e.getAttribute('role')?.slice(0,24)??null,
+      class:e.getAttribute('class')?.slice(0,64)??null}:null;
+     const rect=b=>[b.x,b.y,b.width,b.height].map(n=>Math.round(n*1000)/1000);
+     const diagnostic={port_tid:r.portTid.slice(0,96),port_box:rect(box),point:[box.x+box.width/2,box.y+box.height/2],
+      covering:describe(hit),covering_box:hit?rect(hit.getBoundingClientRect()):null,
+      anchor:describe(hit?.closest?.('[data-tid],[role="tooltip"],[role="dialog"],.x-tip,.x-window,.x-menu,.x-panel'))};
+     // Escaped control characters can expand attributes sixfold. Keep the
+     // complete diagnostic inside the existing 500-character error budget.
+     for(let limit=32;JSON.stringify(diagnostic).length>400;limit=Math.floor(limit/2)){
+      diagnostic.port_tid=diagnostic.port_tid.slice(0,limit);
+      for(const e of [diagnostic.covering,diagnostic.anchor])if(e)
+       for(const key of ['tag','tid','role','class'])if(typeof e[key]==='string')e[key]=e[key].slice(0,limit);
+     }
+     detail=': '+JSON.stringify(diagnostic);
+    }catch{}
+    fail('Port has no observed interaction point'+detail);
+   }
    r.portDom=dom;r.phase='menu_issued';return {phase:r.phase,point};
   }
   if(mode==='menu'||mode==='open_issued') {
