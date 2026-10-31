@@ -1810,17 +1810,36 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   let storageNavigating=false;
-  const inspectServerSource=(ref,{signal,deadline}={})=>serverSources.inspect(ref,options=>{
+  const waitDownloadConnection=async(call,{signal,deadline,operation_id})=>{
+    let recorded=false;
+    while(true){
+      signal?.throwIfAborted();
+      if(deadline!==undefined&&now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+      try{return await call();}catch(error){
+        const diagnostic=operationFailureDiagnostic(error);
+        // Only the existing guard's bounded, same-session recovery is retryable.
+        // Identity loss, a missing job and unknown browser effects remain fatal.
+        if(deadline===undefined||diagnostic.code!=='LOGINOM_DISCONNECTED'
+          ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+        if(!recorded){await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});recorded=true;}
+        await new Promise(resolve=>setTimeout(resolve,Math.min(250,Math.max(1,deadline-now()))));
+      }
+    }
+  };
+  const inspectServerSource=(ref,{signal,deadline,storageSession,operation_id}={})=>waitDownloadConnection(()=>serverSources.inspect(ref,options=>{
     signal?.throwIfAborted();const timeout=Math.min(35000,deadline===undefined?35000:deadline-now());
     if(timeout<=0)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
     return execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout});
+      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout,storageSession});
+  }),{signal,deadline,operation_id}).catch(async error=>{
+    if(operation_id)await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});
+    throw error;
   });
-  const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
-  const drainServerDownload=async id=>{
-    const cancelled=await controlServerDownload(id,'cancel');
+  const controlServerDownload=(operation_id,mode,options)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`,{storageSession:'download-control',...options});
+  const drainServerDownload=async(id,options={})=>{
+    const cancelled=await controlServerDownload(id,'cancel',options);
     if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
-    const released=await controlServerDownload(id,'release');
+    const released=await controlServerDownload(id,'release',options);
     if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
   };
   const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
@@ -1839,17 +1858,33 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
       let started;
-      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now())});}
-      catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});}
+      catch(error){await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});error.cleanupUnconfirmed=true;throw error;}
       await onRecord({phase:'storage_download_started',operation_id,outcome:started});
       if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
         const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
         error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
       }
+      let primary,connectionWaiting=false;
       try {
         while(true) {
           signal.throwIfAborted();
-          const current=await controlServerDownload(operation_id,'status');
+          if(now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          let current;
+          try{
+            current=await controlServerDownload(operation_id,'status',
+              {signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});
+            connectionWaiting=false;
+          }catch(error){
+            const diagnostic=operationFailureDiagnostic(error);
+            if(diagnostic.code!=='LOGINOM_DISCONNECTED'
+              ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+            if(!connectionWaiting)await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});
+            connectionWaiting=true;
+            // Keep the normal recovery attempt even mid-transfer, but always
+            // account for already received bytes while that attempt is pending.
+            current=await controlServerDownload(operation_id,'status',{signal,timeout:Math.max(1,deadline-now())});
+          }
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           onProgress(current.output.bytes);
           if(current.output.state==='settled'){
@@ -1860,7 +1895,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           await new Promise(resolve=>setTimeout(resolve,250));
         }
-      }finally{try{await drainServerDownload(operation_id);}catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}}
+      }catch(error){
+        primary=error;await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});throw error;
+      }finally{
+        try{await drainServerDownload(operation_id);}
+        catch(error){
+          await onRecord({phase:'storage_download_cleanup_failed',operation_id,error:operationFailureDiagnostic(error)});
+          if(primary)primary.cleanupUnconfirmed=true;
+          else{error.cleanupUnconfirmed=true;throw error;}
+        }
+      }
     } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;

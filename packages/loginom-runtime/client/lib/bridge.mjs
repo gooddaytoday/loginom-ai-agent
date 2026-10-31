@@ -179,7 +179,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         browserRecovery: config.browserRecovery === true && userProfile,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
+          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
         } }, undefined, options);
         return parseCapabilityResult(response);
       } });
