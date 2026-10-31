@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
 test('tree scenarios bind both immutable tasks, original CSV, export destination and private tree oracle',()=>{
  const r=spawnSync('python3',['-B','-c',`import importlib.util
 from pathlib import Path
@@ -60,4 +61,34 @@ for fault in ['integer','null','order','binding','children']:
  else:raise AssertionError(fault+' was accepted')
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
+});
+
+test('tree model preparation consumes export routing before the real cold output contract',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util,json,tempfile
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+class StopBeforeModel(Exception):pass
+results=[]
+with tempfile.TemporaryDirectory() as directory:
+ root=Path(directory)
+ runner=object.__new__(r.Runner);runner.options={};runner.env={};runner.out=root/'run'
+ def phase(*args,**kwargs):raise StopBeforeModel()
+ runner.phase=phase
+ for name in ['tree-repeat','tree-no-repeat']:
+  folder=root/name/name;folder.mkdir(parents=True)
+  workspace=root/name/'workspace';workspace.mkdir()
+  original=r.expected_for(r.scenario(name),'/owned/tree.lgp')
+  try:runner.model(name,folder,root/name/'profile',workspace,'/owned/tree.lgp',{'package_directory':'/owned'},root/'build')
+  except StopBeforeModel:pass
+  prepared=json.loads((folder/'expected.json').read_text())
+  assert prepared['outputs'][0]['rows']==original['outputs'][0]['rows']
+  assert prepared['proposed_tree_output']==original['proposed_tree_output']
+  assert '/owned/run-'+name+'-tree-result.csv' in (folder/'task.md').read_text()
+  assert (workspace/'documents.csv').read_bytes()==(r.scenario(name)['data']/'documents.csv').read_bytes()
+  results.append(prepared)
+print(json.dumps(results))
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+ for(const expected of JSON.parse(r.stdout))assert.doesNotThrow(()=>parseExpectedOutputs(expected));
 });

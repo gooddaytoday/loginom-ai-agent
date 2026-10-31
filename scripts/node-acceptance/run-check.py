@@ -766,6 +766,7 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
+            elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
