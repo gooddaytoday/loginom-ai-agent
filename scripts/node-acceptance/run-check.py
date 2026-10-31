@@ -105,6 +105,16 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
+        src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
+        task, expected, inputs = {
+            'acf-series': ('task-series.md', 'expected-series-4.json', ['series.csv']),
+            'acf-update': ('task.md', 'expected.json', ['series.csv', 'update.csv']),
+            'acf-one': ('task-one.md', 'expected-series-1.json', ['series.csv']),
+            'acf-eight': ('task-eight.md', 'expected-series-8.json', ['series.csv']),
+        }[name]
+        return dict(source=src, prompt=src / task, data=src / 'data', base=None,
+                    expected_name=expected, input_files=inputs)
     if name in ['outlier-sd', 'outlier-iqr']:
         src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
         if name == 'outlier-iqr': src = src / 'iqr'

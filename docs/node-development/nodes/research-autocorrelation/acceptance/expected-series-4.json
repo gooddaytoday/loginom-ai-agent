@@ -1,0 +1,80 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.auto_correlation"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.auto_correlation",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Lag",
+          "label": "Лаг",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "X_ACF",
+          "label": "X: АКФ",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08
+          }
+        },
+        {
+          "name": "X_StdErr",
+          "label": "X: Ошибка",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08
+          }
+        },
+        {
+          "name": "X_Significant",
+          "label": "X: Значимость",
+          "label_any": true,
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        },
+        {
+          "Lag": 1,
+          "X_ACF": 0.47023809523809523,
+          "X_StdErr": 0.3535533905932738,
+          "X_Significant": true
+        },
+        {
+          "Lag": 2,
+          "X_ACF": 0.25,
+          "X_StdErr": 0.42459506185692736,
+          "X_Significant": false
+        },
+        {
+          "Lag": 3,
+          "X_ACF": -0.005952380952380952,
+          "X_StdErr": 0.4426126597300262,
+          "X_Significant": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "newline": "LF",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "header": true,
+    "null_marker": "?"
+  },
+  "dependencies": "Python 3 standard library only: Fraction exact sums, Decimal sqrt precision 50; no third-party dependencies",
+  "reference_environment": "CPython 3.14.4; Fraction and Decimal from the standard library",
+  "import_types": "Set types explicitly; values such as 1.0 can otherwise be inferred as datetime.",
+  "input_order": "File record order; no automatic sort. RowID is not a selected series.",
+  "files": {
+    "acceptance/data/series.csv": {
+      "bytes": 56,
+      "sha256": "da3565ae31d5f6c9adf9aaf2a15bd1d0354752cd54742191f68937589f876708",
+      "rows": 8,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "acceptance/data/update.csv": {
+      "bytes": 56,
+      "sha256": "57de52fb9b368b4e7c9e80fae5744fc3259a9565d06b96a874bcf185db987b54",
+      "rows": 8,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "fixtures/constant.csv": {
+      "bytes": 56,
+      "sha256": "ecb1a0af8cb6693b66eff5c8e753b038f9fc0938a175d4390662f6c50d8b324f",
+      "rows": 8,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "fixtures/empty.csv": {
+      "bytes": 8,
+      "sha256": "1dab889f658b3766a29da6fd9609d358d49ce18269e84c44b746c686e0cbfc08",
+      "rows": 0,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "fixtures/null.csv": {
+      "bytes": 54,
+      "sha256": "8d72f6b02d68ac04054c9b77e74b659bca27bdf60265fe555550bee65b219ecc",
+      "rows": 8,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "fixtures/one.csv": {
+      "bytes": 14,
+      "sha256": "11203afa10688d739c1a9015d1c36f0bbfa757f65eaeaae3ae363d93ac161f70",
+      "rows": 1,
+      "field_order": [
+        "RowID",
+        "X"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real"
+      }
+    },
+    "fixtures/types.csv": {
+      "bytes": 210,
+      "sha256": "74bc4f59e2ab98a2838ebdffe8fbf51474338d81d5995b5db05dd28db95a8963",
+      "rows": 8,
+      "field_order": [
+        "RowID",
+        "X",
+        "S",
+        "B",
+        "D"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "real",
+        "S": "string",
+        "B": "boolean",
+        "D": "datetime"
+      }
+    }
+  }
+}

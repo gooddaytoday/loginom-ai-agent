@@ -31,6 +31,7 @@ RULES = (
     ((C + 'union-*.mjs',), ('live-ui',), ('s4',)),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18',)),
+    ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
