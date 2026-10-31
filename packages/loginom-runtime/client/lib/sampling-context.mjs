@@ -26,9 +26,18 @@ export function readSamplingBrowser(prefix){
   const es=[...document.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']')].filter(e=>shell.contains(e)&&e.checkVisibility({checkVisibilityCSS:true}));
   const element=es.length===1?es[0]:null,grid=element&&globalThis.Ext?.getCmp?.(element.id);
   const store=grid?.el?.dom===element?grid.getStore?.():null,data=store?.getData?.(),items=data?.items,source=data?.getSource?.()?.items;
+  const chained=store?.$className==='Ext.data.ChainedStore'&&['StratifiedMethodForm;grdStratifiedGrid','BiasedMethodForm;grdBiasedColumns'].includes(suffix);
+  const parent=chained?store.getSource?.():null,parentItems=parent?.getData?.()?.items;
   const details={suffix,matches:es.length,grid_tid:element?.getAttribute('data-tid')??null,component_class:grid?.$className??null,store_class:store?.$className??null,count:store?.getCount?.()??null};
   if(!element||grid?.el?.dom!==element)return {verified:false,...details};
-  if(store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(items)||items.length>limit||store.getCount?.()!==items.length||source&&(source.length!==items.length||source.some(r=>!items.includes(r))))return {verified:false,...details};
+  if(!chained&&store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(items)||items.length>limit||store.getCount?.()!==items.length)return {verified:false,...details};
+  if(chained){
+   // Native field grids chain/filter the cached input-column inventory.
+   // Admit only a complete, idle local parent and its exact record objects.
+   if(parent?.$className!=='Ext.data.Store'||parent.isLoading?.()||parent.isBufferedStore||parent.getRemoteFilter?.()===true||parent.getRemoteSort?.()===true
+    ||!Array.isArray(parentItems)||parentItems.length>128||parent.getCount?.()!==parentItems.length||new Set(parentItems).size!==parentItems.length
+    ||items.some(r=>!parentItems.includes(r))||source&&(!Array.isArray(source)||source.some(r=>!parentItems.includes(r))||items.some(r=>!source.includes(r))))return {verified:false,...details};
+  }else if(source&&(source.length!==items.length||source.some(r=>!items.includes(r))))return {verified:false,...details};
   const selected=grid.getSelectionModel?.().getSelection?.();
   if(!Array.isArray(selected)||selected.some(r=>!items.includes(r)))return {verified:false,...details,selection:false};
   const rows=items.map(r=>{
