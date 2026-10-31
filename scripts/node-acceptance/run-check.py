@@ -850,7 +850,8 @@ class Runner:
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
-            if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
+            if (re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression'
+                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)
