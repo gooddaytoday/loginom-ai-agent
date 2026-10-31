@@ -41,3 +41,20 @@ test('prepared owner must stay identical around the native read',async()=>{
  assert.equal(r.reason,'binning_owner_changed');
  assert.equal((await readBinningContext({}, {},async()=>({verified:true,surface:'graph'}))).reason,'binning_surface');
 });
+test('serialized workspace observer recognizes both Binning-specific wizard pages',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ for(const [marker,stage] of [['MethodSettingsWizard-1;grdColumns','binning'],['DerivedDataSourceMappingEngineOutputPortWizard-1;btnAddMappingColumn','binning_ranges_mapping']]){
+  const page=new Page(),root=page.add('div','MF;TF-1;WizrdMCF');page.add('div','MF;TF-1;WizrdMCF;'+marker,'',undefined,root);
+  const r=await page.observe();assert.equal(r.wizard.stage,stage);
+ }
+});
+test('Binning field and method cells are actionable only on their own wizard page',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ for(const own of [true,false]){
+  const page=new Page(),base='MF;TF-1;WizrdMCF',root=page.add('div',base,'',{x:0,y:70,width:900,height:600});
+  page.add('div',base+(own?';MethodSettingsWizard-1;grdColumns':';CalcDataWizard;btnAddExpression'),'',{x:0,y:75,width:400,height:300},root);
+  for(const [i,name] of ['colDisplayName_1','colMethodType_1'].entries())page.add('td',base+';MethodSettingsWizard-1;'+name,'X',{x:50+i*150,y:120,width:100,height:25},root);
+  const r=await page.observe(),cells=r.ui.elements.filter(e=>/;col(?:DisplayName|MethodType)_1$/.test(e.tid??''));
+  assert.equal(cells.length,own?2:0);for(const cell of cells)assert.ok(cell.allowed_actions.includes('double_click'));
+ }
+});

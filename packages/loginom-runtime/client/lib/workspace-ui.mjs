@@ -2973,7 +2973,8 @@ function readRenderedInputMapping(observation) {
       }
       return /;WizrdMCF;SlidingWindowWizard;(?:colDisplayName_[^;]+|pedIncompleteRecordsProcessing;ValueControl;(?:trg_picker|boundlist;[^;]+))$/.test(tid);
     };
-    const interesting = element => /;WizrdMCF;LogRegressionWizard;ped(?:EventType|EventId|RegressionMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
+    const interesting = element => binningControl(element) || /;WizrdMCF;LogRegressionWizard;ped(?:EventType|EventId|RegressionMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;SizeGridForm;col(?:SizeType|AbsoluteSize)_[^;]+$|;SequenceMethodForm;col[^;]+$/.test(getTid(element)??''))
