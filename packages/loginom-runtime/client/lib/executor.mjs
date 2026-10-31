@@ -536,24 +536,29 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       // Loginom's completed-download notification is an Ext window, so the
       // global dialog guard still sees it until its own close timer fires.
       // Bind that exact native toast; never dismiss it or repeat the download.
-      const binding=await page.evaluateHandle(function bindDownloadToast(ref){
+      const binding=await page.evaluateHandle(function bindDownloadToast(observed){
         const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
-        const matches=document.querySelectorAll('[data-tid="toast"]'),element=state?.refs?.get(ref)?.deref();
+        const matches=document.querySelectorAll('[data-tid="toast"]'),element=state?.refs?.get(observed.ref)?.deref();
         // Keep the observed incarnation, including after its close timer detached
         // it. An absent selector alone cannot prove that an unknown toast closed.
         const refused=predicate=>({refused:predicate,diagnostic:{count:matches.length,
           class_name:typeof (matches[0]??element)?.className==='string'?(matches[0]??element).className.slice(0,512):null,
           text:typeof (matches[0]??element)?.textContent==='string'?(matches[0]??element).textContent.slice(0,512):null}});
         if(state?.document!==document||!element)return refused('observed_element');
-        if(typeof element.className!=='string'
-          ||!['x-window','bg-notify-msg-color-info'].every(c=>element.className.split(/\s+/).includes(c)))return refused('download_classes');
+        if(typeof observed.class_name!=='string'||typeof element.className!=='string'
+          ||!['x-window','bg-notify-msg-color-info'].every(c=>observed.class_name.split(/\s+/).includes(c)
+            &&element.className.split(/\s+/).includes(c)))return refused('download_classes');
+        if(typeof observed.text!=='string'||observed.text.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return refused('download_text');
+        // LAB-625: Loginom clears the detached toast's text before binding.
+        // Its observed text and native classes still belong to this exact ref.
+        if(!element.isConnected&&matches.length===0
+          &&element.className.split(/\s+/).some(c=>c==='x-hidden-offsets'||c==='x-hidden'))return {document,element,classes:element.className};
         if(element.textContent.replace(/\s/g,'')!=='СкачиваниефайловОтменитьвсе')return refused('download_text');
-        if(!element.isConnected&&matches.length===0)return {document,element,classes:element.className};
         if(matches.length!==1||matches[0]!==element||!element.isConnected)return refused('same_element');
         const box=element.getBoundingClientRect(),style=getComputedStyle(element);
         if(box.width<=0||box.height<=0||style.visibility==='hidden'||style.display==='none')return refused('visible');
         return {document,element,classes:element.className};
-      },after.output.ui.dialogs[0].ref);
+      },after.output.ui.dialogs[0]);
       const inspect=()=>page.evaluate(function inspectDownloadToast(b){
         const changed=predicate=>({state:'changed',predicate});
         if(!b)return changed('binding_present');
@@ -677,7 +682,7 @@ export function makeServerSourceDownloadCode(options) {
     ||m[0].storage_entry?.path!==b.destination||m[0].storage_entry?.bytes_source!=='native_file_store')
     throw Error('Server download requires its exact native file row');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
-  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
   const transfer=`(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()},${browserServerDownloadProgress.toString()})`;
   if(!options.browser_downloads_path)return `async page=>${transfer}`;
@@ -706,7 +711,7 @@ export function makeNativeOutputDownloadCode(options){
    ||matches[0].storage_entry?.bytes!==options.expected_bytes||s.file_storage?.directory!==b.directory)throw Error('Native output download binding differs');
  requireExportDestination(b.destination,options.storage_directories);
  const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
- const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+ const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
  const act=makeWorkspaceUiCode({mode:'act',snapshot:s,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
  return `async page=>(${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }
@@ -726,7 +731,7 @@ export function makeArtifactDownloadCode(options) {
   // Upload may have observed the folder tree. Verification owns the separately
   // issued exact CSV/TSV/TXT/XLSX ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
-  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
+  const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
   return `async (page) => (${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }

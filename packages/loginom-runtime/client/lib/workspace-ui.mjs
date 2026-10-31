@@ -182,7 +182,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -716,7 +716,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
     const dialogs = dialogElements.map(element => ({ ref: refOf(element), title: short(element.getAttribute('aria-label') ?? select('[role="heading"],.x-title-text').find(item => element.contains(item))?.textContent),
-        text: textOf(element), bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
+        text: textOf(element, downloadToastObservation&&getTid(element)==='toast'),
+        ...(downloadToastObservation&&getTid(element)==='toast'?{class_name:short(element.getAttribute('class'),512)}:{}),
+        bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
     const dialogRef = element => {
       const owner = dialogElements.find(dialog => dialog === element || dialog.contains(element));
       return owner ? refOf(owner) : null;
@@ -3841,7 +3843,7 @@ function readRenderedInputMapping(observation) {
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
-  },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
+  },{downloadToastObservation:task.download_toast_observation===true,rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
@@ -4952,7 +4954,7 @@ function readRenderedInputMapping(observation) {
   })();
 }
 
-export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
+export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloadToastObservation = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
   if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
     ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined&&options.output_settlement_read===undefined))
@@ -4989,7 +4991,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateUiAction(options.action, options.snapshot);
-  const task = { ...structuredClone(options), kind: 'workspace-ui' };
+  const task = { ...structuredClone(options), kind: 'workspace-ui', ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;

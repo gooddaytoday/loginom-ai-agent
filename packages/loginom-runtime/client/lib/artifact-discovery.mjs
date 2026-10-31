@@ -313,7 +313,7 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
     }
     trace.push({event:'artifact_file_size_verified',bytes:task.artifact.bytes});
     trace.push({event:'artifact_file_discovered',file_ref:ref,file_tid:tid,directory:task.artifact.upload.directory,scrolls:trace.length,document:observed.output.dom_epoch.document,workflow_ref:observed.output.workflow_ref,active_tab_ref:observed.output.active_tab_ref});
-    const read=p=>ui(p,{...base,mode:'observe',root_ref:ref});
+    const read=p=>ui(p,{...base,mode:'observe',root_ref:ref,download_toast_observation:true});
     const act=(p,snapshot)=>ui(p,{...base,mode:'act',snapshot,action:{verb:'double_click',ref}});
     uncertain=true;const outcome=await download(page,{...task,file_ref:ref,snapshot:observed.output},read,act,reveal);
     uncertain=false;return {...outcome,status:moved&&outcome.status==='NOT_APPLIED'?'AMBIGUOUS':outcome.status,

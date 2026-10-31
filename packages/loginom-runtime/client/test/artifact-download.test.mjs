@@ -311,10 +311,10 @@ test('missing event and post-download context change cannot claim a verified cop
 function downloadToastFixture(mode='closes') {
   const f=fixture('sample.xlsx'),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
   let saved=false,reads=0;
-  // Native data-tid=toast DOM captured in LAB-449. Its disappearance may
+  // Native data-tid=toast DOM captured in LAB-449/LAB-625. Its disappearance may
   // happen between the workspace snapshot and the bound-element read.
   const toast=()=>({isConnected:true,className:'x-window bg-notify-msg-color-info x-layer x-window-default x-closable x-window-closable x-window-default-closable x-border-box',
-    textContent:mode==='unknown_text'?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
+    textContent:['unknown_text','absent_unknown_text'].includes(mode)?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
     getAttribute:key=>key==='data-tid'?'toast':null,
     getBoundingClientRect:()=>({width:100,height:50})});
   let element=toast();
@@ -327,18 +327,22 @@ function downloadToastFixture(mode='closes') {
   f.page.uiSnapshot=()=>{
     const s=snapshot();
     if(saved){
-      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding','closes_before_binding'].includes(mode)||mode.startsWith('absent_')&&mode!=='absent_replaced'?reads++<1:true;
+      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding','closes_before_binding','cleared_before_binding'].includes(mode)||mode.startsWith('absent_')&&mode!=='absent_replaced'?reads++<1:true;
       element.isConnected=visible;
-      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:'[outside selected root]'}]:[];
+      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:element.textContent,class_name:element.className}]:[];
       // Recorded sequence: snapshot still has the original toast/ref, then
       // inspect sees it detached; only the next snapshot has no dialogs.
       if(mode==='closes_between_reads'&&reads===2)element.isConnected=false;
+      if(mode==='observed_unknown_text')s.ui.dialogs[0].text='Сохранение пакета';
+      if(mode==='observed_unknown_class')s.ui.dialogs[0].class_name='x-window foreign';
       if(mode==='mask')s.ui.masks=[{ref:'foreign-mask'}];
     }
     return s;
   };
   f.page.evaluateHandle=async(fn,arg)=>{
-    if(mode==='closes_before_binding'||mode.startsWith('absent_'))element.isConnected=false;
+    if(['closes_before_binding','cleared_before_binding','cleared_without_hidden'].includes(mode)||mode.startsWith('absent_'))element.isConnected=false;
+    if(!element.isConnected&&mode!=='cleared_without_hidden')element.className+=' x-hidden-offsets';
+    if(['cleared_before_binding','cleared_without_hidden'].includes(mode))element.textContent='';
     if(mode==='unknown_class')element.className='x-window foreign';
     if(mode==='absent_unknown_class')element.className='x-window foreign';
     if(mode==='absent_unknown_text')element.textContent='Сохранение пакета';
@@ -371,7 +375,7 @@ test('completed XLSX download waits read-only for the owned Loginom download toa
 });
 
 test('native toast closes between observation and binding or inspection without changing download context',async()=>{
-  for(const mode of ['closes_between_reads','closes_after_binding','closes_before_binding']){
+  for(const mode of ['closes_between_reads','closes_after_binding','closes_before_binding','cleared_before_binding']){
     const f=downloadToastFixture(mode),result=await f.run();
     assert.equal(result.status,'SUCCEEDED',mode);assert.equal(result.output.download_completed,true,mode);
     assert.equal(result.cleanup_complete,true);assert.deepEqual(f.calls,['listen','click','save']);
@@ -393,7 +397,7 @@ test('download toast refusal names the changed native guard and predicate',async
 
 test('download toast settlement refuses foreign dialogs, owner changes and the original deadline',async()=>{
   for(const mode of ['unknown_text','unknown_class','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline',
-    'absent_directory','absent_replaced','absent_deadline','absent_unknown_class','absent_unknown_text','replaced_before_binding']) {
+    'observed_unknown_text','observed_unknown_class','cleared_without_hidden','absent_directory','absent_replaced','absent_deadline','absent_unknown_class','absent_unknown_text','replaced_before_binding']) {
     const f=downloadToastFixture(mode);
     if(mode==='no_deadline')delete f.options.deadline_at;
     const result=await f.run();
@@ -415,7 +419,7 @@ test('failed toast binding records the actual bounded class and text',async()=>{
 });
 
 test('toast closure before binding completes upload byte/SHA verification and releases both transfers once',async t=>{
-  const f=downloadToastFixture('closes_before_binding'),root=await mkdtemp(join(tmpdir(),'toast-transfer-'));
+  const f=downloadToastFixture('cleared_before_binding'),root=await mkdtemp(join(tmpdir(),'toast-transfer-'));
   t.after(()=>rm(root,{recursive:true,force:true}));
   const source=join(root,'source');await writeFile(source,'abc');
   const store=await createArtifactStore({directory:join(root,'store')});
