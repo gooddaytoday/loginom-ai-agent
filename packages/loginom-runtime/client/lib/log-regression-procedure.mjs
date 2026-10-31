@@ -123,6 +123,19 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  }
  for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold],...cutoffs]){
   if(state.node_logregression.values[key]!==value){
+   const field=control(state,key+';ValueControl','fill'),scroll=field.scroll;
+   if(cutoffs.some(([name])=>name===key)&&scroll&&scroll.top<scroll.max_top){
+    // Backward skips the disabled entry field, so focus has not revealed
+    // removal below the clipped detail pane (LAB-657 Backward journal:509).
+    await channel.perform({condition:'reveal logistic cutoff in its own detail pane',initialObservation:state,ready:ready('details'),
+     identity:s=>({node:s.prepared_node_context,scroll:control(s,key+';ValueControl','fill').scroll.ref}),
+     resolve:s=>{const target=control(s,key+';ValueControl','fill'),base=s.wizard.root_tid+';LogRegressionWizard-1;';
+      const anchor=s.ui.elements.find(e=>e.scroll?.ref===target.scroll.ref&&e.enabled===true&&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll')
+       &&(e.tid?.startsWith(base)||e.identity?.anchor_tid?.startsWith(base)));
+      need(anchor,'visible logistic detail scroll anchor unavailable');return {verb:'scroll',ref:anchor.ref,delta_y:target.scroll.max_top-target.scroll.top};}});
+    state=await observe('details','logistic cutoff revealed');
+    const moved=control(state,key+';ValueControl','fill').scroll;need(moved?.ref===scroll.ref&&moved.top>scroll.top,'logistic detail pane did not scroll');
+   }
    // Native number fields strip e and minus from scientific notation:
    // 1e-10 became 110 in the owned diagnostic, so enter decimal digits.
    const [coefficient,exponent]=String(value).split('e-');
