@@ -197,6 +197,19 @@ nodeApplyInputSchema.allOf=[
  {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']},read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['target','read']},
   then:{properties:{read:{properties:{sample_rows:{const:100},require_exact_numbers:{const:true}}}}}}
 ];
+// Only the published representation shares repeated schemas. Runtime guards
+// retain the canonical inline schema: validateActionParameters does not resolve
+// JSON Schema references. Definitions preserve descriptions as well as bounds.
+const applyDefinitions={nodeRef:ref,id,fieldName,inputField:groupingFieldSchema,
+ declaredColumns:javascriptParametersSchema.properties.columns,crossTableField:crossTableFieldSchema,
+ text128:text(128),text120:text(120)};
+const applyReferences=new Map(Object.entries(applyDefinitions).map(([key,schema])=>[JSON.stringify(schema),key]));
+const packApplySchema=schema=>JSON.parse(JSON.stringify(schema,(key,value)=>{
+ const reference=key&&value&&typeof value==='object'&&applyReferences.get(JSON.stringify(value));
+ return reference?{$ref:'#/$defs/'+reference}:value;
+}));
+const nodeApplyPublishedSchema={...packApplySchema(nodeApplyInputSchema),
+ $defs:Object.fromEntries(Object.entries(applyDefinitions).map(([key,schema])=>[key,packApplySchema(schema)]))};
 const operation=object({operation_id:id});
 const deliveryId={...id,maxLength:80};
 const delivery=object({operation_id:deliveryId,artifact_id:id,upload_grant_id:id,budget_ms:integer(1000,1800000)});
@@ -207,7 +220,7 @@ const unionObject=branches=>({type:'object',properties:{...Object.assign({},...b
   additionalProperties:false,oneOf:branches});
 export const nodeReadInputSchema=unionObject([nodeOutputReadInputSchema,javascriptSourceInitialSchema,javascriptSourceContinuationSchema,javascriptContextInitialSchema]);
 export const nodeReadOutputSchema=unionObject([nodeJobResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]);
-const tool=(name,description,inputSchema,readOnlyHint=false)=>({name,description,inputSchema,
+const tool=(name,description,inputSchema,readOnlyHint=false)=>({name,description,inputSchema:name==='dock_node_apply'?nodeApplyPublishedSchema:inputSchema,
  outputSchema:name==='dock_node_read'?nodeReadOutputSchema:name.startsWith('dock_node_')?nodeJobResultSchema:deliveryJobResultSchema,
  annotations:{readOnlyHint,destructiveHint:!readOnlyHint,openWorldHint:false}});
 export const nodeApiTools=Object.freeze([
@@ -256,7 +269,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal,scanReceipt}={})
   if(args?.kind==='source')validateJavascriptSourceReadRequest(args);
   else if(args?.kind==='context')validateJavascriptContextReadRequest(args);
   else validateActionParameters(nodeOutputReadInputSchema,args);
- }else validateActionParameters(definition.inputSchema,args);
+ }else validateActionParameters(name==='dock_node_apply'?nodeApplyInputSchema:definition.inputSchema,args);
  if(name==='dock_node_apply'||name==='dock_node_resume'&&Object.keys(args).length>1)validateNodeApplyEnvelope(args);
  signal?.throwIfAborted();
  switch(name){
