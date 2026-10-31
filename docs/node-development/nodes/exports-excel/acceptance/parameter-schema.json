@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "excel_export": {
+      "type": "object",
+      "description": "XLSX settings; new requires all four fields, existing patches preserve omissions.",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Absolute .xlsx path in own exports folder; new file only."
+        },
+        "sheet_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 31,
+          "description": "One explicit worksheet name; reject Excel reserved characters."
+        },
+        "header": {
+          "type": "string",
+          "enum": [
+            "none",
+            "names",
+            "labels"
+          ],
+          "description": "First row: absent, technical field names, or display labels."
+        },
+        "overwrite": {
+          "type": "string",
+          "enum": [
+            "reject"
+          ],
+          "description": "Reject an existing destination; never replace or append."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
