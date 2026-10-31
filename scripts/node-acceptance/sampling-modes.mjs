@@ -37,8 +37,14 @@ export function checkSamplingGraph(expected,graph,baseline){
  parseSamplingExpected(expected);
  need(graph?.complete===true&&Array.isArray(graph.nodes)&&Array.isArray(graph.links),'GRAPH_INCOMPLETE');
  const own=graph.nodes.filter(n=>n.type===expected.sampling_modes.node_type),imports=graph.nodes.filter(n=>n.type==='imports.text');
+ // Saved workflows expose one native variable-service icon that is absent in
+ // the data flow. It may not supply/consume tabular data or bypass the source.
+ const services=graph.nodes.filter(n=>n.type==='bg-vendor-icon-modelvariables');
+ need(services.length<=1&&services.every(n=>Array.isArray(n.inputs)&&n.inputs.length===0&&Array.isArray(n.outputs)&&n.outputs.length===0
+  &&!graph.links.some(l=>l.source===n.ref.node_id||l.target===n.ref.node_id)),'GRAPH_SERVICE');
  need(own.length===1&&imports.length===1&&own[0].ref.node_id===baseline.node_id
-  &&graph.nodes.every(n=>['imports.text','exports.text',expected.sampling_modes.node_type].includes(n.type)),'GRAPH_NODES');
+  &&graph.nodes.every(n=>services.includes(n)||['imports.text','exports.text',expected.sampling_modes.node_type].includes(n.type)),
+  'GRAPH_NODES:'+JSON.stringify({main_node_id:baseline.node_id,nodes:graph.nodes.map(n=>({type:n.type,node_id:n.ref?.node_id}))}));
  const incoming=graph.links.filter(l=>l.target===own[0].ref.node_id);
  need(incoming.length===1&&incoming[0].source===imports[0].ref.node_id&&incoming[0].output===0&&incoming[0].input===0,'GRAPH_SOURCE');
  need(graph.nodes.some(n=>n.type==='exports.text')&&graph.links.every(l=>

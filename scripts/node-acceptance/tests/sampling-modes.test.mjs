@@ -80,7 +80,20 @@ test('cold graph requires direct source, own target identity and no substitute t
  const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:'preprocessing.sampling',ref:{node_id:'sample'}},{type:'exports.text',ref:{node_id:'out'}}],
   links:[{source:'in',target:'sample',input:0,output:0},{source:'sample',target:'out',input:0,output:0}]};
  assert.equal(checkSamplingGraph(f.expected,graph,baseline),true);
+ const reopened=structuredClone(graph);reopened.nodes[1].ref.node_id='reopened';
+ assert.throws(()=>checkSamplingGraph(f.expected,reopened,baseline),error=>error.message.includes('"node_id":"reopened"')&&error.message.includes('"main_node_id":"sample"'));
  for(const mutate of [g=>g.complete=false,g=>g.nodes.push({type:'programming.javascript',ref:{node_id:'js'}}),g=>g.links[0].source='out',g=>g.links[1].output=1]){
+  const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
+ }
+});
+test('saved native model-variables service is admitted only without tabular ports or links',()=>{
+ const f=fixture(),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+ const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:'preprocessing.sampling',ref:{node_id:'sample'}},
+  {type:'exports.text',ref:{node_id:'out'}},{type:'bg-vendor-icon-modelvariables',ref:{node_id:'variables'},inputs:[],outputs:[]}],
+  links:[{source:'in',target:'sample',input:0,output:0},{source:'sample',target:'out',input:0,output:0}]};
+ assert.equal(checkSamplingGraph(f.expected,graph,baseline),true);
+ for(const mutate of [g=>g.nodes[3].inputs.push(0),g=>g.nodes[3].outputs.push(0),
+  g=>g.links.push({source:'variables',target:'sample',input:0,output:0}),g=>g.nodes.push({...g.nodes[3],ref:{node_id:'variables-2'}})]){
   const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
  }
 });
