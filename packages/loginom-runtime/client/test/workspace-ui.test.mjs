@@ -7,6 +7,24 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
+test('private download observation preserves toast text and classes outside the file root',async()=>{
+ const page=new Page(),root=page.add('button','MF;TF-1;FileStorageForm;pnlFileStorage;tbl','Files');
+ const toast=page.add('div','toast','Скачивание файлов Отменить все');
+ toast.attrs.class='x-window bg-notify-msg-color-info';toast.attrs.role='dialog';
+ const roots=await page.observe(),ref=roots.ui.elements.find(e=>e.tid===root.attrs['data-tid']).ref;
+ const options={mode:'observe',root_ref:ref,expected_build:build,expected_origin:origin};
+ const ordinary=await page.execute(options);
+ assert.equal(ordinary.output.ui.dialogs[0].text,'[outside selected root]');
+ assert.equal(ordinary.output.ui.dialogs[0].class_name,undefined);
+ const observed=await vm.runInContext('('+makeWorkspaceUiCode(options,{downloadToastObservation:true})+')',page.context)(page);
+ assert.equal(observed.status,'SUCCEEDED');
+ assert.equal(observed.output.ui.dialogs[0].ref,ordinary.output.ui.dialogs[0].ref);
+ assert.equal(observed.output.ui.dialogs[0].text,'Скачивание файлов Отменить все');
+ assert.equal(observed.output.ui.dialogs[0].class_name,'x-window bg-notify-msg-color-info');
+ toast.remove();toast.ownText='';
+ assert.equal(observed.output.ui.dialogs[0].text,'Скачивание файлов Отменить все');
+});
+
 test('Excel opening waits only for its native spreadsheet LoadMask message',async()=>{
  for(const fault of [null,'foreign_target','foreign_mask','dialog','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview','changed_node','changed_stage','expired']) {
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
@@ -256,7 +274,7 @@ test('observation supplies real graph references, visible editor settings, dialo
 
 test('storage table observation inventories headers once while preserving per-table redaction',async()=>{
   const clock=fixtureClock(),page=new Page({clock:clock.Date});
-  const root=page.add('div','MF;TF-1;FileStorageForm;pnlFileStorage;tbl');
+  const root=page.add('button','MF;TF-1;FileStorageForm;pnlFileStorage;tbl','Files');
   for(const [label,value] of [['Filename','result.csv'],['Password','private-value']]) {
     const table=page.add('table',null,'',undefined,root);
     page.add('th',null,label,undefined,table);

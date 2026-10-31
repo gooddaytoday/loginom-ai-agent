@@ -716,7 +716,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
     const dialogs = dialogElements.map(element => ({ ref: refOf(element), title: short(element.getAttribute('aria-label') ?? select('[role="heading"],.x-title-text').find(item => element.contains(item))?.textContent),
-        text: textOf(element), bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
+        text: textOf(element, task.download_toast_observation===true&&getTid(element)==='toast'),
+        ...(task.download_toast_observation===true&&getTid(element)==='toast'?{class_name:short(element.getAttribute('class'),512)}:{}),
+        bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
     const dialogRef = element => {
       const owner = dialogElements.find(dialog => dialog === element || dialog.contains(element));
       return owner ? refOf(owner) : null;
@@ -4952,7 +4954,7 @@ function readRenderedInputMapping(observation) {
   })();
 }
 
-export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
+export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloadToastObservation = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
   if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
     ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined&&options.output_settlement_read===undefined))
@@ -4989,7 +4991,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateUiAction(options.action, options.snapshot);
-  const task = { ...structuredClone(options), kind: 'workspace-ui' };
+  const task = { ...structuredClone(options), kind: 'workspace-ui', ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
