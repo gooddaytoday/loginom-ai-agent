@@ -2708,10 +2708,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const deadline=Math.min(now()+90000,deadlineAt??Infinity);let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const readPages=async options=>{
+          const original=options.rootRef?observations.get(options.observationId):null;
+          const scrollOnly=original?.ui.elements.some(e=>e.ref===options.rootRef
+            &&e.tid===original.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl');
+          const hasScrollAnchor=output=>scrollOnly&&output.file_storage?.status==='observed'
+            &&output.ui.elements.some(e=>e.tid?.startsWith(output.workflow_ref.prefix+';FileStorageForm;colName_')
+              &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
+            // The table probe needs a delivered scroll owner, not every row.
+            // Targeted row reads still consume all pages for their witness.
+            if(hasScrollAnchor(output))break;
             if(page>=32)throw Error('Server storage observation page limit');
             const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
             if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
@@ -3504,15 +3513,37 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
       const admissionDeadline=operation?.deadline??now()+request.budgets.total_ms;
-      if(!operation&&serverDownloads&&request.parameters.source?.kind==='storage'){
-        // A released STALE opening leaves the workflow on its graph. Restore
-        // Files through the existing guarded navigation before claiming the
-        // node gate; source verification still compares the ORIGINAL witness,
-        // not the fresh reference minted by this navigation.
-        const source=serverSources.peek(request.parameters.source.server_source_ref);
-        const located=await runtime.serverDownload({operation_id:randomUUID(),path:source.path},'dock_storage_source',
-          {signal,sourceOperation:operationId,deadlineAt:admissionDeadline});
-        if(located.status!=='SUCCEEDED')throw Error('Server source navigation requires inspection before node admission');
+      const nodeHistory=()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
+        .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
+          source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
+      let admissionSources=null,admissionFailure=null;
+      if(!operation&&serverDownloads){
+        const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
+        const resolve=async(ref,receipt=scanReceipt)=>{
+          if(!proofs.has(ref)){
+            // Restore Files before claiming the node gate. Compare the old
+            // witness; a new reference from navigation cannot approve drift.
+            const source=serverSources.peek(ref);
+            const located=await runtime.serverDownload({operation_id:randomUUID(),path:source.path},'dock_storage_source',
+              {signal,sourceOperation:operationId,deadlineAt:deadline});
+            if(located.status!=='SUCCEEDED')throw Error('Server source navigation requires inspection before node admission');
+            proofs.set(ref,await inspectServerSource(ref,{signal,deadline}));
+          }
+          return serverDownloads.bind(proofs.get(ref),receipt);
+        };
+        try{
+          const history=nodeHistory();
+          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+            await verifyDeferredTextImportSources(request,history,resolve);
+          }
+          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+        }catch(error){
+          if(pending||running)throw error;
+          error.nodePhaseRefusal??={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+          admissionFailure=error;
+        }
+        admissionSources=proofs;
       }
       running=true;
       try {
@@ -3533,10 +3564,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:async(ref,receipt=scanReceipt)=>{
-              const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
+              const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
-            resolveDeliveredSource:path=>inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
+            resolveDeliveredSource:path=>admissionSources?.get(serverSources.referenceForPath(path))
+              ??inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3548,9 +3580,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             },
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
-            nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
-              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
-                source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt})),
+            nodeHistory,
             uploadHistory:()=>({complete:true,records:[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o.action.capability==='artifact.upload')
               .map(({o,sequence})=>structuredClone({sequence,operation_id:o.id,destination:o.parameters.destination,artifact:o.checkpoint.artifact,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed===true,transport_uncertain:o.transportUncertain===true}))}),
             exclusiveNodeOperation:()=>running===true&&pending===operation&&operation.nodeApply?.pending?.phase==='read',
@@ -3561,7 +3591,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(typeof operation.nodeApplyDrivers?.[name]!=='function')throw new Error('Local node driver missing: '+name);
           // Reuse the accepted graph driver directly, under this operation ID.
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
+          const originalSource=operation.nodeApplyDrivers.verifySource;
           operation.nodeApplyDrivers={...operation.nodeApplyDrivers,
+            verifySource:async(...args)=>{
+              try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
+              // Admission observations are valid for this initial source phase
+              // only. Resume/continuation must obtain fresh native evidence.
+              finally{admissionSources=null;admissionFailure=null;}
+            },
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
                 const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
