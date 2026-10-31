@@ -7,7 +7,7 @@ test('sequential sampling and partition are installed with explicit row counts a
  const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
  for(const type of ['preprocessing.sampling','preprocessing.data_partition']){
   assert.ok(handlers.has(type),type);
-  assert.deepEqual(NODE_TYPES[type].modes,['sequential','random','stratified','biased']);
+  assert.deepEqual(NODE_TYPES[type].modes,['sequential','random']);
  }
  assert.equal(NODE_TYPES['preprocessing.data_partition'].tabular_outputs,3);
  const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema;

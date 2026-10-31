@@ -3,6 +3,14 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("sampling advertises random and explicitly refuses deferred modes", () => {
+  expect(skill).toContain('mode:"random"')
+  expect(skill).toContain('«Этот режим пока не поддерживается»')
+  expect(skill).toContain('Не подменяй эти режимы другим алгоритмом')
+  expect(skill).not.toContain('mode:"stratified"')
+  expect(skill).not.toContain('mode:"biased"')
+})
+
 test("automation preserves technical output names explicitly requested by the user", () => {
   expect(skill).toMatch(/пользователь называет поле или колонку[\s\S]*?RequestId[\s\S]*?Key[\s\S]*?EchoPath/)
   expect(skill).toMatch(/выходное техническое имя[\s\S]*?ровно[\s\S]*?без приставок[\s\S]*?Returned[\s\S]*?переводов[\s\S]*?суффиксов/)

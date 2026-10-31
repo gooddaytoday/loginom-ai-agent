@@ -332,8 +332,7 @@ export interface SamplingConfigurationReadback {
 }
 
 export interface SamplingModesConfigurationReadback extends Omit<SamplingConfigurationReadback,'mode'> {
- mode:'random' | 'stratified' | 'biased'; seed:number; strata_fields:string[];
- bias_field:string | null; bias_factors:Array<{value:string;factor:number}>; test_priority:false;
+ mode:'random'; seed:number; test_priority:false;
 }
 
 export interface CorrAnalysisConfigurationReadback {

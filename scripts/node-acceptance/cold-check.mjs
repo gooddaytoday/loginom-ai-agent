@@ -277,7 +277,7 @@ page = context.pages()[0]
    javascriptAdmission={admission:javascriptAdmission,receipt,owner};
   }
   const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
-  const execution = javascriptAdmission
+  let execution = javascriptAdmission
    ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
    :await run();
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
@@ -288,6 +288,15 @@ page = context.pages()[0]
    const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
    samplingMappings.set(port,proof);
    await record({phase:'sampling_cold_output_definition',...proof});
+  }
+  if(sampling){
+   // Native Cancel can deselect the node and invalidate its materialized ports.
+   // The production execution driver reselects this exact node and proves a
+   // new completed execution; no stale pre-wizard port proof may be reused.
+   execution=await runColdExecution({driver:createNodeExecutionProcedure(channel,node,{allowDeactivate:true}),channel,node,operation,readReceipt,record});
+   if(execution.status!=='completed'||!execution.verified||!execution.owner_verified)throw Error('COLD_EXECUTION_NOT_VERIFIED');
+   ownedExecutions.push(execution);
+   await record({phase:'sampling_cold_reactivated_after_cancel',node,execution,settings_applied:false});
   }
 
   for(const {port:outputPort,content_candidate} of ports){

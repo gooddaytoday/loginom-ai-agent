@@ -7,7 +7,7 @@ import {samplingConfigurationReadback} from './sampling-readback.mjs';
 import {samplingOutputColumns,alignSamplingOutput,readSamplingOutputs} from './sampling-output.mjs';
 export function createSamplingNodeSupport(config){return createSequentialNodeSupport(config,{type:'preprocessing.sampling',validate:validateSamplingParameters,parameterSchema:samplingParametersSchema});}
 export function createSequentialNodeSupport(config,{type,validate,parameterSchema}){return createTabularTransformNodeSupport(config,{
- type,mode:'sequential',modes:['sequential','random','stratified','biased'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
+ type,mode:'sequential',modes:['sequential','random'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
  configurationObservation:{condition:'sequential settings',readSampling:true,ready:s=>['sampling','data_partition'].includes(s.wizard?.stage)&&s.node_sampling?.verified===true},
  configure:configureSampling,
  async configureAllOutputs(channel,c,p,mappings,finishWizard){

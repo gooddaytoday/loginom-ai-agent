@@ -6,8 +6,8 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
-  ['preprocessing.sampling','Сэмплинг','sampling',1,1,false,['sequential','random','stratified','biased'],'processors/preprocessing/sampling.md'],
-  ['preprocessing.data_partition','Разбиение на множества','partition',1,3,false,['sequential','random','stratified','biased'],'processors/preprocessing/partition.md'],
+  ['preprocessing.sampling','Сэмплинг','sampling',1,1,false,['sequential','random'],'processors/preprocessing/sampling.md'],
+  ['preprocessing.data_partition','Разбиение на множества','partition',1,3,false,['sequential','random'],'processors/preprocessing/partition.md'],
   ['preprocessing.elim_outlier','Редактирование выбросов','elimoutlier',1,3,false,['detect'],'processors/preprocessing/eliminate-outliers.md'],
   ['datamining.log_regression','Логистическая регрессия','logregression',1,2,false,['enter'],'processors/datamining/logistic-regression/README.md'],
   ['research.corr_analysis','Корреляционный анализ','corranalysis',1,1,false,['pearson'],'processors/scrutiny/correlation-analysis.md'],

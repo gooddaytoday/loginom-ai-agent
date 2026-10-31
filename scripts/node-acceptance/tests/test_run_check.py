@@ -22,7 +22,7 @@ spec.loader.exec_module(runner)
 
 class RunCheckTests(unittest.TestCase):
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
-        for name in ['sampling-random', 'sampling-stratified', 'sampling-biased', 'partition-random', 'partition-stratified', 'partition-biased']:
+        for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)
             expected = runner.expected_for(case, '/test/modes.lgp')
             self.assertEqual(case['input_files'], ['modes.csv'])
@@ -30,9 +30,6 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['data'] / 'modes.csv').is_file())
             self.assertEqual(expected['sampling_modes']['mode'], name.rsplit('-', 1)[1])
             self.assertEqual(expected['sampling_modes']['seed'], 42)
-            if name == 'sampling-biased':
-                self.assertEqual(expected['sampling_modes']['requested_sizes'], {'sample': 14})
-                self.assertEqual(expected['sampling_modes']['bias_field'], 'Class')
             self.assertEqual(len(expected['outputs']), 1 if name.startswith('sampling') else 3)
             self.assertEqual(expected['package_path'], '/test/modes.lgp')
         for name in ['sampling', 'sampling-null', 'sampling-empty', 'data-partition', 'data-partition-null', 'data-partition-empty']:
