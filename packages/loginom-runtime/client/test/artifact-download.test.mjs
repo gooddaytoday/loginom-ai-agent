@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {Page,build,runtime} from './support/executor-fixture.mjs';
 import {mkdtemp,writeFile,rm,readFile,stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {createArtifactStore} from '../lib/artifacts.mjs';
 import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {parseCapabilityResult} from '../lib/executor.mjs';
 import {join} from 'node:path';
@@ -319,12 +320,14 @@ function downloadToastFixture(mode='closes') {
   let element=toast();
   const document={querySelectorAll:()=>element.isConnected?[element]:[]};
   const sandbox={document,getComputedStyle:()=>({visibility:'visible',display:'block'})};
+  sandbox[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={document,refs:new Map([['toast-ref',{deref:()=>original}]])};
+  const original=element;
   const save=f.download.saveAs;
   f.download.saveAs=async path=>{await save(path);saved=true;};
   f.page.uiSnapshot=()=>{
     const s=snapshot();
     if(saved){
-      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding'].includes(mode)?reads++<1:true;
+      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding','closes_before_binding'].includes(mode)||mode.startsWith('absent_')&&mode!=='absent_replaced'?reads++<1:true;
       element.isConnected=visible;
       s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:'[outside selected root]'}]:[];
       // Recorded sequence: snapshot still has the original toast/ref, then
@@ -334,8 +337,13 @@ function downloadToastFixture(mode='closes') {
     }
     return s;
   };
-  f.page.evaluateHandle=async fn=>{
-    const handle={value:vm.runInNewContext('('+fn.toString()+')',sandbox)(),dispose:async()=>{}};
+  f.page.evaluateHandle=async(fn,arg)=>{
+    if(mode==='closes_before_binding'||mode.startsWith('absent_'))element.isConnected=false;
+    if(mode==='unknown_class')element.className='x-window foreign';
+    if(mode==='absent_unknown_class')element.className='x-window foreign';
+    if(mode==='absent_unknown_text')element.textContent='Сохранение пакета';
+    if(mode==='replaced_before_binding')element=toast();
+    const handle={value:vm.runInNewContext('('+fn.toString()+')',sandbox)(arg),dispose:async()=>{}};
     if(mode==='closes_after_binding')element.isConnected=false;
     return handle;
   };
@@ -344,6 +352,9 @@ function downloadToastFixture(mode='closes') {
   const wait=f.page.waitForTimeout.bind(f.page);
   f.page.waitForTimeout=async ms=>{
     await wait(ms);if(mode==='directory')f.page.directory='/other';if(mode.startsWith('replaced'))element=toast();
+    if(mode==='absent_directory')f.page.directory='/other';
+    if(mode==='absent_replaced')element=toast();
+    if(mode==='absent_deadline')f.page.clock=f.options.deadline_at;
     if(mode==='changed_classes')element.className+=' foreign';
     if(mode==='changed_text')element.textContent='Сохранение пакета';
   };
@@ -359,8 +370,8 @@ test('completed XLSX download waits read-only for the owned Loginom download toa
   assert.ok(f.page.clock<=f.options.deadline_at);
 });
 
-test('LAB-449 native toast closes between observation and inspection without changing download context',async()=>{
-  for(const mode of ['closes_between_reads','closes_after_binding']){
+test('native toast closes between observation and binding or inspection without changing download context',async()=>{
+  for(const mode of ['closes_between_reads','closes_after_binding','closes_before_binding']){
     const f=downloadToastFixture(mode),result=await f.run();
     assert.equal(result.status,'SUCCEEDED',mode);assert.equal(result.output.download_completed,true,mode);
     assert.equal(result.cleanup_complete,true);assert.deepEqual(f.calls,['listen','click','save']);
@@ -381,7 +392,8 @@ test('download toast refusal names the changed native guard and predicate',async
 });
 
 test('download toast settlement refuses foreign dialogs, owner changes and the original deadline',async()=>{
-  for(const mode of ['unknown_text','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline']) {
+  for(const mode of ['unknown_text','unknown_class','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline',
+    'absent_directory','absent_replaced','absent_deadline','absent_unknown_class','absent_unknown_text','replaced_before_binding']) {
     const f=downloadToastFixture(mode);
     if(mode==='no_deadline')delete f.options.deadline_at;
     const result=await f.run();
@@ -390,6 +402,48 @@ test('download toast settlement refuses foreign dialogs, owner changes and the o
     assert.deepEqual(f.calls,['listen','click','save'],mode);
     assert.ok(f.page.clock<=1300,mode);
   }
+});
+
+test('failed toast binding records the actual bounded class and text',async()=>{
+  for(const mode of ['unknown_class','unknown_text']){
+    const f=downloadToastFixture(mode),result=await f.run();
+    const diagnostic=result.trace.find(e=>e.event==='download_toast_binding_diagnostic');
+    assert.equal(diagnostic.count,1);
+    assert.equal(mode==='unknown_class'?diagnostic.class_name:diagnostic.text,
+      mode==='unknown_class'?'x-window foreign':'Сохранение пакета');
+  }
+});
+
+test('toast closure before binding completes upload byte/SHA verification and releases both transfers once',async t=>{
+  const f=downloadToastFixture('closes_before_binding'),root=await mkdtemp(join(tmpdir(),'toast-transfer-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const source=join(root,'source');await writeFile(source,'abc');
+  const store=await createArtifactStore({directory:join(root,'store')});
+  t.after(()=>store.releaseUploads());
+  const artifact=await store.admit({sourcePath:source,name:f.options.artifact.name,bytes:3,
+    sha256:createHash('sha256').update('abc').digest('hex'),upload:{directory:'/test',overwrite:'replace'}});
+  let uploads=0;
+  const locator=f.page.locator.bind(f.page),input={count:async()=>1,isEnabled:async()=>true,elementHandle:async()=>input,dispose:async()=>{},
+    evaluate:async fn=>fn({isConnected:true,tagName:'INPUT',type:'file'}),setInputFiles:async path=>{
+      assert.equal(await readFile(path,'utf8'),'abc');uploads++;
+    }};
+  f.page.locator=selector=>selector.includes('FileStorageForm;tbrActions')?{
+    count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,locator:()=>input}:locator(selector);
+  const save=f.download.saveAs;
+  f.download.saveAs=async path=>{f.options.download_path=path;await save(path);await writeFile(path,'abc');};
+  const rt=runtime(f.page,{artifactStore:store});
+  const observed=await rt.observe();
+  await rt.upload({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
+    observationId:observed.output.observation_id,operationId:'upload'});
+  const row=await rt.observe(),request={operationId:'upload',verificationId:'verify',observationId:row.output.observation_id,
+    fileRef:row.output.ui.elements.find(e=>e.label===artifact.name).ref};
+  const result=await rt.verifyArtifact(request);
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.sha256,artifact.sha256);
+  assert.equal(result.output.bytes_verified,true);assert.equal(result.output.upload_completion_verified,true);
+  assert.equal(result.cleanup_complete,true);assert.equal(uploads,1);assert.deepEqual(f.calls,['listen','click','save']);
+  assert.deepEqual(await rt.verifyArtifact(request),result);
+  assert.equal((await rt.inspect({operationId:'upload'})).output.state,'resolved');
+  assert.doesNotThrow(()=>rt.assertPreparationAllowed());
 });
 
 function revealFixture(mode='success') {
