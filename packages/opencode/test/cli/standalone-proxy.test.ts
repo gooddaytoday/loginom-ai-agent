@@ -132,8 +132,7 @@ test.skipIf(process.platform !== "linux")(
     })
     proxy.listen(0, "127.0.0.1")
     pac.listen(0, "127.0.0.1")
-    await once(proxy, "listening")
-    await once(pac, "listening")
+    await Promise.all([once(proxy, "listening"), once(pac, "listening")])
     const directory = await mkdtemp(join(tmpdir(), "loginom-cli-pac-"))
     try {
       const bin = join(directory, "bin")

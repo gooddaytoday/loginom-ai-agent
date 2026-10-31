@@ -33,6 +33,7 @@ import { anthropicHelper } from "./provider/anthropic"
 import { googleHelper } from "./provider/google"
 import { openaiHelper } from "./provider/openai"
 import { oaCompatHelper } from "./provider/openai-compatible"
+import { systemoneHelper } from "./provider/systemone"
 import { createRateLimiter as createIpRateLimiter } from "./ipRateLimiter"
 import { createRateLimiter as createKeyRateLimiter } from "./keyRateLimiter"
 import { createTrialLimiter } from "./trialLimiter"
@@ -114,6 +115,8 @@ export async function handler(
           opts.modelList === "full"
             ? entry?.providers.find((provider) => provider.id === entry.byokProvider)?.model
             : undefined,
+        // Keyless requests for free models skip legacy checks and go straight to new inference.
+        anonymous: opts.modelList === "full" && entry?.allowAnonymous === true,
         body: (providerModel) => requestBody?.stream(providerModel ?? model, false) ?? body,
       }).catch(() => {
         void (requestBody ? requestBody.cancel() : body.cancel()).catch(() => {})
@@ -685,6 +688,7 @@ export async function handler(
         if (format === "anthropic") return anthropicHelper(opts)
         if (format === "google") return googleHelper(opts)
         if (format === "openai") return openaiHelper(opts)
+        if (format === "systemone") return systemoneHelper(opts)
         return oaCompatHelper(opts)
       })(),
     }
