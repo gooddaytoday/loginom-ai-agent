@@ -40,6 +40,10 @@ test('full apply schema reserves v0.3.9 growth with at least 1500 bytes below 46
  for(const [key,reserve,modes] of [['tree_io',1024,[]],['sampling_random',256,['random']],
   ['partition_random',256,['random']],['date_iso_weeks',256,['iso_week','iso_week_year','iso_week_start','iso_week_end']],
   ['replacement_conversion',512,['convert']],['rest_post_headers',1024,['POST']],['logistic_stepwise',512,['forward','backward']]]){
+  // The approved ISO extension is registered in calendar, with no new mode
+  // or parameter object. Its actual enum bytes are already in full.inputSchema.
+  if(key==='date_iso_weeks'&&['iso_year','iso_week','iso_week_start','day_of_week'].every(
+   operation=>dateTimeParametersSchema.properties.fields.items.properties.transformations.items.properties.operation.enum.includes(operation)))continue;
   const start=bytes(expanded),schema={type:'object',properties:{},additionalProperties:false,description:''};
   schema.description='x'.repeat(reserve-bytes(schema));
   assert.equal(bytes(schema),reserve,key);
