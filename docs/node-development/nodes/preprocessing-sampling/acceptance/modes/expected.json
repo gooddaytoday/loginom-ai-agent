@@ -1,0 +1,177 @@
+{
+  "status": "proposal_requires_owner_approval_not_stock_expected",
+  "node_type": "preprocessing.sampling",
+  "source": {
+    "rows": [
+      {
+        "RowID": 1,
+        "Class": "A",
+        "Value": 10
+      },
+      {
+        "RowID": 2,
+        "Class": "A",
+        "Value": 20
+      },
+      {
+        "RowID": 3,
+        "Class": "A",
+        "Value": 30
+      },
+      {
+        "RowID": 4,
+        "Class": "A",
+        "Value": 40
+      },
+      {
+        "RowID": 5,
+        "Class": "A",
+        "Value": 50
+      },
+      {
+        "RowID": 6,
+        "Class": "A",
+        "Value": 60
+      },
+      {
+        "RowID": 7,
+        "Class": "A",
+        "Value": 70
+      },
+      {
+        "RowID": 8,
+        "Class": "A",
+        "Value": 80
+      },
+      {
+        "RowID": 9,
+        "Class": "A",
+        "Value": 90
+      },
+      {
+        "RowID": 10,
+        "Class": "A",
+        "Value": 100
+      },
+      {
+        "RowID": 11,
+        "Class": "B",
+        "Value": 110
+      },
+      {
+        "RowID": 12,
+        "Class": "B",
+        "Value": 120
+      },
+      {
+        "RowID": 13,
+        "Class": "B",
+        "Value": 130
+      },
+      {
+        "RowID": 14,
+        "Class": "B",
+        "Value": 140
+      },
+      {
+        "RowID": 15,
+        "Class": "B",
+        "Value": 150
+      },
+      {
+        "RowID": 16,
+        "Class": "B",
+        "Value": 160
+      },
+      {
+        "RowID": 17,
+        "Class": "B",
+        "Value": 170
+      },
+      {
+        "RowID": 18,
+        "Class": "B",
+        "Value": 180
+      },
+      {
+        "RowID": 19,
+        "Class": "B",
+        "Value": 190
+      },
+      {
+        "RowID": 20,
+        "Class": "B",
+        "Value": 200
+      }
+    ],
+    "row_count": 20,
+    "class_counts": {
+      "A": 10,
+      "B": 10
+    }
+  },
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "label_any": true
+    },
+    {
+      "name": "Class",
+      "type": "string",
+      "label_any": true
+    },
+    {
+      "name": "Value",
+      "type": "integer",
+      "label_any": true
+    }
+  ],
+  "ports": [
+    0
+  ],
+  "seed": 42,
+  "requested_sizes": {
+    "sample": 8
+  },
+  "common": {
+    "unchanged_source_and_settings": true,
+    "repeat_executions": 2,
+    "repeat_comparison": "exact ordered equality per output port",
+    "membership": "complete rows from source, no new or duplicate RowID",
+    "values_and_types": "exact; preserve configured column order",
+    "cold": "reopen saved package and execute unchanged settings; compare the same ports"
+  },
+  "random": {
+    "proposed_row_counts": {
+      "sample": 8
+    },
+    "cardinality_status": "sampling size 8 observed twice; partition 8/4 observed on all ports",
+    "exact_selected_rows": null
+  },
+  "stratified": {
+    "fields": [
+      "Class"
+    ],
+    "proposed_quotas_if_native_method_enforces_them": {
+      "sample": {
+        "A": 4,
+        "B": 4
+      }
+    },
+    "quota_status": "sampling 4A/4B and partition train 4A/4B, test 2A/2B observed once each",
+    "exact_selected_rows": null
+  },
+  "partition_relations": null,
+  "random_uniform": {
+    "proposed_group_size": 1,
+    "status": "native group controls observed; output semantics unconfirmed",
+    "exact_selected_rows": null
+  },
+  "biased": {
+    "status": "exact_oracle_unresolved",
+    "reason": "native method exposes category factors and Random seed, not a row offset",
+    "exact_selected_rows": null,
+    "acceptance": "owner decision required before substituting invariant acceptance"
+  }
+}
