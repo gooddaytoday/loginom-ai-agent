@@ -219,7 +219,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.javascript_read_refusal=true;
       }
-      if(name==='read'&&request.target.type==='exports.text'&&operation.cleanupConfirmed===true&&!operation.transportUncertain
+      if(name==='read'&&['exports.text','exports.excel'].includes(request.target.type)&&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedExportReadRefusal(refusal,state.node,state.execution,operation.id)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
@@ -287,7 +287,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.calculator_default_expression=refusal.proof.before.expressions?.length===1
          &&refusal.proof.before.expressions[0].name==='Expr1'&&refusal.proof.before.expressions[0].formula==='';
       }
-      if(name==='configure'&&request.target.type==='exports.text'&&refusal?.phase===name&&refusal.status==='FAILED'
+      if(name==='configure'&&['exports.text','exports.excel'].includes(request.target.type)&&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&['text_export_conflict_rejected','text_export_unsupported_retained'].includes(refusal.verification)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
@@ -494,7 +494,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
     if(state.pending?.phase==='configure'&&!operation.transportUncertain
-      &&(error.restConfigureFailure||request.target.type==='exports.text'&&operation.lastReceipt?.action_key==='node.export.next')){
+      &&(error.restConfigureFailure||['exports.text','exports.excel'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
       catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
     }
@@ -586,7 +586,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
-  const exportRelease=request.target.type==='exports.text';
+  const exportRelease=['exports.text','exports.excel'].includes(request.target.type);
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'

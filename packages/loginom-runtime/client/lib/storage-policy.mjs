@@ -29,7 +29,7 @@ export function requireStorageDestination(path, directories, purpose, { director
     throw Error('Destination is outside the selected Loginom directory');
   }
   if (!directory && purpose === 'packages' && !/\.lgp$/i.test(path)) throw Error('A Loginom package filename is required');
-  if (!directory && purpose === 'exports' && !/\.(csv|tsv)$/i.test(path)) throw Error('A CSV or TSV filename is required');
+  if (!directory && purpose === 'exports' && !/\.(csv|tsv|xlsx)$/i.test(path)) throw Error('A CSV, TSV or XLSX filename is required');
   return path;
 }
 
@@ -66,8 +66,8 @@ export function withStorageIdentity(code, binding, storageSession) {
 export function requireExportDestination(value, directories = null) {
   if (directories) return requireStorageDestination(value, directories, 'exports');
   // Unchanged scope for legacy acceptance profiles and catalog revisions.
-  if (typeof value !== 'string' || !/^\/test-2\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9][A-Za-z0-9_.-]*\.(csv|tsv)$/.test(value)
-      || value.length > 512 || value.includes('..')) throw Error('Export requires an explicitly assigned CSV/TSV in /test-2');
+  if (typeof value !== 'string' || !/^\/test-2\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9][A-Za-z0-9_.-]*\.(csv|tsv|xlsx)$/.test(value)
+      || value.length > 512 || value.includes('..')) throw Error('Export requires an explicitly assigned CSV/TSV/XLSX in /test-2');
   return value;
 }
 
