@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {createNodeTargetBrowserAdapter,readGraph} from '../lib/node-target-browser.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
-function fixture(){
+function fixture({portIndex=0}={}){
  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelForm{};
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[{tid:'crumb',label:'Scenario'}]}};
  const element=tid=>({getAttribute:()=>tid,textContent:'Scenario',getBoundingClientRect:()=>({width:10,height:10}),classList:{contains:()=>true}});
@@ -13,7 +13,7 @@ function fixture(){
  root.contains=e=>e===body||e===portDom||e===alternatePortDom||e===labelDom||inside.includes(e);root.querySelectorAll=()=>[body,portDom,labelDom,...inside].filter(e=>e.getAttribute('data-tid'));
  const port={FCell:{visible:true}},node={FGuid:'n',FIconCls:'bg-vendor-icon-calcdata',FCell:{geometry:{x:10,y:10}},FPorts:[{FCollection:[port]}]};
  Object.assign(port,{FGuid:'port-guid',data:{},parent:node,FType:1,FSubType:1});port.FCell.parent=node.FCell;
- let portTid='MF;TF-1;Graph;Calc;Output_Data-0';portDom.getAttribute=()=>portTid;
+ let portTid='MF;TF-1;Graph;Calc;Output_Data-'+portIndex,nodeTid='MF;TF-1;Graph;Calc';body.getAttribute=()=>nodeTid;labelDom.getAttribute=()=>nodeTid+';Label;Label';portDom.getAttribute=()=>portTid;
  node.FLabel={parent:node,FCell:{parent:node.FCell,visible:true},FRawValue:'Calc'};
  let bodyRendered=true,rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
  const extraStates=new Map();
@@ -45,7 +45,7 @@ function fixture(){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {rename:(suffix='Output_Data-'+portIndex)=>{nodeTid='MF;TF-1;Graph;Квантование:_X';node.FLabel.FRawValue='Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('REST service edge is identified by native node/port types and the exact rendered edge, never labels',async()=>{
  const f=fixture(),link=f.restLink(),g=await f.read();
@@ -181,4 +181,25 @@ test('node body rendering wait rechecks the prepared document and keeps a finite
  await assert.rejects(foreign.read(),/Prepared graph document changed/);
  const absent=fixture();absent.hideBody();absent.pausePaint();
  await assert.rejects(absent.read(),/Node identity is not rendered/);
+});
+
+// Fifth-build frequency-2 journal :415 has the new DOM port TID; :418 has
+// its alternate native shape with no attribute and the cached old caption.
+test('Binning rebinds the same native output after caption replacement and alternate SVG rendering',async()=>{
+ const f=fixture({portIndex:1});f.node.FIconCls='bg-vendor-icon-binning';await f.read();
+ f.rename();const observed=await f.read();assert.equal(observed.nodes[0].label,'Квантование: X');
+ const bound=await f.binding();assert.deepEqual(Array.from(bound.native_bindings[0].outputs),[1]);
+});
+test('Binning caption rebinding preserves native identity, unique DOM and exact port suffix guards',async()=>{
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.losePortTid(),f=>{f.port.FGuid='foreign';},f=>{f.port.data={};},
+  f=>{f.port.parent={};},f=>{f.port.FCell={...f.port.FCell};},f=>{f.port.FCell.parent={};},f=>{f.port.FType=0;},f=>{f.port.FSubType=9;},f=>f.rename('Output_Data-0')]){
+  const f=fixture({portIndex:1});f.node.FIconCls='bg-vendor-icon-binning';await f.read();f.rename();change(f);
+  await assert.rejects(f.read(),/Visible port identity/);
+ }
+});
+test('caption rebinding remains refused for existing non-Binning node types',async()=>{
+ for(const type of ['transform.calculator','datamining.lin_regression','programming.javascript']){
+  const f=fixture();f.node.FIconCls=NODE_TYPES[type].icon_class;await f.read();f.rename();
+  await assert.rejects(f.read(),/Visible port identity/);
+ }
 });
