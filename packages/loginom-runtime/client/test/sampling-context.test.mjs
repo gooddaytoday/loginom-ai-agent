@@ -94,3 +94,17 @@ test('biased factors use the native factor column dataIndex, with string categor
  assert.equal(result.bias_fields.rows[0].values.Name,'Class');assert.equal(result.bias_fields.rows[0].selected,true);
  assert.equal(result.bias.rows[0].values.Value,'A');assert.equal(result.bias.rows[0].values.Factor,0.4);
 });
+
+test('native chained strata inventory may filter a complete local parent but refuses loading or foreign records',()=>{
+ for(const fault of ['none','loading','foreign','count']){
+  const result=fixture(f=>{
+   const record={internalId:'class',data:{DisplayName:'Категория'}},parentRecords=[record,{internalId:'value',data:{DisplayName:'Value'}}];
+   const flag={suffix:'StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_Class',querySelectorAll:()=>[{classList:{contains:()=>true}}]};
+   addMethodGrid(f,'StratifiedMethodForm;grdStratifiedGrid',[record],[[flag,{suffix:'StratifiedMethodForm;colDisplayName_Class'}]]);
+   const component=f.components['StratifiedMethodForm;grdStratifiedGrid'],store=component.getStore();
+   const parent={$className:'Ext.data.Store',getCount:()=>fault==='count'?3:2,getData:()=>({items:fault==='foreign'?[{},{}]:parentRecords}),isLoading:()=>fault==='loading'};
+   component.getStore=()=>({...store,$className:'Ext.data.ChainedStore',getSource:()=>parent,getData:()=>({items:[record],getSource:()=>({items:parentRecords})})});
+  },false,'Стратифицированный',false);
+  assert.equal(result.verified,fault==='none',fault);
+ }
+});
