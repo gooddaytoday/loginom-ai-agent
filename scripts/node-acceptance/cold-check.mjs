@@ -276,12 +276,6 @@ page = context.pages()[0]
    const receipt=await javascriptAdmission.admit({});
    javascriptAdmission={admission:javascriptAdmission,receipt,owner};
   }
-  const samplingMappings=new Map();
-  if(sampling)for(const {port} of ports){
-   const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
-   samplingMappings.set(port,proof);
-   await record({phase:'sampling_cold_output_definition',...proof});
-  }
   const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
   const execution = javascriptAdmission
    ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
@@ -289,6 +283,12 @@ page = context.pages()[0]
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+  const samplingMappings=new Map();
+  if(sampling)for(const {port} of ports){
+   const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
+   samplingMappings.set(port,proof);
+   await record({phase:'sampling_cold_output_definition',...proof});
+  }
 
   for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
