@@ -53,9 +53,10 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options) {
  validatePreparedNodeContext(binding);
- if(!request||Object.keys(request).sort().join(',')!=='execution,port,requireExactNumbers,sampleRows'
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).sort().join(','))
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
   ||!Number.isInteger(request.sampleRows)||request.sampleRows<0||request.sampleRows>100
+  ||Object.hasOwn(request,'rowOffset')&&(!Number.isSafeInteger(request.rowOffset)||request.rowOffset<0)
   ||typeof request.requireExactNumbers!=='boolean'
   ||request.execution?.verified!==true||request.execution.owner_verified!==true||request.execution.status!=='completed'
   ||typeof request.execution.execution_id!=='string'||typeof request.execution.process_id!=='string'||typeof request.execution.process_record_id!=='string'
@@ -140,6 +141,8 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    dataSource=await output.QueryInterface(bg.IBGDataSource);live();sourceBaseline=source();stable();
    const rowCount=await dataSource.get_RowCount();live();stable();
    need(Number.isSafeInteger(rowCount)&&rowCount>=0,'row_count');
+   const offset=q.rowOffset??0;
+   need(offset<=rowCount,'row_offset');
    columns=await dataSource.get_Columns();live();stable();
    const total=await columns.get_Count();live();stable();need(Number.isInteger(total)&&total>0&&total<=10000,'column_count');
    const schema=[],types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
@@ -151,10 +154,10 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&type,'column_metadata');
     schema.push({index,name,label,type});
    }
-   const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount,q.sampleRows,Math.floor(10000/total));
+   const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount-offset,q.sampleRows,Math.floor(10000/total));
    const helper=sourceBaseline.helper;
-   let limited=requested<Math.min(rowCount,q.sampleRows);
-   for(let row=0;row<requested;row++){
+   let limited=requested<Math.min(rowCount-offset,q.sampleRows);
+   for(let row=offset;row<offset+requested;row++){
     const rawValues=[];
     for(let column=0;column<total;column++){
      live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();
@@ -176,8 +179,13 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     values.push(rowValues);sample.push(cells);
    }
    live();stable();
-   result={port:q.port,port_guid:baseline.portGuid,fresh:true,execution_id:q.execution.execution_id,freshness_basis:'completed_execution_port_source',schema,row_count:rowCount,sample,sample_rows:sample.length,sample_complete:sample.length===rowCount,
+   result={port:q.port,port_guid:baseline.portGuid,fresh:true,execution_id:q.execution.execution_id,freshness_basis:'completed_execution_port_source',schema,row_count:rowCount,sample,sample_rows:sample.length,sample_complete:offset===0&&sample.length===rowCount,
     precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'data source text; existing secret redaction applies; original byte encoding is not attested'},...(limited?{read_limit:'preview_cell_or_byte_budget'}: {})};
+   // Private cold windows carry their range and completed execution binding.
+   // The ordinary model read omits rowOffset and keeps its existing bytes.
+   if(q.rowOffset!==undefined)Object.assign(result,{row_offset:offset,next_row_offset:offset+sample.length,
+    window_binding:{document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,
+     execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    need(new TextEncoder().encode(JSON.stringify(result)).length<=4*1024*1024,'response_byte_budget');
   }catch{result=undefined;
   }finally{

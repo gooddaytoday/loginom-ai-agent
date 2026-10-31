@@ -64,6 +64,14 @@ r3/r4 attach only their new holdout.csv/replace.csv. CSV checks consume every ex
 order; their tasks leave CSV order free, so only those base exports map columns
 by their unique names. Final continuation CSVs retain their fixture's ordering
 rules. Names, widths, counts and every value remain checked.
+For types300 only, the runner selects the private `--exact-port-windows` cold
+reader. It reads every expected row through contiguous production port windows,
+retaining the same document, workflow, node, port and completed execution.
+Changed bindings, schema, row count, unverified precision or incomplete cleanup
+refuse the result. Each window keeps the ordinary preview budgets; the assembled
+cold oracle checks every cell, including signed zero, milliseconds and full text.
+The offset is internal: public tool schemas and their read limits are unchanged.
+
 Stock cold receives `--csv` with the last checked download of the final stage
 and that file's delimiter, and never reapplies node settings. A single export
 is `actual.csv`; multiple exports are `actual-1.csv`, `actual-2.csv`, etc.
