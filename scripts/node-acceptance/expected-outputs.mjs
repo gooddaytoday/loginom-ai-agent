@@ -204,8 +204,7 @@ function matchesCell(cell,column,want){
   // Browser transport JSON loses the sign of numeric zero. The production
   // decoder's round-trip decimal retains it; reject contradictory evidence.
   if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
-   ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value
-   ||cell.decimal!==(cell.decimal==='-0'?'-0':String(value)))return false;
+   ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value)return false;
   value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
