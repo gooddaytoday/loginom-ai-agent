@@ -21,6 +21,92 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def export_events(self, marker='?', *, destination='/test/all.csv', kind='new', readback=None):
+        request = dict(operation_id='export', target=dict(type='exports.text', kind=kind),
+                       parameters=dict(destination=destination, null_marker=marker))
+        events = [(1, dict(type='tool_use', part=dict(tool='loginom_dock_node_apply',
+                  state=dict(status='completed', input=request, output=json.dumps(dict(state='running'))))))]
+        if readback is not None:
+            events.append((2, dict(type='tool_use', part=dict(tool='loginom_dock_node_wait', state=dict(
+                status='completed', output=json.dumps(dict(operation_id='export', status='SUCCEEDED',
+                configuration=dict(status='applied', readback=dict(kind='text_export',
+                    destination=destination, settings=dict(null_marker=readback))))))))))
+        return events
+
+    def test_export_null_marker_observed_lab612_and_fail_closed(self):
+        # LAB-612 execution-events.jsonl:470; actual-1.csv preserves ? and empty Class.
+        expected = dict(columns=[dict(name='IsTestSet', type='boolean'), dict(name='RowID', type='integer'),
+            dict(name='Class', type='string'), dict(name='Value', type='real'),
+            dict(name='Flag', type='boolean'), dict(name='Stamp', type='datetime')], rows=[
+            dict(IsTestSet=False, RowID=2, Class=None, Value=None, Flag=True, Stamp='2024-01-02'),
+            dict(IsTestSet=False, RowID=3, Class='A', Value=-12.25, Flag=None, Stamp=None),
+            dict(IsTestSet=True, RowID=1, Class='', Value=.5, Flag=False, Stamp='2024-01-01')])
+        observed = 'IsTestSet,RowID,Class,Value,Flag,Stamp\nFalse,2,?,?,True,2024-01-02\nFalse,3,A,-12.25,?,?\nTrue,1,,0.5,False,2024-01-01\n'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text(observed)
+            options = dict(null_marker=None, export_events=self.export_events(), destination='/test/all.csv')
+            runner.check_csv(path, expected, **options)
+            for events, code in [([], 'CSV_NULL_MARKER_MISSING'),
+                    (self.export_events(destination='/other/all.csv'), 'CSV_NULL_MARKER_MISSING'),
+                    (self.export_events(marker='NIL'), 'CSV_NULL_MARKER_UNSUPPORTED'),
+                    (self.export_events(marker=''), 'CSV_NULL_MARKER_COLLISION')]:
+                with self.subTest(code=code), self.assertRaisesRegex(AssertionError, code):
+                    runner.check_csv(path, expected, **dict(options, export_events=events))
+            expected['rows'][2]['Class'] = '?'
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                runner.check_csv(path, expected, **options)
+            expected['rows'][2]['Class'] = ''
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                runner.check_csv(path, expected, **dict(options, null_marker=''))
+            path.write_text(observed.replace('False,2,?,?,', 'False,2,?,NULL,'))
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                runner.check_csv(path, expected, **options)
+
+    def test_export_null_marker_patch_uses_final_receipt(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\nNULL\n""\n')
+            options = dict(null_marker=None, destination='/test/all.csv')
+            events = self.export_events(kind='existing', readback='NULL')
+            runner.check_csv(path, expected, export_events=events, **options)
+            # Omitted patch fields must come from observed settings, not defaults.
+            events[0][1]['part']['state']['input']['parameters'] = {}
+            runner.check_csv(path, expected, export_events=events, **options)
+            for bad in [events[:1], self.export_events(kind='existing', readback='')]:
+                with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_(MISSING|COLLISION)'):
+                    runner.check_csv(path, expected, export_events=bad, **options)
+            events[1][1]['part']['state']['output'] = events[1][1]['part']['state']['output'].replace('"export"', '"unrelated"')
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, export_events=events, **options)
+
+    def test_export_null_markers_and_last_patch_inspect(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='value')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            for marker in ['', '?', 'null', 'NULL']:
+                path.write_text('s\n"' + marker + '"\nvalue\n')
+                runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                                 export_events=self.export_events(marker))
+            events = self.export_events(readback='?')
+            outcome = json.loads(events[1][1]['part']['state']['output'])
+            node = dict(document_id='doc', workflow_id='workflow', node_id='export-node')
+            outcome['configuration']['readback']['node'] = node
+            events[1][1]['part']['state']['output'] = json.dumps(dict(output=dict(outcome=outcome)))
+            patch_events = self.export_events(kind='existing', readback='NULL')
+            patch_events[0][1]['part']['state']['input'].update(operation_id='patch')
+            patch_events[0][1]['part']['state']['input']['target']['ref'] = node
+            patch_events[0][1]['part']['state']['input']['parameters'] = {}
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                                 export_events=events + patch_events[:1])
+            outcome = json.loads(patch_events[1][1]['part']['state']['output'])
+            outcome['operation_id'] = 'patch'
+            patch_events[1][1]['part']['state']['output'] = json.dumps(dict(output=dict(outcome=outcome)))
+            runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                             export_events=events + patch_events)
+
     def test_types300_d76_exact_forms_and_strict_other_cells(self):
         # LAB-583 types300-checks.jsonl:1: 15 negative zeros and 14 midnight dates.
         columns = [{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'},
