@@ -50,11 +50,15 @@ export function createStorageBinding({ sessionId, origin, build, documentId, acc
 
 // Every browser operation retains the account/document observed by prepare.
 // This is an identity guard; destination existence is checked by native UI.
-export function withStorageIdentity(code, binding) {
+export function withStorageIdentity(code, binding, storageSession) {
   if (!binding) throw Error('Prepare Loginom before using the selected directories');
+  // Private status/cancel/release controls touch the original Page-owned job.
+  // Byte accounting and draining must continue while Loginom is disconnected;
+  // the source is still checked against the captured session before caching.
+  if(storageSession==='download-control')return code;
   return `async page=>{
     const expected=${JSON.stringify(binding)};
-    await (${guardLoginomConnection.toString()})(page,expected);
+    await (${guardLoginomConnection.toString()})(page,expected,${JSON.stringify(storageSession)});
     return (${code})(page);
   }`;
 }
@@ -193,7 +197,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
         };
         try {
-          job.source=await inspect(request.server_source_ref,{signal:job.controller.signal});job.controller.signal.throwIfAborted();
+          job.source=await inspect(request.server_source_ref,{signal:job.controller.signal,storageSession:'capture'});job.controller.signal.throwIfAborted();
           job.deadline=job.started+serverDownloadBudget(job.source.bytes);
           if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
           job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
@@ -212,7 +216,8 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
               if(bytes>(job.bytes??0)){job.bytes=bytes;job.lastProgress=now();arm();}
             }});
           job.controller.signal.throwIfAborted();job.phase='verifying';
-          const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline}),copy=await lstat(job.path);
+          const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline,
+            storageSession:'verify',operation_id:request.operation_id}),copy=await lstat(job.path);
           if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
             throw Error('LOGINOM_FILE_CHANGED');
           await chmod(job.path,0o600);job.identity=local(await lstat(job.path));

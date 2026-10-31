@@ -3,6 +3,45 @@ import assert from 'node:assert/strict';
 import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runColdExecution,openColdOutputViews} from '../cold-reader-policy.mjs';
 import {createNodeProcedure} from '../../../packages/loginom-runtime/client/lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'cross'};
+
+function windowFixture(change=()=>{}) {
+ const calls=[],execution={verified:true,owner_verified:true,status:'completed',execution_id:'doc:1',process_id:'1.1',process_record_id:'child'};
+ const rows=Array.from({length:100},(_,i)=>[{type:'integer',is_null:false,value:String(i+1)},
+  {type:'string',is_null:false,value:('row '+i+' ').padEnd(6000,'я')}]);
+ const channel={async readOutputPort(request){
+  calls.push(structuredClone(request));
+  const start=request.rowOffset,end=Math.min(start+43,100);
+  const result={verified:true,cleanup_complete:true,node_context:{...node,verified:true},output:{
+   port:0,port_guid:'port',fresh:true,execution_id:execution.execution_id,freshness_basis:'completed_execution_port_source',
+   schema:[{index:0,name:'I',label:'I',type:'integer'},{index:1,name:'S',label:'S',type:'string'}],
+   row_count:100,row_offset:start,next_row_offset:end,sample_rows:end-start,sample_complete:false,
+   sample:structuredClone(rows.slice(start,end)),precision:{numbers_verified:true,limitations:[]},
+   window_binding:{...node,execution_id:execution.execution_id,process_id:execution.process_id,process_record_id:execution.process_record_id},read_limit:'preview_cell_or_byte_budget'}};
+  change(result,calls.length);return result;
+ }};
+ return {channel,execution,calls,rows};
+}
+test('cold windows cover all 100 rows in order including both boundaries and complete text',async()=>{
+ const {readColdPortWindows}=await import('../cold-reader-policy.mjs'),f=windowFixture();
+ const result=await readColdPortWindows(f.channel,{node,execution:f.execution,port:0,rowCount:100});
+ assert.deepEqual(f.calls.map(r=>r.rowOffset),[0,43,86]);
+ assert.equal(result.sample_complete,true);assert.equal(result.sample_rows,100);
+ assert.deepEqual(result.sample,f.rows);assert.equal(result.read_limit,undefined);
+ assert.deepEqual(result.windows.map(w=>[w.row_offset,w.next_row_offset]),[[0,43],[43,86],[86,100]]);
+});
+for(const [fault,change] of Object.entries({
+ document:r=>r.node_context.document_id='other',node:r=>r.node_context.node_id='other',
+ execution:r=>r.output.execution_id='other',process:r=>r.output.window_binding.process_record_id='other',
+ port:r=>r.output.port_guid='other',
+ gap:r=>r.output.row_offset++,overlap:r=>r.output.row_offset--,end:r=>r.output.next_row_offset++,
+ count:r=>r.output.row_count++,schema:r=>r.output.schema[0].name='other',
+ cleanup:r=>r.cleanup_complete=false,precision:r=>r.output.precision.numbers_verified=false,
+ empty:r=>{r.output.sample=[];r.output.sample_rows=0;r.output.next_row_offset=r.output.row_offset;},
+}))test('cold refuses '+fault+' change between windows without publishing stitched output',async()=>{
+ const {readColdPortWindows}=await import('../cold-reader-policy.mjs'),f=windowFixture((r,n)=>{if(n===2)change(r);});
+ await assert.rejects(()=>readColdPortWindows(f.channel,{node,execution:f.execution,port:0,rowCount:100}),/COLD_PORT_WINDOW/);
+ assert.equal(f.calls.length,2);
+});
 const configuration={node_context:node};
 const output=(types)=>({verified:true,inventory_complete:true,node_context:{...node,verified:true},port:0,node_id:node.node_id,
  fields:types.map(type=>({type,excluded:false}))});

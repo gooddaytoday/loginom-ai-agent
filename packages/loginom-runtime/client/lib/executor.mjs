@@ -1810,17 +1810,36 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const observations = createObservationPages();
   const serverSources=createServerSourceRegistry({getBinding:getStorageBinding});
   let storageNavigating=false;
-  const inspectServerSource=(ref,{signal,deadline}={})=>serverSources.inspect(ref,options=>{
+  const waitDownloadConnection=async(call,{signal,deadline,operation_id})=>{
+    let recorded=false;
+    while(true){
+      signal?.throwIfAborted();
+      if(deadline!==undefined&&now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+      try{return await call();}catch(error){
+        const diagnostic=operationFailureDiagnostic(error);
+        // Only the existing guard's bounded, same-session recovery is retryable.
+        // Identity loss, a missing job and unknown browser effects remain fatal.
+        if(deadline===undefined||diagnostic.code!=='LOGINOM_DISCONNECTED'
+          ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+        if(!recorded){await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});recorded=true;}
+        await new Promise(resolve=>setTimeout(resolve,Math.min(250,Math.max(1,deadline-now()))));
+      }
+    }
+  };
+  const inspectServerSource=(ref,{signal,deadline,storageSession,operation_id}={})=>waitDownloadConnection(()=>serverSources.inspect(ref,options=>{
     signal?.throwIfAborted();const timeout=Math.min(35000,deadline===undefined?35000:deadline-now());
     if(timeout<=0)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
     return execute(makeWorkspaceUiCode({mode:'observe',operation_id:randomUUID(),
-      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout});
+      expected_origin:targetOrigin,expected_build:targetBuild,...options}),{signal,timeout,storageSession});
+  }),{signal,deadline,operation_id}).catch(async error=>{
+    if(operation_id)await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});
+    throw error;
   });
-  const controlServerDownload=(operation_id,mode)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`);
-  const drainServerDownload=async id=>{
-    const cancelled=await controlServerDownload(id,'cancel');
+  const controlServerDownload=(operation_id,mode,options)=>execute(`async page=>(${browserServerDownloadControl.toString()})(page,${JSON.stringify({operation_id,mode})})`,{storageSession:'download-control',...options});
+  const drainServerDownload=async(id,options={})=>{
+    const cancelled=await controlServerDownload(id,'cancel',options);
     if(cancelled.status!=='SUCCEEDED'||cancelled.output?.state!=='settled')throw Error('Original browser download cleanup is unconfirmed');
-    const released=await controlServerDownload(id,'release');
+    const released=await controlServerDownload(id,'release',options);
     if(released.status!=='SUCCEEDED')throw Error('Original browser download cleanup is unconfirmed');
   };
   const serverDownloads=cacheDirectory?createServerDownloadRegistry({directory:cacheDirectory,inspect:inspectServerSource,now,recover:drainServerDownload,
@@ -1839,17 +1858,33 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
       let started;
-      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now())});}
-      catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}
+      try{started=await execute(code,{signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});}
+      catch(error){await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});error.cleanupUnconfirmed=true;throw error;}
       await onRecord({phase:'storage_download_started',operation_id,outcome:started});
       if(started.status!=='SUCCEEDED'||started.output?.download_started!==true){
         const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=started.cleanup_complete!==true;
         error.details={reason:'browser_start_refused',code:/^[A-Z_]{1,80}$/.test(started.error?.code??'')?started.error.code:'UNKNOWN'};throw error;
       }
+      let primary,connectionWaiting=false;
       try {
         while(true) {
           signal.throwIfAborted();
-          const current=await controlServerDownload(operation_id,'status');
+          if(now()>=deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+          let current;
+          try{
+            current=await controlServerDownload(operation_id,'status',
+              {signal,timeout:Math.max(1,deadline-now()),storageSession:'verify'});
+            connectionWaiting=false;
+          }catch(error){
+            const diagnostic=operationFailureDiagnostic(error);
+            if(diagnostic.code!=='LOGINOM_DISCONNECTED'
+              ||!['reason=dialog','reason=attempted','reason=awaiting_original_attempt'].includes(diagnostic.detail))throw error;
+            if(!connectionWaiting)await onRecord({phase:'storage_download_connection_wait',operation_id,error:diagnostic,deadline_at:deadline});
+            connectionWaiting=true;
+            // Keep the normal recovery attempt even mid-transfer, but always
+            // account for already received bytes while that attempt is pending.
+            current=await controlServerDownload(operation_id,'status',{signal,timeout:Math.max(1,deadline-now())});
+          }
           if(current.status!=='SUCCEEDED')throw Error('LOGINOM_DOWNLOAD_FAILED');
           onProgress(current.output.bytes);
           if(current.output.state==='settled'){
@@ -1860,7 +1895,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           await new Promise(resolve=>setTimeout(resolve,250));
         }
-      }finally{try{await drainServerDownload(operation_id);}catch{const error=Error('LOGINOM_DOWNLOAD_FAILED');error.cleanupUnconfirmed=true;throw error;}}
+      }catch(error){
+        primary=error;await onRecord({phase:'storage_download_failed',operation_id,error:operationFailureDiagnostic(error)});throw error;
+      }finally{
+        try{await drainServerDownload(operation_id);}
+        catch(error){
+          await onRecord({phase:'storage_download_cleanup_failed',operation_id,error:operationFailureDiagnostic(error)});
+          if(primary)primary.cleanupUnconfirmed=true;
+          else{error.cleanupUnconfirmed=true;throw error;}
+        }
+      }
     } }):null;
   // Browser recovery lease: while set, only read-only facade calls run.
   let leased = null;
@@ -2688,10 +2732,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return session;
   }});
   const runtime=Object.freeze({
-    serverDownload(request,name,{signal}={}) {
+    serverDownload(request,name,{signal,sourceOperation,deadlineAt}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
       if(name==='dock_storage_source')return (async()=>{
-        if(storageNavigating||serverDownloads.unsettled||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
+        if(storageNavigating||serverDownloads.unsettled||running||pending
+          ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
@@ -2704,13 +2749,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(previous.outcome);
         }
         auxiliary.set(id,{signature});storageNavigating=true;
-        const deadline=now()+90000;let step=0;
+        const deadline=Math.min(now()+90000,deadlineAt??Infinity);let step=0;
         const guard=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Server storage navigation deadline elapsed');};
         const readPages=async options=>{
+          const original=options.rootRef?observations.get(options.observationId):null;
+          const scrollOnly=original?.ui.elements.some(e=>e.ref===options.rootRef
+            &&e.tid===original.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl');
+          const hasScrollAnchor=output=>scrollOnly&&output.file_storage?.status==='observed'
+            &&output.ui.elements.some(e=>e.tid?.startsWith(output.workflow_ref.prefix+';FileStorageForm;colName_')
+              &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
           guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
+            // The table probe needs a delivered scroll owner, not every row.
+            // Targeted row reads still consume all pages for their witness.
+            if(hasScrollAnchor(output))break;
             if(page>=32)throw Error('Server storage observation page limit');
             const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
             if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
@@ -3502,12 +3556,45 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
+      const admissionDeadline=operation?.deadline??now()+request.budgets.total_ms;
+      const nodeHistory=()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
+        .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
+          source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
+      let admissionSources=null,admissionFailure=null;
+      if(!operation&&serverDownloads){
+        const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
+        const resolve=async(ref,receipt=scanReceipt)=>{
+          if(!proofs.has(ref)){
+            // Restore Files before claiming the node gate. Compare the old
+            // witness; a new reference from navigation cannot approve drift.
+            const source=serverSources.peek(ref);
+            const located=await runtime.serverDownload({operation_id:randomUUID(),path:source.path},'dock_storage_source',
+              {signal,sourceOperation:operationId,deadlineAt:deadline});
+            if(located.status!=='SUCCEEDED')throw Error('Server source navigation requires inspection before node admission');
+            proofs.set(ref,await inspectServerSource(ref,{signal,deadline}));
+          }
+          return serverDownloads.bind(proofs.get(ref),receipt);
+        };
+        try{
+          const history=nodeHistory();
+          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+            await verifyDeferredTextImportSources(request,history,resolve);
+          }
+          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+        }catch(error){
+          if(pending||running)throw error;
+          error.nodePhaseRefusal??={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+          admissionFailure=error;
+        }
+        admissionSources=proofs;
+      }
       running=true;
       try {
         if(!operation){
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -3521,10 +3608,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           };
           operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,scanReceipt,
             resolveStorageSource:async(ref,receipt=scanReceipt)=>{
-              const source=await inspectServerSource(ref,{signal,deadline:operation.deadline});
+              const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
-            resolveDeliveredSource:path=>inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
+            resolveDeliveredSource:path=>admissionSources?.get(serverSources.referenceForPath(path))
+              ??inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
               const saved=operations.get(id),outcome=saved?.outcome;
               if(!saved||saved.action.action_key!=='package.save_checkpoint'||outcome?.status!=='SUCCEEDED'
@@ -3536,9 +3624,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             },
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
-            nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
-              .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
-                source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt})),
+            nodeHistory,
             uploadHistory:()=>({complete:true,records:[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o.action.capability==='artifact.upload')
               .map(({o,sequence})=>structuredClone({sequence,operation_id:o.id,destination:o.parameters.destination,artifact:o.checkpoint.artifact,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed===true,transport_uncertain:o.transportUncertain===true}))}),
             exclusiveNodeOperation:()=>running===true&&pending===operation&&operation.nodeApply?.pending?.phase==='read',
@@ -3549,7 +3635,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(typeof operation.nodeApplyDrivers?.[name]!=='function')throw new Error('Local node driver missing: '+name);
           // Reuse the accepted graph driver directly, under this operation ID.
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
+          const originalSource=operation.nodeApplyDrivers.verifySource;
           operation.nodeApplyDrivers={...operation.nodeApplyDrivers,
+            verifySource:async(...args)=>{
+              try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
+              // Admission observations are valid for this initial source phase
+              // only. Resume/continuation must obtain fresh native evidence.
+              finally{admissionSources=null;admissionFailure=null;}
+            },
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
                 const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
@@ -3630,7 +3723,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume});}
+          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.

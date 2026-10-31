@@ -762,7 +762,7 @@ function failedOpenFixture(fault='none') {
  root.matches=()=>f.state.mask;root.contains=e=>e===root;
  error.contains=e=>[error,body,ok].includes(e);
  for(const e of [error,body,ok])e.getBoundingClientRect=()=>({x:100,y:100,width:f.state.openError?200:0,height:f.state.openError?100:0});
- const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,Controller:{Node:{data:{node}}}};
+ const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,closable:true,Controller:{Node:{data:{node}}}};
  const message={el:{dom:error}},messages={el:{dom:body}},info={};
  const instance={FMessageBox:message,FMessages:messages,FErrorMessageInfo:info};
  const button={el:{dom:ok},disabled:false,ownerCt:message};
@@ -826,6 +826,14 @@ test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
   await wait(ms);
   if(ms<=100&&scenario==='persistent-window')native.state.openError=true;
  };
+ // The post-OK close state is intentionally incomplete for one extra read.
+ const rootComponent=c.Ext.getCmp('MF;TF-1');
+ if(scenario==='clean')rootComponent.closable=false;
+ const settle=native.page.waitForTimeout;let settlementReads=0;
+ native.page.waitForTimeout=async ms=>{
+  await settle(ms);
+  if(ms<=100&&scenario==='clean'&&++settlementReads>=2)rootComponent.closable=true;
+ };
  if(scenario==='foreign-account')native.state.account='foreign';
  if(scenario==='replacement-session')c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={};
  if(scenario==='foreign-operation')receipt.request=JSON.stringify({session:'foreign-session',intent:'open_package',packagePath:path});
@@ -864,6 +872,7 @@ test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
   assert.equal(native.events.filter(e=>e==='logout').length,success?1:0);
   assert.equal(result.package_cleanup.unsaved_changes_discarded??false,false);
   if(success){
+   assert.ok(settlementReads>=2);
    assert.equal(result.package_cleanup.package_path,path);assert.equal(result.package_cleanup.document_id,'own-doc');
    assert.equal(result.package_cleanup.account,'test-2');assert.equal(result.package_cleanup.package_closed,true);
    assert.equal(result.package_cleanup.logged_out,true);assert.equal(result.package_cleanup.policy,'opened_saved_package');
