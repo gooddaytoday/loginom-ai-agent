@@ -174,3 +174,56 @@ bun -e 'import {nodeApplyInputSchema,nodeApiTools} from "./packages/loginom-runt
 отдельно при реализации. Это не замер всего MCP-конверта и не резерв для
 остальных узлов. Предел 46 000 Б не использован как стоп этапа 0; общий запас
 обеспечивает F2 (LAB-516). Схема здесь не правится.
+
+
+## Тип результата Замены — LAB-701, 01.11.2026
+
+Исследование на `v039@004e96dbfa47e8b5251493ab38ae5766ecc0fa5a`,
+mas, Loginom 7.4.2, Chromium 1246, `?testable=true`, worker назначенной пары.
+Штатные DOM-жесты по `data-tid`; материализованные локальные controls/stores
+только читались, внутренний JavaScript Loginom не менялся.
+
+Корень `MF;TF-1;WizrdMCF;ReplaceColumnsWizard;` (R).
+`btnTypeChange` — split button: клик по телу меню не открывает, `ArrowDown`
+открывает `btnTypeChange;mn`. Наблюдены `itmTypeChangeBoolean`,
+`itmTypeChangeDTime`, `itmTypeChangeFloat`, `itmTypeChangeInt`, `itmTypeChangeStr`.
+Тип подтверждается совпадением native `iconCls` с классом принадлежащего
+кнопке `btnIconEl`: `bg-TBGDataType-dtString/dtInteger/dtFloat/dtDateTime`.
+Входной `grdDataList` сохраняет `DataType`; целевой тип не хранится в этой записи.
+В точной таблице ключ хранит исходный `DataValueType`, замена — новый
+`ReplaceByType`. Это разные типы, а не изменение типа входного ключа.
+
+Редактор ключа `ReplaceEditor;fldVariant;ValueContainer;txt`, результата
+`ReplaceEditor-1;fldVariant;ValueContainer;Int64Field` (integer),
+`num` (real), `datetimefield` (datetime); Null — соответствующий `trg_SetNullTrigger`.
+Для datetime наблюдён `Ext.ux.DateTimeField`, ввод ISO `2026-11-01T00:00:00`
+после Tab дал native Date и отображение `11/01/2026, 00:00`.
+Материализованный `ReplaceRender` — Date; локальная ISO-дата читается без UTC-конверсии.
+Смена типа существующей таблицы преобразует её константы: integer 12 стал
+1900-01-11. Поэтому обработчик сначала удаляет запрошенную таблицу, затем
+выбирает тип и записывает полные новые пары. Незаданные поля не меняются.
+
+**Автоматического преобразования оставшегося текста нет.** Пара строка
+`"12"` → integer 12 и `other:null` дала значение 12; строки `bad`, пустая,
+`3.5`, `-7` и исходный NULL дали NULL, флаг true у всех шести строк.
+Даже синтаксически корректное число без пары не преобразуется.
+`cbxReplaceOther` содержит только «Не заменять», «На пропущенное», «На значение».
+При другом типе замены с `other:keep` нативная схема Code стала **variant**,
+с `other:null` — **integer**. Первая комбинация не входит в точный scalar-контракт
+и отклоняется до записи; предлагается явно выбрать null/value.
+Дата поддержана константами с целыми секундами и `other:null`; boolean и
+datetime other.value не входят в эту добавку. Regex остаётся строковым.
+
+Доказательства вне Git: `02-type-options.json`, `03-integer-type.json`,
+`05-output-type.json` (variant), `06-other-options.json`, `07-typed-integer-pair.json`,
+`08-scalar-schema.json`, `09-integer-output.json`, `10-date-editor.json`,
+`11-date-values.json`. Снимок сразу после жеста может предшествовать ответу
+сервера; окончательные значения подтверждены повторным чтением и выполнением.
+
+Новый аддитивный `rules[].result_type` — string/integer/real/datetime;
+пропуск равен входному типу. `type` и `from` сохраняют тип ключа, `to` и
+`other.value` используют тип результата. Новые typed-константы и их типы
+проходят обычные production readback, port-read, CSV и cold-check.
+Фикстура и независимый Python oracle — `acceptance/convert/`; сценарий
+`replace-convert` проверяет целые, вещественные, даты, незаданные числовые
+строки, плохой текст, NULL и пустые строки. Oracle готовится до модельных прогонов.

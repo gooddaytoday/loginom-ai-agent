@@ -13,10 +13,22 @@ function fixture(){
  for(const [k,s] of [['grdDataList',input],['grdReplaceItems',table]]){const e=element(base+k,root);components[e.id]={el:{dom:e},getStore:()=>s,getSelectionModel:()=>({getSelection:()=>selected})};}
  const values={cbxReplaceOther:0,chkCaseSensitivity:true,edPrecision:0,edtReplaceOther:'x'};
  for(const k of Object.keys(values)){const e=element(base+k,root);components[e.id]={el:{dom:e},getValue:()=>values[k]};}
- const masks=[];const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
+ const target={type:null,badIcon:false},button=element(base+'btnTypeChange',root),icon=element(base+'icon',root);
+ components[button.id]={el:{dom:button},btnIconEl:{dom:icon},get iconCls(){return 'bg-TBGDataType-'+({2:'dtDateTime',3:'dtFloat',4:'dtInteger',5:'dtString'}[target.type??fields[0].data.DataType]);}};
+ icon.classList={contains:value=>!target.badIcon&&value===components[button.id].iconCls};
+ const masks=[];const context={Date,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
  const addControl=(name,properties)=>{const e=element(base+name,root);components[e.id]={el:{dom:e},...properties};};
- return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
+ return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,target,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
 }
+test('different key/result types follow the owned type icon and native pair types',()=>{
+ for(const [type,to,expected] of [[4,12,'12'],[3,1.25,1.25],[2,new Date(2026,10,1),'2026-11-01T00:00:00']]){
+  const f=fixture();f.target.type=type;f.values.cbxReplaceOther=1;
+  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'converted',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:type,ValueRender:'12',ReplaceRender:to}});
+  const r=f.read();assert.equal(r.verified,true);assert.equal(r.pairs[0].from.type,'string');assert.equal(r.pairs[0].to.value,expected);assert.equal(r.result_type,r.pairs[0].to.type);
+  f.target.badIcon=true;assert.equal(f.read().verified,false);
+  f.target.badIcon=false;f.pairs[0].data.ReplaceByType=5;assert.equal(f.read().verified,false);
+ }
+});
 test('real editor separators come from the exact owned local controls',()=>{
  const f=fixture();f.fields[0].data.DataType=3;
  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:3,ReplaceByType:3,ValueRender:1.25,ReplaceRender:9.125}});

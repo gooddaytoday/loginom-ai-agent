@@ -1,0 +1,144 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IntText",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IntText_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "RealText",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "RealText_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "DateText",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "DateText_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "IntText": 12,
+          "IntText_Replaced": true,
+          "RealText": 1.25,
+          "RealText_Replaced": true,
+          "DateText": "2026-11-01T00:00:00",
+          "DateText_Replaced": true,
+          "Keep": "one"
+        },
+        {
+          "Id": 2,
+          "IntText": -7,
+          "IntText_Replaced": true,
+          "RealText": -2.5,
+          "RealText_Replaced": true,
+          "DateText": "2024-02-29T00:00:00",
+          "DateText_Replaced": true,
+          "Keep": "two"
+        },
+        {
+          "Id": 3,
+          "IntText": null,
+          "IntText_Replaced": true,
+          "RealText": null,
+          "RealText_Replaced": true,
+          "DateText": null,
+          "DateText_Replaced": true,
+          "Keep": "three"
+        },
+        {
+          "Id": 4,
+          "IntText": null,
+          "IntText_Replaced": true,
+          "RealText": null,
+          "RealText_Replaced": true,
+          "DateText": null,
+          "DateText_Replaced": true,
+          "Keep": "four"
+        },
+        {
+          "Id": 5,
+          "IntText": null,
+          "IntText_Replaced": true,
+          "RealText": null,
+          "RealText_Replaced": true,
+          "DateText": null,
+          "DateText_Replaced": true,
+          "Keep": "five"
+        },
+        {
+          "Id": 6,
+          "IntText": null,
+          "IntText_Replaced": true,
+          "RealText": null,
+          "RealText_Replaced": true,
+          "DateText": null,
+          "DateText_Replaced": true,
+          "Keep": "six"
+        },
+        {
+          "Id": 7,
+          "IntText": null,
+          "IntText_Replaced": true,
+          "RealText": null,
+          "RealText_Replaced": true,
+          "DateText": null,
+          "DateText_Replaced": true,
+          "Keep": "seven"
+        },
+        {
+          "Id": 8,
+          "IntText": 42,
+          "IntText_Replaced": true,
+          "RealText": 9.125,
+          "RealText_Replaced": true,
+          "DateText": "2024-01-01T00:00:00",
+          "DateText_Replaced": true,
+          "Keep": "eight"
+        }
+      ]
+    }
+  ]
+}

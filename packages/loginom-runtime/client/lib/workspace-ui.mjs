@@ -2801,7 +2801,7 @@ function readRenderedInputMapping(observation) {
         }
         const grids=tids.get(base+'grdReplaceItems')??[],editors=tids.get(base+'ReplaceEditor')??[];
         if(grids.length===1&&editors.length===1&&grids[0].contains(editors[0])&&visible(editors[0])){
-          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
+          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field','datetimefield'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
             const es=(tids.get(tid)??[]).filter(e=>grids[0].contains(e)&&visible(e)&&!sensitive(e));
             if(es.length===1)replacementCells.set(refOf(es[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:tid.endsWith('update')?'update':tid.endsWith('cancel')?'cancel':'set_null',wizard_root_ref:wizard.root_ref});
           }
