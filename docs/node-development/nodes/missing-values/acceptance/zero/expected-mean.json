@@ -1,0 +1,80 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.data_recovery"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.data_recovery",
+      "output_port": 0,
+      "export_destination": "missing-mean.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "A",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 2,
+          "R": 2.5,
+          "A": null,
+          "Keep": null
+        },
+        {
+          "RowID": 2,
+          "I": 2.0,
+          "R": 2.5,
+          "A": null,
+          "Keep": 0
+        },
+        {
+          "RowID": 3,
+          "I": 0,
+          "R": 0.0,
+          "A": null,
+          "Keep": 9
+        },
+        {
+          "RowID": 4,
+          "I": 4,
+          "R": 5.0,
+          "A": null,
+          "Keep": null
+        }
+      ]
+    }
+  ]
+}

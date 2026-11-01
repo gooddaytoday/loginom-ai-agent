@@ -30,3 +30,12 @@ test('preserved reexecution is existing-only; close cannot mutate input mapping'
  assert.throws(()=>validate(parameters(),'impute',{...request,inputs:[]}));
  assert.throws(()=>validate(parameters(),'impute',{...request,finish:'close',mappings:[{direction:'input',port:0}]}));
 });
+test('native zero accepts continuous integer/real without a replacement value',()=>{
+ for(const type of ['integer','real']){
+  const p={ordered:false,max_nulls_percent:100,fields:[{field:field('Amount'),method:'zero'}]};
+  assert.doesNotThrow(()=>validate(p,'impute',request));
+  assert.equal(resolve(p,[{...schema[0],type}])[0].method,'zero');
+  for(const value of [0,'0',null])assert.throws(()=>validate({...p,fields:[{...p.fields[0],value}]},'impute',request));
+  for(const source of [{...schema[0],type:'string'},{...schema[0],data_kind:'Дискретный'}])assert.throws(()=>resolve(p,[source]),/incompatible/);
+ }
+});

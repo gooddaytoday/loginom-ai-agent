@@ -21,6 +21,26 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_missing_zero_fixtures_and_independent_oracle(self):
+        for name, kind in [('missing-zero', 'core'), ('missing-zero-threshold', 'threshold'),
+                           ('missing-zero-empty', 'empty'), ('missing-mean', 'mean')]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/test/zero.lgp')
+            generated = json.loads(subprocess.check_output([sys.executable, str(case['source'] / 'oracle.py'), kind]))
+            generated['package_path'] = '/test/zero.lgp'
+            self.assertEqual(expected, generated)
+            self.assertEqual(case['input_files'], [('core' if kind == 'mean' else kind) + '.csv'])
+            self.assertTrue((case['data'] / case['input_files'][0]).is_file())
+            self.assertTrue(case['prompt'].is_file())
+            rows = expected['outputs'][0]['rows']
+            if kind == 'empty':
+                self.assertEqual(rows, [])
+                continue
+            self.assertIsNone(rows[0]['Keep'])
+            self.assertEqual(rows[2]['I'], 0)
+            self.assertEqual(rows[1]['I'], None if kind == 'threshold' else 2 if kind == 'mean' else 0)
+            self.assertEqual(rows[1]['A'], 0 if kind == 'core' else None)
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)
