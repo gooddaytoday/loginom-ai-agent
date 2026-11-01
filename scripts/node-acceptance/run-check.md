@@ -13,6 +13,12 @@ all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
 
+`missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
+use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
+reach the model. Independent expected tables check numeric zero imputation,
+preserved zero/NULL and unprocessed fields, all-NULL, threshold and empty input.
+The main case changes mean to zero on the same node; each case uses CSV/Save/cold.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two

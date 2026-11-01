@@ -115,6 +115,13 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
+    if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
+        src = REPO / 'docs/node-development/nodes/missing-values/acceptance/zero'
+        kind = {'missing-zero': 'core', 'missing-zero-threshold': 'threshold',
+                'missing-zero-empty': 'empty', 'missing-mean': 'mean'}[name]
+        return dict(source=src, prompt=src / ('task.md' if kind == 'core' else 'task-' + kind + '.md'),
+                    data=src / 'data', input_files=[('core' if kind == 'mean' else kind) + '.csv'], base=None,
+                    expected_name='expected.json' if kind == 'core' else 'expected-' + kind + '.json')
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)

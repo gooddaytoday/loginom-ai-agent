@@ -21,6 +21,35 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_missing_zero_fixtures_and_independent_oracle(self):
+        for name, kind in [('missing-zero', 'core'), ('missing-zero-threshold', 'threshold'),
+                           ('missing-zero-empty', 'empty'), ('missing-mean', 'mean')]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/test/zero.lgp')
+            generated = json.loads(subprocess.check_output([sys.executable, str(case['source'] / 'oracle.py'), kind]))
+            generated['package_path'] = '/test/zero.lgp'
+            self.assertEqual(expected, generated)
+            # Apply the same expected contract that cold-check uses before login.
+            subprocess.run(['node', '--input-type=module', '-e',
+                            "import {parseExpectedOutputs} from './scripts/node-acceptance/expected-outputs.mjs';"
+                            "let s='';for await(const part of process.stdin)s+=part;parseExpectedOutputs(JSON.parse(s));"],
+                           input=json.dumps(expected), text=True, check=True, cwd=runner.REPO,
+                           capture_output=True)
+            self.assertEqual(case['input_files'], [('core' if kind == 'mean' else kind) + '.csv'])
+            self.assertTrue((case['data'] / case['input_files'][0]).is_file())
+            self.assertTrue(case['prompt'].is_file())
+            rows = expected['outputs'][0]['rows']
+            if kind == 'empty':
+                self.assertEqual(rows, [])
+                continue
+            self.assertIsNone(rows[0]['Keep'])
+            self.assertEqual(rows[2]['I'], 0)
+            self.assertEqual(rows[1]['I'], None if kind == 'threshold' else 2 if kind == 'mean' else 0)
+            self.assertEqual(rows[1]['A'], None if kind == 'mean' else 0)
+            self.assertEqual(rows[1]['R'], 2.5 if kind == 'mean' else 0)
+            if kind == 'threshold':
+                self.assertIn('для I выбери замену средним', case['prompt'].read_text())
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)
