@@ -56,11 +56,14 @@ test('admission records a redacted host boundary refusal and remains retired wit
  const f=fixture({secret:'PRIVATE_CREDENTIAL'}),receipt=await f.admission.admit({});
  let effects=0;
  await assert.rejects(()=>f.admission.withEffect(input(f,receipt),async()=>{
-  effects++;throw Error('Owned preparation failed: PRIVATE_CREDENTIAL');
+  effects++;const error=Error('Owned preparation failed: PRIVATE_CREDENTIAL');
+  error.stack='Error: Owned preparation failed: PRIVATE_CREDENTIAL\n at ownedInspector (graph.mjs:85:7)';throw error;
  }),{code:'boundary'});
  const refused=f.events.filter(event=>event.phase==='javascript_source_boundary_refused');
  assert.equal(refused.length,1);
  assert.equal(refused[0].reason,'Owned preparation failed: [redacted]');
+ assert.equal(refused[0].exception_name,'Error');
+ assert.equal(refused[0].exception_stack,'Error: Owned preparation failed: [redacted]\n at ownedInspector (graph.mjs:85:7)');
  assert.deepEqual(refused[0].owner,f.owner);
  assert.equal(refused[0].read_id,3);
  assert.equal(f.admission.state,'retired');

@@ -182,7 +182,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -1047,6 +1047,17 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           else if(!unique || !chain)ownerContext.status='ambiguous';
           else if(last.workflow_icon&&!preparedNavigationNode) {
             navigationContext={status:'observed',kind:'workflow',path:items.map(({tid,label})=>({tid,label}))};
+          }
+          // The deactivation question may precede the visible Settings crumb.
+          // The native reader already bound both pending tree components to
+          // this exact GUID. Retain the actually rendered node-only path;
+          // never infer a wizard owner from its caption alone.
+          else if(wizard.status==='absent'&&preparedGraphTid&&preparedNodeId===preparedNativeNodeId
+            &&workflowNavigation.status==='observed'&&items.length===preparedWorkflowPath.length+1
+            &&last.vendor_icon&&last.tid===preparedPendingWizardNode?.tid&&last.label===preparedPendingWizardNode.label
+            &&items.at(-2)?.workflow_icon){
+            ownerContext={status:'observed',opening_verified:false,panel_ref:refOf(panels[0]),
+              node:{ref:last.ref,tid:last.tid,label:last.label},path:items.map(({ref,tid,label})=>({ref,tid,label}))};
           }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.output_data_icon && node.label
             && items.at(-3)?.outputs_icon && items.at(-4)?.vendor_icon && items.at(-4)?.label && items.at(-5)?.workflow_icon) {
@@ -3881,6 +3892,7 @@ function readRenderedInputMapping(observation) {
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedNativeNodeId:nodeContext?.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.tid:null,
+    preparedPendingWizardNode:nodeContext?.surface==='graph'?nodeContext.pending_wizard_node??null:null,
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
@@ -4097,7 +4109,7 @@ function readRenderedInputMapping(observation) {
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
     const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {
@@ -4182,7 +4194,9 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!(same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+              ||typeof n.pending_wizard_node?.tid==='string'
+                &&same(current.wizard_pending_owner.path.map(({tid,label})=>({tid,label})),[...binding.opening.workflow_path,n.pending_wizard_node]))
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
@@ -4366,6 +4380,9 @@ function readRenderedInputMapping(observation) {
         if(['apply_expression_parameters','cancel_expression_parameters','select_wizard_option','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb))postActionRoot=current.wizard.root_ref;
         const exactDeactivation=fresh=>fresh.prepared_node_context?.verified===true
           &&fresh.prepared_node_context.surface==='graph'&&fresh.wizard?.status==='absent'
+          &&current.prepared_node_context?.verified===true
+          &&['document_id','workflow_id','node_id','tid'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context[k])
+          &&fresh.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===current.workflow_ref.prefix&&m.dialog_ref===null)
           &&fresh.ui.dialogs.length===1&&fresh.ui.elements.filter(e=>e.wizard_deactivation_confirmation
             &&e.tid==='msgbox;tlb;yes'&&e.allowed_actions.includes('confirm_wizard_deactivation')).length===1;
         const lifecycleContextMatches=(fresh,allowToasts=false)=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build

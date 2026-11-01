@@ -37,6 +37,7 @@ RULES = (
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter',)),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
+    (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),

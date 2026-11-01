@@ -13,6 +13,7 @@ Object.assign(cases,{placement_native:'serialized REST capability reveals real f
 Object.assign(cases,{placement_reselect:'D28 J2 reselects a free visible connection point after zoom with overflow y843 and zero native scroll'});
 Object.assign(cases,{placement_dense:'D28 connection searches a narrow visible gap before unreachable overflow'});
 Object.assign(cases,{placement_before_drag:'REST checkpoints its unchanged graph when free space disappears before drag'});
+Object.assign(cases,{plain_label:'plain GET waits for buffered native URL and label changes before saving without parameter edits'});
 for(const stage of ['placement_still_full','placement_before_drag'])for(const fault of ['changed','incomplete','busy','owner'])
  cases[stage+':'+fault]='REST refuses '+stage+' checkpoint with '+fault+' graph or owner';
 for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
@@ -21,6 +22,8 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
+ let nativeUrl='',nativeLabel='REST-сервис',pendingUrl=false,pendingLabel=false;
+ const settleFields=()=>{if(pendingUrl){nativeUrl=url;label='REST: '+url;pendingUrl=false;}if(pendingLabel){nativeLabel=label;pendingLabel=false;}};
  if(reusing){label='Echo';url='https://httpbin.org/anything';paramName='Key';added=true;}
  let held=false,dragMoves=0,downCount=0,upCount=0,expanded=stage!=='expander',expansions=0;
  let opening=false,confirmations=0,responseType='application/json',responseFills=0,wizardCloses=0,referenceReads=0;
@@ -88,6 +91,10 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   },
   evaluate:async(fn,arg)=>{
    lastSelector=selector;
+   if(fn.toString().includes('control.value')){
+    const element={id:'field'},value=selector.includes('pedURL')?(stage==='plain_label'?nativeUrl:url):(stage==='plain_label'?nativeLabel:label);
+    return vm.runInNewContext('('+fn.toString()+')',{Ext:{getCmp:()=>({el:{dom:element},value,lastValue:value})}})(element,arg);
+   }
    if(stage==='placement_late_changed'&&navigated&&selector.includes(item))placementGraph.nodes[0].position.x++;
    if(selector.includes('cmpDiagram')){
     if(!stage.startsWith('placement_'))return {x:500,y:400};
@@ -112,16 +119,16 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   },
   fill:async value=>{
    if(selector.includes('pedResponseContentType')){responseFills++;responseType=value;return;}
-   if(selector.includes('pedURL')){assert.equal(urlPoints,4);url=value;fills++;if(stage==='input')throw Error('fixture stopped after the sole reachable fill');return;}
-   if(selector.includes('fldLabel')){label=value;return;}
+   if(selector.includes('pedURL')){assert.equal(urlPoints,4);url=value;pendingUrl=stage==='plain_label';fills++;if(stage==='input')throw Error('fixture stopped after the sole reachable fill');return;}
+   if(selector.includes('fldLabel')){label=value;pendingLabel=stage==='plain_label';return;}
    assert.ok(selector.includes('celleditor'));queryFills++;if(stage==='parameter')throw Error('fixture stopped after the typed parameter editor');paramName=value;
   },
   press:async()=>{},
  });
- const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone'))wizardCloses++;if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
+ const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone')){if(stage==='plain_label')settleFields();wizardCloses++;}if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
   move:async()=>{if(!held&&reusing)referenceMoves++;if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
-  up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
+  up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='plain_label')settleFields();if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
   evaluate:async(fn,arg)=>{
    const code=fn.toString();if(reusing&&(code.includes('REST connection reference changed')||code.includes('REST reference source owner differs')||code.includes('actual=b.node.FConnectionNode')))return sourceRead(fn,arg);if(code.includes('packageNode=false')&&checkpointPending&&fault==='owner')return false;
    if(code.includes('Prepared graph document changed'))return structuredClone(placementGraph);if(code.includes('FNodes.FCollection.map'))return [{id:'existing',y:stage.startsWith('placement_')?1500:100}];
@@ -142,7 +149,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  try{
   const task={deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:workflow,...(reusing?{existing_target:{document_id:'doc',workflow_id:'flow',node_id:'rest'}}:{}),
-   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:[{name:'Key',field:'Key'}]};
+   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:stage==='plain_label'?[]:[{name:'Key',field:'Key'}]};
   const result=['placement_native','placement_reselect'].includes(stage)?await vm.runInNewContext('('+makeRestConnectionCode(task)+')',{get document(){return globalThis.document;},innerWidth:1280,innerHeight:800})(page):await restConnectionCapability(page,task,async()=>{
    const graph=structuredClone(placementGraph);
    if(reusing&&++serviceGraphReads===2&&stage==='reuse_changed')graph.rest_connection_links=[];
@@ -170,6 +177,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    assert.ok(Math.abs(result.placement_navigation.point.y-843.3274620201366)<.001);
    assert.equal(result.placement_navigation.view.scroll.y,0);return;
   }
+  if(stage==='plain_label'){assert.equal(result.verified,true,result.error);assert.deepEqual(result.connection.query_parameters,[]);assert.equal(queryFills,0);return;}
   assert.equal(result.verified,['animation','expander','confirm','mime','refresh','render_wait','placement_below','placement_scrolled','placement_crowded','placement_native'].includes(stage),result.error);
   if(['animation','expander','confirm','mime','refresh','render_wait','placement_below','placement_scrolled','placement_crowded','placement_native'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
   else if(['placement_changed','placement_unknown','placement_hidden','placement_late_changed'].includes(stage)){
