@@ -80,6 +80,19 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 runner.check_text_export_encodings(bad, destinations)
 
+    def test_replace_convert_uses_independent_typed_fixture(self):
+        case = runner.scenario('replace-convert')
+        self.assertTrue(case['prompt'].is_file())
+        self.assertTrue((case['data'] / 'input.csv').is_file())
+        expected = runner.expected_for(case, '/test/convert.lgp')
+        self.assertEqual(expected['package_path'], '/test/convert.lgp')
+        columns = {c['name']: c['type'] for c in expected['outputs'][0]['columns']}
+        self.assertEqual([columns[n] for n in ['IntText', 'RealText', 'DateText']], ['integer', 'real', 'datetime'])
+        for row in expected['outputs'][0]['rows']:
+            if row['DateText'] is not None:
+                self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)

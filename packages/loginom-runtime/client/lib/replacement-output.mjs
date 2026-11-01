@@ -7,7 +7,7 @@ export function replacementSources(configuration,mode){
  const changed=new Set(configuration.rules.map(r=>r.field.name));
  return configuration.input_fields.flatMap(f=>{
   const original={name:f.name,label:f.label,type:f.type};if(!changed.has(f.name))return [original];
-  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'}];
+  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:configuration.rules.find(r=>r.field.name===f.name).result_type??f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'}];
  });
 }
 export function validateReplacementSources(configuration,native){

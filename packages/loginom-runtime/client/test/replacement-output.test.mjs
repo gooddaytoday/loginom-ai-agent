@@ -2,6 +2,13 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {replacementSources,validateReplacementSources} from '../lib/replacement-output.mjs';
 const config={input_fields:[{name:'A',label:'Same',type:'string'},{name:'B',label:'Same',type:'integer'}],rules:[{field:{name:'A'}}],requested_output_mode:'add'};
 const native=()=>({verified:true,inventory_complete:true,source_identity_verified:true,produce_mode:'supplement',source_fields:replacementSources(config,'add'),target_fields:[]});
+test('replacement result type changes only the derived value, retaining source and flag types',()=>{
+ for(const result_type of ['integer','real','datetime']){
+  const converted={...config,rules:[{field:{name:'A'},result_type}]};
+  assert.deepEqual(replacementSources(converted,'add').map(f=>[f.name,f.type]),[['A','string'],['A_Replace',result_type],['A_Replaced','boolean'],['B','integer']]);
+  assert.deepEqual(replacementSources(converted,'replace').map(f=>[f.name,f.type]),[['A',result_type],['A_Replaced','boolean'],['B','integer']]);
+ }
+});
 test('generated fields retain original names and disambiguate duplicate labels',()=>{assert.deepEqual(replacementSources(config,'add').map(f=>[f.name,f.type]),[['A','string'],['A_Replace','string'],['A_Replaced','boolean'],['B','integer']]);assert.deepEqual(replacementSources(config,'replace').map(f=>f.name),['A','A_Replaced','B']);assert.deepEqual(validateReplacementSources(config,native()),[]);});
 test('output proof refuses duplicated names, wrong types, wrong policy and incomplete sources',()=>{for(const edit of [n=>n.source_fields[1]=n.source_fields[0],n=>n.source_fields[2].type='string',n=>n.produce_mode='replace',n=>n.source_identity_verified=false,n=>n.source_fields.pop()]){const n=native();edit(n);assert.throws(()=>validateReplacementSources(config,n));}});
 
