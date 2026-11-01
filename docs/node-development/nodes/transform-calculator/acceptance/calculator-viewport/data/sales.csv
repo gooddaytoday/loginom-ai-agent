@@ -1,0 +1,4 @@
+Id,Quantity,Price,UnitCost,Amount
+A,2,100,60,10
+B,-1,20,12,20
+C,5,0,1,0
