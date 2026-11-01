@@ -148,6 +148,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']:
+        acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        variant = name.removeprefix('logreg-')
+        source = acceptance / 'selection'
+        return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
+                    data=acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -969,7 +975,8 @@ class Runner:
                 delimiter = csv_delimiter(actual)
                 sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))
                 continue
-            if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
+            if (re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression'
+                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)

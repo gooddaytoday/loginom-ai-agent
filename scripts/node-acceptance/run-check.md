@@ -334,3 +334,10 @@ abs=1e-8 только для real, метки через label_any.
 утверждённые task-iso-weeks*.md и независимый Python expected из
 `docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
 из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
+
+`logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
+со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
+Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
+информационные/строгий/мягкий сценарии исключены из активного каталога.
+Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
+передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.

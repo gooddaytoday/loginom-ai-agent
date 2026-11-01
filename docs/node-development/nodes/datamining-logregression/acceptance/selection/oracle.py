@@ -76,7 +76,7 @@ def lr_p(smaller, larger):
     return math.erfc(math.sqrt(max(0, 2 * (larger["ll"] - smaller["ll"])) / 2))
 
 
-def select(rows, mode="stepwise", criterion="deviance", entry=0.01, removal=0.2):
+def select(rows, mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
     selected = list(FACTORS) if mode == "backward" else []
     history = []
     for _ in range(20):
@@ -115,7 +115,7 @@ def select(rows, mode="stepwise", criterion="deviance", entry=0.01, removal=0.2)
     raise AssertionError("selection did not terminate")
 
 
-def expected(mode="stepwise", criterion="deviance", entry=0.01, removal=0.2):
+def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
     rows = source()
     model, _ = select(rows, mode, criterion, entry, removal)
     columns = [
@@ -168,8 +168,8 @@ if __name__ == "__main__":
     parser.add_argument("actual_csv", nargs="?", type=Path)
     parser.add_argument("--mode", choices=("forward", "backward", "stepwise"), default="stepwise")
     parser.add_argument("--criterion", choices=CRITERIA, default="deviance")
-    parser.add_argument("--entry", type=float, default=0.01)
-    parser.add_argument("--removal", type=float, default=0.2)
+    parser.add_argument("--entry", type=float, default=0.05)
+    parser.add_argument("--removal", type=float, default=0.1)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--diagnostic", action="store_true")
     args = parser.parse_args()

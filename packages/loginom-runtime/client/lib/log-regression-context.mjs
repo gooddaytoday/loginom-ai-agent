@@ -21,11 +21,11 @@ export function readLogRegressionBrowser(prefix) {
  const active=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],e=es[0],b=e?.getBoundingClientRect();return es.length===1&&e.checkVisibility({checkVisibilityCSS:true})&&b.width>0&&b.height>0&&b.x>=0&&b.y>=0&&b.x<innerWidth&&b.y<innerHeight;};
  for(const [kind,card,names] of [
   ['parameters','LogRegressionWizard',['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId','pedUseScoring','pedSetupCalibration']],
-  ['details','LogRegressionWizard-1',['pedEpsilon','pedIntercept','pedThreshold']]
+  ['details','LogRegressionWizard-1',['pedEpsilon','pedIntercept','pedThreshold','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
-  const values={},switches={};
-  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
+  const values={},switches={},disabled={};
+  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
   if(kind==='parameters'&&(!Number.isInteger(values.pedRegressionMethod)||!['pedAutoMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'].every(k=>typeof values[k]==='boolean')))return {verified:false,reason:'logregression_initializing'};
   if(kind==='details'&&(!(typeof values.pedEpsilon==='number'&&values.pedEpsilon>0)||typeof values.pedIntercept!=='boolean'))return {verified:false,reason:'logregression_initializing'};
   const classes=[];
@@ -40,7 +40,7 @@ export function readLogRegressionBrowser(prefix) {
    }
    if(new Set(classes.map(c=>c.index)).size!==classes.length||new Set(classes.map(c=>c.label)).size!==classes.length)return {verified:false,reason:'logregression_class_identity'};
   }
-  return {verified:true,kind,values,switches,...(kind==='parameters'?{classes}:{})};
+  return {verified:true,kind,values,switches,...(kind==='details'?{disabled}:{}),...(kind==='parameters'?{classes}:{})};
  }
  const partitionBase=prefix+';WizrdMCF;LearnPartitionWizard';
  if(active(partitionBase)){
