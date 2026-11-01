@@ -3,6 +3,61 @@ import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure,trainConfiguredNode} from '../lib/node-execution-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
+
+// LAB-713 main-execution-events.jsonl:323-330: completed/loaded root,
+// visible process cell, no expander or child yet. At :358 both are present.
+for(const fault of [undefined,'root','record','node'])test('empty import waits for its own group children: '+fault,async()=>{
+ let opened=false,menu=false,launched=false,children=false,selected=false,shown=false;
+ const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,signature:{tid},allowed_actions});
+ const state=()=>({prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'},navigation_context:{status:'observed'},
+  node_outputs:{verified:true,node_selected:shown},
+  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:children&&fault==='root'?'foreign':'root',
+   node_context:{...node,verified:true,node_id:children&&fault==='node'?'foreign':node.node_id},processes:launched?[
+    {process_id:'1',record_id:children&&fault==='record'?'foreign':'group',parent_id:null,state:'completed',error:false,
+     rendered:true,process_tid:'group-row',children_loaded:true,expanded:children?true:null,expander_tid:children?'group-expander':null},
+    ...(children?[{process_id:'1.1',record_id:'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]:[])]:[]},
+  ui:{elements:[el(button),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),el('group-row'),...(children?[el('child-row',['right_click'])]:[])]:[]),
+   ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
+ const channel={observe:async o=>{
+  if(o.condition==='execution group expansion available'){
+   assert.equal(o.ready(state()),false);children=true;
+  }
+  const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);
+ },perform:async o=>{
+  const s=state();assert.ok(o.ready(s));o.identity(s);const a=o.resolve(s);actions.push(a);
+  if(a.ref===button)opened=true;if(a.ref==='ConsoleForm;btnClose')opened=false;
+  if(a.verb==='right_click'){menu=true;if(a.ref==='child-row')selected=true;}
+  if(a.verb==='press')menu=false;if(a.verb==='show_process_node'){shown=true;menu=false;}
+  return {status:'SUCCEEDED'};
+ }};
+ const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;await driver.identify();actions.length=0;
+ if(fault)await assert.rejects(driver.waitCompleted());
+ else assert.equal((await driver.waitCompleted()).owner_verified,true);
+ assert.equal(actions.some(a=>a.ref==='group-expander'||a.verb==='execute_graph_node'),false);
+ if(fault)assert.equal(actions.length,0);
+});
+
+test('already open console captures its toolbar before the next confirmed launch',async()=>{
+ // LAB-713 :354-370 scopes reads to ConsoleForm; the toolbar is only
+ // observed after Close. The subsequent graph/output read omits it again.
+ let opened=true,menu=false,launched=false,captured=false;
+ const el=(tid,allowed_actions=['click'])=>({tid,ref:tid,signature:{tid},allowed_actions});
+ const state=()=>({prepared_node_context:{...node,verified:true,surface:'graph'},
+  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true},processes:launched?[
+   {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false}]:[]},
+  ui:{elements:opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[])]:[el(button)]}});
+ const channel={get launchConfirmed(){return launched;},observe:async o=>{
+  if(!opened&&!launched&&o.readProcessControls)captured=true;
+  const s=state();assert.ok(o.ready(s),o.condition);return s;
+ },perform:async o=>{
+  const s=state();assert.ok(o.ready(s));const a=o.resolve(s);
+  if(a.ref===button){assert.equal(captured,true);assert.deepEqual(o.settleProcessConsole,{ref:button,signature:{tid:button}});opened=true;}
+  if(a.verb==='right_click')menu=true;if(a.verb==='press')menu=false;if(a.ref==='ConsoleForm;btnClose')opened=false;
+  return {status:'SUCCEEDED'};
+ }};
+ const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;
+ assert.equal((await driver.identify()).group_id,'1');
+});
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
  training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false,cachedGroup=false,groupFault}={}){
  let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false,groupVisible=!cachedGroup,groupExpanded=!cachedGroup;

@@ -110,7 +110,15 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   }
   async function closeConsole(s) {
     if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
-    return observe('process console closed',s=>!consoleVisible(s));
+    const closed=await observe('process console closed',s=>!consoleVisible(s),{readProcesses:false,readProcessControls:true});
+    // An initially open ConsoleForm scopes out the toolbar. Retain its
+    // control after Close, before launch, also in the shared channel.
+    if(!launched()&&!consoleControl){
+      const buttons=control(closed,button);
+      if(buttons.length===1&&buttons[0].signature)
+        consoleControl={ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)};
+    }
+    return closed;
   }
   const processes=s=>s.node_processes?.verified===true&&s.node_processes.show_completed===true;
   async function revealChildren(s,group) {
@@ -122,6 +130,20 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       const current=state=>state.node_processes?.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
       s=await revealExecutionControl(channel,node,s,group,state=>current(state)?.process_tid);
       group=current(s);requireValue(group?.rendered===true,'Execution group did not become visible');
+    }
+    if(group.expanded!==true&&!group.expander_tid){
+      // A fast empty Import can paint its completed group before adding the
+      // child/expander. Completion and loaded=true alone do not prove a leaf.
+      s=await observe('execution group expansion available',state=>{
+        requireValue(processes(state)&&state.node_processes.root_id===s.node_processes.root_id
+          &&state.node_processes.node_context?.verified===true
+          &&['document_id','workflow_id','node_id'].every(k=>state.node_processes.node_context[k]===node[k]),
+        'Execution group owner changed before expansion');
+        const current=state.node_processes.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
+        requireValue(current,'Execution group replaced before expansion');
+        return current.expanded===true||typeof current.expander_tid==='string'&&current.expander_tid.length>0;
+      });
+      group=s.node_processes.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
     }
     if(group.expanded!==true) {
       requireValue(group.expander_tid,'Execution group expander must be identified');
