@@ -74,8 +74,9 @@ function fixture(direction='output') {
   if(q.startsWith('[data-tid=')){const t=JSON.parse(q.slice(10,-1));return elements.filter(e=>e.tid===t);}
   if(q.startsWith('[data-tid^=')){const t=JSON.parse(q.slice(11,-1));return elements.filter(e=>e.tid?.startsWith(t));}
   if(q==='[role="dialog"],.x-message-box')return dialog.visible?[dialog]:[];
-  if(q==='.x-mask,.x-mask-msg,.bg-mask-message')return [];
+  if(q==='.x-mask,.x-mask-msg,.bg-mask-message')return flags.graphMasks??[];
   if(dialog.visible)return [dialog];
+  if(card.Controller.FController===graph&&flags.graphMasks)return flags.graphMasks;
   if(card.Controller.FController===wizard&&flags.finishMasks)return flags.finishMasks;
   if(flags.loading>0){flags.loading--;return [{checkVisibility:()=>true}];}return [];
  }};
@@ -105,6 +106,72 @@ test('port opening binds menu and wizard native identities and replays without a
  assert.equal(f.gestures.length,2);assert.equal(r.trace.at(-1).event,'output_port_wizard_verified');
  const again=await f.run();assert.equal(again.status,'SUCCEEDED',again.error);assert.equal(again.replayed,true);assert.equal(f.gestures.length,2);
 });
+
+function groupingBusy(f){
+ const root=f.graph.FDiagram.FmxGraph.container,panel=f.el('MF;TF;ModelForm');
+ panel.tagName='DIV';panel.getAttribute=key=>key==='data-tid'?panel.tid:key==='class'?'x-panel bg-mask-message':null;
+ panel.classList={contains:key=>key==='bg-mask-message'};
+ panel.contains=e=>e===panel||e===root||root.contains(e);
+ f.graph.FView={el:{dom:panel}};f.node.FIconCls='bg-vendor-icon-groupdata';
+ f.flags.graphMasks=[panel];return panel;
+}
+
+for(const stage of ['begin','menu_issued','open_issued'])test('Grouping waits for its bound graph mask at '+stage,async()=>{
+ const f=fixture('input');let waits=0;
+ if(stage==='begin')groupingBusy(f);
+ if(stage==='menu_issued'){
+  const read=f.readNode;let reads=0;
+  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)groupingBusy(f);return result;};
+  f.run=()=>openPreparedOutputPort(f.page,f.task,runRead);
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)groupingBusy(f);};return l;
+  };
+ }
+ f.page.waitForTimeout=async()=>{
+  if(!f.flags.graphMasks?.length)return;
+  waits++;assert.equal(f.gestures.length,stage==='open_issued'?1:0);
+  f.flags.graphMasks=[];
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(waits,1);assert.equal(f.gestures.length,2);
+ assert.ok(result.trace.some(x=>x.event==='input_port_graph_busy'&&x.mode===stage));
+});
+
+for(const variant of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','other-node-type','dialog','persistent','changed-node'])test('Grouping busy mask refuses '+variant,async()=>{
+ const f=fixture('input'),panel=groupingBusy(f);
+ if(variant==='foreign-tid')panel.getAttribute=()=> 'other';
+ if(variant==='foreign-native')f.graph.FView.el.dom={};
+ if(variant==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(variant==='foreign-node')f.node.FGuid='other';
+ if(variant==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(variant==='duplicate-root')f.el(panel.tid);
+ if(variant==='other-node-type')f.node.FIconCls='bg-vendor-icon-other';
+ if(variant==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
+ let waits=0;f.page.waitForTimeout=async()=>{
+  waits++;
+  if(variant==='persistent')f.task.deadline=Date.now()-1;
+  if(variant==='changed-node')f.node.FGuid='other';
+ };
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED',result.error);
+ assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);assert.deepEqual(f.gestures,[]);
+ assert.equal(waits,['persistent','changed-node'].includes(variant)?1:0);
+});
+
+test('Grouping deactivation question permits only the same bound busy graph',async()=>{
+ for(const foreign of [false,true]){
+  const f=fixture('input');f.flags.deactivation=true;
+  const locator=f.page.locator;f.page.locator=s=>{
+   const l=locator(s),click=l.click;l.click=async o=>{
+    await click(o);
+    if(!o?.trial&&s.includes('mniConfigurePort')){groupingBusy(f);if(foreign)f.flags.graphMasks.push({...f.flags.graphMasks[0],getAttribute:()=> 'foreign'});}
+   };return l;
+  };
+  const result=await f.run();assert.equal(result.status,foreign?'AMBIGUOUS':'SUCCEEDED',result.error);
+  assert.equal(f.gestures.length,foreign?2:3);
+ }
+});
 test('outline SVG clones cannot replace or duplicate a port inside the prepared graph',async()=>{
  for(const direction of ['input','output']){
   const f=fixture(direction);const clone=f.el(f.portDom.tid);clone.getBoundingClientRect=()=>({x:0,y:0,width:0,height:0});
@@ -126,6 +193,24 @@ test('foreign port tree cannot become a successful opening receipt',async()=>{
 test('unknown target and blocked graph cause no gesture',async()=>{
  for(const change of [f=>{f.task.port=1;},f=>{f.node.FLocked=true;},f=>{f.flags.loading=1;},f=>{f.menu.visible=true;}]){
   const f=fixture();change(f);const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(f.gestures.length,0);
+ }
+});
+test('blocked opening reports only bounded layer and parent identity',async()=>{
+ for(const long of [false,true]){
+  const f=fixture('input');
+  const parent={tagName:'DIV',getAttribute:key=>key==='data-tid'?'MF;TF;WizrdMCF':key==='class'?'x-panel':null};
+  const mask={tagName:'DIV',parentElement:parent,textContent:'PRIVATE_TEXT',value:'PRIVATE_VALUE',
+   getAttribute:key=>key==='class'?(long?'"\n\\'.repeat(1000):'x-mask'):key==='role'?'presentation':null,
+   classList:{contains:()=>false},checkVisibility:()=>true};
+  const query=f.document.querySelectorAll;
+  f.document.querySelectorAll=q=>q==='[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message'?[mask]:query(q);
+  const result=await f.run();
+  assert.equal(result.status,'NOT_APPLIED');assert.deepEqual(f.gestures,[]);
+  assert.match(result.error,/Port opening blocked: /);assert.ok(result.error.length<=500);
+  assert.ok(!result.error.includes('PRIVATE_TEXT'));assert.ok(!result.error.includes('PRIVATE_VALUE'));
+  const d=JSON.parse(result.error.slice(result.error.indexOf(': ')+2));
+  assert.equal(d.mode,'begin');assert.equal(d.layer.tag,'div');
+  if(!long){assert.equal(d.layer.class,'x-mask');assert.equal(d.parent.tid,'MF;TF;WizrdMCF');}
  }
 });
 test('verified opening refuses a different wizard or a reused operation target',async()=>{
