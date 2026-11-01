@@ -20,10 +20,13 @@ export async function configureBinningOutputs(channel,c,p,mappings){
    &&b?.direction==='output'&&b.port===port&&b.native_index===port&&b.node_icon_class==='bg-vendor-icon-binning'
    &&typeof b.port_guid==='string'&&b.port_guid.length>0&&typeof b.opening_operation_id==='string'&&b.opening_operation_id.length>0
    &&['direction','port','native_index','port_guid','opening_operation_id','node_icon_class'].every(k=>b[k]===current.output_port?.[k]),'native output port owner differs');
-  // Derived Binning definitions have no ConnectedRecord/source collection.
-  // Their identity comes from the owned native output port, not input links.
-  need(m.mapping_wizard==='DerivedDataSourceOutputSocketWizard'&&m.source_fields?.length===0
-   &&fields.length===expected.length&&fields.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type&&f.source===null),'native output schema/order differs');
+  // Initial definitions are unconnected; materialized models expose a native
+  // source collection. Both must retain the exact owned output schema/order.
+  const sources=m.source_fields,sourceMapping=Array.isArray(sources)&&(sources.length===0?fields.every(f=>f.source===null)
+   :m.source_identity_verified===true&&sources.length===expected.length&&fields.length===expected.length
+    &&fields.every((f,i)=>sources[i].name===expected[i].name&&sources[i].type===expected[i].type&&JSON.stringify(f.source)===JSON.stringify(sources[i])));
+  need(m.mapping_wizard==='DerivedDataSourceOutputSocketWizard'&&sourceMapping
+   &&fields.length===expected.length&&fields.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type),'native output schema/order differs');
   const definition=await readOutputDefinitionPages(channel,{expectedCount:m.target_fields.length});
   need(definition.fields.length===fields.length&&definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===fields[i][k])),'rendered output definition differs');
   ports.push({port,schema:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}))});
