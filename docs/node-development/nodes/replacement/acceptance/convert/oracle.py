@@ -16,7 +16,7 @@ def expectations():
     dictionaries = {
         'IntText': {s: int(s) for s in ['12', '-7', '42']},
         'RealText': {s: float(Decimal(s)) for s in ['1.25', '-2.5', '9.125']},
-        'DateText': {s: datetime.fromisoformat(s).isoformat() for s in ['2026-11-01', '2024-02-29', '2024-01-01']},
+        'DateText': {s: datetime.fromisoformat(s).isoformat(timespec='milliseconds') for s in ['2026-11-01', '2024-02-29', '2024-01-01']},
     }
     rows = []
     for source_row in source:

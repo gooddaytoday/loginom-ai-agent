@@ -64,7 +64,7 @@
           "IntText_Replaced": true,
           "RealText": 1.25,
           "RealText_Replaced": true,
-          "DateText": "2026-11-01T00:00:00",
+          "DateText": "2026-11-01T00:00:00.000",
           "DateText_Replaced": true,
           "Keep": "one"
         },
@@ -74,7 +74,7 @@
           "IntText_Replaced": true,
           "RealText": -2.5,
           "RealText_Replaced": true,
-          "DateText": "2024-02-29T00:00:00",
+          "DateText": "2024-02-29T00:00:00.000",
           "DateText_Replaced": true,
           "Keep": "two"
         },
@@ -134,7 +134,7 @@
           "IntText_Replaced": true,
           "RealText": 9.125,
           "RealText_Replaced": true,
-          "DateText": "2024-01-01T00:00:00",
+          "DateText": "2024-01-01T00:00:00.000",
           "DateText_Replaced": true,
           "Keep": "eight"
         }
