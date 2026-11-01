@@ -23,6 +23,15 @@ test('Done reports deferred schema without inventing execution or package persis
  const r=read(phases());assert.equal(r.output_scope,'not_materialized');assert.equal(r.execution_id,null);
  assert.deepEqual(r.category_fields,[]);assert.equal(r.package_persistence_verified,false);assert.equal(r.receipt_ids.length,5);
 });
+test('continuous real row key retains its type and identity in executed readback',()=>{
+ const ps=phases(true),configured=ps.find(p=>p.phase==='configure').value.configuration;
+ Object.assign(configured.row_keys[0],{type:'real',data_kind:'Непрерывный'});
+ const port=ps.find(p=>p.phase==='read').value.ports[0];port.schema[0].type='real';
+ const result=read(ps);
+ assert.deepEqual(result.row_keys,[{name:'Region',label:'Region',type:'real',order:0}]);
+ assert.equal(result.execution_id,'fresh');assert.equal(result.output_scope,'observed_after_verified_execution');
+ port.schema[0].type='integer';assert.throws(()=>read(ps),/row key changed/);
+});
 test('materialized readback requires fresh execution and matching category identities',()=>{
  const r=read(phases(true));assert.equal(r.execution_id,'fresh');assert.equal(r.category_fields[0].category,'A');assert.equal(r.receipt_ids.length,7);
  for(const mutate of [ps=>ps[0].value.native_mapping.node_context.node_id='foreign',

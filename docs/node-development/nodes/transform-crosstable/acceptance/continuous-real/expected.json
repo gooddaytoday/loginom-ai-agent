@@ -1,0 +1,129 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "null_marker": "?",
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "R",
+          "label": "R",
+          "type": "real"
+        },
+        {
+          "name": "Segment",
+          "label": "Segment",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label_any": true,
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label_any": true,
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "R": 1.25,
+          "Segment": "B",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 10.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": -0.0,
+          "Segment": "A",
+          "C_1_Amount_Sum": 7.0,
+          "C_1_Amount_Count": 2,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        },
+        {
+          "R": 1.25,
+          "Segment": "A",
+          "C_1_Amount_Sum": 3.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": 13.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": -2.5,
+          "Segment": "B",
+          "C_1_Amount_Sum": 7.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        },
+        {
+          "R": null,
+          "Segment": "A",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 30.0,
+          "C_2_Amount_Count": 2
+        },
+        {
+          "R": -2.5,
+          "Segment": "A",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 17.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": 0.0,
+          "Segment": "B",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 23.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": 0.1,
+          "Segment": "A",
+          "C_1_Amount_Sum": 29.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": 31.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": 0.10000000000000002,
+          "Segment": "A",
+          "C_1_Amount_Sum": 37.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        }
+      ]
+    }
+  ]
+}

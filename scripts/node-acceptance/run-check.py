@@ -104,6 +104,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name == 'crosstable-real-keys':
+        src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data',
+                    input_files=['keys.csv'], base=None, expected_name='expected.json')
     if name in ['tree-repeat', 'tree-no-repeat']:
         nodes = REPO / 'docs/node-development/nodes'
         src = nodes / 'trees-jsontotree/acceptance'
