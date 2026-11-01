@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins minute/second calendar registration and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,93095,'1a175743fcdc350df9d45e7de9b59760777539a4b62e7edbde81770fc0cecf24'],
+  [nodeApiTools,93097,'df1e851c8ee77aff173efae54ec485542bfe28279f36faa6fc8ea045086d6998'],
   [nodeApiTools.map(userNodeTool),17361,'a9cdeea2ffe3ef38960f1a475674e60a269be89e1bf10debf5bf1a82a6544c45'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));

@@ -39,7 +39,7 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
     {
       name: "loginom_file_profile",
       description:
-        "Profile a local CSV/TSV/TXT or XLSX by literal path BEFORE Read or admission. XLSX is recognized by ZIP workbook relationships; reads bounded streaming XML, disk-indexed shared strings, sheet names/visibility, dimensions, date system, cached formulas and Excel import settings. Quick budget: 8 MiB decoded content / about 5 seconds. Select sheet_name if needed. settings.source delivery IDs and source_path are filled after sample delivery. Excel runtime supports 1–8 columns, 1–10 header rows and imports blank rows; respect settings_complete=false. CSV returns encoding/dialect and paginated columns. Does not validate the whole file: use loginom_file_scan for exact count/types.",
+        "Profile a local CSV/TSV/TXT or XLSX by literal path BEFORE Read or admission. XLSX is recognized by ZIP workbook relationships; reads bounded streaming XML, disk-indexed shared strings, sheet names/visibility, dimensions, date system, cached formulas and Excel import settings. Quick budget: 8 MiB decoded content / about 5 seconds. Select sheet_name if needed. settings.source delivery IDs and source_path are filled after sample delivery. Excel runtime supports 1–12 columns, 1–10 header rows and imports blank rows; respect settings_complete=false. CSV returns encoding/dialect and paginated columns. Does not validate the whole file: use loginom_file_scan for exact count/types.",
       properties: {
         path: { type: "string" },
         profile_id: { type: "string" },

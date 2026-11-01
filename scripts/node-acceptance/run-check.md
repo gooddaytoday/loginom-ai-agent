@@ -6,6 +6,13 @@ minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
 inputs, then removal of only DateA minutes from the same node. Stock CSV,
 Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
 
+`excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
+from a three-sheet workbook with different schemas. `excel-import-wide` imports
+all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-single` retains the original three-field, first-sheet fixture.
+Only the original XLSX and user task reach the model. Independent OpenPyXL
+oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two
@@ -225,6 +232,25 @@ in `D87` only after LAB-413 provides the XLSX switching path and validate it liv
 
 To add a scenario for a new node:
 
+| Name | Stock fixture under docs/node-development/nodes | Acceptance |
+|---|---|---|
+| calculator-viewport | transform-calculator/acceptance/calculator-viewport | Nine calculators, distant financial node, export then fresh port/tooltip read; CSV/Save/cold/cleanup |
+| linreg-short | datamining-linregression/acceptance/linreg-short | Expected Loginom training error: two rows, four coefficients; Save/cleanup, no CSV |
+| throw1 | programming-javascript/acceptance/throw1 | Expected JavaScript exception; Save/cleanup, no CSV |
+| js-declared-empty | programming-javascript/acceptance/js-declared-empty | Positive declared Broken:real empty table; header-only CSV/Save/cold/cleanup |
+
+These four names run without private fixtures or `--case-root`.
+The private `execution_error: {"text": "..."}` oracle with `outputs: []`
+requires the expected text in a tool's error result (or native browser error
+snapshot) and in the final user response, no export request/downloaded CSV,
+Save after the error, normal close/logout without discard and runtime-close ACK.
+This is separate from `upload_only`: saving is required.
+No output port is required for an expected execution error; any returned
+ports still pass the stock native ownership/exactness/cleanup checks.
+Cold readback is inapplicable to the two expected execution errors; `--cold`
+continues to check all positive cases, including the declared empty table.
+Oracle contents never reach the model.
+
 `tree-repeat` and `tree-no-repeat` use the approved tasks under
 `trees-jsontotree/acceptance` and `trees-treetodata/acceptance`, respectively,
 and only the original `documents.csv`. Their independent expected files carry
@@ -249,7 +275,7 @@ separate chats, profiles and packages; no oracle content reaches the model.
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
 
 Offline tests: from `scripts/node-acceptance/tests`, run
-`python3 -m unittest test_run_check -v`.
+`python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
 
 CSV specification audit (the original 87 fixture names, including variants; D87 uses its generated manifest):
 
