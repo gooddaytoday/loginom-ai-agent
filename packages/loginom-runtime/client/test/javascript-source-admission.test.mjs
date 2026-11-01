@@ -247,3 +247,22 @@ test('retained settings bind a fresh reader without authorizing any callback on 
  assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));
  assert.throws(()=>fixture({expectedSettings:'bad'}),{code:'settings_binding'});
 });
+
+test('confirmed effect execution failure survives admission retirement without replay',async()=>{
+ const f=fixture({source:'throw new Error("LAB669 intentional execution failure");'});
+ const receipt=await f.admission.admit({});
+ const error=Object.assign(Error('LAB669 intentional execution failure'),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message:'LAB669 intentional execution failure'}});
+ let effects=0;
+ await assert.rejects(f.admission.withEffect(input(f,receipt),async()=>{effects++;throw error;}),e=>e===error);
+ assert.equal(f.admission.state,'retired');assert.equal(effects,1);
+ await assert.rejects(f.admission.withEffect(input(f,receipt),f.effect),{code:'state'});
+ assert.equal(f.calls.includes('effect'),false);
+});
+
+test('an execution failure marker before effect dispatch cannot bypass the source boundary',async()=>{
+ const f=fixture(),receipt=await f.admission.admit({});
+ const error=Object.assign(Error('unverified read'),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED'}});
+ f.browser.observe=()=>{throw error;};
+ await assert.rejects(f.admission.withEffect(input(f,receipt),f.effect),{code:'boundary'});
+ assert.equal(f.calls.includes('effect'),false);assert.equal(f.admission.state,'retired');
+});

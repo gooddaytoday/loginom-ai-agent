@@ -143,6 +143,9 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
       await journal({phase:'javascript_source_closed_check_refused',proof});
       error.javascriptSourceClosedRefusal = proof;
     }
+    // The trusted effect driver has already crossed the source checks and
+    // proved a Loginom execution failure. Preserve its release/report path.
+    if (before === 'effect_dispatched' && error?.nodeExecutionFailure?.code === 'NODE_EXECUTION_FAILED') throw error;
     // Preserve the trusted adapter/driver refusal privately before replacing
     // its public message. Recording it cannot authorize a retry or an effect.
     if (!(error instanceof SourceAdmissionError) && Date.now() < deadline) {
