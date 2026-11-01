@@ -4,8 +4,9 @@ import {createNodeProcedure} from '../lib/node-procedure.mjs';
 
 // l667lin-diag:661–737: successful native Train, then a toast outside
 // the toolbar root for every sample. DOM template: manual train-toast.json.
-const message='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
+const defaultMessage='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
 function replay(fault,verb='train',options={}) {
+ const message=options.message??defaultMessage;
  let clock=1,launched=false,closed=false;const records=[],actions=[];
  const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
  const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
@@ -38,7 +39,7 @@ function replay(fault,verb='train',options={}) {
     if(code.includes('async function readNodeProcesses('))return structuredClone(processes);
     const output=state();
     if(code.includes('"node_error_toast_observation":true')&&output.ui.dialogs.length){
-     output.ui.dialogs[0].error_toast={kind:fault==='info'?'info':'error',caption:fault==='caption'?'Other:':'Прогноз Y:',message:fault==='text'?'Other error':message};
+     output.ui.dialogs[0].error_toast={kind:fault==='info'?'info':'error',caption:fault==='caption'?'Other:':'Прогноз Y:',message:fault==='text'?'Other error':options.toastMessage??message};
      output.ui.elements.push({ref:'ui-close',tid:'toast;p.h;close',signature:{tag:'div',dialog_ref:'ui-toast'},enabled:true,allowed_actions:['click']});
     }
     return {status:'SUCCEEDED',output};
@@ -57,6 +58,7 @@ function replay(fault,verb='train',options={}) {
   return channel.observe({condition:'prepared node available for process console',readProcessControls:true,ready:()=>fault!=='no-launch'});
  }};
 }
+const message=defaultMessage;
 for(const verb of ['train','execute_graph_node','execute_wizard'])test('own '+verb+' error toast returns Loginom text before readiness timeout and closes only its toast',async()=>{
  const f=replay(undefined,verb);await assert.rejects(f.run(),e=>e.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'&&e.message===message);
  assert.ok(f.clock<15000);assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch','ui-close']);
@@ -114,4 +116,14 @@ test('baseline owner refusal is journaled before rejection without any gesture',
  await assert.rejects(f.channel.bindExecutionBaseline({root_id:'root',roots:[],node:{document_id:'doc',workflow_id:'wf',node_id:'other'}}),/baseline owner differs/);
  const refused=f.records.find(r=>r.stage==='error_toast_baseline');
  assert.deepEqual(refused.failed_conditions,['owner']);assert.equal(refused.baseline.node.node_id,'other');assert.equal(f.actions.length,0);
+});
+
+// LAB-692 throw1-1:392: Loginom renders stack newlines as <br>, whose
+// textContent omits the newline while retaining the following indentation.
+for(const fault of [undefined,'text','caption','owner'])test('multiline JavaScript error preserves strict toast ownership: '+fault,async()=>{
+ const message='Error: LAB669 intentional execution failure\n   at Anonymous function (<main>:1:1)\n   at module (<main>:1:1)';
+ const f=replay(fault,'execute_graph_node',{message,toastMessage:message.replaceAll('\n','')});
+ await assert.rejects(f.run(),e=>fault?!e.nodeExecutionFailure:
+  e.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'&&e.message===message.replaceAll('\n',''));
+ assert.deepEqual(f.actions.map(a=>a.ref),fault?['ui-launch']:['ui-launch','ui-close']);
 });
