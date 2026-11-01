@@ -51,7 +51,8 @@ export function resolveCrossTableParameters(p,fields){
  const get=ref=>{const xs=fields.filter(f=>f.name===ref.name);need(xs.length===1,'input field missing: '+ref.name);return xs[0];};
  const columns=crossTableDimensions(p).map(get),keys=p.row_keys.map(get),facts=p.facts.map(f=>({...get(f.field),functions:f.functions}));
  need(columns.every(f=>f.data_kind==='Дискретный'&&['string','integer','real','boolean','datetime'].includes(f.type)),'column dimensions require supported discrete fields');
- need(keys.every(f=>f.data_kind==='Дискретный'&&['string','integer','boolean','datetime'].includes(f.type)),'row keys require supported discrete fields');
+ need(keys.every(f=>['string','integer','real','boolean','datetime'].includes(f.type)
+  &&(f.data_kind==='Дискретный'||f.data_kind==='Непрерывный'&&['integer','real'].includes(f.type))),'row keys require supported discrete fields or continuous integer/real fields');
  need(facts.every(f=>CROSSTABLE_TYPE_MASKS[f.type]&&f.functions.every(fn=>(CROSSTABLE_TYPE_MASKS[f.type]&CROSSTABLE_FUNCTIONS[fn].bit)!==0
   &&(f.available_functions===undefined||(f.available_functions&CROSSTABLE_FUNCTIONS[fn].bit)!==0))),'unsupported fact type/function pair');
  need([...keys,...columns,...facts].every(f=>f.label&&f.label.length<=120&&!f.label.includes('|')),'roles need unique unambiguous labels without |');

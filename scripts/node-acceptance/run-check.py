@@ -80,6 +80,10 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'clustering-normalized':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    input_files=['normalized.csv'], export_count=2)
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
@@ -134,6 +138,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name == 'crosstable-real-keys':
+        src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data',
+                    input_files=['keys.csv'], base=None, expected_name='expected.json')
     if name in ['tree-repeat', 'tree-no-repeat']:
         nodes = REPO / 'docs/node-development/nodes'
         src = nodes / 'trees-jsontotree/acceptance'
@@ -175,6 +183,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'union-auto-match':
+        src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -1113,6 +1124,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('clustering_normalized'):
+            write(folder / 'clustering-replies.json', [o for _, o in replies])
+            self.phase('clustering-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-normalized.mjs',
+                folder / 'expected.json', folder / 'clustering-replies.json', folder / 'clustering-baseline.json'], folder, timeout=60)
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 

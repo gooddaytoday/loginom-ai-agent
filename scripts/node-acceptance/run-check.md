@@ -6,6 +6,14 @@ minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
 inputs, then removal of only DateA minutes from the same node. Stock CSV,
 Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
 
+`clustering-normalized`: k-means, 12 объектов с X/Y в разных масштабах.
+На одном узле сначала none, затем standardize дважды с seed 42; оба порта,
+два CSV, Save и cold. Независимые геометрические инварианты проверяют каждую
+строку ровно один раз, три группы, отличие от raw-разбиения, центры как средние
+в исходных единицах (abs 1e-6), расстояния с выборочным SD и повторяемость seed.
+Cold читает сохранённые роли, NormType=5, k и seed без повторной настройки.
+Oracle/expected не передаются модели.
+
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
@@ -18,6 +26,11 @@ use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
 reach the model. Independent expected tables check numeric zero imputation,
 preserved zero/NULL and unprocessed fields, all-NULL, threshold and empty input.
 The main case changes mean to zero on the same node; each case uses CSV/Save/cold.
+
+`union-auto-match`: three inputs with reordered Code/Amount fields and one
+unpaired Extra column, name/type automatic matching, preserved duplicate rows,
+and repeated configuration of the same Union node. Independent CSV/typed cold
+expected is in `docs/node-development/nodes/union/acceptance/union-auto-match`.
 
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
@@ -325,6 +338,12 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+`crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
+ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
+`docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
+Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
+близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
 
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row

@@ -30,7 +30,7 @@ RULES = (
     ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),
     ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
-    ((C + 'union-*.mjs',), ('live-ui',), ('s4',)),
+    ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18', 'throw1', 'js-declared-empty')),
     ((C + 'node-port-*.mjs', C + 'node-output-context.mjs', C + 'node-read*.mjs',
@@ -50,6 +50,8 @@ RULES = (
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
+    (('scripts/node-acceptance/clustering-normalized.mjs',
+      'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
     ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise')),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
@@ -63,6 +65,8 @@ RULES = (
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),
     ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single')),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
+    ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
+     ('live-ui',), ('crosstable-real-keys',)),
 )
 UNITS = {
     'host-unit': ('(cd packages/loginom-host && bun test)', '#447: runtime/src требует полный host bun test'),
