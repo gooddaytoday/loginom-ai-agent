@@ -166,6 +166,10 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name == 'date-time-minsec':
+        src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    input_files=['minsec.csv'])
     if name in ['date-time-iso', 'date-time-iso-empty']:
         node = REPO / 'docs/node-development/nodes/date-time'
         empty = name.endswith('-empty')

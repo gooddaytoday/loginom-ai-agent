@@ -1,5 +1,11 @@
 Run live acceptance without repeatedly reading live logs:
 
+`date-time-minsec` uses the independent fixture under
+`docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
+minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
+inputs, then removal of only DateA minutes from the same node. Stock CSV,
+Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two

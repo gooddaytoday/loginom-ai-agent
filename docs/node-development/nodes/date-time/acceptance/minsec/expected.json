@@ -1,0 +1,163 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.date_time"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.date_time",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "DateA",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "DateB",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "A_Hour",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_Second",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_Hour",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_Minute",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_Second",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "DateA": "2024-02-29T00:00:00.000",
+          "A_Hour": 0,
+          "A_Second": 0,
+          "DateB": "2024-03-01T23:59:59.000",
+          "B_Hour": 23,
+          "B_Minute": 59,
+          "B_Second": 59
+        },
+        {
+          "RowID": 2,
+          "DateA": "2024-03-01T23:59:59.000",
+          "A_Hour": 23,
+          "A_Second": 59,
+          "DateB": "2024-02-29T00:00:00.000",
+          "B_Hour": 0,
+          "B_Minute": 0,
+          "B_Second": 0
+        },
+        {
+          "RowID": 3,
+          "DateA": "2025-01-01T12:00:59.000",
+          "A_Hour": 12,
+          "A_Second": 59,
+          "DateB": "2025-01-02T03:59:00.000",
+          "B_Hour": 3,
+          "B_Minute": 59,
+          "B_Second": 0
+        },
+        {
+          "RowID": 4,
+          "DateA": "2025-01-02T03:59:00.000",
+          "A_Hour": 3,
+          "A_Second": 0,
+          "DateB": "2025-01-01T12:00:59.000",
+          "B_Hour": 12,
+          "B_Minute": 0,
+          "B_Second": 59
+        },
+        {
+          "RowID": 5,
+          "DateA": "2025-06-15T13:14:15.000",
+          "A_Hour": 13,
+          "A_Second": 15,
+          "DateB": "2025-06-16T04:15:14.000",
+          "B_Hour": 4,
+          "B_Minute": 15,
+          "B_Second": 14
+        },
+        {
+          "RowID": 6,
+          "DateA": "2025-06-16T04:15:14.000",
+          "A_Hour": 4,
+          "A_Second": 14,
+          "DateB": "2025-06-15T13:14:15.000",
+          "B_Hour": 13,
+          "B_Minute": 14,
+          "B_Second": 15
+        },
+        {
+          "RowID": 7,
+          "DateA": null,
+          "A_Hour": null,
+          "A_Second": null,
+          "DateB": "2025-12-31T23:59:59.000",
+          "B_Hour": 23,
+          "B_Minute": 59,
+          "B_Second": 59
+        },
+        {
+          "RowID": 8,
+          "DateA": "2025-12-31T23:59:59.000",
+          "A_Hour": 23,
+          "A_Second": 59,
+          "DateB": null,
+          "B_Hour": null,
+          "B_Minute": null,
+          "B_Second": null
+        },
+        {
+          "RowID": 9,
+          "DateA": null,
+          "A_Hour": null,
+          "A_Second": null,
+          "DateB": "2025-07-01T01:02:03.000",
+          "B_Hour": 1,
+          "B_Minute": 2,
+          "B_Second": 3
+        },
+        {
+          "RowID": 10,
+          "DateA": "2025-07-01T01:02:03.000",
+          "A_Hour": 1,
+          "A_Second": 3,
+          "DateB": null,
+          "B_Hour": null,
+          "B_Minute": null,
+          "B_Second": null
+        }
+      ]
+    }
+  ]
+}
