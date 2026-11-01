@@ -36,6 +36,20 @@ for(const fault of ['foreign','unknown','document','button','missing'])test('con
  const f=fixture(fault);await assert.rejects(f.read());assert.ok(f.clock<=5000);assert.equal(f.operation.deadline,30000);
  await assert.rejects(f.channel.act({verb:'click',ref:'console-button'}));
 });
+for(const [fault,failed] of [['button',['progress_ref']],['missing',['progress_unique','progress_ref','progress_enabled','progress_click','progress_signature']]])test('console settlement journals the refused snapshot and failed guards: '+fault,async()=>{
+ const f=fixture(fault);
+ await assert.rejects(f.read(),/Owned process console settlement context changed/);
+ const refusal=f.records.find(e=>e.phase==='node_observation_context_refused');
+ assert.ok(refusal,'the refused settlement must be observable before throwing');
+ assert.equal(refusal.condition,'prepared node available for process console');
+ assert.equal(refusal.reason,'Owned process console settlement context changed');
+ assert.deepEqual(refusal.failed_conditions,failed);
+ assert.equal(refusal.outcome.output.prepared_node_context.node_id,'node');
+ assert.equal(refusal.outcome.output.dom_epoch.revision,5000);
+ assert.deepEqual(refusal.outcome.output.ui.elements.map(e=>e.ref),fault==='missing'?[]:['replacement']);
+ await assert.rejects(f.channel.act({verb:'click',ref:'console-button'}),/fresh internal observation/);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_prepared').length,0);
+});
 test('own loading still stops at the original deadline without a usable observation',async()=>{
  const f=fixture(undefined,{until:40000});await assert.rejects(f.read(),/readiness timeout/);assert.equal(f.clock,30000);
  await assert.rejects(f.channel.act({verb:'click',ref:'console-button'}));

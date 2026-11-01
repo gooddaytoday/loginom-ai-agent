@@ -183,6 +183,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       baseline=captureExecutionBaseline(s.node_processes,node);
+      await channel.bindExecutionBaseline?.(baseline);
       if(!keepConsoleOpen)await closeConsole(s);
       return structuredClone(baseline);
     },
