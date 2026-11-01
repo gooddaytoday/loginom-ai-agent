@@ -19,14 +19,15 @@ export function makePackageCleanupCode(options) {
   return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
 }
 
-// Reconciliation of an unsuccessful Open. It never promotes prepare
-// to READY: bind just the newly opened native package before the SAME close guard.
+// Reconcile an unsuccessful Open or new draft without promoting prepare to
+// READY. Bind only its new native package before the same guarded Close.
 export function makeFailedOpenCleanupCode(options) {
   makePackageCleanupCode({...options,account:options.bindOnly===true?'unbound':options.account,
     documentId:'unbound',tabTid:'unbound',diagnosticDiscard:false,diagnosticWaitForIdle:false});
   if(typeof options.operationId!=='string'||!/^[a-zA-Z0-9_.:-]{1,128}$/.test(options.operationId))throw Error('Exact Open operation required');
   const o={sessionId:options.sessionId,account:options.account,documentId:options.documentId,
     bindOnly:options.bindOnly===true,packagePath:options.packagePath,
+    ...(options.unsavedDraft===true?{unsavedDraft:true}:{}),
     origin:new URL(options.loginomUrl).origin,loginomBuild:options.loginomBuild,operationId:options.operationId,
     timeoutMs:options.timeoutMs??8000,diagnosticDiscard:false,diagnosticWaitForIdle:false};
   const gesture=withBrowserReceipt('perform()',{
@@ -72,15 +73,17 @@ function bindFailedOpen(o) {
   if(typeof account!=='string'||!account||account.length>200
     ||location.origin!==o.origin||app?.Version!==o.loginomBuild||prep?.document!==document
     ||o.documentId&&prep.id!==o.documentId
-    ||typeof prep.id!=='string'||!r||r.phase!=='effect_possible'||r.openSubmitted!==true
+    ||typeof prep.id!=='string'||!r||r.phase!=='effect_possible'||(o.unsavedDraft?r.draftSubmitted:r.openSubmitted)!==true
     ||r.packageInventoryBefore!==0||r.openAccount!==account||r.openConnection!==m?.FServerConnection
     ||!r.openServerSession||r.openServerSession!==m?.FServerConnection?.Session
     ||m?.FServerConnection?.Connected!==true||m.FServerConnection.UserName!==account
     ||m.PackageNodes?.Count!==1||!Array.isArray(r.before)||Date.now()>=o.deadline)return null;
   let request;try{request=JSON.parse(r.request);}catch{return null;}
-  if(request.session!==o.sessionId||request.intent!=='open_package'||request.packagePath!==o.packagePath)return null;
+  if(request.session!==o.sessionId||request.intent!==(o.unsavedDraft?'new_draft':'open_package')
+    ||(o.unsavedDraft?request.packagePath!=null:request.packagePath!==o.packagePath))return null;
   const node=m.PackageNodes.Items(0),normalize=p=>typeof p==='string'&&p?'/'+p.replaceAll('\\','/').replace(/^\/+/, ''):null;
-  if(normalize(node.PackageFileName)!==o.packagePath||typeof node.ReadOnly!=='boolean')return null;
+  if(normalize(node.PackageFileName)!==o.packagePath||typeof node.ReadOnly!=='boolean'
+    ||o.unsavedDraft&&(!r.openError||node.ReadOnly!==false))return null;
   const tabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
     .filter(t=>/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(t.getAttribute('data-tid')));
   const active=tabs.filter(t=>t.classList.contains('x-tab-active')),added=tabs.filter(t=>!r.before.includes(t));
@@ -278,11 +281,12 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         state.failed_open_receipt=prepared;
       }
       if(o.unsavedDraft && (JSON.parse(prepared.request).intent!=='new_draft'
-        || prepared.phase!=='verified' || prepared.packageInventoryBefore!==0))return {reason:'DRAFT_OWNER_UNCONFIRMED'};
+        || prepared.phase!==(o.failedOpenOperation?'effect_possible':'verified')
+        || prepared.packageInventoryBefore!==0))return {reason:'DRAFT_OWNER_UNCONFIRMED'};
       if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
         ||state.open_error_dismiss_started)) {
         if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
-          ||prepared.phase!=='effect_possible'||prepared.openSubmitted!==true||prepared.packageInventoryBefore!==0
+          ||prepared.phase!=='effect_possible'||(o.unsavedDraft?prepared.draftSubmitted:prepared.openSubmitted)!==true||prepared.packageInventoryBefore!==0
           ||prepared.openAccount!==o.account||prepared.openConnection!==m.FServerConnection
           ||prepared.openServerSession!==m.FServerConnection.Session)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
         const prefix=o.tabTid.match(/;tb(-\d+)?$/);
