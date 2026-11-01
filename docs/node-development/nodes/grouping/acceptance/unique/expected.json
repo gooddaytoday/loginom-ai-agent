@@ -1,0 +1,21 @@
+{
+  "package_path": "/acceptance/grouping-unique.lgp",
+  "nodes": [{"type": "imports.text"}, {"type": "transform.group_data"}, {"type": "exports.text"}],
+  "outputs": [{
+    "output_node_type": "export_input",
+    "export_destination": "customers-summary.csv",
+    "ordered": false,
+    "columns": [
+      {"name": "Region", "type": "string", "label_any": true},
+      {"name": "Rows", "type": "integer", "label": "Строки"},
+      {"name": "UniqueCustomers", "type": "integer", "label": "Уникальные клиенты"},
+      {"name": "UniqueIds", "type": "integer", "label": "Уникальные номера"}
+    ],
+    "rows": [
+      {"Region": "North", "Rows": 6, "UniqueCustomers": 3, "UniqueIds": 2},
+      {"Region": "South", "Rows": 4, "UniqueCustomers": 2, "UniqueIds": 1},
+      {"Region": "NullOnly", "Rows": 2, "UniqueCustomers": 0, "UniqueIds": 0},
+      {"Region": "EmptyOnly", "Rows": 2, "UniqueCustomers": 1, "UniqueIds": 0}
+    ]
+  }]
+}

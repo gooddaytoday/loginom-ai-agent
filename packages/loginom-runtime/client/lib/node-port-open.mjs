@@ -37,6 +37,18 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(!prepared||records.some(r=>r.tab!==prepared.tab||r.packageNode!==prepared.packageNode)
     ||tabs.length!==1||tabs[0]!==prepared.tab||!tabs[0].classList.contains('x-tab-active'))fail('Port opening workflow changed');
   const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller?.FController;
+  const ownGroupingGraphMask=e=>{
+   const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
+   const nodes=model?.FDiagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
+   return input&&model instanceof app.ModelForm&&card.Controller.Node?.data?.node===prepared.nodeTargetWorkflowNode
+    &&roots.length===1&&roots[0]===e&&e.getAttribute('data-tid')===b.workflow_ref.prefix+';ModelForm'&&model.FView?.el?.dom===e
+    &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
+    &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
+    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FIconCls==='bg-vendor-icon-groupdata'&&nodes[0].FLocked===false
+    &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
+      &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
+      &&(r.port.FPortIndex===undefined||r.port.FPortIndex===r.nativeIndex));
+  };
   if(['await_open','deactivation_issued'].includes(mode)) {
    if(!r||r.phase!=='open_issued'||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode
      ||r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
@@ -55,7 +67,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      ||model!==r.graph||r.graph.FCurrentPortMenu!==r.port||r.node.FLocked===true
      ||card.Controller.Node?.data?.node!==r.workflow)fail('Port deactivation question owner changed');
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
-   if(masks.some(e=>!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
+   if(masks.some(e=>!ownGroupingGraphMask(e)&&!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
      &&!(e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
        &&e.parentElement?.getAttribute('data-tid')==='MF')))fail('Port confirmation has an unrelated mask');
@@ -78,7 +90,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
-  const blocked=blockers.some(e=>{
+  const blocked=blockers.find(e=>{
    const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
    const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
@@ -94,9 +106,27 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&roots.length===1&&model?.FView?.el?.dom===roots[0]&&roots[0].contains(parent)
     &&column?.el?.dom===parent&&column.disabled===true
     &&blockers.filter(mask=>mask.parentElement===parent).length===1;
-   return !ownDisabledHeader&&!ownDisabledOutputHeader;
+   return !ownDisabledHeader&&!ownDisabledOutputHeader&&!ownGroupingGraphMask(e);
   });
-  if(blocked){if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};fail('Port opening blocked');}
+  if(blocked){
+   if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};
+   let detail='';
+   // Failure-only identity, without text/values or actionable references.
+   try{
+    const describe=e=>e?{tag:e.tagName?.toLowerCase().slice(0,16)??null,
+     tid:e.getAttribute('data-tid')?.slice(0,96)??null,role:e.getAttribute('role')?.slice(0,24)??null,
+     class:e.getAttribute('class')?.slice(0,64)??null}:null;
+    const diagnostic={mode,layer:describe(blocked),parent:describe(blocked.parentElement)};
+    for(let limit=48;JSON.stringify(diagnostic).length>360;limit=Math.floor(limit/2))
+     for(const e of [diagnostic.layer,diagnostic.parent])if(e)
+      for(const key of ['tag','tid','role','class'])if(typeof e[key]==='string')e[key]=e[key].slice(0,limit);
+    detail=': '+JSON.stringify(diagnostic);
+   }catch{}
+   fail('Port opening blocked'+detail);
+  }
+  // A completed Grouping/rename can still leave its native graph busy. Wait
+  // for this exact surface to settle; never issue a port gesture through it.
+  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy'};
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');
@@ -230,6 +260,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   fail('Unknown port opening phase');
  },{task,mode});
+ const settled=async mode=>{
+  let busy;
+  while(remaining()>0){
+   const result=await inspect(mode);if(result.reason!=='port_graph_busy')return result;
+   if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);}
+   busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
+  }
+ };
  const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
  try {
   remaining();let existing=await inspect('lookup');
@@ -237,16 +275,16 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(existing){effect=existing.phase!=='reserved';const result=await finish();return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
   const before=await readNode(page,task.binding);
   if(before?.verified!==true||before.surface!=='graph'||before.locked!==false)throw Error('Prepared unlocked graph required for port opening');
-  const target=await inspect('begin');trace.push({event:direction+'_port_reserved',...target});
+  const target=await settled('begin');trace.push({event:direction+'_port_reserved',...target});
   if(JSON.stringify(await readNode(page,task.binding))!==JSON.stringify(before))throw Error('Prepared node changed before port opening');
-  let issued=await inspect('menu_issued');
+  let issued=await settled('menu_issued');
   if(issued.tooltip){
    const until=Date.now()+Math.min(1000,remaining());
    trace.push({event:direction+'_port_tooltip_observed',point:issued.point});
    await page.mouse.move(issued.point.x,issued.point.y);
    while(issued.tooltip){
     if(Date.now()>=Math.min(until,task.deadline))throw Error('Loginom tooltip ttip still covers port after bounded hover recovery; no port gesture issued');
-    issued=await inspect('menu_issued');
+    issued=await settled('menu_issued');
     if(issued.tooltip)await page.waitForTimeout(Math.min(100,Math.max(1,until-Date.now()),remaining()));
    }
    trace.push({event:direction+'_port_tooltip_cleared'});
@@ -254,9 +292,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   remaining();effect=true;
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
-  trace.push({event:direction+'_port_menu_verified',...await inspect('menu')});
+  trace.push({event:direction+'_port_menu_verified',...await settled('menu')});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});
-  trace.push({event:direction+'_port_open_issued',...await inspect('open_issued')});
+  trace.push({event:direction+'_port_open_issued',...await settled('open_issued')});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
   trace.push({event:direction+'_port_open_returned'});
   let pendingObservation;

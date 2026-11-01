@@ -93,6 +93,18 @@ class RunCheckTests(unittest.TestCase):
                 self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_grouping_unique_fixture_and_independent_oracle(self):
+        case = runner.scenario('grouping-unique')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertIsNone(case['base'])
+        self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['customers.csv'])
+        expected = runner.expected_for(case, '/test/unique.lgp')
+        oracle = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py', '/test/unique.lgp']))
+        self.assertEqual(expected, oracle)
+        self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], ['string', 'integer', 'integer', 'integer'])
+        self.assertEqual(len(expected['outputs'][0]['rows']), 4)
+        self.assertIn('grouping-unique', runner.scenario_names('grouping-unique'))
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)

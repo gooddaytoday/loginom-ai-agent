@@ -105,6 +105,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name in ['excel-import-sheet', 'excel-import-wide', 'excel-import-single']:
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
+
+    if name == 'grouping-unique':
+        src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name in ['calculator-viewport', 'linreg-short', 'throw1', 'js-declared-empty']:
         slug, filename = {
             'calculator-viewport': ('transform-calculator', 'sales.csv'),

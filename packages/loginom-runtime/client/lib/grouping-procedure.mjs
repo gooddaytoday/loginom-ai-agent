@@ -1,4 +1,4 @@
-import {resolveGroupingParameters} from './grouping-parameters.mjs';
+import {resolveGroupingParameters,supportedGroupingMeasure} from './grouping-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const control=(s,suffix,verb='click')=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+suffix&&e.allowed_actions.includes(verb));need(es.length===1,'Unique grouping control required: '+suffix);return es[0];};
@@ -7,7 +7,7 @@ export async function configureGrouping(channel,p){
  const observe=condition=>channel.observe({condition,readGrouping:true,ready});
  const before=await observe('complete grouping inventory'),baseline=before.node_grouping;
  if(p.group_by===undefined){
-  need(baseline.keys.length&&baseline.measures.length&&baseline.measures.every(f=>f.functions>0&&(f.functions&~31)===0),'Existing grouping contains unsupported or incomplete aggregation');
+  need(baseline.keys.length&&baseline.measures.length&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
   return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,preservation:{unchanged:true}};
  }
  const plan=resolveGroupingParameters(p,baseline.input_fields),wanted=new Map([...plan.keys.map(f=>[f.name,6]),...plan.functions.map(f=>[f.name,7])]);
