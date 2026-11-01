@@ -998,11 +998,12 @@ class Runner:
             self.current['rejection_location'] = str(folder / 'model.stdout') + ':' + str(guarded)
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
-        invalid = port_failure(replies, folder / 'model.stdout') if not rejection or any(ports([o for _, o in replies])) else None
+        delivered = any(ports([o for _, o in replies]))
+        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error) or delivered else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
-        self.current.setdefault('port-read', 'PASS')
+        self.current.setdefault('port-read', '— (expected execution error)' if execution_error and not delivered else 'PASS')
         if expected.get('proposed_tree_output'):
             trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
             assert trees, 'TREE_READ_MISSING'

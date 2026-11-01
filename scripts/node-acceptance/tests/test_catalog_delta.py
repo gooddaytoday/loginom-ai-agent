@@ -26,6 +26,8 @@ class ExecutionErrorTests(unittest.TestCase):
             message = expected['execution_error']['text']
             error = dict(status='FAILED', state='settled', action_key='node.apply',
                          error=dict(code='NODE_EXECUTION_FAILED', message=message))
+            if fault == 'bad port':
+                error['output'] = dict(ports=[dict(port=0, schema=[], sample=[])])
             if fault == 'wrong error': error['error']['message'] = 'MCP Request timed out'
             if fault == 'echo':
                 error = dict(status='SUCCEEDED', configuration=dict(code=message))
@@ -68,12 +70,20 @@ class ExecutionErrorTests(unittest.TestCase):
             self.assertEqual(instance.current['cleanup'], 'main PASS')
             self.assertEqual(instance.current['cold'], '— (expected execution error)')
             self.assertIsNone(result[2])
+            if fault == 'bad port':
+                self.assertEqual(instance.current.get('failure_class'), 'PORT_READ_INVALID')
+                return result
+            self.assertNotIn('failure_class', instance.current)
+            self.assertEqual(instance.current['port-read'], '— (expected execution error)')
 
     def test_error_modes_keep_save_and_cleanup(self):
         for name in ['linreg-short', 'throw1']:
             with self.subTest(name=name): self.exercise(name=name)
         for fault in ['error state', 'inspect', 'snapshot']:
             with self.subTest(fault=fault): self.exercise(fault)
+
+    def test_returned_ports_still_require_native_evidence(self):
+        self.exercise('bad port')
 
     def test_error_expectation_does_not_hide_failures(self):
         for fault, code in [('wrong error', 'EXPECTED_EXECUTION_ERROR_MISSING'),

@@ -232,6 +232,8 @@ requires the expected text in a tool's error result (or native browser error
 snapshot) and in the final user response, no export request/downloaded CSV,
 Save after the error, normal close/logout without discard and runtime-close ACK.
 This is separate from `upload_only`: saving is required.
+No output port is required for an expected execution error; any returned
+ports still pass the stock native ownership/exactness/cleanup checks.
 Cold readback is inapplicable to the two expected execution errors; `--cold`
 continues to check all positive cases, including the declared empty table.
 Oracle contents never reach the model.
