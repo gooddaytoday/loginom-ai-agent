@@ -878,6 +878,17 @@ test('context menu wrapper keeps its E2E identity alongside the anonymous ARIA c
   assert.equal((await page.act({verb:'click',ref:target.ref},snapshot)).status,'NOT_APPLIED');
 });
 
+test('Union detached automatic menu is discoverable and its exact wrapper can be clicked',async()=>{
+ const page=new Page(),menu=page.add('div','mnUnionGrid','',{x:30,y:100,width:220,height:60});
+ const wrapper=page.add('div','mnUnionGrid;mniLinksAuto','',{x:30,y:100,width:220,height:25},menu);
+ const inner=page.add('a',null,'Автоматически связать все поля',wrapper.box,wrapper);inner.attrs.role='menuitem';
+ const roots=await page.execute({mode:'observe',discover_roots:true}),root=roots.output.ui.elements.find(e=>e.tid==='mnUnionGrid');
+ assert.ok(root?.ref,'detached menu root must be discoverable');
+ const detail=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=detail.output.ui.elements.find(e=>e.tid==='mnUnionGrid;mniLinksAuto');assert.ok(target?.allowed_actions.includes('click'));
+ assert.equal((await page.act({verb:'click',ref:target.ref},detail.output)).status,'SUCCEEDED');
+});
+
 test('node settings affordance without button role is observable and guarded', async () => {
   const page = new Page();
   const settings = page.add('g', 'MF;TF-1;Graph;Текстовый_файл;Setting', '', {x:30,y:50,width:20,height:20});
