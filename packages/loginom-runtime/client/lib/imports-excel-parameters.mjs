@@ -5,7 +5,7 @@ export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion.'},
  sheet_name:{...text(120),description:'Exact sheet; omit=first initially, preserve during source_switch. No named ranges.'},
  header_rows:{type:'integer',minimum:1,maximum:10,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
- columns:{type:'array',minItems:1,maxItems:8,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
+ columns:{type:'array',minItems:1,maxItems:12,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
   type:{type:'string',enum:['string','integer','real','datetime']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
@@ -34,7 +34,7 @@ export function validateExcelParameters(p,mode,r){
   return;
  }
  need(Number.isInteger(e.header_rows)&&e.header_rows>=1&&e.header_rows<=10,'header_rows must be 1..10');
- need(Array.isArray(e.columns)&&e.columns.length>=1&&e.columns.length<=8,'1..8 explicit columns are required');
+ need(Array.isArray(e.columns)&&e.columns.length>=1&&e.columns.length<=12,'1..12 explicit columns are required');
  for(const c of e.columns){
   need(c&&Object.keys(c).every(k=>['source_name','name','label','type','data_kind'].includes(k)),'unsupported column setting');
   need(typeof c.name==='string'&&c.name.length<=120&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.name),'technical names must be ASCII identifiers; keep the header in source_name');

@@ -8,6 +8,13 @@ Run live acceptance without repeatedly reading live logs:
 Cold читает сохранённые роли, NormType=5, k и seed без повторной настройки.
 Oracle/expected не передаются модели.
 
+`excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
+from a three-sheet workbook with different schemas. `excel-import-wide` imports
+all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-single` retains the original three-field, first-sheet fixture.
+Only the original XLSX and user task reach the model. Independent OpenPyXL
+oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two
