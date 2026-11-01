@@ -8,7 +8,10 @@ def expected():
     groups = {}
     with (Path(__file__).parent / 'data/keys.csv').open() as source:
         for row in csv.DictReader(source):
-            key = (None if row['R'] == '?' else float(row['R']), row['Segment'])
+            value = None if row['R'] == '?' else float(row['R'])
+            # Equality groups both signed zeros; the representative sign is not
+            # a separate group identity. Keep every nonzero binary64 exact.
+            key = (0.0 if value == 0 else value, row['Segment'])
             category = groups.setdefault(key, {}).setdefault(row['Category'], [])
             category.append(float(row['Amount']))
     output = {
