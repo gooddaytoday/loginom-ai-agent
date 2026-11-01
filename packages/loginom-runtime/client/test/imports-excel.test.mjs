@@ -13,6 +13,17 @@ import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mj
 const request={inputs:[],mappings:[],finish:'execute',read:{ports:[0]}};
 const parameters={source:{artifact_id:'book',upload_operation_id:'upload'},excel:{source_path:'/worker/sales.xlsx',header_rows:1,
  columns:[{name:'Id',label:'Id',type:'integer'},{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'Amount',type:'real'}]}};
+test('Excel accepts twelve explicit fields on a named sheet and preserves the first-sheet default',()=>{
+ const columns=Array.from({length:12},(_,i)=>({name:'Field'+i,label:'Field'+i,type:i%2?'real':'string'}));
+ for(const sheet_name of [undefined,'Продажи 2026']){
+  const excel={...parameters.excel,columns,...(sheet_name?{sheet_name}:{})};
+  assert.doesNotThrow(()=>validateExcelParameters({...parameters,excel},'xlsx',request));
+ }
+ const fixture=excelReadbackFixture();
+ fixture.phases[0].value.configuration.columns=excelColumns({columns});
+ assert.equal(excelSchemaSnapshot(fixture.phases[0].value.configuration,fixture.phases[2].value.native_mapping).columns.length,12);
+ assert.equal(excelParametersSchema.properties.excel.properties.columns.maxItems,12);
+});
 test('existing Excel source switch admits only file/sheet and backend scan/save IDs',()=>{
  const p={source:parameters.source,excel:{source_path:'/worker/full.xlsx',sheet_name:'Sales'},source_switch:{profile_id:'profile',save_operation_id:'save'}};
  const r={...request,target:{kind:'existing'}};
@@ -154,7 +165,7 @@ test('native type choice auto-commits and closes its editor without another Ente
  const values=new Map([[file+'edtFileName;ValueControl',source.source_path],[file+'cbbTableNamingMethod;ValueControl','По номеру'],[file+'cbbTableName;ValueContainer;cbx','1'],[file+'cbbActionBlankRow;ValueControl','Импортировать'],[file+'edtTitleRowCount;ValueControl','1'],[defs+'cbbAutoDetectColumnsMode;ValueControl','Нет']]);
  const locator=(tid,visibleEditor=false)=>({
   count:async()=>tid==='masks'?0:visibleEditor?(editor?1:0):1,
-  locator:()=>locator(tid,visibleEditor),getByRole:(_,{name})=>locator('option:'+name),
+  locator:()=>locator(tid,visibleEditor),getByRole:(_,{name})=>locator('option:'+name),scrollIntoViewIfNeeded:async()=>{},
   inputValue:async()=>tid.includes('celleditor')?columns[2].type:values.get(tid),
   fill:async value=>{values.set(tid,value);},press:async key=>{pressed.push(key);if(key==='Enter'&&!editor)throw Error('Native combo editor is already closed');},
   evaluate:async fn=>{if(fn.toString().includes('getBoundingClientRect')){target=tid;return{x:1,y:1};}return true;},

@@ -101,6 +101,9 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['excel-import-sheet', 'excel-import-wide', 'excel-import-single']:
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
