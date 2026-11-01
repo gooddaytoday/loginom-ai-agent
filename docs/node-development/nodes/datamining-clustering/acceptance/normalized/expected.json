@@ -130,6 +130,7 @@
     {
       "output_node_type": "datamining.clustering",
       "output_port": 0,
+      "column_order": "any",
       "columns": [
         {
           "name": "Cluster",
@@ -260,6 +261,7 @@
     {
       "output_node_type": "datamining.clustering",
       "output_port": 1,
+      "column_order": "any",
       "columns": [
         {
           "name": "Cluster",

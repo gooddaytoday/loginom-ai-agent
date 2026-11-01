@@ -36,11 +36,11 @@ def expected():
                                       'groups': [[r['RowID'] for r in g] for g in groups],
                                       'raw_groups': [[1, 3, 5, 7], [2, 4, 6, 8], [9, 10, 11, 12]]},
             'outputs': [
-                {'output_node_type': 'datamining.clustering', 'output_port': 0,
+                {'output_node_type': 'datamining.clustering', 'output_port': 0, 'column_order': 'any',
                  'columns': [column('Cluster', 'integer'), column('Distance', 'real'),
                              column('X', 'real'), column('Y', 'real'), column('RowID', 'integer')],
                  'rows': sorted(rows, key=lambda r: r['RowID'])},
-                {'output_node_type': 'datamining.clustering', 'output_port': 1,
+                {'output_node_type': 'datamining.clustering', 'output_port': 1, 'column_order': 'any',
                  'columns': [column('Cluster', 'integer'), column('X', 'real'), column('Y', 'real')],
                  'rows': [dict(Cluster=i, **center) for i, center in enumerate(centers)]}]}
 
