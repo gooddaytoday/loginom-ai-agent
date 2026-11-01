@@ -8,8 +8,8 @@ export const NODE_POSITION_MIN = 64;
 const definitions = [
   ['trees.from_json','JSON в дерево','jsontotree',1,0,false,['auto_structure'],'processors/trees/json-to-tree.md'],
   ['trees.to_table','Дерево в таблицу','treetodata',0,1,false,['selected_nodes'],'processors/trees/tree-to-table.md'],
-  ['preprocessing.sampling','Сэмплинг','sampling',1,1,false,['sequential'],'processors/preprocessing/sampling.md'],
-  ['preprocessing.data_partition','Разбиение на множества','partition',1,3,false,['sequential'],'processors/preprocessing/partition.md'],
+  ['preprocessing.sampling','Сэмплинг','sampling',1,1,false,['sequential','random'],'processors/preprocessing/sampling.md'],
+  ['preprocessing.data_partition','Разбиение на множества','partition',1,3,false,['sequential','random'],'processors/preprocessing/partition.md'],
   ['preprocessing.elim_outlier','Редактирование выбросов','elimoutlier',1,3,false,['detect'],'processors/preprocessing/eliminate-outliers.md'],
   ['datamining.log_regression','Логистическая регрессия','logregression',1,2,false,['enter'],'processors/datamining/logistic-regression/README.md'],
   ['research.auto_correlation','Автокорреляция','autocorrelation',1,1,false,['time_domain'],'processors/scrutiny/autocorrelation.html'],

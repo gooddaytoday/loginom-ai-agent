@@ -1,5 +1,20 @@
 Run live acceptance without repeatedly reading live logs:
 
+Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
+Only these translate their proposal into `sampling_modes`. The unchanged task
+and modes.csv go to the model; the oracle never does. Decision 1 checks two
+completed executions and exact typed source membership, with every CSV compared
+to the observed result. Configured sizes and seed are verified, but output sizes,
+quotas, source row order and P relations are not acceptance assertions.
+Cold validates the direct import → requested node → export graph and native
+field names/types. Native definition order is observed, not constrained. After
+Cancel, which can deselect/deactivate outputs, a fresh production execution
+reselects this node and verifies completion before reading any port. Two such
+rounds must match main. Field presentation permutations are normalized by
+verified names/types. Save, port proofs, cancellation and cleanup remain mandatory.
+Stratified, biased and uniform are not registered.
+Stock expected parsing, exact matching and existing scenarios are unchanged.
+
 ```sh
 python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n1,q7 --pair ~/.config/loginom-multica/cards/PAIR --cold
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
