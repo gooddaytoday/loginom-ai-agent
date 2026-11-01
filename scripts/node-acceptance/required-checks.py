@@ -29,9 +29,7 @@ RULES = (
     ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs',), ('live-ui',), ('s4',)),
-    ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13', 'crosstable-real-keys')),
-    (('docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**',),
-     ('live-ui',), ('crosstable-real-keys',)),
+    ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18',)),
     ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
@@ -49,6 +47,8 @@ RULES = (
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),
     ((C + 'text-import-*.mjs', C + 'imports-excel-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
+    ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
+     ('live-ui',), ('crosstable-real-keys',)),
 )
 UNITS = {
     'host-unit': ('(cd packages/loginom-host && bun test)', '#447: runtime/src требует полный host bun test'),
