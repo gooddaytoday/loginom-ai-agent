@@ -78,7 +78,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
-  const blocked=blockers.some(e=>{
+  const blocked=blockers.find(e=>{
    const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
    const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
@@ -96,7 +96,22 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&blockers.filter(mask=>mask.parentElement===parent).length===1;
    return !ownDisabledHeader&&!ownDisabledOutputHeader;
   });
-  if(blocked){if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};fail('Port opening blocked');}
+  if(blocked){
+   if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};
+   let detail='';
+   // Failure-only identity, without text/values or actionable references.
+   try{
+    const describe=e=>e?{tag:e.tagName?.toLowerCase().slice(0,16)??null,
+     tid:e.getAttribute('data-tid')?.slice(0,96)??null,role:e.getAttribute('role')?.slice(0,24)??null,
+     class:e.getAttribute('class')?.slice(0,64)??null}:null;
+    const diagnostic={mode,layer:describe(blocked),parent:describe(blocked.parentElement)};
+    for(let limit=48;JSON.stringify(diagnostic).length>360;limit=Math.floor(limit/2))
+     for(const e of [diagnostic.layer,diagnostic.parent])if(e)
+      for(const key of ['tag','tid','role','class'])if(typeof e[key]==='string')e[key]=e[key].slice(0,limit);
+    detail=': '+JSON.stringify(diagnostic);
+   }catch{}
+   fail('Port opening blocked'+detail);
+  }
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');

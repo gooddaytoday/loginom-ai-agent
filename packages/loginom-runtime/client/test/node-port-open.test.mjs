@@ -83,6 +83,24 @@ test('unknown target and blocked graph cause no gesture',async()=>{
   const f=fixture();change(f);const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(f.gestures.length,0);
  }
 });
+test('blocked opening reports only bounded layer and parent identity',async()=>{
+ for(const long of [false,true]){
+  const f=fixture('input');
+  const parent={tagName:'DIV',getAttribute:key=>key==='data-tid'?'MF;TF;WizrdMCF':key==='class'?'x-panel':null};
+  const mask={tagName:'DIV',parentElement:parent,textContent:'PRIVATE_TEXT',value:'PRIVATE_VALUE',
+   getAttribute:key=>key==='class'?(long?'"\n\\'.repeat(1000):'x-mask'):key==='role'?'presentation':null,
+   classList:{contains:()=>false},checkVisibility:()=>true};
+  const query=f.document.querySelectorAll;
+  f.document.querySelectorAll=q=>q==='[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message'?[mask]:query(q);
+  const result=await f.run();
+  assert.equal(result.status,'NOT_APPLIED');assert.deepEqual(f.gestures,[]);
+  assert.match(result.error,/Port opening blocked: /);assert.ok(result.error.length<=500);
+  assert.ok(!result.error.includes('PRIVATE_TEXT'));assert.ok(!result.error.includes('PRIVATE_VALUE'));
+  const d=JSON.parse(result.error.slice(result.error.indexOf(': ')+2));
+  assert.equal(d.mode,'begin');assert.equal(d.layer.tag,'div');
+  if(!long){assert.equal(d.layer.class,'x-mask');assert.equal(d.parent.tid,'MF;TF;WizrdMCF');}
+ }
+});
 test('verified opening refuses a different wizard or a reused operation target',async()=>{
  const f=fixture();assert.equal((await f.run()).status,'SUCCEEDED');f.wizard.FModelEnginePort={};assert.equal((await f.run()).verified,false);assert.equal(f.gestures.length,2);
  f.task.port=1;assert.equal((await f.run()).verified,false);assert.equal(f.gestures.length,2);
