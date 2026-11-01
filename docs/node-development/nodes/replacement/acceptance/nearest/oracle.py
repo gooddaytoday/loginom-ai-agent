@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent Decimal distance oracle; never supplied to the model."""
+"""Independent Decimal matching and IEEE-754 binary64 Delta; never supplied to the model."""
 import argparse
 import csv
 from decimal import Decimal
@@ -30,7 +30,8 @@ def expectations(exact=False):
                 row[field] = pairs[str(key)] if key is not None else (int(value) if field == 'I' else float(value))
                 row[field + '_Replaced'] = key is not None
                 if not exact:
-                    row[field + '_Delta'] = float(key - value) if key is not None else None
+                    # Native Delta subtracts the stored binary64 operands, not decimals.
+                    row[field + '_Delta'] = float(key) - float(value) if key is not None else None
             rows.append(row)
     return dict(package_path='{{PACKAGE_PATH}}', null_marker='NULL',
                 nodes=[dict(type='imports.text'), dict(type='transform.replace_columns')],

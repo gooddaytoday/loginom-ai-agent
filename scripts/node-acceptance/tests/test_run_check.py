@@ -91,6 +91,8 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(rows[2]['I'], 1200)
         self.assertEqual(rows[9]['R'], rows[10]['R'])  # zero and negative zero
         self.assertEqual(rows[3]['R'], 101)  # final existing-node patch
+        self.assertEqual(rows[1]['R_Delta'], 0.24999900000000075)
+        self.assertNotEqual(rows[1]['R_Delta'], 0.249999)
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
     def test_replace_convert_uses_independent_typed_fixture(self):

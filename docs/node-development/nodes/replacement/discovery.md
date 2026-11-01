@@ -288,3 +288,9 @@ DOM результатов: `MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSet
 Фикстура 26 строк, независимый Decimal-oracle и expected записаны до правки
 обработчика: [nearest](acceptance/nearest/task.md), [oracle](acceptance/nearest/oracle.py),
 [expected](acceptance/nearest/expected.json). Save/cold — отдельная приёмка.
+
+Приёмка LAB-728 уточнила арифметику Delta: это вычитание native binary64,
+а не десятичных рациональных значений. Например, 10 − 9.750001 даёт
+0.24999900000000075. Oracle выбирает ближайший ключ через Decimal,
+а Delta вычисляет независимым Python binary64-вычитанием; сверка остаётся точной.
+Первый запуск с десятичной Delta классифицирован как ошибка fixture, без зачёта.
