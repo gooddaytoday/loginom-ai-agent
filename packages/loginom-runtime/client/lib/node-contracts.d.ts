@@ -350,7 +350,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface LogRegressionConfigurationReadback {
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
- node:NodeRef; receipt_ids:string[]; mode:'enter'; input_fields:string[]; target_field:string;
+ node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
  normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;

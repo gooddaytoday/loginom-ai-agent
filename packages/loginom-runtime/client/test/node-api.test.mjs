@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins ISO-calendar registration and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,92977,'24d76697cef3f74dbf5bb7f6c520f5b6af56e1ef2a4f2dfd7f9217027d815e21'],
-  [nodeApiTools.map(userNodeTool),17329,'a649c8909fa5f037629088cc5e1a3443c288c7c810f761075952f62864e5fd68'],
+  [nodeApiTools,93041,'e99e8adaad188f8411b03f2fa3c4ccd259c88d6901cdf2816f34df2aac0583c7'],
+  [nodeApiTools.map(userNodeTool),17361,'a9cdeea2ffe3ef38960f1a475674e60a269be89e1bf10debf5bf1a82a6544c45'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
