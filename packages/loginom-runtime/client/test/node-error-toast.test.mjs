@@ -43,7 +43,7 @@ function replay(fault,verb='train') {
   }});
  return {channel,actions,records,get clock(){return clock},async run(){
   await channel.observe({condition:'native launch available',readTraining:verb==='train',ready:()=>true});
-  if(fault!=='no-baseline')channel.bindExecutionBaseline?.({root_id:'root',node,roots:[{process_id:'1',record_id:'old',completed:true}],launch_verified:false});
+  if(fault!=='no-baseline')await channel.bindExecutionBaseline?.({root_id:'root',node,roots:[{process_id:'1',record_id:'old',completed:true}],launch_verified:false});
   if(fault!=='no-launch')await channel.act({verb:verb==='train'?'click':verb,ref:'ui-launch'});
   return channel.observe({condition:'prepared node available for process console',readProcessControls:true,ready:()=>fault!=='no-launch'});
  }};
@@ -56,4 +56,17 @@ for(const verb of ['train','execute_graph_node','execute_wizard'])test('own '+ve
 });
 for(const fault of ['info','caption','text','owner','stale','root','running','no-baseline'])test('unproved toast retains the existing timeout and no dismissal: '+fault,async()=>{
  const f=replay(fault);await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);assert.equal(f.actions.length,1);
+ const failed={info:'toast_error_kind',caption:'toast_caption_matches',text:'toast_message_matches',owner:'failed_owned_child',
+  stale:'new_execution_group',root:'new_execution_group',running:'failed_owned_child','no-baseline':'launch_bound'}[fault];
+ const refused=f.records.find(r=>r.phase==='node_observation_context_refused'&&r.failed_conditions?.includes(failed));
+ assert.ok(refused,'the failed ownership condition and its observation must be durable');
+ assert.equal(refused.outcome.output.ui.dialogs[0].identity.anchor_tid,'toast');
+ if(fault!=='no-baseline')assert.ok(refused.native_processes);
+ if(['owner','stale','root','running'].includes(fault))assert.ok(refused.native_proof_error?.condition);
+});
+test('baseline owner refusal is journaled before rejection without any gesture',async()=>{
+ const f=replay();
+ await assert.rejects(f.channel.bindExecutionBaseline({root_id:'root',roots:[],node:{document_id:'doc',workflow_id:'wf',node_id:'other'}}),/baseline owner differs/);
+ const refused=f.records.find(r=>r.stage==='error_toast_baseline');
+ assert.deepEqual(refused.failed_conditions,['owner']);assert.equal(refused.baseline.node.node_id,'other');assert.equal(f.actions.length,0);
 });

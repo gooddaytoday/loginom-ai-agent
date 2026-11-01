@@ -715,24 +715,33 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
+    const errorToastDiagnostics=new Map();
     const errorToast = element => {
-      if(!nodeErrorToastObservation||!element||getTid(element)!=='toast'||!element.classList.contains('bg-notify-msg-color-error')
-        ||String(element.getAttribute('class')).split(/\s+/).filter(c=>c.startsWith('bg-notify-msg-color-')).length!==1)return null;
+      if(!nodeErrorToastObservation||!element||getTid(element)!=='toast')return null;
+      const checks={error_class:element.classList.contains('bg-notify-msg-color-error'),
+        unique_type_class:String(element.getAttribute('class')).split(/\s+/).filter(c=>c.startsWith('bg-notify-msg-color-')).length===1};
+      const finish=value=>{errorToastDiagnostics.set(element,{checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k])});return value??null;};
+      if(Object.values(checks).some(ok=>!ok))return finish();
       const native=globalThis.Ext?.getCmp?.(element.id);
-      if(native?.el?.dom!==element||native.title!=='Ошибка'||native.iconCls!=='bg-icon-info-negative')return null;
+      Object.assign(checks,{native_element:native?.el?.dom===element,native_title:native?.title==='Ошибка',native_icon:native?.iconCls==='bg-icon-info-negative'});
+      if(Object.values(checks).some(ok=>!ok))return finish();
       const exact=tid=>[...element.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       const captions=exact('toast;cnt;cnt;cmp'),messages=exact('toast;cnt;cnt;MessagesView'),closes=exact('toast;p.h;close');
       const items=messages.length===1?[...messages[0].querySelectorAll('.bg-error-item')]:[];
-      if(captions.length!==1||messages.length!==1||closes.length!==1||items.length!==1
-        ||!messages[0].classList.contains('bg-error-messages')||!items[0].parentElement?.classList.contains('bg-error-list')
-        ||!closes[0].querySelector('.x-tool-close'))return null;
+      Object.assign(checks,{caption_unique:captions.length===1,messages_unique:messages.length===1,close_unique:closes.length===1,error_item_unique:items.length===1,
+        messages_class:messages.length===1&&messages[0].classList.contains('bg-error-messages'),
+        error_list:items.length===1&&items[0].parentElement?.classList.contains('bg-error-list')===true,
+        close_icon:closes.length===1&&!!closes[0].querySelector('.x-tool-close')});
+      if(Object.values(checks).some(ok=>!ok))return finish();
       const caption=captions[0].textContent.trim(),message=items[0].textContent.trim();
-      return caption&&caption.length<=241&&message&&message.length<=1000?{kind:'error',caption,message}:null;
+      Object.assign(checks,{caption_nonempty:!!caption,caption_bounded:caption.length<=241,message_nonempty:!!message,message_bounded:message.length<=1000});
+      return finish(Object.values(checks).every(Boolean)?{kind:'error',caption,message}:null);
     };
     const dialogs = dialogElements.map(element => ({ ref: refOf(element), title: short(element.getAttribute('aria-label') ?? select('[role="heading"],.x-title-text').find(item => element.contains(item))?.textContent),
         text: textOf(element, downloadToastObservation&&getTid(element)==='toast'),
         ...(downloadToastObservation&&getTid(element)==='toast'?{class_name:short(element.getAttribute('class'),512)}:{}),
         ...(errorToast(element)?{error_toast:errorToast(element)}:{}),
+        ...(nodeErrorToastObservation&&getTid(element)==='toast'?{error_toast_diagnostic:errorToastDiagnostics.get(element)}:{}),
         bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
     const dialogRef = element => {
       const owner = dialogElements.find(dialog => dialog === element || dialog.contains(element));
@@ -4153,12 +4162,18 @@ function readRenderedInputMapping(observation) {
         if (!current.authenticated) fail('LOGIN_REQUIRED', 'Loginom authentication is required before changing the workspace');
         if (!same(task.snapshot.dom_epoch, current.dom_epoch)) fail('UI_EPOCH_CHANGED', 'The document changed since this observation; observe again even if its visible state looks unchanged');
         if (!same(current.ui.dialogs.map(item => item.ref), task.snapshot.ui.dialogs.map(item => item.ref))) fail('UI_CONTEXT_CHANGED', 'The visible dialog changed; observe the workspace again');
-        if(task.node_error_toast_observation===true&&(!task.prepared_node_context||task.action.verb!=='click'
-          ||current.ui.elements.find(e=>e.ref===task.action.ref)?.tid!=='toast;p.h;close'
-          ||current.ui.dialogs.length!==1||!current.ui.dialogs[0].error_toast
-          ||!same(current.ui.dialogs[0].error_toast,task.snapshot.ui.dialogs[0]?.error_toast)
-          ||!same(current.prepared_node_context,task.snapshot.prepared_node_context)))
-          fail('UI_CONTEXT_CHANGED','The proved node error toast changed before its close');
+        if(task.node_error_toast_observation===true){
+          const checks={prepared_node:!!task.prepared_node_context,close_verb:task.action.verb==='click',
+            close_tid:current.ui.elements.find(e=>e.ref===task.action.ref)?.tid==='toast;p.h;close',dialog_unique:current.ui.dialogs.length===1,
+            error_template:!!current.ui.dialogs[0]?.error_toast,
+            same_error:same(current.ui.dialogs[0]?.error_toast,task.snapshot.ui.dialogs[0]?.error_toast),
+            same_node:same(current.prepared_node_context,task.snapshot.prepared_node_context)};
+          if(Object.values(checks).some(ok=>!ok)){
+            record('node_error_toast_close_refused',{checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k]),
+              observation:current,expected:task.snapshot});
+            fail('UI_CONTEXT_CHANGED','The proved node error toast changed before its close');
+          }
+        }
         if(task.action.verb==='confirm_wizard_deactivation') {
           const binding=task.snapshot.node_wizard_confirmation,n=current.prepared_node_context;
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid

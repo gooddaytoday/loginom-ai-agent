@@ -746,25 +746,47 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // Train/Execute can fail immediately and leave an error portal outside
         // this read's root. Bind it to a fresh native-owned failed child from
         // the pre-launch inventory, never to a caption or an old error alone.
-        if(launchEvidence&&result.output.ui.dialogs.length===1
-          &&result.output.ui.dialogs[0].identity?.anchor_tid==='toast'
-          &&result.output.prepared_node_context?.surface==='graph'&&result.output.prepared_node_context.locked===false
-          &&result.output.wizard?.status==='absent'&&!result.output.ui.masks.length) {
+        const toastGate={launch_bound:!!launchEvidence,dialog_unique:result.output.ui.dialogs.length===1,
+          toast_identity:result.output.ui.dialogs[0]?.identity?.anchor_tid==='toast',
+          node_surface:result.output.prepared_node_context?.surface==='graph',node_unlocked:result.output.prepared_node_context?.locked===false,
+          wizard_absent:result.output.wizard?.status==='absent',masks_absent:!result.output.ui.masks.length};
+        if(!ownedErrorToast&&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid==='toast')&&Object.values(toastGate).some(ok=>!ok))
+          await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,stage:'error_toast_gate',
+            reason:'Owned execution error toast gate refused',checks:toastGate,failed_conditions:Object.keys(toastGate).filter(k=>!toastGate[k]),
+            launch:structuredClone(launchEvidence??null),outcome:structuredClone(result)});
+        if(Object.values(toastGate).every(Boolean)) {
           const portal=result.output.ui.dialogs[0],native=await read(makeNodeProcessContextCode(preparedNodeContext,{errorToast:true}),{timeout:readTimeout()});
           const detail=await readUi({mode:'observe',operation_id:id,...boundOptions,root_ref:portal.ref,
             node_error_toast_observation:true,download_toast_observation:true,expected_origin:targetOrigin,expected_build:targetBuild});
+          if(detail.status!=='SUCCEEDED')await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+            stage:'error_toast_detail',reason:'Owned execution error toast detail refused',failed_conditions:['detail_succeeded'],
+            launch:structuredClone(launchEvidence),native_processes:structuredClone(native),outcome:structuredClone(detail)});
           if(detail.status==='SUCCEEDED') {
-            assertContext(detail.output,true);
+            try {assertContext(detail.output,true);}
+            catch(error){
+              await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,stage:'error_toast_context',
+                reason:String(error.message),failed_conditions:['detail_context'],launch:structuredClone(launchEvidence),
+                expected:structuredClone(preparedNodeContext),native_processes:structuredClone(native),outcome:structuredClone(detail)});
+              throw error;
+            }
             const state=detail.output,dialog=state.ui.dialogs[0],toast=dialog?.error_toast;
-            let child,execution;
-            try {execution=identifyNewExecution(launchEvidence.baseline,native);child=selectFailedExecutionChild(execution,native);}catch { /* Unproved notifications retain ordinary readiness. */ }
+            let child,execution,proofStage='identify_new_execution',nativeProofError;
+            try {execution=identifyNewExecution(launchEvidence.baseline,native);proofStage='select_failed_execution_child';child=selectFailedExecutionChild(execution,native);}
+            catch(error) {nativeProofError={stage:proofStage,condition:String(error.message)};}
             const closes=state.ui.elements.filter(e=>e.tid==='toast;p.h;close'&&e.signature?.dialog_ref===portal.ref&&e.enabled===true&&e.allowed_actions.includes('click'));
-            if(child&&toast?.kind==='error'&&toast.message===child.error_details&&toast.caption===child.caption+':'
-              &&state.ui.dialogs.length===1&&dialog.ref===portal.ref&&closes.length===1
-              &&state.dom_epoch.document===launchEvidence.browser_document&&now()>=launchEvidence.started_at
-              &&JSON.stringify(canonical(native.node_context))===JSON.stringify(canonical(state.prepared_node_context))
-              &&state.prepared_node_context.surface==='graph'&&!state.prepared_node_context.locked
-              &&state.wizard?.status==='absent'&&!state.ui.masks.length) {
+            const checks={new_execution_group:!!execution,failed_owned_child:!!child,toast_error_kind:toast?.kind==='error',
+              toast_message_matches:!!child&&toast?.message===child.error_details,toast_caption_matches:!!child&&toast?.caption===child.caption+':',
+              dialog_unique:state.ui.dialogs.length===1,dialog_ref:dialog?.ref===portal.ref,close_unique:closes.length===1,
+              browser_document:state.dom_epoch.document===launchEvidence.browser_document,after_launch:now()>=launchEvidence.started_at,
+              native_context:JSON.stringify(canonical(native.node_context))===JSON.stringify(canonical(state.prepared_node_context)),
+              node_surface:state.prepared_node_context.surface==='graph',node_unlocked:!state.prepared_node_context.locked,
+              wizard_absent:state.wizard?.status==='absent',masks_absent:!state.ui.masks.length};
+            if(Object.values(checks).some(ok=>!ok))await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+              stage:'error_toast_owner',reason:'Owned execution error toast ownership refused',checks,
+              failed_conditions:Object.keys(checks).filter(k=>!checks[k]),native_proof_error:nativeProofError??null,
+              launch:structuredClone(launchEvidence),native_processes:structuredClone(native),
+              execution:structuredClone(execution??null),child:structuredClone(child??null),outcome:structuredClone(detail),initial_outcome:structuredClone(result)});
+            if(Object.values(checks).every(Boolean)) {
               const failure={code:'NODE_EXECUTION_FAILED',message:toast.message,native:{source:'loginom_error_toast',
                 node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id,
                 execution_id:execution.execution_id,process_id:child.process_id,process_record_id:child.record_id}};
@@ -833,6 +855,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             throw Error('Owned output settlement context changed');
           }
         }
+        if(ownedErrorToast){
+          const state=result.output,checks={dialog_unique:state.ui.dialogs.length===1,dialog_ref:state.ui.dialogs[0]?.ref===ownedErrorToast.ref,
+            same_toast:JSON.stringify(state.ui.dialogs[0]?.error_toast)===JSON.stringify(ownedErrorToast.error_toast),
+            node_surface:state.prepared_node_context?.surface==='graph',node_unlocked:state.prepared_node_context?.locked===false,
+            wizard_absent:state.wizard?.status==='absent',masks_absent:!state.ui.masks.length,
+            close_unique:state.ui.elements.filter(e=>e.tid==='toast;p.h;close'&&e.signature?.dialog_ref===ownedErrorToast.ref&&e.allowed_actions.includes('click')).length===1};
+          if(Object.values(checks).some(ok=>!ok))await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+            stage:'error_toast_close_ready',reason:'Owned error toast close not ready',checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k]),
+            outcome:structuredClone(result),expected:structuredClone(ownedErrorToast)});
+        }
         satisfied = (ownedErrorToast&&result.output.ui.dialogs.length===1&&result.output.ui.dialogs[0].ref===ownedErrorToast.ref
             &&JSON.stringify(result.output.ui.dialogs[0].error_toast)===JSON.stringify(ownedErrorToast.error_toast)
           ||boundWizardConfirmation(result.output,wizardConfirmation)
@@ -882,14 +914,26 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async act(action,processControl,{preserveJoinMapping=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
-      if(ownedErrorToast&&(action.verb!=='click'||!snapshot.ui.elements.some(e=>e.ref===action.ref&&e.tid==='toast;p.h;close'
-        &&e.signature?.dialog_ref===ownedErrorToast.ref)))throw Error('Only the proved error toast close is authorized');
+      if(ownedErrorToast){
+        const checks={close_verb:action.verb==='click',close_ref:snapshot.ui.elements.some(e=>e.ref===action.ref&&e.tid==='toast;p.h;close'
+          &&e.signature?.dialog_ref===ownedErrorToast.ref)};
+        if(Object.values(checks).some(ok=>!ok)){
+          await entry('node_observation_context_refused',{stage:'error_toast_close',reason:'Only the proved error toast close is authorized',
+            checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k]),action:structuredClone(action),outcome:{output:structuredClone(snapshot)}});
+          throw Error('Only the proved error toast close is authorized');
+        }
+      }
       if(preserveJoinMapping&&(!isUnchangedTransformExecution(operation.parameters)
         ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
         ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
         throw Error('Preserved Join navigation requires its unchanged node read');
       validateUiAction(action, snapshot);
-      assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
+      try {assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);}
+      catch(error){
+        if(ownedErrorToast)await entry('node_observation_context_refused',{stage:'error_toast_close_context',reason:String(error.message),
+          failed_conditions:['close_context'],expected:structuredClone(ownedErrorToast),outcome:{output:structuredClone(snapshot)}});
+        throw error;
+      }
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
       if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
         || !(snapshotWizardConfirmation.kind==='close'&&!mappingConflict
@@ -1138,9 +1182,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
     },
     get steps() { return sequence; },
-    bindExecutionBaseline(baseline) {
-      if(!preparedNodeContext||!baseline?.root_id||!Array.isArray(baseline.roots)
-        ||!['document_id','workflow_id','node_id'].every(k=>baseline.node?.[k]===preparedNodeContext.node[k]))throw Error('Execution baseline owner differs');
+    async bindExecutionBaseline(baseline) {
+      const checks={prepared_node:!!preparedNodeContext,root_id:!!baseline?.root_id,roots:Array.isArray(baseline?.roots),
+        owner:!!preparedNodeContext&&['document_id','workflow_id','node_id'].every(k=>baseline?.node?.[k]===preparedNodeContext.node[k])};
+      if(Object.values(checks).some(ok=>!ok)){
+        await entry('node_observation_context_refused',{stage:'error_toast_baseline',reason:'Execution baseline owner differs',checks,
+          failed_conditions:Object.keys(checks).filter(k=>!checks[k]),baseline:structuredClone(baseline??null),prepared_node:structuredClone(preparedNodeContext??null)});
+        throw Error('Execution baseline owner differs');
+      }
       executionBaseline=structuredClone(baseline);
     },
     get launchConfirmed() { return launchConfirmed; },

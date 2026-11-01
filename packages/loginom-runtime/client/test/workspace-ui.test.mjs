@@ -23,7 +23,11 @@ test('error toast template is private and requires the native error class, compo
   assert.equal(normal.output.ui.dialogs[0].error_toast,undefined);
   const observed=await vm.runInContext('('+makeWorkspaceUiCode({mode:'observe',node_error_toast_observation:true,expected_build:build,expected_origin:origin})+')',page.context)(page);
   assert.equal(observed.status,'SUCCEEDED');
-  if(fault)assert.equal(observed.output.ui.dialogs[0].error_toast,undefined);
+  if(fault){
+   assert.equal(observed.output.ui.dialogs[0].error_toast,undefined);
+   const failed={info:'error_class',native:'native_element',messages:'error_item_unique'}[fault];
+   assert.ok(observed.output.ui.dialogs[0].error_toast_diagnostic.failed_conditions.includes(failed));
+  }
   else {
    assert.deepEqual(clone(observed.output.ui.dialogs[0].error_toast),{kind:'error',caption:'Прогноз Y:',message:'Native error'});
    assert.ok(observed.output.ui.elements.find(e=>e.tid==='toast;p.h;close').allowed_actions.includes('click'));
