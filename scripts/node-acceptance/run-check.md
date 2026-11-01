@@ -339,6 +339,12 @@ runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
 
+`crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
+ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
+`docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
+Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
+близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
+
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
 age/pressure business task). Fixtures and independent expected tables are in
