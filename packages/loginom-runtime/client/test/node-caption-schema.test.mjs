@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
-import {nodeApiTools,nodeApplyInputSchema,dispatchNodeApi,dateTimeParametersSchema} from '../lib/node-api.mjs';
+import {nodeApiTools,nodeApplyInputSchema,dispatchNodeApi} from '../lib/node-api.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
@@ -12,38 +12,9 @@ const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
 test('full apply schema reserves v0.3.9 growth with at least 1500 bytes below 46000',t=>{
  const bytes=value=>Buffer.byteLength(JSON.stringify(value));
  const expanded=structuredClone(full.inputSchema),before=bytes(expanded),costs={};
- // Sizing fixtures, not registrations: every future standalone node pays a
- // complete F2 Date/time-sized parameter object, its type ID and mode.
- for(const [type,mode] of [['exports.excel','xlsx'],['preprocessing.smoothing','smooth'],
-  ['research.autocorrelation','autocorrelation'],['preprocessing.quantization','quantize']]){
-  const start=bytes(expanded);
-  if(!expanded.properties.target.properties.type.enum.includes(type)){
-   expanded.properties.target.properties.type.enum.push(type);
-   expanded.properties.parameters.properties['reserve_node_'+type.split('.').at(-1)]=structuredClone(dateTimeParametersSchema);
-  }
-  if(!expanded.properties.mode.enum.includes(mode))expanded.properties.mode.enum.push(mode);
-  costs[type]=bytes(expanded)-start;
- }
- const trees=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/trees-jsontotree/acceptance/schema-proposal.json',import.meta.url)));
- for(const [type,definition] of Object.entries(trees)){
-  const start=bytes(expanded);
-  if(!expanded.properties.target.properties.type.enum.includes(type)){
-   expanded.properties.target.properties.type.enum.push(type);
-   Object.assign(expanded.properties.parameters.properties,definition.parameter_schema.properties);
-  }
-  if(!expanded.properties.mode.enum.includes(definition.mode))expanded.properties.mode.enum.push(definition.mode);
-  costs[type]=bytes(expanded)-start;
- }
- // The extension contracts are not final: reserve independent parameter
- // objects of these UTF-8 sizes, plus each missing mode. This does not claim
- // that the planned runtime parameters or mode names are already supported.
- for(const [key,reserve,modes] of [['tree_io',1024,[]],['sampling_random',256,['random']],
-  ['partition_random',256,['random']],['date_iso_weeks',256,['iso_week','iso_week_year','iso_week_start','iso_week_end']],
-  ['replacement_conversion',512,['convert']],['rest_post_headers',1024,['POST']],['logistic_stepwise',512,['forward','backward']]]){
-  // The approved ISO extension is registered in calendar, with no new mode
-  // or parameter object. Its actual enum bytes are already in full.inputSchema.
-  if(key==='date_iso_weeks'&&['iso_year','iso_week','iso_week_start','day_of_week'].every(
-   operation=>dateTimeParametersSchema.properties.fields.items.properties.transformations.items.properties.operation.enum.includes(operation)))continue;
+ // All accepted v0.3.9 nodes are registered. Only stepwise logistic
+ // regression remains reserved; its contract is still being developed.
+ for(const [key,reserve,modes] of [['logistic_stepwise',512,['forward','backward']]]){
   const start=bytes(expanded),schema={type:'object',properties:{},additionalProperties:false,description:''};
   schema.description='x'.repeat(reserve-bytes(schema));
   assert.equal(bytes(schema),reserve,key);
