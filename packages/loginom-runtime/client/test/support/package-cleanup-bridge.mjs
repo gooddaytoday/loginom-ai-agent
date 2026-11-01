@@ -47,6 +47,7 @@ class ExternalClient {
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
+      if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
     }
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
@@ -861,13 +862,18 @@ function failedOpenFixture(fault='none') {
  }};
 }
 
-for(const scenario of ['clean','foreign-account','replacement-session','foreign-operation','wrong-path','dirty','persistent-window','unknown-error','replacement-after-binding','document-after-binding','busy','unsettled'])
-test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
+for(const intent of ['open_package','new_draft'])for(const scenario of ['clean','foreign-account','replacement-session','foreign-operation','wrong-path','dirty','persistent-window','unknown-error','replacement-after-binding','document-after-binding','busy','unsettled'])
+test('managed shutdown reconciles its rejected preparation: '+intent+' '+scenario,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'cleanup-rejected-open-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
  const native=failedOpenFixture('late modal'),c=native.context;
  native.state.timeoutMs=8000;
  const receipt=c.__loginomDockPreparationV1.receipts.get('prepare'),error=receipt.openError;
+ if(intent==='new_draft'){
+  receipt.request=JSON.stringify({session:'own-session',intent});
+  receipt.draftSubmitted=true;delete receipt.openSubmitted;
+  native.state.path=null;
+ }
  // LAB-591 native-messagebox.json: four controls, exactly one OK response.
  const extras=[['DetailPanel;btnDetais','Технические подробности'],['DetailPanel;btnMailto','Сообщить об ошибке'],['b','']]
   .map(([tid,label])=>({getAttribute:()=>tid,innerText:label,getBoundingClientRect:()=>({width:20,height:10})}));
@@ -902,7 +908,7 @@ test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
   }
   return result;
  };
- const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog,native};
+ const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog,native,failedDraft:intent==='new_draft'};
  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
   artifactStore:{list:()=>[],async releaseUploads(){}}};
@@ -912,7 +918,7 @@ test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
  const client=new AgentClient({name:'failed-open-cleanup',version:'1'});
  try{
   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
-  const response=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path,operation_id:'prepare'}});
+  const response=await client.callTool({name:'dock_prepare',arguments:{intent,...(intent==='open_package'?{package_path:path}:{}),operation_id:'prepare'}});
   assert.ok(session.metadata.workspacePreparation,JSON.stringify(response));
   const prepared=session.metadata.workspacePreparation.state;
   assert.equal(prepared.status,'NOT_READY');assert.equal(prepared.document_id,undefined);assert.equal(prepared.loginom_account,undefined);
@@ -926,9 +932,9 @@ test('managed shutdown reconciles its rejected Open: '+scenario,async t=>{
   assert.equal(result.package_cleanup.unsaved_changes_discarded??false,false);
   if(success){
    assert.ok(settlementReads>=2);
-   assert.equal(result.package_cleanup.package_path,path);assert.equal(result.package_cleanup.document_id,'own-doc');
+   assert.equal(result.package_cleanup.package_path,intent==='new_draft'?null:path);assert.equal(result.package_cleanup.document_id,'own-doc');
    assert.equal(result.package_cleanup.account,'test-2');assert.equal(result.package_cleanup.package_closed,true);
-   assert.equal(result.package_cleanup.logged_out,true);assert.equal(result.package_cleanup.policy,'opened_saved_package');
+   assert.equal(result.package_cleanup.logged_out,true);assert.equal(result.package_cleanup.policy,intent==='new_draft'?'unsaved_draft':'opened_saved_package');
    assert.ok(native.events.indexOf('error-ok')<native.events.indexOf('idle-wait'));
    assert.ok(native.events.indexOf('idle-wait')<native.events.indexOf('close'));
    assert.ok(native.events.indexOf('close')<native.events.indexOf('logout'));
