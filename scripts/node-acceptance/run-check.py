@@ -947,10 +947,11 @@ class Runner:
             assert execution_error['text'] in answer, 'EXECUTION_ERROR_NOT_REPORTED'
             # Admission stores a hash-prefixed copy next to downloaded outputs.
             # Exclude only this case's exact input identities, not arbitrary CSVs.
-            inputs = {hashlib.sha256(p.read_bytes()).hexdigest() + '-': p.name for p in files if p.is_file()}
+            inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
             assert not any(p.is_file() and not any(
-                re.fullmatch(re.escape(digest) + r'\d+-' + re.escape(name), p.name)
-                for digest, name in inputs.items()) for p in profile.rglob('*.csv')), 'UNEXPECTED_CSV'
+                re.fullmatch(r'[0-9a-f]{64}-\d+-' + re.escape(name), p.name)
+                and hashlib.sha256(p.read_bytes()).digest() == digest
+                for name, digest in inputs.items()) for p in profile.rglob('*.csv')), 'UNEXPECTED_CSV'
             assert any(n > observed[0] and o.get('status') == 'SUCCEEDED'
                        and o.get('action_key') in ['package.save_checkpoint', 'package.save_as']
                        and o.get('output', {}).get('save_completed') is True for n, o in replies), 'SAVE_AFTER_ERROR_MISSING'

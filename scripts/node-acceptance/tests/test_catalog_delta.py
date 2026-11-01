@@ -1,5 +1,4 @@
 import json
-import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -17,7 +16,12 @@ class ExecutionErrorTests(unittest.TestCase):
             spec = runner.scenario(name)
             source = spec['data'] / spec['input_files'][0]
             (profile / 'artifacts').mkdir()
-            (profile / 'artifacts' / (hashlib.sha256(source.read_bytes()).hexdigest()+'-0-'+source.name)).write_bytes(source.read_bytes())
+            # Admission prefixes identify the message's file group, not file bytes.
+            (profile / 'artifacts' / ('0'*64+'-0-'+source.name)).write_bytes(source.read_bytes())
+            if fault == 'modified input':
+                (profile / 'artifacts' / ('0'*64+'-0-'+source.name)).write_text('changed')
+            if fault == 'renamed input':
+                (profile / 'artifacts' / source.name).write_bytes(source.read_bytes())
             expected = runner.expected_for(spec, '/test/run.lgp')
             message = expected['execution_error']['text']
             error = dict(status='FAILED', state='settled', action_key='node.apply',
@@ -76,6 +80,7 @@ class ExecutionErrorTests(unittest.TestCase):
                             ('echo', 'EXPECTED_EXECUTION_ERROR_MISSING'),
                             ('no answer', 'EXECUTION_ERROR_NOT_REPORTED'),
                             ('export', 'UNEXPECTED_EXPORT'), ('download', 'UNEXPECTED_CSV'),
+                            ('modified input', 'UNEXPECTED_CSV'), ('renamed input', 'UNEXPECTED_CSV'),
                             ('no save', 'SAVE_NOT_CONFIRMED'),
                             ('cleanup', 'MAIN_CLEANUP_UNCONFIRMED'), ('no ack', 'RUNTIME_CLOSE_ACK_MISSING')]:
             with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, code):
