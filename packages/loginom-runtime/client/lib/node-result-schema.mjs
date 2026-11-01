@@ -134,6 +134,7 @@ const missingValuesConfigurationReadback=object({kind:values('missing_values'),s
  fields:{...boundedFields({anyOf:[
   object({...missingValuesField,used:disabled}),
   object({...missingValuesField,type:values('integer','real'),data_kind:values('Непрерывный'),used:{type:'boolean',const:true},method:values('mean')}),
+  object({...missingValuesField,type:values('integer','real'),data_kind:values('Непрерывный','Дискретный'),used:{type:'boolean',const:true},method:values('zero')}),
   object({...missingValuesField,type:values('string'),data_kind:values('Дискретный'),used:{type:'boolean',const:true},method:values('constant'),value:str}),
  ]}),minItems:1},ordered:disabled,max_nulls_percent:missingValuesThreshold,
  options:object({pedUseQuality:object({value:disabled,switch_pressed:disabled}),pedOrderedSample:object({value:disabled,switch_pressed:disabled}),

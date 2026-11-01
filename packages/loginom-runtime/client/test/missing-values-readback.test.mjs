@@ -10,6 +10,11 @@ function fixture(){
  return {node,operation_id:'op',phases:Object.entries(value).map(([phase,v])=>({phase,receipt_id:'op:'+phase,status:'verified',value:{verified:true,cleanup_complete:true,...v}}))};
 }
 test('missing values readback reports observed threshold and method without persistence or mean claims',()=>{const r=readback(fixture());assert.equal(r.max_nulls_percent,100);assert.equal(r.fields[0].method,'mean');assert.equal(r.package_persistence_verified,false);assert.equal(Object.hasOwn(r,'mean'),false);});
+test('zero readback requires native enum 11 and omits constant value',()=>{
+ const f=fixture(),field=f.phases[1].value.configuration.fields[0];field.method='zero';field.method_code=11;
+ const r=readback(f);assert.equal(r.fields[0].method,'zero');assert.equal(Object.hasOwn(r.fields[0],'value'),false);
+ for(const code of [1,2,3,4,5,6,7,12]){field.method_code=code;assert.throws(()=>readback(f),/enum differs/);}
+});
 test('missing values refuses mismatched owners, receipts, methods and incomplete processing coverage',()=>{
  for(const mutate of [f=>f.phases[1].value.configuration.node_context={verified:true,node_id:'foreign'},f=>f.phases[1].receipt_id='old:configure',f=>f.phases[1].value.configuration.fields[0].method_code=6,f=>f.phases[1].value.configuration.fields[0].method='median',f=>f.phases[1].value.configuration.fields=[],f=>f.phases[1].value.configuration.max_nulls_percent=101,f=>f.phases[1].value.configuration.options.pedMaxNullsPercent.value=99,f=>f.phases[1].value.configuration.options.pedMaxNullsPercent.switch_pressed=true,f=>f.phases[2].value.settings_applied=false,f=>f.phases.push(f.phases[1])]){const f=fixture();mutate(f);assert.throws(()=>readback(f));}
 });
@@ -18,8 +23,10 @@ test('published diagnostic job schema admits completed Missing Values readback a
  const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
  const {nodeApiTools}=await import('../lib/node-api.mjs');
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApiTools.find(t=>t.name==='dock_node_status').outputSchema);
- for(const finish of ['done','execute']){
+ for(const method of ['mean','zero'])for(const finish of ['done','execute']){
   const f=fixture();f.phases.at(-1).value.mode=finish;
+  f.phases[1].value.configuration.fields[0].method=method;
+  f.phases[1].value.configuration.fields[0].method_code=method==='zero'?11:3;
   const output={operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,
    execution:{status:finish==='done'?'not_requested':'completed',execution_id:finish==='done'?null:'execution'},
    output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,cleanup_complete:true,warnings:[],

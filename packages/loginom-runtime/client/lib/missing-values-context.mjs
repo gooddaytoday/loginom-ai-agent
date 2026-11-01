@@ -30,7 +30,7 @@ export function readMissingValuesBrowser(prefix){
    ||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||typeof d.Usable!=='boolean'||!Number.isInteger(d.ActionNull)||typeof d.NullStrValue!=='string'||d.NullStrValue.length>5000)return fail('missing_values_field');
   ids.add(id);names.add(d.Name.toLowerCase());
   fields.push({index,record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],used:d.Usable,
-   method_code:d.ActionNull,method:d.ActionNull===3?'mean':d.ActionNull===6?'constant':null,value:d.NullStrValue});
+   method_code:d.ActionNull,method:d.ActionNull===3?'mean':d.ActionNull===11?'zero':d.ActionNull===6?'constant':null,value:d.NullStrValue});
  }
  const options={};
  for(const key of ['pedOrderedSample','pedMaxNullsPercent','pedUseQuality','RandSeedEdit;edtRandSeed']){
