@@ -88,6 +88,7 @@ function fixture({onRecord=()=>{},deadlineMs=15000}={}) {
 // not a claim that the historical tooltip's trigger or native owner was proved.
 function coveredFixture(options={}) {
  const f=fixture(options),tid=f.body.getAttribute('data-tid');
+ f.page.waitForTimeout=async ms=>{f.page.clock.advance(ms);};
  f.body.box.height=104;
  const label=f.page.add('g',tid+';Label;Label','Export',{x:1167,y:719,width:82,height:16});
  for(const e of [f.body,label]){
@@ -96,6 +97,7 @@ function coveredFixture(options={}) {
  }
  const tooltip=f.page.add('div','ttip','',{x:1162,y:686,width:118,height:114});
  tooltip.attrs.class='x-tip x-layer x-tip-default x-border-box';
+ tooltip.checkVisibility=()=>tooltip.style.display!=='none';
  const cover=f.page.add('u',null,'',{x:1168,y:691,width:58.328125,height:35},tooltip);
  const hit=f.page.document.elementFromPoint.bind(f.page.document),click=f.page.mouse.click;
  f.page.document.elementFromPoint=(x,y)=>{
@@ -146,7 +148,7 @@ test('Export rebinds its native owner after label selection redraws the body lab
 test('Export retains all native input hit guards when selection does not clear the covering element',async()=>{
  const f=coveredFixture(),click=f.page.mouse.click;
  f.page.mouse.click=async(x,y,options)=>{await click(x,y,options);if(options.button==='left')f.tooltip.style.display='block';};
- await assert.rejects(f.run(),/Port has no observed interaction point/);
+ await assert.rejects(f.run(),/ttip still covers port after bounded hover recovery/);
  assert.deepEqual(f.gestures.map(g=>g.kind),['label-click']);
  const refused=f.records.find(e=>e.phase==='node_step_completed'&&e.outcome.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED');
  assert.equal(refused.outcome.status,'NOT_APPLIED');assert.equal(refused.outcome.effect_possible,false);
@@ -216,7 +218,7 @@ for(const mode of ['native owner','graph container'])test('Export refuses change
 test('Export does not select a label for a covered input without its own clipping reveal',async()=>{
  const f=coveredFixture(),hit=f.page.document.elementFromPoint.bind(f.page.document);f.input.box.y=650;
  f.page.document.elementFromPoint=(x,y)=>{const e=hit(x,y);return e===f.input?f.cover:e;};
- await assert.rejects(f.run(),/Port has no observed interaction point/);
+ await assert.rejects(f.run(),/ttip still covers port after bounded hover recovery/);
  assert.equal(f.canvas.scrollTop,0);assert.deepEqual(f.gestures,[]);
  assert.equal(f.records.filter(e=>e.action?.verb==='click'||e.action?.verb==='scroll').length,0);
 });

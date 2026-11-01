@@ -163,6 +163,22 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     if(x>=0&&y>=0&&x<width&&y<height&&hit&&(hit===dom||dom.contains(hit)))point??={x,y};
    }
    if(!point){
+    // Loginom can leave its hover tip over a freshly observed port. Move only
+    // to a hit-tested empty point in this graph, then recheck the same owner.
+    const hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
+    const tooltip=hit?.closest?.('[data-tid="ttip"]');
+    if(tooltip?.getAttribute('data-tid')==='ttip'&&exact('ttip').length===1
+      &&tooltip.checkVisibility({checkVisibilityCSS:true})){
+     for(const dy of [.5,.1,.9])for(const dx of [.5,.1,.9]){
+      const x=Math.max(0,gb.x)+(Math.min(width,gb.x+gb.width)-Math.max(0,gb.x))*dx;
+      const y=Math.max(0,gb.y)+(Math.min(height,gb.y+gb.height)-Math.max(0,gb.y))*dy;
+      const background=document.elementFromPoint(x,y);
+      if(x>=0&&y>=0&&x<width&&y<height&&x>=gb.x&&x<gb.x+gb.width&&y>=gb.y&&y<gb.y+gb.height
+        &&background&&(background===graph.container||graph.container.contains(background))
+        &&!graph.getCellAt(x-gb.x+graph.container.scrollLeft,y-gb.y+graph.container.scrollTop))
+       return {tooltip:true,point:{x,y}};
+     }
+    }
     let detail='';
     // Failure-only DOM identity: a covered port remains a refusal. Never read
     // text/values or grant the covering layer an actionable UI reference.
@@ -223,7 +239,19 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(before?.verified!==true||before.surface!=='graph'||before.locked!==false)throw Error('Prepared unlocked graph required for port opening');
   const target=await inspect('begin');trace.push({event:direction+'_port_reserved',...target});
   if(JSON.stringify(await readNode(page,task.binding))!==JSON.stringify(before))throw Error('Prepared node changed before port opening');
-  const issued=await inspect('menu_issued');effect=true;
+  let issued=await inspect('menu_issued');
+  if(issued.tooltip){
+   const until=Date.now()+Math.min(1000,remaining());
+   trace.push({event:direction+'_port_tooltip_observed',point:issued.point});
+   await page.mouse.move(issued.point.x,issued.point.y);
+   while(issued.tooltip){
+    if(Date.now()>=Math.min(until,task.deadline))throw Error('Loginom tooltip ttip still covers port after bounded hover recovery; no port gesture issued');
+    issued=await inspect('menu_issued');
+    if(issued.tooltip)await page.waitForTimeout(Math.min(100,Math.max(1,until-Date.now()),remaining()));
+   }
+   trace.push({event:direction+'_port_tooltip_cleared'});
+  }
+  remaining();effect=true;
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
   trace.push({event:direction+'_port_menu_verified',...await inspect('menu')});
