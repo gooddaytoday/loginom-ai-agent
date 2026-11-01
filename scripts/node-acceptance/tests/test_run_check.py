@@ -39,7 +39,7 @@ class RunCheckTests(unittest.TestCase):
             self.assertIsNone(rows[0]['Keep'])
             self.assertEqual(rows[2]['I'], 0)
             self.assertEqual(rows[1]['I'], None if kind == 'threshold' else 2 if kind == 'mean' else 0)
-            self.assertEqual(rows[1]['A'], 0 if kind == 'core' else None)
+            self.assertIsNone(rows[1]['A'])
 
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
