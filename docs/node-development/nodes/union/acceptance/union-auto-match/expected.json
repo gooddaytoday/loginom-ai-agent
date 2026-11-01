@@ -9,7 +9,6 @@
     {
       "output_node_type": "transform.union_data",
       "output_port": 0,
-      "export_destination": "union-result.csv",
       "ordered": true,
       "column_order": "exact",
       "columns": [

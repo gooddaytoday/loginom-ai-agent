@@ -13,7 +13,7 @@ def expected(package):
             for row in csv.DictReader(source):
                 rows.append({"Code": row["Code"], "Amount": float(row["Amount"]), "Extra": row.get("Extra")})
     return {"package_path": package, "nodes": [{"type": "transform.union_data"}], "outputs": [{
-        "output_node_type": "transform.union_data", "output_port": 0, "export_destination": "union-result.csv",
+        "output_node_type": "transform.union_data", "output_port": 0,
         "ordered": True, "column_order": "exact", "columns": [
             {"name": name, "type": kind, "label_any": True}
             for name, kind in (("Code", "string"), ("Amount", "real"), ("Extra", "string"))], "rows": rows}]}
