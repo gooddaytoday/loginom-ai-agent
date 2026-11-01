@@ -1,5 +1,15 @@
 # Приёмка пошагового отбора — предложение LAB-655
 
+
+Текущий срез v0.3.9: Forward, Backward и Stepwise только со стандартным
+критерием и порогами Loginom (наблюдались Deviance, entry=0.05, removal=0.1).
+Выбор критериев и пользовательские пороги исключены из публичного контракта
+и активного каталога приёмки. Ниже сохранён приёмочный комплект этапа 0;
+его расширенные сценарии и `selection-schema.json` — историческое предложение,
+не поддерживаемый контракт. Активны только task-forward/backward/stepwise.md,
+обновлённые по решению владельца. CLI oracle по умолчанию использует 0.05/0.1;
+для каждого из этих трёх методов эталон expected.json остаётся прежним.
+
 Новый режим требует утверждения владельцем до изменения обработчика.
 Существующий Enter в базе уже реализован; его старый комплект остаётся
 регрессией. Этот каталог не регистрирует новые production-режимы.
@@ -66,7 +76,7 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 
 | Task | Настройка | Expected / независимый результат |
 |---|---|---|
-| `task-stepwise-strict.md` | Deviance / entry=0, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
+| `task-stepwise-strict.md` | Deviance / entry=1e-9, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
 | `task-stepwise-permissive.md` | Deviance / 0.95, 0.99 | `expected-permissive.json`, X+Noise |
 
 Строгий случай отличает слишком высокий/умолчательный entry; мягкий —
@@ -77,7 +87,7 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 python3 oracle.py --check
 python3 oracle.py --diagnostic
 python3 oracle.py actual.csv
-python3 oracle.py --entry 0 --removal 0.2 actual.csv
+python3 oracle.py --entry 0.000000001 --removal 0.2 actual.csv
 python3 oracle.py --entry 0.95 --removal 0.99 actual.csv
 node schema-size.mjs
 ```
@@ -90,7 +100,7 @@ stock CSV oracle вычисляет тот же результат; `--check` п
 свои настройки вызова oracle в их fixture, без расширения общего runner.
 Пока эти команды проверяют документы/CSV и не запускают модель.
 
-## Контракт и стандарт приёмки этапа 1
+## Историческое предложение контракта этапа 0
 
 Предложение: прежний `parameters.logistic` дополняется **selection** из
 `selection-schema.json`; mode — отдельное поле `forward|backward|stepwise`.
@@ -98,9 +108,9 @@ stock CSV oracle вычисляет тот же результат; `--check` п
 Для новых режимов criterion обязателен. При Deviance Forward требует только
 entry_significance, Backward — только removal_significance, Stepwise — оба,
 0 <= entry < removal < 1. Для информационных критериев p-поля запрещены.
-По разрешению владельца в LAB-657 строгий entry изменён с 1e-9 на 0:
-независимый oracle и эталон остаются прежними. Removal сохраняет открытый
-интервал (0,1); явный entry=0 проверяется живым сценарием.
+Это историческое предложение; пользовательские критерии и пороги
+в текущем срезе v0.3.9 не поддерживаются. Строгий entry=0 был отклонён
+после двух живых расхождений с независимым oracle.
 Пустые/неприменимые/некорректные параметры должны отклоняться до мутации;
 не выбирать вместо неизвестного метода Enter, другой критерий или auto.
 

@@ -111,11 +111,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
-    if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
+    if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']:
         acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         variant = name.removeprefix('logreg-')
         source = acceptance / 'selection'
-        if variant in ['stepwise-strict', 'stepwise-permissive']: source = source / variant
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name == 'logreg-enter':
@@ -851,7 +850,7 @@ class Runner:
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
             if (re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression'
-                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']):
+                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)

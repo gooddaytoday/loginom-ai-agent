@@ -107,19 +107,15 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  await next('lin_regression','lin_regression_details');
  state=await observe('details','complete logistic details');
  need(state.node_logregression.values.pedIntercept===true&&Object.values(state.node_logregression.switches).every(v=>v===false),'fixed intercept without variable bindings required');
- let selection;
  const cutoffs=[];
  if(mode!=='enter'){
-  const criteria={deviance:[0,'Deviance'],aic:[1,'AIC'],aicc:[2,'AICc'],bic:[3,'BIC'],hqic:[4,'Ханнана—Куинна']};
-  const wanted=p.selection;
-  await choose('pedRegSelQuality',criteria[wanted.criterion][1],criteria[wanted.criterion][0],'details');
+  // Native defaults observed on a new 7.4.2 node (LAB-657 strict journal:493).
+  await choose('pedRegSelQuality','Deviance',0,'details');
   need(state.node_logregression.disabled?.pedRegSelQuality===false,'selection criterion must be editable');
-  for(const [key,name,applies] of [['pedAddSignificance','entry_significance',mode!=='backward'],['pedRemoveSignificance','removal_significance',mode!=='forward']]){
-   const applicable=wanted.criterion==='deviance'&&applies;
+  for(const [key,value,applicable] of [['pedAddSignificance',0.05,mode!=='backward'],['pedRemoveSignificance',0.1,mode!=='forward']]){
    need(state.node_logregression.disabled?.[key]===!applicable,'unexpected selection cutoff availability: '+key);
-   if(applicable)cutoffs.push([key,wanted[name],name]);
+   if(applicable)cutoffs.push([key,value]);
   }
-  selection={criterion:Object.keys(criteria).find(k=>criteria[k][0]===state.node_logregression.values.pedRegSelQuality)};
  }
  for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold],...cutoffs]){
   if(state.node_logregression.values[key]!==value){
@@ -147,10 +143,9 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   }
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);
  }
- if(selection)for(const [key,,name] of cutoffs)selection[name]=state.node_logregression.values[key];
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition,classes:classes.map(({index,label})=>({index,label})),
-  mode:observedMode,...(selection?{selection}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  mode:observedMode,target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

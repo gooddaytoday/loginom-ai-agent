@@ -1001,7 +1001,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_logreg_selection_catalog_keeps_oracle_private_and_all_cells(self):
-        for variant in ['forward', 'backward', 'stepwise', 'stepwise-aic', 'stepwise-aicc', 'stepwise-bic', 'stepwise-hqic', 'stepwise-strict', 'stepwise-permissive']:
+        for variant in ['forward', 'backward', 'stepwise']:
             case = runner.scenario('logreg-' + variant)
             self.assertEqual(case['prompt'].name, 'task-' + variant + '.md')
             self.assertTrue(case['prompt'].is_file())
@@ -1014,6 +1014,11 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             self.assertEqual(output['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
             reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
             self.assertEqual(output, reference['outputs'][0])
+
+    def test_logreg_custom_selection_cases_are_not_in_v039_catalog(self):
+        for variant in ['aic', 'aicc', 'bic', 'hqic', 'strict', 'permissive']:
+            with self.assertRaises(ValueError):
+                runner.scenario('logreg-stepwise-' + variant)
 
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')

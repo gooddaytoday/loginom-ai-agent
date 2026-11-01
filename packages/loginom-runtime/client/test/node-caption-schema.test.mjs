@@ -40,11 +40,6 @@ test('full apply schema reserves v0.3.9 growth with at least 1500 bytes below 46
  for(const [key,reserve,modes] of [['tree_io',1024,[]],['sampling_random',256,['random']],
   ['partition_random',256,['random']],['date_iso_weeks',256,['iso_week','iso_week_year','iso_week_start','iso_week_end']],
   ['replacement_conversion',512,['convert']],['rest_post_headers',1024,['POST']],['logistic_stepwise',512,['forward','backward']]]){
-  // This node's implemented selection is already charged in the full schema.
-  if(key==='logistic_stepwise'&&full.inputSchema.properties.parameters.properties.logistic.properties.selection){
-   for(const mode of ['forward','backward','stepwise'])assert.ok(full.inputSchema.properties.mode.enum.includes(mode));
-   costs[key]=0;continue;
-  }
   const start=bytes(expanded),schema={type:'object',properties:{},additionalProperties:false,description:''};
   schema.description='x'.repeat(reserve-bytes(schema));
   assert.equal(bytes(schema),reserve,key);

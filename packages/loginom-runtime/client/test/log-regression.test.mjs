@@ -35,15 +35,15 @@ test('logistic roles keep identifiers and comments and require a discrete string
  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,target_field:'x'}},'enter'));
 });
 
-function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,needsScroll=false}={}){
+function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',nativeSelection,needsScroll=false}={}){
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
- const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:1,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
+ const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:1,pedAddSignificance:0.05,pedRemoveSignificance:0.1,...nativeSelection};
  let stage='input_mapping',picker=null,scrollTop=0;const actions=[];
  const rawState=()=>({prepared_node_context:{...node,verified:true},wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
-  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'AIC',aicc:'AICc',bic:'BIC',hqic:'Ханнана—Куинна'})[selection.criterion]:'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
+  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?'Deviance':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
   node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:details.pedRegSelQuality!==0||mode==='forward'}})}});
  const state=()=>{const s=rawState();if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
  const channel={async observe({ready,condition}){const s=state();assert.ok(ready(s),condition);return s;},async perform({ready,resolve,initialObservation}){
@@ -55,10 +55,10 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
   if(a.verb==='set_checked')target[key]=a.checked;
   else if(a.verb==='fill')target[key]=Number(a.text);
   else if(a.ref.startsWith('event-')){target.pedEventId=classes[Number(a.ref.slice(6))].index;picker=null;}
-  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection.criterion):picker==='pedEventType'?4:2;picker=null;}
+  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise'].indexOf(mode):picker==='pedRegSelQuality'?0:picker==='pedEventType'?4:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
- return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(selection?{selection}:{})}},{request:{...request,mode},inputMapping})};
+ return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,parameters,{request:{...request,mode},inputMapping})};
 }
 
 test('Enter resolves event from observed classes, sets explicit threshold/epsilon and advances to Done',async()=>{
@@ -95,28 +95,32 @@ test('readback binds training, event and cutoff to committed settings and separa
  entries.finish.training.execution_id='execute';assert.throws(()=>logRegressionConfigurationReadback(candidate),/training/);
 });
 
-for(const mode of ['forward','backward','stepwise'])for(const criterion of ['deviance','aic','aicc','bic','hqic'])test(mode+' / '+criterion+' selects observed controls and reports applicable cutoffs',async()=>{
- const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:0}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
- assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,selection}},mode));
- const f=fixture({mode,selection}),r=await f.run();
- assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise'].indexOf(mode));
- assert.equal(r.configuration.mode,mode);assert.deepEqual(r.configuration.selection,selection);
- assert.equal(f.details.pedRegSelQuality,['deviance','aic','aicc','bic','hqic'].indexOf(criterion));
+for(const mode of ['forward','backward','stepwise'])test(mode+' uses native selection defaults without public selection parameters',async()=>{
+ assert.doesNotThrow(()=>validateLogRegressionParameters(parameters,mode));
+ const f=fixture({mode,nativeSelection:{pedAddSignificance:0.95,pedRemoveSignificance:0.99}}),r=await f.run();
+ assert.equal(r.configuration.mode,mode);assert.equal(Object.hasOwn(r.configuration,'selection'),false);
+ assert.equal(f.details.pedRegSelQuality,0);
+ if(mode!=='backward')assert.equal(f.details.pedAddSignificance,0.05);
+ if(mode!=='forward')assert.equal(f.details.pedRemoveSignificance,0.1);
  const edited=f.actions.filter(a=>a.verb==='fill').map(a=>a.ref.split(':')[0]);
- assert.equal(edited.includes('pedAddSignificance'),criterion==='deviance'&&mode!=='backward');
- assert.equal(edited.includes('pedRemoveSignificance'),criterion==='deviance'&&mode!=='forward');
- if(criterion==='deviance'&&mode!=='backward')assert.equal(f.actions.find(a=>a.verb==='fill'&&a.ref.startsWith('pedAddSignificance')).text,'0');
+ assert.equal(edited.includes('pedAddSignificance'),mode!=='backward');
+ assert.equal(edited.includes('pedRemoveSignificance'),mode!=='forward');
 });
 
-test('selection rejects missing, inapplicable, unknown and unordered cutoffs before UI',()=>{
- for(const [mode,selection] of [['enter',{criterion:'aic'}],['forward',undefined],['stepwise',{}],['forward',{criterion:'unknown'}],['forward',{criterion:'deviance',entry_significance:-1e-9}],['backward',{criterion:'deviance',removal_significance:0}],['backward',{criterion:'deviance',removal_significance:1}],['forward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['backward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['stepwise',{criterion:'deviance',entry_significance:0.2,removal_significance:0.1}],['stepwise',{criterion:'aic',entry_significance:0.01}],['stepwise',{criterion:'aic',unexpected:true}]])
-  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,...(selection?{selection}:{})}},mode));
+test('custom selection criteria and significance cutoffs refuse before UI for every method',()=>{
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
+ assert.equal(Object.hasOwn(card.parameter_schema.properties.logistic.properties,'selection'),false);
+ for(const mode of ['enter','forward','backward','stepwise'])for(const selection of [{},...['deviance','aic','aicc','bic','hqic'].map(criterion=>({criterion})),{criterion:'deviance',entry_significance:0,removal_significance:0.2}]){
+  const p={logistic:{...logistic,selection}};
+  assert.throws(()=>validateLogRegressionParameters(p,mode),/not supported/);
+  assert.throws(()=>validateNodeApplyRequest({...request,mode,parameters:p},support.nodeApplyHandlers));
+ }
 });
 
- test('Backward reveals its own clipped removal cutoff using a visible anchor in the same scroll region',async()=>{
-  const f=fixture({mode:'backward',selection:{criterion:'deviance',removal_significance:0.2},needsScroll:true});
-  const result=await f.run();
-  assert.equal(result.configuration.selection.removal_significance,0.2);
-  assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
-  assert.ok(f.actions.findIndex(a=>a.verb==='scroll')<f.actions.findIndex(a=>a.verb==='fill'&&a.ref.startsWith('pedRemoveSignificance')));
- });
+test('Backward reveals its clipped default removal cutoff using a visible anchor in the same scroll region',async()=>{
+ const f=fixture({mode:'backward',nativeSelection:{pedRemoveSignificance:0.2},needsScroll:true});
+ await f.run();assert.equal(f.details.pedRemoveSignificance,0.1);
+ assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
+ assert.ok(f.actions.findIndex(a=>a.verb==='scroll')<f.actions.findIndex(a=>a.verb==='fill'&&a.ref.startsWith('pedRemoveSignificance')));
+});

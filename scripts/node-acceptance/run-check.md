@@ -279,8 +279,8 @@ Cold сверяет исходный эталон без CSV-допусков; �
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
 
 `logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
-с Deviance; `logreg-stepwise-aic`, `logreg-stepwise-aicc`, `logreg-stepwise-bic`,
-`logreg-stepwise-hqic` — информационные критерии без p-порогов;
-`logreg-stepwise-strict` и `logreg-stepwise-permissive` — чувствительность порогов.
+со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
+Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
+информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.

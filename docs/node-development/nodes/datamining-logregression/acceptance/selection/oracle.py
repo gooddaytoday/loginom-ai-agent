@@ -76,7 +76,7 @@ def lr_p(smaller, larger):
     return math.erfc(math.sqrt(max(0, 2 * (larger["ll"] - smaller["ll"])) / 2))
 
 
-def select(rows, mode="stepwise", criterion="deviance", entry=0.01, removal=0.2):
+def select(rows, mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
     selected = list(FACTORS) if mode == "backward" else []
     history = []
     for _ in range(20):
@@ -115,7 +115,7 @@ def select(rows, mode="stepwise", criterion="deviance", entry=0.01, removal=0.2)
     raise AssertionError("selection did not terminate")
 
 
-def expected(mode="stepwise", criterion="deviance", entry=0.01, removal=0.2):
+def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
     rows = source()
     model, _ = select(rows, mode, criterion, entry, removal)
     columns = [
@@ -168,12 +168,12 @@ if __name__ == "__main__":
     parser.add_argument("actual_csv", nargs="?", type=Path)
     parser.add_argument("--mode", choices=("forward", "backward", "stepwise"), default="stepwise")
     parser.add_argument("--criterion", choices=CRITERIA, default="deviance")
-    parser.add_argument("--entry", type=float, default=0.01)
-    parser.add_argument("--removal", type=float, default=0.2)
+    parser.add_argument("--entry", type=float, default=0.05)
+    parser.add_argument("--removal", type=float, default=0.1)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--diagnostic", action="store_true")
     args = parser.parse_args()
-    assert 0 <= args.entry < 1 and 0 < args.removal < 1
+    assert 0 < args.entry < 1 and 0 < args.removal < 1
     if args.mode == "stepwise" and args.criterion == "deviance":
         assert args.entry < args.removal
     result = expected(args.mode, args.criterion, args.entry, args.removal)
@@ -190,9 +190,9 @@ if __name__ == "__main__":
         full = fit(source(), FACTORS)
         selected, _ = select(source())
         assert max(abs(a - b) for a, b in zip(full["probabilities"], selected["probabilities"])) > 0.01
-        assert select(source(), entry=0, removal=0.2)[0]["factors"] == []
+        assert select(source(), entry=1e-9, removal=0.2)[0]["factors"] == []
         assert select(source(), entry=0.95, removal=0.99)[0]["factors"] == list(FACTORS)
-        for name, entry, removal in [("expected-strict.json", 0, 0.2),
+        for name, entry, removal in [("expected-strict.json", 1e-9, 0.2),
                                      ("expected-permissive.json", 0.95, 0.99)]:
             assert json.loads((Path(__file__).parent / name).read_text()) == expected(entry=entry, removal=removal)
         print("PASS: 15 mode/criterion combinations, fixture copy, Enter distinction, threshold sensitivity")
