@@ -743,7 +743,7 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
 
 function xlsxReply(p: Stored, cursor = 0) {
   const reasons = [
-    ...(p.columns.length < 1 || p.columns.length > 8 ? ["Excel runtime supports 1–8 columns"] : []),
+    ...(p.columns.length < 1 || p.columns.length > 12 ? ["Excel runtime supports 1–12 columns"] : []),
     ...(p.header_rows < 1 ? ["Excel runtime requires 1–10 header rows"] : []),
     ...(p.blank_rows !== "import" ? ["Excel runtime imports blank rows; blank_rows=skip cannot be applied"] : []),
     ...(!p.shared_strings_complete ? ["Shared strings quick budget reached; exact scan required"] : []),

@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins continuous row keys and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,93185,'7be9835ebe13ebaa91874ead24b3dfc9e7c77178459965ff2c84d842c3197ad8'],
+  [nodeApiTools,93187,'013773024031d9d913e72bd4b00e3a91e7f120e20816ed879c7402599f043eeb'],
   [nodeApiTools.map(userNodeTool),17361,'a9cdeea2ffe3ef38960f1a475674e60a269be89e1bf10debf5bf1a82a6544c45'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));

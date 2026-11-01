@@ -1,0 +1,152 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "export_destination": "wide-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "label_any": true,
+          "type": "real"
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "label_any": true,
+          "type": "datetime"
+        },
+        {
+          "name": "Units",
+          "label": "Units",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Rate",
+          "label": "Rate",
+          "label_any": true,
+          "type": "real"
+        },
+        {
+          "name": "Booked",
+          "label": "Booked",
+          "label_any": true,
+          "type": "datetime"
+        },
+        {
+          "name": "Code",
+          "label": "Code",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Cost",
+          "label": "Cost",
+          "label_any": true,
+          "type": "real"
+        },
+        {
+          "name": "Comment",
+          "label": "Comment",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Balance",
+          "label": "Balance",
+          "label_any": true,
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Region": "North",
+          "Amount": 10.0,
+          "Occurred": "2026-02-03T12:34:56.000",
+          "Units": 3,
+          "Note": "Привет",
+          "Rate": 1.25,
+          "Booked": "2026-02-03T12:34:56.000",
+          "Code": "001",
+          "Cost": 0.0,
+          "Comment": "far right",
+          "Balance": 7.0
+        },
+        {
+          "Id": 2,
+          "Region": null,
+          "Amount": -2.5,
+          "Occurred": null,
+          "Units": null,
+          "Note": "a;b",
+          "Rate": null,
+          "Booked": "2026-02-03T12:34:56.000",
+          "Code": "X",
+          "Cost": -3.75,
+          "Comment": null,
+          "Balance": null
+        },
+        {
+          "Id": 3,
+          "Region": "South",
+          "Amount": null,
+          "Occurred": "2026-02-03T12:34:56.000",
+          "Units": 0,
+          "Note": null,
+          "Rate": 0.0,
+          "Booked": null,
+          "Code": null,
+          "Cost": null,
+          "Comment": "NULL",
+          "Balance": -9.0
+        },
+        {
+          "Id": 4,
+          "Region": "West",
+          "Amount": 0.125,
+          "Occurred": "2026-02-03T12:34:56.000",
+          "Units": -2,
+          "Note": "end",
+          "Rate": -0.5,
+          "Booked": "2026-02-03T12:34:56.000",
+          "Code": "Z",
+          "Cost": 2.5,
+          "Comment": "last",
+          "Balance": 0.0
+        }
+      ]
+    }
+  ]
+}
