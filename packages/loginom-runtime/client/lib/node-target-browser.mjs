@@ -392,7 +392,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
 
 // Moving off a selected node can replace its SVG body when hover controls
 // disappear. Settle that UI-only transition before binding the drag epochs.
-export async function prepareLinkHover(page,task,read,sameGraph) {
+export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewport,project) {
   const observe=async()=>{
     for(let attempt=0;attempt<3;attempt++){
       try{return await read(page,task);}catch(error){
@@ -426,10 +426,10 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
   const maskDeadline=Math.min(task.deadline,Date.now()+15000);
-  let point;
+  let point,revealed=false;
   for(let attempt=0;attempt<10;attempt++){
     if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
-    point=await source.evaluate(async(e,{request,origin,build,deadline})=>{
+    point=await source.evaluate(async(e,{request,origin,build,deadline,sourceId,revealed})=>{
       const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
       let element=e;
@@ -474,9 +474,47 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
           await new Promise(resolve=>setTimeout(resolve,50));
         }
       }
-      const current=point();return current.reachable?{x:current.x,y:current.y}:null;
-    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline});
+      const current=point();
+      if(current.reachable)return {x:current.x,y:current.y};
+      // LAB-736: ConsoleForm's north resize strip can extend above the panel
+      // and cover a port at the clipped bottom of the graph. Only this native,
+      // nonmodal console permits guarded viewport navigation. Reveal the center
+      // because the admitted link primitive uses it again to start its drag.
+      const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(exact),panel=panels[0];
+      const component=panel&&globalThis.Ext?.getCmp?.(panel.id);
+      const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+      const diagram=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController?.FDiagram;
+      const graph=diagram?.FmxGraph,root=roots[0],sources=exact(e.getAttribute('data-tid'));
+      if(Date.now()>=deadline||location.origin!==origin||bg?.app?.Version!==build
+        ||panels.length!==1||!panel.classList.contains('x-panel-status')||component?.el?.dom!==panel||component.modal===true
+        ||!current.hit?.matches('.x-resizable-handle.x-resizable-handle-north')||current.hit.parentElement!==panel
+        ||roots.length!==1||graph?.container!==root||sources.length!==1||sources[0]!==element||!root.contains(element)
+        ||[...document.querySelectorAll('[role="dialog"],[aria-modal="true"],.bg-mask-message,.x-mask-msg,.x-menu,.x-tip')].some(visible))return null;
+      const owners=diagram.FNodes?.FCollection?.filter(n=>n.FGuid===sourceId);
+      if(owners?.length!==1)return null;
+      const ports=(owners[0].FPorts??[]).flatMap(p=>p.FCollection??[]).filter(p=>p.parent===owners[0]
+        &&p.FCell?.parent===owners[0].FCell&&p.FGuid&&p.data&&p.FType===1&&p.FSubType===1
+        &&graph.view.getState(p.FCell)?.shape?.node===element);
+      if(ports.length!==1)return null;
+      const v=root.getBoundingClientRect();
+      if(graph.getCellAt(current.x-v.x+root.scrollLeft,current.y-v.y+root.scrollTop)!==ports[0].FCell)return null;
+      return revealed?null:{reveal:true};
+    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline,sourceId:task.effect.parameters?.edge?.source,revealed});
     if(point?.status==='NOT_APPLIED')return point;
+    if(point?.reveal){
+      revealed=true;
+      const remaining=()=>{
+        if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+        const ms=task.deadline-Date.now();if(ms<=0)throw Error('Link hover deadline elapsed');return ms;
+      };
+      const guard=async()=>{remaining();if(!sameGraph(before,await observe()))throw Error('Graph changed during link source reveal');};
+      await guard();
+      const node=before.nodes.find(n=>n.ref.node_id===task.effect.parameters.edge.source);
+      await reveal({page,root,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+        scrollNode:true,remaining,guard,readViewport,project});
+      await guard();point=null;
+      continue;
+    }
     if(point)break;
     await page.waitForTimeout(50);
   }
@@ -661,7 +699,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const edge=effect.parameters.edge,bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
-        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
+        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()})`,deadline);
         if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
