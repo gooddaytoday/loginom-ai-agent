@@ -38,6 +38,7 @@ def render(data):
          'Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.', '',
          f"Исторический каталог: **{len(data['nodes'])}** компонентов. Обработчики: **{counts['implemented']}**; обычный остаток: **{counts['backlog']}**; условный резерв: **{counts['conditional_reserve']}**.", '',
          'Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.', '',
+         f"Снимок регистрации: `{data['source_snapshot']['branch']}@{data['source_snapshot']['commit']}`. Режимы — значения runtime; операции и ограничения перечислены ниже. Приёмка относится только к указанному в источнике SHA, не переносится на этот снимок.", '',
          '## Реализованные обработчики','',
          '| № | Узел | Подплан | Runtime type / режимы | Историческая приёмка | Проверка нового клиента |',
          '| --- | --- | --- | --- | --- | --- |']
@@ -45,7 +46,26 @@ def render(data):
         if n['queue_class']!='implemented':continue
         h=n['handler']; modes=', '.join(h['modes'])
         title=f"[{n['name']}]({n['card']})"
-        out.append(f"| {n['legacy_subplan']} | {title} | [План]({n['plan']}) | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
+        out.append(f"| {n['legacy_subplan'] or '—'} | {title} | [План]({n['plan']}) | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
+    out+=['','## Текущий объём и источники приёмки','',
+          'Наличие задания и oracle не означает PASS. `not_validated` означает отсутствие найденного подтверждения независимой приёмки этого объёма; успешные прогоны исполнителя и интеграционные прогоны указаны отдельно в источнике. Старые карточки и подпланы могут описывать discovery до реализации; регистрация ниже сверена с кодом снимка.', '',
+          '| Runtime type | Операции / параметры | Ограничения | Приёмка и источник |',
+          '| --- | --- | --- | --- |']
+    for n in data['nodes']:
+        if not n.get('handler'):continue
+        h=n['handler']; acceptance=n.get('acceptance',{})
+        refs=[]
+        for ref in acceptance.get('evidence',[]):
+            e=data['evidence_catalog'].get(ref)
+            if e is None:
+                refs.append(ref);continue
+            refs.append(f"[{ref}]({e.get('url') or e['path']})")
+        details='; '.join(h.get('capabilities',[])) or ', '.join(h['modes'])
+        limits='; '.join(n['limitations'])
+        status=acceptance.get('status','not_validated')
+        note=acceptance.get('note','')
+        cells=[f"`{h['type']}`",details,limits,f"{status}: {note} {'; '.join(refs)}"]
+        out.append('| '+' | '.join(c.replace('|','/').replace('\n',' ') for c in cells)+' |')
     out+=['','## Компоненты без полного обработчика','',
           'Список не является разрешённой очередью. У каждого компонента есть карточка и подплан; наличие подплана не подтверждает поддержку runtime и не назначает реализацию. Перед назначением подплан приводится к [шаблону](templates/node-plan.md) по [порядку создания](workflow/new-node-plan.md).', '',
           '| Component ID | Узел | Подплан | Категория | Следующее действие |','| --- | --- | --- | --- | --- |']
@@ -56,7 +76,7 @@ def render(data):
     return '\n'.join(out)
 
 
-def check(render_view=False, source_archive=None):
+def check(render_view=False, source_archive=None, registry_only=False):
     errors=[]
     for name in REQUIRED:
         if not (ROOT/name).is_file() and not (render_view and name=='inventory.md'):
@@ -69,22 +89,24 @@ def check(render_view=False, source_archive=None):
         errors.append('catalog size differs from its source declaration')
     if set(counts)-{'implemented','backlog','conditional_reserve'}:
         errors.append('unknown queue classification')
-    runtime=(REPO/'packages/loginom-runtime/client/lib/node-support.mjs').read_text()
-    # Read the explicit type dispatch without importing or running product code.
-    registered=set(re.findall(r"if\(type===['\"]([^'\"]+)['\"]\)",runtime))
+    runtime=(REPO/'packages/loginom-runtime/client/lib/node-contracts.mjs').read_text()
+    # Read declarative registration, not dispatch syntax (which also has grouped branches).
+    registered=registered_modes(runtime)
     declared={n['handler']['type'] for n in nodes if n.get('handler')}
-    if registered!=declared:errors.append('runtime handlers differ: '+str(sorted(registered^declared)))
+    if set(registered)!=declared:errors.append('runtime handlers differ: '+str(sorted(set(registered)^declared)))
     if len(declared)!=sum(bool(n.get('handler')) for n in nodes):errors.append('duplicate runtime type')
     historical=json.loads((ROOT/data['evidence_catalog']['historical-catalog']['path']).read_text())
     historical_ids=set(re.findall(r'component\.[A-Za-z0-9_.]+',json.dumps(historical)))
     if historical_ids!=set(ids):errors.append('historical catalog IDs differ: '+str(sorted(historical_ids^set(ids))))
     evidence=data['evidence_catalog']
+    for ref in data['source_snapshot'].get('evidence',[]):
+        if ref not in evidence:errors.append('unknown snapshot evidence '+ref)
     for key,e in evidence.items():
         if not all(k in e for k in ['path','sha256','scope','platform','availability']):errors.append('evidence fields '+key)
         if e.get('path'):
             p=ROOT/e['path']
             if not p.is_file(): errors.append('evidence missing '+key+': '+e['path'])
-            elif e.get('sha256') and sha(p.read_bytes())!=e['sha256']:errors.append('evidence hash '+key)
+            elif e.get('sha256') and (not registry_only or key in data['source_snapshot'].get('evidence',[])) and sha(p.read_bytes())!=e['sha256']:errors.append('evidence hash '+key)
     for n in nodes:
         for key in ['component_id','name','legacy_subplan','handler','card','limitations','readiness','next_action','queue_class']:
             if key not in n:errors.append('node field '+n.get('component_id','?')+': '+key)
@@ -104,20 +126,30 @@ def check(render_view=False, source_archive=None):
         if bool(n.get('handler'))!=(n['queue_class']=='implemented'):
             errors.append('handler classification mismatch '+n['component_id'])
         plan=ROOT/f"nodes/{n['slug']}/plan.md"
-        if plan.is_file():
+        if plan.is_file() and not registry_only:
             text=plan.read_text()
             if not re.search(r'^Статус: ',text,re.M):errors.append('plan without status '+n['slug'])
             for number in range(7):
                 if not re.search(rf'^## {number}\. ',text,re.M):errors.append(f'plan without section {number} '+n['slug'])
         h=n.get('handler')
         if h:
+            if h['modes']!=registered.get(h['type']):errors.append('runtime modes differ: '+h['type'])
             paths=h['source'] if isinstance(h['source'],list) else [h['source']]
+            paths=paths+([h['parameters_source']] if h.get('parameters_source') else [])
             for p in paths:
                 if not (ROOT/p).is_file() and not (REPO/p).is_file():errors.append('missing handler source '+p)
+            for ref in n.get('acceptance',{}).get('evidence',[]):
+                if ref not in evidence:errors.append('unknown acceptance evidence '+ref)
+            if registry_only and not n.get('acceptance',{}).get('status'):
+                errors.append('missing acceptance status '+h['type'])
     expected=render(data)
     if render_view:(ROOT/'inventory.md').write_text(expected)
     elif not (ROOT/'inventory.md').is_file() or (ROOT/'inventory.md').read_text()!=expected:
         errors.append('inventory is stale; run --render')
+    if registry_only:
+        return {'status':'FAIL' if errors else 'PASS','scope':'current_registry_only',
+                'registry_components':len(nodes),'counts':dict(counts),'handler_types':len(registered),
+                'historical_archive_checked':False,'errors':errors}
     prov=json.loads((ROOT/'provenance.json').read_text())
     if prov.get('schema_version')!=2:errors.append('provenance must distinguish original and adapted bytes')
     sources=[e['source_path'] for e in prov['files']]
@@ -176,6 +208,21 @@ def check(render_view=False, source_archive=None):
     return {'status':'FAIL' if errors else 'PASS','registry_components':len(nodes),'counts':dict(counts),'handler_types':len(registered),'historical_files_verified':len(prov['files']),'active_markdown_checked':len(active),'all_markdown_checked':len(all_markdown),'unavailable_artifacts_classified':len(artifact_ids),'original_archive_verified':bool(source_archive),'errors':errors}
 
 
+def registered_modes(runtime):
+    declaration=re.search(r'^const definitions = \[(.*?)^\];',runtime,re.M|re.S)
+    if not declaration:raise ValueError('missing node definitions')
+    entries=re.findall(r"^\s*\['([^']+)'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*\d+\s*,\s*\d+\s*,\s*(?:true|false)\s*,\s*\[([^\]]+)\]",declaration[1],re.M)
+    if not entries or len(entries)!=len(re.findall(r'^\s*\[',declaration[1],re.M)):
+        raise ValueError('unrecognized node definition')
+    if len(entries)!=len({t for t,_ in entries}):raise ValueError('duplicate node definition')
+    if any(not re.fullmatch(r"\s*'[^']+'(?:\s*,\s*'[^']+')*\s*",modes) for _,modes in entries):
+        raise ValueError('unrecognized node modes')
+    return {t:re.findall(r"'([^']+)'",modes) for t,modes in entries}
+
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--render',action='store_true');parser.add_argument('--source-archive',type=Path);args=parser.parse_args()
-    result=check(args.render,args.source_archive);print(json.dumps(result,ensure_ascii=False,indent=2));raise SystemExit(bool(result['errors']))
+    parser=argparse.ArgumentParser();parser.add_argument('--render',action='store_true');parser.add_argument('--source-archive',type=Path)
+    parser.add_argument('--registry-only',action='store_true',help='Validate current registry and render; omit historical migration hashes and plan-template audit')
+    args=parser.parse_args()
+    if args.registry_only and args.source_archive:parser.error('--registry-only cannot audit --source-archive')
+    result=check(args.render,args.source_archive,args.registry_only);print(json.dumps(result,ensure_ascii=False,indent=2));raise SystemExit(bool(result['errors']))
