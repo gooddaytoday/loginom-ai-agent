@@ -17,7 +17,7 @@ export function inspectManagedJavascriptDoneOutcome(args,readStage,readGraph,rea
   }
   if(globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.Connected!==true)
     throw Error('Managed JavaScript Done settlement connection changed');
-  const graph=readGraph(args);
+  const graph=readGraph({...args,doneSettlement:true});
   if(!['waiting','closed'].includes(graph.state))throw Error('Managed JavaScript Done graph boundary changed');
   return {state:graph.state,graph};
 }

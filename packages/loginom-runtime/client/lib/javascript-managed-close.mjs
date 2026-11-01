@@ -33,7 +33,7 @@ export function inspectManagedJavascriptClosePoint(args,inspect,readDraft) {
   return {x,y,tid:prefix+';WizrdMCF;btnClose',page_tid:state.page.tid,node_id:task.owner.node_id};
 }
 
-export function inspectManagedJavascriptCloseDecision({held,task}) {
+export function inspectManagedJavascriptCloseDecision({held,task,doneSettlement=false}) {
   const app=globalThis.bg?.app,form=app?.Application?.FInstance?.FMainForm;
   const map=form?.FMapTree,tab=form?.Items?.Workspace?.getActiveTab?.();
   const preparation=globalThis.__loginomDockPreparationV1;
@@ -78,11 +78,21 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
     const graph=diagram?.FmxGraph,shape=found.length===1?graph?.view?.getState?.(found[0].FCell)?.shape?.node:null;
     const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.prefix+';ModelForm;cmpDiagram')+']')];
+    const shapeTid=shape?.getAttribute?.('data-tid');
+    // Done can apply Loginom's automatic node label (for example JS: Broken).
+    // Only that acknowledged commit may rebind addressing, through the same
+    // native GUID/data/cell shape and one exact element in the owned graph.
+    // The caller still independently verifies the fresh prepared graph/type.
+    const addressed=doneSettlement===true&&shapeTid!==held.node.tid&&typeof shapeTid==='string'&&roots.length===1
+      ?[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(shapeTid)+']')]:[];
+    const renamedShape=doneSettlement===true&&found.length===1&&!!held.binding.nodeData
+      &&found[0].data===held.binding.nodeData&&typeof shapeTid==='string'
+      &&shapeTid.startsWith(task.workflow_ref.prefix+';Graph;')&&addressed.length===1&&addressed[0]===shape;
     const checks={collection_array:Array.isArray(nodes),collection_bounded:!Array.isArray(nodes)||nodes.length<=200,
       node_unique:found.length<=1,root_unique:roots.length<=1,
       javascript_type:found.length!==1||found[0].FIconCls==='bg-vendor-icon-javascript',
       graph_container:roots.length!==1||!graph?.container||roots[0]===graph.container,
-      shape_binding:!shape?.isConnected||roots.length!==1||roots[0].contains(shape)&&shape.getAttribute('data-tid')===held.node.tid};
+      shape_binding:!shape?.isConnected||roots.length!==1||roots[0].contains(shape)&&(shapeTid===held.node.tid||renamedShape)};
     if(Object.values(checks).some(value=>!value))
       // Serialize bounded read-only facts into the exception: Playwright does
       // not preserve custom Error properties across the browser boundary.
@@ -101,7 +111,7 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     if(masks.length)return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
       loading_mask_count:masks.length};
     return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
-      graph_tid:held.node.tid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
+      graph_tid:shapeTid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
   }
   if(!visible(root)||current!==held.wizard||model?.FView?.el?.dom!==root
     ||model?.FModelNode!==held.binding.nodeData)
