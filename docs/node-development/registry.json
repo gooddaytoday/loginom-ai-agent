@@ -4,9 +4,9 @@
   "snapshot_date": "2026-11-01",
   "source_snapshot": {
     "repository": "loginom-ai-agent",
-    "commit": "a296eba00bfe535333339948cb066528a87807b7",
+    "commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
     "branch": "origin/v039",
-    "method": "static_source_and_retained_document_inspection",
+    "method": "static_source_and_retained_documents_and_multica_acceptance_inspection",
     "live_revalidation_performed": false,
     "evidence": [
       "v039-node-contracts",
@@ -111,10 +111,9 @@
     "Публичный preview: по умолчанию 10 строк, максимум 100 и ограничения объёма/числа ячеек; выборка не доказывает полноту.",
     "dock_node_read связан с завершённой квитанцией и заново выполняет узел; это не универсальное безопасное восстановление.",
     "Без нового живого прогона не повышать статус для свежей ревизии исходников, runtime или клиента.",
-    "Снимок v039 не поддерживает iso_week_end (ограничение Loginom); minute/second отсутствуют в DATE_TIME_OPERATIONS.",
     "Случайные расширения Sampling/Partition ограничены random; uniform/stratified/biased не зарегистрированы.",
     "Логистический отбор: стандартные Deviance / entry 0.05 / removal 0.1; пользовательские критерии и пороги отбора отклоняются.",
-    "В этом SHA Заполнение пропусков поддерживает mean и строковый constant, без числового zero; Текстовый экспорт — UTF-8, без Windows-1251."
+    "ISO: iso_week_end не поддержан из-за ограничения Loginom; minute/second доступны в calendar."
   ],
   "prerequisite_definitions": {
     "accepted_base": "Зафиксированный базовый commit активного loginom-ai-agent; не наследовать неслитую ветку другого узла автоматически.",
@@ -1308,7 +1307,7 @@
       "sha256": "fda519fd2e4917de4018112d8b402b1f9d23f28e33e3d4d9176c7e871a09216b",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1318,7 +1317,7 @@
       "sha256": "923beea2bbd1624c3e4b61947eecbd4b26555b025761392d9e2bdcc3240de800",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1328,7 +1327,7 @@
       "sha256": "b434a74f7ee00501c9a70e43a8752c5b05936c7307c99983673ced3894e28a29",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1338,7 +1337,7 @@
       "sha256": "727c02cd8f8dd08c7bc12f0d6b28a43afcf5c5ede3982d1727d0141acdc09992",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1348,7 +1347,7 @@
       "sha256": "f7eeb4b9008c5766d44ee8ea7770037df15b574376c2592bf8a45803cb0d8f6e",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1358,7 +1357,7 @@
       "sha256": "c6de1bb12090c893650e4f99d8ed1dc4688e1e4d32e433245aa90c43c7462110",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1368,7 +1367,7 @@
       "sha256": "132421d987667e5a92e7d8b4d6179c310934e330c92240bd6a22fedfcfffb641",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1378,7 +1377,7 @@
       "sha256": "022553b472bf61c66406e987a8f00ef1af2777ecd3fa3989f95369b143fe09b2",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1388,7 +1387,7 @@
       "sha256": "31aba2c75ab9ba28f13bff0b021a745abe134862d7cdb82f54cc91f171678b2f",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1398,7 +1397,7 @@
       "sha256": "28320ac796ed86278b708ae92ec1b4f10189df60ddf3165de722face6bf5f895",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1408,7 +1407,7 @@
       "sha256": "69d6590ec524da14fc8f65b161df853bc648a355e19e899c3c3a47c90387b316",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1418,7 +1417,7 @@
       "sha256": "efafb10b1372bf51455935ebd5ca3ffaa4868a309d8c7acdcdf868b2d40660c1",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1428,7 +1427,7 @@
       "sha256": "3b075b8effeb07363f64f2eb8562909b9c01c30982d519aaef9a0d11d6a3f8f8",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1438,7 +1437,7 @@
       "sha256": "330c3b8217779a4d5f97c46956541bc6466868305a82b0b7fa629ecc1055d3ef",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1448,7 +1447,7 @@
       "sha256": "cd9c64728002162c75f51a91670534e943036ca286952d4f692071e48f02b7aa",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1458,7 +1457,7 @@
       "sha256": "430ce4150df1fb71b1f64e1d1a8becb71e29801abf46187130cb701e42f39139",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1468,7 +1467,7 @@
       "sha256": "8efb006865d6475a2ceb8a7d3e9eccda049929cace0d0a794a601f9e0b36fe71",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1478,27 +1477,27 @@
       "sha256": "d10e77c53a486d6b89c50f2fe0b56958f295f86f16ecb61905c51c6a50ab4d31",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
     },
     "v039-replacement-node": {
       "path": "../../packages/loginom-runtime/client/lib/replacement-node.mjs",
-      "sha256": "80b0ac8f68609116ab86416414b013acd7feff06b75398b48fab40178095539e",
+      "sha256": "32ed2ea74703bf9641ac51f6ec6ce7bb3e8a3dba53f81f49752485c8828e1e68",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
     },
     "v039-replacement-parameters": {
       "path": "../../packages/loginom-runtime/client/lib/replacement-parameters.mjs",
-      "sha256": "c2d8d86e13537e499a93046e283b321da7fb2ed516c6669afa72778d9498c169",
+      "sha256": "e2e7728f6d1083da09a6954c60b532aaecede6f70d2f1cbe3aabb5861359a84f",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1508,7 +1507,7 @@
       "sha256": "5e20205746956f2f5ffc7bc84e46ea3c090524a83ae7e16f66c2b63d73cc9e04",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1518,7 +1517,7 @@
       "sha256": "b8f7b589dad969fff614920b0684cf7ea7ae862c24db82819e9402152da0702e",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1528,17 +1527,17 @@
       "sha256": "17fbdeb7ca6471559cfc762255effabe397dc36b8775066c281784b8d61449f1",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
     },
     "v039-date-time-parameters": {
       "path": "../../packages/loginom-runtime/client/lib/date-time-parameters.mjs",
-      "sha256": "fc9daf5fba0200f460d52398df227c156ed3e51a93d0153ab2ac34e61b674641",
+      "sha256": "7a28086076b5c0ec02e250d90a182549d04b211086c9bf19032d680f58d76f7f",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1548,17 +1547,17 @@
       "sha256": "69097e62b14bd8e800fa96ad2e7da0b730cf97f56a804a619694c266a85a689e",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
     },
     "v039-missing-values-parameters": {
       "path": "../../packages/loginom-runtime/client/lib/missing-values-parameters.mjs",
-      "sha256": "73d0f6859397b4225fd0fb272da9062eac46c8d50bc54be6f151ff9c6cab4c4b",
+      "sha256": "b751e6c9e4b72842255a15f44117a6f0100c237596e7c9eedd99d0e6fad56292",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1568,7 +1567,7 @@
       "sha256": "b5956275f5b878fe9ca7f3e4f727bd5ec2d42190a56846113cfe260ca41b5eb9",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1578,7 +1577,7 @@
       "sha256": "cb08851a27cde0f528dc0e489c716b93acf3d69b6da6637c15811e03193df6d8",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1588,17 +1587,17 @@
       "sha256": "65ef42ce0d859ca42d5e9e6791122f98e7d1c24e3956e0a0f81bc25a7f054a6d",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
     },
     "v039-text-export-parameters": {
       "path": "../../packages/loginom-runtime/client/lib/text-export-parameters.mjs",
-      "sha256": "437bb52b275d9d6dc9996e5388d24163f162a91b843942622f0cf145fc0f13fd",
+      "sha256": "9a1eee52c849e59220a5780a6894455f0b6284bf2b4f3a49b27cf16bc5d6a279",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1608,7 +1607,7 @@
       "sha256": "32d65393bac5dec8a581effc37b838ebcf6dd9bffda351b74aa2cadc6ac7760b",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1618,7 +1617,7 @@
       "sha256": "bb717521720ba47292065a35607224796918f0d674798c64f8382344d2476890",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1628,7 +1627,7 @@
       "sha256": "bc5831f1be8ed8b97e03b9581472ccb466236b096bae49269f1362448e134b4c",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1638,7 +1637,7 @@
       "sha256": "6f0b81e98aee1be4b4699767afe31ee0601004bf721fc995ea677a712e5fc6e6",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1659,7 +1658,7 @@
       "sha256": "81144b41b5916e7ecf92e5d1e77470547ca78c26f6e6a87401a6ff62de8cdb28",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1669,7 +1668,7 @@
       "sha256": "797e9451b64daef4a9abecb74dd5b4bc502ed782ce602fbbdc786aa259aa172b",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1679,7 +1678,7 @@
       "sha256": "eeaf4da48881a12d92614569e0c5ed98a2c238db9527567eec5a7556e698c61f",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1700,7 +1699,7 @@
       "sha256": "7edfd6c24c09c0a27ed0c73080cce1354e017bdf556600ab47bd4b18a27daa31",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1710,7 +1709,7 @@
       "sha256": "0bffcfe1e3df2975af93fcfb2ef982494d5dac69f8c612e5c5986b4b69e62a3d",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1720,7 +1719,7 @@
       "sha256": "7ae530477941d15d69b454e7aecd7fa8cb90c0fbe19fb5105d8476708e2ffa7c",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1730,7 +1729,7 @@
       "sha256": "03709ec521a84c8f8110f62e2eac7c4e4aafa5a0d0d65ecc0dd1458bd9e4999a",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1740,7 +1739,7 @@
       "sha256": "60394c5e498e71d01435ff3921a37cb291c2c6aab93832e4025c7280c28dead3",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1750,7 +1749,7 @@
       "sha256": "eafce295781f898fe28d7995351b8ed96cd4008c8abc92bda93e7973aab58b17",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1760,7 +1759,7 @@
       "sha256": "1159679165b2bf15847c398a5cc3882497e410ed87c3dd52fcfde3a454e7a7a5",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1781,7 +1780,7 @@
       "sha256": "2ed9fe0ac88391895de3439cccf7c6844bd2284a330e7332b7fe59b58e55d98f",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1791,7 +1790,7 @@
       "sha256": "4d338a602b6904732331095a96c0a753ab1471ecdc7e966811396beb99d1d0f8",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1801,7 +1800,7 @@
       "sha256": "9d0d62fd1f351cb201776aef442d9aad058b73f7c1d0db034b8b6235f3e8f4c4",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1822,7 +1821,7 @@
       "sha256": "4db3faab7eb2fea7d787e04b3c7c4daa20183b29cd56e4b30e456505424427df",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1832,7 +1831,7 @@
       "sha256": "f019375cd80b910870f6b4b53fd174adbbd51157903208b4f079f4e83f53e951",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1842,7 +1841,7 @@
       "sha256": "a0096b28a0f912a6df727d0e70953e99cdae67b5154d8f73b87ba45072ca4fba",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1863,7 +1862,7 @@
       "sha256": "6b8271dc7094833465e9b49c84a086778a5aa9e8e01073cc92e23aa1a119d6e0",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1873,7 +1872,7 @@
       "sha256": "eac6f02b6d7d3b1033b05f01b10f51768f5b10b8c348719de8c2dbe285fb79de",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1883,7 +1882,7 @@
       "sha256": "fa304f3877ae43855ff11774c37a64f93b15f368fe4475293dd65ffdb0b0253e",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1893,7 +1892,7 @@
       "sha256": "9f8b6fbf7ff15e771e8983bd84abb276ba21f167ab0243e4d0f1540c9f2fe396",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1903,7 +1902,7 @@
       "sha256": "979cc778c8c61bfafb2a276397c2503cadc1b72f5119ca79d0097c5381b429f0",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1913,7 +1912,7 @@
       "sha256": "5605a46b01c5ffafbe0fcf11476ce8c00336fb5156d05df645267fcb82f2df64",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1934,7 +1933,7 @@
       "sha256": "581d4289775b2a5b71fc2e3d48e7bfc897d23b482198ab3b51813fb19756b013",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1944,7 +1943,7 @@
       "sha256": "8b58cd575be6d82289f47b1e382a75dec4ed2c3feb2ddf3a20209f8985567f0d",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1954,7 +1953,7 @@
       "sha256": "500527a39fa38e40cd912a36cb6d547be0bc6a6e4cdf097b61c5aefa4200cf87",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -1964,7 +1963,7 @@
       "sha256": "d7730f012c3b6878ceb7f9b70af7c9b57efb9b532806bc8d954f067c2b181b7c",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1974,7 +1973,7 @@
       "sha256": "f6482a0ae040d8a21d580cd854cef091eaa147c490d9df44e9db14b2a396cb93",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -1995,7 +1994,7 @@
       "sha256": "014e460754c8e21024f2428d84386a80c72441ea0ac3585ad5b1f3bed849283a",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2005,7 +2004,7 @@
       "sha256": "4c0d26a6c5575ce7f8eb9a69511e8ad634988b414d526fb2ec5cefda6f46c711",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2015,7 +2014,7 @@
       "sha256": "dca105227adcd47ed6f0b266e7ca918fb0649e65c0d952c70910e0175c5aa3b4",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -2036,7 +2035,7 @@
       "sha256": "bd8012fa54868540143856e6872383b7eac1132ca4e051ea012934de8ebfc67f",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2046,7 +2045,7 @@
       "sha256": "20201eb0f6c5acddc9e7489a7d91d5ca50cdabe0eb394173d44ffd39d14a769e",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2056,7 +2055,7 @@
       "sha256": "a609bbe0f1e80c3cc3012e4f76c4e392cdfca4c70b06a4ef8bc5934bf0e2f005",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -2066,7 +2065,7 @@
       "sha256": "7e72da63b1f7677391a83bbaad5da81286246ebc8adf740907104f90f2ed9def",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2076,7 +2075,7 @@
       "sha256": "7b70f312441c3e606fd8d673f6285266ef5673eb0879ac613b60b33be3b19ed4",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2097,7 +2096,7 @@
       "sha256": "5c75ee07b16ae3e14b22e87eb94c4392c8e613be0d619f9b33b31cb3f247d541",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2107,7 +2106,7 @@
       "sha256": "8f0032d36d8d72b78dbb144efbd0394fd13e48befeceb9e35485722c848219b6",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2117,7 +2116,7 @@
       "sha256": "c2c9deb090a2aecb0a2ff01204b96f918dcdb758f1190a8b6fd6f51cf2badee5",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -2138,7 +2137,7 @@
       "sha256": "f27e50cd6fc3fa19327580616e381ad6fb73098a24306bace5f0a7be9bd057bf",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2148,7 +2147,7 @@
       "sha256": "5f0b1f11362a43260d0a875941b701289b0f57c927014fc77d029127de9917db",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Текущие исходники снимка v039; статическое чтение, без переноса живого PASS."
@@ -2158,7 +2157,7 @@
       "sha256": "2a51bf8459a6ee051e4ff146c06a978c4c48fe44702adf258d2317f94cffe80e",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -2168,7 +2167,7 @@
       "sha256": "c61259fc0e70c7dfa26dccddbcd400f19d85872c22224aaa0394a11b9853dd7c",
       "kind": "document",
       "availability": "retained_document",
-      "source_commit": "a296eba00bfe535333339948cb066528a87807b7",
+      "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
       "runtime": null,
       "platform": null,
       "scope": "Приёмочный комплект (задание/критерии); наличие файлов не подтверждает результат."
@@ -2282,6 +2281,146 @@
       "runtime": null,
       "platform": "mas3 / Linux / Loginom 7.4.2",
       "scope": "LAB-575: SD/IQR worker 3/3 на 724ab1d5d984702928fbb7f32479ed77c0fb424e; независимый протокол не заявлен."
+    },
+    "lab-675-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a194ad-5e81-727c-aef7-1a1eb2efb377",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-675",
+      "issue_id": "01a194ad-5e81-727c-aef7-1a1eb2efb377",
+      "comment_id": "01a194ea-5d2d-7e6f-824e-ea20e60ef708",
+      "scope": "preprocessing-sampling: sampling-random 2/3 PASS, sampling 1/1 PASS; cold PASS (Один cold-отказ cancellation/owner context при load1=2.28; критерий 2/3 выполнен.); preprocessing-datapartition: partition-random 2/3 PASS; cold PASS (Третья попытка UI_SCAN_LIMIT в экспорте; partition-modes-smoke не подтвердил регрессию из-за исключённых stratified/biased в старой fixture.)"
+    },
+    "lab-676-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a194ad-60e0-7e9a-9837-ec57b49acb93",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-676",
+      "issue_id": "01a194ad-60e0-7e9a-9837-ec57b49acb93",
+      "comment_id": "01a194f0-0b06-70c5-9e9f-90fa7e7f3dce",
+      "scope": "preprocessing-smoothing: smoothing-hp 2/2 зачётных PASS с cold (All-NULL — native отказ вне критерия, без CSV; один отказ старта подключения исключён и повторён.); research-autocorrelation: acf-update 2/2 PASS с cold; exports-excel: exports-excel 1/1 PASS с cold; date-time: date-time-iso и date-time-iso-empty по 1/1 PASS с cold"
+    },
+    "lab-687-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a1957d-2a40-75ab-a514-12af47d3ed17",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-687",
+      "issue_id": "01a1957d-2a40-75ab-a514-12af47d3ed17",
+      "comment_id": "01a19620-2a89-7d7e-a8e2-e3556ac956a2",
+      "scope": "exports-excel: exports-excel PASS с cold (Общий PASS карточки не установлен из-за незавершённого n18; данный сценарий PASS.); trees-jsontotree: tree-repeat и tree-no-repeat PASS с cold (Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.); trees-treetodata: tree-repeat и tree-no-repeat PASS с cold (Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.); research-autocorrelation: acf-update PASS с cold (Общий PASS карточки не установлен из-за n18; данный сценарий PASS.); preprocessing-smoothing: smoothing-hp PASS с cold (Общий PASS карточки не установлен из-за n18; данный сценарий PASS.); calculator: s1 и s3 PASS с cold (Принят составной срез, не вся матрица Калькулятора. n18 не завершён.); grouping: s1 PASS с cold (Принят составной срез, не вся матрица Группировки. n18 не завершён.); sorting: s1 PASS с cold (Принят составной срез, не вся матрица Сортировки. n18 не завершён.); join: s3 / left PASS с cold (Принят составной срез LEFT; n18 не завершён.); row-filter: s3 / conditions PASS с cold (Принят составной срез conditions, не row_number. n18 не завершён.); transform-crosstable: s5 / pivot PASS с cold (Принят составной срез; n18 не завершён.)"
+    },
+    "lab-689-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a1957d-2e89-7d48-9344-fbcbdc0105ea",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-689",
+      "issue_id": "01a1957d-2e89-7d48-9344-fbcbdc0105ea",
+      "comment_id": "01a19601-1f1d-72c2-8bd6-017eda7a4c3a",
+      "scope": "date-time: ISO и ISO-empty PASS; карточка 8/8 с cold (Нагрузка и общий бюджет пакета исключены, свежие повторы PASS.); datamining-logregression: forward/backward/stepwise/enter — все PASS; карточка 8/8 с cold; research-corranalysis: corr-pairs PASS; карточка 8/8 с cold; transform-slidingwindow: n21 / lag PASS; карточка 8/8 с cold (Повтор после исключённого общего бюджета пакета PASS.)"
+    },
+    "lab-690-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a1957d-3146-7d61-b7b4-8fbb095270bb",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-690",
+      "issue_id": "01a1957d-3146-7d61-b7b4-8fbb095270bb",
+      "comment_id": "01a195d3-a4ec-7b07-b88c-8c54948b582c",
+      "scope": "join: right/full/difference — все PASS; карточка 9/9 с cold; replacement: regex-replace PASS; карточка 9/9 с cold; preprocessing-elimoutlier: SD/IQR — оба PASS; карточка 9/9 с cold; preprocessing-sampling: sampling-modes-smoke / random PASS; карточка 9/9 с cold (Сценарий count=20, seed=42; не подтверждает stratified/biased.); preprocessing-datapartition: partition-modes-smoke / random PASS; карточка 9/9 с cold (Сценарий train_count=20, test_count=0, seed=42; не подтверждает stratified/biased.); integration-restrequest: rest-get-plain PASS; карточка 9/9 с cold (GET полного URL без входа/query; после исключённого общего бюджета пакета свежий повтор PASS.)"
+    },
+    "lab-711-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a19719-6910-70f1-95b3-d4de3781e6b0",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "c4316a2ccf27507c7a3448e9b198576b54979d6a",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-711",
+      "issue_id": "01a19719-6910-70f1-95b3-d4de3781e6b0",
+      "comment_id": "01a19755-d0a1-7bed-9b1c-174966ba75fc",
+      "scope": "imports-excel: sheet 3/3, wide 3/3, single 1/1 PASS с cold (Второй лист по имени; все 12 полей/типов, включая Balance:real, подтверждены.)"
+    },
+    "lab-716-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a19742-f6aa-7ea5-9dee-e2f03437ce7b",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "6cda8d0a21e8c553157520bc7794e2c318fecaf4",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-716",
+      "issue_id": "01a19742-f6aa-7ea5-9dee-e2f03437ce7b",
+      "comment_id": "01a1978e-c0fe-7637-97da-1af215a86409",
+      "scope": "date-time: minute/second 3/3 PASS с cold, ISO PASS (Полный объём карточки не проверен: date-time-minsec-empty не зарегистрирован и fixture отсутствует.)"
+    },
+    "lab-722-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a1977a-e8c9-724e-9c8f-5f1525328a97",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "e66fd0d0500d715d8de138473ed9e54b5a2e86c0",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-722",
+      "issue_id": "01a1977a-e8c9-724e-9c8f-5f1525328a97",
+      "comment_id": "01a197a6-140e-79bb-85f5-82f2d93f39a4",
+      "scope": "replacement: result_type convert 3/3 PASS с cold; exact регрессия PASS (64 ячейки каждого convert, integer/real/datetime; exact без result_type — 66 ячеек. Два отказа сети/MCP исключены и повторены.)"
+    },
+    "lab-723-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a19781-9b53-789f-8013-d799dbb067dc",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "6299a9f017801784782bd2ec1ecd3de2de783d83",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-723",
+      "issue_id": "01a19781-9b53-789f-8013-d799dbb067dc",
+      "comment_id": "01a197ab-c5d7-7dda-b559-b80d649ef7b3",
+      "scope": "text-export: CP1251 3/3 PASS с cold; s8 PASS (Точные 76 байт CP1251 → 112 байт UTF-8, без BOM; символы вне CP1251 не входили в live fixture.)"
+    },
+    "lab-724-independent-acceptance": {
+      "path": null,
+      "url": "https://mas.kartamyshev.dev/lab/issues/01a19781-9d89-7163-bab8-044165265ba3",
+      "sha256": null,
+      "kind": "candidate_acceptance",
+      "availability": "external_report",
+      "source_commit": "17eb8605d2a782b22219c7bbd87fe45e2cae906d",
+      "runtime": null,
+      "platform": null,
+      "issue_key": "LAB-724",
+      "issue_id": "01a19781-9d89-7163-bab8-044165265ba3",
+      "comment_id": "01a197aa-327f-7c1c-984c-51912a896ce9",
+      "scope": "missing-values: zero 3/3 PASS; empty и threshold по 1/1 PASS с cold (mean→zero на том же узле; при пороге 20% mean сохраняет NULL, zero заполняет включая all-NULL.)"
     }
   },
   "nodes": [
@@ -2439,37 +2578,30 @@
           "raw_evidence": "deleted_by_user_authorization"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-687-independent-acceptance"
           ],
-          "cases": [
-            "B18",
-            "B27",
-            "B47",
-            "B65",
-            "V65"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 и s3 PASS с cold. Принят составной срез, не вся матрица Калькулятора. n18 не завершён.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-04"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-calculator-node",
+            "v039-calculator-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -2481,7 +2613,7 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Зависимые выражения, добавление и replace; порядок вычисления и порядок выходных полей.",
         "Integer/real/string/boolean/datetime, NULL, дроби; ошибки формул без ложного успеха.",
@@ -2490,9 +2622,21 @@
       "plan": "nodes/calculator/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-687-independent-acceptance"
+        ],
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 и s3 PASS с cold. Принят составной срез, не вся матрица Калькулятора. n18 не завершён.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s1 и s3 PASS с cold",
+            "limitations": "Принят составной срез, не вся матрица Калькулятора. n18 не завершён."
+          }
+        ]
       }
     },
     {
@@ -2643,34 +2787,30 @@
           "raw_evidence": "deleted_by_user_authorization"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-687-independent-acceptance"
           ],
-          "cases": [
-            "B27",
-            "V37"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s3 / conditions PASS с cold. Принят составной срез conditions, не row_number. n18 не завершён.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-06"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-filter-node",
+            "v039-filter-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -2682,7 +2822,7 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Сравнения, интервалы/списки/строковые/Boolean/NULL условия; AND/OR.",
         "Полная сверка обоих выходов и сохранение всех входных строк в их объединении.",
@@ -2691,9 +2831,21 @@
       "plan": "nodes/row-filter/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-687-independent-acceptance"
+        ],
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s3 / conditions PASS с cold. Принят составной срез conditions, не row_number. n18 не завершён.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s3 / conditions PASS с cold",
+            "limitations": "Принят составной срез conditions, не row_number. n18 не завершён."
+          }
+        ]
       }
     },
     {
@@ -2742,41 +2894,30 @@
           "raw_evidence": "deleted_by_user_authorization"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-687-independent-acceptance"
           ],
-          "cases": [
-            "B02",
-            "B18",
-            "B27",
-            "B37",
-            "B47",
-            "B65",
-            "V02",
-            "V27",
-            "V65"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 PASS с cold. Принят составной срез, не вся матрица Группировки. n18 не завершён.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-07"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-grouping-node",
+            "v039-grouping-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -2788,7 +2929,7 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Несколько ключей и несколько функций поля; NULL/all-null/пустой вход/дроби.",
         "Имена/labels/исключение ключей/output mapping и полный multiset результата.",
@@ -2797,9 +2938,21 @@
       "plan": "nodes/grouping/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-687-independent-acceptance"
+        ],
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 PASS с cold. Принят составной срез, не вся матрица Группировки. n18 не завершён.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s1 PASS с cold",
+            "limitations": "Принят составной срез, не вся матрица Группировки. n18 не завершён."
+          }
+        ]
       }
     },
     {
@@ -2848,39 +3001,30 @@
           "raw_evidence": "deleted_by_user_authorization"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-687-independent-acceptance"
           ],
-          "cases": [
-            "B02",
-            "B27",
-            "B37",
-            "B47",
-            "B65",
-            "V27",
-            "V65"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 PASS с cold. Принят составной срез, не вся матрица Сортировки. n18 не завершён.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-08"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-sorting-node",
+            "v039-sorting-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -2892,7 +3036,7 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Несколько ASC/DESC ключей, регистр и locale; NULL и одинаковые значения.",
         "Полный порядок строк по независимому comparator без обещания порядка равных ключей.",
@@ -2901,9 +3045,21 @@
       "plan": "nodes/sorting/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-687-independent-acceptance"
+        ],
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s1 PASS с cold. Принят составной срез, не вся матрица Сортировки. n18 не завершён.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s1 PASS с cold",
+            "limitations": "Принят составной срез, не вся матрица Сортировки. n18 не завершён."
+          }
+        ]
       }
     },
     {
@@ -2957,34 +3113,32 @@
           "raw_evidence": "deleted_by_user_authorization"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-687-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "cases": [
-            "V02",
-            "V65"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s3 / left PASS с cold. Принят составной срез LEFT; n18 не завершён.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): right/full/difference — все PASS; карточка 9/9 с cold; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-09"
+            "lab-687-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-join-node",
+            "v039-join-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -2996,7 +3150,7 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "INNER/LEFT, один/несколько ключей, unmatched, NULL, повторы ключей и ожидаемая кратность.",
         "Оба входа, одинаковые labels, rename/exclude/order, занятый вход без переподключения чужого источника.",
@@ -3005,11 +3159,30 @@
       "plan": "nodes/join/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-561"
+          "lab-687-independent-acceptance",
+          "lab-690-independent-acceptance"
         ],
-        "note": "PR #561 — right/full/difference; #584 — принятые ветки и по одному интеграционному PASS. Старый accepted_scoped относится к inner/left; независимая серия всего текущего среза не найдена."
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s3 / left PASS с cold. Принят составной срез LEFT; n18 не завершён.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): right/full/difference — все PASS; карточка 9/9 с cold",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s3 / left PASS с cold",
+            "limitations": "Принят составной срез LEFT; n18 не завершён."
+          },
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "right/full/difference — все PASS; карточка 9/9 с cold",
+            "limitations": ""
+          }
+        ]
       }
     },
     {
@@ -3125,14 +3298,16 @@
         "source": "../../packages/loginom-runtime/client/lib/replacement-node.mjs",
         "parameters_source": "../../packages/loginom-runtime/client/lib/replacement-parameters.mjs",
         "capabilities": [
-          "exact и regex; внутренняя таблица правил; add/replace; строки, порядок правил и политика отсутствия совпадения."
+          "exact и regex; внутренняя таблица правил; output_mode add/replace; политика отсутствия совпадения.",
+          "exact: rules[].result_type string/integer/real/datetime; пропуск сохраняет входной type. type/from — тип ключа; to и other.value — тип результата."
         ]
       },
       "card": "nodes/replacement/README.md",
-      "initial_scope": "Внутренняя exact-таблица для string/integer/real, replace/add и фактический признак _Replaced.",
-      "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
+      "initial_scope": "exact и regex; внутренняя таблица правил; output_mode add/replace; политика отсутствия совпадения.; exact: rules[].result_type string/integer/real/datetime; пропуск сохраняет входной type. type/from — тип ключа; to и other.value — тип результата.",
+      "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
-        "Regex — ограниченный набор ASCII-паттернов, групп, [0-9], положительного {n}, якорей и inline (?i); без zero-length совпадений. Преобразование типов и внешние правила не поддержаны."
+        "При смене result_type other.keep запрещён, чтобы не создавать Variant; для datetime только other.null и локальное ISO-время с целыми секундами. Boolean-правил нет.",
+        "Regex остаётся string; ограниченный набор ASCII-паттернов, групп, [0-9], положительного {n}, якорей и inline (?i), без zero-length совпадений; внешние правила не поддержаны."
       ],
       "prerequisites": [
         "accepted_base",
@@ -3158,33 +3333,32 @@
           "raw_evidence": "external_not_revalidated"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-690-independent-acceptance",
+            "lab-722-independent-acceptance"
           ],
-          "cases": [
-            "V37"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): regex-replace PASS; карточка 9/9 с cold; LAB-722 (e66fd0d0500d715d8de138473ed9e54b5a2e86c0): result_type convert 3/3 PASS с cold; exact регрессия PASS. 64 ячейки каждого convert, integer/real/datetime; exact без result_type — 66 ячеек. Два отказа сети/MCP исключены и повторены.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-11"
+            "lab-690-independent-acceptance",
+            "lab-722-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-replacement-node",
+            "v039-replacement-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -3196,20 +3370,40 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "String/integer/real/NULL exact pairs; replace/add, multi-field и частичный existing patch.",
         "Независимый _Replaced, сохранение неперечисленных правил, collisions и unsupported до эффекта.",
-        "Точность real/Int64 и save/reopen всех настроек/результатов."
+        "Точность real/Int64 и save/reopen всех настроек/результатов.",
+        "result_type integer/real/datetime при string-ключах, пропуск result_type сохраняет exact; все значения/NULL и типы после cold (LAB-722)."
       ],
       "plan": "nodes/replacement/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-565"
+          "lab-690-independent-acceptance",
+          "lab-722-independent-acceptance"
         ],
-        "note": "PR #565 — regex; #584 — принятая ветка и адресные интеграционные PASS. Старый accepted_scoped относится к exact; независимая серия всего текущего среза не найдена."
+        "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): regex-replace PASS; карточка 9/9 с cold; LAB-722 (e66fd0d0500d715d8de138473ed9e54b5a2e86c0): result_type convert 3/3 PASS с cold; exact регрессия PASS. 64 ячейки каждого convert, integer/real/datetime; exact без result_type — 66 ячеек. Два отказа сети/MCP исключены и повторены.",
+        "scoped_results": [
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "regex-replace PASS; карточка 9/9 с cold",
+            "limitations": ""
+          },
+          {
+            "evidence": "lab-722-independent-acceptance",
+            "issue": "LAB-722",
+            "source_commit": "e66fd0d0500d715d8de138473ed9e54b5a2e86c0",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "result_type convert 3/3 PASS с cold; exact регрессия PASS",
+            "limitations": "64 ячейки каждого convert, integer/real/datetime; exact без result_type — 66 ячеек. Два отказа сети/MCP исключены и повторены."
+          }
+        ]
       }
     },
     {
@@ -3324,15 +3518,16 @@
         "source": "../../packages/loginom-runtime/client/lib/date-time-node.mjs",
         "parameters_source": "../../packages/loginom-runtime/client/lib/date-time-parameters.mjs",
         "capabilities": [
-          "calendar: year, quarter, month, day_of_month, hour, year_start/end, quarter_start/end, month_start/end, date.",
+          "calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date.",
           "ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week."
         ]
       },
       "card": "nodes/date-time/README.md",
-      "initial_scope": "12 преобразований: year/quarter/month/day_of_month/hour, start/end года/квартала/месяца и date.",
-      "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
+      "initial_scope": "calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date.; ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week.",
+      "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
-        "iso_week_end не поддержан из-за ограничения Loginom; minute/second отсутствуют в таблице операций этого SHA."
+        "iso_week_end не поддержан из-за ограничения Loginom.",
+        "LAB-716: minute/second на непустой таблице 3/3 PASS; отдельный date-time-minsec-empty не проверен — сценарий/fixture отсутствовал на принятом SHA."
       ],
       "prerequisites": [
         "accepted_base",
@@ -3358,34 +3553,34 @@
           "raw_evidence": "external_not_revalidated"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-676-independent-acceptance",
+            "lab-689-independent-acceptance",
+            "lab-716-independent-acceptance"
           ],
-          "cases": [
-            "B02",
-            "V27"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): date-time-iso и date-time-iso-empty по 1/1 PASS с cold; LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): ISO и ISO-empty PASS; карточка 8/8 с cold. Нагрузка и общий бюджет пакета исключены, свежие повторы PASS.; LAB-716 (6cda8d0a21e8c553157520bc7794e2c318fecaf4): minute/second 3/3 PASS с cold, ISO PASS. Полный объём карточки не проверен: date-time-minsec-empty не зарегистрирован и fixture отсутствует.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-13"
+            "lab-676-independent-acceptance",
+            "lab-689-independent-acceptance",
+            "lab-716-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-date-time-node",
+            "v039-date-time-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -3397,20 +3592,49 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Конец месяца/года/квартала, високосный день, время суток, NULL и пустая таблица.",
         "Несколько преобразований/полей, точные типы/границы периодов, независимые ожидаемые значения.",
-        "Input/output mappings и сохранённые настройки/порядок после отдельного reopen."
+        "Input/output mappings и сохранённые настройки/порядок после отдельного reopen.",
+        "minute/second, границы 59 и 23:59:59, перенастройка одного поля с сохранением второго; minsec-empty отдельно не проверен (LAB-716)."
       ],
       "plan": "nodes/date-time/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-625"
+          "lab-676-independent-acceptance",
+          "lab-689-independent-acceptance",
+          "lab-716-independent-acceptance"
         ],
-        "note": "PR #625: ISO worker 2/3, empty 2/3 на 17418cf13099990b78233c80ea7777b7141747c6; независимая приёмка остаётся отдельным шагом. Исторический calendar PASS сохранён в readiness."
+        "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): date-time-iso и date-time-iso-empty по 1/1 PASS с cold; LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): ISO и ISO-empty PASS; карточка 8/8 с cold. Нагрузка и общий бюджет пакета исключены, свежие повторы PASS.; LAB-716 (6cda8d0a21e8c553157520bc7794e2c318fecaf4): minute/second 3/3 PASS с cold, ISO PASS. Полный объём карточки не проверен: date-time-minsec-empty не зарегистрирован и fixture отсутствует.",
+        "scoped_results": [
+          {
+            "evidence": "lab-676-independent-acceptance",
+            "issue": "LAB-676",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "date-time-iso и date-time-iso-empty по 1/1 PASS с cold",
+            "limitations": ""
+          },
+          {
+            "evidence": "lab-689-independent-acceptance",
+            "issue": "LAB-689",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "ISO и ISO-empty PASS; карточка 8/8 с cold",
+            "limitations": "Нагрузка и общий бюджет пакета исключены, свежие повторы PASS."
+          },
+          {
+            "evidence": "lab-716-independent-acceptance",
+            "issue": "LAB-716",
+            "source_commit": "6cda8d0a21e8c553157520bc7794e2c318fecaf4",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "minute/second 3/3 PASS с cold, ISO PASS",
+            "limitations": "Полный объём карточки не проверен: date-time-minsec-empty не зарегистрирован и fixture отсутствует."
+          }
+        ]
       }
     },
     {
@@ -3427,14 +3651,16 @@
         "source": "../../packages/loginom-runtime/client/lib/missing-values-node.mjs",
         "parameters_source": "../../packages/loginom-runtime/client/lib/missing-values-parameters.mjs",
         "capabilities": [
-          "impute: mean для непрерывных integer/real; constant для дискретных string, включая пустую строку."
+          "impute: mean для непрерывных integer/real; zero для integer/real непрерывного и дискретного вида без value; constant для дискретных string, включая пустую строку.",
+          "Для zero фиксированная замена применяется независимо от доли NULL, включая полностью пустое числовое поле; порог max_nulls_percent продолжает действовать для mean."
         ]
       },
       "card": "nodes/missing-values/README.md",
-      "initial_scope": "Mean для непрерывных integer/real, заданная константа для дискретных string, явный max_nulls_percent и ordered=false.",
-      "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
+      "initial_scope": "impute: mean для непрерывных integer/real; zero для integer/real непрерывного и дискретного вида без value; constant для дискретных string, включая пустую строку.; Для zero фиксированная замена применяется независимо от доли NULL, включая полностью пустое числовое поле; порог max_nulls_percent продолжает действовать для mean.",
+      "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
-        "Числовая константа zero не поддержана: валидатор допускает constant только для string."
+        "Только явно неупорядоченный вход (ordered=false); произвольная числовая constant не поддержана, для нуля используется method=zero без value.",
+        "Автоматической смены типа/вида данных нет; строковая constant требует string, mean требует непрерывный integer/real."
       ],
       "prerequisites": [
         "accepted_base",
@@ -3460,33 +3686,30 @@
           "raw_evidence": "external_not_revalidated"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-724-independent-acceptance"
           ],
-          "cases": [
-            "V02"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-724 (17eb8605d2a782b22219c7bbd87fe45e2cae906d): zero 3/3 PASS; empty и threshold по 1/1 PASS с cold. mean→zero на том же узле; при пороге 20% mean сохраняет NULL, zero заполняет включая all-NULL.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-14"
+            "lab-724-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-missing-values-node",
+            "v039-missing-values-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -3498,18 +3721,31 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Mean и строковая константа на нескольких полях, неперечисленные поля неизменны.",
         "Пороговые случаи, all-null/empty, строка NULL vs настоящий NULL, число после native rounding.",
-        "Настройки/результаты после save/reopen; отдельно проверять нужные train/apply/retrain свойства выбранного режима."
+        "Настройки/результаты после save/reopen; отдельно проверять нужные train/apply/retrain свойства выбранного режима.",
+        "zero для integer/real обоих видов данных, без value; mean→zero на том же узле, empty и смешанный порог (LAB-724)."
       ],
       "plan": "nodes/missing-values/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-724-independent-acceptance"
+        ],
+        "note": "LAB-724 (17eb8605d2a782b22219c7bbd87fe45e2cae906d): zero 3/3 PASS; empty и threshold по 1/1 PASS с cold. mean→zero на том же узле; при пороге 20% mean сохраняет NULL, zero заполняет включая all-NULL.",
+        "scoped_results": [
+          {
+            "evidence": "lab-724-independent-acceptance",
+            "issue": "LAB-724",
+            "source_commit": "17eb8605d2a782b22219c7bbd87fe45e2cae906d",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "zero 3/3 PASS; empty и threshold по 1/1 PASS с cold",
+            "limitations": "mean→zero на том же узле; при пороге 20% mean сохраняет NULL, zero заполняет включая all-NULL."
+          }
+        ]
       }
     },
     {
@@ -3624,14 +3860,16 @@
         "source": "../../packages/loginom-runtime/client/lib/text-export-node.mjs",
         "parameters_source": "../../packages/loginom-runtime/client/lib/text-export-parameters.mjs",
         "capabilities": [
-          "delimited: UTF-8; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink."
+          "delimited: UTF-8 и Windows-1251; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink.",
+          "Windows-1251: BOM игнорируется, файл без BOM; символы вне CP1251 заменяются байтом 0x1A (SUB), требуется предупреждение о потере данных."
         ]
       },
       "card": "nodes/text-export/README.md",
-      "initial_scope": "Один табличный вход → проверенный CSV/TSV UTF-8; назначение в разрешённом хранилище, явный формат и overwrite.",
-      "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
+      "initial_scope": "delimited: UTF-8 и Windows-1251; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink.; Windows-1251: BOM игнорируется, файл без BOM; символы вне CP1251 заменяются байтом 0x1A (SUB), требуется предупреждение о потере данных.",
+      "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
-        "Windows-1251 не поддержана в этом SHA; фактический формат/NULL и файл требуют отдельной проверки."
+        "Windows-1251 выбирается явно; рекомендуемое bom=false. Замена символов вне кодировки — потеря данных, не транслитерация.",
+        "LAB-723: точные байты CP1251 и переключение того же узла на UTF-8 подтверждены; замену символов вне CP1251 отдельным модельным прогоном не проверяли, native-наблюдение сохранено в discovery."
       ],
       "prerequisites": [
         "accepted_base",
@@ -3657,33 +3895,30 @@
           "raw_evidence": "external_not_revalidated"
         },
         "client_technical_validation": {
-          "status": "reported_desktop_technical_pass",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "desktop-results",
-            "desktop-checkpoint"
+            "lab-723-independent-acceptance"
           ],
-          "cases": [
-            "V65"
-          ],
-          "standalone_status": "not_revalidated",
-          "note": "Завершённые Desktop пути; не все режимы, не холодное повторное открытие и не аналитическая правильность."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-723 (6299a9f017801784782bd2ec1ecd3de2de783d83): CP1251 3/3 PASS с cold; s8 PASS. Точные 76 байт CP1251 → 112 байт UTF-8, без BOM; символы вне CP1251 не входили в live fixture.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "acceptance-17"
+            "lab-723-independent-acceptance"
           ],
-          "historical_scope_preserved": true,
-          "note": "Историческое принятие сохранено; аналитика Desktop не проверялась; новый CLI oracle не выполнялся."
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "runtime-registry",
-            "migration-map"
+            "v039-node-contracts",
+            "v039-text-export-node",
+            "v039-text-export-parameters"
           ],
-          "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
-          "note": "Мигрированный runtime в этом репозитории; не подтверждение текущей установки."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "historical_rc8",
@@ -3695,18 +3930,31 @@
           "note": "RC6–RC8 поставляли тип; RC9 исходный. Текущая выпущенная standalone CLI версия этим не сертифицируется."
         }
       },
-      "next_action": "Карточка Multica на этап 0 подплана — перепроверка принятого объёма: приёмочный комплект из прежнего oracle, CLI-приёмка и cold-check на вершине ветки задания, исправления в принятом объёме. Расширения — отдельными карточками по решению владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "verification_cases": [
         "Кириллица, кавычки/разделитель/перенос внутри поля, NULL/empty, типизированные значения.",
         "TSV, BOM, CRLF, метки, пустой файл и широкая таблица; запрет перезаписи и явная замена существующего файла.",
-        "Байты/SHA файла и его принадлежность свежему исполнению; сохранение .lgp проверяется отдельно."
+        "Байты/SHA файла и его принадлежность свежему исполнению; сохранение .lgp проверяется отдельно.",
+        "Windows-1251 и переключение того же узла на UTF-8; точные байты и отсутствие BOM (LAB-723)."
       ],
       "plan": "nodes/text-export/plan.md",
       "plan_status": "accepted_scope_maintenance",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-723-independent-acceptance"
+        ],
+        "note": "LAB-723 (6299a9f017801784782bd2ec1ecd3de2de783d83): CP1251 3/3 PASS с cold; s8 PASS. Точные 76 байт CP1251 → 112 байт UTF-8, без BOM; символы вне CP1251 не входили в live fixture.",
+        "scoped_results": [
+          {
+            "evidence": "lab-723-independent-acceptance",
+            "issue": "LAB-723",
+            "source_commit": "6299a9f017801784782bd2ec1ecd3de2de783d83",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "CP1251 3/3 PASS с cold; s8 PASS",
+            "limitations": "Точные 76 байт CP1251 → 112 байт UTF-8, без BOM; символы вне CP1251 не входили в live fixture."
+          }
+        ]
       }
     },
     {
@@ -4489,26 +4737,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-622"
+            "lab-689-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): forward/backward/stepwise/enter — все PASS; карточка 8/8 с cold; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-622"
+            "lab-689-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-log-regression-node",
+            "v039-log-regression-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -4516,18 +4768,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/datamining-logregression/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-622",
-          "v039-datamining-logregression-acceptance-spec",
-          "pr-574",
-          "pr-633"
+          "lab-689-independent-acceptance"
         ],
-        "note": "PR #574: владелец принял Enter 3/3 на 66456ed401723605a6ef17df225269ea9fee1265; #622: Forward/Backward/Stepwise worker по 3/3 на 36a87b36294265ade2fb2fd952a0a693ba811332. #633 называет этот SHA принятым; независимый протокол 2/3 полного среза не найден."
+        "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): forward/backward/stepwise/enter — все PASS; карточка 8/8 с cold",
+        "scoped_results": [
+          {
+            "evidence": "lab-689-independent-acceptance",
+            "issue": "LAB-689",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "forward/backward/stepwise/enter — все PASS; карточка 8/8 с cold",
+            "limitations": ""
+          }
+        ]
       }
     },
     {
@@ -4816,26 +5075,32 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-609"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): exports-excel 1/1 PASS с cold; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): exports-excel PASS с cold. Общий PASS карточки не установлен из-за незавершённого n18; данный сценарий PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-609"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-exports-excel-node",
+            "v039-exports-excel-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -4843,16 +5108,34 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/exports-excel/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-609",
-          "v039-exports-excel-acceptance-spec"
+          "lab-676-independent-acceptance",
+          "lab-687-independent-acceptance"
         ],
-        "note": "PR #609: worker XLSX 3/3 на 71c88cbd86dcffbce02ef39e8d13ba8d2d90f6eb; независимые 2/3 остаются для приёмки, names/none/empty live не выполнялись. #632 — интеграция принятого SHA."
+        "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): exports-excel 1/1 PASS с cold; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): exports-excel PASS с cold. Общий PASS карточки не установлен из-за незавершённого n18; данный сценарий PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-676-independent-acceptance",
+            "issue": "LAB-676",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "exports-excel 1/1 PASS с cold",
+            "limitations": ""
+          },
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "exports-excel PASS с cold",
+            "limitations": "Общий PASS карточки не установлен из-за незавершённого n18; данный сценарий PASS."
+          }
+        ]
       }
     },
     {
@@ -5261,23 +5544,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated",
-          "note": "PR #135: worker 3/4 (последние три 2/3) на 94ca8b7d7e (LAB-96); независимая приёмка проверяющего не зафиксирована."
+          "status": "независимая приёмка на интеграционной голове",
+          "evidence": [
+            "lab-711-independent-acceptance"
+          ],
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-711 (c4316a2ccf27507c7a3448e9b198576b54979d6a): sheet 3/3, wide 3/3, single 1/1 PASS с cold. Второй лист по имени; все 12 полей/типов, включая Balance:real, подтверждены.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "independent_oracle_pass",
+          "evidence": [
+            "lab-711-independent-acceptance"
+          ],
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "excel-import-handler"
+            "v039-node-contracts",
+            "v039-imports-excel-node",
+            "v039-imports-excel-parameters"
           ],
-          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
-          "note": "PR #135 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "prerelease_v0.3.2",
@@ -5287,15 +5577,25 @@
           "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Реализован этап 1; независимая приёмка на текущем SHA и этап 2 — отдельными назначениями.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/imports-excel/plan.md",
       "plan_status": "implemented_pending_revalidation",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-643"
+          "lab-711-independent-acceptance"
         ],
-        "note": "PR #643 (LAB-700): sheet 3/3, wide 3/3, single 1/1 на c4316a2ccf27507c7a3448e9b198576b54979d6a; независимые 2/3 не найдены."
+        "note": "LAB-711 (c4316a2ccf27507c7a3448e9b198576b54979d6a): sheet 3/3, wide 3/3, single 1/1 PASS с cold. Второй лист по имени; все 12 полей/типов, включая Balance:real, подтверждены.",
+        "scoped_results": [
+          {
+            "evidence": "lab-711-independent-acceptance",
+            "issue": "LAB-711",
+            "source_commit": "c4316a2ccf27507c7a3448e9b198576b54979d6a",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "sheet 3/3, wide 3/3, single 1/1 PASS с cold",
+            "limitations": "Второй лист по имени; все 12 полей/типов, включая Balance:real, подтверждены."
+          }
+        ]
       }
     },
     {
@@ -5784,14 +6084,16 @@
           "request"
         ],
         "source": "../../packages/loginom-runtime/client/lib/rest-request-node.mjs",
-        "parameters_source": "../../packages/loginom-runtime/client/lib/rest-request-parameters.mjs"
+        "parameters_source": "../../packages/loginom-runtime/client/lib/rest-request-parameters.mjs",
+        "capabilities": [
+          "request: GET полного URL с REST-подключением; запрос без входа/query либо с параметрами строки запроса из входной таблицы."
+        ]
       },
       "card": "nodes/integration-restrequest/README.md",
       "initial_scope": "Чтение контролируемого HTTP-сервиса по ограниченным входным строкам, параметры запроса и все результаты/ошибки.",
       "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
-        "Этап 1: GET с параметрами строки запроса из одной входной таблицы и REST-подключением; Content-Type ответа application/json или text/html.",
-        "Прочие методы, сегменты и замена URL, тело, заголовки, retry и auth/TLS — этапы 2+."
+        "Прочие HTTP-методы, тело, произвольные заголовки, retry и auth/TLS вне среза; независимый plain GET подтверждён LAB-690."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5820,23 +6122,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated",
-          "note": "PR #101: worker 2/3 на 9f2611040b (LAB-86/LAB-91); кворум независимого проверяющего на том же SHA не зафиксирован."
+          "status": "независимая приёмка на интеграционной голове",
+          "evidence": [
+            "lab-690-independent-acceptance"
+          ],
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): rest-get-plain PASS; карточка 9/9 с cold. GET полного URL без входа/query; после исключённого общего бюджета пакета свежий повтор PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "independent_oracle_pass",
+          "evidence": [
+            "lab-690-independent-acceptance"
+          ],
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "rest-request-handler"
+            "v039-node-contracts",
+            "v039-rest-request-node",
+            "v039-rest-request-parameters"
           ],
-          "source_commit": "90b0cb816463360f024bbf33857a8861dee1ef10",
-          "note": "PR #133 в demo-022, далее в loginom; присутствует в source v0.3.2–v0.3.7."
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "prerelease_v0.3.2",
@@ -5846,13 +6155,25 @@
           "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Реализован этап 1; независимая приёмка на текущем SHA и этапы 2+ — отдельными назначениями.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/integration-restrequest/plan.md",
       "plan_status": "implemented_pending_revalidation",
       "acceptance": {
-        "status": "not_validated",
-        "evidence": [],
-        "note": "Независимая приёмка полного текущего объёма на SHA снимка не подтверждена; прежние факты сохранены в readiness."
+        "status": "независимая приёмка на интеграционной голове",
+        "evidence": [
+          "lab-690-independent-acceptance"
+        ],
+        "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): rest-get-plain PASS; карточка 9/9 с cold. GET полного URL без входа/query; после исключённого общего бюджета пакета свежий повтор PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "rest-get-plain PASS; карточка 9/9 с cold",
+            "limitations": "GET полного URL без входа/query; после исключённого общего бюджета пакета свежий повтор PASS."
+          }
+        ]
       }
     },
     {
@@ -6170,26 +6491,32 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-615"
+            "lab-675-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-675 (24cbc6c36b78dc334ce1fb67599675330564d74b): partition-random 2/3 PASS; cold PASS. Третья попытка UI_SCAN_LIMIT в экспорте; partition-modes-smoke не подтвердил регрессию из-за исключённых stratified/biased в старой fixture.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): partition-modes-smoke / random PASS; карточка 9/9 с cold. Сценарий train_count=20, test_count=0, seed=42; не подтверждает stratified/biased.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-615"
+            "lab-675-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-data-partition-node",
+            "v039-data-partition-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6197,30 +6524,32 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/preprocessing-datapartition/plan.md",
       "plan_status": "ready_for_development",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-615",
-          "v039-preprocessing-datapartition-acceptance-spec",
-          "pr-571"
+          "lab-675-independent-acceptance",
+          "lab-690-independent-acceptance"
         ],
-        "note": "Последовательный срез 339e3b74 принят в LAB-573/LAB-574 по #571; random в #615: worker два полных PASS на d5b9695c92b87ee726e580354dcd94184edf8254, третья попытка/повторы неполны, checkpoint blocked. Независимый PASS random не найден.",
+        "note": "LAB-675 (24cbc6c36b78dc334ce1fb67599675330564d74b): partition-random 2/3 PASS; cold PASS. Третья попытка UI_SCAN_LIMIT в экспорте; partition-modes-smoke не подтвердил регрессию из-за исключённых stratified/biased в старой fixture.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): partition-modes-smoke / random PASS; карточка 9/9 с cold. Сценарий train_count=20, test_count=0, seed=42; не подтверждает stratified/biased.",
         "scoped_results": [
           {
-            "modes": [
-              "sequential"
-            ],
-            "status": "accepted_scoped",
-            "source": "pr-571",
-            "source_sha_prefix": "339e3b74",
-            "independent_acceptance_issues": [
-              "LAB-573",
-              "LAB-574"
-            ],
-            "note": "Подтверждение приёмки старого SHA в тексте PR; не переносится на random или SHA снимка."
+            "evidence": "lab-675-independent-acceptance",
+            "issue": "LAB-675",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "partition-random 2/3 PASS; cold PASS",
+            "limitations": "Третья попытка UI_SCAN_LIMIT в экспорте; partition-modes-smoke не подтвердил регрессию из-за исключённых stratified/biased в старой fixture."
+          },
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "partition-modes-smoke / random PASS; карточка 9/9 с cold",
+            "limitations": "Сценарий train_count=20, test_count=0, seed=42; не подтверждает stratified/biased."
           }
         ]
       }
@@ -6273,26 +6602,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-572"
+            "lab-690-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): SD/IQR — оба PASS; карточка 9/9 с cold; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-572"
+            "lab-690-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-elim-outlier-node",
+            "v039-elim-outlier-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6300,18 +6633,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/preprocessing-elimoutlier/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-572",
-          "v039-preprocessing-elimoutlier-acceptance-spec",
-          "pr-586",
-          "pr-583"
+          "lab-690-independent-acceptance"
         ],
-        "note": "PR #583 (LAB-575): worker SD 3/3 и IQR 3/3 на 724ab1d5d984702928fbb7f32479ed77c0fb424e после исправления #572; #586 сообщает по одному интеграционному PASS на 3af8e16d089fece256846d04a357c3b60ae4b8b7. Независимая серия 2/3 не найдена."
+        "note": "LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): SD/IQR — оба PASS; карточка 9/9 с cold",
+        "scoped_results": [
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "SD/IQR — оба PASS; карточка 9/9 с cold",
+            "limitations": ""
+          }
+        ]
       }
     },
     {
@@ -6363,26 +6703,32 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-615"
+            "lab-675-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-675 (24cbc6c36b78dc334ce1fb67599675330564d74b): sampling-random 2/3 PASS, sampling 1/1 PASS; cold PASS. Один cold-отказ cancellation/owner context при load1=2.28; критерий 2/3 выполнен.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): sampling-modes-smoke / random PASS; карточка 9/9 с cold. Сценарий count=20, seed=42; не подтверждает stratified/biased.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-615"
+            "lab-675-independent-acceptance",
+            "lab-690-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-sampling-node",
+            "v039-sampling-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6390,30 +6736,32 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/preprocessing-sampling/plan.md",
       "plan_status": "ready_for_development",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-615",
-          "v039-preprocessing-sampling-acceptance-spec",
-          "pr-571"
+          "lab-675-independent-acceptance",
+          "lab-690-independent-acceptance"
         ],
-        "note": "Последовательный срез 339e3b74 принят в LAB-573/LAB-574 по #571; random в #615: worker 3/3 на d5b9695c92b87ee726e580354dcd94184edf8254, независимая проверка не заявлена. Полный текущий срез not_validated.",
+        "note": "LAB-675 (24cbc6c36b78dc334ce1fb67599675330564d74b): sampling-random 2/3 PASS, sampling 1/1 PASS; cold PASS. Один cold-отказ cancellation/owner context при load1=2.28; критерий 2/3 выполнен.; LAB-690 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): sampling-modes-smoke / random PASS; карточка 9/9 с cold. Сценарий count=20, seed=42; не подтверждает stratified/biased.",
         "scoped_results": [
           {
-            "modes": [
-              "sequential"
-            ],
-            "status": "accepted_scoped",
-            "source": "pr-571",
-            "source_sha_prefix": "339e3b74",
-            "independent_acceptance_issues": [
-              "LAB-573",
-              "LAB-574"
-            ],
-            "note": "Подтверждение приёмки старого SHA в тексте PR; не переносится на random или SHA снимка."
+            "evidence": "lab-675-independent-acceptance",
+            "issue": "LAB-675",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "sampling-random 2/3 PASS, sampling 1/1 PASS; cold PASS",
+            "limitations": "Один cold-отказ cancellation/owner context при load1=2.28; критерий 2/3 выполнен."
+          },
+          {
+            "evidence": "lab-690-independent-acceptance",
+            "issue": "LAB-690",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "sampling-modes-smoke / random PASS; карточка 9/9 с cold",
+            "limitations": "Сценарий count=20, seed=42; не подтверждает stratified/biased."
           }
         ]
       }
@@ -6439,7 +6787,7 @@
       "initial_scope": "Ходрик–Прескотт; Lambda или period; integer/real; сохранение исходных полей, NULL и порядка; добавление real _S.",
       "scope_basis": "v039_static_registration_and_scoped_reports",
       "limitations": [
-        "Вейвлеты и переменные не поддержаны; live empty/all-null не подтверждены."
+        "Вейвлеты и переменные не поддержаны. LAB-676: all-NULL даёт native NODE_EXECUTION_FAILED («Ошибка в алгоритме сглаживания»), достоверного CSV нет; диагностика вне критерия PASS."
       ],
       "prerequisites": [
         "accepted_base",
@@ -6467,26 +6815,32 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-619"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): smoothing-hp 2/2 зачётных PASS с cold. All-NULL — native отказ вне критерия, без CSV; один отказ старта подключения исключён и повторён.; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): smoothing-hp PASS с cold. Общий PASS карточки не установлен из-за n18; данный сценарий PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-619"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-smoothing-node",
+            "v039-smoothing-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6494,16 +6848,34 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/preprocessing-smoothing/plan.md",
       "plan_status": "ready_for_development",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-619",
-          "v039-preprocessing-smoothing-acceptance-spec"
+          "lab-676-independent-acceptance",
+          "lab-687-independent-acceptance"
         ],
-        "note": "PR #619: worker 3/3 на a5010b6779166aba8a7f6b2e062a812643be31e0; независимые 2/3 не выполнены. #632 включает как принятый SHA, но не даёт отдельного независимого протокола."
+        "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): smoothing-hp 2/2 зачётных PASS с cold. All-NULL — native отказ вне критерия, без CSV; один отказ старта подключения исключён и повторён.; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): smoothing-hp PASS с cold. Общий PASS карточки не установлен из-за n18; данный сценарий PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-676-independent-acceptance",
+            "issue": "LAB-676",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "smoothing-hp 2/2 зачётных PASS с cold",
+            "limitations": "All-NULL — native отказ вне критерия, без CSV; один отказ старта подключения исключён и повторён."
+          },
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "smoothing-hp PASS с cold",
+            "limitations": "Общий PASS карточки не установлен из-за n18; данный сценарий PASS."
+          }
+        ]
       }
     },
     {
@@ -6688,26 +7060,32 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-613"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): acf-update 2/2 PASS с cold; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): acf-update PASS с cold. Общий PASS карточки не установлен из-за n18; данный сценарий PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-613"
+            "lab-676-independent-acceptance",
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-auto-correlation-node",
+            "v039-auto-correlation-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6715,16 +7093,34 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/research-autocorrelation/plan.md",
       "plan_status": "ready_for_development",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-613",
-          "v039-research-autocorrelation-acceptance-spec"
+          "lab-676-independent-acceptance",
+          "lab-687-independent-acceptance"
         ],
-        "note": "PR #613: acf-update worker 3/3 и acf-one/eight PASS на b23342c9f214726df1cf6e2bb2ba360bba863c77; независимые 2/3 ещё требуются. #632 включает принятый SHA без нового live прогона."
+        "note": "LAB-676 (24cbc6c36b78dc334ce1fb67599675330564d74b): acf-update 2/2 PASS с cold; LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): acf-update PASS с cold. Общий PASS карточки не установлен из-за n18; данный сценарий PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-676-independent-acceptance",
+            "issue": "LAB-676",
+            "source_commit": "24cbc6c36b78dc334ce1fb67599675330564d74b",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "acf-update 2/2 PASS с cold",
+            "limitations": ""
+          },
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "acf-update PASS с cold",
+            "limitations": "Общий PASS карточки не установлен из-за n18; данный сценарий PASS."
+          }
+        ]
       }
     },
     {
@@ -6775,26 +7171,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-560"
+            "lab-689-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): corr-pairs PASS; карточка 8/8 с cold; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-560"
+            "lab-689-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-corr-analysis-node",
+            "v039-corr-analysis-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -6802,17 +7202,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/research-corranalysis/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-560",
-          "v039-research-corranalysis-acceptance-spec",
-          "pr-584"
+          "lab-689-independent-acceptance"
         ],
-        "note": "PR #560: NULL worker 3/3 на 098b987a8dedfc31485545948935a5f003ff61ce, pairs 3/3 на 9f0751fb25cc58ebf26525478634e9eaf7369b9a; независимая серия не найдена. #584/#586 — адресные интеграционные PASS."
+        "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): corr-pairs PASS; карточка 8/8 с cold",
+        "scoped_results": [
+          {
+            "evidence": "lab-689-independent-acceptance",
+            "issue": "LAB-689",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "corr-pairs PASS; карточка 8/8 с cold",
+            "limitations": ""
+          }
+        ]
       }
     },
     {
@@ -7040,39 +7448,55 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "standalone_cli_accepted",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "crosstable-acceptance-task",
-            "crosstable-oracle"
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "accepted_4c1eb0f49"
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s5 / pivot PASS с cold. Принят составной срез; n18 не завершён.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
           "status": "independent_oracle_pass",
           "evidence": [
-            "crosstable-oracle"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": true
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "v039-node-contracts",
+            "v039-crosstable-node",
+            "v039-crosstable-parameters"
+          ],
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_released",
           "evidence": []
         }
       },
-      "next_action": "Принят на 4c1eb0f49 (LAB-10, LAB-12, LAB-13). Merge cross-table в loginom — решение владельца.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/transform-crosstable/plan.md",
       "plan_status": "accepted",
       "acceptance": {
-        "status": "accepted_scoped",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "crosstable-acceptance-task",
-          "crosstable-oracle"
+          "lab-687-independent-acceptance"
         ],
-        "note": "Этапы 1–3: независимая приёмка 24 выходов на 4c1eb0f49720b84e848028985691d0318f8eb9f5 по описанию crosstable-oracle; текущий SHA не перепроверялся."
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): s5 / pivot PASS с cold. Принят составной срез; n18 не завершён.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "s5 / pivot PASS с cold",
+            "limitations": "Принят составной срез; n18 не завершён."
+          }
+        ]
       }
     },
     {
@@ -7183,26 +7607,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-562"
+            "lab-689-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): n21 / lag PASS; карточка 8/8 с cold. Повтор после исключённого общего бюджета пакета PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-562"
+            "lab-689-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-sliding-window-node",
+            "v039-sliding-window-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -7210,17 +7638,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/transform-slidingwindow/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-562",
-          "v039-transform-slidingwindow-acceptance-spec",
-          "pr-584"
+          "lab-689-independent-acceptance"
         ],
-        "note": "PR #562: n21 worker 3/3 на 686f9c9c996d283b03a42ce59aa3755ecae97bf5, после merge HEAD befa8e17b81b2538dfe0dcedc77ec7513f71df26 blocked по точному SHA; #584 даёт один интеграционный PASS. Независимые 2/3 не найдены."
+        "note": "LAB-689 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): n21 / lag PASS; карточка 8/8 с cold. Повтор после исключённого общего бюджета пакета PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-689-independent-acceptance",
+            "issue": "LAB-689",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "n21 / lag PASS; карточка 8/8 с cold",
+            "limitations": "Повтор после исключённого общего бюджета пакета PASS."
+          }
+        ]
       }
     },
     {
@@ -7447,26 +7883,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-611"
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): tree-repeat и tree-no-repeat PASS с cold. Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-611"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-tree-node",
+            "v039-tree-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -7474,16 +7914,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/trees-jsontotree/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-611",
-          "v039-trees-jsontotree-acceptance-spec"
+          "lab-687-independent-acceptance"
         ],
-        "note": "PR #611: worker repeat on 3/3 и off 3/3 на 74f390ee13bb055192121f3200d6d103992b36e0, tree/table/CSV/Save/cold/cleanup; независимый протокол 2/3 не найден. #632 — интеграция принятого SHA."
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): tree-repeat и tree-no-repeat PASS с cold. Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "tree-repeat и tree-no-repeat PASS с cold",
+            "limitations": "Общий PASS карточки не установлен из-за n18; оба сценария пары PASS."
+          }
+        ]
       }
     },
     {
@@ -7594,26 +8043,30 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
+          "status": "независимая приёмка на интеграционной голове",
           "evidence": [
-            "pr-611"
+            "lab-687-independent-acceptance"
           ],
-          "standalone_status": "not_revalidated_at_snapshot",
-          "note": "Живые результаты и их SHA — в PR; независимый 2/3 PASS полного текущего объёма не найден."
+          "standalone_status": "independently_accepted_scoped",
+          "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): tree-repeat и tree-no-repeat PASS с cold. Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.; новый статический снимок не является новым живым прогоном."
         },
         "analytical_validation": {
-          "status": "not_validated",
+          "status": "independent_oracle_pass",
           "evidence": [
-            "pr-611"
+            "lab-687-independent-acceptance"
           ],
-          "historical_scope_preserved": false
+          "historical_scope_preserved": false,
+          "note": "Только сценарии и SHA, перечисленные в acceptance.scoped_results; полная матрица типа не заявлена."
         },
         "integration": {
           "status": "present_in_source",
           "evidence": [
-            "v039-node-contracts"
+            "v039-node-contracts",
+            "v039-tree-node",
+            "v039-tree-parameters"
           ],
-          "source_commit": "a296eba00bfe535333339948cb066528a87807b7"
+          "source_commit": "87aed6197eb93244b35b8a3b81aa8fa6b0c6bf70",
+          "note": "Текущий снимок origin/v039; приёмочные SHA перечислены отдельно."
         },
         "release": {
           "status": "not_validated",
@@ -7621,16 +8074,25 @@
           "note": "Публикация/установленная приёмка этого снимка не проверялись."
         }
       },
-      "next_action": "Независимая приёмка назначенного SHA по карточке; расширения подплана — отдельным назначением.",
+      "next_action": "Независимая приёмка указанных сценариев подтверждена карточками Multica; расширения/непроверенные случаи — отдельным назначением.",
       "plan": "nodes/trees-treetodata/plan.md",
       "plan_status": "discovery_required",
       "acceptance": {
-        "status": "not_validated",
+        "status": "независимая приёмка на интеграционной голове",
         "evidence": [
-          "pr-611",
-          "v039-trees-treetodata-acceptance-spec"
+          "lab-687-independent-acceptance"
         ],
-        "note": "PR #611: worker пары repeat on/off по 3/3 на 74f390ee13bb055192121f3200d6d103992b36e0; отдельный независимый протокол 2/3 не найден. #632 — интеграция принятого SHA."
+        "note": "LAB-687 (b97436638a8cf309aca45183c9d6e7ff3a0c3279): tree-repeat и tree-no-repeat PASS с cold. Общий PASS карточки не установлен из-за n18; оба сценария пары PASS.",
+        "scoped_results": [
+          {
+            "evidence": "lab-687-independent-acceptance",
+            "issue": "LAB-687",
+            "source_commit": "b97436638a8cf309aca45183c9d6e7ff3a0c3279",
+            "status": "независимая приёмка на интеграционной голове",
+            "result": "tree-repeat и tree-no-repeat PASS с cold",
+            "limitations": "Общий PASS карточки не установлен из-за n18; оба сценария пары PASS."
+          }
+        ]
       }
     },
     {

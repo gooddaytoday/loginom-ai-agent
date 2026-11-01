@@ -59,7 +59,7 @@ def render(data):
             e=data['evidence_catalog'].get(ref)
             if e is None:
                 refs.append(ref);continue
-            refs.append(f"[{ref}]({e.get('url') or e['path']})")
+            refs.append(f"[{e.get('issue_key',ref)}]({e.get('url') or e['path']})")
         details='; '.join(h.get('capabilities',[])) or ', '.join(h['modes'])
         limits='; '.join(n['limitations'])
         status=acceptance.get('status','not_validated')
