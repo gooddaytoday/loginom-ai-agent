@@ -217,6 +217,13 @@ large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
+`grouping-unique`: повторяющиеся клиенты по регионам, integer/string,
+NULL и пустая строка; count одновременно с unique_count. Одна Группировка
+перенастраивается и переименовывается. Task, независимый set/count oracle
+и expected: `docs/node-development/nodes/grouping/acceptance/unique/`.
+Модель получает только task и customers.csv; CSV, Save, cold и cleanup
+проверяются штатной оснасткой.
+
 To add a scenario for a new node:
 
 `tree-repeat` and `tree-no-repeat` use the approved tasks under
