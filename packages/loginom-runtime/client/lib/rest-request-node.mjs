@@ -90,6 +90,12 @@ export function createRestRequestNodeSupport(config){
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   let connection=null;
   const request=options.operation.parameters;
+  const linkConnection=async ctx=>{
+   if(!connection)return null;
+   const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+   need(graph.complete,'complete graph is required for the service link');
+   return runRestStep(options,ctx,'link',makeRestLinkCode,{connection,dom_epoch:graph.dom_epoch},config);
+  };
   const drivers=createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
@@ -112,23 +118,32 @@ export function createRestRequestNodeSupport(config){
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
-    const target_inputs=request.inputs.length?(existingInput?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
+    const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
-   beforeInput:async(options,ctx)=>{
-    if(!connection)return;
-    const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
-    need(graph.complete,'complete graph is required for the service link');
-    await runRestStep(options,ctx,'link',makeRestLinkCode,{connection,dom_epoch:graph.dom_epoch},config);
-   },
+   beforeInput:(_,ctx)=>linkConnection(ctx),
    configure:async(channel,p,{request})=>{
     const ctx={document_id:request.document_id,workflow_ref:request.workflow_ref,node:options.operation.nodeApply.node,deadline:options.operation.deadline};
     const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,p,config);
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);
-  return {...drivers,async releaseBeforeTarget({signal,deadline}){
+  return {...drivers,async mapPorts(mappings,ctx){
+   if(ctx.receipt_id===options.operation.id+':input_mapping'&&request.finish!=='close'&&!request.inputs.length&&!mappings.length){
+    const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+    const owned=g=>g.complete===true&&g.document_id===ctx.document_id&&JSON.stringify(g.workflow_ref)===JSON.stringify(ctx.workflow_ref);
+    const connected=g=>g.links.some(link=>link.target===ctx.node.node_id&&link.input===0);
+    need(owned(graph),'complete owned graph is required for an absent table input');
+    if(!connected(graph)){
+     const linked=await linkConnection(ctx);
+     const after=linked?await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal):graph;
+     need(owned(after)&&!connected(after),'table input changed during service linking');
+     return {verified:true,cleanup_complete:true,effect_possible:linked?.effect_possible===true,not_applicable:true,mappings:[],native_table_input_absent:true};
+    }
+   }
+   return drivers.mapPorts(mappings,ctx);
+  },async releaseBeforeTarget({signal,deadline}){
    const child=options.operation.restQueryEncoder;
    if(!child||child.result?.status==='SUCCEEDED'||options.operation.preTargetGraph)return;
    const original=child.operation,childRequest=original.parameters;

@@ -47,6 +47,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
   // zero-sized. Wait for this exact input's hit-test before the sole fill.
   const reachableInput=tid=>wait('reachable input '+tid,async()=>{try{return await point(find(tid).locator('input'));}catch{return null;}});
   const fill=async(tid,value,key='Tab')=>{await quiet();await reachableInput(tid);await guard();const input=find(tid).locator('input');effect=true;await input.fill(value,{timeout:remaining()});await guard();await input.press(key,{timeout:remaining()});};
+  const committed=(tid,value)=>wait('committed input '+tid,()=>find(tid).evaluate((e,value)=>{const control=Ext.getCmp(e.id);return control?.el?.dom===e&&control.value===value&&control.lastValue===value;},value));
   const openSettings=async()=>{
    const opening=await page.evaluateHandle(form=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
     const roots=document.querySelectorAll('[data-tid='+JSON.stringify(form)+']');
@@ -145,7 +146,10 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    await fill(fields+'pedResponseContentType;ValueControl',t.connection.response_content_type);
   if(!existing.length){
    need(observed.parameters.length===0,'new connection unexpectedly has parameters');
-   await fill(fields+'pedURL;ValueControl',t.connection.base_url);await fill(fields+'fldLabel',t.connection.name);
+   // Ext buffers change events. Commit URL before its generated label, then
+   // commit the requested label even when no parameter edits follow it.
+   await fill(fields+'pedURL;ValueControl',t.connection.base_url);await committed(fields+'pedURL;ValueControl',t.connection.base_url);
+   await fill(fields+'fldLabel',t.connection.name);await committed(fields+'fldLabel',t.connection.name);
    for(const q of t.query_parameters){
     const before=(await read()).parameters;await click(fields+'btnAdd');
     const added=await wait('new string URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1&&next[0].type==='Строковый'?next[0]:null;});

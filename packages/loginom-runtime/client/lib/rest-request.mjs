@@ -54,7 +54,20 @@ export async function restRequestCapability(page,t,readContext){
    while(Date.now()<deadline){await guard();const v=await read();if(Date.now()>=deadline)break;if(v)return v;await page.waitForTimeout(Math.min(80,deadline-Date.now()));}
    throw Object.assign(Error('REST request: '+label+' timed out (30000 ms maximum); control '+control),{code:'REST_CONFIGURE_STEP_TIMEOUT'});
   };
-  const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
+  const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').evaluateAll((blockers,root)=>blockers.every(mask=>{
+   // Ext masks disabled column headers too; this particular overlay is not loading.
+   // Fail closed unless both the current wizard and the native column own this DOM.
+   try{
+    if(!mask.matches('.x-mask')||mask.matches('.x-mask-msg,.bg-mask-message,.x-window'))return false;
+    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(root),
+     columns=exact(root+';TuneDataSourceInputPortWizard;colTargetDelete'),owner=mask.parentElement,
+     c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,
+     column=owner&&Ext.getCmp(owner.id);
+    return roots.length===1&&columns.length===1&&columns[0]===owner&&
+     c.FView.el.dom===roots[0]&&roots[0].contains(owner)&&c.FCardLayout.getActiveItem().el.dom.contains(owner)&&
+     column?.el?.dom===owner&&column.getXType()==='actioncolumn'&&column.disabled===true;
+   }catch{return false;}
+  }),root));
   const point=async tid=>{control=tid;const count=await find(tid).count();if(count!==1)throw Object.assign(Error('REST request: control is ambiguous: '+tid+'; count='+count),{code:'REST_CONFIGURE_CONTROL_AMBIGUOUS'});return find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable');return{x,y};});};
   const click=async tid=>{control=tid;await quiet();await guard();const p=await point(tid);effect=true;await page.mouse.click(p.x,p.y);};
   const title=()=>find(root+';cardWizardPanel;p.h;p.t').innerText({timeout:5000});
