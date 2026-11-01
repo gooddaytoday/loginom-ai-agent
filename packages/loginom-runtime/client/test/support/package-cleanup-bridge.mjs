@@ -862,7 +862,7 @@ function failedOpenFixture(fault='none') {
  }};
 }
 
-for(const intent of ['open_package','new_draft'])for(const scenario of ['clean','foreign-account','replacement-session','foreign-operation','wrong-path','dirty','persistent-window','unknown-error','replacement-after-binding','document-after-binding','busy','unsettled'])
+for(const intent of ['open_package','new_draft'])for(const scenario of ['clean','sole-tab','foreign-account','replacement-session','foreign-operation','wrong-path','dirty','persistent-window','unknown-error','replacement-after-binding','document-after-binding','busy','unsettled'])
 test('managed shutdown reconciles its rejected preparation: '+intent+' '+scenario,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'cleanup-rejected-open-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -885,13 +885,18 @@ test('managed shutdown reconciles its rejected preparation: '+intent+' '+scenari
   await wait(ms);
   if(ms<=100&&scenario==='persistent-window')native.state.openError=true;
  };
- // The post-OK close state is intentionally incomplete for one extra read.
+ // Missing Package must settle. A sole tab stays nonclosable even when ready.
  const rootComponent=c.Ext.getCmp('MF;TF-1');
- if(scenario==='clean')rootComponent.closable=false;
+ const packageNode=c.bg.app.Application.FInstance.FMainForm.FMapTree.PackageNodes.Items(0),modelPackage=packageNode.Package;
+ if(['clean','sole-tab'].includes(scenario))rootComponent.closable=false;
+ if(scenario==='clean')packageNode.Package=undefined;
  const settle=native.page.waitForTimeout;let settlementReads=0;
  native.page.waitForTimeout=async ms=>{
   await settle(ms);
-  if(ms<=100&&scenario==='clean'&&++settlementReads>=2)rootComponent.closable=true;
+  if(ms<=100){
+   settlementReads++;
+   if(scenario==='clean'&&settlementReads>=2){rootComponent.closable=true;packageNode.Package=modelPackage;}
+  }
  };
  if(scenario==='foreign-account')native.state.account='foreign';
  if(scenario==='replacement-session')c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={};
@@ -923,7 +928,7 @@ test('managed shutdown reconciles its rejected preparation: '+intent+' '+scenari
   const prepared=session.metadata.workspacePreparation.state;
   assert.equal(prepared.status,'NOT_READY');assert.equal(prepared.document_id,undefined);assert.equal(prepared.loginom_account,undefined);
   f.busy=scenario==='busy';f.unsettled=scenario==='unsettled';
-  const result=await bridge.close(),success=scenario==='clean';
+  const result=await bridge.close(),success=['clean','sole-tab'].includes(scenario);
   assert.equal(result.package_cleanup.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result.package_cleanup));
   assert.equal(session.metadata.workspaceReady,false);assert.equal(f.saves,0);
   assert.equal(native.state.dismissals,success||['dirty','persistent-window'].includes(scenario)?1:0);
@@ -931,7 +936,8 @@ test('managed shutdown reconciles its rejected preparation: '+intent+' '+scenari
   assert.equal(native.events.filter(e=>e==='logout').length,success?1:0);
   assert.equal(result.package_cleanup.unsaved_changes_discarded??false,false);
   if(success){
-   assert.ok(settlementReads>=2);
+   assert.ok(settlementReads>=(scenario==='clean'?2:1));
+   if(scenario==='sole-tab')assert.equal(rootComponent.closable,false);
    assert.equal(result.package_cleanup.package_path,intent==='new_draft'?null:path);assert.equal(result.package_cleanup.document_id,'own-doc');
    assert.equal(result.package_cleanup.account,'test-2');assert.equal(result.package_cleanup.package_closed,true);
    assert.equal(result.package_cleanup.logged_out,true);assert.equal(result.package_cleanup.policy,intent==='new_draft'?'unsaved_draft':'opened_saved_package');

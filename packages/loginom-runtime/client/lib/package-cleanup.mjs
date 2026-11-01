@@ -354,15 +354,18 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
           button.click();
           return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
         }
-        if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
-        // A renderer failure can leave a mounted but unfinished TabForm.
-        // Wait for its native close control before reading package state.
+        const loadingState={mask_visible:blockers.some(loading),package_available:!!node.Package,
+          tab_closable:typeof native.closable==='boolean'?native.closable:null};
+        if(loadingState.mask_visible)return {reason:'OWNED_OPEN_LOADING',loading:loadingState};
+        // Loginom makes its first/only tab nonclosable independently of package
+        // readiness. ClosePackage uses the native dirty/lock guards below;
+        // a missing Package or an owned loading mask still has to settle.
         let activeNode=native.Controller?.Node?.data?.node;const seenNodes=new Set();
         for(let i=0;activeNode&&activeNode!==node&&i<32&&!seenNodes.has(activeNode);i++){
           seenNodes.add(activeNode);activeNode=activeNode.ParentNode;
         }
         if(activeNode!==node)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
-        if(native.closable!==true||!node.Package)return {reason:'OWNED_OPEN_LOADING'};
+        if(!node.Package)return {reason:'OWNED_OPEN_LOADING',loading:loadingState};
         // This callback is only for OK. If its owned error vanished in transit,
         // leave Close to the ordinary path and its fresh native guards.
         if(dismissOpenError)return {reason:'OWNED_OPEN_ERROR_ABSENT'};
@@ -434,6 +437,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN'
       ||before.reason==='RUNNING_NODES'&&before.own_running===true
       ||options.failedOpenOperation&&['OWNED_OPEN_LOADING','OWNED_OPEN_ERROR_CLOSING'].includes(before.reason)) {
+      if(before.loading)receipt.failed_open_loading=before.loading;
       receipt.stage = 'idle_wait';
       const waitDeadline=before.reason==='RUNNING_NODES'||before.reason.startsWith('OWNED_OPEN_')?deadline:idleDeadline;
       const left = waitDeadline-Date.now();
