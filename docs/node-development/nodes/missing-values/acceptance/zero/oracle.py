@@ -25,7 +25,7 @@ def expected(case='core'):
                         row[name] = sum(values) / len(values)
             continue
         # The threshold case deliberately puts I/R strictly above 20%.
-        if rows and any(row[name] is not None for row in rows) and sum(row[name] is None for row in rows) * 100 // len(rows) <= (20 if case == 'threshold' else 100):
+        if rows and sum(row[name] is None for row in rows) * 100 // len(rows) <= (20 if case == 'threshold' else 100):
             for row in rows:
                 if row[name] is None:
                     row[name] = 0
