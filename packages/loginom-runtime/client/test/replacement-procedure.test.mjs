@@ -1,5 +1,17 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {revealReplacementAdd,replacementRealEditorText} from '../lib/replacement-procedure.mjs';
+test('numeric patch writes requested native tolerance, commits blur, and preserves saved precision on empty patch',async()=>{
+ const {configureReplacement}=await import('../lib/replacement-procedure.mjs');
+ for(const separator of ['.',',']){
+  const native={verified:true,input_fields:[{record_id:'n',name:'N',label:'N',type:'real',mode:'manual'}],selected:'N',result_type:'real',mode:'exact',pairs:[],other:{mode:'keep'},precision:1,precision_decimal_separator:separator,editor_open:false};
+  const s={wizard:{root_tid:'w',stage:'replacement'},node_replacement:native,ui:{elements:['fill','press'].map(verb=>({tid:'w;ReplaceColumnsWizard;edPrecision',ref:verb,allowed_actions:[verb]}))}},actions=[];
+  const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{const a=o.resolve(s);actions.push(a);if(a.verb==='press'){assert.equal(a.key,'Tab');native.precision=Number(actions.at(-2).text.replace(',','.'));}}};
+  const rule={field:{kind:'input_field',name:'N'},type:'real',pairs:[],other:{mode:'keep'},precision:0.25};
+  assert.equal((await configureReplacement(channel,{rules:[rule],output_mode:'replace'})).configuration.rules[0].precision,0.25);
+  assert.deepEqual(actions.map(a=>a.verb),['fill','press']);assert.equal(actions[0].text,'0'+separator+'25');
+  actions.length=0;assert.equal((await configureReplacement(channel,{})).configuration.rules[0].precision,0.25);assert.equal(actions.length,0);
+ }
+});
 test('real values follow the observed native decimal separator without scaling or rounding',()=>{
  for(const [separator,pair,remaining] of [['.','9.125','-5.25'],[',','9,125','-5,25']]){
   assert.equal(replacementRealEditorText(9.125,separator),pair);
