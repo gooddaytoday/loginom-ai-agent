@@ -126,7 +126,10 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    r=(await observe('replacement pair committed',r=>!r.editor_open&&r.pairs.some(p=>p.record_id===added[0].record_id&&same(pairKeys([p]),pairKeys([pair]))))).node_replacement;
   }
   if(mode==='exact'&&rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
-  if(rule.type!=='string'&&r.precision!==0)await act('edPrecision','fill',{text:'0'});
+  if(rule.type!=='string'&&r.precision!==rule.precision){
+   await act('edPrecision','fill',{text:replacementRealEditorText(rule.precision,r.precision_decimal_separator)});
+   await act('edPrecision','press',{key:'Tab'});
+  }
   if(r.other.mode!==rule.other.mode){await act('cbxReplaceOther;trg_picker');await act('cbxReplaceOther;boundlist;'+{keep:'Не_заменять',null:'На_пропущенное',value:'На_значение'}[rule.other.mode]);}
   if(rule.other.mode==='value'){
    need(rule.other.value.value!==null,'Use remaining null mode for Null');
@@ -136,7 +139,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    await act('cbxReplaceOther','press',{key:'Tab'});
   }
   r=(await observe('complete replacement field readback')).node_replacement;
-  need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===0),'Replacement field readback differs');
+  need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===rule.precision),'Replacement field readback differs');
  }
  const expected=oldRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]),rules=[];
  for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name),mode));}

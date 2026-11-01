@@ -2,6 +2,17 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {replacementSources,validateReplacementSources} from '../lib/replacement-output.mjs';
 const config={input_fields:[{name:'A',label:'Same',type:'string'},{name:'B',label:'Same',type:'integer'}],rules:[{field:{name:'A'}}],requested_output_mode:'add'};
 const native=()=>({verified:true,inventory_complete:true,source_identity_verified:true,produce_mode:'supplement',source_fields:replacementSources(config,'add'),target_fields:[]});
+test('native nearest adds a real Delta for integer and real inputs, retaining precision zero schema',()=>{
+ for(const type of ['integer','real'])for(const mode of ['add','replace']){
+  const c={input_fields:[{name:'N',label:'Number',type}],rules:[{field:{name:'N'},precision:0.25}]};
+  const fields=replacementSources(c,mode);
+  assert.deepEqual(fields.at(-1),{name:'N_Delta',label:'Number Отклонение',type:'real'});
+  const n={verified:true,inventory_complete:true,source_identity_verified:true,produce_mode:mode==='add'?'supplement':'replace',source_fields:fields,target_fields:[]};
+  assert.doesNotThrow(()=>validateReplacementSources(c,n));
+  n.source_fields=n.source_fields.slice(0,-1);assert.throws(()=>validateReplacementSources(c,n),/generated schema/);
+  c.rules[0].precision=0;assert.equal(replacementSources(c,mode).at(-1).name,'N_Replaced');
+ }
+});
 test('replacement result type changes only the derived value, retaining source and flag types',()=>{
  for(const result_type of ['integer','real','datetime']){
   const converted={...config,rules:[{field:{name:'A'},result_type}]};

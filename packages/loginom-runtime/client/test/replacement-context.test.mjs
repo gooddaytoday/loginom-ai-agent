@@ -17,7 +17,7 @@ function fixture(){
  components[button.id]={el:{dom:button},btnIconEl:{dom:icon},get iconCls(){return 'bg-TBGDataType-'+({2:'dtDateTime',3:'dtFloat',4:'dtInteger',5:'dtString'}[target.type??fields[0].data.DataType]);}};
  icon.classList={contains:value=>!target.badIcon&&value===components[button.id].iconCls};
  const masks=[];const context={Date,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
- const addControl=(name,properties)=>{const e=element(base+name,root);components[e.id]={el:{dom:e},...properties};};
+ const addControl=(name,properties)=>{const e=all.find(e=>e.tid===base+name)??element(base+name,root);components[e.id]={el:{dom:e},...properties};};
  return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,target,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
 }
 test('different key/result types follow the owned type icon and native pair types',()=>{
@@ -56,3 +56,11 @@ test('reader refuses loading, pending responses, foreign selection and unsupport
 test('replacement read is bracketed by unchanged node ownership',async()=>{let i=0;const r=await readReplacementContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:++i}));assert.equal(r.verified,false);assert.equal((await readReplacementContext({}, {},async()=>({verified:true,surface:'wizard',output_port:{}}))).verified,false);});
 
 test('server refreshed Int64 words are decoded exactly without object methods',()=>{for(const [words,expected] of [[{lo:4294967295,hi:2147483647},'9223372036854775807'],[{lo:0,hi:2147483648},'-9223372036854775808']]){const f=fixture();f.fields[0].data.DataType=4;f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:4,ReplaceByType:4,ValueRender:1,ReplaceRender:words}});assert.equal(f.read().pairs[0].to.value,expected);}});
+
+test('numeric precision and its separator are read from the owned control',()=>{
+ for(const type of [3,4])for(const separator of ['.',',']){
+  const f=fixture();f.fields[0].data.DataType=type;f.pairs.splice(0,f.pairs.length);
+  f.addControl('edPrecision',{getValue:()=>0.25,decimalSeparator:separator});
+  const r=f.read();assert.equal(r.verified,true);assert.equal(r.precision,0.25);assert.equal(r.precision_decimal_separator,separator);
+ }
+});

@@ -80,6 +80,21 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 runner.check_text_export_encodings(bad, destinations)
 
+    def test_replace_nearest_fixture_is_independent_and_covers_native_boundaries(self):
+        case = runner.scenario('replace-nearest')
+        expected = runner.expected_for(case, '/test/nearest.lgp')
+        self.assertEqual(expected['package_path'], '/test/nearest.lgp')
+        rows = expected['outputs'][0]['rows']
+        self.assertEqual(len(rows), 26)
+        self.assertEqual([rows[i]['R_Replaced'] for i in [0, 1, 2]], [True, True, False])
+        self.assertEqual(rows[4]['R'], 200)  # tie chooses larger key
+        self.assertEqual(rows[2]['I'], 1200)
+        self.assertEqual(rows[9]['R'], rows[10]['R'])  # zero and negative zero
+        self.assertEqual(rows[3]['R'], 101)  # final existing-node patch
+        self.assertEqual(rows[1]['R_Delta'], 0.24999900000000075)
+        self.assertNotEqual(rows[1]['R_Delta'], 0.249999)
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')
         self.assertTrue(case['prompt'].is_file())
