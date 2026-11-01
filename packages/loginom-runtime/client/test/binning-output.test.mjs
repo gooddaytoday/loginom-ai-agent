@@ -38,6 +38,25 @@ test('derived output inspection awaits asynchronous Close before opening the nex
  const f=fixture(undefined,{closeDelay:3}),r=await f.run();
  assert.equal(r.verified,true);assert.equal(f.closeSamples,6);assert.deepEqual(f.calls,['open:0','close:0','open:1','close:1']);
 });
+function materialized(s){
+ const m=s.node_mapping;
+ m.source_fields=m.target_fields.map(({name,label,type,index})=>({record_id:'source-'+index,field_id:String(index),index,name,label,type,required:false}));
+ m.target_fields.forEach((f,i)=>{f.source=structuredClone(m.source_fields[i]);});
+ m.source_identity_verified=true;
+}
+test('materialized Binning outputs retain verified native source links without committing mappings',async()=>{
+ const f=fixture(materialized),r=await f.run();
+ assert.deepEqual(r.ports.map(p=>p.schema.map(f=>f.name)),names.map(fs=>fs.map(([n])=>n)));
+ assert.deepEqual(f.calls,['open:0','close:0','open:1','close:1']);
+});
+test('materialized Binning outputs reject unverified, missing, foreign or reordered source links',async()=>{
+ for(const change of [s=>s.node_mapping.source_identity_verified=false,s=>s.node_mapping.source_fields.pop(),
+  s=>s.node_mapping.target_fields[1].source=null,s=>s.node_mapping.target_fields[1].source.record_id='foreign',
+  s=>s.node_mapping.source_fields.reverse(),s=>s.node_mapping.source_fields[1].type='integer']){
+  const f=fixture(s=>{materialized(s);change(s);});
+  await assert.rejects(f.run(),/Binning output:/);assert.deepEqual(f.calls,['open:0']);
+ }
+});
 test('derived output inspection refuses foreign owners/ports and incomplete, reordered or mistyped schemas',async()=>{
  for(const change of [s=>s.node_mapping.node_context.node_id='other',s=>s.node_mapping.node_context.output_port.port=1,
   s=>s.node_mapping.node_context.output_port.node_icon_class='bg-vendor-icon-other',s=>s.node_mapping.node_context.output_port.port_guid='',

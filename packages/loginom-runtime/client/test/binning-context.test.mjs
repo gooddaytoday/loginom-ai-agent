@@ -36,6 +36,10 @@ test('incomplete input/bins, pending selection, foreign owners and invalid inter
 test('settings-only field is distinguished from a materialized saved model',()=>{
  const f=fixture();f.records[1].data.BinsCount=0;f.bins.splice(0);const r=f.read();assert.equal(r.verified,true);assert.equal(r.state,'settings');assert.deepEqual(r.intervals,[]);
 });
+test('an empty numeric store after reopening is not a ready Binning inventory',()=>{
+ const f=fixture();f.records.splice(0);f.selection.splice(0);f.bins.splice(0);f.controller.FViewedColumnRecord=null;
+ assert.equal(f.read().verified,false);
+});
 test('prepared owner must stay identical around the native read',async()=>{
  let i=0;const r=await readBinningContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF-1'}},async()=>({verified:true,surface:'wizard',node_id:++i}));
  assert.equal(r.reason,'binning_owner_changed');

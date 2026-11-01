@@ -22,6 +22,8 @@ export function readBinningBrowser(prefix){
  if(!w||c.FWizardForm?.FView!==w)return fail('binning_wizard_owner');
  const queues=Object.getOwnPropertySymbols(w).filter(s=>s.description==='LockQueue');
  if(queues.length!==1||w[queues[0]]?.IsEmpty!==true||c.FBinsReloading===true)return fail('binning_pending');
+ // Reopening after Train can expose the owned store before numeric rows arrive.
+ if(rs.length===0)return fail('binning_fields_pending');
  const fields=[],ids=new Set(),indices=new Set(),types={2:'datetime',3:'real',4:'integer'};
  for(const r of rs){const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||ids.has(id)||!Number.isInteger(d?.Index)||d.Index<0||indices.has(d.Index)||typeof d.DisplayName!=='string'||!types[d.DataType]||![0,2,3,4,5].includes(d.MethodType)||!Number.isInteger(d.BinsCount)||d.BinsCount<0||typeof d.AlwaysDefaultSettings!=='boolean')return fail('binning_field');
