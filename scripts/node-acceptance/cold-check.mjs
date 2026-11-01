@@ -1,6 +1,7 @@
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
 import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
+import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
 import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
@@ -219,6 +220,12 @@ page = context.pages()[0]
   }
 
   const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+  if(expected.clustering_normalized){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
+   if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
+   const settings=await observeClusteringSavedSettings({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
+   await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
+  }
   const actual=[],ownedExecutions=[];
   const readPlans=sampling?[...reads,...reads]:reads;
   for(const [outputIndex,{node:target,ports}] of readPlans.entries()){
@@ -401,6 +408,7 @@ page = context.pages()[0]
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
+  if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 

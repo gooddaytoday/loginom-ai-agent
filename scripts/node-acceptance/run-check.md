@@ -6,6 +6,14 @@ minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
 inputs, then removal of only DateA minutes from the same node. Stock CSV,
 Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
 
+`clustering-normalized`: k-means, 12 объектов с X/Y в разных масштабах.
+На одном узле сначала none, затем standardize дважды с seed 42; оба порта,
+два CSV, Save и cold. Независимые геометрические инварианты проверяют каждую
+строку ровно один раз, три группы, отличие от raw-разбиения, центры как средние
+в исходных единицах (abs 1e-6), расстояния с выборочным SD и повторяемость seed.
+Cold читает сохранённые роли, NormType=5, k и seed без повторной настройки.
+Oracle/expected не передаются модели.
+
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.

@@ -4,6 +4,11 @@
 
 [Подплан](plan.md) · [discovery этапа 0](discovery.md) · [задание](acceptance/task.md) · [реестр](../../registry.json).
 
+Дополнение LAB-717: [стандартизация числовых признаков](normalization.md),
+[приёмочный сценарий](acceptance/normalized/task.md). API допускает
+`normalization:"none"|"standardize"`; g-means и остальные нормировки остаются
+за пределами этого среза.
+
 ## Состояние
 
 В LAB-87 подготовлен кандидат обработчика `datamining.clustering` / `k_means`; готовность реестра не менялась. LAB-84 подготовила discovery и acceptance-комплект для фиксированного k-means волны 2: роли X/Y, нормализация «Нет», k=3, seed=42, оба табличных выхода. Живые наблюдения и их ограничения перечислены в discovery; это не модельная приёмка обработчика.

@@ -1,0 +1,310 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "clustering_normalized": {
+    "version": 1,
+    "seed": 42,
+    "features": [
+      "X",
+      "Y"
+    ],
+    "clusters": 3,
+    "normalization": "standardize",
+    "source": [
+      {
+        "RowID": 1,
+        "X": -0.1,
+        "Y": -100.0
+      },
+      {
+        "RowID": 2,
+        "X": -0.1,
+        "Y": 100.0
+      },
+      {
+        "RowID": 3,
+        "X": 0.1,
+        "Y": -100.0
+      },
+      {
+        "RowID": 4,
+        "X": 0.1,
+        "Y": 100.0
+      },
+      {
+        "RowID": 5,
+        "X": 19.9,
+        "Y": -100.0
+      },
+      {
+        "RowID": 6,
+        "X": 19.9,
+        "Y": 100.0
+      },
+      {
+        "RowID": 7,
+        "X": 20.1,
+        "Y": -100.0
+      },
+      {
+        "RowID": 8,
+        "X": 20.1,
+        "Y": 100.0
+      },
+      {
+        "RowID": 9,
+        "X": -0.1,
+        "Y": 19900.0
+      },
+      {
+        "RowID": 10,
+        "X": -0.1,
+        "Y": 20100.0
+      },
+      {
+        "RowID": 11,
+        "X": 0.1,
+        "Y": 19900.0
+      },
+      {
+        "RowID": 12,
+        "X": 0.1,
+        "Y": 20100.0
+      }
+    ],
+    "groups": [
+      [
+        9,
+        10,
+        11,
+        12
+      ],
+      [
+        5,
+        6,
+        7,
+        8
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "raw_groups": [
+      [
+        1,
+        3,
+        5,
+        7
+      ],
+      [
+        2,
+        4,
+        6,
+        8
+      ],
+      [
+        9,
+        10,
+        11,
+        12
+      ]
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 0,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true,
+          "category_labels_any": true
+        },
+        {
+          "name": "Distance",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 0
+          }
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 0
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": -0.1,
+          "Y": -100.0,
+          "Cluster": 2,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 2,
+          "X": -0.1,
+          "Y": 100.0,
+          "Cluster": 2,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 3,
+          "X": 0.1,
+          "Y": -100.0,
+          "Cluster": 2,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 4,
+          "X": 0.1,
+          "Y": 100.0,
+          "Cluster": 2,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 5,
+          "X": 19.9,
+          "Y": -100.0,
+          "Cluster": 1,
+          "Distance": 0.014360598855377198
+        },
+        {
+          "RowID": 6,
+          "X": 19.9,
+          "Y": 100.0,
+          "Cluster": 1,
+          "Distance": 0.014360598855377198
+        },
+        {
+          "RowID": 7,
+          "X": 20.1,
+          "Y": -100.0,
+          "Cluster": 1,
+          "Distance": 0.014360598855377198
+        },
+        {
+          "RowID": 8,
+          "X": 20.1,
+          "Y": 100.0,
+          "Cluster": 1,
+          "Distance": 0.014360598855377198
+        },
+        {
+          "RowID": 9,
+          "X": -0.1,
+          "Y": 19900.0,
+          "Cluster": 0,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 10,
+          "X": -0.1,
+          "Y": 20100.0,
+          "Cluster": 0,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 11,
+          "X": 0.1,
+          "Y": 19900.0,
+          "Cluster": 0,
+          "Distance": 0.014360598855377096
+        },
+        {
+          "RowID": 12,
+          "X": 0.1,
+          "Y": 20100.0,
+          "Cluster": 0,
+          "Distance": 0.014360598855377096
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 1,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true,
+          "category_labels_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Cluster": 0,
+          "X": 0.0,
+          "Y": 20000.0
+        },
+        {
+          "Cluster": 1,
+          "X": 20.0,
+          "Y": 0.0
+        },
+        {
+          "Cluster": 2,
+          "X": 0.0,
+          "Y": 0.0
+        }
+      ]
+    }
+  ]
+}

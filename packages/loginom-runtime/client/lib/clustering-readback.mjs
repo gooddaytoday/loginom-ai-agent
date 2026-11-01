@@ -6,8 +6,11 @@ export function clusteringConfigurationReadback({node,phases,operation_id}){
  need(c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration owner changed');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&saved.value.settings_applied===true&&finished.value.settings_applied===true,'settings were not committed');
  need(finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'training on the connected source must complete before Execute');
+ const features=c.fields.filter(f=>f.usage_type!==0).map(f=>f.name),norm=c.normalization;
+ need(Array.isArray(norm)&&norm.length===features.length&&features.length>0&&features.every((name,i)=>norm[i]?.name===name)
+  &&[0,5].includes(norm[0].norm_type)&&norm.every(f=>f.norm_type===norm[0].norm_type),'complete uniform supported normalization');
  return {kind:'clustering',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
   receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'k_means',
-  features:c.fields.filter(f=>f.usage_type!==0).map(f=>f.name),clusters:c.clusters,seed:c.seed,normalization:'none',
+  features,clusters:c.clusters,seed:c.seed,normalization:norm[0].norm_type===5?'standardize':'none',
   training:structuredClone(training),package_persistence_verified:false};
 }
