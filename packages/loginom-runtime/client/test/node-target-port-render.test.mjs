@@ -47,7 +47,7 @@ function fixture({portIndex=0}={}){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex)=>{nodeTid='MF;TF-1;Graph;Квантование:_X';node.FLabel.FRawValue='Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex)=>{const regression=node.FIconCls==='bg-vendor-icon-linregression';nodeTid='MF;TF-1;Graph;'+(regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 for(const direction of ['input','output'])test('tree_io binds '+direction+' DataTree ports without treating them as foreign controls',async()=>{
  const f=fixture();if(direction==='input')f.input();f.tree();
@@ -221,8 +221,28 @@ test('Binning caption rebinding preserves native identity, unique DOM and exact 
   await assert.rejects(f.read(),/Visible port identity/);
  }
 });
-test('caption rebinding remains refused for existing non-Binning node types',async()=>{
- for(const type of ['transform.calculator','datamining.lin_regression','programming.javascript']){
+// LAB-693 linreg-short-1/execution-events.jsonl:660: Output_Data-1 has
+// an alternate native SVG without TID after the wizard replaces the caption.
+test('linear regression rebinds its same native data port after caption replacement',async()=>{
+ for(const suffix of ['Input_Data-0','Output_Data-0','Output_Data-1']){
+  const f=fixture({portIndex:Number(suffix.at(-1))});f.node.FIconCls='bg-vendor-icon-linregression';
+  if(suffix.startsWith('Input_'))f.input();
+  await f.read();f.rename(suffix);
+  const observed=await f.read();assert.equal(observed.nodes[0].label,'Линрегрессия: Y X1 X2 X3');
+  const bound=await f.binding(),direction=suffix.startsWith('Input_')?'inputs':'outputs';
+  assert.deepEqual(Array.from(bound.native_bindings[0][direction]),[Number(suffix.at(-1))]);
+ }
+});
+test('linear regression caption rebinding retains native identity, unique DOM and exact suffix guards',async()=>{
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.losePortTid(),f=>{f.port.FGuid='foreign';},f=>{f.port.data={};},
+  f=>{f.port.parent={};},f=>{f.port.FCell={...f.port.FCell};},f=>{f.port.FCell.parent={};},f=>{f.port.FType=0;},f=>{f.port.FSubType=9;},
+  f=>f.rename('Output_Data-0'),f=>f.rename('Input_Data-1'),f=>f.rename('Output_Var-1'),f=>f.changeDocument()]){
+  const f=fixture({portIndex:1});f.node.FIconCls='bg-vendor-icon-linregression';await f.read();f.rename();change(f);
+  await assert.rejects(f.binding(),/Visible port identity|Prepared graph document changed/);
+ }
+});
+test('caption rebinding remains refused for other node types',async()=>{
+ for(const type of ['transform.calculator','programming.javascript']){
   const f=fixture();f.node.FIconCls=NODE_TYPES[type].icon_class;await f.read();f.rename();
   await assert.rejects(f.read(),/Visible port identity/);
  }

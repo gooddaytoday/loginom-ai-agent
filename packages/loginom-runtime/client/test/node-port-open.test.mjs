@@ -193,6 +193,45 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
 
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
 
+for(const direction of ['input','output'])for(const variant of ['hidden','delayed','persistent','foreign','changed-port','no-neutral-point'])test(direction+' port tooltip recovery: '+variant,async()=>{
+ const f=fixture(direction),moves=[],waits=[];
+ await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
+ f.portDom.getBoundingClientRect=()=>({x:1225,y:757,width:6,height:9});
+ const root=f.graph.FDiagram.FmxGraph.container;
+ root.getBoundingClientRect=()=>({x:324,y:100,width:950,height:694});
+ const tooltip=f.el(variant==='foreign'?'foreign-tooltip':'ttip');
+ tooltip.getAttribute=name=>name==='data-tid'?tooltip.tid:name==='class'?'x-tip x-layer x-tip-default x-border-box':null;
+ const cover={getAttribute:()=>null,closest:()=>tooltip,getBoundingClientRect:()=>({x:1168,y:692,width:106,height:102})};
+ let covered=true;
+ f.document.elementFromPoint=(x,y)=>x>1200&&y>750?(covered?cover:f.portDom):root;
+ f.graph.FDiagram.FmxGraph.getCellAt=(x,y)=>x>900&&y>650||variant==='no-neutral-point'?f.port.FCell:null;
+ f.page.mouse.move=async(x,y)=>{
+  moves.push([x,y]);
+  assert.ok(x>=324&&x<1274&&y>=100&&y<794);
+  if(variant==='hidden')covered=false;
+  if(variant==='changed-port')f.port.data={};
+ };
+ f.page.waitForTimeout=async ms=>{
+  if(!covered)return;
+  waits.push(ms);
+  if(variant==='delayed')covered=false;
+  else await new Promise(resolve=>setTimeout(resolve,ms));
+ };
+ const started=Date.now();
+ const r=await f.run();
+ if(['hidden','delayed'].includes(variant)){
+  assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(moves.length,1);assert.equal(f.gestures.length,2);
+  assert.ok(r.trace.some(t=>t.event===direction+'_port_tooltip_cleared'));
+  assert.equal(waits.length,variant==='delayed'?1:0);
+ }else{
+  assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);
+  assert.equal(f.gestures.length,0);assert.equal((direction==='input'?f.prep.inputPortOpenReceipts:f.prep.outputPortOpenReceipts).size,0);
+  assert.equal(moves.length,['foreign','no-neutral-point'].includes(variant)?0:1);
+  assert.ok(waits.length<=11);assert.ok(Date.now()-started<2000);
+  if(variant==='persistent')assert.match(r.error,/ttip still covers port/);
+ }
+});
+
 for(const direction of ['input','output'])for(const long of [false,true])test('covered '+direction+' port retains bounded DOM identity without text; long='+long,async()=>{
  const f=fixture(direction);
  await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
