@@ -122,6 +122,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'core' else 'task-' + kind + '.md'),
                     data=src / 'data', input_files=[('core' if kind == 'mean' else kind) + '.csv'], base=None,
                     expected_name='expected.json' if kind == 'core' else 'expected-' + kind + '.json')
+
+    if name == 'text-export-cp1251':
+        src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
@@ -347,6 +352,27 @@ def csv_delimiter(path):
         # A single-column CSV has no delimiter to infer.
         if not any(char in text for char in ',;\t'): return ','
         raise
+
+
+def check_text_export_encodings(replies, destinations):
+    exports = []
+    for destination, encoding in zip(destinations, [1251, 65001]):
+        matches = []
+        for line, reply in replies:
+            if reply.get('action_key') == 'operation.inspect':
+                reply = reply.get('output', {}).get('outcome', {})
+            configuration = reply.get('configuration', {})
+            readback = configuration.get('readback', {})
+            if (reply.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
+                    and readback.get('kind') == 'text_export' and readback.get('destination') == destination
+                    and readback.get('settings', {}).get('encoding') == encoding
+                    and any(f.get('destination') == destination for f in reply.get('output', {}).get('file_artifacts', []))):
+                matches.append((line, readback))
+        assert matches, 'TEXT_EXPORT_ENCODING_READBACK_MISSING'
+        exports.append(matches[0])
+    assert len(destinations) == len(exports) == 2, 'TEXT_EXPORT_ENCODING_COUNT'
+    assert exports[0][0] < exports[1][0], 'TEXT_EXPORT_ENCODING_ORDER'
+    assert exports[0][1]['node'] == exports[1][1]['node'], 'TEXT_EXPORT_ENCODING_NODE_CHANGED'
 
 
 def export_null_marker(events, destination):
@@ -1046,10 +1072,17 @@ class Runner:
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
         header = spec.get('csv_header', 'names')
+        if spec.get('text_export_encodings'):
+            check_text_export_encodings(replies, destinations)
         sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
+            if spec.get('text_export_encodings'):
+                self.phase('oracle-' + str(index + 1), [sys.executable, '-B', src / 'oracle.py',
+                    '--csv', actual, '--encoding', spec['text_export_encodings'][index]], folder, timeout=60)
+                delimiter = ';'
+                continue
             if expected.get('sampling_modes'):
                 delimiter = csv_delimiter(actual)
                 sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))

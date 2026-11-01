@@ -161,6 +161,12 @@ CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, S
 Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+`text-export-cp1251` uses its frozen task/expected/oracle under
+`nodes/text-export/acceptance/cp1251`: CP1251 input, Cyrillic labels/values,
+semicolon/CRLF, exact file bytes, then the same export node switched to UTF-8.
+Its two exports use independent byte checks; cold reads the final UTF-8 file.
+For a downloaded CP1251 file, direct cold-check supports explicit
+`--csv-encoding Windows-1251`; the default remains UTF-8.
 `join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
 CSV inputs and expected outputs in `docs/node-development/nodes/join/acceptance/`.
 Each runs independently with the stock CSV, Save, cold and cleanup checks.
