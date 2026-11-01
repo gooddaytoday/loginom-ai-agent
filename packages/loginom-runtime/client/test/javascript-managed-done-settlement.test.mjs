@@ -111,6 +111,24 @@ test('Done graph return reuses native Close identity, lock, mask and rendered ty
   f.masks.push(f.element('foreign-mask',''));await assert.rejects(f.outcome,/foreign loading mask/);f.masks.length=0;
   native.FLocked=false;
   assert.equal((await f.outcome()).state,'closed');
+  // Live declared-schema reproduction: native Done changes the label-derived
+  // tid from JavaScript to JS:_Broken while retaining this node GUID/data.
+  native.data=f.binding.nodeData;graphRoot.querySelectorAll=()=>[shape];
+  const originalTid=shape.tid;shape.tid='MF;TF-1;Graph;JS:_Broken';
+  const renamed=await f.outcome();
+  assert.equal(renamed.state,'closed');assert.equal(renamed.graph.graph_tid,shape.tid);
+  assert.equal(f.held.node.tid,originalTid);
+  native.data={};await assert.rejects(f.outcome,/graph owner changed/);native.data=f.binding.nodeData;
+  graphRoot.querySelectorAll=()=>[shape,shape];await assert.rejects(f.outcome,/graph owner changed/);
+  graphRoot.querySelectorAll=()=>[shape];
+  graphRoot.contains=()=>false;await assert.rejects(f.outcome,/graph owner changed/);graphRoot.contains=e=>e===shape;
+  shape.tid='MF;TF-2;Graph;JS:_Broken';await assert.rejects(f.outcome,/graph owner changed/);
+  shape.tid='MF;TF-1;Graph;JS:_Broken';
+  native.FIconCls='bg-vendor-icon-importtextfile';await assert.rejects(f.outcome,/graph owner changed/);
+  native.FIconCls='bg-vendor-icon-javascript';
+  await assert.rejects(waitManagedJavascriptDoneSettlement({...f.options,execute:async code=>
+    code.includes('readJavascriptExistingGraphType')?{verified:true,node_id:'node',graph_tid:originalTid}:f.execute(code)}),
+  /independent graph changed/);
   const result=await waitManagedJavascriptDoneSettlement({...f.options,execute:async code=>
     code.includes('readJavascriptExistingGraphType')?{verified:true,node_id:'node',graph_tid:shape.tid}:f.execute(code)});
   assert.equal(result.owned_done_settled,true);assert.deepEqual(f.calls,[]);

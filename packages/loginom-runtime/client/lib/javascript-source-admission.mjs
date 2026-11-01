@@ -147,7 +147,9 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     // its public message. Recording it cannot authorize a retry or an effect.
     if (!(error instanceof SourceAdmissionError) && Date.now() < deadline) {
       await journal({phase:'javascript_source_boundary_refused',owner:targetOwner,read_id:readId,
-        reason:redactor.text(String(error?.message ?? 'Source boundary failed')).slice(0,1024)},boundaryDiagnostic(error));
+        reason:redactor.text(String(error?.message ?? 'Source boundary failed')).slice(0,4096),
+        exception_name:redactor.text(String(error?.name ?? 'Error')).slice(0,128),
+        exception_stack:redactor.text(String(error?.stack ?? '')).slice(0,4096)},boundaryDiagnostic(error));
     }
     throw error instanceof SourceAdmissionError ? error : new SourceAdmissionError('boundary');
   };
