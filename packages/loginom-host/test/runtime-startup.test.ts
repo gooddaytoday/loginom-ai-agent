@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "../src/supervisor"
@@ -57,3 +57,34 @@ for (const scenario of [
     }
   }, 15000)
 }
+
+for (const knowledge of [true, false]) test(`startup diagnostic is private, redacted and retained by host: knowledge=${knowledge}`, async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
+  const directory = await mkdtemp(join(tmpdir(), "startup-diagnostic-"))
+  try {
+    const entry = join(directory, "entry.mjs")
+    await writeFile(entry, `process.on('message', m => {
+      if(m.operation==='start' && ${knowledge}) process.send({id:m.id,result:{protocol:1,generation:1,started:true}});
+      if(m.operation==='list' || m.operation==='start' && !${knowledge}) process.send({id:m.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE',
+        startupDiagnostics:[{phase:'initialize',retry:false,error:{name:'TypeError',message:'fetch failed',cause:{code:'ECONNRESET',
+          message:'TLS EOF PRIVATE-KEY password=unknown-password https://u:p@example.test/mcp?arbitrary=hidden-query'}}}]});
+      if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+    });`)
+    const input = { node, entry, resources: directory, stateDir: directory, generation: 1, chat: "diagnostic",
+      apiKey: "PRIVATE-KEY", endpoint: "https://example.test/mcp", environment: {},
+      connection: { apiKey: "PRIVATE-KEY", password: "p", username: "user", url: "https://example.test" } }
+    if (knowledge) {
+      const runtime = await superviseKnowledge(input)
+      await expect(runtime.request("list")).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      await runtime.close()
+    } else await expect(supervise(input)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+    const hostLog = await readFile(join(directory, "startup-failures.jsonl"), "utf8")
+    const [id] = await readdir(join(directory, "diagnostics"))
+    const diagnostic = await readFile(join(directory, "diagnostics", id, "events.jsonl"), "utf8")
+    for (const text of [hostLog, diagnostic]) {
+      expect(text).toContain("ECONNRESET"); expect(text).toContain("TLS EOF")
+      for (const secret of ["PRIVATE-KEY", "unknown-password", "hidden-query", "u:p"]) expect(text).not.toContain(secret)
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 15000)

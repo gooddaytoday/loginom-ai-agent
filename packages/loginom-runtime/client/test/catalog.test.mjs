@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '../lib/catalog.mjs';
+import { catalogStartup, startupDiagnostic, readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '../lib/catalog.mjs';
 
 const tool = (name) => ({ name, inputSchema: { type: 'object', properties: {} } });
 
@@ -48,12 +48,12 @@ test('executor-preview removes every raw browser and clipboard tool while keepin
 
 
 test('remote initialization retries one transient connection with a fresh client and never retries rejected authentication', async () => {
-  for (const failure of [new TypeError('fetch failed'), Object.assign(new Error('bad gateway'), { code: 502 }), Object.assign(new Error('unauthorized'), { code: 401 })]) {
+  for (const failure of [new TypeError('fetch failed', { cause: Object.assign(Error('reset'), { code: 'ECONNRESET' }) }), Object.assign(new Error('bad gateway'), { code: 502 }), Object.assign(new Error('unauthorized'), { code: 401 })]) {
     let attempts = 0, closed = 0;
     const connect = connectRemote(() => {
       const attempt = attempts++;
       return { transport: {}, client: {
-        connect: async (_, options) => { assert.equal(options.timeout, 25000); if (!attempt || failure.code === 401) throw failure; },
+        connect: async (_, options) => { assert.ok(options.timeout > 0 && options.timeout <= 25000); if (!attempt || failure.code === 401) throw failure; },
         close: async () => { closed++; },
       } };
     });
@@ -62,6 +62,35 @@ test('remote initialization retries one transient connection with a fresh client
     assert.equal(closed, 1);
   }
   let attempts = 0;
-  await assert.rejects(connectRemote(() => { attempts++; return { transport: {}, client: { connect: async () => { throw new TypeError('fetch failed'); }, close: async () => {} } }; }), /fetch failed/);
+  await assert.rejects(connectRemote(() => { attempts++; return { transport: {}, client: { connect: async () => { throw Object.assign(Error('reset'), { code: 'ECONNRESET' }); }, close: async () => {} } }; }), /reset/);
   assert.equal(attempts, 2);
+});
+
+test('catalog retry expires with the original deadline and does not retry cancellation or certificate errors', async () => {
+  let calls = 0;
+  const startup = catalogStartup({ deadline: Date.now() + 20 });
+  await assert.rejects(startup.read('listTools', async () => {
+    calls++; await new Promise(resolve => setTimeout(resolve, 25)); throw Object.assign(Error('reset'), { code: 'ECONNRESET' });
+  }));
+  assert.equal(calls, 1);
+  for (const error of [new TypeError('fetch failed'), Object.assign(Error('certificate expired'), { code: 'CERT_HAS_EXPIRED' }), Error('invalid manifest')]) {
+    let attempts = 0;
+    await assert.rejects(catalogStartup().read('manifest.read', () => { attempts++; throw error; }));
+    assert.equal(attempts, 1);
+  }
+  const controller = new AbortController(); let attempts = 0;
+  await assert.rejects(catalogStartup({ signal: controller.signal }).read('initialize', () => {
+    attempts++; controller.abort(); throw Object.assign(Error('reset'), { code: 'ECONNRESET' });
+  }));
+  assert.equal(attempts, 1);
+});
+
+test('startup diagnostic retains the original transport cause and removes credentials, headers and URL queries', () => {
+  const error = new TypeError('fetch failed https://u:p@example.test/mcp?unknown=private-query#secret', {
+    cause: Object.assign(Error('TLS EOF api_key=private-key Authorization: Bearer unknown-token'), { code: 'ECONNRESET' }),
+  });
+  const diagnostic = startupDiagnostic(error, ['private-key', 'p']);
+  assert.equal(diagnostic.cause.code, 'ECONNRESET');
+  const text = JSON.stringify(diagnostic);
+  for (const secret of ['private-query','private-key','unknown-token','u:p','?unknown=']) assert.ok(!text.includes(secret), text);
 });
