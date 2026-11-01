@@ -1968,24 +1968,33 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
           items: { type: "string", enum: ["output_mapping", "done"] },
           description: 'Allowed values (validated by the tool): [["output_mapping","done"]].',
         },
+        {
+          type: "array",
+          minItems: 2,
+          maxItems: 2,
+          items: { type: "string", enum: ["tree_output_mapping", "done"] },
+          description: 'Allowed values (validated by the tool): [["tree_output_mapping","done"]].',
+        },
       ],
     })
     expect(source.uiActionSchema).toEqual(before)
     expect(JSON.stringify(result)).not.toContain('"enum":[[')
-    expect(() =>
-      source.validateUiAction({
-        verb: "wizard_step",
-        ref: "ui-observed",
-        expected_stage: ["output_mapping", "done"],
-      }),
-    ).not.toThrow()
-    expect(() =>
-      source.validateUiAction({
-        verb: "wizard_step",
-        ref: "ui-observed",
-        expected_stage: ["done", "output_mapping"],
-      }),
-    ).toThrow()
+    for (const stage of ["output_mapping", "tree_output_mapping"]) {
+      expect(() =>
+        source.validateUiAction({
+          verb: "wizard_step",
+          ref: "ui-observed",
+          expected_stage: [stage, "done"],
+        }),
+      ).not.toThrow()
+      expect(() =>
+        source.validateUiAction({
+          verb: "wizard_step",
+          ref: "ui-observed",
+          expected_stage: ["done", stage],
+        }),
+      ).toThrow()
+    }
   })
 
   test.each([
