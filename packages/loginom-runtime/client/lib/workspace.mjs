@@ -200,7 +200,14 @@ async function prepareWorkspace(page, options) {
         }
       }
     }
-    if (mode==='effect') current.phase='effect_possible';
+    if (mode==='effect') {
+      current.phase='effect_possible';
+      if(options.intent==='new_draft') {
+        current.draftSubmitted=true;
+        current.openErrorBefore=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance?.FErrorMessageInfo??null;
+        current.openErrorAbsent=openErrors.length===0;
+      }
+    }
     if (mode==='lookup') {
       if (!receipt) return {exists:false,document_id:state.id};
       if (receipt.phase==='missing_package') return absenceStillBound(receipt.missing)
@@ -216,19 +223,19 @@ async function prepareWorkspace(page, options) {
           || state.id!==options.workflowRef.document_id || tabTid!==options.workflowRef.tab_tid
           || crumbs.length!==options.workflowRef.navigation_path.length
           || crumbs.some((crumb,i)=>crumb.tid!==options.workflowRef.navigation_path[i].tid || crumb.label!==options.workflowRef.navigation_path[i].label))) return {error:'WORKFLOW_CHANGED'};
-      if (options.intent==='open_package' && openErrors.length) {
-        // Capture only this Open's newly reported native error. This is not
-        // proof of no effect, nor permission to retry Open or dismiss other UI.
+      if (['open_package','new_draft'].includes(options.intent) && openErrors.length) {
+        // Bind only the native error newly reported by this preparation.
+        // It proves neither no effect nor permission to repeat the gesture.
         const instance=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance;
         const message=instance?.FMessageBox,root=message?.el?.dom,messages=instance?.FMessages;
-        if(current?.openSubmitted===true&&current.openErrorAbsent===true&&!current.openError
+        if((options.intent==='new_draft'?current?.draftSubmitted:current?.openSubmitted)===true&&current.openErrorAbsent===true&&!current.openError
           &&openErrors.length===1&&openErrors[0]===messages?.el?.dom&&root?.contains(openErrors[0])
           &&/^msgbox(?:-\d+)?$/.test(root.getAttribute('data-tid')??'')
           &&globalThis.Ext?.getCmp?.(root.id)===message&&instance.FErrorMessageInfo
           &&instance.FErrorMessageInfo!==current.openErrorBefore
           &&(openErrors[0].textContent??'').trim()==="Cannot read properties of undefined (reading 'TestableCellRenderer')")
           current.openError={instance,message,root,messages,info:instance.FErrorMessageInfo,element:openErrors[0]};
-        return {error:'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError,blocking_windows:blockingWindows};
+        return {error:options.intent==='new_draft'?'NATIVE_MESSAGE_BOX_BLOCKED':'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError,blocking_windows:blockingWindows};
       }
       // Buttonless native progress windows may settle on their own.
       if(blockingWindows?.windows.some(w=>w.message_box?.buttons.length>0))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};

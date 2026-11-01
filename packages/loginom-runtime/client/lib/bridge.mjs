@@ -690,7 +690,13 @@ export async function createBridge(config, session, { browserTransport: managedB
           && prepared.state.effect_possible === true && prepared.state.created_draft === false
           && prepared.state.operation_id === preparationRequest.operation_id
           && prepared.state.session_id === session.metadata.sessionId;
-        const unsavedDraft = normalCleanup && !lastSavedPackage
+        const failedDraft = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'new_draft' && prepared?.operation_id === preparationRequest.operation_id
+          && prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'NATIVE_MESSAGE_BOX_BLOCKED'
+          && prepared.state.phase === 'exact_workflow_ready' && prepared.state.created_draft === true
+          && prepared.state.effect_possible === true && prepared.state.operation_id === preparationRequest.operation_id
+          && prepared.state.session_id === session.metadata.sessionId;
+        const unsavedDraft = failedDraft || normalCleanup && !lastSavedPackage
           && preparationRequest?.intent === 'new_draft'
           && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
             || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
@@ -716,11 +722,12 @@ export async function createBridge(config, session, { browserTransport: managedB
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
                 if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-                if (failedOpen) {
+                if (failedOpen || failedDraft) {
                   const options = {sessionId:session.metadata.sessionId, operationId:preparationRequest.operation_id,
-                    packagePath, loginomUrl:config.loginomUrl, loginomBuild:prepared.state.target?.loginom_build};
+                    packagePath, ...(failedDraft ? {unsavedDraft:true} : {}),
+                    loginomUrl:config.loginomUrl, loginomBuild:prepared.state.target?.loginom_build};
                   // NOT_READY has no account/document. Bind them inside the same
-                  // browser gate to the original Open receipt and server session.
+                  // browser gate to the original preparation and server session.
                   const binding = parseFailedOpenBinding(await browser.callTool({name:'browser_run_code_unsafe',
                     arguments:{code:makeFailedOpenCleanupCode({...options, bindOnly:true})}}, undefined, {timeout:30000}), options);
                   const cleanupOptions = {...options, documentId:binding.document_id, account:binding.account};
