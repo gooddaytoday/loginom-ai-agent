@@ -130,7 +130,7 @@ const execute = async (fixture, options = {}, clock = Date) => runInNewContext(m
   compatibility: { profile_id: 'tested-ui', loginom_build: build, platform: 'macos', browser: 'chromium' }, platform: 'darwin', ...options,
 }), {Date:clock})(fixture.page);
 
-for(const fault of ['none','old error','foreign DOM','different text'])test('D78 captures only a new native ErrorMsg from this submitted Open: '+fault,async()=>{
+for(const intent of ['open_package','new_draft'])for(const fault of ['none','old error','foreign DOM','different text'])test('D78 captures only a new native ErrorMsg from this preparation: '+intent+' '+fault,async()=>{
  const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll;
  const failures=[],evaluate=f.page.evaluate;
  f.page.evaluate=async(...args)=>{try{return await evaluate(...args);}catch(e){failures.push(e.message);throw e;}};
@@ -146,13 +146,13 @@ for(const fault of ['none','old error','foreign DOM','different text'])test('D78
  c.document.querySelectorAll=q=>q==='.bg-error-messages'?(shown?[body]:[]):query(q);
  if(fault==='different text')body.textContent='Some other error';
  const locator=f.page.locator;
- f.page.locator=q=>{const l=locator(q),click=l.click;l.click=async(...args)=>{await click(...args);if(q.includes('OpenDialogForm;btnOpen')){shown=true;instance.FErrorMessageInfo=info;}};return l;};
+ f.page.locator=q=>{const l=locator(q),click=l.click;l.click=async(...args)=>{await click(...args);if(q.includes('OpenDialogForm;btnOpen')||q.includes('btnCreateUnsavedPackage')){shown=true;instance.FErrorMessageInfo=info;}};return l;};
  const {makeWorkspacePrepareCode:makeCode}=await import(process.env.D78_WORKSPACE_MODULE??'../lib/workspace.mjs');
  const state=await runInNewContext(makeCode({loginomUrl:'http://loginom.example/app',compatibility:{loginom_build:build,platform:'macos',browser:'chromium'},
-  platform:'darwin',intent:'open_package',packagePath:'/test-account/result.lgp',sessionId:'d78',operationId:'d78-open'}))(f.page);
- assert.equal(state.reason,'PACKAGE_OPEN_REJECTED',JSON.stringify(failures));assert.equal(state.effect_possible,true);
+  platform:'darwin',intent,...(intent==='open_package'?{packagePath:'/test-account/result.lgp'}:{}),sessionId:'d78',operationId:'d78-open'}))(f.page);
+ assert.equal(state.reason,intent==='open_package'?'PACKAGE_OPEN_REJECTED':'NATIVE_MESSAGE_BOX_BLOCKED',JSON.stringify(failures));assert.equal(state.effect_possible,true);
  const receipt=c.__loginomDockPreparationV1.receipts.get('d78-open');
- assert.equal(!!receipt.openError,fault==='none');assert.equal(f.events.filter(e=>e==='open_package').length,1);
+ assert.equal(!!receipt.openError,fault==='none');assert.equal(f.events.filter(e=>e===(intent==='new_draft'?'create_draft':'open_package')).length,1);
 });
 
 test('normal preparation opens Loginom and asks for login without assuming test credentials', async () => {
