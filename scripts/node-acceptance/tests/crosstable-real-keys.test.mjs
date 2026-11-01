@@ -17,6 +17,7 @@ assert sorted(p.name for p in c['data'].iterdir())==['keys.csv']
 assert e['package_path']=='/owned/real.lgp'
 v=e['outputs'][0]
 assert v['output_port']==0 and v['column_order']=='exact'
+assert v['ordered'] is True
 assert [x['type'] for x in v['columns']]==['real','string','real','integer','real','integer']
 values=[[row[c['name']] for c in v['columns']] for row in v['rows']]
 rows={(x[0],x[1]):x[2:] for x in values}

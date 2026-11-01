@@ -17,7 +17,7 @@ def expected():
     output = {
         'output_node_type': 'transform.cross_table',
         'output_port': 0,
-        'ordered': False,
+        'ordered': True,
         'column_order': 'exact',
         'columns': [
             {'name': 'R', 'label': 'R', 'type': 'real'},
@@ -30,7 +30,8 @@ def expected():
                  for category in ['A', 'B']
                  for value in ([sum(categories[category]), len(categories[category])]
                                if category in categories else [None, None])]
-                 for key, categories in groups.items()],
+                 for key, categories in sorted(groups.items(), key=lambda item:
+                     (item[0][0] is not None, item[0][0] or 0, item[0][1]))],
     }
     output['rows'] = [dict(zip([c['name'] for c in output['columns']], row))
                       for row in output['rows']]

@@ -16,7 +16,7 @@
     {
       "output_node_type": "transform.cross_table",
       "output_port": 0,
-      "ordered": false,
+      "ordered": true,
       "column_order": "exact",
       "columns": [
         {
@@ -52,38 +52,6 @@
       ],
       "rows": [
         {
-          "R": 1.25,
-          "Segment": "B",
-          "C_1_Amount_Sum": null,
-          "C_1_Amount_Count": null,
-          "C_2_Amount_Sum": 10.0,
-          "C_2_Amount_Count": 1
-        },
-        {
-          "R": 0.0,
-          "Segment": "A",
-          "C_1_Amount_Sum": 7.0,
-          "C_1_Amount_Count": 2,
-          "C_2_Amount_Sum": null,
-          "C_2_Amount_Count": null
-        },
-        {
-          "R": 1.25,
-          "Segment": "A",
-          "C_1_Amount_Sum": 3.0,
-          "C_1_Amount_Count": 1,
-          "C_2_Amount_Sum": 13.0,
-          "C_2_Amount_Count": 1
-        },
-        {
-          "R": -2.5,
-          "Segment": "B",
-          "C_1_Amount_Sum": 7.0,
-          "C_1_Amount_Count": 1,
-          "C_2_Amount_Sum": null,
-          "C_2_Amount_Count": null
-        },
-        {
           "R": null,
           "Segment": "A",
           "C_1_Amount_Sum": null,
@@ -98,6 +66,22 @@
           "C_1_Amount_Count": null,
           "C_2_Amount_Sum": 17.0,
           "C_2_Amount_Count": 1
+        },
+        {
+          "R": -2.5,
+          "Segment": "B",
+          "C_1_Amount_Sum": 7.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        },
+        {
+          "R": 0.0,
+          "Segment": "A",
+          "C_1_Amount_Sum": 7.0,
+          "C_1_Amount_Count": 2,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
         },
         {
           "R": 0.0,
@@ -122,6 +106,22 @@
           "C_1_Amount_Count": 1,
           "C_2_Amount_Sum": null,
           "C_2_Amount_Count": null
+        },
+        {
+          "R": 1.25,
+          "Segment": "A",
+          "C_1_Amount_Sum": 3.0,
+          "C_1_Amount_Count": 1,
+          "C_2_Amount_Sum": 13.0,
+          "C_2_Amount_Count": 1
+        },
+        {
+          "R": 1.25,
+          "Segment": "B",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 10.0,
+          "C_2_Amount_Count": 1
         }
       ]
     }
