@@ -17,18 +17,20 @@ def expected(case='core'):
                  float(raw[name]) if TYPES[name] == 'real' else int(raw[name])
                  for name in names} for raw in reader]
     for name in ('I', 'R', 'A'):
-        if case == 'mean':
-            if name != 'A':
-                values = [row[name] for row in rows if row[name] is not None]
-                for row in rows:
-                    if row[name] is None:
-                        row[name] = sum(values) / len(values)
+        method = ('mean' if name != 'A' else None) if case == 'mean' else (
+            'mean' if case == 'threshold' and name == 'I' else 'zero')
+        if method is None:
             continue
-        # The threshold case deliberately puts I/R strictly above 20%.
-        if rows and sum(row[name] is None for row in rows) * 100 // len(rows) <= (20 if case == 'threshold' else 100):
-            for row in rows:
-                if row[name] is None:
-                    row[name] = 0
+        replacement = 0
+        if method == 'mean':
+            values = [row[name] for row in rows if row[name] is not None]
+            # Compare exactly: mean obeys the statistical threshold; fixed zero does not.
+            if not values or (len(rows) - len(values)) * 100 > len(rows) * (20 if case == 'threshold' else 100):
+                continue
+            replacement = sum(values) / len(values)
+        for row in rows:
+            if row[name] is None:
+                row[name] = replacement
     return {'package_path': '{{PACKAGE_PATH}}',
             'nodes': [{'type': t} for t in ('imports.text', 'preprocessing.data_recovery', 'exports.text')],
             'outputs': [{'output_node_type': 'preprocessing.data_recovery', 'output_port': 0,

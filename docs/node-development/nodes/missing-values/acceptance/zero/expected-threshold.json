@@ -49,28 +49,28 @@
           "RowID": 1,
           "I": 2,
           "R": 2.5,
-          "A": null,
+          "A": 0,
           "Keep": null
         },
         {
           "RowID": 2,
           "I": null,
-          "R": null,
-          "A": null,
+          "R": 0,
+          "A": 0,
           "Keep": 0
         },
         {
           "RowID": 3,
           "I": 0,
           "R": 0.0,
-          "A": null,
+          "A": 0,
           "Keep": 9
         },
         {
           "RowID": 4,
           "I": 6,
           "R": 7.5,
-          "A": null,
+          "A": 0,
           "Keep": null
         }
       ]

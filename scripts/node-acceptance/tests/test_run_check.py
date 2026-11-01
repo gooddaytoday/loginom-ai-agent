@@ -45,7 +45,10 @@ class RunCheckTests(unittest.TestCase):
             self.assertIsNone(rows[0]['Keep'])
             self.assertEqual(rows[2]['I'], 0)
             self.assertEqual(rows[1]['I'], None if kind == 'threshold' else 2 if kind == 'mean' else 0)
-            self.assertEqual(rows[1]['A'], 0 if kind == 'core' else None)
+            self.assertEqual(rows[1]['A'], None if kind == 'mean' else 0)
+            self.assertEqual(rows[1]['R'], 2.5 if kind == 'mean' else 0)
+            if kind == 'threshold':
+                self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
