@@ -3,6 +3,46 @@ import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { knowledgeServer } from './support/knowledge-server.mjs';
 
+for (const stage of ['initialize', 'tools/list']) for (const failures of [1, 2]) {
+  test(`catalog startup ${stage}: ${failures} transient HTTP failures, at most one retry`, async t => {
+    let attempts = 0;
+    const server = await knowledgeServer(t, { request(body, request, response) {
+      if (body?.method !== stage) return false;
+      if (++attempts > failures) return false;
+      response.writeHead(503); response.end('temporary catalog outage'); return true;
+    } });
+    const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+    const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+    if (failures === 1) {
+      const knowledge = await starting;
+      assert.equal(knowledge.tools.length, 7); await knowledge.close();
+    } else await assert.rejects(starting);
+    assert.equal(attempts, 2);
+    assert.equal(server.calls.length, 0);
+  });
+}
+
+test('initialization and listTools share a single retry allowance', async t => {
+  let initialized = 0, listed = 0;
+  const server = await knowledgeServer(t, { request(body, request, response) {
+    if (body?.method === 'initialize' && ++initialized === 1 || body?.method === 'tools/list' && ++listed === 1) {
+      response.writeHead(503); response.end('temporary'); return true;
+    }
+    return false;
+  } });
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  await assert.rejects(createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }));
+  assert.equal(initialized, 2); assert.equal(listed, 1);
+});
+
+test('semantic catalog failure is not retried', async t => {
+  let listed = 0;
+  const server = await knowledgeServer(t, { list() { listed++; throw Error('invalid catalog'); } });
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  await assert.rejects(createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }));
+  assert.equal(listed, 1);
+});
+
 test('knowledge reads real authenticated MCP schemas and Help without browser modules or a child process', async t => {
   const server = await knowledgeServer(t);
   const hooks = registerHooks({ resolve(specifier, context, next) {

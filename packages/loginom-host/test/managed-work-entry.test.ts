@@ -51,6 +51,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/client/lib/redact.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/client/lib/catalog.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/catalog.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/session.mjs": `
       import { readFileSync } from 'node:fs';
       import { createArtifactStore } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/artifacts.mjs", import.meta.url).href)};
