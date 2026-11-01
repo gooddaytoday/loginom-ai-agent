@@ -490,6 +490,26 @@ test('partly clipped graph visualizers use their observed painted point and refu
   }
 });
 
+// LAB-656 main :3241/:3262: the port centre is x=1274, beyond the graph,
+// while the fresh observation proves a painted point at x=1272.5.
+for(const direction of ['Input','Output'])for(const cover of ['gutter','covered','dialog'])test('minimum-scale graph port '+direction+' uses its observed point: '+cover,async()=>{
+ const page=new Page(),tid='MF;TF-1;Graph;Finance';
+ page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
+ const graph=page.add('div','MF;TF-1;ModelForm;cmpDiagram','',{x:324,y:100,width:950,height:694});
+ const body=page.add('g',tid,'',{x:1249,y:752,width:22,height:29},graph);
+ page.add('span',tid+';Label;Label','Finance',undefined,body);
+ const port=page.add('g',tid+';'+direction+'_Data-0','',{x:1271,y:762,width:6,height:9},graph);
+ const gutter=page.add('div',null,'',{x:1274,y:730,width:6,height:64});gutter.attrs.role='presentation';
+ const snapshot=await page.observe(),e=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']);
+ assert.equal(e.kind,'port');assert.equal(e.scope,'graph');
+ assert.deepEqual(e.interaction.point,{x:1272.5,y:766.5});
+ if(cover!=='gutter')page.beforeHandleGeometry=target=>{if(target===port){gutter.box.x=1270;gutter.box.width=10;if(cover==='dialog')gutter.attrs.role='dialog';}};
+ const result=await page.act({verb:'click',ref:e.ref},snapshot);
+ assert.equal(result.status,cover==='gutter'?'SUCCEEDED':'NOT_APPLIED',JSON.stringify(result.error));
+ assert.deepEqual(page.clickedPoints,cover==='gutter'?[{...e.interaction.point,clickCount:1}]:[]);
+ if(cover!=='gutter'){assert.equal(result.error.code,'UI_REFERENCE_OBSCURED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);}
+});
+
 test('a DOM geometry change during preflight is rejected before any checked-point click', async () => {
   const page = new Page(), shape = page.add('g', 'MF;TF-1;Graph;Узел');
   const snapshot = await page.observe(), element = snapshot.ui.elements.find(item => item.tid === shape.getAttribute('data-tid'));

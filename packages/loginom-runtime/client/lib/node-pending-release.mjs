@@ -1,5 +1,6 @@
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {returnFromNodeViews} from './node-output-procedure.mjs';
+import {boundWizardDeactivationConfirmation} from './node-wizard-open.mjs';
 
 const requireValue=(value,message)=>{if(!value)throw new Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -24,7 +25,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,draftReceipt=false;
+ let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -57,6 +58,30 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
   const n=r.output?.prepared_node_context,w=r.output?.wizard;
+  if(state.pending.phase==='open'&&state.request.target?.type==='imports.text'
+   &&r.action_key==='ui.act'&&operation.lastReceipt.action_key==='ui.act'
+   &&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id
+   &&r.operation_id===operation.lastReceipt.id&&r.operation_id.startsWith(operation.id+':n')
+   &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===true
+   &&r.error?.code==='WIZARD_CONTEXT_CHANGED'&&gestures.length===1&&gestures[0].verb==='begin_wizard'
+   &&r.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='begin_wizard').length===1
+   &&sameNode(n,node)&&n.surface==='graph'&&n.locked===false&&typeof n.tid==='string'
+   &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label
+   &&r.output.authenticated===true&&r.output.workflow_navigation?.status==='observed'
+   &&r.output.workflow_navigation.path?.length>0
+   &&same(r.output.workflow_navigation.path,state.request.workflow_ref.navigation_path)
+   &&same(r.output.workflow_navigation.current_path,[...r.output.workflow_navigation.path,n.pending_wizard_node])
+   &&n.pending_wizard_node.tid.startsWith(r.output.workflow_navigation.path.at(-1).tid+'>')
+   &&typeof r.output.dom_epoch?.document==='string'&&typeof r.output.active_tab_ref==='string'
+   &&r.output.ui?.dialogs?.length===1){
+   const s=r.output;
+   const binding={kind:'deactivation',release_opening:{node:n,workflow_ref:s.workflow_ref,document:s.dom_epoch.document,
+    origin:s.origin,build:s.loginom_build,active_tab_ref:s.active_tab_ref,package_identity:s.package_identity,
+    navigation:s.workflow_navigation,dialog:s.ui.dialogs[0]}};
+   if(boundWizardDeactivationConfirmation(s,binding)){
+    openingConfirmation=structuredClone(binding);
+   }
+  }
   if(draft){
    requireValue(typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id,
     'The completed draft receipt identity changed');
@@ -84,12 +109,18 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
- const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,...(settleWizard?{settleWizard}:{}),
+ const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,
+  ...(openingConfirmation?{wizardConfirmation:openingConfirmation}:{}),...(settleWizard?{settleWizard}:{}),
   ready:s=>['absent','observed'].includes(s.wizard?.status)}).catch(error=>{
    throw new NodeReleaseBlocked('The Loginom workspace could not be observed for release: '+String(error.message).slice(0,300),
     'Warn the user that unsaved settings of the open wizard will be lost, ask them to close any open Loginom wizard or dialog with its Cancel button and return to this scenario graph.'+retry);});
  if(beforeSettlement)requireValue(same(beforeSettlement,await readReleaseGraph(operation,node,settleWizard.deadline,now)),
   'The graph changed while the original wizard gesture settled; no cleanup was authorized');
+ if(openingConfirmation){
+  await channel.perform({condition:'cancel only the stopped opening deactivation question',initialObservation:current,
+   ready:s=>boundWizardDeactivationConfirmation(s,openingConfirmation),identity:()=>openingConfirmation,
+   resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;cancel').ref})});
+ }
  if(draftReceipt)requireValue(current.ui?.dialogs?.length===0&&current.ui?.masks?.length===0,
   'The stopped draft has a blocking dialog or mask');
  if(current.wizard.status==='observed'){
@@ -119,7 +150,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(same(graph,await readReleaseGraph(operation,node,deadline,now))&&same(first.prepared_node_context,second.prepared_node_context),
   'The graph changed during release; inspect the operation again');
  requireValue(graph.nodes.filter(n=>same(n.ref,node)).length===1,'The released node is absent from its graph');
- return {verified:true,cleanup_complete:true,effect_possible:cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,
+ return {verified:true,cleanup_complete:true,effect_possible:!!openingConfirmation||cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,
   node_context:second.prepared_node_context,graph,cleanup};
 }
 
