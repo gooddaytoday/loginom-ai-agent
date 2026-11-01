@@ -28,10 +28,19 @@ test('effective input mapping is validated before its Done, preserving retained 
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'A',type:'string'}]},native));
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'Renamed',type:'datetime'}]},native));
 });
-test('unsupported ISO/string operations and repeated assignments are refused',()=>{
- for(const operation of ['iso_year','custom','week','to_string'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
+test('unsupported ISO end/string operations and repeated assignments are refused',()=>{
+ for(const operation of ['iso_week_end','custom','week','to_string'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
  const p=structuredClone(parameters);p.fields[0].transformations.push({...p.fields[0].transformations[0],name:'Other'});assert.throws(()=>validateDateTimeParameters(p,'calendar',request));
- assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,12);
+ assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,16);
+});
+test('four ISO-week operations validate and resolve distinct generated sources beside calendar year',()=>{
+ const operations=[['year','A_Y_1','Дата (Год)','integer'],['iso_year','A_Y_2','Дата (Год, ISO8601)','integer'],['iso_week','A_WY_7','Дата (Неделя, ISO8601)','integer'],['iso_week_start','A_YW_3','Дата (Год + Неделя, Первый день, ISO8601)','datetime'],['day_of_week','A_DW_1','Дата (День недели)','integer']];
+ const p={fields:[{field:{kind:'input_field',name:'A'},transformations:operations.map(([operation])=>({operation,name:operation,label:operation}))}]};
+ validateDateTimeParameters(p,'calendar',request);
+ const sources=operations.map(([,name,label,type],i)=>field(String(i),name,label,type,true)).reverse();
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,source_fields:sources,target_fields:sources.map(source=>({source,name:source.name,label:source.label,excluded:false}))};
+ const result=resolveDateTimeOutput({input_fields:[{name:'A',label:'Дата',type:'datetime'}]},p,native);
+ assert.deepEqual(result.map(r=>r.name),operations.map(([operation])=>operation).reverse());
 });
 const field=(record_id,name,label,type,required)=>({record_id,name,label,type,required});
 test('output origin uses exact input prefix/type/boundary with equal labels, never output order',()=>{

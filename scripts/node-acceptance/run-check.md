@@ -329,3 +329,8 @@ abs=1e-8 только для real, метки через label_any.
 `smoothing-hp`: Сглаживание HP Lambda=1 для X/R, series → update на прежнем узле,
 фиксированный порядок RowID,X,R,Tag,X_S,R_S через autosync=false;
 приёмочный комплект `preprocessing-smoothing/acceptance`, ordered CSV/Save/cold.
+
+`date-time-iso` и `date-time-iso-empty`: четыре операции ISO-календаря в «Дата и время»,
+утверждённые task-iso-weeks*.md и независимый Python expected из
+`docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
+из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
