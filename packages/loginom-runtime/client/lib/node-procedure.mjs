@@ -32,7 +32,7 @@ import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
-import {identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
@@ -85,7 +85,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
   let launchConfirmed = false;
-  let executionBaseline,launchEvidence,ownedErrorToast;
+  let executionBaseline,launchEvidence,ownedErrorToast,reportedErrorToast;
   let launchConsoleControl;
   const rememberConsoleControl = state => {
     if(launchConfirmed||!preparedNodeContext||state.prepared_node_context?.surface!=='graph')return;
@@ -673,6 +673,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           }
           throw error;
         }
+        // Reporting a pre-process error grants no UI action, including dismiss.
+        // Ordinary release may only wait for that exact notification to expire.
+        if(reportedErrorToast&&result.output.ui.dialogs.length) {
+          const portal=result.output.ui.dialogs[0];
+          if(result.output.ui.dialogs.length!==1||portal.ref!==reportedErrorToast.ref||portal.identity?.anchor_tid!=='toast')
+            throw Error('Reported error notification changed during release');
+          const detail=await readUi({mode:'observe',operation_id:id,...boundOptions,root_ref:portal.ref,
+            node_error_toast_observation:true,expected_origin:targetOrigin,expected_build:targetBuild});
+          if(detail.status!=='SUCCEEDED')throw Error('Reported error notification could not be observed during release');
+          assertContext(detail.output,true);
+          if(JSON.stringify(detail.output.ui.dialogs[0]?.error_toast)!==JSON.stringify(reportedErrorToast.error_toast))
+            throw Error('Reported error notification changed during release');
+          await entry('node_reported_error_toast_wait',{step,sample,internal_operation_id:id,condition,outcome:structuredClone(detail)});
+          satisfied=false;confirmations=0;previousIdentity=undefined;
+          continue;
+        }
+        reportedErrorToast=undefined;
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
         if(readNavigation)result.output.node_navigation_read=true;
         if(readProcessControls)result.output.node_process_controls_read=true;
@@ -744,8 +761,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
         }
         // Train/Execute can fail immediately and leave an error portal outside
-        // this read's root. Bind it to a fresh native-owned failed child from
-        // the pre-launch inventory, never to a caption or an old error alone.
+        // this read's root. A fresh group requires strict native child proof.
+        // Validation before a process exists may only report and stop.
         const toastGate={launch_bound:!!launchEvidence,dialog_unique:result.output.ui.dialogs.length===1,
           toast_identity:result.output.ui.dialogs[0]?.identity?.anchor_tid==='toast',
           node_surface:result.output.prepared_node_context?.surface==='graph',node_unlocked:result.output.prepared_node_context?.locked===false,
@@ -781,9 +798,33 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               native_context:JSON.stringify(canonical(native.node_context))===JSON.stringify(canonical(state.prepared_node_context)),
               node_surface:state.prepared_node_context.surface==='graph',node_unlocked:!state.prepared_node_context.locked,
               wizard_absent:state.wizard?.status==='absent',masks_absent:!state.ui.masks.length};
+            let unchangedHistory=false;
+            try {
+              const current=captureExecutionBaseline(native,launchEvidence.baseline.node);
+              unchangedHistory=current.root_id===launchEvidence.baseline.root_id
+                &&JSON.stringify(canonical(current.roots))===JSON.stringify(canonical(launchEvidence.baseline.roots))
+                &&current.roots.every(root=>root.completed===true);
+            } catch { /* Missing/ambiguous native history never enables the fallback. */ }
+            const reportChecks={...Object.fromEntries(Object.entries(checks).filter(([key])=>
+              !['new_execution_group','failed_owned_child','toast_message_matches','toast_caption_matches'].includes(key))),
+              no_new_execution:!execution&&unchangedHistory,
+              toast_absent_before_launch:launchEvidence.toast_absent===true,
+              launch_wait_active:now()<operation.deadline,
+              exclusive_operation:operation.exclusiveNodeExecution?.()===true};
+            if(Object.values(reportChecks).every(Boolean)) {
+              const failure={code:'NODE_EXECUTION_FAILED',message:('Loginom сообщил после запуска: '+toast.message).slice(0,1000),
+                native:{source:'loginom_post_launch_error_toast',attribution:'own_action_wait',message:toast.message,
+                  node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id}};
+              const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
+                launch:structuredClone(launchEvidence),checks:reportChecks,failure,native_processes:native,outcome:structuredClone(detail)});
+              if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');
+              reportedErrorToast=structuredClone(dialog);launchEvidence=undefined;snapshot=null;evidenceSnapshot=null;
+              throw Object.assign(Error(failure.message),{nodeExecutionFailure:failure});
+            }
             if(Object.values(checks).some(ok=>!ok))await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
               stage:'error_toast_owner',reason:'Owned execution error toast ownership refused',checks,
-              failed_conditions:Object.keys(checks).filter(k=>!checks[k]),native_proof_error:nativeProofError??null,
+              failed_conditions:Object.keys(checks).filter(k=>!checks[k]),report_checks:reportChecks,
+              report_failed_conditions:Object.keys(reportChecks).filter(k=>!reportChecks[k]),native_proof_error:nativeProofError??null,
               launch:structuredClone(launchEvidence),native_processes:structuredClone(native),
               execution:structuredClone(execution??null),child:structuredClone(child??null),outcome:structuredClone(detail),initial_outcome:structuredClone(result)});
             if(Object.values(checks).every(Boolean)) {
@@ -1011,7 +1052,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         rememberConsoleControl(before);
         launchConfirmed=true;
         launchEvidence=executionBaseline?{baseline:structuredClone(executionBaseline),browser_document:before.dom_epoch.document,
-          operation_id:id,started_at:launchStartedAt}:undefined;
+          operation_id:id,started_at:launchStartedAt,toast_absent:before.ui.dialogs.length===0}:undefined;
       }
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);

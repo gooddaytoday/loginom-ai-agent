@@ -3613,6 +3613,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
+          // Private attestation of the existing session gate, including cleanup.
+          operation.exclusiveNodeExecution=()=>running===true&&pending===operation;
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
