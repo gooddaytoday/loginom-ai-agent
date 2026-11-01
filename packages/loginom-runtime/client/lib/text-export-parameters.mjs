@@ -19,6 +19,7 @@ export const EXPORT_FIELDS=Object.freeze({
 });
 const need=(v,m)=>{if(!v)throw Error(m);};
 export function validateExportDestination(value,directories=null){
+ need(typeof value==='string'&&/\.(csv|tsv)$/i.test(value),'Text export requires a CSV or TSV filename');
  return requireExportDestination(value,directories);
 }
 export function validateTextExportParameters(p,mode,r,directories=null){

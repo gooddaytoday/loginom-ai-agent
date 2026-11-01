@@ -72,7 +72,7 @@ export function buildNodeReadRequest(args,source){
  // completed execution; only its output was not refreshed.
  const releasedRead=outcome?.status==='FAILED'&&node?.checkpoint_kind==='local_node_released'&&node.released_phase==='read';
  need((outcome?.status==='SUCCEEDED'||releasedRead)&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
-  &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
+  &&node.execution?.status==='completed'&&node.node&&!['exports.text','exports.excel'].includes(request?.target?.type),
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
  const javascript=request.target.type==='programming.javascript';
  const readback=node.configuration?.readback;
@@ -105,7 +105,7 @@ export function buildNodeReadRequest(args,source){
 function buildRecoveredReadRequest(args,receipt){
  const request=receipt.request;
  need(receipt.status==='continuable'&&receipt.facts?.includes('node_released_on_quiet_graph')&&receipt.node&&request?.target
-  &&!['programming.javascript','exports.text'].includes(request.target.type),
+  &&!['programming.javascript','exports.text','exports.excel'].includes(request.target.type),
   'Invalid parameters.source_operation_id: this browser recovery receipt has no readable table node');
  const ports=args.read?.ports??[0];
  const budget=args.budget_ms??300000;

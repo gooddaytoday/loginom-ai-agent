@@ -36,7 +36,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['corr_analysis','excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','sliding_window','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['corr_analysis','excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','excel_export','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','sliding_window','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -333,6 +333,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // fixed markers expose the current page without scanning its whole tree.
     const wizardMarkers={corr_analysis:';CorrAnalysisWizard;cbCorrTypeLinear',sampling:';SamplingComponentWizard;pedSamplingMethod',data_partition:';PartitionComponentWizard;pedSamplingMethod',excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:[';LinRegressionWizard;pedRegressionMethod',';LogRegressionWizard;pedRegressionMethod'],lin_regression_details:[';LinRegressionWizard-1;pedEpsilon',';LogRegressionWizard-1;pedEpsilon'],normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
       text_import_format:';ImportTextFileParamsWizard;edtValueNull',
+      excel_export:';ExportExcelFilePreviewWizard;edtFileName',
       text_export_params:';ExportTextFileParamsWizard;edtFileName',
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
@@ -347,7 +348,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
       '[data-tid$=";WizrdMCF;DataSetOutputSocketWizard;btnAddMappingColumn"]',
-      ...Object.entries({ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
+      ...Object.entries({ExportExcelFilePreviewWizard:['edtFileName','edtSheetName','cbbFileType','cbbHeadersRow','cbbFloatFormat','pedDecimalCount','chkDivideThousands'],ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
@@ -929,9 +930,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
     const javascriptPort=preparedInputPort??preparedOutputPort;
-    const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
+    const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile,.bg-vendor-icon-exportexcelfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','excel_export','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
-          &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
+          &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile'].includes(preparedInputPort.node_icon_class))
       // Restored dense packages often have long captions. Import's node and
       // Settings breadcrumbs overflow too; the native GUID-bound wizard is
       // already verified. Read their context without making hidden controls actionable.
@@ -2107,9 +2108,9 @@ function readRenderedInputMapping(observation) {
       if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(inputs[0]))
         wizardCombos.set(ownerTid,{name:'join_mode',scope:'join',owner_ref:refOf(owners[0]),input_ref:refOf(inputs[0]),root_ref:wizard.root_ref,value:String(inputs[0].value??'')});
     }
-    if(wizard.status==='observed' && ['text_export_params','text_export_format'].includes(wizard.stage)) {
-      const first=wizard.stage==='text_export_params',base=wizard.root_tid+';'+(first?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard')+';';
-      const fields=first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
+    if(wizard.status==='observed' && ['text_export_params','text_export_format','excel_export'].includes(wizard.stage)) {
+      const excel=wizard.stage==='excel_export',first=wizard.stage==='text_export_params',base=wizard.root_tid+';'+(excel?'ExportExcelFilePreviewWizard':first?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard')+';';
+      const fields=excel?{destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat'}:first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
         :{delimiter:'edtDelimiterChar',encoding:'edtCodePage',line_ending:'edtLineEnding',header:'edtCaptionType'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const ownerTid=base+key+';ValueControl',owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
@@ -2118,8 +2119,8 @@ function readRenderedInputMapping(observation) {
         if(owners.length!==1||inputs.length!==1||sw?.pressed!==false)return [name,{status:'unobserved_or_variable'}];
         const input=inputs[0],value=String(input.value??''),limit=name==='destination'?512:256;
         if(value.length<=limit&&enabled(input)) {
-          if(name!=='destination')wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
-          if(['destination','time_format'].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
+          if(!['destination','sheet_name'].includes(name))wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
+          if(['destination','sheet_name','time_format'].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
         }
         return [name,{status:'observed',value:value.slice(0,limit),value_length_utf16:value.length,truncated:value.length>limit,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text'}];
@@ -4756,7 +4757,7 @@ function readRenderedInputMapping(observation) {
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
-          const exportOption=!expressionParameter&&['text_export_params','text_export_format'].includes(current.wizard.stage);
+          const exportOption=!expressionParameter&&['text_export_params','text_export_format','excel_export'].includes(current.wizard.stage);
           if(sourceOption||exportOption)for(let attempt=0;attempt<24;attempt++) {
             const f=observed.wizard[sourceOption?'import_source':'settings']?.fields?.[choice.field.name];
             if(f?.value===choice.label&&!observed.ui.masks.length)break;

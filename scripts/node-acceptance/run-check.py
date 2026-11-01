@@ -94,10 +94,16 @@ def scenario(name, case_root=None, *, cases=None):
         if set(config) - {'source_path', 'attachment', 'upload_only'} or not {'source_path', 'attachment'} <= set(config) or config['attachment'] not in ['path', 'file'] or type(config.get('upload_only', False)) is not bool:
             raise ValueError('External case requires source_path and attachment path/file')
         source = Path(config['source_path'])
+        if not source.is_absolute() and source.suffix.lower() == '.xlsx':
+            source = (src / source).resolve()
+            if not source.is_relative_to(src): raise ValueError('XLSX source must remain inside its case')
         if not source.is_absolute() or not source.is_file():
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name == 'exports-excel':
+        src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -713,10 +719,10 @@ class Runner:
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not rejection: prompt += ' Выгрузи и скачай полный итоговый CSV.'
+            if not rejection: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
-            if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
+            if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -839,6 +845,15 @@ class Runner:
         if rejection:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
+        if spec.get('xlsx'):
+            assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
+            actual = folder / Path(destinations[0]).name
+            shutil.copyfile(downloaded_csv(profile, destinations[0]), actual)
+            sink = dict(expected['outputs'][0], filename=actual.name)
+            write(folder / 'xlsx-expected.json', sink)
+            self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
+            self.current['csv'] = 'PASS (XLSX)'
+            return session, expected, actual, ','
         header = spec.get('csv_header', 'names')
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
@@ -900,7 +915,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names'), *(['--exact-port-windows'] if case == 'types300' else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
