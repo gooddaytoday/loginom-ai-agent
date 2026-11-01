@@ -70,6 +70,11 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
+        // Binning's caption replacement leaves an alternate native SVG without
+        // data-tid while the canvas already has the new caption's port element.
+        // Rebind that same native cell to its unchanged suffix; other types keep
+        // the previous caption restriction and exact cached-TID lookup.
+        const renamedBinning=type==='preprocessing.binning' && previous && previous.nodeTid!==tid && p.FSubType===1;
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.
@@ -81,13 +86,15 @@ export async function readGraph(page, task) {
         if(!ptid && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && previous.nodeTid===tid
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedBinning)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedBinning?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
-              || (!previous && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+              || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
+            if(renamedBinning && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if([...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
@@ -105,20 +112,30 @@ export async function readGraph(page, task) {
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
-        const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data-(\d+)$/.exec(suffix);
+        const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
         if(type==='programming.javascript' && m && (p.FType!==(m[1]==='Input'?0:1) || p.FSubType!==1))fail('JavaScript data port has a foreign native type');
+        if(m?.[2] && (!p.FGuid || !p.data || p.parent!==n || p.FCell.parent!==n.FCell
+          || p.FType!==(m[1]==='Input'?0:1)))fail('Tree port native identity changed');
         allPorts.push(suffix);
         if (/^(Input|Output)_Connection-0$/.test(suffix) && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)
           connectionPorts.set(ptid,{node:n,port:p});
-        if (m) { (m[1] === 'Input' ? inputs : outputs).push(Number(m[2])); byTid.set(ptid, {node:n.FGuid,index:Number(m[2]),direction:m[1]}); }
+        if (m) { (m[1] === 'Input' ? inputs : outputs).push(Number(m[3])); byTid.set(ptid, {node:n.FGuid,index:Number(m[3]),direction:m[1],kind:m[2]?'tree':'data'}); }
       }
       inputs.sort((a,b)=>a-b);outputs.sort((a,b)=>a-b);
-      nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs]});
+      const kinds={};
+      for(const [direction,indexes] of [['Input',inputs],['Output',outputs]]){
+        const ports=[...byTid.values()].filter(p=>p.node===n.FGuid&&p.direction===direction);
+        if(ports.some(p=>p.kind==='tree')){
+          if(new Set(indexes).size!==indexes.length)fail('Ambiguous typed port indexes');
+          kinds[direction.toLowerCase()+'_kinds']=indexes.map(index=>ports.find(p=>p.index===index).kind);
+        }
+      }
+      nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs],...kinds});
       for(const p of byTid.values())if(p.node===n.FGuid)p.index=(p.direction==='Input'?inputs:outputs).indexOf(p.index);
       return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,dom_epoch:epoch(dom),
-        position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),
-        other_ports:allPorts.filter(p=>! /^(Input|Output)_Data-\d+$/.test(p)).sort(),locked:n.FLocked===true};
+        position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,
+        other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
     const links=[],foreign_links=[],rest_connection_links=[];
     for(const e of containers[0].querySelectorAll('[data-tid]')) {
@@ -126,7 +143,7 @@ export async function readGraph(page, task) {
       const body=parts[1];if(!/^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body))continue;
       const endpoints=body.split('|');
       const prefix=parts[0]+';Graph;',s=byTid.get(prefix+endpoints[0]+';'+endpoints[1]),t=byTid.get(prefix+endpoints[2]+';'+endpoints[3]);
-      if(s&&t)links.push({source:s.node,output:s.index,target:t.node,input:t.index});else {
+      if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index});}else {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
@@ -285,13 +302,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const resolve=(id,direction,index)=>{
         const matches=bindings.filter(b=>b.node_id===id);
         if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
-        return {label:matches[0].label,index:matches[0][direction][index]};
+        const kind=matches[0][direction==='inputs'?'input_kinds':'output_kinds']?.[index]??'data';
+        if(!['data','tree'].includes(kind))throw Error('Unknown owned port kind');
+        return {label:matches[0].label,index:matches[0][direction][index],kind};
       };
       const service=p.edge.output==='connection:0'&&p.edge.input==='connection:0';
       const serviceEdges=service?(before.rest_connection_links??[]).filter(e=>JSON.stringify(e)===JSON.stringify(p.edge)):[];
       if(service&&(serviceEdges.length!==1||!before.foreign_links.includes(serviceEdges[0].tid)))throw Error('Exact owned REST service edge disappeared');
       const source=service?null:resolve(p.edge.source,'outputs',p.edge.output),target=service?null:resolve(p.edge.target,'inputs',p.edge.input);
-      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
+      if(!service&&source.kind!==target.kind)throw Error('Incompatible owned link port kinds');
+      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_'+(source.kind==='tree'?'DataTree-':'Data-')+source.index+'|'+target.label+'|Input_'+(target.kind==='tree'?'DataTree-':'Data-')+target.index;
       const nativeLinks=()=>page.evaluate(()=>{
         const links=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FLinks.FCollection;
         if(!Array.isArray(links)||links.length>400)throw Error('Bounded native link identities unavailable');
@@ -648,16 +668,19 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
           if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact tabular port disappeared');
-          return {label:matches[0].label,index:matches[0][direction][index]};
+          const kind=matches[0][direction==='inputs'?'input_kinds':'output_kinds']?.[index]??'data';
+          if(!['data','tree'].includes(kind))throw Error('Unknown owned port kind');
+          return {label:matches[0].label,index:matches[0][direction][index],kind};
         };
         const edge=effect.parameters.edge,bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
+        if(bound.source.kind!==bound.target.kind)throw Error('Incompatible source and target port kinds');
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
+        const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_'+(bound.source.kind==='tree'?'DataTree-':'Data-')+bound.source.index});
         graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
         if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
-          source_port:{kind:'data',index:bound.source.index},target_port:{kind:'data',index:bound.target.index}};
+          source_port:{kind:bound.source.kind,index:bound.source.index},target_port:{kind:bound.target.kind,index:bound.target.index}};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         return await call(makeCapabilityCode(pinned.actions.get('link.create'),pinned.selectors,params,{mode:'apply',operation_id:effect.id,expected_build:build,
           deadline_at:deadline,node_target_graph_reader:readGraph,node_target_context:{request,graph_baseline:graph,graph_probe:task(),dom_epoch:graph.dom_epoch,nodes:[{id:effect.parameters.edge.source,tid:bound.source.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.source).dom_epoch},{id:effect.parameters.edge.target,tid:bound.target.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.target).dom_epoch}]},node_target_cancellation_id:effect.id,receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,

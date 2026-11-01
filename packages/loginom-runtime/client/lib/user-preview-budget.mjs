@@ -8,7 +8,7 @@ const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefine
 export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
  if(wireSize(reply)<=USER_PREVIEW_WIRE_BUDGET)return;
  const ports=reply.output?.ports??[];
- if(ports.some(p=>p.exact_table||p.read_coverage||p.cell_precision||p.sample?.some(r=>r.some(c=>c.precision==='exact_native'))))return;
+ if(ports.some(p=>p.port_kind==='tree'||p.exact_table||p.read_coverage||p.cell_precision||p.sample?.some(r=>r.some(c=>c.precision==='exact_native'))))return;
  for(const port of ports)for(const row of port.sample??[])for(const cell of row){
   // Decimal is the already verified round-trip binary64 value. Remove only
   // equivalent display/number duplicates, never infer numbers from UI text.

@@ -21,6 +21,25 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
+        for name in ['sampling-random', 'partition-random']:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/test/modes.lgp')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            self.assertTrue(case['prompt'].is_file())
+            self.assertTrue((case['data'] / 'modes.csv').is_file())
+            self.assertEqual(expected['sampling_modes']['mode'], name.rsplit('-', 1)[1])
+            self.assertEqual(expected['sampling_modes']['seed'], 42)
+            self.assertEqual(len(expected['outputs']), 1 if name.startswith('sampling') else 3)
+            self.assertEqual(expected['package_path'], '/test/modes.lgp')
+        for name in ['sampling', 'sampling-null', 'sampling-empty', 'data-partition', 'data-partition-null', 'data-partition-empty']:
+            case = runner.scenario(name)
+            stock = runner.read(case['source'] / case.get('expected_name', 'expected.json'))
+            expected = runner.expected_for(case, '/test/stock.lgp')
+            self.assertNotIn('sampling_modes', expected)
+            outputs = stock.get('outputs', [{k: v for k, v in stock.items() if k not in ['package_path', 'nodes']}])
+            self.assertEqual(expected['outputs'], outputs)
+
     def export_events(self, marker='?', *, destination='/test/all.csv', kind='new', readback=None):
         request = dict(operation_id='export', target=dict(type='exports.text', kind=kind),
                        parameters=dict(destination=destination, null_marker=marker))

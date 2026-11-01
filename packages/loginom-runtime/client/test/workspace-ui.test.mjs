@@ -1778,6 +1778,25 @@ test('supported transforms accept only owned conditional destinations after one 
  assert.throws(()=>validateUiAction({verb:'wizard_step',ref:b.ref,expected_stage:['output_mapping','done']},s),/supported transform/);
 });
 
+test('JSON tree conditional Next reaches only its owned tree output mapping or done',async()=>{
+ for(const destination of ['done','tree_output_mapping','input_mapping']){
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';JSONToTreeWizard;pedSourceColumn';
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+  assert.equal(snapshot.wizard.stage,'json_tree');
+  page.waitForTimeout=async ms=>page.clock.advance(ms);const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);c.marker.remove();
+   const marker=destination==='done'?';DoneWizard;edtDisplayName':destination==='tree_output_mapping'?';DataTreeNodesMappingEngineOutputPortWizard':';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+   page.add('div',c.base+marker,'',undefined,c.form);
+  };
+  const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:['tree_output_mapping','done']},snapshot);
+  assert.equal(result.status,destination==='input_mapping'?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+ }
+ const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+ const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ assert.throws(()=>validateUiAction({verb:'wizard_step',ref:button.ref,expected_stage:['tree_output_mapping','done']},snapshot),/JSON tree/);
+});
+
 test('wizard transition waits through a transient mask without repeating its click',async()=>{
   const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe();
   const button=snapshot.ui.elements.find(e=>e.wizard_step);let mask,waits=0;

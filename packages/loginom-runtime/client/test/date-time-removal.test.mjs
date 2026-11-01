@@ -34,10 +34,20 @@ test('wrong or ambiguous original sources never authorize deletion',()=>{
 });
 test('unsupported native ISO and string removals are refused before flag changes',()=>{
  for(const kind of ['iso','string']){
-  const f=fixture();if(kind==='iso')f.original.field_matrices[0].matrix[4].iso=true;
+  const f=fixture();if(kind==='iso'){f.original.field_matrices[0].matrix[4].iso=true;f.original.field_matrices[0].matrix[4].func=5;}
   else f.original.field_matrices[0].matrix[4].string=true;
   assert.throws(()=>planDateTimeRemovals(f.original,f.parameters,f.baseline),/ISO\/string\/unsupported/);
  }
+});
+test('removing ISO year uses its own bound source while preserving calendar year',()=>{
+ const f=fixture(),iso={...f.baseline.source_fields[0],record_id:'iso',name:'DateA_Y_2',label:'Дата (Год, ISO8601)'};
+ f.original.field_matrices[0].matrix.push({...f.original.field_matrices[0].matrix[4],iso:true});
+ f.baseline.source_fields.push(iso);f.baseline.target_fields.push({...f.baseline.target_fields[0],field_id:'9',source:iso});
+ f.parameters.fields[0].transformations=[{operation:'year',name:'Year',label:'Year'}];
+ const result=planDateTimeRemovals(f.original,f.parameters,f.baseline);
+ assert.equal(result.length,1);assert.equal(result[0].operation,'iso_year');assert.equal(result[0].source.record_id,'iso');
+ f.parameters.fields[0].transformations.push({operation:'iso_year',name:'ISOYear',label:'ISOYear'});
+ assert.deepEqual(planDateTimeRemovals(f.original,f.parameters,f.baseline),[]);
 });
 
 test('orphan deletion refreshes mapping evidence after addressed paging and preserves the other fields',async()=>{

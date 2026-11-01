@@ -104,6 +104,24 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name in ['tree-repeat', 'tree-no-repeat']:
+        nodes = REPO / 'docs/node-development/nodes'
+        src = nodes / 'trees-jsontotree/acceptance'
+        return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
+                    data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
+                    expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+
+    if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
+                'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
+        kind = name.removeprefix('binning-')
+        data = {'count': ['values.csv'], 'width': ['real.csv'], 'real': ['real.csv'],
+                'integer': ['values.csv'], 'frequency': ['frequency.csv'], 'frequency-ties': ['frequency-ties.csv'],
+                'apply': ['frequency.csv', 'update.csv'], 'retrain': ['frequency.csv', 'update.csv'],
+                'holdout': ['real.csv', 'holdout.csv']}[kind]
+        return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
+                    data=src / 'data', base=None, export_count=2, input_files=data,
+                    expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -111,12 +129,25 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
+        src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
+        task, expected, inputs = {
+            'acf-series': ('task-series.md', 'expected-series-4.json', ['series.csv']),
+            'acf-update': ('task.md', 'expected.json', ['series.csv', 'update.csv']),
+            'acf-one': ('task-one.md', 'expected-series-1.json', ['series.csv']),
+            'acf-eight': ('task-eight.md', 'expected-series-8.json', ['series.csv']),
+        }[name]
+        return dict(source=src, prompt=src / task, data=src / 'data', base=None,
+                    expected_name=expected, input_files=inputs)
     if name in ['outlier-sd', 'outlier-iqr']:
         src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
         if name == 'outlier-iqr': src = src / 'iqr'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'smoothing-hp':
+        src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -126,9 +157,29 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name in ['date-time-iso', 'date-time-iso-empty']:
+        node = REPO / 'docs/node-development/nodes/date-time'
+        empty = name.endswith('-empty')
+        return dict(source=node / 'acceptance',
+                    prompt=node / 'acceptance' / ('task-iso-weeks-empty.md' if empty else 'task-iso-weeks.md'),
+                    data=node / 'fixtures', base=None,
+                    expected_name='expected-iso-weeks-empty.json' if empty else 'expected.json',
+                    input_files=['iso-weeks-empty.csv' if empty else 'iso-weeks.csv'])
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-random', 'partition-random']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        mode = name.rsplit('-', 1)[1]
+        root = REPO / 'docs/node-development/nodes' / slug
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-' + mode + '.md'),
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None,
+                    sampling_mode=mode)
+    if name in ['sampling-modes-smoke', 'partition-modes-smoke']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        root = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=root / 'modes-smoke', prompt=root / 'task-modes-smoke.md',
+                    data=root / 'modes-smoke/data', base=None, expected_name='expected.json')
     if name in ['sampling', 'data-partition', 'sampling-null', 'sampling-empty', 'data-partition-null', 'data-partition-empty']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         variant = next((v for v in ['null', 'empty'] if name.endswith('-' + v)), None)
@@ -169,6 +220,10 @@ def scenario(name, case_root=None, *, cases=None):
 
 def expected_for(case, package):
     src = case['source']
+    # The owner-approved sampling envelope is separate from stock exact rows.
+    if case.get('sampling_mode'):
+        return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
+            'expected', str(src / 'modes/expected.json'), case['sampling_mode'], package]))
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
@@ -428,7 +483,7 @@ def ports(value, receipt=None):
         # the receipt that owns output.ports, never the outer inspect cleanup.
         if isinstance(value.get('output'), dict) and 'ports' in value['output']:
             receipt = value
-        if 'port' in value and 'schema' in value and 'sample' in value: yield receipt or {}, value
+        if 'port' in value and ('schema' in value and 'sample' in value or value.get('port_kind') == 'tree' and 'tree' in value): yield receipt or {}, value
         for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
         for item in value: yield from ports(item, receipt)
@@ -463,6 +518,47 @@ def port_failure(replies, journal):
     delivered = [(n, owner, p) for n, o in replies for owner, p in ports(o)]
     invalid = [n for n, o, p in delivered if port_path(o, p) is None]
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
+
+
+def check_tree(port, expected):
+    tree = port.get('tree', {})
+    assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
+    schema, instances = tree.get('schema', []), tree.get('instances', [])
+    assert len(instances) == tree.get('node_count') and len(instances) <= 256 and tree.get('max_depth', 17) <= 16, 'TREE_LIMITS'
+    assert schema and schema[0]['path'] == '' and schema[0]['is_container'] and not schema[0]['is_array'], 'TREE_ROOT'
+    assert [schema[i]['name'] for i in schema[0]['children']] == expected['schema_field_order'], 'TREE_SCHEMA_ORDER'
+    branch = next(n for n in schema if n['path'] == '/items')
+    assert branch['is_array'] and [schema[i]['name'] for i in branch['children']] == expected['item_field_order'], 'TREE_ITEM_ORDER'
+    for path, kind in expected['schema_types'].items():
+        actual = [n for n in schema if n['path'] == path]
+        assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+    wanted = []
+    def walk(node, parent=None, schema_path=''):
+        index = len(wanted)
+        item = dict(node=node, parent=parent, schema_path=schema_path, children=[])
+        wanted.append(item)
+        for child in node.get('children', []):
+            path = schema_path if node['type'] == 'array' else schema_path + '/' + child['path'].rsplit('/', 1)[-1]
+            item['children'].append(walk(child, index, path))
+        return index
+    walk(expected['document'])
+    assert len(instances) == len(wanted), 'TREE_INSTANCE_COUNT'
+    for index, (actual, binding) in enumerate(zip(instances, wanted)):
+        want = binding['node']
+        kind = 'null' if actual.get('is_null') is True else actual['type']
+        assert actual['index'] == index and actual['path'] == want['path'] and kind == want['type'], 'TREE_INSTANCE_ORDER_OR_TYPE'
+        assert (actual['parent'] == binding['parent'] and 0 <= actual['schema_index'] < len(schema)
+                and schema[actual['schema_index']]['path'] == binding['schema_path']), 'TREE_SCHEMA_BINDING'
+        if 'children' in want:
+            assert actual['children'] == binding['children'], 'TREE_CHILDREN'
+        elif kind == 'integer':
+            assert actual.get('is_null') is False and actual.get('precision') == 'exact_integer' and actual.get('value') == want['value'], 'TREE_INT64'
+        elif kind == 'real':
+            assert (actual.get('is_null') is False and actual.get('precision') == '17_significant_digits'
+                    and type(actual.get('value')) in (int, float) and Decimal(str(actual.get('value'))) == Decimal(want['value'])), 'TREE_REAL'
+        else:
+            assert actual.get('value') == want['value'] and (kind != 'boolean' or type(actual.get('value')) is bool), 'TREE_SCALAR'
+            assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
 
 
 def downloaded_csv(profile, destination):
@@ -708,6 +804,8 @@ class Runner:
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
+            if exports and not any(name in prompt for name in exports):
+                prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
         if spec.get('upload_only') or rejection: exports = []
         if not exports and not spec.get('upload_only') and not rejection:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
@@ -723,6 +821,7 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
+            elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -837,6 +936,13 @@ class Runner:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
         self.current.setdefault('port-read', 'PASS')
+        if expected.get('proposed_tree_output'):
+            trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
+            assert trees, 'TREE_READ_MISSING'
+            for owner, port in trees:
+                assert port_path(owner, port) == 'port', 'TREE_READ_OWNERSHIP'
+                check_tree(port, expected['proposed_tree_output'])
+            self.current['tree-read'] = 'PASS'
         cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
         acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
@@ -855,9 +961,14 @@ class Runner:
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
         header = spec.get('csv_header', 'names')
+        sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
             shutil.copyfile(downloaded_csv(profile, destination), actual)
+            if expected.get('sampling_modes'):
+                delimiter = csv_delimiter(actual)
+                sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))
+                continue
             if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression':
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
@@ -871,6 +982,11 @@ class Runner:
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
             if counts: self.current['d76'] = counts
+        if expected.get('sampling_modes'):
+            write(folder / 'sampling-replies.json', [o for _, o in replies])
+            write(folder / 'sampling-csvs.json', sampling_csvs)
+            self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
+                'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 
@@ -915,7 +1031,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection'):
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
