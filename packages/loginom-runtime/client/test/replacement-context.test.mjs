@@ -29,6 +29,9 @@ test('different key/result types follow the owned type icon and native pair type
   f.target.badIcon=false;f.pairs[0].data.ReplaceByType=5;assert.equal(f.read().verified,false);
  }
 });
+test('unprocessed Boolean and Variant fields remain readable passthrough inventory',()=>{
+ for(const type of [1,6]){const f=fixture();f.fields[0].data.DataType=type;f.fields[0].data.ReplaceMode=0;f.pairs.splice(0,f.pairs.length);assert.equal(f.read().verified,true);}
+});
 test('real editor separators come from the exact owned local controls',()=>{
  const f=fixture();f.fields[0].data.DataType=3;
  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:3,ReplaceByType:3,ValueRender:1.25,ReplaceRender:9.125}});

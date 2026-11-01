@@ -262,7 +262,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid$=";ReplaceColumnsWizard;btnTypeChange;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -346,6 +346,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // including buttons without their labels loses the observed directory.
     const wizardSelectors=['[data-tid*=";WizrdMCF;SmoothingWizard;"]','[data-tid*=";WizrdMCF;MethodSettingsWizard-1;"]','[data-tid^="MethodSettingFrame;"]','[data-tid*=";WizrdMCF;AutoCorrelationWizard;"]','[data-tid*=";WizrdMCF;JSONToTreeWizard;"]','[data-tid*=";WizrdMCF;TreeToDataWizard;"]','[data-tid*=";WizrdMCF;SlidingWindowWizard;"]','[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
+      '[data-tid$=";WizrdMCF;ReplaceColumnsWizard;btnTypeChange"]','[data-tid$=";WizrdMCF;ReplaceColumnsWizard;grdDataList"]',
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
       '[data-tid$=";WizrdMCF;DataSetOutputSocketWizard;btnAddMappingColumn"]',
@@ -2798,6 +2799,16 @@ function readRenderedInputMapping(observation) {
         if(selected.data?.ReplaceMode===1){
           const es=tids.get(base+'cbxReplaceOther;trg_picker')??[];
           if(es.length===1&&visible(es[0])&&!sensitive(es[0]))replacementCells.set(refOf(es[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'other_picker',wizard_root_ref:wizard.root_ref});
+          // The split-button menu is a portal, outside the wizard subtree.
+          const buttons=tids.get(base+'btnTypeChange')??[],menus=tids.get(base+'btnTypeChange;mn')??[];
+          const button=buttons.length===1?globalThis.Ext?.getCmp?.(buttons[0].id):null;
+          if(button?.el?.dom===buttons[0]&&menus.length===1&&button.menu?.el?.dom===menus[0]&&visible(menus[0])){
+            for(const suffix of ['Str','Int','Float','DTime']){
+              const items=tids.get(base+'itmTypeChange'+suffix)??[],item=items.length===1?globalThis.Ext?.getCmp?.(items[0].id):null;
+              if(items.length===1&&item?.el?.dom===items[0]&&item.ownerCt===button.menu&&menus[0].contains(items[0])&&visible(items[0])&&!sensitive(items[0]))
+                replacementCells.set(refOf(items[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'result_type',wizard_root_ref:wizard.root_ref});
+            }
+          }
         }
         const grids=tids.get(base+'grdReplaceItems')??[],editors=tids.get(base+'ReplaceEditor')??[];
         if(grids.length===1&&editors.length===1&&grids[0].contains(editors[0])&&visible(editors[0])){

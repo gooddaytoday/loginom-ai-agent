@@ -29,7 +29,7 @@ export function readReplacementBrowser(prefix){
  if(!field)return {verified:true,inventory_complete:true,input_fields:fields,selected:null,pairs:[],settings_applied:false};
  const rows=records(cmp('grdReplaceItems'),'bg.ext.CollectionListProxy',512);if(!rows)return fail('replacement_table_inventory');
  const typeButton=cmp('btnTypeChange'),icon=typeButton?.btnIconEl?.dom;
- const resultType=Object.entries({string:'dtString',integer:'dtInteger',real:'dtFloat',datetime:'dtDateTime'})
+ const resultType=field.mode==='none'?field.type:Object.entries({string:'dtString',integer:'dtInteger',real:'dtFloat',datetime:'dtDateTime'})
   .find(([,suffix])=>typeButton?.iconCls==='bg-TBGDataType-'+suffix&&icon&&roots[0].contains(icon)&&icon.classList.contains(typeButton.iconCls))?.[0];
  if(!resultType)return fail('replacement_result_type');
  const typed=(v,type)=>{

@@ -838,6 +838,23 @@ for(const mode of ['ready','loading','unverified_without_mask','foreign_dialog',
  }
 });
 
+test('replacement type menu uses its unique portal only during replacement observation',async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'replace'}};
+ const node={...binding.node,verified:true,surface:'wizard'},base='MF;TF-1;WizrdMCF';
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},
+  wizard:{status:'observed',stage:'replacement',root_tid:base,root_ref:'wizard'},ui:{elements:[{tid:base+';ReplaceColumnsWizard;btnTypeChange;mn',ref:'menu'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const roots=[];
+ const channel=createNodeProcedure({operation:{id:'replacement-menu',deadline:10000,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>1,wait:async()=>{},record:async e=>structuredClone(e),execute:async code=>{
+   if(code.includes('function workspaceUiCapability')){if(!code.includes('"discover_roots":true'))roots.push(/"root_ref":"([^"]+)"/.exec(code)?.[1]);return {status:'SUCCEEDED',output:structuredClone(state)};}
+   return {verified:true,node_context:node};
+  }});
+ await channel.observe({condition:'replacement result type menu',readReplacement:true,ready:()=>true});assert.equal(roots.at(-1),'menu');
+ await channel.observe({condition:'ordinary wizard',ready:()=>true});assert.equal(roots.at(-1),'wizard');
+ state.ui.elements.push({...state.ui.elements[0],ref:'other'});await assert.rejects(channel.observe({condition:'ambiguous type menu',readReplacement:true,ready:()=>true}),/menu is ambiguous/);
+});
+
 test('Join link menu uses a unique bounded portal only during Join observation',async()=>{
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'join'}};

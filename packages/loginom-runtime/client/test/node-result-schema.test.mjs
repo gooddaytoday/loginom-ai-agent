@@ -88,6 +88,14 @@ test('replacement public readback admits typed Null and exact Int64 without clai
  r.configuration={status:'applied',readback:{kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'exact',output_mode:'add',rules:[{field:{kind:'input_field',name:'Code'},type:'integer',precision:0,pairs:[{from:{type:'integer',value:null},to:{type:'integer',value:'9223372036854775807'}}],other:{mode:'keep'}}],input_mapping:{port:0,autosync:true,fields:[field]},output_mapping:{port:0,autosync:true,fields:[{...field,excluded:false}]},package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
  for(const patch of [{output_mode:'external'},{package_persistence_verified:true},{mode:'regex'}]){const bad=structuredClone(r);Object.assign(bad.configuration.readback,patch);assert.equal(validate(bad).valid,false);}
+ for(const [result_type,value] of [['integer','12'],['real',1.25],['datetime','2026-11-01T00:00:00']]){
+  const converted=structuredClone(r),rule=converted.configuration.readback.rules[0];
+  delete rule.precision;Object.assign(rule,{type:'string',result_type,case_sensitive:true,pairs:[{from:{type:'string',value:'12'},to:{type:result_type,value}}],other:{mode:'null'}});
+  converted.configuration.readback.input_mapping.fields[0].type='string';
+  converted.configuration.readback.output_mapping.fields[0].type=result_type;
+  assert.equal(validate(converted).valid,true,result_type);
+  rule.result_type='boolean';assert.equal(validate(converted).valid,false);
+ }
 });
 
 test('regex readback admits only string constants, ordered patterns and keep/null policy',()=>{
