@@ -15,7 +15,6 @@
     {
       "output_node_type": "preprocessing.data_recovery",
       "output_port": 0,
-      "export_destination": "missing-core.csv",
       "ordered": true,
       "column_order": "exact",
       "columns": [

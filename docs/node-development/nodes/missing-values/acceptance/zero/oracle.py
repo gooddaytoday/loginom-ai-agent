@@ -32,7 +32,6 @@ def expected(case='core'):
     return {'package_path': '{{PACKAGE_PATH}}',
             'nodes': [{'type': t} for t in ('imports.text', 'preprocessing.data_recovery', 'exports.text')],
             'outputs': [{'output_node_type': 'preprocessing.data_recovery', 'output_port': 0,
-                         'export_destination': 'missing-' + case + '.csv',
                          'ordered': True, 'column_order': 'exact',
                          'columns': [{'name': name, 'type': TYPES[name], 'label_any': True} for name in names],
                          'rows': rows}]}

@@ -29,6 +29,12 @@ class RunCheckTests(unittest.TestCase):
             generated = json.loads(subprocess.check_output([sys.executable, str(case['source'] / 'oracle.py'), kind]))
             generated['package_path'] = '/test/zero.lgp'
             self.assertEqual(expected, generated)
+            # Apply the same expected contract that cold-check uses before login.
+            subprocess.run(['node', '--input-type=module', '-e',
+                            "import {parseExpectedOutputs} from './scripts/node-acceptance/expected-outputs.mjs';"
+                            "let s='';for await(const part of process.stdin)s+=part;parseExpectedOutputs(JSON.parse(s));"],
+                           input=json.dumps(expected), text=True, check=True, cwd=runner.REPO,
+                           capture_output=True)
             self.assertEqual(case['input_files'], [('core' if kind == 'mean' else kind) + '.csv'])
             self.assertTrue((case['data'] / case['input_files'][0]).is_file())
             self.assertTrue(case['prompt'].is_file())
