@@ -104,6 +104,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name in ['tree-repeat', 'tree-no-repeat']:
+        nodes = REPO / 'docs/node-development/nodes'
+        src = nodes / 'trees-jsontotree/acceptance'
+        return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
+                    data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
+                    expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -428,7 +434,7 @@ def ports(value, receipt=None):
         # the receipt that owns output.ports, never the outer inspect cleanup.
         if isinstance(value.get('output'), dict) and 'ports' in value['output']:
             receipt = value
-        if 'port' in value and 'schema' in value and 'sample' in value: yield receipt or {}, value
+        if 'port' in value and ('schema' in value and 'sample' in value or value.get('port_kind') == 'tree' and 'tree' in value): yield receipt or {}, value
         for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
         for item in value: yield from ports(item, receipt)
@@ -463,6 +469,47 @@ def port_failure(replies, journal):
     delivered = [(n, owner, p) for n, o in replies for owner, p in ports(o)]
     invalid = [n for n, o, p in delivered if port_path(o, p) is None]
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
+
+
+def check_tree(port, expected):
+    tree = port.get('tree', {})
+    assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
+    schema, instances = tree.get('schema', []), tree.get('instances', [])
+    assert len(instances) == tree.get('node_count') and len(instances) <= 256 and tree.get('max_depth', 17) <= 16, 'TREE_LIMITS'
+    assert schema and schema[0]['path'] == '' and schema[0]['is_container'] and not schema[0]['is_array'], 'TREE_ROOT'
+    assert [schema[i]['name'] for i in schema[0]['children']] == expected['schema_field_order'], 'TREE_SCHEMA_ORDER'
+    branch = next(n for n in schema if n['path'] == '/items')
+    assert branch['is_array'] and [schema[i]['name'] for i in branch['children']] == expected['item_field_order'], 'TREE_ITEM_ORDER'
+    for path, kind in expected['schema_types'].items():
+        actual = [n for n in schema if n['path'] == path]
+        assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+    wanted = []
+    def walk(node, parent=None, schema_path=''):
+        index = len(wanted)
+        item = dict(node=node, parent=parent, schema_path=schema_path, children=[])
+        wanted.append(item)
+        for child in node.get('children', []):
+            path = schema_path if node['type'] == 'array' else schema_path + '/' + child['path'].rsplit('/', 1)[-1]
+            item['children'].append(walk(child, index, path))
+        return index
+    walk(expected['document'])
+    assert len(instances) == len(wanted), 'TREE_INSTANCE_COUNT'
+    for index, (actual, binding) in enumerate(zip(instances, wanted)):
+        want = binding['node']
+        kind = 'null' if actual.get('is_null') is True else actual['type']
+        assert actual['index'] == index and actual['path'] == want['path'] and kind == want['type'], 'TREE_INSTANCE_ORDER_OR_TYPE'
+        assert (actual['parent'] == binding['parent'] and 0 <= actual['schema_index'] < len(schema)
+                and schema[actual['schema_index']]['path'] == binding['schema_path']), 'TREE_SCHEMA_BINDING'
+        if 'children' in want:
+            assert actual['children'] == binding['children'], 'TREE_CHILDREN'
+        elif kind == 'integer':
+            assert actual.get('is_null') is False and actual.get('precision') == 'exact_integer' and actual.get('value') == want['value'], 'TREE_INT64'
+        elif kind == 'real':
+            assert (actual.get('is_null') is False and actual.get('precision') == '17_significant_digits'
+                    and type(actual.get('value')) in (int, float) and Decimal(str(actual.get('value'))) == Decimal(want['value'])), 'TREE_REAL'
+        else:
+            assert actual.get('value') == want['value'] and (kind != 'boolean' or type(actual.get('value')) is bool), 'TREE_SCALAR'
+            assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
 
 
 def downloaded_csv(profile, destination):
@@ -708,6 +755,8 @@ class Runner:
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
+            if exports and not any(name in prompt for name in exports):
+                prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
         if spec.get('upload_only') or rejection: exports = []
         if not exports and not spec.get('upload_only') and not rejection:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
@@ -723,6 +772,7 @@ class Runner:
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
+            elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -837,6 +887,13 @@ class Runner:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
         self.current.setdefault('port-read', 'PASS')
+        if expected.get('proposed_tree_output'):
+            trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
+            assert trees, 'TREE_READ_MISSING'
+            for owner, port in trees:
+                assert port_path(owner, port) == 'port', 'TREE_READ_OWNERSHIP'
+                check_tree(port, expected['proposed_tree_output'])
+            self.current['tree-read'] = 'PASS'
         cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
         acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'

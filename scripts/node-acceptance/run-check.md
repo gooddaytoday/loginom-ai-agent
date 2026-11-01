@@ -199,6 +199,16 @@ in `D87` only after LAB-413 provides the XLSX switching path and validate it liv
 
 To add a scenario for a new node:
 
+`tree-repeat` and `tree-no-repeat` use the approved tasks under
+`trees-jsontotree/acceptance` and `trees-treetodata/acceptance`, respectively,
+and only the original `documents.csv`. Their independent expected files carry
+`export_destination: tree-result.csv`; the runner adds the owned export request
+when its filename is absent from the immutable task. Main acceptance checks
+every typed tree instance and schema field against `proposed_tree_output`.
+With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
+table is read with the existing completed-port reader. Repeat on/off run in
+separate chats, profiles and packages; no oracle content reaches the model.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.

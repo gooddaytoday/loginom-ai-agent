@@ -5,7 +5,7 @@ import {readNodeTargetLinkValidation} from '../lib/executor.mjs';
 import {linkPage,linkParameters,run} from './support/executor-fixture.mjs';
 function fixture(value,kind='data'){
  const context={request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'wf'}},dom_epoch:1,nodes:[{id:'s',tid:'Source'},{id:'t',tid:'Target'}]};
- const make=(id,label,direction)=>{const tid='wf;Graph;'+label+';'+direction+'_'+(kind==='connection'?'Connection':'Data')+'-0',element={getAttribute:()=>tid,getBoundingClientRect:()=>({x:100,y:200,width:12,height:24})},node={FGuid:id,FCell:{},FPorts:[]},port={parent:node,FCell:{id,parent:node.FCell}};node.FPorts=[{FCollection:[port]}];return {node,port,element,tid};};
+ const make=(id,label,direction)=>{const tid='wf;Graph;'+label+';'+direction+'_'+(kind==='connection'?'Connection':kind==='tree'?'DataTree':'Data')+'-0',element={getAttribute:()=>tid,getBoundingClientRect:()=>({x:100,y:200,width:12,height:24})},node={FGuid:id,FCell:{},FPorts:[]},port={parent:node,FCell:{id,parent:node.FCell}};node.FPorts=[{FCollection:[port]}];return {node,port,element,tid};};
  const source=make('s','Source','Output'),target=make('t','Target','Input');
  const root={querySelectorAll:q=>[source,target].filter(p=>q.includes(JSON.stringify(p.tid))).map(p=>p.element)},document={querySelectorAll:()=>[root]};
  const handler={first:{},previous:{cell:source.port.FCell},marker:{validState:{cell:target.port.FCell}},error:null};
@@ -44,3 +44,7 @@ for(const mode of ['delayed','rejected','expired','foreign','marker','cancelled'
 });
 
 test('REST service links retain native cached compatibility and marker ownership',async()=>{const f=fixture(true,'connection');assert.equal((await f.read()).state,'ready');f.handler.marker.validState=null;assert.equal((await f.read()).target_ready,false);f.diagram.FHandlers.FConnectionHandler.FDelegationHandler.FMouseDown=false;await assert.rejects(f.read(),/owner/);});
+test('tree_io link validation binds the native tree sockets and retains drag ownership',async()=>{
+ const f=fixture(true,'tree');assert.equal((await f.read()).state,'ready');
+ f.target.port.parent={};await assert.rejects(f.read(),/port changed/);
+});

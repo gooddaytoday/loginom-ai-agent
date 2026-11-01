@@ -113,6 +113,11 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     need(schema||schema===null&&(unchanged||request.parameters.observed_schema===true),'Retained output schema missing');
     const result=await channel.readOutputPort({port,execution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
     const output=result.output;
+    if(output.port_kind==='tree'){
+     need(request.target.type==='trees.from_json'&&output.tree?.complete===true
+      &&JSON.stringify(output.tree.schema)===JSON.stringify(schema),'Retained tree schema changed');
+     ports.push(output);continue;
+    }
     const policy=operation.parameters.parameters.cross_table_policy;
     let materialized;
     if(policy){

@@ -16,6 +16,7 @@
     {
       "output_node_type": "trees.to_table",
       "output_port": 0,
+      "export_destination": "tree-result.csv",
       "ordered": true,
       "column_order": "exact",
       "columns": [
