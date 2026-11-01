@@ -4,6 +4,7 @@ export const DATE_TIME_OPERATIONS=Object.freeze(Object.fromEntries([
  ['year',4,'DoNumber','Год','Y','integer'],['quarter',5,'DoNumber','Квартал','Q','integer'],
  ['month',6,'DoNumber','Месяц','M','integer'],['day_of_month',10,'DoNumber','День месяца','DM','integer'],
  ['hour',12,'DoNumber','Часы','HRS','integer'],
+ ['minute',13,'DoNumber','Минуты','MIN','integer'],['second',14,'DoNumber','Секунды','SEC','integer'],
  ['year_start',4,'DoDateTimeFirst','Год','Y','datetime'],['year_end',4,'DoDateTimeLast','Год','Y','datetime'],
  ['quarter_start',0,'DoDateTimeFirst','Год + Квартал','YQ','datetime'],['quarter_end',0,'DoDateTimeLast','Год + Квартал','YQ','datetime'],
  ['month_start',1,'DoDateTimeFirst','Год + Месяц','YM','datetime'],['month_end',1,'DoDateTimeLast','Год + Месяц','YM','datetime'],
