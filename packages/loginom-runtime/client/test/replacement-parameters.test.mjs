@@ -4,6 +4,24 @@ import {validateReplacementParameters,validateReplacementValue,resolveReplacemen
 const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
+test('exact replacement distinguishes the input key type from the result type',()=>{
+ const p=params();p.rules[0].result_type='integer';p.rules[0].other={mode:'null'};
+ p.rules[0].pairs=[{from:value('unknown'),to:value(0,'integer')},{from:value(null),to:value(null,'integer')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ p.rules[0].pairs[0].to=value('0');
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/typed value/);
+ p.rules[0].pairs[0].to=value(0,'integer');p.rules[0].pairs[0].from=value(1,'integer');
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/typed value/);
+});
+test('conversion policies refuse Variant and validate real and datetime result literals',()=>{
+ const p=params(),r=p.rules[0];r.result_type='real';r.pairs=[{from:value('1.25'),to:value(1.25,'real')}];
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/produces Variant/);
+ r.other={mode:'value',value:value(-5.25,'real')};assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ r.other.value.value=-5.125;assert.throws(()=>validateReplacementParameters(p,'exact',request),/two decimal/);
+ r.result_type='datetime';r.other={mode:'null'};r.pairs=[{from:value('2024-02-29'),to:value('2024-02-29T00:00:00','datetime')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ for(const date of ['2023-02-29T00:00:00','2024-02-29','2024-02-29T00:00:00Z','2024-02-29T00:00:00.123']){r.pairs[0].to.value=date;assert.throws(()=>validateReplacementParameters(p,'exact',request),/datetime|calendar/);}
+});
 test('Null, empty string and literal null remain three distinct keys',()=>assert.equal(validateReplacementParameters(params(),'exact',request).rules[0].pairs.length,3));
 test('regex accepts ordered string constants and inline case flag, refusing unsupported semantics',()=>{
  const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Code'},type:'string',pairs:[{from:value('(?i)AB-([0-9]{2})'),to:value('SKU-$1')},{from:value('^AB-00$'),to:value('ZERO')}],other:{mode:'null'}}]};

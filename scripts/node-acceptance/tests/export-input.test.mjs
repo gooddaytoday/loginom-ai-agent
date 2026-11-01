@@ -96,6 +96,23 @@ test('CSV header reader respects BOM, quoting, escaped quotes, separators and em
  assert.throws(()=>parseExportCsvHeader('a|b','|'),/COLD_EXPORT_CSV_INVALID/);
 });
 
+test('cold CSV header decodes only the explicitly selected encoding, defaulting to UTF-8',async()=>{
+ const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
+ const declaration=source.slice(source.indexOf('const exportCsv='),source.indexOf('\n\nconst saved ='));
+ const decode=new (Object.getPrototypeOf(async function(){}).constructor)('args','readFile','resolve','parseExportCsvHeader',
+  declaration+';return exportCsv;');
+ const cp=Buffer.from([0xca,0xee,0xe4,0x3b,0xd2,0xe5,0xea,0xf1,0xf2,0x0d,0x0a]);
+ const args={csv:'download.csv','csv-delimiter':';','csv-header':'labels','csv-encoding':'Windows-1251'};
+ const read=async(_path,encoding)=>encoding?cp.toString(encoding):cp;
+ assert.deepEqual((await decode(args,read,x=>x,parseExportCsvHeader)).columns,['Код','Текст']);
+ const utf=Buffer.from('\uFEFFКод;Текст\r\n');
+ const utfRead=async(_path,encoding)=>encoding?utf.toString(encoding):utf;
+ delete args['csv-encoding'];
+ assert.deepEqual((await decode(args,utfRead,x=>x,parseExportCsvHeader)).columns,['Код','Текст']);
+ args['csv-encoding']='unsupported-encoding';
+ await assert.rejects(decode(args,read,x=>x,parseExportCsvHeader));
+});
+
 test('label headers require an explicit mode and unambiguous observed labels',()=>{
  const a=actual('rename',1);a.data.schema[0].label='Код';
  const want={...output,column_order:'exact',columns:[{name:'Code',label:'Код',type:'string'}]};
