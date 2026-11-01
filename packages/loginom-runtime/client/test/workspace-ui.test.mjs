@@ -7,6 +7,30 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
+test('error toast template is private and requires the native error class, component and message structure',async()=>{
+ for(const fault of [null,'info','native','messages']) {
+  const page=new Page(),toast=page.add('div','toast');toast.attrs.class='x-window bg-notify-msg-color-'+(fault==='info'?'info':'error');
+  const heading=page.add('div','toast;p.h;p.t','Ошибка',undefined,toast);heading.attrs.class='x-title-text';
+  page.add('div','toast;cnt;cnt;cmp','Прогноз Y:',undefined,toast);
+  const messages=page.add('div','toast;cnt;cnt;MessagesView','',undefined,toast);messages.attrs.class='bg-error-messages';
+  const list=page.add('ul',null,'',undefined,messages);list.attrs.class='bg-error-list';
+  const item=page.add('li',null,'Native error',undefined,list);item.attrs.class='bg-error-item';
+  if(fault==='messages'){const second=page.add('li',null,'Second',undefined,list);second.attrs.class='bg-error-item';}
+  const close=page.add('div','toast;p.h;close','',undefined,toast),icon=page.add('img',null,'',undefined,close);icon.attrs.class='x-tool-close';
+  page.context.Ext={getCmp:()=>({el:{dom:fault==='native'?{}:toast},title:'Ошибка',iconCls:'bg-icon-info-negative'})};
+  page.evaluate=async(fn,arg)=>vm.runInContext('('+fn.toString()+')',page.context)(arg);
+  const normal=await page.execute({mode:'observe',expected_build:build,expected_origin:origin});
+  assert.equal(normal.output.ui.dialogs[0].error_toast,undefined);
+  const observed=await vm.runInContext('('+makeWorkspaceUiCode({mode:'observe',node_error_toast_observation:true,expected_build:build,expected_origin:origin})+')',page.context)(page);
+  assert.equal(observed.status,'SUCCEEDED');
+  if(fault)assert.equal(observed.output.ui.dialogs[0].error_toast,undefined);
+  else {
+   assert.deepEqual(clone(observed.output.ui.dialogs[0].error_toast),{kind:'error',caption:'Прогноз Y:',message:'Native error'});
+   assert.ok(observed.output.ui.elements.find(e=>e.tid==='toast;p.h;close').allowed_actions.includes('click'));
+  }
+ }
+});
+
 test('private download observation preserves toast text and classes outside the file root',async()=>{
  const page=new Page(),root=page.add('button','MF;TF-1;FileStorageForm;pnlFileStorage;tbl','Files');
  const toast=page.add('div','toast','Скачивание файлов Отменить все');

@@ -40,6 +40,14 @@ function fixture(prefix='ConsoleForm') {
   const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'graph'};
   return {nodes,page,node,readNode:async()=>({...node}),left,right,menu,root,group,child,store,views,rows,masks,el,panel,elements};
 }
+test('error-toast proof may read the bound hidden cache without rendered control claims',async()=>{
+ const f=fixture();f.left.hidden=true;f.right.hidden=true;
+ assert.equal((await readNodeProcesses(f.page,{},f.readNode)).reason,'console_not_ready');
+ const proof=await readNodeProcesses(f.page,{},f.readNode,true);
+ assert.equal(proof.verified,true);assert.ok(proof.processes.every(p=>p.rendered===false));
+ f.views.right.getStore=()=>({});
+ assert.equal((await readNodeProcesses(f.page,{},f.readNode,true)).reason,'console_store');
+});
 test('native process inventory binds both split grids and cached tree records',async()=>{
  const f=fixture(),r=await readNodeProcesses(f.page,{},f.readNode);
  assert.equal(r.verified,true);assert.equal(r.processes[1].process_id,'1.1');assert.equal(r.processes[1].selected,true);

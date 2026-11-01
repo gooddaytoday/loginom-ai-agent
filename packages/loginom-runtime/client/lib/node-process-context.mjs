@@ -1,14 +1,14 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
-export function makeNodeProcessContextCode(binding) {
+export function makeNodeProcessContextCode(binding,{errorToast=false}={}) {
   validatePreparedNodeContext(binding);
-  return `async page=>{const readNode=${readPreparedNodeContext.toString()};return (${readNodeProcesses.toString()})(page,${JSON.stringify(binding)},readNode)}`;
+  return `async page=>{const readNode=${readPreparedNodeContext.toString()};return (${readNodeProcesses.toString()})(page,${JSON.stringify(binding)},readNode,${errorToast===true})}`;
 }
 
-export async function readNodeProcesses(page,binding,readNode=readPreparedNodeContext) {
+export async function readNodeProcesses(page,binding,readNode=readPreparedNodeContext,errorToast=false) {
   const before=await readNode(page,binding);
   if(!before.verified)return {verified:false,reason:'node_context'};
-  const result=await page.evaluate(nodeId=>{
+  const result=await page.evaluate(({nodeId,errorToast})=>{
     const fail=reason=>({verified:false,reason});
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(tid=>[...exact(tid)]);
@@ -27,7 +27,10 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
     const checked=menu[0].classList.contains('x-menu-item-checked'),unchecked=menu[0].classList.contains('x-menu-item-unchecked');
     if(checked===unchecked)return fail('completed_filter_ambiguous');
     const visible=e=>e.getBoundingClientRect().width>0 && e.getBoundingClientRect().height>0 && getComputedStyle(e).visibility!=='hidden' && getComputedStyle(e).display!=='none';
-    if(!visible(body[0])||!visible(right[0])||[...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible))return fail('console_not_ready');
+    const consoleVisible=visible(body[0])&&visible(right[0]);
+    // Only the error-toast proof may inspect this already bound hidden cache.
+    // Hidden records never establish rendered controls or authorize a gesture.
+    if(!consoleVisible&&!errorToast||[...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible))return fail('console_not_ready');
     const nativeRows=[...body[0].querySelectorAll('table.x-grid-item')],nativeRight=[...right[0].querySelectorAll('table.x-grid-item')];
     if(nativeRows.length>200||nativeRight.length>200)return fail('render_bound');
     const processes=[],seen=new Set();let visited=0;
@@ -54,7 +57,7 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
             path=texts[0].getAttribute('data-tid');selected=rows[0].classList.contains('x-grid-item-selected');
             const expanders=texts[0].querySelectorAll('.x-tree-expander');
             if(expanders.length===1){expander_tid=expanders[0].getAttribute('data-tid');expanded=typeof d.expanded==='boolean'?d.expanded:null;}
-            rendered=d.Status!==3||progress[0].classList.contains('bg-progress-ptpsCompleted');
+            rendered=consoleVisible&&(d.Status!==3||progress[0].classList.contains('bg-progress-ptpsCompleted'));
           }
         }
         const state=d.Status===3?'completed':'pending_or_failed';
@@ -83,7 +86,7 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
     if(new Set(processes.map(p=>p.process_id)).size!==processes.length||new Set(processes.map(p=>p.record_id)).size!==processes.length)return fail('duplicate_process');
     return {verified:true,inventory_complete:true,root_id:String(root.internalId),show_completed:checked,
       filter_source:'cached_native_menu_check_state',processes,execution_freshness_verified:false};
-  },before.surface==='graph'?before.node_id:null);
+  },{nodeId:before.surface==='graph'?before.node_id:null,errorToast});
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'node_context_changed'};
   return {...result,node_context:after};

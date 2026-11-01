@@ -32,6 +32,7 @@ import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
+import {identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
@@ -84,6 +85,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
   let launchConfirmed = false;
+  let executionBaseline,launchEvidence,ownedErrorToast;
   let launchConsoleControl;
   const rememberConsoleControl = state => {
     if(launchConfirmed||!preparedNodeContext||state.prepared_node_context?.surface!=='graph')return;
@@ -189,7 +191,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     const expressionMask=m=>expressionModal&&m.kind==='modal_background'&&m.target_tid===state.wizard.root_tid&&m.ref===state.wizard.root_ref;
     if (!Array.isArray(state.ui?.masks) || !Array.isArray(state.ui?.dialogs)
       || (!allowTransient && !closing && state.ui.masks.some(m=>!expressionMask(m)))
-      || !closing && state.ui.dialogs.some(d => !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state) && !pendingPreviewDialog(d,state)))
+      || !closing && state.ui.dialogs.some(d => !(ownedErrorToast&&d.ref===ownedErrorToast.ref
+        &&JSON.stringify(d.error_toast)===JSON.stringify(ownedErrorToast.error_toast)) && !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state) && !pendingPreviewDialog(d,state)))
       || ['dialogs','masks'].some(key => state.ui.truncated?.[key] !== false)
       || state.scan?.complete !== true) {
       throw new Error('Node procedure is blocked by a mask or dialog');
@@ -438,6 +441,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         return value;
       };
       const readUi = options => {
+        if(ownedErrorToast)options={...options,node_error_toast_observation:true};
         if(!settleOutputPort)return read(makeWorkspaceUiCode(options),{timeout:readTimeout()});
         // Capture before transport: dispatch and browser reads consume one allowance.
         const readDeadline=Math.min(deadline,now()+OUTPUT_SETTLEMENT_READ_MS);
@@ -541,7 +545,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const trainingRoot=readTraining?(roots.output.ui?.elements??[]).find(e=>e.tid==='mn')?.ref:undefined;
         const normEditor=readClustering&&wizard?.stage==='normalization'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';ColumnsEditForm')?.ref:undefined;
         const normPortal=readClustering&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
-        const root = normPortal ?? normEditor ?? trainingRoot ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const root = ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
@@ -739,6 +743,51 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             throw Error('Owned wizard loading context changed');
           if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
         }
+        // Train/Execute can fail immediately and leave an error portal outside
+        // this read's root. Bind it to a fresh native-owned failed child from
+        // the pre-launch inventory, never to a caption or an old error alone.
+        if(launchEvidence&&result.output.ui.dialogs.length===1
+          &&result.output.ui.dialogs[0].identity?.anchor_tid==='toast'
+          &&result.output.prepared_node_context?.surface==='graph'&&result.output.prepared_node_context.locked===false
+          &&result.output.wizard?.status==='absent'&&!result.output.ui.masks.length) {
+          const portal=result.output.ui.dialogs[0],native=await read(makeNodeProcessContextCode(preparedNodeContext,{errorToast:true}),{timeout:readTimeout()});
+          const detail=await readUi({mode:'observe',operation_id:id,...boundOptions,root_ref:portal.ref,
+            node_error_toast_observation:true,download_toast_observation:true,expected_origin:targetOrigin,expected_build:targetBuild});
+          if(detail.status==='SUCCEEDED') {
+            assertContext(detail.output,true);
+            const state=detail.output,dialog=state.ui.dialogs[0],toast=dialog?.error_toast;
+            let child,execution;
+            try {execution=identifyNewExecution(launchEvidence.baseline,native);child=selectFailedExecutionChild(execution,native);}catch { /* Unproved notifications retain ordinary readiness. */ }
+            const closes=state.ui.elements.filter(e=>e.tid==='toast;p.h;close'&&e.signature?.dialog_ref===portal.ref&&e.enabled===true&&e.allowed_actions.includes('click'));
+            if(child&&toast?.kind==='error'&&toast.message===child.error_details&&toast.caption===child.caption+':'
+              &&state.ui.dialogs.length===1&&dialog.ref===portal.ref&&closes.length===1
+              &&state.dom_epoch.document===launchEvidence.browser_document&&now()>=launchEvidence.started_at
+              &&JSON.stringify(canonical(native.node_context))===JSON.stringify(canonical(state.prepared_node_context))
+              &&state.prepared_node_context.surface==='graph'&&!state.prepared_node_context.locked
+              &&state.wizard?.status==='absent'&&!state.ui.masks.length) {
+              const failure={code:'NODE_EXECUTION_FAILED',message:toast.message,native:{source:'loginom_error_toast',
+                node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id,
+                execution_id:execution.execution_id,process_id:child.process_id,process_record_id:child.record_id}};
+              const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
+                launch:structuredClone(launchEvidence),failure,native_processes:native,outcome:structuredClone(detail)});
+              if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');
+              const error=Object.assign(Error(failure.message),{nodeExecutionFailure:failure});
+              ownedErrorToast=structuredClone(dialog);snapshot=structuredClone(state);evidenceSnapshot=structuredClone(saved.outcome.output);
+              launchEvidence=undefined;
+              try {await channel.perform({condition:'close own native execution error toast',confirmIdentity:s=>s.dom_epoch,
+                ready:s=>s.ui.dialogs.length===1&&s.ui.dialogs[0].ref===portal.ref
+                  &&JSON.stringify(s.ui.dialogs[0].error_toast)===JSON.stringify(toast)
+                  &&s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false
+                  &&s.wizard?.status==='absent'&&!s.ui.masks.length
+                  &&s.ui.elements.filter(e=>e.tid==='toast;p.h;close'&&e.signature?.dialog_ref===portal.ref&&e.allowed_actions.includes('click')).length===1,
+                resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid==='toast;p.h;close').ref}),
+                identity:()=>({node:failure.native.node,toast:portal.ref})});}
+              catch(cleanupError){await entry('node_execution_error_toast_cleanup_failed',{step,reason:String(cleanupError.message)});}
+              finally {ownedErrorToast=undefined;snapshot=null;evidenceSnapshot=null;}
+              throw error;
+            }
+          }
+        }
         if(settleProcessConsole&&(settleProcessConsole.quiet||settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
@@ -784,7 +833,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             throw Error('Owned output settlement context changed');
           }
         }
-        satisfied = (boundWizardConfirmation(result.output,wizardConfirmation)
+        satisfied = (ownedErrorToast&&result.output.ui.dialogs.length===1&&result.output.ui.dialogs[0].ref===ownedErrorToast.ref
+            &&JSON.stringify(result.output.ui.dialogs[0].error_toast)===JSON.stringify(ownedErrorToast.error_toast)
+          ||boundWizardConfirmation(result.output,wizardConfirmation)
           || result.output.ui.masks.every(m=>result.output.ui.dialogs.length===1&&allowedNodeEditor(result.output.ui.dialogs[0],result.output)
             &&m.kind==='modal_background'&&m.target_tid===result.output.wizard.root_tid&&m.ref===result.output.wizard.root_ref)
             &&result.output.ui.dialogs.every(d=>allowedDialog(d,tableDialog)||allowedOutputEditor(d,result.output)||allowedNodeEditor(d,result.output)))
@@ -831,6 +882,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async act(action,processControl,{preserveJoinMapping=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
+      if(ownedErrorToast&&(action.verb!=='click'||!snapshot.ui.elements.some(e=>e.ref===action.ref&&e.tid==='toast;p.h;close'
+        &&e.signature?.dialog_ref===ownedErrorToast.ref)))throw Error('Only the proved error toast close is authorized');
       if(preserveJoinMapping&&(!isUnchangedTransformExecution(operation.parameters)
         ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
         ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
@@ -844,6 +897,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           : snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid===(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes'))))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
+      const launchStartedAt=now();
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
         ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
@@ -876,6 +930,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
+        ...(ownedErrorToast?{node_error_toast_observation:true}:{}),
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
       const wrapped = wrapMutation(before.node_mapping_editor?`async page=>{
         const current=await (${makeNodeMappingContextCode(preparedNodeContext,before.node_mapping_editor)})(page);
@@ -911,6 +966,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(preparedNodeContext&&(['execute_graph_node','execute_wizard'].includes(action.verb)||trainingLaunch)){
         rememberConsoleControl(before);
         launchConfirmed=true;
+        launchEvidence=executionBaseline?{baseline:structuredClone(executionBaseline),browser_document:before.dom_epoch.document,
+          operation_id:id,started_at:launchStartedAt}:undefined;
       }
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
@@ -1081,6 +1138,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
     },
     get steps() { return sequence; },
+    bindExecutionBaseline(baseline) {
+      if(!preparedNodeContext||!baseline?.root_id||!Array.isArray(baseline.roots)
+        ||!['document_id','workflow_id','node_id'].every(k=>baseline.node?.[k]===preparedNodeContext.node[k]))throw Error('Execution baseline owner differs');
+      executionBaseline=structuredClone(baseline);
+    },
     get launchConfirmed() { return launchConfirmed; },
     // Execution drivers can be recreated between JS materialization/finish.
     // Retain the pre-launch control; never recapture its replacement afterwards.
