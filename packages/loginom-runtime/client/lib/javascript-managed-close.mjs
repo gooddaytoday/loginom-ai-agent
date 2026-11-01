@@ -78,11 +78,19 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
     const graph=diagram?.FmxGraph,shape=found.length===1?graph?.view?.getState?.(found[0].FCell)?.shape?.node:null;
     const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.prefix+';ModelForm;cmpDiagram')+']')];
-    if(!Array.isArray(nodes)||nodes.length>200||found.length>1||roots.length>1
-      ||found.length===1&&found[0].FIconCls!=='bg-vendor-icon-javascript'
-      ||roots.length===1&&graph?.container&&roots[0]!==graph.container
-      ||shape?.isConnected&&roots.length===1&&(!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid))
-      throw Error('Managed JavaScript Close graph owner changed');
+    const checks={collection_array:Array.isArray(nodes),collection_bounded:!Array.isArray(nodes)||nodes.length<=200,
+      node_unique:found.length<=1,root_unique:roots.length<=1,
+      javascript_type:found.length!==1||found[0].FIconCls==='bg-vendor-icon-javascript',
+      graph_container:roots.length!==1||!graph?.container||roots[0]===graph.container,
+      shape_binding:!shape?.isConnected||roots.length!==1||roots[0].contains(shape)&&shape.getAttribute('data-tid')===held.node.tid};
+    if(Object.values(checks).some(value=>!value))
+      // Serialize bounded read-only facts into the exception: Playwright does
+      // not preserve custom Error properties across the browser boundary.
+      throw Error('Managed JavaScript Close graph owner changed: '+JSON.stringify({checks,
+        node_count:Array.isArray(nodes)?nodes.length:null,matching_node_count:found.length,root_count:roots.length,
+        icon_cls:typeof found[0]?.FIconCls==='string'?found[0].FIconCls.slice(0,128):null,
+        graph_container_present:!!graph?.container,shape_connected:shape?.isConnected===true,
+        shape_tid:shape?.getAttribute?.('data-tid')?.slice(0,256)??null,expected_shape_tid:held.node.tid}));
     // Close can repaint the graph before Loginom releases the owned node lock.
     // A visible shape alone cannot authorize the next owned operation.
     if(found.length===0||roots.length===0||!graph?.container||!shape?.isConnected||found[0].FLocked===true)
