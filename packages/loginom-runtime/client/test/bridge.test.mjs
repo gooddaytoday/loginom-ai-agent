@@ -128,6 +128,17 @@ test('observation usage is a separate bounded hint and never changes the authori
 
 // Module mocks are isolated to this child process, so actual SDK and bridge
 // imports used by the other suites retain their original implementations.
+for (const fault of ['initialize-one', 'list-one', 'read-one', 'list-two', 'read-two', 'list-semantic']) {
+  test(`bridge startup ${fault}: retry only catalog reads before a single prepare`, async () => {
+    const environment = { ...process.env, LOGINOM_TEST_CATALOG_FAULT: fault };
+    delete environment.NODE_TEST_CONTEXT;
+    const result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
+      fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))],
+    { timeout: 30000, env: environment });
+    assert.match(result.stdout, /pass 1/); assert.match(result.stdout, /fail 0/);
+  });
+}
+
 test('bridge keeps application feedback recoverable over the MCP protocol', async () => {
   const environment = { ...process.env, ...desktopEnvironment, DOCK_TEST_SECRET: 'must-not-reach-browser' };
   delete environment.NODE_TEST_CONTEXT;

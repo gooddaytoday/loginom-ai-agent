@@ -1,4 +1,4 @@
-import {selectPreparedGraphNode} from './node-graph-selection.mjs';
+import {selectPreparedGraphNode,isPreparedBodyReplacement} from './node-graph-selection.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
@@ -47,13 +47,28 @@ export function wizardOpenBinding(state) {
 
 export function wizardDeactivationDialogOwner(state,binding) {
  const n=state.prepared_node_context,ui=state.ui;
+ // A stopped begin_wizard can leave only the native node breadcrumb, before
+ // Loginom appends Settings. Release may answer No only to the exact dialog
+ // captured by that settled gesture, with the same native pending node/path.
+ if(binding?.kind==='deactivation'&&binding.release_opening){
+  const b=binding.release_opening;
+  return n?.verified===true&&n.surface==='graph'&&n.locked===false&&same(n,b.node)
+   &&state.wizard?.status==='absent'&&same(state.workflow_ref,b.workflow_ref)
+   &&state.dom_epoch?.document===b.document&&state.origin===b.origin&&state.loginom_build===b.build
+   &&state.active_tab_ref===b.active_tab_ref&&same(state.package_identity,b.package_identity)
+   &&same(state.workflow_navigation,b.navigation)&&ui?.dialogs?.length===1
+   &&same({...ui.dialogs[0],title:b.dialog.title,text:b.dialog.text},b.dialog)&&Array.isArray(ui.masks)
+   &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===n.tid.split(';Graph;')[0]&&m.dialog_ref===null);
+ }
  return binding?.kind==='deactivation'&&n?.verified===true&&n.surface==='graph'
   &&n.tid===binding.graph_tid&&['document_id','workflow_id','node_id'].every(k=>n[k]===binding.node?.[k])
   &&state.wizard?.status==='absent'&&state.wizard_pending_owner?.status==='observed'
   &&(state.wizard_pending_owner.node?.tid===binding.opening?.workflow_path?.at(-1)?.tid+'>'+binding.opening?.node?.node_label
     ||n.pending_wizard_node?.tid===state.wizard_pending_owner.node?.tid
       &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label===state.wizard_pending_owner.node?.label)
-  &&same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
+  &&(same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
+    ||typeof n.pending_wizard_node?.tid==='string'
+      &&same(state.wizard_pending_owner.path?.map(({tid,label})=>({tid,label})),[...binding.opening.workflow_path,n.pending_wizard_node]))
   &&Array.isArray(ui?.dialogs)&&ui.dialogs.length===1&&Array.isArray(ui.masks)
   &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===binding.graph_tid.split(';Graph;')[0]&&m.dialog_ref===null);
 }
@@ -72,10 +87,23 @@ export async function openPreparedWizard(channel) {
   &&s.prepared_node_context.surface==='graph'&&s.wizard?.status==='absent'&&s.ui.dialogs.length===0&&s.ui.masks.length===0});
  // Closing the schema-inspection wizard clears Loginom's graph selection.
  // Restore only the bound node, then observe its settings before opening once.
- if(!s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard')))
-  await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings');
- s=await channel.observe({condition:'prepared node settings available',ready:s=>s.prepared_node_context?.surface==='graph'
-  &&s.wizard?.status==='absent'&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'))});
+ const settings=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+  &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'));
+ const selection=!settings(s)?await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings'):null;
+ const now=()=>channel.now?.()??Date.now(),deadline=now()+15000;
+ // A succeeded click can precede Loginom's asynchronous SVG replacement.
+ // Only a proved new body of the same GUID permits one fresh selection;
+ // missing controls or an uncertain receipt alone never authorize a click.
+ const replaced=s=>s.wizard?.status==='absent'&&s.wizard_pending_owner?.status!=='observed'
+  &&selection?.receipt?.status==='SUCCEEDED'&&selection.receipt.cleanup_complete===true
+  &&isPreparedBodyReplacement({...selection,receipt:{output:s}});
+ s=await channel.observe({condition:'prepared node settings available',ready:s=>settings(s)||replaced(s)});
+ if(!settings(s)) {
+  requireValue(now()<deadline,'Prepared node settings deadline elapsed');
+  await selectPreparedGraphNode(channel,s,'select replaced prepared body before reopening settings');
+  requireValue(now()<deadline,'Prepared node settings deadline elapsed');
+  s=await channel.observe({condition:'prepared node settings available',timeoutMs:Math.min(15000,deadline-now()),ready:settings});
+ }
  const binding=wizardOpenBinding(s);
  await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
   ready:s=>same(wizardOpenBinding(s),binding),identity:()=>binding,

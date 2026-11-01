@@ -70,6 +70,10 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
+        // Linear regression replaces its caption when the wizard finishes,
+        // leaving an alternate SVG without TID. Rebind only the same native
+        // data port to the new caption with its exact previous suffix.
+        const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.
@@ -81,13 +85,15 @@ export async function readGraph(page, task) {
         if(!ptid && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && previous.nodeTid===tid
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedRegression)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedRegression?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
-              || (!previous && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+              || ((!previous || renamedRegression) && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+            if(renamedRegression && (candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if([...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
@@ -199,13 +205,25 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       gestureBefore=await read(page,task);
       if(!sameGraph(before,gestureBefore))throw Error('Graph changed after placement navigation');
       placementNavigation.rebound_node_epochs=gestureBefore.nodes.filter(n=>before.nodes.find(b=>b.ref.node_id===n.ref.node_id)?.dom_epoch!==n.dom_epoch).map(n=>({node_id:n.ref.node_id,dom_epoch:n.dom_epoch}));
-      const origin=await canvas.boundingBox(),target=placementNavigation.point;
-      const reachable=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{
-        const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);
+      const origin=await canvas.boundingBox();
+      const reachable=await canvas.evaluate((e,{point,scale,prefix})=>{
+        const b=e.getBoundingClientRect();let p=point,hit=document.elementFromPoint(p.x,p.y);
+        // At minimum zoom Chromium can hit the collapsed workarea splitter
+        // for a fractional point just inside the canvas (793.978 vs 794).
+        // Use an actual event pixel only when it remains in the SAME model
+        // grid cell and hits this canvas. Foreign windows never authorize it.
+        const pixel={x:Math.floor(p.x),y:Math.floor(p.y)};
+        if(hit?.closest?.('[data-tid]')?.getAttribute('data-tid')===prefix+';ModelForm;pnlWorkarea;bordersplitter-1'
+          &&!hit.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg')&&Number.isFinite(scale)&&scale>0
+          &&Math.abs(pixel.x-p.x)<4*scale&&Math.abs(pixel.y-p.y)<4*scale){
+          const candidate=document.elementFromPoint(pixel.x,pixel.y);
+          if(candidate&&(candidate===e||e.contains(candidate))&&!candidate.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg')){p=pixel;hit=candidate;}
+        }
         return {reachable:p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&!!hit&&(hit===e||e.contains(hit)),
           graph_rect:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight},screen_point:p,hit_inside:!!hit&&(hit===e||e.contains(hit))};
-      },target);
+      },{point:placementNavigation.point,scale:placementNavigation.view?.scale,prefix:task.request.workflow_ref.prefix});
       if(!reachable.reachable){placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};throw new Error('Requested drop surface is not reachable');}
+      const target=reachable.screen_point;placementNavigation.point=target;
       if(p.type==='exports.text'){
         const args={owner_tid:task.request.workflow_ref.prefix+';ModelForm;pnlVendors;tree',item_tid:palette};
         const owner=find(args.owner_tid);if(await owner.count()!==1)throw Error('Export palette owner is ambiguous');
@@ -374,7 +392,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
 
 // Moving off a selected node can replace its SVG body when hover controls
 // disappear. Settle that UI-only transition before binding the drag epochs.
-export async function prepareLinkHover(page,task,read,sameGraph) {
+export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewport,project) {
   const observe=async()=>{
     for(let attempt=0;attempt<3;attempt++){
       try{return await read(page,task);}catch(error){
@@ -408,10 +426,10 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
   const maskDeadline=Math.min(task.deadline,Date.now()+15000);
-  let point;
+  let point,revealed=false;
   for(let attempt=0;attempt<10;attempt++){
     if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
-    point=await source.evaluate(async(e,{request,origin,build,deadline})=>{
+    point=await source.evaluate(async(e,{request,origin,build,deadline,sourceId,revealed})=>{
       const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
       let element=e;
@@ -456,9 +474,47 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
           await new Promise(resolve=>setTimeout(resolve,50));
         }
       }
-      const current=point();return current.reachable?{x:current.x,y:current.y}:null;
-    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline});
+      const current=point();
+      if(current.reachable)return {x:current.x,y:current.y};
+      // LAB-736: ConsoleForm's north resize strip can extend above the panel
+      // and cover a port at the clipped bottom of the graph. Only this native,
+      // nonmodal console permits guarded viewport navigation. Reveal the center
+      // because the admitted link primitive uses it again to start its drag.
+      const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(exact),panel=panels[0];
+      const component=panel&&globalThis.Ext?.getCmp?.(panel.id);
+      const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+      const diagram=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController?.FDiagram;
+      const graph=diagram?.FmxGraph,root=roots[0],sources=exact(e.getAttribute('data-tid'));
+      if(Date.now()>=deadline||location.origin!==origin||bg?.app?.Version!==build
+        ||panels.length!==1||!panel.classList.contains('x-panel-status')||component?.el?.dom!==panel||component.modal===true
+        ||!current.hit?.matches('.x-resizable-handle.x-resizable-handle-north')||current.hit.parentElement!==panel
+        ||roots.length!==1||graph?.container!==root||sources.length!==1||sources[0]!==element||!root.contains(element)
+        ||[...document.querySelectorAll('[role="dialog"],[aria-modal="true"],.bg-mask-message,.x-mask-msg,.x-menu,.x-tip')].some(visible))return null;
+      const owners=diagram.FNodes?.FCollection?.filter(n=>n.FGuid===sourceId);
+      if(owners?.length!==1)return null;
+      const ports=(owners[0].FPorts??[]).flatMap(p=>p.FCollection??[]).filter(p=>p.parent===owners[0]
+        &&p.FCell?.parent===owners[0].FCell&&p.FGuid&&p.data&&p.FType===1&&p.FSubType===1
+        &&graph.view.getState(p.FCell)?.shape?.node===element);
+      if(ports.length!==1)return null;
+      const v=root.getBoundingClientRect();
+      if(graph.getCellAt(current.x-v.x+root.scrollLeft,current.y-v.y+root.scrollTop)!==ports[0].FCell)return null;
+      return revealed?null:{reveal:true};
+    },{request:task.request,origin:task.origin,build:task.build,deadline:maskDeadline,sourceId:task.effect.parameters?.edge?.source,revealed});
     if(point?.status==='NOT_APPLIED')return point;
+    if(point?.reveal){
+      revealed=true;
+      const remaining=()=>{
+        if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw Error('Node target cancelled');
+        const ms=task.deadline-Date.now();if(ms<=0)throw Error('Link hover deadline elapsed');return ms;
+      };
+      const guard=async()=>{remaining();if(!sameGraph(before,await observe()))throw Error('Graph changed during link source reveal');};
+      await guard();
+      const node=before.nodes.find(n=>n.ref.node_id===task.effect.parameters.edge.source);
+      await reveal({page,root,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+        scrollNode:true,remaining,guard,readViewport,project});
+      await guard();point=null;
+      continue;
+    }
     if(point)break;
     await page.waitForTimeout(50);
   }
@@ -470,7 +526,9 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
       const diagnostic=await page.evaluate(({sourceTid,rootTid})=>{
         const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
         const roots=exact(rootTid),sources=exact(sourceTid);
-        if(roots.length!==1||sources.length!==1||!roots[0].contains(sources[0]))return {source_identity_changed:true};
+        if(roots.length!==1||sources.length!==1||!roots[0].contains(sources[0]))return {source_identity_changed:true,source_tid:sourceTid.slice(0,96),
+          root_matches:roots.length,source_matches:sources.length,
+          graph_source_matches:roots.length===1?sources.filter(e=>roots[0].contains(e)).length:null};
         const e=sources[0],b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
         const describe=n=>n?{tag:n.tagName.toLowerCase().slice(0,24),tid:n.getAttribute('data-tid')?.slice(0,96)??null,
           role:n.getAttribute('role')?.slice(0,24)??null,class:n.getAttribute('class')?.slice(0,96)??null}:null;
@@ -641,7 +699,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const edge=effect.parameters.edge,bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_Data-'+bound.source.index});
-        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()})`,deadline);
+        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()})`,deadline);
         if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),

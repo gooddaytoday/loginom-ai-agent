@@ -127,18 +127,55 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.closed) return
     port.postMessage(generation === undefined ? value : { ...value, generation })
   }
-  async function connectionLease(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
+  async function connectionLease(
+    id: string,
+    run: NonNullable<ReturnType<typeof runs.get>>,
+    preparation?: { deadline: number; signal: AbortSignal; waited: boolean },
+  ) {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
     if (run.lease) return run.lease
     const status = await service.api.status()
     if (run.lease) return run.lease
     if (!status.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")
+    if (preparation && status.state === "starting") {
+      // Reuse this generation's startup request; it spends the prepare budget.
+      preparation.waited = true
+      const remaining = preparation.deadline - Date.now()
+      if (remaining <= 0) throw new Error("LOGINOM_CONNECTION_NOT_READY")
+      const cancelled = () => state.closed || run.released || preparation.signal.aborted
+      if (cancelled()) throw new Error("LOGINOM_CONNECTION_NOT_READY")
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let abort: (() => void) | undefined
+      try {
+        await Promise.race([
+          service.catalog(status.generation),
+          new Promise<never>((_, reject) => {
+            abort = () => reject(new Error("LOGINOM_CONNECTION_NOT_READY"))
+            timer = setTimeout(abort, remaining)
+            preparation.signal.addEventListener("abort", abort, { once: true })
+          }),
+        ])
+      } finally {
+        clearTimeout(timer)
+        if (abort) preparation.signal.removeEventListener("abort", abort)
+      }
+      const current = await service.api.status()
+      if (
+        cancelled() ||
+        runs.get(id) !== run ||
+        Date.now() >= preparation.deadline ||
+        current.generation !== status.generation ||
+        current.state !== "ready"
+      )
+        throw new Error("LOGINOM_CONNECTION_NOT_READY")
+    }
     const lease = service.acquire(`${owner}:${id}`)
     if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
     run.lease = lease
     return lease
   }
   async function handle(data: unknown) {
+    const started = Date.now()
     if (state.closed) return
     if (
       !data ||
@@ -216,6 +253,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
       if (data.method === "release") {
         run.released = true
+        run.packagePreparation?.abort()
         if (!run.calls) {
           await release(input.run, run)
         }
@@ -313,7 +351,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if ((data.method === "call" || referenceCall) && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
       if (data.method === "call" || referenceCall) run.dispatching = true
-      if (packageInput) run.packagePreparation = new AbortController()
+      const preparing = data.method === "call" && "name" in input && input.name === prepareTool.name
+      if (packageInput || preparing) run.packagePreparation = new AbortController()
+      const args = "args" in input ? input.args : undefined
+      const timeout = args && typeof args === "object" && "timeout_ms" in args ? args.timeout_ms : undefined
+      const preparation =
+        preparing &&
+        (timeout === undefined ||
+          (typeof timeout === "number" && Number.isInteger(timeout) && timeout >= 1 && timeout <= 120_000))
+          ? {
+              deadline:
+                started +
+                (typeof timeout === "number" && Number.isInteger(timeout) && timeout >= 1 && timeout <= 120_000
+                  ? timeout
+                  : 120_000),
+              signal: run.packagePreparation!.signal,
+              waited: false,
+            }
+          : undefined
       const packageAborted = () =>
         packageInput && (state.closed || run.released || run.packagePreparation?.signal.aborted)
       if (browserCall || referenceCall) run.browserDispatching = true
@@ -491,7 +546,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
         if (admissions.some((admission) => admission.files.some((file) => file.name.toLowerCase().endsWith(".lgp"))))
           throw new Error("LOGINOM_SCOPE_DENIED")
-        const lease = await connectionLease(input.run, run)
+        const lease = await connectionLease(input.run, run, preparation)
         if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
           throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
@@ -509,7 +564,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.clear()
             run.catalog = new Set([prepareTool.name])
           }
-          const runtime = await service.runtime(lease.generation, run.chat)
+          const runtime = await service.runtime(lease.generation, run.chat, preparation)
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           const packageArtifact = packageAdmission
             ? await runtime.request("admit", packageAdmission).then((value) => {
@@ -525,6 +580,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.add(admission.userMessage)
           }
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
+          if (
+            preparation?.waited &&
+            (state.closed || run.released || preparation.signal.aborted || Date.now() >= preparation.deadline)
+          )
+            throw new Error("LOGINOM_CONNECTION_NOT_READY")
           recovery.id = await service.journal.begin(run.chat, lease.generation)
           run.active.add(recovery.id)
           if (!service.hasRuntime(lease.generation, run.chat) || packageAborted()) {
@@ -536,11 +596,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw new Error(packageAborted() ? "LOGINOM_RUN_ABORTED" : "LOGINOM_SCOPE_DENIED")
           }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          const remaining = preparation?.waited ? preparation.deadline - Date.now() : undefined
+          if (remaining !== undefined && (remaining <= 0 || preparation!.signal.aborted || run.released)) {
+            await service.journal.settle(recovery.id, true)
+            run.active.delete(recovery.id)
+            recovery.id = undefined
+            throw new Error("LOGINOM_CONNECTION_NOT_READY")
+          }
           const result = await runtime.request(
             "call",
             {
               name: input.name,
-              arguments: "args" in input ? input.args : undefined,
+              arguments: remaining === undefined ? args : { ...(args as object), timeout_ms: remaining },
               ...(packageArtifact ? { packageArtifact } : {}),
               ...(input.name === "dock_node_apply" && "scanReceipt" in input ? { scanReceipt: input.scanReceipt } : {}),
             },
@@ -608,6 +675,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     state.closed = true
     runs.forEach((run) => {
       run.released = true
+      run.packagePreparation?.abort()
     })
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {

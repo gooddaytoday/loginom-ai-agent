@@ -1,8 +1,10 @@
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { mkdir, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
+import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
+import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
 export type Launch = {
   node: string
@@ -25,9 +27,10 @@ export type Launch = {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability for temporary browser recovery tools.
   browserRecovery?: boolean
+  startupDeadline?: number
 }
 
-type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
+type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
 export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
 
 export class RuntimeStartupError extends Error {
@@ -105,11 +108,11 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Browser validation follows the separate key-only Help check in Host.
   const runtime = await superviseProcess(
-    input,
+    { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
     { ...input, environment: undefined, protocol: 1 },
-    input.validation ? 210_000 : 120_000,
+    Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
-    input.closeSavedPackageOnShutdown === true ? 45_000 : 5000,
+    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,
   )
   const ready = runtime.ready
   if (
@@ -128,7 +131,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
 
 export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
   const runtime = await superviseProcess(
-    input,
+    { ...input, diagnosticSecrets: [input.apiKey] },
     {
       protocol: 1,
       generation: input.generation,
@@ -185,12 +188,27 @@ async function superviseProcess(
   child.on("disconnect", fail)
   child.on("exit", fail)
   child.on("error", fail)
-  child.on("message", (message) => {
+  child.on("message", async (message) => {
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
     pending.delete(message.id)
     clearTimeout(request.timer)
+    if ("startupDiagnostics" in message && Array.isArray(message.startupDiagnostics)) {
+      const events = message.startupDiagnostics.slice(0, 2).flatMap((item: unknown) => {
+        if (!item || typeof item !== "object" || !("error" in item)) return []
+        return [{ event: "runtime.startup_failure", generation: input.generation, pid: child.pid,
+          phase: "phase" in item && typeof item.phase === "string"
+            && ["initialize", "listTools", "manifest.read", "knowledge.catalog", "runtime.start"].includes(item.phase)
+            ? item.phase : "runtime.start", retry: "retry" in item && item.retry === true,
+          error: startupDiagnostic(item.error, input.diagnosticSecrets) }]
+      })
+      if (events.length) await Promise.allSettled([
+        appendFile(join(input.stateDir, "startup-failures.jsonl"), events.map((event) =>
+          JSON.stringify({ version: 1, recorded_at: new Date().toISOString(), ...event }) + "\n").join(""), { mode: 0o600 }),
+        recordLocalDiagnostics(input.stateDir, "startup", events),
+      ])
+    }
     if ("error" in message) {
       request.reject(
         hostError(message) !== "LOGINOM_HOST_REQUEST_FAILED"

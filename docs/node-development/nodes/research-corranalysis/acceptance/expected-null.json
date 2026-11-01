@@ -1,0 +1,83 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.corr_analysis"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.corr_analysis",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ColSet1",
+          "label": "Поле1.Имя",
+          "type": "string"
+        },
+        {
+          "name": "ColSet1_Label",
+          "label": "Поле1.Метка",
+          "type": "string"
+        },
+        {
+          "name": "ColSet2",
+          "label": "Поле2.Имя",
+          "type": "string"
+        },
+        {
+          "name": "ColSet2_Label",
+          "label": "Поле2.Метка",
+          "type": "string"
+        },
+        {
+          "name": "Pirson",
+          "label": "Пирсона",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ],
+      "rows": [
+        {
+          "ColSet1": "X",
+          "ColSet1_Label": "X",
+          "ColSet2": "Z",
+          "ColSet2_Label": "Z",
+          "Pirson": null
+        },
+        {
+          "ColSet1": "Y",
+          "ColSet1_Label": "Y",
+          "ColSet2": "Z",
+          "ColSet2_Label": "Z",
+          "Pirson": null
+        },
+        {
+          "ColSet1": "X",
+          "ColSet1_Label": "X",
+          "ColSet2": "W",
+          "ColSet2_Label": "W",
+          "Pirson": -0.25819888974716115
+        },
+        {
+          "ColSet1": "Y",
+          "ColSet1_Label": "Y",
+          "ColSet2": "W",
+          "ColSet2_Label": "W",
+          "Pirson": -0.5
+        }
+      ]
+    }
+  ]
+}

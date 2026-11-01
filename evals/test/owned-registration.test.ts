@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promis
 import os from "node:os"
 import path from "node:path"
 import { releaseStaleWriter } from "../src/profile"
-import { superviseProcess, type OwnedRegistration } from "../src/process-supervisor"
+import { supervisedProcesses, superviseProcess, type OwnedRegistration } from "../src/process-supervisor"
 import { evalsRoot } from "../src/config"
 import { spawn } from "node:child_process"
 
@@ -19,9 +19,22 @@ async function fixture() {
   await Bun.write(path.join(profile, ".writer/owner"), "original-owner")
   const writer = await stat(path.join(profile, ".writer"))
   const acquiredAt = new Date().toISOString()
-  const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: evalsRoot,
-    env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000 })
+  // A short-lived CLI can exit before the source proof captures its ancestry.
+  const input = new TransformStream<Uint8Array, Uint8Array>()
+  const writerInput = input.writable.getWriter()
+  const pending = superviseProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: evalsRoot,
+    env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, stdin: input.readable, owner: { kind: "command", id: root } })
+  try {
+    const deadline = Date.now() + 5000
+    while (!supervisedProcesses().scopes.some(scope => scope.owner.id === root && scope.processes?.some(entry =>
+      entry.pid !== scope.launcher.pid && entry.executable === process.execPath))) {
+      if (Date.now() > deadline) throw Error("Registration fixture CLI admission did not arrive")
+      await Bun.sleep(10)
+    }
+  } finally { await writerInput.close(); await pending }
+  const run = await pending
   expect(run.processCleanup.status).toBe("confirmed")
+  expect(run.processCleanup.origins?.map(entry => entry.via)).toContain("cli")
   // Synthetic historical error in fixture only. All process/registration identities are real.
   const original = { ...run.processCleanup, status: "failed" as const, error: "Writer owner unavailable", runtimeDirectories: [runtime],
     writer: { device: writer.dev, inode: writer.ino, owner: "original-owner" } }

@@ -56,11 +56,14 @@ test('admission records a redacted host boundary refusal and remains retired wit
  const f=fixture({secret:'PRIVATE_CREDENTIAL'}),receipt=await f.admission.admit({});
  let effects=0;
  await assert.rejects(()=>f.admission.withEffect(input(f,receipt),async()=>{
-  effects++;throw Error('Owned preparation failed: PRIVATE_CREDENTIAL');
+  effects++;const error=Error('Owned preparation failed: PRIVATE_CREDENTIAL');
+  error.stack='Error: Owned preparation failed: PRIVATE_CREDENTIAL\n at ownedInspector (graph.mjs:85:7)';throw error;
  }),{code:'boundary'});
  const refused=f.events.filter(event=>event.phase==='javascript_source_boundary_refused');
  assert.equal(refused.length,1);
  assert.equal(refused[0].reason,'Owned preparation failed: [redacted]');
+ assert.equal(refused[0].exception_name,'Error');
+ assert.equal(refused[0].exception_stack,'Error: Owned preparation failed: [redacted]\n at ownedInspector (graph.mjs:85:7)');
  assert.deepEqual(refused[0].owner,f.owner);
  assert.equal(refused[0].read_id,3);
  assert.equal(f.admission.state,'retired');
@@ -243,4 +246,23 @@ test('retained settings bind a fresh reader without authorizing any callback on 
   &&error.javascriptSourceClosedRefusal?.source_read_discard_verified===true);
  assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));
  assert.throws(()=>fixture({expectedSettings:'bad'}),{code:'settings_binding'});
+});
+
+test('confirmed effect execution failure survives admission retirement without replay',async()=>{
+ const f=fixture({source:'throw new Error("LAB669 intentional execution failure");'});
+ const receipt=await f.admission.admit({});
+ const error=Object.assign(Error('LAB669 intentional execution failure'),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message:'LAB669 intentional execution failure'}});
+ let effects=0;
+ await assert.rejects(f.admission.withEffect(input(f,receipt),async()=>{effects++;throw error;}),e=>e===error);
+ assert.equal(f.admission.state,'retired');assert.equal(effects,1);
+ await assert.rejects(f.admission.withEffect(input(f,receipt),f.effect),{code:'state'});
+ assert.equal(f.calls.includes('effect'),false);
+});
+
+test('an execution failure marker before effect dispatch cannot bypass the source boundary',async()=>{
+ const f=fixture(),receipt=await f.admission.admit({});
+ const error=Object.assign(Error('unverified read'),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED'}});
+ f.browser.observe=()=>{throw error;};
+ await assert.rejects(f.admission.withEffect(input(f,receipt),f.effect),{code:'boundary'});
+ assert.equal(f.calls.includes('effect'),false);assert.equal(f.admission.state,'retired');
 });

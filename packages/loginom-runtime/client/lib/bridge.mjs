@@ -5,7 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from './catalog.mjs';
+import { catalogStartup, readCatalog, combineCatalogs, connectRemote, selectToolGroups } from './catalog.mjs';
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -29,7 +29,7 @@ import { createHostArtifactAdmission, codexInputIdentity } from './host-artifact
 import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
-import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
+import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
@@ -91,7 +91,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -154,17 +154,18 @@ export async function createBridge(config, session, { browserTransport: managedB
   const redactor=createRedactor([config.apiKey]);
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
+  const startup = catalogStartup(startupOptions);
   try {
-    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);
+    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; }), browser.connect(browserTransport)]);
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
-    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote), readCatalog(browser)]);
+    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote, { startup }), readCatalog(browser)]);
     if (!browserTools.some(tool => tool.name === 'browser_run_code_unsafe')) {
       throw new Error('The pinned browser runtime lacks the verified clipboard execution tool');
     }
     if (['executor-preview', 'executor-replay'].includes(config.mode)) {
       const replay = config.mode === 'executor-replay';
-      const pinned = await pinActionCatalog(remote, { runtimeIdentity: session.metadata, ...(replay ? {
+      const pinned = await pinActionCatalog(remote, { startup, runtimeIdentity: session.metadata, ...(replay ? {
         manifestUri: config.actionManifestUri, manifestSha256: config.actionManifestSha256, allowCandidate: true,
       } : {}) });
       pinnedActions = pinned;
@@ -179,7 +180,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         browserRecovery: config.browserRecovery === true && userProfile,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
+          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
         } }, undefined, options);
         return parseCapabilityResult(response);
       } });
@@ -645,9 +646,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
-        await actionRuntime?.closeArtifactDeliveries();
-        await actionRuntime?.cleanupServerCache();
-        await recovery.close();
+        let lifecycleCleanupFailed=false;
+        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries(),()=>actionRuntime?.closeNodeOperations?.(),
+          ()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
+          try{await cleanup();}catch{lifecycleCleanupFailed=true;}
+        }
         if(config.storageDirectories&&actionRuntime){
           // Diagnostics are read without the connection guard, including after
           // a disconnect. They never certify package or transport cleanup.
@@ -681,7 +684,19 @@ export async function createBridge(config, session, { browserTransport: managedB
           && preparationRequest?.intent === 'open_package' && prepared.state?.status === 'READY'
           && prepared.state.created_draft === false && prepared.state.package_ref?.persisted === true
           && prepared.state.package_ref.path === preparationRequest.package_path ? prepared.state.package_ref.path : null;
-        const unsavedDraft = normalCleanup && !lastSavedPackage
+        const failedOpen = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'open_package' && prepared?.operation_id === preparationRequest.operation_id
+          && prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'PACKAGE_OPEN_REJECTED'
+          && prepared.state.effect_possible === true && prepared.state.created_draft === false
+          && prepared.state.operation_id === preparationRequest.operation_id
+          && prepared.state.session_id === session.metadata.sessionId;
+        const failedDraft = normalCleanup && !lastSavedPackage
+          && preparationRequest?.intent === 'new_draft' && prepared?.operation_id === preparationRequest.operation_id
+          && prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'NATIVE_MESSAGE_BOX_BLOCKED'
+          && prepared.state.phase === 'exact_workflow_ready' && prepared.state.created_draft === true
+          && prepared.state.effect_possible === true && prepared.state.operation_id === preparationRequest.operation_id
+          && prepared.state.session_id === session.metadata.sessionId;
+        const unsavedDraft = failedDraft || normalCleanup && !lastSavedPackage
           && preparationRequest?.intent === 'new_draft'
           && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
             || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
@@ -689,23 +704,37 @@ export async function createBridge(config, session, { browserTransport: managedB
           && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
           && prepared.state.created_draft === true && prepared.state.package_ref?.persisted === false
           && prepared.state.package_ref.path === null;
-        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
+        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage ?? (failedOpen ? preparationRequest.package_path : null) : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
-          if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
+          if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
+          else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
-              // Refuse unsettled background node jobs before waiting on the
-              // browser gate. Shutdown never cancels them to force a close.
+              // Draining a locally cancelled worker does not resolve an unknown
+              // effect. Keep every unsettled-work and native dirty-state guard.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-              if (session.metadata.workspaceReady !== true && !unsavedDraft || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft
+              if (session.metadata.workspaceReady !== true && !unsavedDraft && !failedOpen || !packagePath && !unsavedDraft || !saveOperationId && !openedPackage && !unsavedDraft && !failedOpen
                   || normalCleanup && lastSavedPackage && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
                 if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+                if (failedOpen || failedDraft) {
+                  const options = {sessionId:session.metadata.sessionId, operationId:preparationRequest.operation_id,
+                    packagePath, ...(failedDraft ? {unsavedDraft:true} : {}),
+                    loginomUrl:config.loginomUrl, loginomBuild:prepared.state.target?.loginom_build};
+                  // NOT_READY has no account/document. Bind them inside the same
+                  // browser gate to the original preparation and server session.
+                  const binding = parseFailedOpenBinding(await browser.callTool({name:'browser_run_code_unsafe',
+                    arguments:{code:makeFailedOpenCleanupCode({...options, bindOnly:true})}}, undefined, {timeout:30000}), options);
+                  const cleanupOptions = {...options, documentId:binding.document_id, account:binding.account};
+                  const response = await browser.callTool({name:'browser_run_code_unsafe',
+                    arguments:{code:makeFailedOpenCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
+                  return parsePackageCleanupResult(response, cleanupOptions);
+                }
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup
@@ -721,7 +750,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
-            ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage?'opened_saved_package':'last_confirmed_own_save'} : {})};
+            ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage||failedOpen?'opened_saved_package':'last_confirmed_own_save'} : {})};
           try {
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
             await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
@@ -746,6 +775,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         // A failed transport close does not prove that an unconfirmed paste has
         // stopped. Retain leases while this process lives; process exit still
         // releases kernel locks and is not cross-process recovery evidence.
+        if(lifecycleCleanupFailed&&!cleanup)throw Error('Runtime lifecycle cleanup is unconfirmed');
         return { browser_transport_closed: browserTransportClosed,
           browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size,
           ...(cleanup ? {package_cleanup:cleanup} : {}) };

@@ -96,7 +96,10 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
     assert.equal(read().state,'closed');
   }
   model.FDiagram.FNodes.FCollection.push({FGuid:'extra'});
-  assert.throws(read,/graph owner changed/);
+  assert.throws(read,error=>{
+    const observed=JSON.parse(error.message.split(': ').at(-1));
+    assert.equal(observed.checks.collection_bounded,false);assert.equal(observed.node_count,201);return true;
+  });
   model.FDiagram.FNodes.FCollection=[native];
   native.FLocked=true;
   assert.equal(read().state,'waiting');
@@ -144,5 +147,8 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
   assert.throws(read,/foreign active owner/);
   tab.Controller.Node.data.node=workflow;
   shape.getAttribute=()=> 'MF;TF-1;Graph;foreign';
-  assert.throws(read,/graph owner changed/);
+  assert.throws(read,error=>{
+    const observed=JSON.parse(error.message.split(': ').at(-1));
+    assert.equal(observed.checks.shape_binding,false);assert.equal(observed.shape_tid,'MF;TF-1;Graph;foreign');return true;
+  });
 });

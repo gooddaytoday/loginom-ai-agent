@@ -22,3 +22,30 @@ jobs:
 
       - name: Run typecheck
         run: bun turbo typecheck --continue --concurrency=2
+
+  generated-fork:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Install locked runtime dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+
+      # The upstream generator also formats the entire fork. Limit this check to
+      # SDK/OpenAPI generation so unrelated formatting cannot hide schema drift.
+      - name: Generate legacy SDK
+        run: bun ./packages/sdk/js/script/build.ts
+
+      - name: Generate OpenAPI schema
+        working-directory: packages/opencode
+        run: bun dev generate > ../sdk/openapi.json
+
+      - name: Check generated SDK and OpenAPI schema
+        run: git diff --exit-code -- packages/sdk

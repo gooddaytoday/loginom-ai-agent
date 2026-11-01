@@ -1,8 +1,8 @@
 Из корня Git checkout (Python 3.9+, только stdlib):
 
 ```sh
-python3 scripts/node-acceptance/required-checks.py list --base origin/demo-022 --head HEAD
-python3 scripts/node-acceptance/required-checks.py verify --base origin/demo-022 --report report.md
+python3 scripts/node-acceptance/required-checks.py list --base origin/v038 --head HEAD
+python3 scripts/node-acceptance/required-checks.py verify --base origin/v038 --report report.md
 ```
 
 `list` сравнивает merge-base..head; незакоммиченные файлы не учитываются.

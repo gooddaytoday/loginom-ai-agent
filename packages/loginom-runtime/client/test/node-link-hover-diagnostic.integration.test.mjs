@@ -2,6 +2,50 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {prepareLinkHover} from '../lib/node-target-browser.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
+import {revealNodePlacement,nodePlacementViewport,nodePlacementPoint} from '../lib/node-placement.mjs';
+
+for(const fault of ['none','clipped','foreign_panel','dialog','mask','menu','modal','unbound_panel','duplicate_source','native_cell','changed_graph','expired','cancelled'])test('console resize handle link source: '+fault,{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:15000,
+},async()=>{
+ const {chromium}=await import('playwright-core');
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
+  await page.setContent(`<style>body{margin:0} #graph{position:absolute;left:324px;top:100px;width:950px;height:494px;overflow:auto}
+   #content{height:1100px} #port{position:absolute;left:297px;top:490px;width:15px;height:24px}
+   #console{position:absolute;left:0;right:0;top:604px;height:196px;z-index:20}
+   #handle{position:absolute;top:-6px;left:0;right:0;height:8px}</style>
+   <div id="graph" data-tid="wf;ModelForm;cmpDiagram"><div id="content"></div><div id="port" data-tid="wf;Graph;Source;Output_Data-0"></div></div>
+   <div id="console" data-tid="MF;ConsoleForm" class="x-panel x-panel-status"><div id="handle" role="presentation" class="x-resizable-handle x-resizable-handle-north x-panel-handle-north"></div></div>`);
+  await page.evaluate(fault=>{
+   const root=document.querySelector('#graph'),port=document.querySelector('#port'),panel=document.querySelector('#console');
+   const node={FGuid:'source',FCell:{},FPorts:[]},cell={parent:node.FCell};
+   node.FPorts=[{FCollection:[{parent:node,FGuid:'output',data:{},FType:1,FSubType:1,FCell:cell}]}];
+   const graph={container:root,view:{scale:1,translate:{x:0,y:0},getState:()=>({shape:{node:port}})},getCellAt:()=>fault==='native_cell'?{}:cell};
+   globalThis.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}}}})}}}}}}};
+   globalThis.Ext={getCmp:()=>({el:{dom:fault==='unbound_panel'?document.body:panel},modal:fault==='modal'})};
+   if(fault==='clipped'){port.style.top='501px';document.querySelector('#handle').style.top='-6px';document.querySelector('#handle').style.height='40px';}
+   if(fault==='foreign_panel')panel.setAttribute('data-tid','MF;Properties');
+   if(fault==='dialog')panel.setAttribute('role','dialog');
+   if(fault==='mask')panel.classList.add('bg-mask-message');
+   if(fault==='menu')panel.classList.add('x-menu');
+   if(fault==='duplicate_source')document.body.append(port.cloneNode(true));
+  },fault);
+  const graph={document_id:'doc',dom_epoch:1,nodes:[{ref:{node_id:'source'},position:{x:297,y:490},dom_epoch:2}],links:[]};
+  let reads=0,moves=0,hover;
+  const move=page.mouse.move.bind(page.mouse);page.mouse.move=async(...args)=>{moves++;hover=args;return move(...args);};
+  const task={deadline:Date.now()+(fault==='expired'?-1:10000),origin:'null',build:'7.4.2',
+   request:{workflow_ref:{prefix:'wf'}},effect:{id:'connect',before:graph,parameters:{edge:{source:'source'}}},source_tid:'wf;Graph;Source;Output_Data-0'};
+  if(fault==='cancelled')page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['connect']);
+  const read=async()=>++reads>1&&fault==='changed_graph'?{...graph,dom_epoch:4}:graph;
+  const run=()=>prepareLinkHover(page,task,read,samePlacementGraph,revealNodePlacement,nodePlacementViewport,nodePlacementPoint);
+  if(['none','clipped'].includes(fault)){
+   await run();assert.equal(moves,1);
+   assert.equal(await page.locator('#graph').evaluate(e=>e.scrollTop>0),true);
+   assert.equal(await page.locator('#port').evaluate((e,[x,y])=>{const hit=document.elementFromPoint(x,y);return hit===e||e.contains(hit);},hover),true);
+  }else{await assert.rejects(run());assert.equal(moves,0);assert.equal(await page.locator('#graph').evaluate(e=>e.scrollTop),0);}
+ }finally{await browser.close();}
+});
 
 for(const fault of ['none','redraw','source_redraw','timeout','owner','tab','dialog','nested_dialog','foreign_mask','graph'])test('link hover settles only its exact native ModelForm mask: '+fault,{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:10000,
@@ -108,6 +152,16 @@ test('covered link refusal preserves bounded real DOM blocker identity without a
    assert.ok(error.message.length<=1000);
    const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
    assert.equal(diagnostic.truncated,true);assert.ok(diagnostic.anchor.tid.length<96);return true;
+  });
+  // The observed source_identity_changed branch must distinguish a missing
+  // source from an outline duplicate outside the prepared canvas.
+  await page.locator('#port').evaluate(e=>document.body.append(e.cloneNode(true)));
+  await assert.rejects(refuse(),error=>{
+   const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
+   assert.equal(diagnostic.source_identity_changed,true);
+   assert.equal(diagnostic.root_matches,1);assert.equal(diagnostic.source_matches,2);
+   assert.equal(diagnostic.graph_source_matches,1);
+   assert.ok(error.message.length<=1000);return true;
   });
   assert.equal(moves,0);assert.equal(clicks,0);
  }finally{await browser.close();}

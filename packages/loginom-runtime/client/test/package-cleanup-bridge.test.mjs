@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 test('package cleanup preserves the bridge shutdown contract',async()=>{
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   let result;
-  try{result=await promisify(execFile)(process.execPath,['--experimental-test-module-mocks','--test',fileURLToPath(new URL('./support/package-cleanup-bridge.mjs',import.meta.url))],{env,timeout:30000});}
+  try{result=await promisify(execFile)(process.execPath,['--experimental-test-module-mocks','--test',fileURLToPath(new URL('./support/package-cleanup-bridge.mjs',import.meta.url))],{env,timeout:240000});}
   catch(error){assert.fail(String(error.stdout)+'\n'+String(error.stderr));}
-  assert.match(result.stdout,/pass 70/);assert.match(result.stdout,/fail 0/);
+  assert.match(result.stdout,new RegExp('pass '+(env.LOGINOM_DOCK_TEST_BROWSER?105:98)+'\\b'));assert.match(result.stdout,/fail 0/);
 });

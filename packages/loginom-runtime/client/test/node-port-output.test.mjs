@@ -47,6 +47,62 @@ test('reads_bound_port_without_table',async()=>{
  assert.deepEqual(f.disposed.sort(),['columns','dataSource','integerColumn','output','realColumn','stringColumn']);
 });
 
+test('internal windows read shifted native rows without changing the default response',async()=>{
+ const f=fixture({rows:[[1,0,'first'],[2,-0,'middle'],[3,1e-300,'last']]});
+ const request={port:0,execution,sampleRows:2,requireExactNumbers:true};
+ const initial=await f.run(request);
+ assert.equal(Object.hasOwn(initial.output,'row_offset'),false);
+ assert.equal(Object.hasOwn(initial.output,'window_binding'),false);
+ f.rpcCalls.length=0;
+ const shifted=await f.run({...request,rowOffset:1});
+ assert.equal(shifted.verified,true);assert.equal(shifted.cleanup_complete,true);
+ assert.deepEqual(shifted.output.sample.map(row=>row.map(c=>c.value)),[['2',-0,'middle'],['3',1e-300,'last']]);
+ assert.equal(shifted.output.sample[0][1].decimal,'-0');
+ assert.equal(shifted.output.row_offset,1);assert.equal(shifted.output.next_row_offset,3);
+ assert.equal(shifted.output.sample_complete,false);
+ assert.equal(shifted.output.window_binding.process_record_id,execution.process_record_id);
+ assert.deepEqual(f.rpcCalls,[[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]]);
+ assert.equal(JSON.stringify(await f.run(request)),JSON.stringify(initial));
+});
+
+test('internal offset preserves per-window ownership and rejects invalid bounds',async()=>{
+ const request={port:0,execution,sampleRows:1,requireExactNumbers:true};
+ for(const rowOffset of [-1,0.5,NaN,undefined,Number.MAX_SAFE_INTEGER+1])
+  assert.throws(()=>fixture().run({...request,rowOffset}),/Exact bounded/);
+ const f=fixture();
+ const outside=await f.run({...request,rowOffset:2});
+ assert.equal(outside.verified,false);assert.equal(outside.reason,'row_offset');
+ assert.deepEqual(f.rpcCalls,[]);
+ f.port.parent={...f.node};
+ assert.equal((await f.run({...request,rowOffset:0})).verified,false);
+});
+
+test('cold stitches production byte-limited windows and rejects a changed execution at the boundary',async()=>{
+ const {readColdPortWindows}=await import('../../../../scripts/node-acceptance/cold-reader-policy.mjs');
+ const {matchExpectedOutputs}=await import('../../../../scripts/node-acceptance/expected-outputs.mjs');
+ const rows=Array.from({length:100},(_,i)=>[i+1,i%7===0?-0:1e-300,('row '+i+' ').padEnd(6000,'я')]);
+ const f=fixture({rows});f.columnItems[2].AsString=async i=>rows[i][2];
+ const node=f.binding.node,offsets=[];
+ const channel={async readOutputPort(request){offsets.push(request.rowOffset);
+  return JSON.parse(JSON.stringify(await f.run(request)));}};
+ const data=await readColdPortWindows(channel,{node,execution,port:0,rowCount:100});
+ assert.ok(offsets.length>1);assert.equal(offsets[0],0);
+ assert.equal(data.sample.length,100);assert.equal(data.sample_complete,true);
+ for(let i=0;i<100;i++){
+  assert.equal(data.sample[i][0].value,String(i+1));assert.equal(data.sample[i][2].value,rows[i][2]);
+  assert.equal(data.sample[i][1].decimal,i%7===0?'-0':'1e-300');
+ }
+ const want={output_node_type:'transform.calculator',ordered:true,columns:data.schema,rows:rows.map(r=>({I:r[0],R:r[1],S:r[2]}))};
+ const actual={node,type:want.output_node_type,output_port:0,data};
+ assert.equal(matchExpectedOutputs([actual],[want]).length,1);
+ const bad=structuredClone(actual);bad.data.sample[99][2].value=rows[99][2].slice(0,-1);
+ assert.throws(()=>matchExpectedOutputs([bad],[want]));
+ offsets.length=0;
+ const changed={async readOutputPort(request){if(request.rowOffset>0)f.child.data.Status=2;return channel.readOutputPort(request);}};
+ await assert.rejects(()=>readColdPortWindows(changed,{node,execution,port:0,rowCount:100}),/COLD_PORT_WINDOW/);
+ assert.equal(offsets.length,2);
+});
+
 test('full count comes from the completed data source even above the million-row UI buffer cap',async()=>{
  const f=fixture();f.dataSource.get_RowCount=async()=>7692308;
  const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});

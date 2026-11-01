@@ -55,6 +55,8 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/node-port-output.mjs','n19'],
  ['packages/loginom-runtime/client/lib/crosstable-readback.mjs','n13'],
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
+ ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
+ ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
@@ -72,6 +74,12 @@ test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t
  const sub=spawnSync('python3',[script,'list','--base','base'],{cwd:join(r.cwd,'packages'),encoding:'utf8'});
  assert.equal(sub.status,0,sub.stderr);assert.ok(ids(sub.stdout).includes('host-unit'));
  assert.notEqual(r.run('list','--base','missing-ref').status,0);
+});
+
+test('join changes require the three registered mode scenarios',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/join-parameters.mjs');
+ const text=r.list();assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['join-right','join-full','join-difference'])assert.ok(text.includes(name));
 });
 
 test('deleted and renamed source paths still require their suites',t=>{

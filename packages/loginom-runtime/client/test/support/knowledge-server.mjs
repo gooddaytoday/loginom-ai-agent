@@ -24,6 +24,7 @@ export async function knowledgeServer(t, options = {}) {
         for await (const chunk of request) chunks.push(chunk);
         body = JSON.parse(Buffer.concat(chunks).toString());
       }
+      if (await options.request?.(body, request, response)) return;
       let session = state.sessions.get(request.headers['mcp-session-id']);
       if (!session && isInitializeRequest(body)) {
         if (options.initialize) await options.initialize();

@@ -19,12 +19,15 @@ export function makePackageCleanupCode(options) {
   return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle, unsavedDraft})},${Date.now()+30000})`;
 }
 
-// Cold-only reconciliation of an unsuccessful Open. It never promotes prepare
-// to READY: bind just the newly opened native package before the SAME close guard.
+// Reconcile an unsuccessful Open or new draft without promoting prepare to
+// READY. Bind only its new native package before the same guarded Close.
 export function makeFailedOpenCleanupCode(options) {
-  makePackageCleanupCode({...options,documentId:'unbound',tabTid:'unbound',diagnosticDiscard:false,diagnosticWaitForIdle:false});
+  makePackageCleanupCode({...options,account:options.bindOnly===true?'unbound':options.account,
+    documentId:'unbound',tabTid:'unbound',diagnosticDiscard:false,diagnosticWaitForIdle:false});
   if(typeof options.operationId!=='string'||!/^[a-zA-Z0-9_.:-]{1,128}$/.test(options.operationId))throw Error('Exact Open operation required');
-  const o={sessionId:options.sessionId,account:options.account,packagePath:options.packagePath,
+  const o={sessionId:options.sessionId,account:options.account,documentId:options.documentId,
+    bindOnly:options.bindOnly===true,packagePath:options.packagePath,
+    ...(options.unsavedDraft===true?{unsavedDraft:true}:{}),
     origin:new URL(options.loginomUrl).origin,loginomBuild:options.loginomBuild,operationId:options.operationId,
     timeoutMs:options.timeoutMs??8000,diagnosticDiscard:false,diagnosticWaitForIdle:false};
   const gesture=withBrowserReceipt('perform()',{
@@ -41,6 +44,7 @@ export function makeFailedOpenCleanupCode(options) {
         const bound=await page.evaluate(${bindFailedOpen.toString()},{...o,deadline});
         if(Date.now()>=deadline)return blocked('CLEANUP_DEADLINE_EXCEEDED');
         if(!bound)return blocked('FAILED_OPEN_OWNER_UNCONFIRMED');
+        if(o.bindOnly)return {...bound,session_id:o.sessionId,operation_id:o.operationId,package_path:o.packagePath};
         return (${closeOwnedPackage.toString()})(page,{...o,documentId:bound.document_id,tabTid:bound.tab_tid,
           diagnosticReadOnly:bound.read_only,failedOpenOperation:o.operationId},Math.min(deadline,bound.cleanup_deadline),
           perform=>(${gesture})(page));
@@ -49,19 +53,37 @@ export function makeFailedOpenCleanupCode(options) {
   }`;
 }
 
+export function parseFailedOpenBinding(response, expected) {
+  if (response?.isError) throw Error('Failed Open binding failed');
+  for (const block of response?.content ?? []) {
+    if (block.type !== 'text') continue;
+    let value;
+    try { value = JSON.parse(block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text); } catch { continue; }
+    if (value?.session_id === expected.sessionId && value.operation_id === expected.operationId
+        && value.package_path === expected.packagePath
+        && [value.document_id,value.account].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)) return value;
+  }
+  throw Error('Original Open binding missing');
+}
+
 function bindFailedOpen(o) {
   const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree;
   const prep=globalThis.__loginomDockPreparationV1,r=prep?.receipts?.get(o.operationId);
-  if(location.origin!==o.origin||app?.Version!==o.loginomBuild||prep?.document!==document
-    ||typeof prep.id!=='string'||!r||r.phase!=='effect_possible'||r.openSubmitted!==true
-    ||r.packageInventoryBefore!==0||r.openAccount!==o.account||r.openConnection!==m?.FServerConnection
+  const account=o.bindOnly?r?.openAccount:o.account;
+  if(typeof account!=='string'||!account||account.length>200
+    ||location.origin!==o.origin||app?.Version!==o.loginomBuild||prep?.document!==document
+    ||o.documentId&&prep.id!==o.documentId
+    ||typeof prep.id!=='string'||!r||r.phase!=='effect_possible'||(o.unsavedDraft?r.draftSubmitted:r.openSubmitted)!==true
+    ||r.packageInventoryBefore!==0||r.openAccount!==account||r.openConnection!==m?.FServerConnection
     ||!r.openServerSession||r.openServerSession!==m?.FServerConnection?.Session
-    ||m?.FServerConnection?.Connected!==true||m.FServerConnection.UserName!==o.account
+    ||m?.FServerConnection?.Connected!==true||m.FServerConnection.UserName!==account
     ||m.PackageNodes?.Count!==1||!Array.isArray(r.before)||Date.now()>=o.deadline)return null;
   let request;try{request=JSON.parse(r.request);}catch{return null;}
-  if(request.session!==o.sessionId||request.intent!=='open_package'||request.packagePath!==o.packagePath)return null;
+  if(request.session!==o.sessionId||request.intent!==(o.unsavedDraft?'new_draft':'open_package')
+    ||(o.unsavedDraft?request.packagePath!=null:request.packagePath!==o.packagePath))return null;
   const node=m.PackageNodes.Items(0),normalize=p=>typeof p==='string'&&p?'/'+p.replaceAll('\\','/').replace(/^\/+/, ''):null;
-  if(normalize(node.PackageFileName)!==o.packagePath||typeof node.ReadOnly!=='boolean')return null;
+  if(normalize(node.PackageFileName)!==o.packagePath||typeof node.ReadOnly!=='boolean'
+    ||o.unsavedDraft&&(!r.openError||node.ReadOnly!==false))return null;
   const tabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
     .filter(t=>/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(t.getAttribute('data-tid')));
   const active=tabs.filter(t=>t.classList.contains('x-tab-active')),added=tabs.filter(t=>!r.before.includes(t));
@@ -73,7 +95,7 @@ function bindFailedOpen(o) {
   r.failedOpenCleanupDeadline=Math.min(r.failedOpenCleanupDeadline??o.deadline,o.deadline);
   if(Date.now()>=r.failedOpenCleanupDeadline)return null;
   r.tab=tab;r.packageNode=node;r.failedOpenCleanup=true;
-  return {document_id:prep.id,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly,cleanup_deadline:r.failedOpenCleanupDeadline};
+  return {document_id:prep.id,account,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly,cleanup_deadline:r.failedOpenCleanupDeadline};
 }
 
 // Journal snapshot only: no preparation binding or native mutations.
@@ -130,6 +152,18 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString(),
     deadline_at:new Date(deadline).toISOString()};
   let closeStarted=false;
+  // Preserve useful native errors without persisting arbitrary upstream text,
+  // stacks, selectors, URLs or credentials in the private receipt.
+  const describeError = (error, step) => {
+    const first=typeof error?.message==='string'?error.message.split(/[\r\n]/,1)[0]:'';
+    const property=first.match(/^Cannot read properties of (?:undefined|null) \(reading '([^']+)'\)$/);
+    const safeProperty=property&&['HasRunningNodes','IsPackageModified','Package','TestableCellRenderer','FMessageBox','FMessages','el','dom'].includes(property[1]);
+    return {step,name:['Error','TypeError','ReferenceError','TimeoutError'].includes(error?.name)?error.name:'Error',
+      code:typeof error?.code==='number'&&Number.isSafeInteger(error.code)?error.code:
+        typeof error?.code==='string'&&/^ERR_[A-Z_]{1,48}$/.test(error.code)?error.code:null,
+      message:safeProperty||first==='Cleanup deadline exceeded'?first:
+        error?.name==='TimeoutError'?'UI step timed out':'[redacted upstream message]'};
+  };
   const finish = async (status, reason, extra = {}) => {
     if(status==='BLOCKED'&&receipt.stage==='logout_menu_open')receipt.logout_menu_failed_at=new Date().toISOString();
     // Diagnostics must leave time for the existing 30 s MCP reply to arrive.
@@ -175,16 +209,17 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
             const s=globalThis.__loginomDockCleanupV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
             if(s?.document!==document||s.identity!==JSON.stringify(o))return {status:'identity_changed'};
             return {status:'observed',done:s.done===true,closed:s.closed===true,failed:s.failed===true,result:s.result??'pending',
-              packages_after:m?.PackageNodes?.Count??null,original_tab_attached:document.contains(s.tab)};
+              packages_after:m?.PackageNodes?.Count??null,original_tab_attached:document.contains(s.tab),error:s.error??null};
           },options)]);
         } catch {}
       } else receipt.native_close_readback.reason='deadline_exceeded';
     }
+    if(receipt.native_close_readback?.error)receipt.native_close_readback.error=describeError(receipt.native_close_readback.error,'native_close');
     return {...receipt,...extra,status,reason,completed_at:new Date().toISOString()};
   };
   const at = tid => page.locator('[data-tid='+JSON.stringify(tid)+']');
-  const remaining = () => {
-    const ms = Math.min(timeoutMs, deadline-Date.now());
+  const remaining = (limit = timeoutMs) => {
+    const ms = Math.min(limit, deadline-Date.now());
     if (ms <= 0) throw Error('Cleanup deadline exceeded');
     return ms;
   };
@@ -212,6 +247,26 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       if (!o.failedOpenOperation&&[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
+      // Absence is safe only after our OK, with the original empty inventory
+      // and submitted Open still bound to these exact native session handles.
+      if(o.failedOpenOperation&&state.open_error_dismiss_started&&m.PackageNodes?.Count===0) {
+        const prepared=prep.receipts.get(o.failedOpenOperation);
+        const tabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
+          .filter(t=>/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(t.getAttribute('data-tid')));
+        const active=f.Items?.Workspace?.getActiveTab();
+        let request;try{request=JSON.parse(prepared?.request);}catch{return {reason:'FAILED_OPEN_OWNER_CHANGED'};}
+        if(state.failed_open_receipt!==prepared||request.session!==o.sessionId||request.intent!=='open_package'||request.packagePath!==o.packagePath
+          ||prepared?.failedOpenCleanup!==true||prepared.phase!=='effect_possible'||prepared.openSubmitted!==true
+          ||prepared.packageInventoryBefore!==0||prepared.openAccount!==o.account
+          ||prepared.openConnection!==state.connection||prepared.openServerSession!==state.serverSession
+          ||document.contains(prepared.tab)||tabs.some(t=>!prepared.before.includes(t))
+          ||active?.Controller?.Node?.data?.node)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        if([...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible))
+          return {reason:'DIALOG_OR_OPERATION_OPEN'};
+        if(Date.now()>=deadline)return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
+        state.tab=prepared.tab;state.close_started=true;state.done=true;state.closed=true;state.result='absent';
+        return {started:true,packages_before:1,modified:false,already_absent:true};
+      }
       if (m.PackageNodes?.Count !== 1) return {reason:'PACKAGE_INVENTORY_CHANGED'};
       const node = m.PackageNodes.Items(0), normalized = value => typeof value === 'string' && value ? '/'+value.replaceAll('\\','/').replace(/^\/+/, '') : null;
       if (normalized(node.PackageFileName) !== o.packagePath || node.ReadOnly !== o.diagnosticReadOnly) return {reason:'PACKAGE_IDENTITY_CHANGED'};
@@ -221,12 +276,17 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
+      if(o.failedOpenOperation){
+        if(state.failed_open_receipt&&state.failed_open_receipt!==prepared)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        state.failed_open_receipt=prepared;
+      }
       if(o.unsavedDraft && (JSON.parse(prepared.request).intent!=='new_draft'
-        || prepared.phase!=='verified' || prepared.packageInventoryBefore!==0))return {reason:'DRAFT_OWNER_UNCONFIRMED'};
+        || prepared.phase!==(o.failedOpenOperation?'effect_possible':'verified')
+        || prepared.packageInventoryBefore!==0))return {reason:'DRAFT_OWNER_UNCONFIRMED'};
       if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
         ||state.open_error_dismiss_started)) {
         if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
-          ||prepared.phase!=='effect_possible'||prepared.openSubmitted!==true||prepared.packageInventoryBefore!==0
+          ||prepared.phase!=='effect_possible'||(o.unsavedDraft?prepared.draftSubmitted:prepared.openSubmitted)!==true||prepared.packageInventoryBefore!==0
           ||prepared.openAccount!==o.account||prepared.openConnection!==m.FServerConnection
           ||prepared.openServerSession!==m.FServerConnection.Session)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
         const prefix=o.tabTid.match(/;tb(-\d+)?$/);
@@ -295,6 +355,14 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
           return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
         }
         if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
+        // A renderer failure can leave a mounted but unfinished TabForm.
+        // Wait for its native close control before reading package state.
+        let activeNode=native.Controller?.Node?.data?.node;const seenNodes=new Set();
+        for(let i=0;activeNode&&activeNode!==node&&i<32&&!seenNodes.has(activeNode);i++){
+          seenNodes.add(activeNode);activeNode=activeNode.ParentNode;
+        }
+        if(activeNode!==node)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        if(native.closable!==true||!node.Package)return {reason:'OWNED_OPEN_LOADING'};
         // This callback is only for OK. If its owned error vanished in transit,
         // leave Close to the ordinary path and its fresh native guards.
         if(dismissOpenError)return {reason:'OWNED_OPEN_ERROR_ABSENT'};
@@ -338,7 +406,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         state.closed = value === true && m.PackageNodes.Count === 0;
         state.result=value===true?'true':value===false?'false':'other';
         state.done = true;
-      }, () => { state.done = true; state.failed = true; });
+      }, error => { state.done = true; state.failed = true; state.error={name:error?.name,code:error?.code,message:error?.message}; });
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
     }, {options, deadline,dismissOpenError});
     let before = await beginClose();
@@ -413,7 +481,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         remaining:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count,
         diagnostic:state?.document===document&&state.identity===JSON.stringify(o)?{status:'observed',
           done:state?.done===true,closed:state?.closed===true,failed:state?.failed===true,result:state?.result??'pending',
-          original_tab_attached:document.contains(state?.tab)}:{status:'identity_changed'}};
+          original_tab_attached:document.contains(state?.tab),error:state?.error??null}:{status:'identity_changed'}};
     },options);
     receipt.native_close_readback={...closed.diagnostic,packages_after:closed.remaining??null};
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
@@ -429,6 +497,8 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       // A timed-out click may already have opened the menu. Observe before
       // retrying once; never toggle it closed or extend the cleanup call.
       receipt.logout_menu_step='observe_after_timeout';
+      // Lazy first menu loading may outlast the click's step cap. Observe
+      // read-only using the original cleanup remainder, never a new deadline.
       const observed = await page.waitForFunction(o => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
         const m = app?.Application?.FInstance?.FMainForm?.FMapTree;
@@ -444,7 +514,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         if ([...document.querySelectorAll('.x-mask')].some(visible)) return false;
         const avatar = [...document.querySelectorAll('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')].filter(visible);
         return avatar.length === 1 ? {safe:true, menu:false} : false;
-      }, options, {timeout:remaining()});
+      }, options, {timeout:remaining(30000)});
       const state = await observed.jsonValue();
       await observed.dispose();
       if (!state?.safe) return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
@@ -478,8 +548,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     receipt.stage = 'complete';
     return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
   } catch(error) {
-    // Fixed private stage only: retain refusal and never persist raw errors,
-    // credentials, DOM contents or an inferred logout from browser closure.
+    receipt.error=describeError(error,receipt.stage);
     receipt.failure_class=error?.name==='TimeoutError'?'ui_timeout':'step_failed';
     return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
   }

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,450 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def export_events(self, marker='?', *, destination='/test/all.csv', kind='new', readback=None):
+        request = dict(operation_id='export', target=dict(type='exports.text', kind=kind),
+                       parameters=dict(destination=destination, null_marker=marker))
+        events = [(1, dict(type='tool_use', part=dict(tool='loginom_dock_node_apply',
+                  state=dict(status='completed', input=request, output=json.dumps(dict(state='running'))))))]
+        if readback is not None:
+            events.append((2, dict(type='tool_use', part=dict(tool='loginom_dock_node_wait', state=dict(
+                status='completed', output=json.dumps(dict(operation_id='export', status='SUCCEEDED',
+                configuration=dict(status='applied', readback=dict(kind='text_export',
+                    destination=destination, settings=dict(null_marker=readback))))))))))
+        return events
+
+    def test_export_null_marker_observed_lab612_and_fail_closed(self):
+        # LAB-612 execution-events.jsonl:470; actual-1.csv preserves ? and empty Class.
+        expected = dict(columns=[dict(name='IsTestSet', type='boolean'), dict(name='RowID', type='integer'),
+            dict(name='Class', type='string'), dict(name='Value', type='real'),
+            dict(name='Flag', type='boolean'), dict(name='Stamp', type='datetime')], rows=[
+            dict(IsTestSet=False, RowID=2, Class=None, Value=None, Flag=True, Stamp='2024-01-02'),
+            dict(IsTestSet=False, RowID=3, Class='A', Value=-12.25, Flag=None, Stamp=None),
+            dict(IsTestSet=True, RowID=1, Class='', Value=.5, Flag=False, Stamp='2024-01-01')])
+        observed = 'IsTestSet,RowID,Class,Value,Flag,Stamp\nFalse,2,?,?,True,2024-01-02\nFalse,3,A,-12.25,?,?\nTrue,1,,0.5,False,2024-01-01\n'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text(observed)
+            options = dict(null_marker=None, export_events=self.export_events(), destination='/test/all.csv')
+            runner.check_csv(path, expected, **options)
+            for events, code in [([], 'CSV_NULL_MARKER_MISSING'),
+                    (self.export_events(destination='/other/all.csv'), 'CSV_NULL_MARKER_MISSING'),
+                    (self.export_events(marker='NIL'), 'CSV_NULL_MARKER_UNSUPPORTED')]:
+                with self.subTest(code=code), self.assertRaisesRegex(AssertionError, code):
+                    runner.check_csv(path, expected, **dict(options, export_events=events))
+            expected['rows'][2]['Class'] = '?'
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                runner.check_csv(path, expected, **options)
+            expected['rows'][2]['Class'] = ''
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                runner.check_csv(path, expected, **dict(options, null_marker=''))
+            path.write_text(observed.replace('False,2,?,?,', 'False,2,?,NULL,'))
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                runner.check_csv(path, expected, **options)
+
+    def test_export_null_marker_patch_uses_final_receipt(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\nNULL\n""\n')
+            options = dict(null_marker=None, destination='/test/all.csv')
+            events = self.export_events(kind='existing', readback='NULL')
+            runner.check_csv(path, expected, export_events=events, **options)
+            # Omitted patch fields must come from observed settings, not defaults.
+            events[0][1]['part']['state']['input']['parameters'] = {}
+            runner.check_csv(path, expected, export_events=events, **options)
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, export_events=events[:1], **options)
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                runner.check_csv(path, expected,
+                                 export_events=self.export_events(kind='existing', readback=''), **options)
+            events[1][1]['part']['state']['output'] = events[1][1]['part']['state']['output'].replace('"export"', '"unrelated"')
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, export_events=events, **options)
+
+    def test_empty_export_null_marker_rejects_empty_strings_but_accepts_null_only(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\n""\n""\n')
+            runner.check_csv(path, expected, null_marker='')
+            for events in [self.export_events(marker=''), self.export_events(kind='existing', readback='')]:
+                with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                    runner.check_csv(path, expected, null_marker=None,
+                                     destination='/test/all.csv', export_events=events)
+            expected['rows'][1]['s'] = 'value'
+            path.write_text('s\n""\nvalue\n')
+            runner.check_csv(path, expected, null_marker=None,
+                             destination='/test/all.csv', export_events=self.export_events(marker=''))
+
+    def test_export_null_markers_and_last_patch_inspect(self):
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='value')])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            for marker in ['', '?', 'null', 'NULL']:
+                path.write_text('s\n"' + marker + '"\nvalue\n')
+                runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                                 export_events=self.export_events(marker))
+            events = self.export_events(readback='?')
+            outcome = json.loads(events[1][1]['part']['state']['output'])
+            node = dict(document_id='doc', workflow_id='workflow', node_id='export-node')
+            outcome['configuration']['readback']['node'] = node
+            events[1][1]['part']['state']['output'] = json.dumps(dict(output=dict(outcome=outcome)))
+            patch_events = self.export_events(kind='existing', readback='NULL')
+            patch_events[0][1]['part']['state']['input'].update(operation_id='patch')
+            patch_events[0][1]['part']['state']['input']['target']['ref'] = node
+            patch_events[0][1]['part']['state']['input']['parameters'] = {}
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                                 export_events=events + patch_events[:1])
+            outcome = json.loads(patch_events[1][1]['part']['state']['output'])
+            outcome['operation_id'] = 'patch'
+            patch_events[1][1]['part']['state']['output'] = json.dumps(dict(output=dict(outcome=outcome)))
+            runner.check_csv(path, expected, null_marker=None, destination='/test/all.csv',
+                             export_events=events + patch_events)
+
+    def test_types300_d76_exact_forms_and_strict_other_cells(self):
+        # LAB-583 types300-checks.jsonl:1: 15 negative zeros and 14 midnight dates.
+        columns = [{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'},
+                   {'name': 'BigID', 'type': 'integer'}]
+        expected = dict(columns=columns, ordered=True, column_order='exact', rows=[
+            dict(SmallReal=-0.0, EventAt='2027-01-01T00:00:00.001', BigID='9007199254740993')])
+        trials = [
+            ('0', '2027-01-01', '9007199254740993', True, 1, 1),
+            ('-0', '2027-01-01 00:00:00.001', '9007199254740993', True, 0, 0),
+            ('0.0', '2027-01-01', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-02', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-01 00:00:00.000', '9007199254740993', False, 0, 0),
+            ('0', '2027-01-01', '9007199254740992', False, 0, 0)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            for real, date, integer, ok, zeros, dates in trials:
+                with self.subTest(real=real, date=date, integer=integer):
+                    path.write_text('SmallReal,EventAt,BigID\n' + ','.join([real, date, integer]) + '\n')
+                    counts = {}
+                    if ok:
+                        self.assertEqual(runner.check_csv(path, expected, scenario_name='types300', d76=counts), ',')
+                        self.assertEqual(counts, {'negative_zero': zeros, 'midnight_date': dates})
+                    else:
+                        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                            runner.check_csv(path, expected, scenario_name='types300', d76=counts)
+            for goal, actual in [(0.1, '0'), (-12.5, '0')]:
+                want = dict(columns=columns[:1], ordered=True, rows=[dict(SmallReal=goal)])
+                path.write_text('SmallReal\n' + actual + '\n')
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, want, scenario_name='types300')
+            for actual in ['2027-01-01', '2027-01-01 12:00:00']:
+                want = dict(columns=columns[1:2], ordered=True,
+                            rows=[dict(EventAt='2027-01-01T12:00:00.001')])
+                path.write_text('EventAt\n' + actual + '\n')
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, want, scenario_name='types300')
+
+    def test_types300_observed_100_rows_count_15_zeros_and_14_dates(self):
+        columns = [{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'}]
+        rows = [dict(SmallReal=-0.0 if i % 7 == 0 else 0.1,
+                     EventAt='2027-01-01T00:00:00.001' if i % 7 == 4 else '2027-01-01T12:00:00.001')
+                for i in range(100)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            with path.open('w') as stream:
+                writer = csv.writer(stream)
+                writer.writerow(['SmallReal', 'EventAt'])
+                writer.writerows([['0' if i % 7 == 0 else row['SmallReal'],
+                                  '2027-01-01' if i % 7 == 4 else row['EventAt']]
+                                 for i, row in enumerate(rows)])
+            expected = dict(columns=columns, rows=rows, ordered=True)
+            with self.assertRaises(AssertionError): runner.check_csv(path, expected)
+            counts = {}
+            runner.check_csv(path, expected, scenario_name='types300', d76=counts)
+            self.assertEqual(counts, dict(negative_zero=15, midnight_date=14))
+
+    def test_path_seed_uses_case_source_instead_of_stale_task_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                           output=dict(bytes=16, upload_completion_verified=True))
+            self.upload_model(root, receipt)
+            task = (root / 'run/task.md').read_text()
+            self.assertIn(str(root / 'input.csv'), task)
+            self.assertNotIn('/obsolete/seed.csv', task)
+
+    def tamper_model(self, root, calls, rejection=None):
+        case = root / 'cases/S-tamper'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Проверь отказ после подмены и сохрани пакет.')
+        runner.write(case / 'expected.json', dict(nodes=[], outputs=[], rejection=rejection or dict(
+            code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')))
+        folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
+        folder.mkdir(); workspace.mkdir(); profile.mkdir()
+        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True,
+                     unsaved_changes_discarded=False))
+        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        instance = runner.Runner.__new__(runner.Runner)
+        instance.out, instance.env, instance.current = root, {}, {}
+        instance.options = dict(cases=str(case.parent))
+        def phase(*args, **kwargs):
+            (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(
+                type='tool_use', sessionID='session', part=part)) for part in calls))
+        with patch.object(instance, 'phase', side_effect=phase):
+            result = instance.model('S-tamper', folder, profile, workspace, '/test/run.lgp',
+                                    dict(package_directory='/test'), root / 'build')
+        self.assertEqual(instance.current['rejection'], 'PASS')
+        self.assertEqual(instance.current['cleanup'], 'main PASS')
+        self.assertEqual(instance.current['save'], 'PASS')
+        self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
+        self.assertEqual(result[2:], (None, None))
+
+    def tamper_calls(self):
+        def call(tool, parameters, reply):
+            return dict(tool=tool, state=dict(status='completed', input=parameters, output=json.dumps(reply)))
+        return [call('loginom_dock_node_apply', dict(target=dict(type='exports.text'),
+                      parameters=dict(overwrite='replace'), finish='execute'), dict(status='SUCCEEDED')),
+                call('loginom_dock_node_apply', dict(target=dict(type='transform.group_data'), finish='execute'),
+                     dict(status='NOT_APPLIED', effect_possible=False, cleanup_complete=True,
+                          error=dict(code='LOGINOM_FILE_CHANGED'), output=dict(
+                              execution=dict(status='not_requested'), output=dict(status='not_refreshed', ports=[])))),
+                call('loginom_dock_action_run', {}, dict(status='SUCCEEDED', action_key='package.save_checkpoint',
+                     output=dict(save_completed=True)))]
+
+    def test_tamper_accepts_only_guard_after_overwrite_without_stale_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.tamper_model(Path(directory), self.tamper_calls())
+
+    def test_tamper_accepts_correlated_async_errors_and_inspect(self):
+        for mode in ['error', 'inspect']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                calls = self.tamper_calls()
+                events = []
+                for index, call in enumerate(calls[:2]):
+                    operation = 'node-' + str(index)
+                    call['state']['input']['operation_id'] = operation
+                    reply = dict(json.loads(call['state']['output']), operation_id=operation)
+                    call['state']['output'] = json.dumps(dict(state='running', operation_id=operation))
+                    events.append(call)
+                    if index == 0:
+                        events.append(dict(tool='loginom_dock_node_wait', state=dict(status='completed',
+                            input=dict(operation_id=operation), output=json.dumps(reply))))
+                    elif mode == 'error':
+                        events.append(dict(tool='loginom_dock_node_wait', state=dict(status='error',
+                            input=dict(operation_id=operation), error=json.dumps(reply))))
+                    else:
+                        events.append(dict(tool='loginom_dock_operation_inspect', state=dict(status='completed',
+                            input=dict(operation_id=operation), output=json.dumps(dict(action_key='operation.inspect',
+                                output=dict(outcome=reply))))))
+                self.tamper_model(Path(directory), events + calls[2:])
+
+    def test_tamper_rejects_other_outcomes_and_stale_rows(self):
+        for variant in ['missing guard', 'wrong error', 'possible effect', 'execution', 'stale ports',
+                        'missing overwrite', 'wrong target', 'later rows', 'missing save', 'wrong oracle']:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                calls = self.tamper_calls()
+                reply = json.loads(calls[1]['state']['output'])
+                if variant == 'wrong error': reply['error']['code'] = 'UI_DEADLINE_EXCEEDED'
+                if variant == 'possible effect': reply['effect_possible'] = True
+                if variant == 'execution': reply['output']['execution']['status'] = 'completed'
+                if variant == 'stale ports': reply['output']['output']['ports'] = [dict(sample=[['old']])]
+                calls[1]['state']['output'] = json.dumps(reply)
+                if variant == 'missing guard': calls.pop(1)
+                if variant == 'missing overwrite': calls.pop(0)
+                if variant == 'wrong target': calls[1]['state']['input']['target']['type'] = 'exports.text'
+                if variant == 'later rows':
+                    calls.append(dict(tool='loginom_dock_node_apply', state=dict(status='completed',
+                        input=dict(target=dict(type='transform.group_data')), output=json.dumps(dict(
+                            status='SUCCEEDED', output=dict(ports=[dict(sample=[['old']])]))))))
+                if variant == 'missing save': calls.pop()
+                with self.assertRaises(AssertionError):
+                    self.tamper_model(Path(directory), calls, dict(code='OTHER') if variant == 'wrong oracle' else None)
+
+    def test_sequential_node_scenarios_resolve_approved_oracles(self):
+        for name, count, ports in [('sampling', 2, [0, 0]), ('data-partition', 3, [0, 1, 2])]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, 'task.md')
+            self.assertTrue((case['data'] / 'rows.csv').is_file())
+            expected = runner.expected_for(case, '/test/check.lgp')
+            self.assertEqual(len(expected['outputs']), count)
+            self.assertEqual([o['output_port'] for o in expected['outputs']], ports)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertNotIn('oracle', case['prompt'].read_text())
+
+    def test_sequential_null_empty_keep_approved_schema_order_and_row_counts(self):
+        for name, counts in [('sampling-null', [3, 2]), ('sampling-empty', [0, 0]),
+                             ('data-partition-null', [3, 2, 1]), ('data-partition-empty', [0, 0, 0])]:
+            case = runner.scenario(name)
+            variant = name.split('-')[-1]
+            self.assertEqual([p.name for p in case['data'].iterdir()], [variant + '.csv'])
+            expected = runner.expected_for(case, '/test/null-empty.lgp')
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertEqual(expected['outputs'][0]['columns'][-1]['type'], 'datetime')
+            self.assertTrue(all(o['column_order'] == 'exact' and o['ordered'] for o in expected['outputs']))
+
+    def upload_model(self, root, receipt, *, calls=None):
+        source = root / 'input.csv'
+        source.write_text('Id,Value\n1,test\n')
+        case = root / 'cases/seed'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Загрузи /obsolete/seed.csv в Loginom.')
+        runner.write(case / 'case.json', dict(source_path=str(source), attachment='path', upload_only=True))
+        runner.write(case / 'expected.json', dict(nodes=[], outputs=[]))
+        folder, workspace, profile = root / 'run', root / 'workspace', root / 'profile'
+        folder.mkdir(); workspace.mkdir(); profile.mkdir()
+        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True,
+                     package_path=None, save_operation_id=None, unsaved_changes_discarded=False))
+        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        instance = runner.Runner.__new__(runner.Runner)
+        instance.out, instance.env, instance.current = root, {}, {}
+        instance.options = dict(case_root=str(case.parent))
+        events = calls or [dict(tool='loginom_dock_artifact_deliver', state=dict(
+            status='completed', output=json.dumps(receipt)))]
+        def phase(*args, **kwargs):
+            (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(
+                type='tool_use', sessionID='session', part=part)) for part in events))
+        with patch.object(instance, 'phase', side_effect=phase):
+            result = instance.model('seed', folder, profile, workspace, '/test/run.lgp',
+                                    dict(package_directory='/test'), root / 'build')
+        self.assertEqual(instance.current['upload'], 'ready')
+        return result
+
+    def test_upload_only_accepts_verified_sync_and_async_receipts(self):
+        # LAB-549 l549cseed2/model.stdout:20: settled success has no upload_status.
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for mode in ['sync', 'async']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                calls = None
+                if mode == 'async':
+                    reply['upload_status'] = 'ready'
+                    calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(status='completed',
+                                  output=json.dumps(dict(state='running', upload_status='authorizing')))),
+                             dict(tool='loginom_dock_artifact_delivery_status', state=dict(
+                                  status='completed', output=json.dumps(reply)))]
+                self.upload_model(Path(directory), reply, calls=calls)
+
+    def test_upload_count_excludes_only_proven_prebrowser_rejections(self):
+        # LAB-549 Sseed/model.stdout:20 rejects budget_ms before any browser effect.
+        receipt = dict(status='SUCCEEDED', state='settled', upload_status='ready', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        rejected = dict(status='NOT_APPLIED', state='settled', action_key='request.validate',
+                        phase='request_rejected', request_rejected=True, effect_possible=False,
+                        error=dict(code='REQUEST_REJECTED', parameter_path='budget_ms'))
+        cases = [('prebrowser', rejected, True), ('possible effect', dict(rejected, effect_possible=True), False),
+                 ('unknown effect', {k: v for k, v in rejected.items() if k != 'effect_possible'}, False),
+                 ('unproven rejection', dict(rejected, request_rejected=False), False),
+                 ('runtime error', dict(state='settled', status='FAILED'), False),
+                 ('malformed', None, False), ('second upload', receipt, False)]
+        for name, prior, accepted in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                calls = [dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed' if name == 'second upload' else 'error',
+                             **{'output' if name == 'second upload' else 'error':
+                                json.dumps(prior) if prior else 'not JSON'})),
+                         dict(tool='loginom_dock_artifact_deliver', state=dict(
+                             status='completed', output=json.dumps(receipt)))]
+                if accepted:
+                    self.upload_model(Path(directory), receipt, calls=calls)
+                else:
+                    with self.assertRaisesRegex(AssertionError, 'UPLOAD_COUNT'):
+                        self.upload_model(Path(directory), receipt, calls=calls)
+
+    def test_upload_only_keeps_verification_requirements(self):
+        receipt = dict(status='SUCCEEDED', state='settled', cleanup_complete=True,
+                       output=dict(bytes=16, upload_completion_verified=True))
+        for key, value in [('status', 'NOT_APPLIED'), ('state', 'running'), ('cleanup_complete', False),
+                           ('bytes', 15), ('upload_completion_verified', False), ('upload_status', 'failed')]:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
+                reply = copy.deepcopy(receipt)
+                (reply['output'] if key in ['bytes', 'upload_completion_verified'] else reply)[key] = value
+                with self.assertRaisesRegex(AssertionError, 'UPLOAD_NOT_READY'):
+                    self.upload_model(Path(directory), reply)
+
+    def test_regex_catalog_keeps_oracles_out_of_model_inputs(self):
+        for name, expected, width in [('regex-add', 'expected.json', 5), ('regex-replace', 'expected-replace.json', 4)]:
+            case = runner.scenario(name)
+            self.assertEqual(case['expected_name'], expected)
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual([p.name for p in case['data'].glob('*.csv')], ['input.csv'])
+            result = runner.expected_for(case, '/test/regex.lgp')
+            self.assertEqual(result['package_path'], '/test/regex.lgp')
+            self.assertEqual(len(result['outputs'][0]['columns']), width)
+            self.assertEqual(len(result['outputs'][0]['rows']), 8)
+            self.assertIn('transform.replace_columns', [n['type'] for n in result['nodes']])
+
+    def test_join_modes_resolve_approved_tasks_inputs_and_cold_expectations(self):
+        for mode, columns, rows in [('right', 6, 7), ('full', 6, 9), ('difference', 3, 2)]:
+            with self.subTest(mode=mode):
+                case = runner.scenario('join-' + mode)
+                self.assertIsNone(case['base'])
+                self.assertEqual(case['prompt'].resolve(), (runner.REPO / 'docs/node-development/nodes/join/acceptance' / ('task-' + mode + '.md')).resolve())
+                self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['left.csv', 'manifest.json', 'right.csv'])
+                expected = runner.expected_for(case, '/test/join.lgp')
+                self.assertEqual(expected['package_path'], '/test/join.lgp')
+                self.assertEqual(expected['null_marker'], 'NULL')
+                output = expected['outputs'][0]
+                self.assertEqual(len(output['columns']), columns)
+                self.assertEqual(len(output['rows']), rows)
+                self.assertEqual(output['export_destination'], '/' + mode + '-result.csv')
+
+    def test_model_phase_budget_comes_from_scenario_catalog(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, timeout in [('C1', 2700), ('5-REST', 2700), ('other', 1800), ('s1', 1800), ('n11', 1800)]:
+                with self.subTest(name=name):
+                    if name in ['C1', '5-REST', 'other']:
+                        source = root / 'cases' / name
+                        (source / 'data').mkdir(parents=True)
+                        (source / 'task.md').write_text('Выгрузи result.csv')
+                        runner.write(source / 'expected.json', {'nodes': [], 'outputs': [{
+                            'output_node_type': 'export_input', 'export_destination': '/test/result.csv'}]})
+                    instance = runner.Runner.__new__(runner.Runner)
+                    instance.out, instance.env, instance.options = root, {}, {'cases': str(root / 'cases')}
+                    folder, workspace = root / (name + '-run'), root / (name + '-workspace')
+                    folder.mkdir(); workspace.mkdir()
+                    with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                        with self.assertRaises(InterruptedError):
+                            instance.model(name, folder, root / 'profile', workspace, '/test/run.lgp',
+                                           {'package_directory': '/test'}, root / 'build')
+                    self.assertEqual(phase.call_args.kwargs.get('timeout', 1800), timeout)
+
+    def test_deadline_interrupts_cli_before_emergency_group_signals(self):
+        for exits_on in ['owner', 'group', 'kill']:
+            with self.subTest(exits_on=exits_on), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                instance = self.make_runner(root)
+                calls = []
+                class Child:
+                    pid = 12345
+                    def poll(self): return None
+                    def send_signal(self, sig): calls.append(('owner', sig))
+                    def wait(self, timeout=None):
+                        calls.append(('wait', timeout))
+                        if (len(calls) == 2 and exits_on != 'owner'
+                                or len(calls) == 4 and exits_on == 'kill'):
+                            raise subprocess.TimeoutExpired('fake-cli', timeout)
+                        return 0
+                with patch.object(runner.os, 'getloadavg', return_value=(0, 0, 0)), \
+                     patch.object(runner.subprocess, 'Popen', return_value=Child()), \
+                     patch.object(runner.subprocess, 'check_output', return_value=b'{"pid": 99999}'), \
+                     patch.object(runner.os, 'killpg', side_effect=lambda pid, sig: calls.append(('group', sig))), \
+                     patch.object(instance, 'memory', return_value={}):
+                    with self.assertRaisesRegex(TimeoutError, 'model deadline'):
+                        instance.phase('model', ['fake-cli'], root, timeout=0)
+                expected = [('owner', signal.SIGINT), ('wait', 100)]
+                if exits_on != 'owner': expected += [('group', signal.SIGINT), ('wait', 40)]
+                if exits_on == 'kill': expected += [('group', signal.SIGKILL), ('wait', None)]
+                self.assertEqual(calls, expected)
+
+    def test_case_root_keeps_catalog_budgets_and_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'input.csv'
+            source.write_text('a\n1\n')
+            for name, timeout in [('C1', 2700), ('5-REST', 2700), ('E1', 1800)]:
+                case = root / name
+                case.mkdir()
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                self.assertEqual(runner.scenario(name, root).get('model_timeout', 1800), timeout)
+
     def test_external_private_case_uses_stock_checks_and_rejects_directory_escape(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -47,6 +492,30 @@ class RunCheckTests(unittest.TestCase):
         runner.write(root / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
             'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
         return runner.Runner(root)
+
+    def test_prepare_only_verifies_build_without_setup_or_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = self.make_runner(Path(directory), ('r6',))
+            instance.options['prepare_only'] = True
+            with patch.object(instance, 'build', return_value=Path(directory) / 'cli') as build, \
+                 patch.object(instance, 'phase') as phase, patch.object(instance, 'model') as model:
+                instance.run()
+            build.assert_called_once()
+            phase.assert_not_called()
+            model.assert_not_called()
+            self.assertEqual(instance.report['runs'][0]['status'], 'NOT_RUN')
+            self.assertEqual(instance.report['runs'][0]['reason'], 'PREPARE_ONLY')
+            self.assertTrue(instance.report['runs'][0]['preparation_only'])
+            self.assertEqual(instance.report['phase'], 'complete')
+            command = [sys.executable, str(Path(runner.__file__)), 'wait', directory, '--timeout', '0']
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('| r6 | подготовка |', result.stdout)
+            for status, reason in [('NOT_RUN', 'BATCH_BUDGET_EXHAUSTED'), ('FAIL', 'PREPARE_ONLY')]:
+                instance.report['runs'][0].update(status=status, reason=reason)
+                instance.save()
+                result = subprocess.run(command, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
 
     def test_gate_and_setup_times_are_separate(self):
         for exhausted in [False, True]:
@@ -234,6 +703,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                         instance.model(mode, folder, root / 'profile', workspace, '/test/result.lgp',
                                        {'package_directory': '/test'}, root / 'build')
                 command = list(map(str, phase.call_args.args[1]))
+                self.assertEqual(phase.call_args.kwargs['timeout'], 1800)
                 attached = [command[i+1] for i, v in enumerate(command) if v == '--file']
                 self.assertEqual(attached, [str(spec['local_file'])] if mode == 'E2' else [])
                 self.assertEqual(list(workspace.iterdir()), [])
@@ -322,6 +792,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                                            {'package_directory': '/test'}, root / 'build',
                                            session='base-session' if index else None)
                     command = phase.call_args.args[1]
+                    self.assertEqual(phase.call_args.kwargs['timeout'], 1800, name)
                     attached = [Path(command[i + 1]) for i, item in enumerate(command) if item == '--file']
                     self.assertEqual(sorted(attached), sorted(workspace / p.name for p in inputs))
                     for source in inputs:
@@ -450,7 +921,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(usage['runtime'], 0)
 
     def test_all_regression_names_resolve_real_inputs(self):
-        names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 26)]
+        names = ([f'n{i}' for i in range(1, 22)] + ['logreg-enter'] + [f'p{i}' for i in range(1, 26)]
                  + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
                  + [f's{i}' for i in range(1, 9)]
                  + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
@@ -460,9 +931,39 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 self.assertTrue(case['prompt'].is_file())
                 self.assertTrue((case['source'] / 'oracle.py').is_file())
                 self.assertTrue(case['data'].is_dir())
-        for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n21', 'q11', 's9', '../n1', 'clustering']:
+        for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n22', 'q11', 's9', '../n1', 'clustering']:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
+
+    def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
+        case = runner.scenario('rest-get-plain')
+        self.assertIsNone(case['base'])
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertEqual([p for p in case['data'].iterdir() if p.suffix in ['.csv', '.xlsx']], [])
+        self.assertIn('без query-параметров и без входной таблицы', case['prompt'].read_text())
+        expected = runner.expected_for(case, '/test/plain.lgp')
+        self.assertEqual(expected['package_path'], '/test/plain.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual(output['rows'], [dict(ErrorCode=0, HttpStatusCode=200)])
+        self.assertEqual(output['output_node_type'], 'export_input')
+        self.assertEqual([c['name'] for c in output['columns']], ['ErrorCode', 'HttpStatusCode'])
+        result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
+        self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
+        case = runner.scenario('logreg-enter')
+        self.assertEqual(case['source'].parent.name, 'datamining-logregression')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertIsNone(case['base'])
+        self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['train.csv'])
+        expected = runner.expected_for(case, '/test/logistic.lgp')
+        self.assertEqual(expected['package_path'], '/test/logistic.lgp')
+        self.assertEqual(expected['outputs'][0]['output_port'], 0)
+        self.assertEqual(len(expected['outputs'][0]['rows']), 32)
+        self.assertEqual(expected['outputs'][0]['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
+        result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')
@@ -577,6 +1078,20 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
 
+    def test_outlier_scenarios_resolve_frozen_tasks_and_all_three_ports(self):
+        for name, method, counts in [('outlier-sd', 'стандартного отклонения', [22, 0, 1]),
+                                     ('outlier-iqr', 'интерквартильной ширины', [22, 1, 1])]:
+            case = runner.scenario(name)
+            self.assertIn(method, case['prompt'].read_text())
+            self.assertEqual(case['export_count'], 3)
+            self.assertTrue((case['source'] / 'oracle.py').is_file())
+            self.assertEqual(len(list(case['data'].glob('*.csv'))), 1)
+            expected = runner.expected_for(case, '/test.lgp')
+            self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            self.assertEqual([len(o['rows']) for o in expected['outputs']], counts)
+            self.assertTrue(all(o['ordered'] and o['column_order'] == 'exact' for o in expected['outputs']))
+            self.assertTrue(all(c.get('label_any') for o in expected['outputs'] for c in o['columns']))
+
     def test_n19_file_oracle_accepts_labels_but_rejects_bad_centers_and_extra_rows(self):
         case = runner.scenario('n19')
         output = runner.expected_for(case, '/test.lgp')['outputs'][0]
@@ -665,6 +1180,26 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         for text in ['Number\n0\n2\n', 'Number\n2\n""\n', 'Number\n""\n3\n']:
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, text, header='labels')
+
+    def test_csv_null_marker_is_explicit_and_preserves_other_values(self):
+        output = {'columns': [{'name': 'Value', 'type': 'real'},
+                              {'name': 'Text', 'type': 'string'}],
+                  'rows': [{'Value': None, 'Text': '?'}, {'Value': 0, 'Text': ''}],
+                  'ordered': True}
+        self.csv_result(output, 'Value,Text\n,?\n0,\n')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'Value,Text\n?,?\n0,\n')
+        self.csv_result(output, 'Value,Text\n?,?\n0,\n', null_marker='?')
+        for text in ['Value,Text\n,?\n0,\n', 'Value,Text\n0,?\n0,\n',
+                     'Value,Text\n?,?\n?,\n', 'Value,Text\n?,\n0,\n']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, text, null_marker='?')
+
+    def test_corr_null_fixture_declares_csv_marker_separately_from_native_nulls(self):
+        expected = runner.expected_for(runner.scenario('corr-null'), '/own/test.lgp')
+        self.assertEqual(expected['null_marker'], '?')
+        self.assertIsNone(expected['outputs'][0]['rows'][0]['Pirson'])
+        self.assertNotIn('null_marker', expected['outputs'][0])
 
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -805,6 +1340,80 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 result = runner.read(out / 'results.json')['runs'][0]
                 self.assertEqual(result['status'], 'PASS' if corrupt is None else 'FAIL', result)
                 self.assertEqual(len(cold_calls), 1 if corrupt is None else 0)
+
+    def test_types300_d76_requires_successful_cold(self):
+        for count, corrupt in [(1, None), (1, 'cold'), (1, 'exact'), (1, 'disabled')]:
+            with self.subTest(exports=count, corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'points.csv'
+                source.write_text('X,Y,RowID\n0,20,1\n')
+                case = root / 'cases/types300'
+                (case / 'data').mkdir(parents=True)
+                names = ['assignments.csv', 'centers.csv'][:count]
+                (case / 'task.md').write_text('Выгрузи ' + ' и '.join(names))
+                runner.write(case / 'case.json', {'source_path': str(source), 'attachment': 'path'})
+                columns = [[{'name': 'SmallReal', 'type': 'real'}, {'name': 'EventAt', 'type': 'datetime'}]]
+                rows = [dict(SmallReal=-0.0, EventAt='2027-01-01T00:00:00.001')]
+                runner.write(case / 'expected.json', {'package_path': '/test/result.lgp', 'nodes': [],
+                    'outputs': [{'output_node_type': 'datamining.clustering', 'output_port': i,
+                        'columns': cols, 'rows': [rows[i]]} for i, cols in enumerate(columns)]})
+                out = root / 'run'
+                out.mkdir()
+                runner.write(out / 'request.json', {'case_root': str(root / 'cases'), 'pair': str(root / 'pair'), 'cold': corrupt != 'disabled'})
+                (root / 'pair').mkdir()
+                runner.write(root / 'pair/worker.json', {'package_directory': '/test', 'loginom': {
+                    'username': 'test', 'password': 'test', 'url': 'https://example.test', 'api_key': 'test'}})
+                runner.write(out / 'results.json', {'head': 'a' * 40, 'tree': 'b' * 40,
+                    'started': time.time(), 'runs': [{'scenario': 'types300', 'status': 'PENDING'}]})
+                instance = runner.Runner(out)
+                cold_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    instance.report['phase'] = name
+                    profile = out / 'types300/profile'
+                    if name == 'setup':
+                        (profile / 'data').mkdir(parents=True)
+                        (profile / 'config').mkdir()
+                        runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                    if name == 'model':
+                        # Replace the process boundary; model still parses events
+                        # and validates every downloaded CSV itself.
+                        events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                            'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                            {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                            {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                                'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                        (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                        runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                        runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                        for i, cols in enumerate(columns):
+                            delimiter = ',' if i == 0 else ';'
+                            (profile / ('run-types300-' + names[i])).write_text(
+                                delimiter.join(c['name'] for c in cols) + '\n' +
+                                delimiter.join(str(rows[i][col['name']]) if corrupt == 'exact' else ('0' if j == 0 else '2027-01-01')
+                                               for j, col in enumerate(cols)) + '\n')
+                    if name == 'cold':
+                        command = list(map(str, command))
+                        self.assertIn('--exact-port-windows', command)
+                        actual = Path(command[command.index('--csv') + 1])
+                        cold_calls.append(actual.name)
+                        self.assertTrue(actual.is_file(), str(actual))
+                        self.assertEqual(actual.name, 'actual.csv' if count == 1 else 'actual-2.csv')
+                        self.assertEqual(command[command.index('--csv-delimiter') + 1], ',' if count == 1 else ';')
+                        self.assertEqual(len(runner.read(Path(command[command.index('--expected') + 1]))['outputs']), count)
+                        (folder / 'cold').mkdir()
+                        runner.write(folder / 'cold/result.json', {'status': 'FAIL' if corrupt == 'cold' else 'PASS', 'settingsReapplied': False,
+                            'cleanup': {'package_closed': True, 'logged_out': True}})
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                    instance.run()
+                result = runner.read(out / 'results.json')['runs'][0]
+                self.assertEqual(result['status'], runner.D76_STATUS if corrupt is None else 'PASS' if corrupt == 'exact' else 'FAIL', result)
+                self.assertIn(result['status'], runner.summary(instance.report))
+                if corrupt is None:
+                    self.assertEqual(result['d76'], dict(negative_zero=1, midnight_date=1))
+                    self.assertIn('negative_zero=1; midnight_date=1', runner.summary(instance.report))
+                self.assertEqual(len(cold_calls), 0 if corrupt == 'disabled' else 1)
 
     def native_reply(self):
         # Public shape observed in smoke-4/q7/s5/model.stdout:48 on v0.3.3.

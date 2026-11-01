@@ -159,3 +159,156 @@ PASS исполнителя: CLI, независимая сверка по ра�
 - **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
 - **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
 - **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.
+
+## 7. v0.3.8: Правое, Полное, Разность — предложение этапа 0 (LAB-529)
+
+Назначенная база: `origin/v038` = `1e0d8e62e2ab4503afa24bc3614bec84ea332d5b`.
+Этот раздел дополняет техническую матрицу; действующий регламент — instructions
+сквада из карточки. Критерии ниже **предложены владельцу, ещё не утверждены**.
+Runtime, публичная схема и реестр готовности этим docs-PR не меняются.
+
+### Живой мастер и границы поведения
+
+Исследование 30.10.2026 на mas, только
+`https://app.loginom.ai/app/?testable=true`, Loginom **7.4.2** (версия из
+диалога деактивации). Использован worker назначенной пары LAB-529; чужие
+пакеты не исследовались. Два собственных текстовых импорта → один «Слияние»;
+тот же узел последовательно перенастроен и выполнен через нативный UI.
+Это исследование человеком через Playwright, **не модельная приёмка CLI**.
+
+В этой сессии префикс мастера `MF;TF-1;WizrdMCF`; номер вкладки непостоянен.
+Наблюдённые `data-tid`:
+
+| Назначение | Суффикс после префикса мастера |
+|---|---|
+| Список «Тип операции» | `;JoinDataWizard;pedJoinType;ValueControl;trg_picker` |
+| Правое | `;JoinDataWizard;pedJoinType;ValueControl;boundlist;Правое_соединение` |
+| Полное | `;JoinDataWizard;pedJoinType;ValueControl;boundlist;Полное_соединение` |
+| Разность | `;JoinDataWizard;pedJoinType;ValueControl;boundlist;Разность` |
+| Регистр | `;JoinDataWizard;chbCaseSensitive;ValueControl;DisplayEl` |
+| Добавлять присоединяемые ключевые поля | `;JoinDataWizard;chbIncludeJoinedKeyFields;ValueControl;DisplayEl` |
+| Связи составного ключа | `;JoinDataWizard;colSourceName_LKey` → `colDisplayName_RKey`; аналогично `LPart` → `RPart` |
+
+`readJoinBrowser` из production `join-context.mjs` подтвердил `verified=true`,
+обе полные схемы, две взаимные связи ключей и значения настроек. Нового чтения
+внутренних объектов/перехвата JS не добавлено. Смена режима сохраняет оба
+входа (0 основной/левый, 1 присоединяемый/правый) и один выход 0, составной
+ключ и флаги. После выполнения повторное открытие мастера требует штатного
+подтверждения деактивации `msgbox;tlb;yes`. Название узла в автоматическом
+режиме меняется на «Правое», «Полное», «Разность»; метка не является ID узла.
+
+Данные — [fixtures/modes](fixtures/modes/manifest.json): 5 строк слева,
+5 справа, все шесть исходных полей строковые; `;`, UTF-8 без BOM, LF,
+заголовок из имён. Размеры CSV 87 и 92 Б; SHA-256 закреплены в manifest.
+У пары `(A,X)` по две записи с каждой стороны, есть `(a,X)`, а также
+несовпадения по каждой части ключа. Входных NULL/пустых строк нет.
+
+| Режим, case_sensitive=true | include_joined_keys | Строки | Поля выхода и смысл |
+|---|---|---:|---|
+| Правое | true | 7 | `LKey,LPart,LValue,RKey,RPart,RValue`: 5 совпавших пар + 2 строки только справа; все левые поля этих двух строк NULL |
+| Правое | false | 7 | `LKey,LPart,LValue,RValue`: правые ключи исключены, левые ключи для строк только справа остаются NULL, не заполняются правыми |
+| Полное | true | 9 | Все 6 полей: совпадения + 2 строки только слева + 2 только справа; отсутствующая сторона целиком NULL |
+| Полное | false | 9 | 4 поля, как у правого без правых ключей; состав строк сохраняется |
+| Разность | true и false | 2 | Только `LKey,LPart,LValue`: `(B,X,only-left)` и `(A,Y,left-other-part)`; правых полей нет при обоих флагах |
+
+Флаг правых ключей в «Разности» остаётся видимым и включённым для ввода;
+он не добавляет правые поля. «Разность» — левое антисоединение, не
+симметрическая разность. В отличие от inner (только пары) и left (пары плюс
+строки только слева), right/full сохраняют строки только справа.
+Для одинаковых ключей сохраняются **все** пары, порядок результата различен
+у right/full и не входит в критерий.
+
+Результаты прочитаны в F3 из
+`MF;TF-1;Graph;<метка>;Output_Data-0` → `mn;mniShowDataPreview`;
+ячейки имеют префикс
+`MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt;`,
+например `LValue_0`, `RValue_0`. NULL виден как `<null>`.
+Сырые DOM-снимки остаются вне Git; таблица выше — вывод исследования.
+
+### Предложенный приёмочный комплект
+
+- [task-right.md](acceptance/task-right.md), [task-full.md](acceptance/task-full.md),
+  [task-difference.md](acceptance/task-difference.md) описывают действия на языке
+  пользователя, без инструментов и ожидаемых чисел. Модель получает только
+  соответствующий `task.md` и два входных CSV.
+- Каталоги `acceptance/right`, `acceptance/full`, `acceptance/difference`
+  содержат `expected.json` stock-формата; `task.md`, `oracle.py`, `data/`
+  ссылаются на общие файлы. Это готовые входы существующего `run-check --cases`,
+  без регистрации сценариев или изменения обвязки.
+- [oracle.py](acceptance/oracle.py) независимо рассчитывает все пары по байтам
+  закреплённых CSV и добавляет отсутствующую сторону. Не читает Loginom,
+  обработчик или сохранённый пакет. `--check` сверяет manifest и три
+  закоммиченных `expected.json`; `--mode` выбирает режим, дополнительные флаги
+  позволяют рассчитать исключение правых ключей и нечувствительность к регистру.
+- Primary right/full включают правые ключи, difference выключает; expected
+  требует полную схему string и мультимножество всех строк с NULL. Незапрошенные
+  метки свободны (`label_any=true`), порядок строк/CSV-столбцов свободный.
+  `export_input` привязывает cold к результату слияния на входе заданного
+  экспорта; `export_destination` нужен штатному `run-check --cases` и при
+  запуске заменяется его уникальным полным путём.
+
+Предлагается стандартная приёмка этапа 1: каждый из трёх сценариев — ≥2 PASS
+из 3 у исполнителя и 2/3 при независимой проверке **одного точного SHA**;
+в каждом PASS полная сверка CSV, Save, cold-check и close/logout. Cold получает
+скачанный CSV штатным `--csv`. Дополнительного механизма проверки не требуется.
+Отдельные локальные red→green проверки нужны для выбора всех режимов,
+`parameters={}` существующего узла, сужения/расширения выходной схемы при
+смене full↔difference, флагов регистра/правых ключей и регрессии inner/left.
+
+После утверждения критериев и реализации, из корня checkout:
+
+```sh
+python3 -B docs/node-development/nodes/join/acceptance/oracle.py --check
+result=$(python3 scripts/node-acceptance/run-check.py start --head "$CANDIDATE_SHA" --cases "$PWD/docs/node-development/nodes/join/acceptance" --scenarios right,full,difference --pair "$PAIR" --cold) && python3 scripts/node-acceptance/run-check.py wait "$result" --timeout 5100
+```
+
+Это **будущая** команда этапа 1; на этапе 0 CLI не собирался и модельные
+прогоны не запускались. Первичные критерии не обещают full без ключей,
+декартово произведение, управляющие переменные, новые типы ключей или новую
+семантику входных NULL. Они сохраняют прежние ограничения узла.
+
+### Размер изменения и схема
+
+Предварительная оценка этапа 1: **2 цикла правки с бизнес-прогоном после
+каждого**, ориентировочно 80–160 строк production-кода плюс адресные тесты.
+Первый — аддитивно right/full и перечисления; второй — mode-aware выход
+«Разности» и смена режима существующего узла. Это оценка, не выполненная
+правка и не гарантия количества циклов.
+
+| Файлы в `packages/loginom-runtime/client/lib/` | Предлагаемое изменение |
+|---|---|
+| `join-node.mjs`, `join-parameters.mjs` | Добавить три режима; схема difference = только левый вход; передать `request.mode` в preflight расчёта выхода |
+| `join-procedure.mjs` | Явная таблица mode→наблюдённая UI-метка вместо inner/left тернарного выбора |
+| `join-mappings.mjs` | Передать mode при раннем расчёте схемы; проверить mode-aware mapping; не требовать правые поля в difference |
+| `join-readback.mjs` | Допустить новые значения при той же проверке владельца/ключей/выходной схемы |
+| `node-contracts.mjs`, `node-contracts.d.ts` | Аддитивные значения режимов в реестре и Join readback type |
+| `node-api.mjs`, `node-result-schema.mjs` | Аддитивные enum входа/Join readback, уточнить описание режима и состава выхода |
+| `node-read-contract.mjs` | Добавить режимы в сохранение настроек существующего Join с `parameters={}` |
+
+`join-context.mjs` уже читает `inner,left,right,full,difference` из 0..4;
+`workspace-ui.mjs` уже публикует combo `join_mode`. Общие императивные
+механизмы, `packages/agent`, runtime/src, лимиты, deadlines, чтение портов и
+проверяющий код менять по текущему наблюдению **не требуется**. Существующий
+`join-output-sync.mjs` и его тесты — проверить при смене схемы; если понадобится
+изменение общей логики сверх аддитивных деклараций, остановиться по карточке.
+Адресные тесты затронут `join-parameters`, `join-procedure`, `join-readback`,
+`join-inline-mapping`, `node-api` и сохранение read-contract; затем полный
+client с pinned Chromium и обязательства `required-checks` по итоговому diff.
+
+На назначенной базе полная `nodeApplyInputSchema` (`dock_node_apply.inputSchema`)
+при компактном `JSON.stringify`, UTF-8: **45 891 Б**. Добавление только
+`"right","full","difference"` в верхний enum `mode` даёт **45 919 Б**, **+28 Б**.
+До 46 000 Б остаётся 81 Б; это не резерв под остальной состав выпуска.
+Текст описания инструмента и выходная схема в этот размер входа не входят.
+Общий запас предоставляет F2 (LAB-516); здесь только измерение, без правки схемы.
+
+Воспроизведение измерения (Node из bootstrap/cache окружения):
+
+```sh
+node --input-type=module - <<'JS'
+import {nodeApplyInputSchema} from './packages/loginom-runtime/client/lib/node-api.mjs';
+const after = structuredClone(nodeApplyInputSchema);
+after.properties.mode.enum.push('right', 'full', 'difference');
+console.log(Buffer.byteLength(JSON.stringify(nodeApplyInputSchema)), Buffer.byteLength(JSON.stringify(after)));
+JS
+```

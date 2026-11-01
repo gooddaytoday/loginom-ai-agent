@@ -7,6 +7,54 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
+test('error toast template is private and requires the native error class, component and message structure',async()=>{
+ for(const fault of [null,'info','native','messages']) {
+  const page=new Page(),toast=page.add('div','toast');toast.attrs.class='x-window bg-notify-msg-color-'+(fault==='info'?'info':'error');
+  const heading=page.add('div','toast;p.h;p.t','Ошибка',undefined,toast);heading.attrs.class='x-title-text';
+  page.add('div','toast;cnt;cnt;cmp','Прогноз Y:',undefined,toast);
+  const messages=page.add('div','toast;cnt;cnt;MessagesView','',undefined,toast);messages.attrs.class='bg-error-messages';
+  const list=page.add('ul',null,'',undefined,messages);list.attrs.class='bg-error-list';
+  const item=page.add('li',null,'Native error',undefined,list);item.attrs.class='bg-error-item';
+  if(fault==='messages'){const second=page.add('li',null,'Second',undefined,list);second.attrs.class='bg-error-item';}
+  const close=page.add('div','toast;p.h;close','',undefined,toast),icon=page.add('img',null,'',undefined,close);icon.attrs.class='x-tool-close';
+  page.context.Ext={getCmp:()=>({el:{dom:fault==='native'?{}:toast},title:'Ошибка',iconCls:'bg-icon-info-negative'})};
+  page.evaluate=async(fn,arg)=>vm.runInContext('('+fn.toString()+')',page.context)(arg);
+  const normal=await page.execute({mode:'observe',expected_build:build,expected_origin:origin});
+  assert.equal(normal.output.ui.dialogs[0].error_toast,undefined);
+  const observed=await vm.runInContext('('+makeWorkspaceUiCode({mode:'observe',node_error_toast_observation:true,expected_build:build,expected_origin:origin})+')',page.context)(page);
+  assert.equal(observed.status,'SUCCEEDED');
+  if(fault){
+   assert.equal(observed.output.ui.dialogs[0].error_toast,undefined);
+   const failed={info:'error_class',native:'native_element',messages:'error_item_unique'}[fault];
+   assert.ok(observed.output.ui.dialogs[0].error_toast_diagnostic.failed_conditions.includes(failed));
+  }
+  else {
+   assert.deepEqual(clone(observed.output.ui.dialogs[0].error_toast),{kind:'error',caption:'Прогноз Y:',message:'Native error'});
+   assert.ok(observed.output.ui.elements.find(e=>e.tid==='toast;p.h;close').allowed_actions.includes('click'));
+  }
+ }
+});
+
+test('private download observation preserves toast text and classes outside the file root',async()=>{
+ const page=new Page(),root=page.add('button','MF;TF-1;FileStorageForm;pnlFileStorage;tbl','Files');
+ const toast=page.add('div','toast','Скачивание файлов Отменить все');
+ toast.attrs.class='x-window bg-notify-msg-color-info';toast.attrs.role='dialog';
+ const roots=await page.observe(),ref=roots.ui.elements.find(e=>e.tid===root.attrs['data-tid']).ref;
+ const options={mode:'observe',root_ref:ref,expected_build:build,expected_origin:origin};
+ // Playwright serializes callbacks into another realm; do not retain closures.
+ page.evaluate=async(fn,arg)=>vm.runInContext('('+fn.toString()+')',page.context)(arg);
+ const ordinary=await page.execute(options);
+ assert.equal(ordinary.output.ui.dialogs[0].text,'[outside selected root]');
+ assert.equal(ordinary.output.ui.dialogs[0].class_name,undefined);
+ const observed=await vm.runInContext('('+makeWorkspaceUiCode(options,{downloadToastObservation:true})+')',page.context)(page);
+ assert.equal(observed.status,'SUCCEEDED');
+ assert.equal(observed.output.ui.dialogs[0].ref,ordinary.output.ui.dialogs[0].ref);
+ assert.equal(observed.output.ui.dialogs[0].text,'Скачивание файлов Отменить все');
+ assert.equal(observed.output.ui.dialogs[0].class_name,'x-window bg-notify-msg-color-info');
+ toast.remove();toast.ownText='';
+ assert.equal(observed.output.ui.dialogs[0].text,'Скачивание файлов Отменить все');
+});
+
 test('Excel opening waits only for its native spreadsheet LoadMask message',async()=>{
  for(const fault of [null,'foreign_target','foreign_mask','dialog','wrong_mask','wrong_message','wrong_component','detached_target','outside_preview','duplicate_preview','changed_node','changed_stage','expired']) {
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
@@ -256,7 +304,7 @@ test('observation supplies real graph references, visible editor settings, dialo
 
 test('storage table observation inventories headers once while preserving per-table redaction',async()=>{
   const clock=fixtureClock(),page=new Page({clock:clock.Date});
-  const root=page.add('div','MF;TF-1;FileStorageForm;pnlFileStorage;tbl');
+  const root=page.add('button','MF;TF-1;FileStorageForm;pnlFileStorage;tbl','Files');
   for(const [label,value] of [['Filename','result.csv'],['Password','private-value']]) {
     const table=page.add('table',null,'',undefined,root);
     page.add('th',null,label,undefined,table);
@@ -468,6 +516,26 @@ test('partly clipped graph visualizers use their observed painted point and refu
     if (covered) { assert.equal(result.error.code, 'UI_REFERENCE_OBSCURED'); assert.equal(result.effect_possible, false); }
     assert.deepEqual(page.clickedPoints, covered ? [] : [{ ...element.interaction.point, clickCount: 1 }]);
   }
+});
+
+// LAB-656 main :3241/:3262: the port centre is x=1274, beyond the graph,
+// while the fresh observation proves a painted point at x=1272.5.
+for(const direction of ['Input','Output'])for(const cover of ['gutter','covered','dialog'])test('minimum-scale graph port '+direction+' uses its observed point: '+cover,async()=>{
+ const page=new Page(),tid='MF;TF-1;Graph;Finance';
+ page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
+ const graph=page.add('div','MF;TF-1;ModelForm;cmpDiagram','',{x:324,y:100,width:950,height:694});
+ const body=page.add('g',tid,'',{x:1249,y:752,width:22,height:29},graph);
+ page.add('span',tid+';Label;Label','Finance',undefined,body);
+ const port=page.add('g',tid+';'+direction+'_Data-0','',{x:1271,y:762,width:6,height:9},graph);
+ const gutter=page.add('div',null,'',{x:1274,y:730,width:6,height:64});gutter.attrs.role='presentation';
+ const snapshot=await page.observe(),e=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']);
+ assert.equal(e.kind,'port');assert.equal(e.scope,'graph');
+ assert.deepEqual(e.interaction.point,{x:1272.5,y:766.5});
+ if(cover!=='gutter')page.beforeHandleGeometry=target=>{if(target===port){gutter.box.x=1270;gutter.box.width=10;if(cover==='dialog')gutter.attrs.role='dialog';}};
+ const result=await page.act({verb:'click',ref:e.ref},snapshot);
+ assert.equal(result.status,cover==='gutter'?'SUCCEEDED':'NOT_APPLIED',JSON.stringify(result.error));
+ assert.deepEqual(page.clickedPoints,cover==='gutter'?[{...e.interaction.point,clickCount:1}]:[]);
+ if(cover!=='gutter'){assert.equal(result.error.code,'UI_REFERENCE_OBSCURED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);}
 });
 
 test('a DOM geometry change during preflight is rejected before any checked-point click', async () => {
@@ -6878,6 +6946,31 @@ test('scrolled process window offers native-bound rows without claiming complete
  assert.equal(s.process_console.top_level_rendered_coverage,false);
  const row=s.ui.elements.find(e=>e.process_row?.record_id==='record-5');
  assert.ok(row?.allowed_actions.includes('right_click'));assert.equal(row.process_row.record_index,4);
+});
+
+test('issue579 retains the exact process row when the two console views renumber history separately',async()=>{
+ // execution-events.jsonl:5990,6016,6028: history evicts group 1 at launch 21.
+ // Left process retains Activation-20 while right controls use Activation-19;
+ // viewport 1920x945, tree (50,769,325,174), final scrollTop/max_top=691.
+ for(const fault of [null,'caption','record','index','view','duplicate']){
+  const f=scrolledProcessWindowFixture(),base='ConsoleForm;ProgressForm;',name='Выручка_себестоимость_валовая_прибыль';
+  f.page.context.innerWidth=1920;f.page.context.innerHeight=945;
+  f.grids[0].box={x:50,y:769,width:325,height:174};f.grids[1].box={x:361,y:769,width:1557,height:174};
+  f.grids.forEach(g=>Object.assign(g,{scrollTop:691,scrollHeight:865,clientHeight:174}));
+  f.cell.box={x:110,y:919,width:250,height:23};f.id.ownText='21.1';f.model.data.id='21.1';
+  const left='Root>Активация_узлов-20>'+name,right='Root>Активация_узлов-19>'+name;
+  f.cell.attrs['data-tid']=base+'colProcess_'+left;f.id.attrs['data-tid']=base+'colId_'+left;
+  f.progress.attrs['data-tid']=base+'colProgress_'+(fault==='caption'?right+'Other':right);
+  if(fault==='record')f.rows[1].attrs['data-recordid']='foreign';
+  if(fault==='index')f.rows[1].attrs['data-recordindex']='3';
+  if(fault==='view')f.rows[1].attrs['data-boundview']='foreign';
+  if(fault==='duplicate')f.page.add('td',f.progress.attrs['data-tid'],'',undefined,f.rows[1]);
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.process_row?.record_id==='record-5');
+  if(fault){assert.equal(row,undefined,fault);continue;}
+  assert.equal(s.process_console.status,'rendered_process_window');
+  assert.equal(row.tid,base+'colProcess_'+left);assert.ok(row.allowed_actions.includes('right_click'));
+  assert.equal(row.process_row.record_index,4);assert.equal(s.process_console.top_level_complete,false);
+ }
 });
 
 test('native process captions containing code tokens remain process controls, not editors',async()=>{

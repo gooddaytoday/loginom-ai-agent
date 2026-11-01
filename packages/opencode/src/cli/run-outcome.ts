@@ -38,12 +38,15 @@ export function runToolOutcome() {
           : ["arguments", input]
       const key = part.tool === "invalid" ? `invalid:${part.id}` : JSON.stringify([part.tool, canonical(identity)])
       if (part.state.status === "error" || part.tool === "invalid" || part.state.metadata?.isError === true) {
+        unresolved.delete(key)
         unresolved.set(key, part)
         return
       }
-      unresolved.delete(key)
-      for (const [key, failure] of unresolved) {
-        if (correctedRead(failure, part)) unresolved.delete(key)
+      if (unresolved.delete(key)) return
+      for (const [key, failure] of [...unresolved].reverse()) {
+        if (!correctedRead(failure, part)) continue
+        unresolved.delete(key)
+        break
       }
     },
     failed: () => unresolved.size > 0,
@@ -59,7 +62,7 @@ function correctedRead(failure: ToolPart, success: ToolPart) {
   if (typeof before !== "string" || typeof after !== "string") return false
   if (!failure.state.error.startsWith(`File not found: ${before}`) || failure.state.metadata?.permissionDenied) return false
   if (path.dirname(before) !== path.dirname(after) || path.extname(before) !== path.extname(after)) return false
-  // A later successful read repairs missing-file errors in this directory and
+  // A later successful read repairs only the latest missing-file error in this directory and
   // extension only when all other arguments match; filename similarity is irrelevant.
   return (
     JSON.stringify(canonical({ ...failure.state.input, filePath: undefined })) ===

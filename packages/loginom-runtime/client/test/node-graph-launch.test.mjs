@@ -86,7 +86,10 @@ test('process prepare materializes console before requesting its native history'
  const f=fixture();await f.driver.prepare();
  assert.equal(f.observations[0].readProcesses,false);
  assert.equal(f.observations[0].readProcessControls,true);
- assert.equal(f.observations.slice(1).every(x=>x.readProcesses===true),true);
+ assert.equal(f.observations.slice(1,-1).every(x=>x.readProcesses===true),true);
+ assert.equal(f.observations.at(-1).condition,'process console closed');
+ assert.equal(f.observations.at(-1).readProcesses,false);
+ assert.equal(f.observations.at(-1).readProcessControls,true,'closed console must retain the pre-launch toolbar');
  assert.equal(f.actions[0].ref,'MF;cntMain;tlbMainToolbar;btnProgress');
  assert.equal(f.actions.some(x=>x.verb==='execute_graph_node'),false);
  assert.equal(f.actions.at(-1).ref,'ConsoleForm;btnClose');

@@ -199,25 +199,100 @@ test('exact destination selects renamed report while the earlier s1 export remai
  }
 });
 
-test('s8 cold selects an observed owned body despite a clipped label; hidden points still require reveal',async()=>{
+test('cold reveals only an unavailable owned body, preserving clipped-label selection guards',async()=>{
  const {observeExportDestinations}=await import('../static-source-proof.mjs');
  const {preparedGraphSelection}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
  for(const mode of ['body','label','hidden','foreign']){
   const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Экспорт_выручки_с_русскими_заголовками';
   // head69/s8 cold journal: body (1188,140)56x104, label (1161,90)111x48;
   // canvas starts y=100, scrollTop=0. Both gesture centers were observed.
-  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},ui:{elements:[
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},ui:{masks:[],dialogs:[],elements:[
    {tid,ref:'body',graph_node:{part:'body'},bounding_box:{x:1188,y:140,width:56,height:104},allowed_actions:['click'],interaction:{state:'point_observed'}},
    {tid:tid+';Label;Label',ref:'label',graph_node:{part:'label'},bounding_box:{x:1161,y:90,width:111,height:48},allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
   if(mode!=='body')state.ui.elements[0].interaction.state='outside_viewport';
   if(mode==='hidden')state.ui.elements[1].interaction.state='outside_viewport';
   if(mode==='foreign')state.prepared_node_context.node_id='foreign';
   let reveals=0,selected=0;
-  const channel={observe:async()=>structuredClone(state),revealGraphNode:async()=>{reveals++;if(mode!=='hidden')throw Error('unnecessary full bbox reveal');state.ui.elements[0].interaction.state='point_observed';}};
+  const channel={observe:async()=>structuredClone(state),revealGraphNode:async options=>{assert.deepEqual(options,{target:'body'});reveals++;if(mode==='hidden')state.ui.elements[0].interaction.state='point_observed';}};
   const helpers={selectPreparedGraphNode:async(c,s)=>{assert.equal(preparedGraphSelection(s).ref,mode==='label'?'label':'body');selected++;throw Error('SELECTION_REACHED');}};
   const result=observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel});
   await assert.rejects(result,mode==='foreign'?/export selection owner/:/SELECTION_REACHED/);
-  assert.equal(reveals,mode==='hidden'?1:0);assert.equal(selected,mode==='foreign'?0:1);
+  assert.equal(reveals,['foreign','body'].includes(mode)?0:1);assert.equal(selected,mode==='foreign'?0:1);
+ }
+});
+
+test('cold avoids visible export reveal and waits for stable owned settings after selection',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Итоговый_CSV';
+ for(const initialSetting of [false,true]){
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},
+   dom_epoch:{document:'dom',revision:1},active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},
+   ui:{dialogs:[],masks:[],elements:[{tid,ref:'body',graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
+  const setting={tid:tid+';Setting',ref:'setting',allowed_actions:['begin_wizard'],interaction:{state:'point_observed'}};
+  if(initialSetting)state.ui.elements.push(setting);
+  let settled=false;
+  const channel={revealGraphNode:async()=>{throw Error('visible export must not reveal: delayed bg-mask-message replaces SVG');},
+   observe:async o=>{
+    if(o.condition==='cold export settings settled'){
+     const masked=structuredClone(state);masked.ui.masks=[{kind:'busy',target_tid:'MF;TF-1;ModelForm',class_name:'bg-mask-message'}];
+     assert.equal(o.ready(masked),false);
+     const hidden=structuredClone(state);hidden.ui.elements.at(-1).interaction.state='point_not_observed';assert.equal(o.ready(hidden),false);
+     const foreign=structuredClone(state);foreign.prepared_node_context.node_id='other';assert.equal(o.ready(foreign),false);
+     assert.equal(typeof o.confirmIdentity,'function');
+     const before=structuredClone(o.confirmIdentity(state));state.dom_epoch.revision++;state.ui.elements.at(-1).ref='fresh-setting';
+     assert.notDeepEqual(o.confirmIdentity(state),before);settled=true;
+    }
+    assert.ok(o.ready(state),o.condition);return structuredClone(state);
+   }};
+  const helpers={selectPreparedGraphNode:async()=>{if(!initialSetting)state.ui.elements.push(structuredClone(setting));},
+   openPreparedWizard:async()=>{assert.ok(settled);throw Error('SETTLED_OPEN_REACHED');}};
+  await assert.rejects(observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel}),/SETTLED_OPEN_REACHED/);
+ }
+});
+
+test('cold reveals a partially visible export before its offscreen Setting and rechecks the fresh owner',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const {selectPreparedGraphNode}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
+ for(const fault of [null,'foreign-after-reveal','unknown-reveal']){
+  const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Итоговый_CSV_UTF-8',actions=[];
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},
+   active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{masks:[],dialogs:[],elements:[
+    {tid,ref:'old-body',graph_node:{part:'body'},bounding_box:{x:1256,y:214,width:42,height:78},
+     allowed_actions:['click'],interaction:{state:'point_observed',point:{x:1268,y:253}}},
+    {tid:tid+';Setting',ref:'setting',bounding_box:{x:1278,y:234,width:18,height:18},
+     allowed_actions:['begin_wizard'],interaction:{state:'point_not_observed'}}]}};
+  const channel={
+   observe:async o=>{
+    if(actions.includes('reveal')&&o.condition==='cold exact export selection'){
+     const masked=structuredClone(state);masked.ui.masks=[{kind:'busy',target_tid:'MF;TF-1;ModelForm',class_name:'bg-mask-message'}];
+     assert.equal(o.ready(masked),false);assert.equal(typeof o.confirmIdentity,'function');
+     const stale=structuredClone(state);stale.ui.elements[0].ref='old-body';
+     assert.notDeepEqual(o.confirmIdentity(state),o.confirmIdentity(stale));
+    }
+    assert.ok(o.ready(state),o.condition);actions.push('observe');return structuredClone(state);
+   },
+   revealGraphNode:async options=>{
+    assert.deepEqual(options,{target:'body'});actions.push('reveal');
+    if(fault==='unknown-reveal')throw Error('unknown reveal effect');
+    state.ui.elements[0].ref='fresh-body';state.ui.elements[0].bounding_box.x=1100;
+    state.ui.elements[1].bounding_box.x=1122;state.ui.elements[1].interaction={state:'point_observed',point:{x:1131,y:243}};
+    if(fault==='foreign-after-reveal')state.prepared_node_context.node_id='foreign';
+   },
+   perform:async o=>{
+    assert.equal(o.initialObservation.ui.elements[0].ref,state.ui.elements[0].ref);assert.ok(o.ready(state));
+    assert.deepEqual(o.resolve(state),{verb:'click',ref:state.ui.elements[0].ref});actions.push('select');
+    return {status:'SUCCEEDED',cleanup_complete:true,output:structuredClone(state)};
+   }};
+  const helpers={selectPreparedGraphNode,openPreparedWizard:async()=>{
+   assert.equal(state.ui.elements[1].interaction.state,'point_observed','Setting must have an observed point before opening');
+   actions.push('open');throw Error('OWNED_OPEN_REACHED');
+  }};
+  await assert.rejects(observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel}),
+   fault==='foreign-after-reveal'?/export selection owner/:fault==='unknown-reveal'?/unknown reveal effect/:/OWNED_OPEN_REACHED/);
+  assert.equal(actions.filter(a=>a==='reveal').length,1);
+  assert.equal(actions.filter(a=>a==='select').length,fault?0:1);
+  assert.equal(actions.filter(a=>a==='open').length,fault?0:1);
+  if(!fault)assert.deepEqual(actions.slice(0,5),['observe','reveal','observe','select','observe']);
  }
 });
 
@@ -231,8 +306,8 @@ test('cold observes both destinations through cancelled owned wizards without ex
   const channelFor=ref=>{
    let stage=null;const c={ref,setStage:s=>{stage=s},revealGraphNode:async()=>actions.push(['reveal',ref.node_id]),
     openInputPort:async port=>{assert.equal(port,0);actions.push(['open-input',ref.node_id]);stage='input_mapping';},
-    observe:async o=>{const s={prepared_node_context:{...owner(ref.node_id),surface:stage?'wizard':'graph'},wizard:stage?{status:'observed',stage,root_tid:'wizard'}:{status:'absent'},
-     active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{elements:[{tid:'wizard;btnNext',ref:'Next',allowed_actions:['wizard_step']}]},
+    observe:async o=>{const s={prepared_node_context:{...owner(ref.node_id),surface:stage?'wizard':'graph',tid:'graph;'+ref.node_id},wizard:stage?{status:'observed',stage,root_tid:'wizard'}:{status:'absent'},
+     active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{masks:[],dialogs:[],elements:[{tid:'graph;'+ref.node_id,ref:'body',graph_node:{part:'body'},interaction:{state:'point_observed'}},{tid:'graph;'+ref.node_id+';Setting',ref:'setting',allowed_actions:['begin_wizard'],interaction:{state:'point_observed'}},{tid:'wizard;btnNext',ref:'Next',allowed_actions:['wizard_step']}]},
      node_mapping:{verified:true,inventory_complete:fault!=='mapping-incomplete',source_identity_verified:true,settings_applied:false,mapping_wizard:'TuneDataSourceMappingWizard',
       node_context:{...owner(fault==='mapping-owner'?'other':ref.node_id),input_port:{port:0}},
       source_fields:[{name:'Code',type:'string',record_id:'source',field_id:'0'}],

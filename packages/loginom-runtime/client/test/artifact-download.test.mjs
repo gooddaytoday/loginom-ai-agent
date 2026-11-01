@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {Page,build,runtime} from './support/executor-fixture.mjs';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,readFile,stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {createArtifactStore} from '../lib/artifacts.mjs';
+import {withStorageIdentity} from '../lib/storage-policy.mjs';
+import {parseCapabilityResult} from '../lib/executor.mjs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {makeArtifactDownloadCode,makeNativeOutputDownloadCode,makeServerSourceDownloadCode,browserServerDownloadControl} from '../lib/executor.mjs';
@@ -75,7 +79,7 @@ test('server event and RPC consume the original operation deadline instead of th
  f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
  let rpc,eventTimeout,rpcStarted;
  const listeners=new Map();
- const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),detach:async()=>{},
+ const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),off:event=>listeners.delete(event),
   send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
  f.page.waitForEvent=async(type,options)=>{
   assert.equal(type,'download');eventTimeout=options.timeout;
@@ -97,7 +101,8 @@ test('server event and RPC consume the original operation deadline instead of th
    }
    return f.page.execute(code);
   }});
- const roots=await r.observe({scope:'roots'}),file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);
+ const roots=await r.observe({scope:'roots'});assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots));
+ const file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);
  const detail=await r.observe({rootRef:file.ref,observationId:roots.output.observation_id});
  const source=detail.output.ui.elements.find(e=>e.storage_entry?.path===native.path).storage_entry.server_source_ref;
  await r.serverDownload({operation_id:'late-event',server_source_ref:source},'dock_storage_download_start');
@@ -108,6 +113,95 @@ test('server event and RPC consume the original operation deadline instead of th
  assert.equal(rpc.timeout,result.progress.deadline_at-rpcStarted);assert.equal(rpc.timeout-eventTimeout,5000);
  assert.ok(eventTimeout>60000);assert.ok(rpc.signal instanceof AbortSignal);
  assert.equal(result.output.bytes,3);assert.equal(f.calls.filter(c=>c==='click').length,1);
+ await r.cleanupServerCache();
+});
+
+for(const fault of ['restored','midstream','session','mtime','bytes','partial','unconfirmed','cleanup','deadline','cancel'])test('server cache retains one production download across connection loss: '+fault,async t=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),root=await mkdtemp(join(tmpdir(),'server-reconnect-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));f.page.clock=Date.now();
+ const native={kind:'file',path:'/test/sales.csv',bytes:3,bytes_source:'native_file_store',mtime:'native-time'};
+ f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements.find(e=>e.ref===f.options.file_ref).storage_entry=structuredClone(native);return s;};
+ const connection={Connected:true,UserName:'worker',FRemoteSession:{},FSession:{}};
+ const globals={document:{},location:{origin:'https://loginom.invalid'},__loginomDockPreparationV1:{id:'d'},
+  bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FReconnecting:false,FMapTree:{FServerConnection:connection,
+   PackageNodes:{Count:0,Items:()=>assert.fail('No package')}}}}}}}};
+ const binding={session_id:'s',document_id:'d',origin:'https://loginom.invalid',loginom_build:'7.4.2',loginom_account:'worker',
+  directories:{inputs:'/test',packages:'/test',exports:'/test'}};
+ const listeners=new Map(),records=[];let disconnected=0,copied=false,copyPending=false,deadline,releaseCopy;
+ const context=()=>({newCDPSession:async()=>({on:(event,callback)=>listeners.set(event,callback),off:event=>listeners.delete(event),
+  send:async method=>method==='Target.getTargetInfo'?{targetInfo:{browserContextId:'owned'}}:method==='Page.getFrameTree'?{frameTree:{frame:{id:'frame'}}}:{}})});
+ f.page.waitForEvent=async()=>{
+  listeners.get('Browser.downloadWillBegin')?.({guid:'owned',frameId:'frame',suggestedFilename:'sales.csv',url:f.download.url()});
+  listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:fault==='midstream'?1:3});return f.download;
+ };
+ f.download.saveAs=async path=>{
+  f.calls.push('save');if(fault==='midstream'){copyPending=true;connection.Connected=false;}
+  await new Promise(resolve=>{releaseCopy=resolve;});
+  await writeFile(path,fault==='partial'?'ab':'abc');copied=true;if(fault!=='midstream')connection.Connected=false;
+  if(fault==='mtime')native.mtime='changed';
+  if(fault==='bytes')native.bytes=4;
+  if(fault==='unconfirmed')throw Error('saveAs did not confirm completion');
+ };
+ f.download.cancel=async()=>{f.calls.push('cancel');releaseCopy?.();};
+ f.download.delete=async()=>{f.calls.push('delete');if(fault==='cleanup'||fault==='unconfirmed')throw Error('cleanup secondary error');};
+ const evaluate=f.page.evaluate.bind(f.page),locator=f.page.locator.bind(f.page);
+ f.page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes('const same=location.origin===b.origin'))return evaluate(fn,arg);
+  if((copied||copyPending)&&!connection.Connected&&++disconnected===3){
+   connection.Connected=true;
+   if(fault==='midstream')listeners.get('Browser.downloadProgress')?.({guid:'owned',receivedBytes:3});
+   if(fault==='session')connection.FSession={};
+   if(fault==='deadline')f.page.clock=deadline;
+  }
+  return vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg});
+ };
+ f.page.locator=selector=>selector.includes('msgbox')?{waitFor:async()=>{throw Error('Reconnect is still pending');}}:locator(selector);
+ const r=runtime(f.page,{cacheDirectory:join(root,'cache'),getStorageBinding:()=>binding,onRecord:async record=>{records.push(record);return record;},
+  execute:async(code,options)=>{
+   if(fault==='cleanup'&&code.includes('"mode":"status"')&&copied)throw Object.assign(Error('LOGINOM_FILE_CHANGED'),{code:'LOGINOM_FILE_CHANGED'});
+   if(code.includes('"download_path":'))deadline=Number(code.match(/"deadline_at":(\d+)/)[1]);
+   // Same serialized guard and error boundary as bridge.mjs. Only the external
+   // Playwright page, connection and Chromium byte events are deterministic.
+   try{
+    if(!f.page.context)await f.page.execute('async page=>null');
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
+    const result=structuredClone(await vm.runInContext('('+withStorageIdentity(code,binding,options?.storageSession)+')',f.page.context)(page));
+    if(code.includes('"mode":"status"')){
+     if(fault==='midstream'&&!connection.Connected)f.page.clock+=30000;
+     if(result.output.bytes===3)releaseCopy?.();
+    }
+    return result;
+   }catch(error){return parseCapabilityResult({isError:true,content:[{type:'text',text:String(error)}]});}
+  }});
+ const roots=await r.observe({scope:'roots'});assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots));
+ const file=roots.output.ui.elements.find(e=>e.ref===f.options.file_ref);
+ const detail=await r.observe({rootRef:file.ref,observationId:roots.output.observation_id});
+ const source=detail.output.ui.elements.find(e=>e.storage_entry?.path===native.path).storage_entry.server_source_ref;
+ const request={operation_id:'reconnecting-download',server_source_ref:source};
+ await r.serverDownload(request,'dock_storage_download_start');
+ let result;
+ do{
+  result=await r.serverDownload({operation_id:request.operation_id,timeout_ms:100},'dock_storage_download_wait');
+  if(fault==='cancel'&&copied&&result.state==='running')await r.serverDownload({operation_id:request.operation_id},'dock_storage_download_cancel');
+ }while(result.state==='running');
+ assert.equal(result.operation_id,request.operation_id);assert.equal(result.progress.deadline_at,deadline);
+ assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(f.calls.filter(c=>c==='save').length,1);
+ if(['restored','midstream'].includes(fault)){
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.phase,'cached');
+  assert.equal(createHash('sha256').update(await readFile(result.output.path)).digest('hex'),createHash('sha256').update('abc').digest('hex'));
+  assert.equal((await stat(result.output.path)).size,3);assert.ok(disconnected>=3);
+  assert.equal((await r.serverDownload(request,'dock_storage_download_start')).phase,'cached');
+ }else{
+  assert.equal(result.status,'FAILED',JSON.stringify(result));assert.equal(result.output.path,undefined);
+  if(fault==='cleanup')assert.equal(result.error.code,'LOGINOM_FILE_CHANGED',JSON.stringify(result));
+  if(fault==='deadline')assert.equal(result.error.code,'LOGINOM_DOWNLOAD_DEADLINE');
+  if(fault==='cancel')assert.equal(result.error.code,'LOGINOM_DOWNLOAD_CANCELLED');
+ }
+ if(['cleanup','unconfirmed'].includes(fault)){
+  assert.equal(result.cleanup_complete,false);assert.ok(records.some(r=>r.phase==='storage_download_cleanup_failed'));
+  f.download.delete=async()=>{};
+ }
+ assert.ok(records.some(r=>r.phase==='storage_download_connection_wait'||r.phase==='storage_download_failed'));
  await r.cleanupServerCache();
 });
 
@@ -217,32 +311,43 @@ test('missing event and post-download context change cannot claim a verified cop
 function downloadToastFixture(mode='closes') {
   const f=fixture('sample.xlsx'),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
   let saved=false,reads=0;
-  // Native data-tid=toast DOM captured in LAB-449. Its disappearance may
+  // Native data-tid=toast DOM captured in LAB-449/LAB-625. Its disappearance may
   // happen between the workspace snapshot and the bound-element read.
   const toast=()=>({isConnected:true,className:'x-window bg-notify-msg-color-info x-layer x-window-default x-closable x-window-closable x-window-default-closable x-border-box',
-    textContent:mode==='unknown_text'?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
+    textContent:['unknown_text','absent_unknown_text'].includes(mode)?'Сохранение пакета':'\u00a0Скачивание файловОтменить все',
     getAttribute:key=>key==='data-tid'?'toast':null,
     getBoundingClientRect:()=>({width:100,height:50})});
   let element=toast();
   const document={querySelectorAll:()=>element.isConnected?[element]:[]};
   const sandbox={document,getComputedStyle:()=>({visibility:'visible',display:'block'})};
+  sandbox[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={document,refs:new Map([['toast-ref',{deref:()=>original}]])};
+  const original=element;
   const save=f.download.saveAs;
   f.download.saveAs=async path=>{await save(path);saved=true;};
   f.page.uiSnapshot=()=>{
     const s=snapshot();
     if(saved){
-      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding'].includes(mode)?reads++<1:true;
+      const visible=['closes','closes_between_reads'].includes(mode)?reads++<2:['replaced_hidden','closes_after_binding','closes_before_binding','cleared_before_binding'].includes(mode)||mode.startsWith('absent_')&&mode!=='absent_replaced'?reads++<1:true;
       element.isConnected=visible;
-      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:'[outside selected root]'}]:[];
+      s.ui.dialogs=visible?[{ref:'toast-ref',identity:{anchor_tid:mode==='foreign_dialog'?'other':'toast',path:[]},title:'',text:element.textContent,class_name:element.className}]:[];
       // Recorded sequence: snapshot still has the original toast/ref, then
       // inspect sees it detached; only the next snapshot has no dialogs.
       if(mode==='closes_between_reads'&&reads===2)element.isConnected=false;
+      if(mode==='observed_unknown_text')s.ui.dialogs[0].text='Сохранение пакета';
+      if(mode==='observed_unknown_class')s.ui.dialogs[0].class_name='x-window foreign';
       if(mode==='mask')s.ui.masks=[{ref:'foreign-mask'}];
     }
     return s;
   };
-  f.page.evaluateHandle=async fn=>{
-    const handle={value:vm.runInNewContext('('+fn.toString()+')',sandbox)(),dispose:async()=>{}};
+  f.page.evaluateHandle=async(fn,arg)=>{
+    if(['closes_before_binding','cleared_before_binding','cleared_without_hidden'].includes(mode)||mode.startsWith('absent_'))element.isConnected=false;
+    if(!element.isConnected&&mode!=='cleared_without_hidden')element.className+=' x-hidden-offsets';
+    if(['cleared_before_binding','cleared_without_hidden'].includes(mode))element.textContent='';
+    if(mode==='unknown_class')element.className='x-window foreign';
+    if(mode==='absent_unknown_class')element.className='x-window foreign';
+    if(mode==='absent_unknown_text')element.textContent='Сохранение пакета';
+    if(mode==='replaced_before_binding')element=toast();
+    const handle={value:vm.runInNewContext('('+fn.toString()+')',sandbox)(arg),dispose:async()=>{}};
     if(mode==='closes_after_binding')element.isConnected=false;
     return handle;
   };
@@ -251,6 +356,9 @@ function downloadToastFixture(mode='closes') {
   const wait=f.page.waitForTimeout.bind(f.page);
   f.page.waitForTimeout=async ms=>{
     await wait(ms);if(mode==='directory')f.page.directory='/other';if(mode.startsWith('replaced'))element=toast();
+    if(mode==='absent_directory')f.page.directory='/other';
+    if(mode==='absent_replaced')element=toast();
+    if(mode==='absent_deadline')f.page.clock=f.options.deadline_at;
     if(mode==='changed_classes')element.className+=' foreign';
     if(mode==='changed_text')element.textContent='Сохранение пакета';
   };
@@ -266,8 +374,8 @@ test('completed XLSX download waits read-only for the owned Loginom download toa
   assert.ok(f.page.clock<=f.options.deadline_at);
 });
 
-test('LAB-449 native toast closes between observation and inspection without changing download context',async()=>{
-  for(const mode of ['closes_between_reads','closes_after_binding']){
+test('native toast closes between observation and binding or inspection without changing download context',async()=>{
+  for(const mode of ['closes_between_reads','closes_after_binding','closes_before_binding','cleared_before_binding']){
     const f=downloadToastFixture(mode),result=await f.run();
     assert.equal(result.status,'SUCCEEDED',mode);assert.equal(result.output.download_completed,true,mode);
     assert.equal(result.cleanup_complete,true);assert.deepEqual(f.calls,['listen','click','save']);
@@ -288,7 +396,8 @@ test('download toast refusal names the changed native guard and predicate',async
 });
 
 test('download toast settlement refuses foreign dialogs, owner changes and the original deadline',async()=>{
-  for(const mode of ['unknown_text','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline']) {
+  for(const mode of ['unknown_text','unknown_class','foreign_dialog','directory','mask','replaced','replaced_hidden','persistent','no_deadline',
+    'observed_unknown_text','observed_unknown_class','cleared_without_hidden','absent_directory','absent_replaced','absent_deadline','absent_unknown_class','absent_unknown_text','replaced_before_binding']) {
     const f=downloadToastFixture(mode);
     if(mode==='no_deadline')delete f.options.deadline_at;
     const result=await f.run();
@@ -297,6 +406,48 @@ test('download toast settlement refuses foreign dialogs, owner changes and the o
     assert.deepEqual(f.calls,['listen','click','save'],mode);
     assert.ok(f.page.clock<=1300,mode);
   }
+});
+
+test('failed toast binding records the actual bounded class and text',async()=>{
+  for(const mode of ['unknown_class','unknown_text']){
+    const f=downloadToastFixture(mode),result=await f.run();
+    const diagnostic=result.trace.find(e=>e.event==='download_toast_binding_diagnostic');
+    assert.equal(diagnostic.count,1);
+    assert.equal(mode==='unknown_class'?diagnostic.class_name:diagnostic.text,
+      mode==='unknown_class'?'x-window foreign':'Сохранение пакета');
+  }
+});
+
+test('toast closure before binding completes upload byte/SHA verification and releases both transfers once',async t=>{
+  const f=downloadToastFixture('cleared_before_binding'),root=await mkdtemp(join(tmpdir(),'toast-transfer-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const source=join(root,'source');await writeFile(source,'abc');
+  const store=await createArtifactStore({directory:join(root,'store')});
+  t.after(()=>store.releaseUploads());
+  const artifact=await store.admit({sourcePath:source,name:f.options.artifact.name,bytes:3,
+    sha256:createHash('sha256').update('abc').digest('hex'),upload:{directory:'/test',overwrite:'replace'}});
+  let uploads=0;
+  const locator=f.page.locator.bind(f.page),input={count:async()=>1,isEnabled:async()=>true,elementHandle:async()=>input,dispose:async()=>{},
+    evaluate:async fn=>fn({isConnected:true,tagName:'INPUT',type:'file'}),setInputFiles:async path=>{
+      assert.equal(await readFile(path,'utf8'),'abc');uploads++;
+    }};
+  f.page.locator=selector=>selector.includes('FileStorageForm;tbrActions')?{
+    count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,locator:()=>input}:locator(selector);
+  const save=f.download.saveAs;
+  f.download.saveAs=async path=>{f.options.download_path=path;await save(path);await writeFile(path,'abc');};
+  const rt=runtime(f.page,{artifactStore:store});
+  const observed=await rt.observe();
+  await rt.upload({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
+    observationId:observed.output.observation_id,operationId:'upload'});
+  const row=await rt.observe(),request={operationId:'upload',verificationId:'verify',observationId:row.output.observation_id,
+    fileRef:row.output.ui.elements.find(e=>e.label===artifact.name).ref};
+  const result=await rt.verifyArtifact(request);
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.sha256,artifact.sha256);
+  assert.equal(result.output.bytes_verified,true);assert.equal(result.output.upload_completion_verified,true);
+  assert.equal(result.cleanup_complete,true);assert.equal(uploads,1);assert.deepEqual(f.calls,['listen','click','save']);
+  assert.deepEqual(await rt.verifyArtifact(request),result);
+  assert.equal((await rt.inspect({operationId:'upload'})).output.state,'resolved');
+  assert.doesNotThrow(()=>rt.assertPreparationAllowed());
 });
 
 function revealFixture(mode='success') {

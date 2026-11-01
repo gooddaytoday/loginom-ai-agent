@@ -74,7 +74,7 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal) {
+  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal, deadline?: number) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise(
       {
@@ -95,6 +95,7 @@ export async function createLoginomHost(options: {
         endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
+        ...(deadline !== undefined ? { startupDeadline: deadline } : {}),
       },
       signal,
     ).catch(startupFailure)
@@ -297,7 +298,7 @@ export async function createLoginomHost(options: {
         throw new Error("LOGINOM_REPLY_INVALID")
       return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
     },
-    async runtime(generation: number, chat: string) {
+    async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
@@ -311,7 +312,7 @@ export async function createLoginomHost(options: {
       return retain(
         current,
         chat,
-        launch(current.connection, chat).then(
+        launch(current.connection, chat, false, startup?.signal, startup?.deadline).then(
           (child) => {
             service.browserStatus(generation, { state: "verified" })
             return child

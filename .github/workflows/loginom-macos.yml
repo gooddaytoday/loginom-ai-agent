@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     env:
       LOGINOM_AI_AGENT_CHANNEL: dev
@@ -45,7 +45,7 @@ jobs:
       - name: Provision locked build inputs
         run: |
           test "$(uname -m)" = arm64
-          test "$(sw_vers -productVersion | cut -d. -f1)" = 14
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/loginom-browsers"
           echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
           echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
@@ -69,7 +69,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: loginom-macos14-arm64-${{ github.run_number }}
+          name: loginom-macos15-arm64-${{ github.run_number }}
           path: |
             ${{ runner.temp }}/candidate/*.dmg
             ${{ runner.temp }}/candidate/*.zip

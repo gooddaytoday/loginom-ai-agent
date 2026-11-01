@@ -49,7 +49,9 @@ export async function exportNext(page,task,readNode,readContext,readBrowser,fiel
    const current=await read();
    const state=JSON.stringify({verified:current.verified,stage:current.stage??null,reason:current.reason??null});
    if(state!==lastState){record('export_next_observed',JSON.parse(state));lastState=state;}
-   if(current.verified&&current.stage==='text_export_format')return result('SUCCEEDED',null,{verified:true,destination:task.destination,overwrite:task.overwrite,existed:answered,decision,format_page:current,node_context:owner},true);
+   // The owned page proves this single transition even while its fields load.
+   // Full format validation follows the procedure's existing owned-mask wait.
+   if(current.stage==='text_export_format'&&(current.verified||current.node_context?.verified===true&&same(current.node_context,owner)))return result('SUCCEEDED',null,{verified:true,destination:task.destination,overwrite:task.overwrite,existed:answered,decision,format_page:current,node_context:owner},true);
    if(answered&&decision==='reject'&&same(current,before))return result('SUCCEEDED',null,{verified:true,destination:task.destination,overwrite:'reject',existed:true,decision:'reject',rejected:true,node_context:owner},true);
    await page.waitForTimeout(Math.min(100,remaining()));
   }
@@ -86,6 +88,7 @@ export async function configureTextExport(channel,p,ctx,options){
  const readUi=stage=>channel.observe({condition:'bound '+stage,ready:s=>s.wizard?.stage===stage});
  const one=es=>{need(es.length===1,'Unique export control required');return es[0];};
  for(const stage of ['text_export_params','text_export_format']){
+  if(stage==='text_export_format'){guard();await readUi(stage);guard();}
   let current=await native();need(current.stage===stage,'Wrong export stage');initial[stage]=current;
   for(const [key,value]of Object.entries(p)){
    if(key==='overwrite'||EXPORT_FIELDS[key]?.[0]!== (stage==='text_export_params'?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard'))continue;

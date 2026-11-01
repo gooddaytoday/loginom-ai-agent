@@ -1,0 +1,33 @@
+{
+  "status": "proposed_before_runs",
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "text_qualifier": "\"",
+  "null_marker": "?",
+  "line_ending": "LF",
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "Document",
+      "type": "string"
+    }
+  ],
+  "files": {
+    "documents.csv": {
+      "bytes": 278,
+      "sha256": "d394ef691db7e1448a8d70422fac523d93676bd12067a1055a5bbe4137c010b8"
+    },
+    "edge-cases.json": {
+      "bytes": 313,
+      "sha256": "43ec7aa06028b49727d99e79256b4c41a370c6b56dcd3bf44f1d5d0dc32f00f9"
+    },
+    "response.json": {
+      "bytes": 211,
+      "sha256": "96b3fb5ae6d138a649705df5db96ae155e68e73a1b62bb1b9b678760e741d85e"
+    }
+  }
+}

@@ -3,13 +3,106 @@ import { expect, test } from "bun:test"
 const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
-import { cp, mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, readlink, realpath, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { hasOwnedAncestry, signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { hasOwnedAncestry, signalProcess, supervisedProcesses, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
+
+for (const changed of [false, true]) test(`supervisor waits for first exec but preserves admitted identity checks (changed=${changed})`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-first-exec-"))
+  const node = await realpath(Bun.which("node")!)
+  const owner = { kind: "command" as const, id: crypto.randomUUID() }
+  const input = new TransformStream<Uint8Array, Uint8Array>()
+  const writer = input.writable.getWriter()
+  const ready = Promise.withResolvers<void>(), forked = Promise.withResolvers<number>(), executed = Promise.withResolvers<void>()
+  let output = ""
+  const next = path.join(root, "next-exec")
+  const program = `console.log('executed'); setInterval(()=>{
+    if(require('node:fs').existsSync(${JSON.stringify(next)}))process.execve('/bin/sleep',['sleep','60'],{PATH:'/usr/bin:/bin'});
+  },10)`
+  const pending = superviseProcess({ cmd: [Bun.which("python3")!, "-c", `import json, os, signal, sys
+print('ready', flush=True)
+sys.stdin.readline()
+gate_read, gate_write = os.pipe()
+child = os.fork()
+if child == 0:
+    os.close(gate_write)
+    os.read(gate_read, 1)
+    os.close(gate_read)
+    os.execv(${JSON.stringify(node)}, [${JSON.stringify(node)}, '-e', ${JSON.stringify(program)}])
+os.close(gate_read)
+print(json.dumps(dict(child=child)), flush=True)
+try:
+    sys.stdin.readline()
+    os.write(gate_write, b'x')
+    os.close(gate_write)
+    sys.stdin.readline()
+finally:
+    # An unreaped child PID cannot be reused; only this fixture's child is stopped.
+    os.kill(child, signal.SIGTERM)
+    os.waitpid(child, 0)
+`], cwd: root, outDir: root, env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, owner,
+    timeoutMs: 10_000, stdin: input.readable, stdout: new WritableStream<Uint8Array>({ write(chunk) {
+      output += new TextDecoder().decode(chunk)
+      const lines = output.split("\n")
+      output = lines.pop()!
+      for (const line of lines) {
+        if (line === "ready") ready.resolve()
+        else if (line === "executed") executed.resolve()
+        else if (line.startsWith("{")) forked.resolve(JSON.parse(line).child)
+      }
+    } }) })
+  try {
+    await ready.promise
+    const deadline = Date.now() + 5000
+    const scope = () => supervisedProcesses().scopes.find(scope => scope.owner.id === owner.id)
+    while (scope()?.status !== "observed" || (scope()?.processes?.length ?? 0) < 2) {
+      if (Date.now() > deadline) throw Error("Parent admission did not arrive")
+      await Bun.sleep(10)
+    }
+    await writer.write(new TextEncoder().encode("fork\n"))
+    const pid = await forked.promise
+    // Keep the fork window open until the supervisor has observed the child.
+    while (scope()?.status !== "unavailable" && !scope()?.processes?.some(process => process.pid === pid)) {
+      if (Date.now() > deadline) throw Error("Fork observation did not arrive")
+      await Bun.sleep(10)
+    }
+    const raw = await readFile(`/proc/${pid}/stat`, "utf8")
+    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+    expect(Number(fields[6]) & 0x40).toBe(0x40)
+    await writer.write(new TextEncoder().encode("exec\n"))
+    await executed.promise
+    while (!scope()?.processes?.some(process => process.pid === pid && process.executable === node) && Date.now() < deadline) await Bun.sleep(10)
+    const admitted = scope()?.processes?.find(process => process.pid === pid && process.executable === node)
+    if (changed && admitted) {
+      await expect(signalProcess({ ...admitted, starttime: "0" }, "SIGTERM")).rejects.toThrow("Process identity changed")
+      process.kill(pid, 0)
+      await Bun.write(next, "exec a different executable after admission")
+      while (await readlink(`/proc/${pid}/exe`) === node) {
+        if (Date.now() > deadline) throw Error("Second exec did not arrive")
+        await Bun.sleep(10)
+      }
+      await expect(signalProcess(admitted, "SIGTERM")).rejects.toThrow("Process identity changed")
+      process.kill(pid, 0)
+      while (scope()?.status !== "unavailable") {
+        if (Date.now() > deadline) throw Error("Changed identity was not refused")
+        await Bun.sleep(10)
+      }
+    }
+    await writer.close()
+    const run = await pending
+    expect(run.processCleanup).toMatchObject(changed ? { status: "failed" } : { status: "confirmed", error: null })
+    expect(admitted).toBeDefined()
+    if (changed) expect(run.processCleanup.error).toContain("Process identity changed")
+    else expect(run.processCleanup.error).toBeNull()
+  } finally {
+    await writer.close().catch(() => {})
+    await pending
+  }
+}, 15_000)
 
 test("supervisor persists its actual launcher lifetime bound to the admitted owner and birth", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-lifetime-"))
@@ -566,10 +659,12 @@ test("supervisor: происхождение без точного browser profi
   const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
   const pidFile = path.join(out, "browser.pid")
   const helperFile = path.join(out, "helper.pid")
+  const stopFile = path.join(out, "stop")
   let run: Awaited<ReturnType<typeof runAgent>> | undefined
   try {
     run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
-      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile", EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile, EVAL_FAKE_BROWSER_HELPER_DETACHED: "1" } },
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile", EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile, EVAL_FAKE_BROWSER_HELPER_DETACHED: "1",
+      EVAL_FAKE_BROWSER_STOP_FILE: stopFile } },
       taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
       outDir: out, profileDir: out, timeoutMs: 30_000 })
     expect(run.processCleanup.status).toBe("failed")
@@ -579,12 +674,27 @@ test("supervisor: происхождение без точного browser profi
     expect(run.processCleanup.admissions?.find((entry) => entry.pid === helper)?.status).not.toBe("allowed")
     process.kill(helper, 0)
   } finally {
+    // The refused process may have exec'd or detached after its ledger sample.
+    // Let this fixture stop its own family without reusing that signal identity.
+    await Bun.write(stopFile, "stop")
     for (const file of [pidFile, helperFile]) {
       if (!(await Bun.file(file).exists())) continue
       const pid = Number(await Bun.file(file).text())
       const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
-      if (saved) await signalProcess(saved, "SIGKILL")
+      if (!saved) continue
+      for (let wait = 0; wait < 200; wait++) {
+        const raw = await readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined
+          throw error
+        })
+        const fields = raw?.slice(raw.lastIndexOf(")") + 2).split(" ")
+        if (!fields || fields[19] !== saved.starttime || ["Z", "X"].includes(fields[0]!)) break
+        if (wait === 199) throw Error("Fixture browser did not stop")
+        await Bun.sleep(10)
+      }
     }
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
   }
 }, 20_000)
 

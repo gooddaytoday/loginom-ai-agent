@@ -3,17 +3,17 @@ import {observeReplacementOutputPolicy} from './replacement-output.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const normalized=r=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
+const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
 const pairKeys=ps=>ps.map(p=>[replacementValueKey(p.from),replacementValueKey(p.to)]);
 export function replacementRealEditorText(value,separator){
  need(typeof value==='number'&&Number.isFinite(value),'Finite replacement real required');
  need(['.',','].includes(separator),'Observed replacement real decimal separator required');
  return String(value).replace('.',separator);
 }
-export async function revealReplacementAdd(channel,observe,ready){
+export async function revealReplacementAdd(channel,observe,ready,mode='exact'){
  let s=await observe('replacement add header');
  for(let attempt=0;attempt<130;attempt++){
-  const tid=s.wizard.root_tid+';ReplaceColumnsWizard;grdReplaceItems;tbl;GroupHeader;0;AddButton';
+  const tid=s.wizard.root_tid+';ReplaceColumnsWizard;grdReplaceItems;tbl;GroupHeader;'+(mode==='regex'?1:0)+';AddButton';
   if(s.ui.elements.some(e=>e.tid===tid&&e.allowed_actions.includes('click')))return s;
   const field=s.node_replacement.selected;
   const anchors=s.ui.elements.filter(e=>e.replacement_field?.role==='pair'&&e.replacement_field.field_key===field&&e.scroll?.top>0&&e.allowed_actions.includes('scroll'));
@@ -27,13 +27,14 @@ export async function revealReplacementAdd(channel,observe,ready){
  }
  throw Error('Replacement add header scroll limit');
 }
-export async function configureReplacement(channel,p,{newNode=false}={}){
+export async function configureReplacement(channel,p,{newNode=false,mode='exact'}={}){
  const ready=s=>s.wizard?.stage==='replacement'&&s.node_replacement?.verified===true;
  const observe=(condition,extra=()=>true)=>channel.observe({condition,readReplacement:true,ready:s=>ready(s)&&extra(s.node_replacement)});
  let state=await observe('replacement input inventory'),baseline=state.node_replacement;
  resolveReplacementParameters(p,baseline.input_fields);
  const control=(s,suffix,verb='click')=>{const tid=s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix,es=s.ui.elements.filter(e=>(e.tid===tid||['fill','press'].includes(verb)&&e.identity?.anchor_tid===tid)&&e.allowed_actions.includes(verb));need(es.length===1,'Replacement control unavailable: '+suffix);return es[0];};
- const act=async(suffix,verb='click',args={})=>{const s=suffix==='grdReplaceItems;tbl;GroupHeader;0;AddButton'?await revealReplacementAdd(channel,observe,ready):await observe('replacement control '+suffix);return channel.perform({condition:'replacement '+suffix,initialObservation:s,ready,identity:()=>({field:s.node_replacement.selected,suffix}),resolve:s=>({verb,ref:control(s,suffix,verb).ref,...args})});};
+ const add='grdReplaceItems;tbl;GroupHeader;'+(mode==='regex'?1:0)+';AddButton';
+ const act=async(suffix,verb='click',args={})=>{const s=suffix===add?await revealReplacementAdd(channel,observe,ready,mode):await observe('replacement control '+suffix);return channel.perform({condition:'replacement '+suffix,initialObservation:s,ready,identity:()=>({field:s.node_replacement.selected,suffix}),resolve:s=>({verb,ref:control(s,suffix,verb).ref,...args})});};
  const cell=(s,name,role,part,id)=>{const es=s.ui.elements.filter(e=>e.replacement_field?.field_key===name&&e.replacement_field.role===role&&e.replacement_field.part===part&&(id===undefined||e.replacement_field.record_id===id)&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement bound cell unavailable: '+name+'/'+part);return es[0];};
  const reveal=async(name,role,part,id)=>{
   let s=await observe('replacement row readiness');
@@ -54,9 +55,9 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
   return (await observe('replacement selected field',r=>r.selected===name)).node_replacement;
  };
  const oldRules=[];
- for(const f of baseline.input_fields.filter(f=>f.mode==='manual')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');oldRules.push(normalized(r));}
+ for(const f of baseline.input_fields.filter(f=>f.mode==='manual')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');need(!r.mode||r.mode===mode,'Existing replacement mode differs; exact/regex mixing is unsupported');oldRules.push(normalized(r,mode));}
  if(newNode)need(oldRules.length===0,'New replacement has unexpected rules');
- if(oldRules.length)validateReplacementParameters({rules:oldRules},'exact',{target:{kind:'existing'},inputs:[],read:{ports:[]},mappings:[],finish:'done'});
+ if(oldRules.length)validateReplacementParameters({rules:oldRules},mode,{target:{kind:'existing'},inputs:[],read:{ports:[]},mappings:[],finish:'done'});
  let outputMode=p.output_mode,modeProof=null,inventoryRefresh=null;
  if(outputMode===undefined&&p.rules!==undefined){
   // Read the saved policy before touching any rule. All navigation stays in
@@ -75,7 +76,7 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
   need(same(fields(returned.input_fields),fields(baseline.input_fields)),'Replacement policy inspection changed input fields');
   inventoryRefresh={before:baseline.input_fields,after:returned.input_fields,policy:modeProof};
   baseline=returned; // Previous rematerializes the same input collection with fresh Ext record IDs.
-  for(const rule of oldRules)need(same(normalized(await select(rule.field.name)),rule),'Replacement policy inspection changed saved rules');
+  for(const rule of oldRules)need(same(normalized(await select(rule.field.name),mode),rule),'Replacement policy inspection changed saved rules');
  }
  if(outputMode!==undefined){
   try{resolveEffectiveReplacementParameters(p,baseline.input_fields,oldRules,outputMode);}
@@ -99,7 +100,7 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
   }
   need(r.pairs.length===0,'Replacement table not cleared');
   for(const pair of rule.pairs){
-   const before=r.pairs.map(p=>p.record_id);await act('grdReplaceItems;tbl;GroupHeader;0;AddButton');
+   const before=r.pairs.map(p=>p.record_id);await act(add);
    r=(await observe('replacement row added',r=>r.pairs.length===before.length+1)).node_replacement;
    const added=r.pairs.filter(p=>!before.includes(p.record_id));need(added.length===1,'Replacement added row ambiguous');
    await gesture(rule.field.name,'pair','from',added[0].record_id,'double_click');
@@ -115,7 +116,7 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
    const s=await observe('replacement row ready to commit');await channel.perform({condition:'commit replacement row',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid==='roweditorbuttons;update'&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement row update unavailable');return {verb:'click',ref:es[0].ref};}});
    r=(await observe('replacement pair committed',r=>!r.editor_open&&r.pairs.some(p=>p.record_id===added[0].record_id&&same(pairKeys([p]),pairKeys([pair]))))).node_replacement;
   }
-  if(rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
+  if(mode==='exact'&&rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
   if(rule.type!=='string'&&r.precision!==0)await act('edPrecision','fill',{text:'0'});
   if(r.other.mode!==rule.other.mode){await act('cbxReplaceOther;trg_picker');await act('cbxReplaceOther;boundlist;'+{keep:'Не_заменять',null:'На_пропущенное',value:'На_значение'}[rule.other.mode]);}
   if(rule.other.mode==='value'){
@@ -126,13 +127,13 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
    await act('cbxReplaceOther','press',{key:'Tab'});
   }
   r=(await observe('complete replacement field readback')).node_replacement;
-  need(same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===0),'Replacement field readback differs');
+  need(same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===0),'Replacement field readback differs');
  }
  const expected=oldRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]),rules=[];
- for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name)));}
+ for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name),mode));}
  for(const rule of expected){const actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:rule.type==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
  state=await observe('replacement final owner');
  const schema=fields=>fields.map(({record_id,name,label,type})=>({record_id,name,label,type}));
  need(same(schema(state.node_replacement.input_fields),schema(baseline.input_fields)),'Replacement input identity changed');
- return {verified:true,cleanup_complete:true,effect_possible:!!p.rules?.length,configuration:{...state.node_replacement,rules,requested_output_mode:p.output_mode??null,effective_output_mode:outputMode??null,input_inventory_refresh:inventoryRefresh},preservation:{unrequested_rules:true,input_identity:true}};
+ return {verified:true,cleanup_complete:true,effect_possible:!!p.rules?.length,configuration:{...state.node_replacement,mode,rules,requested_output_mode:p.output_mode??null,effective_output_mode:outputMode??null,input_inventory_refresh:inventoryRefresh},preservation:{unrequested_rules:true,input_identity:true}};
 }

@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -21,6 +21,7 @@ const args = parseArgs({
     csv: { type: "string" },
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
+    'exact-port-windows': { type: 'boolean', default: false },
   },
   strict: true,
 }).values
@@ -278,7 +279,7 @@ page = context.pages()[0]
   for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
-  if(nativeConfiguration&&outputPort===0){
+  if(!args['exact-port-windows']&&nativeConfiguration&&outputPort===0){
    const {openOwnedNativePreview,closeOwnedNativePreview}=await load('client/lib/collapse-native-output.mjs');
    ownedPreview=await openOwnedNativePreview(channel,ctx);
    useNative=coldNativeEligible(nativeConfiguration,ownedPreview.preview);
@@ -286,7 +287,9 @@ page = context.pages()[0]
   }
 
   let data;
-  if(useNative){
+  if(args['exact-port-windows']){
+   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
+  }else if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
     const {readCollapseNativeOutput}=await load('client/lib/collapse-native-output.mjs');

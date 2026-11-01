@@ -1,0 +1,182 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.sliding_window"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.sliding_window",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_3",
+          "label": "Sales[-3]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_2",
+          "label": "Sales[-2]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_H_1",
+          "label": "Sales[-1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales",
+          "label": "Sales",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Sales_F_1",
+          "label": "Sales[+1]",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price_H_1",
+          "label": "Price[-1]",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Price",
+          "label": "Price",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2025-04",
+          "Sales_H_3": 100,
+          "Sales_H_2": 110,
+          "Sales_H_1": 120,
+          "Sales": 130,
+          "Sales_F_1": 140,
+          "Price_H_1": 10.5,
+          "Price": 10.75
+        },
+        {
+          "Month": "2025-05",
+          "Sales_H_3": 110,
+          "Sales_H_2": 120,
+          "Sales_H_1": 130,
+          "Sales": 140,
+          "Sales_F_1": 150,
+          "Price_H_1": 10.75,
+          "Price": 11.0
+        },
+        {
+          "Month": "2025-06",
+          "Sales_H_3": 120,
+          "Sales_H_2": 130,
+          "Sales_H_1": 140,
+          "Sales": 150,
+          "Sales_F_1": 160,
+          "Price_H_1": 11.0,
+          "Price": 11.25
+        },
+        {
+          "Month": "2025-07",
+          "Sales_H_3": 130,
+          "Sales_H_2": 140,
+          "Sales_H_1": 150,
+          "Sales": 160,
+          "Sales_F_1": 170,
+          "Price_H_1": 11.25,
+          "Price": 11.5
+        },
+        {
+          "Month": "2025-08",
+          "Sales_H_3": 140,
+          "Sales_H_2": 150,
+          "Sales_H_1": 160,
+          "Sales": 170,
+          "Sales_F_1": 180,
+          "Price_H_1": 11.5,
+          "Price": 11.75
+        },
+        {
+          "Month": "2025-09",
+          "Sales_H_3": 150,
+          "Sales_H_2": 160,
+          "Sales_H_1": 170,
+          "Sales": 180,
+          "Sales_F_1": 190,
+          "Price_H_1": 11.75,
+          "Price": 12.0
+        },
+        {
+          "Month": "2025-10",
+          "Sales_H_3": 160,
+          "Sales_H_2": 170,
+          "Sales_H_1": 180,
+          "Sales": 190,
+          "Sales_F_1": 200,
+          "Price_H_1": 12.0,
+          "Price": 12.25
+        },
+        {
+          "Month": "2025-11",
+          "Sales_H_3": 170,
+          "Sales_H_2": 180,
+          "Sales_H_1": 190,
+          "Sales": 200,
+          "Sales_F_1": 210,
+          "Price_H_1": 12.25,
+          "Price": 12.5
+        },
+        {
+          "Month": "2025-12",
+          "Sales_H_3": 180,
+          "Sales_H_2": 190,
+          "Sales_H_1": 200,
+          "Sales": 210,
+          "Sales_F_1": 220,
+          "Price_H_1": 12.5,
+          "Price": 12.75
+        },
+        {
+          "Month": "2026-01",
+          "Sales_H_3": 190,
+          "Sales_H_2": 200,
+          "Sales_H_1": 210,
+          "Sales": 220,
+          "Sales_F_1": 230,
+          "Price_H_1": 12.75,
+          "Price": 13.0
+        }
+      ]
+    }
+  ]
+}

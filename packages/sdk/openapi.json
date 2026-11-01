@@ -2819,6 +2819,13 @@
                       },
                       "content": {
                         "type": "string"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": ["builtin", "bundled", "external", "project", "config", "url"]
+                      },
+                      "digest": {
+                        "type": "string"
                       }
                     },
                     "required": ["name", "location", "content"],
@@ -7355,31 +7362,38 @@
                   "parts": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "pattern": "^prt"
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/TextPartInput"
                         },
-                        "type": {
-                          "type": "string",
-                          "enum": ["file"]
-                        },
-                        "mime": {
-                          "type": "string"
-                        },
-                        "filename": {
-                          "type": "string"
-                        },
-                        "url": {
-                          "type": "string"
-                        },
-                        "source": {
-                          "$ref": "#/components/schemas/FilePartSource"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^prt"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": ["file"]
+                            },
+                            "mime": {
+                              "type": "string"
+                            },
+                            "filename": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "$ref": "#/components/schemas/FilePartSource"
+                            }
+                          },
+                          "required": ["type", "mime", "url"],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": ["type", "mime", "url"],
-                      "additionalProperties": false
+                      ]
                     }
                   }
                 },

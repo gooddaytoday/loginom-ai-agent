@@ -36,7 +36,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['corr_analysis','excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','sliding_window','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -64,7 +64,7 @@ export function validateUiAction(action, snapshot) {
   if (action.verb === 'scroll_horizontal' && (!Number.isInteger(action.delta_x) || !action.delta_x || Math.abs(action.delta_x)>1000)) throw new Error('Horizontal scroll requires a nonzero integer delta_x within -1000..1000');
   if (action.verb === 'set_checked' && typeof action.checked !== 'boolean') throw new Error('set_checked requires a boolean checked value');
   if (snapshot) {
-    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
+    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','sliding_window','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
     if(action.verb==='wizard_step' && (snapshot.wizard?.status!=='observed' || snapshot.wizard.stage===action.expected_stage))throw new Error('wizard_step requires a different destination stage and an observed wizard');
     if (!Array.isArray(snapshot.ui?.elements)) throw new Error('UI action requires an observation snapshot');
     for (const ref of refs) {
@@ -182,7 +182,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       &&['document_id','workflow_id','node_id'].every(k=>typeof previousNode[k]==='string'&&previousNode[k]===nodeContext[k])
       &&typeof previousPort?.port_guid==='string'&&previousPort.port_guid.length>0
       &&typeof previousPort?.opening_operation_id==='string'&&previousPort.opening_operation_id.length>0;
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,downloadToastObservation,nodeErrorToastObservation,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedNativeNodeId,preparedGraphTid,preparedPendingWizardNode,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedPortReturn}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -331,18 +331,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const detailElements=dom.length;
     // E2E bg/selectors.ts wizard lifecycle and P3 wizard selectors. These
     // fixed markers expose the current page without scanning its whole tree.
-    const wizardMarkers={excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:';LinRegressionWizard;pedRegressionMethod',lin_regression_details:';LinRegressionWizard-1;pedEpsilon',normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
+    const wizardMarkers={corr_analysis:';CorrAnalysisWizard;cbCorrTypeLinear',sampling:';SamplingComponentWizard;pedSamplingMethod',data_partition:';PartitionComponentWizard;pedSamplingMethod',excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:[';LinRegressionWizard;pedRegressionMethod',';LogRegressionWizard;pedRegressionMethod'],lin_regression_details:[';LinRegressionWizard-1;pedEpsilon',';LogRegressionWizard-1;pedEpsilon'],normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
       text_import_format:';ImportTextFileParamsWizard;edtValueNull',
       text_export_params:';ExportTextFileParamsWizard;edtFileName',
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
       output_mapping:[';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
-      missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',crosstable:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
+      sliding_window:';SlidingWindowWizard;grdColumns;tbl',elim_outlier:';ElimOutlierWizard;grdColumnsSettings;tbl',missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',crosstable:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
       union:';UnionDataWizard;grdUnionData;grd-1;tbl',join:';JoinDataWizard;grdSourceColumns;tbl',row_filter:';FilterDataWizard;FilterDataPanel;tbl',field_parameters:';ReformColumnsWizard;grdTargetColumns;tbl',done:';DoneWizard;edtDisplayName'};
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=['[data-tid*=";WizrdMCF;SlidingWindowWizard;"]','[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
@@ -352,6 +352,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
+      ...Object.entries({LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept']}).flatMap(([card,names])=>names.flatMap(name=>{
+        const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
+        return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
+      })),
       ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
@@ -711,8 +715,34 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
+    const errorToastDiagnostics=new Map();
+    const errorToast = element => {
+      if(!nodeErrorToastObservation||!element||getTid(element)!=='toast')return null;
+      const checks={error_class:element.classList.contains('bg-notify-msg-color-error'),
+        unique_type_class:String(element.getAttribute('class')).split(/\s+/).filter(c=>c.startsWith('bg-notify-msg-color-')).length===1};
+      const finish=value=>{errorToastDiagnostics.set(element,{checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k])});return value??null;};
+      if(Object.values(checks).some(ok=>!ok))return finish();
+      const native=globalThis.Ext?.getCmp?.(element.id);
+      Object.assign(checks,{native_element:native?.el?.dom===element,native_title:native?.title==='Ошибка',native_icon:native?.iconCls==='bg-icon-info-negative'});
+      if(Object.values(checks).some(ok=>!ok))return finish();
+      const exact=tid=>[...element.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+      const captions=exact('toast;cnt;cnt;cmp'),messages=exact('toast;cnt;cnt;MessagesView'),closes=exact('toast;p.h;close');
+      const items=messages.length===1?[...messages[0].querySelectorAll('.bg-error-item')]:[];
+      Object.assign(checks,{caption_unique:captions.length===1,messages_unique:messages.length===1,close_unique:closes.length===1,error_item_unique:items.length===1,
+        messages_class:messages.length===1&&messages[0].classList.contains('bg-error-messages'),
+        error_list:items.length===1&&items[0].parentElement?.classList.contains('bg-error-list')===true,
+        close_icon:closes.length===1&&!!closes[0].querySelector('.x-tool-close')});
+      if(Object.values(checks).some(ok=>!ok))return finish();
+      const caption=captions[0].textContent.trim(),message=items[0].textContent.trim();
+      Object.assign(checks,{caption_nonempty:!!caption,caption_bounded:caption.length<=241,message_nonempty:!!message,message_bounded:message.length<=1000});
+      return finish(Object.values(checks).every(Boolean)?{kind:'error',caption,message}:null);
+    };
     const dialogs = dialogElements.map(element => ({ ref: refOf(element), title: short(element.getAttribute('aria-label') ?? select('[role="heading"],.x-title-text').find(item => element.contains(item))?.textContent),
-        text: textOf(element), bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
+        text: textOf(element, downloadToastObservation&&getTid(element)==='toast'),
+        ...(downloadToastObservation&&getTid(element)==='toast'?{class_name:short(element.getAttribute('class'),512)}:{}),
+        ...(errorToast(element)?{error_toast:errorToast(element)}:{}),
+        ...(nodeErrorToastObservation&&getTid(element)==='toast'?{error_toast_diagnostic:errorToastDiagnostics.get(element)}:{}),
+        bounding_box: boxOf(element), z_index: Number(getComputedStyle(element).zIndex) || 0, identity: identityOf(element) }));
     const dialogRef = element => {
       const owner = dialogElements.find(dialog => dialog === element || dialog.contains(element));
       return owner ? refOf(owner) : null;
@@ -1018,6 +1048,17 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           else if(last.workflow_icon&&!preparedNavigationNode) {
             navigationContext={status:'observed',kind:'workflow',path:items.map(({tid,label})=>({tid,label}))};
           }
+          // The deactivation question may precede the visible Settings crumb.
+          // The native reader already bound both pending tree components to
+          // this exact GUID. Retain the actually rendered node-only path;
+          // never infer a wizard owner from its caption alone.
+          else if(wizard.status==='absent'&&preparedGraphTid&&preparedNodeId===preparedNativeNodeId
+            &&workflowNavigation.status==='observed'&&items.length===preparedWorkflowPath.length+1
+            &&last.vendor_icon&&last.tid===preparedPendingWizardNode?.tid&&last.label===preparedPendingWizardNode.label
+            &&items.at(-2)?.workflow_icon){
+            ownerContext={status:'observed',opening_verified:false,panel_ref:refOf(panels[0]),
+              node:{ref:last.ref,tid:last.tid,label:last.label},path:items.map(({ref,tid,label})=>({ref,tid,label}))};
+          }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.output_data_icon && node.label
             && items.at(-3)?.outputs_icon && items.at(-4)?.vendor_icon && items.at(-4)?.label && items.at(-5)?.workflow_icon) {
             const parent=items.at(-4);
@@ -1093,7 +1134,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression'].includes(preparedInputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression','bg-vendor-icon-corranalysis','bg-vendor-icon-logregression'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         const hiddenInputNode=e=>singleInputOverflow&&inputOverflowOwner(e)
           &&(!globalThis.bg?.app?.ModelNodeTreeNode||nativeOverflowNode(e))
@@ -2470,8 +2511,14 @@ function readRenderedInputMapping(observation) {
         if(ids.length!==1||cells.length!==1||progress.length!==1||!visibleCell(cells[0],grids[0])
           ||textOf(ids[0],true)!==String(model.data.id))continue;
         const cell=cells[0],path=getTid(cell).slice((processBase+'colProcess_').length);
+        // History eviction can renumber the two locked views independently.
+        // Their exact native record/index/view binding above owns the row;
+        // only the top group's rendered ordinal may differ, never its caption
+        // or the child path. Keep the left view's current action identity.
+        const progressPath=getTid(progress[0]).slice((processBase+'colProgress_').length);
+        const captionPath=value=>value.replace(/^(Root>[^>]+)-[0-9]+(?=>|$)/,'$1');
         if(!path.startsWith('Root>')||(tids.get(getTid(cell))??[]).length!==1
-          ||getTid(progress[0])!==processBase+'colProgress_'+path)continue;
+          ||captionPath(progressPath)!==captionPath(path))continue;
         const row={record_id:id,path,ordinal:String(model.data.id),process_cell_ref:refOf(cell),
           selected:leftRow.classList.contains('x-grid-item-selected'),record_index:index};
         rows.push(row);processCells.set(row.process_cell_ref,{record_id:id,path,record_index:index,
@@ -2535,7 +2582,7 @@ function readRenderedInputMapping(observation) {
         processMenuControls.set(refOf(filters[0]),{action:'mniShowCompletedProcesses',menu_ref:refOf(menus[0]),
           panel_ref:refOf(consoles[0]),checked:filters[0].classList.contains('x-menu-item-checked'),opening_verified:false});
     }
-    const candidates = select('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"],[data-tid],[data-tid$=";DateReformWizard"] img.x-grid-checkcolumn')
+    const candidates = select('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"],[data-tid],[data-tid$=";DateReformWizard"] img.x-grid-checkcolumn,[data-tid$=";ElimOutlierWizard"] img.x-grid-checkcolumn')
       .filter(element => visible(element) && !sensitive(element) && scopeOf(element) !== 'inactive_workflow');
     const selectedRoot = rootRef ? dom.find(element=>state.ids.get(element)===rootRef) : null;
     if (rootRef && (!selectedRoot || !visible(selectedRoot) || sensitive(selectedRoot) || scopeOf(selectedRoot)==='inactive_workflow')) {
@@ -2740,8 +2787,10 @@ function readRenderedInputMapping(observation) {
       const inputRecords=inputGrid?.getStore?.().getData?.()?.items;
       const selected=inputGrid?.el?.dom===inputElement&&selection?.length===1&&Array.isArray(inputRecords)&&inputRecords.includes(selection[0])?selection[0]:null;
       if(selected?.isModel&&typeof selected.data?.Name==='string'){
-        const buttons=tids.get(base+'grdReplaceItems;tbl;GroupHeader;0;AddButton')??[];
-        if(buttons.length===1&&visible(buttons[0])&&!sensitive(buttons[0]))replacementCells.set(refOf(buttons[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'add',wizard_root_ref:wizard.root_ref});
+        for(const group of [0,1]){
+        const buttons=tids.get(base+'grdReplaceItems;tbl;GroupHeader;'+group+';AddButton')??[];
+        if(buttons.length===1&&visible(buttons[0])&&!sensitive(buttons[0]))replacementCells.set(refOf(buttons[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'add',collection_id:group,wizard_root_ref:wizard.root_ref});
+        }
       }
       if(selected?.isModel){
         if(selected.data?.ReplaceMode===1){
@@ -2762,12 +2811,29 @@ function readRenderedInputMapping(observation) {
         if(view?.el?.dom!==grid||store?.$className!=='Ext.data.Store'||store.isLoading?.()||!Array.isArray(records)||records.length>1000)continue;
         for(const row of grid.querySelectorAll('table.x-grid-item')){
           const r=records.find(r=>String(r.internalId)===row.getAttribute('data-recordid')),d=r?.data;
-          if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id||role==='pair'&&(!selected||d.CollectionID!==0||!Object.hasOwn(d,'DataValueType')))continue;
+          if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id||role==='pair'&&(!selected||!(d.CollectionID===0&&Object.hasOwn(d,'DataValueType')||d.CollectionID===1&&Object.hasOwn(d,'RegularExpression'))))continue;
           const name=role==='field'?d.Name:selected.data.Name;if(typeof name!=='string'||!name)continue;
           for(const [column,part] of role==='field'?[['colInputData_','select'],['colReplaceSource_','mode']]:[['colReplaceValue_','from'],['colReplaceBy_','to'],['colReplaceDelete_','delete']]){
-            const tid=base+column+(role==='field'?name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===tid&&!e.closest('tr.x-grid-row-summary'));
+            const tid=base+column+(role==='field'?name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(role==='pair'&&d.CollectionID===1?(getTid(e)??'').startsWith(base+column):getTid(e)===tid)&&!e.closest('tr.x-grid-row-summary'));
             if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
             replacementCells.set(refOf(cells[0]),{field_key:name,record_id:String(r.internalId),selected_record_id:role==='pair'?String(selected.internalId):null,role,part,index:role==='pair'?d.Index:null,row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
+          }
+        }
+      }
+    }
+    const elimOutlierCells=new Map();
+    if(!discoverRoots&&wizard.stage==='elim_outlier'){
+      const base=wizard.root_tid+';ElimOutlierWizard;',grids=tids.get(base+'grdColumnsSettings;tbl')??[];
+      if(grids.length===1){const grid=grids[0],view=globalThis.Ext?.getCmp?.(grid.id),store=view?.getStore?.(),records=store?.getData?.()?.items;
+        if(view?.el?.dom===grid&&store?.$className==='Ext.data.Store'&&!store.isLoading?.()&&Array.isArray(records)&&records.length<=1000)
+        for(const row of grid.querySelectorAll('table.x-grid-item')){
+          const index=Number(row.getAttribute('data-recordindex')),r=records[index],d=r?.data;
+          if(!Number.isSafeInteger(index)||index<0||!r?.isModel||typeof d?.Name!=='string'||typeof d.ChkUsable!=='boolean'||row.getAttribute('data-recordid')!==String(r.internalId)||row.getAttribute('data-boundview')!==grid.id)continue;
+          for(const [column,part] of [['colDisplayName_','field'],['colUsable_','used']]){
+            const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(getTid(e)??'').startsWith(base+column));
+            const targets=part==='used'&&cells.length===1?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:cells;
+            if(targets.length!==1||!visible(targets[0])||sensitive(targets[0])||part==='used'&&targets[0].classList.contains('x-grid-checkcolumn-checked')!==d.ChkUsable)continue;
+            elimOutlierCells.set(refOf(targets[0]),{part,field_key:d.Name,record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
           }
         }
       }
@@ -2938,7 +3004,21 @@ function readRenderedInputMapping(observation) {
           &&e.closest('[data-tid='+JSON.stringify(workflow.prefix+';NavigationBar')+']')
           &&e.querySelectorAll('.navigation-icon-up').length===1&&visible(e)&&!sensitive(e);
       }):[];
-    const interesting = element => navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+    const slidingWindowControl=element=>{
+      if(wizard.stage!=='sliding_window')return false;
+      const tid=getTid(element)??'',base=wizard.root_tid+';SlidingWindowWizard;';
+      if(['roweditorbuttons;update','roweditorbuttons;cancel'].includes(tid)){
+        const grids=tids.get(base+'grdColumns')??[],editors=tids.get(base+'grdColumns;roweditor')??[];
+        return grids.length===1&&editors.length===1&&grids[0].contains(editors[0])&&visible(editors[0])
+          &&grids[0].contains(element)&&(tids.get(tid)??[]).filter(e=>grids[0].contains(e)&&visible(e)).length===1;
+      }
+      return /;WizrdMCF;SlidingWindowWizard;(?:colDisplayName_[^;]+|pedIncompleteRecordsProcessing;ValueControl;(?:trg_picker|boundlist;[^;]+))$/.test(tid);
+    };
+    const interesting = element => nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || /;WizrdMCF;LogRegressionWizard;ped(?:EventType|EventId|RegressionMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+      &&(getTid(element)??'').startsWith(wizard.root_tid+';')
+      &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
+        || /;SizeGridForm;col(?:SizeType|AbsoluteSize)_[^;]+$|;SequenceMethodForm;col[^;]+$/.test(getTid(element)??''))
+      || wizard.stage==='corr_analysis'&&/;CorrAnalysisWizard;colChk(?:First|Second)Set_[^;]+$/.test(getTid(element)??'') || slidingWindowControl(element) || navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || elimOutlierCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
       || wizard.calculator_preview?.status==='observed'&&getTid(element)===wizard.calculator_preview.root_tid+';p.h;close'
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
@@ -3185,6 +3265,7 @@ function readRenderedInputMapping(observation) {
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
       const filterCell=filterCells.get(state.ids.get(element)),outputColumn=outputColumnCells.get(state.ids.get(element)),reformColumnField=reformColumnCells.get(state.ids.get(element)),importDefinitionCell=importDefinitionCells.get(state.ids.get(element));
+      const elimOutlierCell=elimOutlierCells.get(state.ids.get(element));
       const dateTimeCell=dateTimeCells.get(state.ids.get(element));
       const crossTableField=crossTableCells.get(state.ids.get(element));
       const groupingField=groupingCells.get(state.ids.get(element));
@@ -3304,7 +3385,7 @@ function readRenderedInputMapping(observation) {
         ? 'Открыть список: '+(combo.field.name==='type'?'Тип данных':'Вид данных'):''), scope: scopeOf(element), ...fieldValue,
         ...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),
         ...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}),
-        ...(collapseField?{collapse_field:collapseField}:{}),...(missingValuesField?{missing_values_field:missingValuesField}:{}),...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(replacementField?{replacement_field:replacementField}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(groupingField ? {grouping_field:groupingField} : {}), ...(sortingField?{sorting_field:sortingField}:{}),
+        ...(collapseField?{collapse_field:collapseField}:{}),...(missingValuesField?{missing_values_field:missingValuesField}:{}),...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}),...(replacementField?{replacement_field:replacementField}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(groupingField ? {grouping_field:groupingField} : {}), ...(sortingField?{sorting_field:sortingField}:{}),
         ...(storageEntry ? {storage_entry:storageEntry} : {}),
         ...(graphNodeOf(element) ? {graph_node:graphNodeOf(element)} : {}),
         ...(scroll ? { scroll } : {}),
@@ -3323,11 +3404,11 @@ function readRenderedInputMapping(observation) {
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
         ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
@@ -3803,7 +3884,7 @@ function readRenderedInputMapping(observation) {
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
-  },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
+  },{downloadToastObservation:task.download_toast_observation===true,nodeErrorToastObservation:task.node_error_toast_observation===true,rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
@@ -3811,6 +3892,7 @@ function readRenderedInputMapping(observation) {
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedNativeNodeId:nodeContext?.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.tid:null,
+    preparedPendingWizardNode:nodeContext?.surface==='graph'?nodeContext.pending_wizard_node??null:null,
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
@@ -4027,7 +4109,7 @@ function readRenderedInputMapping(observation) {
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
     const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {
@@ -4092,6 +4174,18 @@ function readRenderedInputMapping(observation) {
         if (!current.authenticated) fail('LOGIN_REQUIRED', 'Loginom authentication is required before changing the workspace');
         if (!same(task.snapshot.dom_epoch, current.dom_epoch)) fail('UI_EPOCH_CHANGED', 'The document changed since this observation; observe again even if its visible state looks unchanged');
         if (!same(current.ui.dialogs.map(item => item.ref), task.snapshot.ui.dialogs.map(item => item.ref))) fail('UI_CONTEXT_CHANGED', 'The visible dialog changed; observe the workspace again');
+        if(task.node_error_toast_observation===true){
+          const checks={prepared_node:!!task.prepared_node_context,close_verb:task.action.verb==='click',
+            close_tid:current.ui.elements.find(e=>e.ref===task.action.ref)?.tid==='toast;p.h;close',dialog_unique:current.ui.dialogs.length===1,
+            error_template:!!current.ui.dialogs[0]?.error_toast,
+            same_error:same(current.ui.dialogs[0]?.error_toast,task.snapshot.ui.dialogs[0]?.error_toast),
+            same_node:same(current.prepared_node_context,task.snapshot.prepared_node_context)};
+          if(Object.values(checks).some(ok=>!ok)){
+            record('node_error_toast_close_refused',{checks,failed_conditions:Object.keys(checks).filter(k=>!checks[k]),
+              observation:current,expected:task.snapshot});
+            fail('UI_CONTEXT_CHANGED','The proved node error toast changed before its close');
+          }
+        }
         if(task.action.verb==='confirm_wizard_deactivation') {
           const binding=task.snapshot.node_wizard_confirmation,n=current.prepared_node_context;
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid
@@ -4100,7 +4194,9 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!(same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+              ||typeof n.pending_wizard_node?.tid==='string'
+                &&same(current.wizard_pending_owner.path.map(({tid,label})=>({tid,label})),[...binding.opening.workflow_path,n.pending_wizard_node]))
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
@@ -4284,6 +4380,9 @@ function readRenderedInputMapping(observation) {
         if(['apply_expression_parameters','cancel_expression_parameters','select_wizard_option','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb))postActionRoot=current.wizard.root_ref;
         const exactDeactivation=fresh=>fresh.prepared_node_context?.verified===true
           &&fresh.prepared_node_context.surface==='graph'&&fresh.wizard?.status==='absent'
+          &&current.prepared_node_context?.verified===true
+          &&['document_id','workflow_id','node_id','tid'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context[k])
+          &&fresh.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===current.workflow_ref.prefix&&m.dialog_ref===null)
           &&fresh.ui.dialogs.length===1&&fresh.ui.elements.filter(e=>e.wizard_deactivation_confirmation
             &&e.tid==='msgbox;tlb;yes'&&e.allowed_actions.includes('confirm_wizard_deactivation')).length===1;
         const lifecycleContextMatches=(fresh,allowToasts=false)=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
@@ -4914,7 +5013,7 @@ function readRenderedInputMapping(observation) {
   })();
 }
 
-export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
+export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloadToastObservation = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
   if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
     ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined&&options.output_settlement_read===undefined))
@@ -4951,7 +5050,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
       || !Number.isInteger(p.limit) || p.limit<1 || p.limit>8)throw new Error('Import definition page requires a bounded offset and limit');
   }
   if (options.mode === 'act') validateUiAction(options.action, options.snapshot);
-  const task = { ...structuredClone(options), kind: 'workspace-ui' };
+  const task = { ...structuredClone(options), kind: 'workspace-ui', ...(downloadToastObservation?{download_toast_observation:true}:{}) };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;

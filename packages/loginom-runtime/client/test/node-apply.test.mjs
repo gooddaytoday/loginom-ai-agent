@@ -9,6 +9,17 @@ import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+for(const cleanup of [true,false])test('proved native error uses NODE_EXECUTION_FAILED and standard release; cleanup='+cleanup,async()=>{
+ const f=fixture(),message='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
+ f.drivers.finish=async()=>{throw Object.assign(Error(message),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message,native:{source:'loginom_error_toast'}}});};
+ f.drivers.releasePending=async()=>{
+  if(!cleanup)throw Error('unconfirmed cleanup');
+  return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:false}};
+ };
+ const result=await f.run();assert.equal(result.error.code,'NODE_EXECUTION_FAILED');assert.equal(result.error.message,message);
+ assert.equal(result.cleanup_complete,cleanup);assert.equal(result.status,cleanup?'FAILED':'AMBIGUOUS');
+ assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+});
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',

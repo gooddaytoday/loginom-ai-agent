@@ -1,0 +1,68 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "header": true,
+    "null_marker": "?"
+  },
+  "dependencies": "Python 3 standard library: fractions, decimal (precision 50), csv; no third-party dependencies",
+  "field_order": [
+    "RowID",
+    "X",
+    "Y",
+    "Z",
+    "W"
+  ],
+  "types": {
+    "RowID": "integer",
+    "X": "real",
+    "Y": "real",
+    "Z": "real",
+    "W": "real"
+  },
+  "age_pressure_origin": "Exact copy of evals/tasks/analytic/age-pressure-correlation/data/dataset.csv at 90b0cb816463360f024bbf33857a8861dee1ef10",
+  "age_pressure_field_order": [
+    "age",
+    "exercise_hours",
+    "sleep_hours",
+    "bmi",
+    "blood_pressure",
+    "stress_level"
+  ],
+  "age_pressure_types": {
+    "age": "integer",
+    "exercise_hours": "real",
+    "sleep_hours": "real",
+    "bmi": "real",
+    "blood_pressure": "real",
+    "stress_level": "integer"
+  },
+  "files": {
+    "age-pressure.csv": {
+      "bytes": 8188,
+      "sha256": "8a99e9dc459dc4194810cb0cab50365cb2c7b14343a7693bce021b2af2a4f795",
+      "rows": 300
+    },
+    "empty.csv": {
+      "bytes": 14,
+      "sha256": "e507564f613e0cf2c4391e0ba8e8d887dd5670f063d976128d84d1dd3d6b3395",
+      "rows": 0
+    },
+    "null.csv": {
+      "bytes": 54,
+      "sha256": "ca35dcad861149ae77fa012440f4d15928b3b4db58715ccca967cf212bb9b544",
+      "rows": 4
+    },
+    "pairs.csv": {
+      "bytes": 107,
+      "sha256": "0d886a2b569abacc0bfdf0f830b4c670bf9819b9929f17776a940e8e6942a596",
+      "rows": 8
+    },
+    "update.csv": {
+      "bytes": 111,
+      "sha256": "5246f8699a1a23a93e64a6223b6e63c53fd957c7b466167c0b9adeef03962504",
+      "rows": 8
+    }
+  }
+}

@@ -160,3 +160,37 @@ PASS исполнителя: CLI, независимая сверка по ра�
 - **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
 - **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
 - **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.
+
+## 7. Режим «Регулярное выражение»: этап 0 v0.3.8, LAB-532
+
+Назначение: docs-only исследование от
+`v038@1e0d8e62e2ab4503afa24bc3614bec84ea332d5b`, без сборки CLI и правки
+runtime. Текущий регламент сквада и описание карточки имеют приоритет над
+историческим разделом 0. Состояние regex: **предложение, ожидает утверждения**;
+готовность exact и реестр этим этапом не повышаются.
+
+Живой UI Loginom 7.4.2 подтвердил группу «Регулярные выражения» внутри
+«Ввод вручную», поиск подстроки с заменой всей ячейки константой, приоритет
+первого правила, literal `$1`, inline `(?i)`, add/replace и other keep/null.
+У checkbox регистра exact и regex разные механизмы: см. [исследование](discovery.md).
+
+Комплект до прогонов:
+
+- [fixtures/regex/input.csv](fixtures/regex/input.csv) и [manifest](fixtures/regex/manifest.json);
+- [acceptance/task-regex.md](acceptance/task-regex.md): add, сохранение NULL/пустоты и patch того же узла;
+- [acceptance/task-regex-replace.md](acceptance/task-regex-replace.md): replace/null, inline-регистр и первое совпадение;
+- [oracle.py](acceptance/regex/oracle.py), [expected.json](acceptance/regex/expected.json),
+  [expected-replace.json](acceptance/regex/expected-replace.json), [инструкция](acceptance/regex/README.md).
+
+Предлагается аддитивный mode `regex` с прежней формой string pairs,
+regex-only таблицами, константной заменой, other keep/null и add/replace.
+Смешение exact+regex, другие типы и template replacement отложены.
+Критерий — существующий стандарт сквада для обоих сценариев: полные ячейки/
+схема, Save+cold, cleanup, два аккаунта и ≥2/3 на одном SHA, регрессия exact.
+Новых механизмов проверки нет. До утверждения обработчик не менять.
+
+Оценка: два цикла с бизнес-прогоном между ними, пять файлов обработчика и
+аддитивная регистрация/привязка UI в общих файлах; ожидается 150–250 строк
+диффа узла плюс тесты. Общей переработки не выявлено; необходимость такой
+правки — стоп. Полная схема dock_node_apply: 45 891 → 45 899 Б (**+8 Б**
+за enum `regex`), без описаний и readback; детали замера в discovery.

@@ -33,8 +33,9 @@ export async function closeManagedResources(state, requests) {
     }
     await record("bridge_ack", "fulfilled")
     const cleanup = bridge[0].value.package_cleanup
-    packageCleanupFailed = cleanup?.policy === "last_confirmed_own_save"
-      && !["SUCCEEDED", "SKIPPED_UNPREPARED"].includes(cleanup.status)
+    packageCleanupFailed = ["last_confirmed_own_save", "opened_saved_package", "unsaved_draft"].includes(cleanup?.policy)
+      && !(cleanup.status === "SKIPPED_UNPREPARED" && cleanup.policy === "last_confirmed_own_save"
+        || cleanup.status === "SUCCEEDED" && cleanup.package_closed === true && cleanup.logged_out === true)
   }
   for (const [stage, handle] of [["browser_server", state.browserServer], ["browser", state.browser]]) {
     await record(stage, "started")

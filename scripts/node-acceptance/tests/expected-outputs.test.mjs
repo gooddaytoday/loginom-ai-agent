@@ -4,6 +4,39 @@ import {parseExpectedOutputs,matchExpectedOutputs} from '../expected-outputs.mjs
 const columns=[{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'A|Amount|Сумма',type:'real'}];
 const report=value=>({output_node_type:'transform.cross_table',columns,rows:[{Region:'North',Amount:value}]});
 const actual=(id,value)=>({node:{node_id:id},type:'transform.cross_table',execution:{execution_id:id},data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'North'},{type:'real',is_null:false,value}]]}});
+test('native binary64 decimal preserves signed zero across the browser JSON boundary',()=>{
+ const a=actual('zero',0),cell=a.data.sample[0][1];
+ Object.assign(cell,{representation:'binary64',precision:'17_significant_digits'});
+ for(const decimal of ['-0','-0E+00','-0.000E-300']){
+  cell.decimal=decimal;
+  assert.equal(matchExpectedOutputs([JSON.parse(JSON.stringify(a))],[report(-0)]).length,1);
+ }
+ for(const value of [1,-1,1e-300]){const bad=structuredClone(a);bad.data.sample[0][1].value=value;
+  assert.throws(()=>matchExpectedOutputs([bad],[report(-0)]));}
+ for(const decimal of ['0','0E+00','0.000E-300']){
+  cell.decimal=decimal;assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
+ }
+});
+test('binary64 cold accepts equivalent exponential decimals from LAB-616 and tiny finite values',()=>{
+ for(const [value,decimal] of [[6052718753.75986,'6.05271875375986E+09'],
+  [6046466566.2198925,'6.0464665662198925E+09'],[6042546632.779791,'6.042546632779791E+09'],
+  [6050861492.43988,'6.05086149243988E+09'],[1e-300,'1E-300'],[-1e-300,'-1E-300']]){
+  const a=actual('exponential',value);
+  Object.assign(a.data.sample[0][1],{representation:'binary64',precision:'17_significant_digits',decimal});
+  assert.equal(matchExpectedOutputs([a],[report(value)]).length,1);
+ }
+});
+test('binary64 cold still rejects contradictory or non-finite decimal evidence',()=>{
+ const a=actual('contradiction',6052718753.75986),cell=a.data.sample[0][1];
+ Object.assign(cell,{representation:'binary64',precision:'17_significant_digits'});
+ for(const decimal of ['6.05271875375987E+09','1E-300','NaN','Infinity','1E+309',null,6052718753.75986]){
+  cell.decimal=decimal;assert.throws(()=>matchExpectedOutputs([a],[report(cell.value)]));
+ }
+ cell.decimal='6.05271875375986E+09';
+ for(const value of [Infinity,NaN,'6052718753.75986']){
+  cell.value=value;assert.throws(()=>matchExpectedOutputs([a],[report(value)]));
+ }
+});
 test('label_any skips only the opted-in column label with either column order policy',()=>{
  for(const column_order of ['any','exact']){
   const want=structuredClone({...report(10),column_order});want.columns[1].label_any=true;
@@ -122,4 +155,14 @@ test('scalar civil DateTime requires exact milliseconds and calendar representat
  }
  const nativeWant=structuredClone(want);nativeWant.rows[0].When={cell_type:'datetime',bytes_le:'000000002079e640'};
  assert.throws(()=>matchExpectedOutputs([a],[nativeWant]));
+});
+
+test('cold preserves expected negative zero including exact native decimal strings',()=>{
+ for(const native of [false,true]){
+  const a=actual('zero',native?'-0':-0);
+  if(native)a.data.sample[0][1].precision='exact_native';
+  assert.equal(matchExpectedOutputs([a],[report(-0)]).length,1);
+  a.data.sample[0][1].value=native?'0':0;
+  assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
+ }
 });

@@ -323,8 +323,9 @@ function validateManifest(manifest, root, allowedStatuses) {
   return `${root}/releases/${manifest.catalog_version}`;
 }
 
-async function readRemoteText(remote, uri, signal) {
-  const result = await remote.callTool({ name: 'read', arguments: { uris: [uri] } }, undefined, { signal, timeout: 60000 });
+async function readRemoteText(remote, uri, signal, startup) {
+  const read = (signal, remaining = 60000) => remote.callTool({ name: 'read', arguments: { uris: [uri] } }, undefined, { signal, timeout: Math.min(60000, remaining) });
+  const result = startup ? await startup.read('manifest.read', read) : await read(signal);
   if (result?.isError) throw new Error(`Dock catalog read failed for ${uri}`);
   const blocks = (result?.content ?? []).filter(block => block.type === 'text').map(block => block.text);
   if (blocks.length !== 1 || !blocks[0].trim()) throw new Error(`Dock catalog read returned no exact text for ${uri}`);
@@ -336,7 +337,7 @@ function parseJson(text, where) {
 }
 
 export async function pinActionCatalog(remote, {
-  root = ACTION_CATALOG_ROOT, signal, manifestUri = null, manifestSha256 = null, allowCandidate = false,
+  root = ACTION_CATALOG_ROOT, signal, startup, manifestUri = null, manifestSha256 = null, allowCandidate = false,
   runtimeIdentity = null, targetIdentity = null,
 } = {}) {
   let current;
@@ -349,7 +350,7 @@ export async function pinActionCatalog(remote, {
     current = { schema_version: 1, status: 'candidate', catalog_version: match[1],
       manifest_uri: manifestUri, manifest_sha256: manifestSha256 };
   } else {
-    const currentText = await readRemoteText(remote, `${root}/current.json`, signal);
+    const currentText = await readRemoteText(remote, `${root}/current.json`, signal, startup);
     current = parseJson(currentText, 'current.json');
     if (!isObject(current)) fail('current.json must be an object');
     exactKeys(current, new Set(['schema_version', 'status', 'catalog_version', 'manifest_uri', 'manifest_sha256',
@@ -363,7 +364,7 @@ export async function pinActionCatalog(remote, {
       fail('current.json replay acceptance reference is invalid');
     }
   }
-  const manifestText = await readRemoteText(remote, current.manifest_uri, signal);
+  const manifestText = await readRemoteText(remote, current.manifest_uri, signal, startup);
   if (digest(manifestText) !== current.manifest_sha256) fail('manifest digest mismatch');
   const manifest = parseJson(manifestText, 'manifest.json');
   // Admission changes only the pointer and adds acceptance. Tested release bytes
@@ -372,7 +373,7 @@ export async function pinActionCatalog(remote, {
   const actionStatuses = current.status === 'candidate' ? new Set(['candidate', 'stale']) : new Set(['candidate']);
   if (releaseRoot + '/manifest.json' !== current.manifest_uri || manifest.catalog_version !== current.catalog_version) fail('manifest identity does not match current.json');
   const texts = Object.fromEntries(await Promise.all(FILE_NAMES.map(async name => {
-    const text = await readRemoteText(remote, `${releaseRoot}/${name}`, signal);
+    const text = await readRemoteText(remote, `${releaseRoot}/${name}`, signal, startup);
     if (digest(text) !== manifest.files[name]) fail(`${name} digest mismatch`);
     return [name, text];
   })));
@@ -388,7 +389,7 @@ export async function pinActionCatalog(remote, {
   validateSourceIndex(sourceIndex, manifest, actions, selectors);
   let acceptance = null;
   if (current.status === 'production') {
-    const acceptanceText = await readRemoteText(remote, current.acceptance_uri, signal);
+    const acceptanceText = await readRemoteText(remote, current.acceptance_uri, signal, startup);
     if (digest(acceptanceText) !== current.acceptance_sha256) fail('replay acceptance digest mismatch');
     acceptance = validateReplayAcceptance(parseJson(acceptanceText, 'acceptance'), {
       manifest, manifestSha256: current.manifest_sha256, runtimeIdentity,

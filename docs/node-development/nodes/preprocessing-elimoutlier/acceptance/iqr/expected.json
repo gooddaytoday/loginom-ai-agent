@@ -1,0 +1,220 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.elim_outlier"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 1.0,
+          "Note": "keep_1"
+        },
+        {
+          "RowID": 2,
+          "X": 2.0,
+          "Note": "keep_2"
+        },
+        {
+          "RowID": 3,
+          "X": 3.0,
+          "Note": "keep_3"
+        },
+        {
+          "RowID": 4,
+          "X": 4.0,
+          "Note": "keep_4"
+        },
+        {
+          "RowID": 5,
+          "X": 5.0,
+          "Note": "keep_5"
+        },
+        {
+          "RowID": 6,
+          "X": 6.0,
+          "Note": "keep_6"
+        },
+        {
+          "RowID": 7,
+          "X": 7.0,
+          "Note": "keep_7"
+        },
+        {
+          "RowID": 8,
+          "X": 8.0,
+          "Note": "keep_8"
+        },
+        {
+          "RowID": 9,
+          "X": 9.0,
+          "Note": "keep_9"
+        },
+        {
+          "RowID": 10,
+          "X": 10.0,
+          "Note": "keep_10"
+        },
+        {
+          "RowID": 11,
+          "X": 11.0,
+          "Note": "keep_11"
+        },
+        {
+          "RowID": 12,
+          "X": 12.0,
+          "Note": "keep_12"
+        },
+        {
+          "RowID": 13,
+          "X": 13.0,
+          "Note": "keep_13"
+        },
+        {
+          "RowID": 14,
+          "X": 14.0,
+          "Note": "keep_14"
+        },
+        {
+          "RowID": 15,
+          "X": 15.0,
+          "Note": "keep_15"
+        },
+        {
+          "RowID": 16,
+          "X": 16.0,
+          "Note": "keep_16"
+        },
+        {
+          "RowID": 17,
+          "X": 17.0,
+          "Note": "keep_17"
+        },
+        {
+          "RowID": 18,
+          "X": 18.0,
+          "Note": "keep_18"
+        },
+        {
+          "RowID": 19,
+          "X": 19.0,
+          "Note": "keep_19"
+        },
+        {
+          "RowID": 20,
+          "X": 20.0,
+          "Note": "keep_20"
+        },
+        {
+          "RowID": 21,
+          "X": 40.0,
+          "Note": "keep_21"
+        },
+        {
+          "RowID": 22,
+          "X": 100.0,
+          "Note": "keep_22"
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 21,
+          "X": 40.0,
+          "Note": "keep_21"
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 22,
+          "X": 100.0,
+          "Note": "keep_22"
+        }
+      ]
+    }
+  ]
+}

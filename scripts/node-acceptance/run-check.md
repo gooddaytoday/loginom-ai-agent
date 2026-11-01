@@ -29,6 +29,12 @@ with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
 Defaults: medium/1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
 between phase starts, 85 minutes total per batch including builds. `--spacing`,
 `--host-load-max`, `--out` and `--build` override these where exposed by help.
+The scenario catalog sets `model_timeout=2700` only for private C1 and 5-REST
+fixtures supplied through `--cases` or `--case-root`; other scenarios, including
+node acceptance, keep 1800 seconds. The batch deadline still caps each phase.
+At a phase deadline, SIGINT goes to the CLI owner first, with 100 seconds for
+normal close/ACK. If it stays alive, the process group receives SIGINT and
+another 40-second wait, then SIGKILL as the final fallback.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
 A supplied build must have matching SHA and `sourceDirty=false`.
 The total budget is shared by sequential scenarios. If it expires before a
@@ -58,6 +64,26 @@ r3/r4 attach only their new holdout.csv/replace.csv. CSV checks consume every ex
 order; their tasks leave CSV order free, so only those base exports map columns
 by their unique names. Final continuation CSVs retain their fixture's ordering
 rules. Names, widths, counts and every value remain checked.
+When `expected.json` sets `null_marker`, CSV NULL cells must use that exact
+marker. Otherwise, for outputs containing NULL, the CSV check uses the explicit
+`parameters.null_marker` of the `exports.text` request for that exact destination.
+Existing-node patches require the correlated successful configuration readback
+(including retained settings), also through wait/inspect receipts. Supported
+markers are `''`, `?`, `null`, and `NULL`; a marker matching any non-NULL value
+in that output fails `CSV_NULL_MARKER_COLLISION`. An empty marker therefore fails
+when the output contains both NULL and empty strings; it still passes when
+there are no empty strings. Missing export evidence
+fails `CSV_NULL_MARKER_MISSING`; unsupported markers fail
+`CSV_NULL_MARKER_UNSUPPORTED`. Every NULL cell still must match the chosen marker.
+
+For types300 only, the runner selects the private `--exact-port-windows` cold
+reader. It reads every expected row through contiguous production port windows,
+retaining the same document, workflow, node, port and completed execution.
+Changed bindings, schema, row count, unverified precision or incomplete cleanup
+refuse the result. Each window keeps the ordinary preview budgets; the assembled
+cold oracle checks every cell, including signed zero, milliseconds and full text.
+The offset is internal: public tool schemas and their read limits are unchanged.
+
 Stock cold receives `--csv` with the last checked download of the final stage
 and that file's delimiter, and never reapplies node settings. A single export
 is `actual.csv`; multiple exports are `actual-1.csv`, `actual-2.csv`, etc.
@@ -93,9 +119,17 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: upload_only, n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
+`rest-get-plain`: один GET https://httpbin.org/status/200 без query-параметров
+и входной таблицы. Задача и независимый oracle —
+`docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
+CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
+
+Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+`join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
+CSV inputs and expected outputs in `docs/node-development/nodes/join/acceptance/`.
+Each runs independently with the stock CSV, Save, cold and cleanup checks.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
 values against the separate cold JSON fixture;
 n14–n17 previously lacked that fixture. Their new fixtures use the independent
@@ -115,6 +149,20 @@ Each expected output declares its CSV `export_destination`; its basename is
 the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
+
+For the S-tamper negative case, use `outputs: []` and
+`rejection: {"code":"LOGINOM_FILE_CHANGED","node_type":"transform.group_data"}`
+in private `expected.json`. PASS requires a successful replacement export,
+then a correlated grouping refusal with no possible effect, no execution and
+no returned ports, followed by Save and normal close/logout/ACK. Synchronous,
+wait and inspect receipts use the same checks. Returned ports after the refusal
+fail the case. CSV and cold output readback are inapplicable to this refusal;
+`--cold` still applies normally to positive cases in the batch. Rejection
+expectations never reach the model.
+
+For `--case-root` path attachments, `{{SOURCE_PATH}}` in `task.md` resolves from
+`case.json`. Upload-only seeds use that configured source even when a copied
+task contains an obsolete path; they never create exports or save a package.
 
 D87 large-file regression, one foreground command (from the repository root):
 
@@ -201,3 +249,36 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
+`corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
+age/pressure business task). Fixtures and independent expected tables are in
+`docs/node-development/nodes/research-corranalysis/acceptance`; each model run
+receives only its named input CSV and user task. Other coefficients are deferred.
+`outlier-sd` и `outlier-iqr` — Редактирование выбросов, detect/keep/keep,
+из `docs/node-development/nodes/preprocessing-elimoutlier/acceptance/`
+и его `iqr/`. Три CSV в порядке: данные, выбросы, экстремальные значения;
+cold сверяет каждый output_port того же узла с отдельным expected.
+
+`n21` — Скользящее окно (`transform.sliding_window` / `lag`): штатный
+`docs/node-development/nodes/transform-slidingwindow/acceptance/task.md`, sales.csv,
+независимый expected.json; точный порядок строк и полей, все значения, типы и NULL.
+
+`logreg-enter`: Логистическая регрессия, бинарный Enter, `event=yes`, порог 0.8,
+32 строки, точные типы/NULL/порядок, CSV/Save/cold. Источник —
+`docs/node-development/nodes/datamining-logregression/acceptance/task.md`,
+только `data/train.csv` передаётся модели. CSV проверяет независимый
+`oracle.py`; холодный порт 0 — отдельный `expected.json` с допуском
+вероятности abs=1e-8/rel=1e-10 и точным порядком полей.
+
+`types300` (через `--cases`) требует `--cold`. Только для этого сценария
+runner допускает два ограничения нативного CSV writer D76: текст `0` вместо
+эталонного отрицательного нуля и ISO-дату вместо полуночи с ненулевыми
+миллисекундами той же даты. Ячейки определяются из эталона, остальные значения
+проверяются строго, включая большие целые и знак нуля. Допуск нельзя расширить
+частным `check_csv.py`. При отличиях CSV и итог имеют отдельный статус
+«PASS с ограничением платформы D76», а results/summary содержат количества
+`negative_zero` и `midnight_date`. Точный CSV даёт обычный PASS.
+Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
+Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
+при составлении отчёта (отдельного машинного oracle для текста ответа нет).
