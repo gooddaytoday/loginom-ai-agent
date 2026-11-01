@@ -300,8 +300,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
-      const regressionRefusal=request.target.type==='datamining.lin_regression'&&request.mode==='apply'
-        &&['configure','output_mapping'].includes(name)&&refusal?.verification==='linregression_apply_preserved'
+      const regressionRefusal=['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='preprocessing.binning'?'binning_apply_preserved':'linregression_apply_preserved')
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
@@ -405,7 +405,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(request.target.type==='datamining.lin_regression'&&request.mode==='apply')requireValue(value.mode==='close'
+      if(['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
         &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
         'Applying a saved regression must discard the inspected draft without committing or training');
       else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'

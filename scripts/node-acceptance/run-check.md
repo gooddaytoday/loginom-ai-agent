@@ -317,3 +317,11 @@ existing reader and `--csv` cold path.
 `acf-update` заменяет вход того же узла; остальные получают только series.csv.
 CSV и cold проверяют весь выход порта 0, порядок полей и лагов, точные Boolean/NULL,
 abs=1e-8 только для real, метки через label_any.
+
+`binning-count`, `binning-width`, `binning-frequency`, `binning-frequency-ties`,
+`binning-real`, `binning-integer`, `binning-apply`, `binning-retrain`, `binning-holdout`
+используют утверждённые task*.md/expected*.json из
+`docs/node-development/nodes/preprocessing-binning/acceptance`. Каждый запускается
+с отдельными входами, двумя CSV и cold-чтением обоих портов; apply/retrain заменяют
+источник того же импорта внутри одного сценария. NULL/пустая строка, типы, порядок
+полей и строк точны, Real abs/rel 1e-12.

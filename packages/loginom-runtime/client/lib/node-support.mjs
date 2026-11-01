@@ -1,5 +1,6 @@
 import {createExcelExportNodeSupport} from './exports-excel-node.mjs';
 import {createTreeNodeSupport} from './tree-node.mjs';
+import {createBinningNodeSupport} from './binning-node.mjs';
 import {createSamplingNodeSupport} from './sampling-node.mjs';
 import {createDataPartitionNodeSupport} from './data-partition-node.mjs';
 import {createLogRegressionNodeSupport} from './log-regression-node.mjs';
@@ -45,6 +46,7 @@ export function createCandidateNodeSupport(config) {
  const excelExport=createExcelExportNodeSupport(config);
  const jsonTree=createTreeNodeSupport(config,{json:true}),treeTable=createTreeNodeSupport(config,{json:false});
  const autoCorrelation=createAutoCorrelationNodeSupport(config);
+ const binning=createBinningNodeSupport(config);
  const slidingWindow=createSlidingWindowNodeSupport(config);
  const elimOutlier=createElimOutlierNodeSupport(config);
  const logregression=createLogRegressionNodeSupport(config),correlation=createCorrAnalysisNodeSupport(config),linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
@@ -53,7 +55,7 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
@@ -64,6 +66,7 @@ export function createCandidateNodeSupport(config) {
   }
   if(type==='trees.from_json')return jsonTree.nodeApplyDriverFactory(options);
   if(type==='trees.to_table')return treeTable.nodeApplyDriverFactory(options);
+  if(type==='preprocessing.binning')return binning.nodeApplyDriverFactory(options);
   if(type==='preprocessing.sampling')return sampling.nodeApplyDriverFactory(options);
   if(type==='preprocessing.data_partition')return partition.nodeApplyDriverFactory(options);
   if(type==='preprocessing.elim_outlier')return elimOutlier.nodeApplyDriverFactory(options);

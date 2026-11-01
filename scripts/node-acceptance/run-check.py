@@ -110,6 +110,18 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+
+    if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
+                'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
+        kind = name.removeprefix('binning-')
+        data = {'count': ['values.csv'], 'width': ['real.csv'], 'real': ['real.csv'],
+                'integer': ['values.csv'], 'frequency': ['frequency.csv'], 'frequency-ties': ['frequency-ties.csv'],
+                'apply': ['frequency.csv', 'update.csv'], 'retrain': ['frequency.csv', 'update.csv'],
+                'holdout': ['real.csv', 'holdout.csv']}[kind]
+        return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
+                    data=src / 'data', base=None, export_count=2, input_files=data,
+                    expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
