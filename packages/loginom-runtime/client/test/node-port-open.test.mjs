@@ -193,6 +193,26 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
 
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
 
+for(const direction of ['input','output'])for(const long of [false,true])test('covered '+direction+' port retains bounded DOM identity without text; long='+long,async()=>{
+ const f=fixture(direction);
+ await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
+ f.portDom.getBoundingClientRect=()=>({x:1225,y:757,width:6,height:9});
+ const anchor={tagName:'DIV',getAttribute:name=>name==='class'?'x-panel':name==='data-tid'?'owned-panel':null};
+ const cover={tagName:'DIV',textContent:'PRIVATE_TEXT',value:'PRIVATE_VALUE',
+  getAttribute:name=>name==='class'?(long?'"\n\\'.repeat(1000):'unknown-layer'):name==='role'?'presentation':null,
+  getBoundingClientRect:()=>({x:1200,y:730,width:80,height:64}),closest:()=>anchor};
+ f.document.elementFromPoint=()=>cover;
+ const r=await f.run();
+ assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);
+ assert.equal(f.gestures.length,0);assert.equal((direction==='input'?f.prep.inputPortOpenReceipts:f.prep.outputPortOpenReceipts).size,0);
+ assert.ok(r.error.startsWith('Port has no observed interaction point: '));
+ assert.ok(r.error.length<=500);assert.ok(!r.error.includes('PRIVATE_TEXT'));assert.ok(!r.error.includes('PRIVATE_VALUE'));
+ const d=JSON.parse(r.error.slice(r.error.indexOf(': ')+2));
+ assert.deepEqual(d.port_box,[1225,757,6,9]);assert.deepEqual(d.point,[1228,761.5]);
+ assert.equal(d.covering.tag,'div');assert.equal(d.covering.role,'presentation');
+ if(!long){assert.equal(d.covering.class,'unknown-layer');assert.equal(d.anchor.tid,'owned-panel');}
+});
+
 test('control input identity comes from the exact cached cell ordinal, never a SVG number',async()=>{
  const f=fixture('input');f.task.kind='control';
  f.portDom.tid='MF;TF;Graph;Node;Input_ControlVar';f.portDom.getAttribute=()=>f.portDom.tid;
