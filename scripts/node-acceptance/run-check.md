@@ -295,3 +295,10 @@ checks the saved Excel destination/sheet/header/general format and freshly
 reads the connected table for native types, values and field order. It does
 not overwrite or reexecute the existing file sink. CSV/TSV cases retain their
 existing reader and `--csv` cold path.
+
+`acf-series`, `acf-update`, `acf-one`, `acf-eight`: Автокорреляция одной числовой
+серии во временной области, ЧАКФ выключена, 4/4/1/8 отсчётов включая лаг 0.
+Задания и независимые expected — `docs/node-development/nodes/research-autocorrelation/acceptance`.
+`acf-update` заменяет вход того же узла; остальные получают только series.csv.
+CSV и cold проверяют весь выход порта 0, порядок полей и лагов, точные Boolean/NULL,
+abs=1e-8 только для real, метки через label_any.
