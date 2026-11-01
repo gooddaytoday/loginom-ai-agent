@@ -1,9 +1,11 @@
 const need=(value,message)=>{if(!value)throw Error('Logistic regression: '+message);};
 export function validateLogRegressionParameters(parameters,mode,r){
- need(mode==='enter','only binary Enter (enter) is supported; apply is outside this stage');
+ need(['enter','forward','backward','stepwise'].includes(mode),'use enter, forward, backward or stepwise; apply is unsupported');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p),'use parameters.logistic');
+ need(!Object.hasOwn(p,'selection'),'custom selection criteria and significance cutoffs are not supported; use native selection defaults');
+ need(Object.keys(p).every(k=>['input_fields','target_field','event','threshold'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');

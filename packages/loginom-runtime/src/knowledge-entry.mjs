@@ -1,7 +1,8 @@
 import { createKnowledgeClient, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
+import { startupDiagnostic } from '../client/lib/catalog.mjs';
 
 process.umask(0o077);
-const state = { client: undefined, closing: undefined, controller: new AbortController() };
+const state = { client: undefined, closing: undefined, controller: new AbortController(), startupDiagnostics: [], apiKey: undefined };
 const requests = new Set();
 const calls = new Map();
 const send = (message, disconnect = false) => {
@@ -47,7 +48,11 @@ async function handle(message) {
       const endpoint = new URL(input.endpoint);
       if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash)
         throw Error('LOGINOM_START_INVALID');
-      state.client = createKnowledgeClient(input, state.controller.signal);
+      state.apiKey = input.apiKey;
+      state.client = createKnowledgeClient(input, state.controller.signal, {
+        deadline: Date.now() + 120000,
+        onFailure: (error, detail) => state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error, [input.apiKey]) }),
+      });
       // Readiness is observed through list; admission of start does not wait for the network.
       void state.client.catch(() => {});
       send({ id: message.id, result: { protocol: 1, generation: input.generation, started: true } });
@@ -61,7 +66,8 @@ async function handle(message) {
     if (!state.client) throw Error('LOGINOM_NOT_READY');
     if (message.operation === 'list') {
       const client = await state.client;
-      send({ id: message.id, result: { tools: client.tools, catalogSha256: client.catalogSha256 } });
+      send({ id: message.id, result: { tools: client.tools, catalogSha256: client.catalogSha256 },
+        startupDiagnostics: state.startupDiagnostics.splice(0) });
       return;
     }
     if (message.operation === 'call') {
@@ -79,7 +85,10 @@ async function handle(message) {
     throw Error('LOGINOM_REQUEST_INVALID');
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
-    send({ id: message.id, error: code }, message.operation === 'close');
+    if (['start', 'list'].includes(message.operation) && !state.startupDiagnostics.length)
+      state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error, [state.apiKey]) });
+    send({ id: message.id, error: code, ...(['start', 'list'].includes(message.operation)
+      ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === 'close');
   }
 }
 

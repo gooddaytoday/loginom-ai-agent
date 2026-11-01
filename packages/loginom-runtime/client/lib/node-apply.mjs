@@ -300,8 +300,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
-      const regressionRefusal=request.target.type==='datamining.lin_regression'&&request.mode==='apply'
-        &&['configure','output_mapping'].includes(name)&&refusal?.verification==='linregression_apply_preserved'
+      const regressionRefusal=['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='preprocessing.binning'?'binning_apply_preserved':'linregression_apply_preserved')
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
@@ -405,7 +405,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(request.target.type==='datamining.lin_regression'&&request.mode==='apply')requireValue(value.mode==='close'
+      if(['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
         &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
         'Applying a saved regression must discard the inspected draft without committing or training');
       else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
@@ -490,6 +490,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    if(error.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'&&state.node&&state.pending&&!operation.transportUncertain) {
+      try {return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.nodeExecutionFailure});}
+      catch { /* A native error never promotes an unconfirmed cleanup to PASS. */ }
+    }
     // A completed configure refusal cancels only its own uncommitted draft
     // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
@@ -534,7 +538,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:/^(LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:error.nodeExecutionFailure?.code??/^(LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }

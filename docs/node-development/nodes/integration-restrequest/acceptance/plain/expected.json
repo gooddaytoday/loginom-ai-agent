@@ -1,0 +1,36 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "plain-get.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "ErrorCode",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ErrorCode": 0,
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}

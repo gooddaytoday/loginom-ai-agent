@@ -1,5 +1,6 @@
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
+import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
@@ -26,6 +27,7 @@ const args = parseArgs({
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'exact-port-windows': { type: 'boolean', default: false },
+    'sampling-baseline': { type: 'string' },
   },
   strict: true,
 }).values
@@ -65,7 +67,11 @@ if(excelExpected){
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
 }
 const expected = excelExpected??rawExpected
-const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
+const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(expected)
+if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
+if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
+const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baseline'],'utf8')):null
+const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected)
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -162,6 +168,7 @@ page = context.pages()[0]
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
@@ -212,7 +219,8 @@ page = context.pages()[0]
 
   const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   const actual=[],ownedExecutions=[];
-  for(const [outputIndex,{node:target,ports}] of reads.entries()){
+  const readPlans=sampling?[...reads,...reads]:reads;
+  for(const [outputIndex,{node:target,ports}] of readPlans.entries()){
   const node=target.ref;
 
   const operation = {
@@ -280,12 +288,27 @@ page = context.pages()[0]
    javascriptAdmission={admission:javascriptAdmission,receipt,owner};
   }
   const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
-  const execution = javascriptAdmission
+  let execution = javascriptAdmission
    ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
    :await run();
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+  const samplingMappings=new Map();
+  if(sampling)for(const {port} of ports){
+   const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
+   samplingMappings.set(port,proof);
+   await record({phase:'sampling_cold_output_definition',...proof});
+  }
+  if(sampling){
+   // Native Cancel can deselect the node and invalidate its materialized ports.
+   // The production execution driver reselects this exact node and proves a
+   // new completed execution; no stale pre-wizard port proof may be reused.
+   execution=await runColdExecution({driver:createNodeExecutionProcedure(channel,node,{allowDeactivate:true}),channel,node,operation,readReceipt,record});
+   if(execution.status!=='completed'||!execution.verified||!execution.owner_verified)throw Error('COLD_EXECUTION_NOT_VERIFIED');
+   ownedExecutions.push(execution);
+   await record({phase:'sampling_cold_reactivated_after_cancel',node,execution,settings_applied:false});
+  }
 
   for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
@@ -298,6 +321,13 @@ page = context.pages()[0]
   }
 
   let data;
+  if(target.type==='trees.to_table'){
+   // The approved tree cold path executes the saved conversion and reads every
+   // resulting table cell through the existing completed-port reader.
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error('COLD_TREE_TABLE_INCOMPLETE');
+   data=read.output;
+  }
   if(args['exact-port-windows']){
    data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
   }else if(useNative){
@@ -329,7 +359,7 @@ page = context.pages()[0]
   const precision = await configureTablePrecision(channel, opened.table)
   const readSettings = await prepareTableRead(channel, opened.table, {openFilter:args=>openColdTableFilter(channel,args,{node,operation,readReceipt,record})})
   const raw = await readTableOutputPages(channel, opened.table, {
-    sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
+    sampleRows: sampling?.sample_rows??Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
   })
   const observedColumns=precision.fields.map(f=>({name:f.key,label:f.label,type:f.type}));
   data = decodeTableOutput(raw, {
@@ -347,6 +377,7 @@ page = context.pages()[0]
   }
 
   actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,cold_read_ceiling:coldReadCeiling,
+   ...(sampling?{sampling_mapping:samplingMappings.get(outputPort)}:{}),
    ...(content_candidate?{content_candidate:true}:{})});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
@@ -368,7 +399,8 @@ page = context.pages()[0]
    if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
+  const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
@@ -404,6 +436,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {
       package_closed: cleanup.package_closed === true,
       logged_out: cleanup.logged_out === true,

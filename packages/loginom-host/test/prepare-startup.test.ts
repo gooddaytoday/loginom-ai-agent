@@ -11,7 +11,7 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
-test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "host-close"])(
+test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interrupt", "close", "generation", "host-close"])(
   "prepare waits for the existing MCP catalog without late admission: %s",
   async (ending) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -32,6 +32,9 @@ test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "
             entered.resolve()
             await release.promise
           }
+          if (ending === "twice" || ending === "retry" && lists === 1)
+            throw Object.assign(Error("temporary catalog outage"), { code: 503 })
+          if (ending === "semantic") throw Error("invalid catalog")
           return { tools: server.tools }
         },
       },
@@ -49,7 +52,10 @@ test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "
       `
       import { appendFileSync } from 'node:fs';
       process.on('message', m => {
-        if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
+        if (m.operation === 'start') {
+          appendFileSync(${JSON.stringify(join(directory, "startup.json"))}, JSON.stringify({deadline:m.input.startupDeadline})+'\\n');
+          process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
+        }
         if (m.operation === 'call') {
           appendFileSync(${JSON.stringify(calls)}, JSON.stringify(m.input) + '\\n');
           process.send({id:m.id,result:{result:{prepared:true},recoveryPending:false}});
@@ -99,6 +105,7 @@ test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "
         scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
       })
       const budget = ending === "deadline" ? 200 : 2000
+      const beforePrepare = Date.now()
       let early: unknown
       const pending = client
         .request("call", {
@@ -148,10 +155,15 @@ test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "
         expect(await readdir(join(root, "recovery"))).toEqual([])
       }
       release.resolve()
-      if (!["host-close", "generation"].includes(ending)) await host.catalog(1)
+      if (["twice", "semantic"].includes(ending)) await expect(host.catalog(1)).rejects.toThrow()
+      else if (!["host-close", "generation"].includes(ending)) await host.catalog(1)
       const outcome = await pending
-      if (ending === "ready") {
+      if (ending === "ready" || ending === "retry") {
         expect(outcome).toEqual({ result: { prepared: true } })
+        const startup = JSON.parse((await readFile(join(directory, "startup.json"), "utf8")).trim())
+        expect(typeof startup.deadline).toBe("number")
+        expect(startup.deadline).toBeLessThanOrEqual(beforePrepare + budget + 50)
+        expect(startup.deadline).toBeGreaterThanOrEqual(beforePrepare + budget - 5)
         const dispatches = (await readFile(calls, "utf8"))
           .trim()
           .split("\n")
@@ -161,10 +173,20 @@ test.each(["ready", "deadline", "release", "interrupt", "close", "generation", "
         expect(dispatched.name).toBe("dock_prepare")
         expect(dispatched.arguments.timeout_ms).toBeGreaterThan(0)
         expect(dispatched.arguments.timeout_ms).toBeLessThan(budget - 20)
-        expect(lists).toBe(1)
+        expect(lists).toBe(ending === "retry" ? 2 : 1)
       } else {
         if (ending !== "close") expect(outcome).toHaveProperty("error")
         expect(await Bun.file(calls).exists()).toBe(false)
+      }
+      if (["retry", "twice", "semantic"].includes(ending)) {
+        expect(lists).toBe(ending === "semantic" ? 1 : 2)
+        const log = await readFile(join(root, "knowledge/1/startup-failures.jsonl"), "utf8")
+        expect(log).toContain(ending === "semantic" ? "invalid catalog" : '"code":"503"')
+        expect(log).not.toContain("UNIT-NONSECRET")
+        const [id] = await readdir(join(root, "knowledge/1/diagnostics"))
+        expect(await readFile(join(root, "knowledge/1/diagnostics", id, "events.jsonl"), "utf8"))
+          .toContain("runtime.startup_failure")
+        if (ending !== "retry") expect(await host.api.status()).toMatchObject({ failure: "LOGINOM_RUNTIME_START_FAILED" })
       }
       expect(await readdir(join(root, "recovery"))).toEqual([])
     } finally {

@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.excel' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | SamplingConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -210,7 +210,7 @@ export interface NativeNodeOutputPort extends NodeOutputPortBase {
   read_consistency: NativeReadConsistency; binding: NativeReadBinding;
   cell_precision: {cells: 'exact_native'; temporal: 'native_serial_only'}; limitations: string[];
 }
-export type NodeOutputPort = LegacyNodeOutputPort | NativeNodeOutputPort;
+export type NodeOutputPort = LegacyNodeOutputPort | NativeNodeOutputPort | TreeNodeOutputPort;
 export interface NodeOutput {
   status: 'not_refreshed' | 'partial' | 'complete'; evidence_ref: string | null;
   execution_id?: string; ports?: NodeOutputPort[]; no_output_requested?: boolean;
@@ -331,6 +331,10 @@ export interface SamplingConfigurationReadback {
  package_persistence_verified:false;
 }
 
+export interface SamplingModesConfigurationReadback extends Omit<SamplingConfigurationReadback,'mode'> {
+ mode:'random'; seed:number; test_priority:false;
+}
+
 export interface CorrAnalysisConfigurationReadback {
  kind: 'corr_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
  node: NodeRef; receipt_ids: string[]; mode: 'pearson'; first_set: string[]; second_set: string[];
@@ -346,8 +350,37 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface LogRegressionConfigurationReadback {
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
- node:NodeRef; receipt_ids:string[]; mode:'enter'; input_fields:string[]; target_field:string;
+ node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
  normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;
+}
+
+export interface TreeConfigurationReadback {
+  kind: 'json_to_tree' | 'tree_to_table'; mode: 'auto_structure' | 'selected_nodes';
+  scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
+  json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.';
+}
+export interface TreeNodeOutputPort {
+  port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
+  freshness_basis: 'completed_execution_port_source'; sample_complete: true;
+  tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
+    schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
+    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string}>};
+}
+export interface AutoCorrelationConfigurationReadback {
+ kind: 'auto_correlation'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; mode: 'time_domain'; field: string; lag_count: number;
+ domain: 'time'; pacf: false; output_port: 0; fields: Array<{name:string;label:string;type:string}>; package_persistence_verified: false;
+}
+export interface BinningConfigurationReadback {
+ kind: 'binning'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
+ mode: 'internal' | 'apply'; field: string; type: 'integer' | 'real'; method: 'count' | 'width' | 'frequency'; size: number;
+ limits: number[] | null; rounding: false; open_ends: false; ties: 'next' | null; state: 'settings' | 'materialized';
+ intervals: {number: number; lower: number; upper: number; label: string; lower_included: boolean; upper_included: boolean}[];
+ training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: {state: 'materialized'; intervals: BinningConfigurationReadback['intervals']}};
+ output_mappings: {port: number; fields: {index: number; name: string; label: string; type: string; data_kind: string; source_name: string}[]}[];
+ package_persistence_verified: false;
 }

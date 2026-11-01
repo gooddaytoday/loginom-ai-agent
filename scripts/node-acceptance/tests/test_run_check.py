@@ -21,6 +21,25 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
+        for name in ['sampling-random', 'partition-random']:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/test/modes.lgp')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            self.assertTrue(case['prompt'].is_file())
+            self.assertTrue((case['data'] / 'modes.csv').is_file())
+            self.assertEqual(expected['sampling_modes']['mode'], name.rsplit('-', 1)[1])
+            self.assertEqual(expected['sampling_modes']['seed'], 42)
+            self.assertEqual(len(expected['outputs']), 1 if name.startswith('sampling') else 3)
+            self.assertEqual(expected['package_path'], '/test/modes.lgp')
+        for name in ['sampling', 'sampling-null', 'sampling-empty', 'data-partition', 'data-partition-null', 'data-partition-empty']:
+            case = runner.scenario(name)
+            stock = runner.read(case['source'] / case.get('expected_name', 'expected.json'))
+            expected = runner.expected_for(case, '/test/stock.lgp')
+            self.assertNotIn('sampling_modes', expected)
+            outputs = stock.get('outputs', [{k: v for k, v in stock.items() if k not in ['package_path', 'nodes']}])
+            self.assertEqual(expected['outputs'], outputs)
+
     def export_events(self, marker='?', *, destination='/test/all.csv', kind='new', readback=None):
         request = dict(operation_id='export', target=dict(type='exports.text', kind=kind),
                        parameters=dict(destination=destination, null_marker=marker))
@@ -661,6 +680,56 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             self.assertEqual(instance.report['runs'][0]['status'], 'PASS', instance.report['runs'][0])
 
 
+    def test_logreg_selection_csv_freedom_uses_oracle_without_relaxing_cold(self):
+        # LAB-657 first live run: warm CSV keeps RowID before X, while cold
+        # has the approved native used-fields-first layout.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = self.make_runner(root, ('logreg-stepwise',))
+            seen = []
+            def phase(name, command, folder, **kwargs):
+                instance.report['phase'] = name
+                profile = root / 'logreg-stepwise/profile'
+                if name == 'setup':
+                    (profile / 'data').mkdir(parents=True)
+                    (profile / 'config').mkdir()
+                    runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                if name == 'model':
+                    expected = runner.read(folder / 'expected.json')['outputs'][0]
+                    events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {
+                        'status': 'completed', 'output': json.dumps(reply)}}} for reply in [
+                        {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'output': {'save_completed': True}},
+                        {'cleanup_complete': True, 'output': {'ports': [{'port': 0, 'schema': [],
+                            'sample': [], 'freshness_basis': 'completed_execution_port_source'}]}}]]
+                    (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+                    runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True})
+                    runner.write(profile / 'runtime-close-test.json', {'closed_ack': True})
+                    order = ['PredictionEvent', 'PredictionProbability', 'ActualEvent', 'Target_predicted', 'RowID', 'X', 'Noise', 'Target', 'Note']
+                    # The task replacement gives the owned export path explicitly.
+                    import re
+                    destination = Path(re.search(r'/test/[^\s]+\.csv', (folder / 'task.md').read_text())[0]).name
+                    with (profile / destination).open('w') as file:
+                        writer = csv.writer(file); writer.writerow(order)
+                        writer.writerows([['?' if r[k] is None else r[k] for k in order] for r in expected['rows']])
+                if name == 'oracle':
+                    seen.append(name)
+                    result = subprocess.run(command, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                if name == 'cold':
+                    seen.append(name)
+                    command = list(map(str, command))
+                    self.assertIn('--csv', command)
+                    expected = runner.read(command[command.index('--expected') + 1])['outputs'][0]
+                    self.assertEqual(expected['column_order'], 'exact')
+                    self.assertEqual([c['name'] for c in expected['columns']][4:], ['X', 'Noise', 'Target', 'RowID', 'Note'])
+                    (folder / 'cold').mkdir()
+                    runner.write(folder / 'cold/result.json', {'status': 'PASS', 'settingsReapplied': False,
+                        'cleanup': {'package_closed': True, 'logged_out': True}})
+            with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                instance.run()
+            self.assertEqual(instance.report['runs'][0]['status'], 'PASS', instance.report['runs'][0])
+            self.assertEqual(seen, ['oracle', 'cold'])
+
     def test_pair_directory_formats_and_unknown_key(self):
         for key in ['package_directory', 'personal_folder']:
             with self.subTest(key=key):
@@ -935,6 +1004,21 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
 
+    def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
+        case = runner.scenario('rest-get-plain')
+        self.assertIsNone(case['base'])
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertEqual([p for p in case['data'].iterdir() if p.suffix in ['.csv', '.xlsx']], [])
+        self.assertIn('без query-параметров и без входной таблицы', case['prompt'].read_text())
+        expected = runner.expected_for(case, '/test/plain.lgp')
+        self.assertEqual(expected['package_path'], '/test/plain.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual(output['rows'], [dict(ErrorCode=0, HttpStatusCode=200)])
+        self.assertEqual(output['output_node_type'], 'export_input')
+        self.assertEqual([c['name'] for c in output['columns']], ['ErrorCode', 'HttpStatusCode'])
+        result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
         self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
         case = runner.scenario('logreg-enter')
@@ -949,6 +1033,26 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(expected['outputs'][0]['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
         result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_logreg_selection_catalog_keeps_oracle_private_and_all_cells(self):
+        for variant in ['forward', 'backward', 'stepwise']:
+            case = runner.scenario('logreg-' + variant)
+            self.assertEqual(case['prompt'].name, 'task-' + variant + '.md')
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['selection.csv'])
+            self.assertIsNone(case['base'])
+            expected = runner.expected_for(case, '/test/selection.lgp')
+            output = expected['outputs'][0]
+            self.assertEqual(len(output['rows']), 64)
+            self.assertEqual(len(output['columns']), 9)
+            self.assertEqual(output['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
+            reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
+            self.assertEqual(output, reference['outputs'][0])
+
+    def test_logreg_custom_selection_cases_are_not_in_v039_catalog(self):
+        for variant in ['aic', 'aicc', 'bic', 'hqic', 'strict', 'permissive']:
+            with self.assertRaises(ValueError):
+                runner.scenario('logreg-stepwise-' + variant)
 
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')

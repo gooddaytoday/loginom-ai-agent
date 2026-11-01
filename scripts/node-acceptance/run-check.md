@@ -1,5 +1,20 @@
 Run live acceptance without repeatedly reading live logs:
 
+Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
+Only these translate their proposal into `sampling_modes`. The unchanged task
+and modes.csv go to the model; the oracle never does. Decision 1 checks two
+completed executions and exact typed source membership, with every CSV compared
+to the observed result. Configured sizes and seed are verified, but output sizes,
+quotas, source row order and P relations are not acceptance assertions.
+Cold validates the direct import → requested node → export graph and native
+field names/types. Native definition order is observed, not constrained. After
+Cancel, which can deselect/deactivate outputs, a fresh production execution
+reselects this node and verifies completion before reading any port. Two such
+rounds must match main. Field presentation permutations are normalized by
+verified names/types. Save, port proofs, cancellation and cleanup remain mandatory.
+Stratified, biased and uniform are not registered.
+Stock expected parsing, exact matching and existing scenarios are unchanged.
+
 ```sh
 python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n1,q7 --pair ~/.config/loginom-multica/cards/PAIR --cold
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
@@ -119,7 +134,12 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+`rest-get-plain`: один GET https://httpbin.org/status/200 без query-параметров
+и входной таблицы. Задача и независимый oracle —
+`docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
+CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
+
+Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 `join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
@@ -198,6 +218,16 @@ X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
 To add a scenario for a new node:
+
+`tree-repeat` and `tree-no-repeat` use the approved tasks under
+`trees-jsontotree/acceptance` and `trees-treetodata/acceptance`, respectively,
+and only the original `documents.csv`. Their independent expected files carry
+`export_destination: tree-result.csv`; the runner adds the owned export request
+when its filename is absent from the immutable task. Main acceptance checks
+every typed tree instance and schema field against `proposed_tree_output`.
+With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
+table is read with the existing completed-port reader. Repeat on/off run in
+separate chats, profiles and packages; no oracle content reaches the model.
 
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
@@ -285,3 +315,34 @@ checks the saved Excel destination/sheet/header/general format and freshly
 reads the connected table for native types, values and field order. It does
 not overwrite or reexecute the existing file sink. CSV/TSV cases retain their
 existing reader and `--csv` cold path.
+
+`acf-series`, `acf-update`, `acf-one`, `acf-eight`: Автокорреляция одной числовой
+серии во временной области, ЧАКФ выключена, 4/4/1/8 отсчётов включая лаг 0.
+Задания и независимые expected — `docs/node-development/nodes/research-autocorrelation/acceptance`.
+`acf-update` заменяет вход того же узла; остальные получают только series.csv.
+CSV и cold проверяют весь выход порта 0, порядок полей и лагов, точные Boolean/NULL,
+abs=1e-8 только для real, метки через label_any.
+
+`binning-count`, `binning-width`, `binning-frequency`, `binning-frequency-ties`,
+`binning-real`, `binning-integer`, `binning-apply`, `binning-retrain`, `binning-holdout`
+используют утверждённые task*.md/expected*.json из
+`docs/node-development/nodes/preprocessing-binning/acceptance`. Каждый запускается
+с отдельными входами, двумя CSV и cold-чтением обоих портов; apply/retrain заменяют
+источник того же импорта внутри одного сценария. NULL/пустая строка, типы, порядок
+полей и строк точны, Real abs/rel 1e-12.
+
+`smoothing-hp`: Сглаживание HP Lambda=1 для X/R, series → update на прежнем узле,
+фиксированный порядок RowID,X,R,Tag,X_S,R_S через autosync=false;
+приёмочный комплект `preprocessing-smoothing/acceptance`, ordered CSV/Save/cold.
+
+`date-time-iso` и `date-time-iso-empty`: четыре операции ISO-календаря в «Дата и время»,
+утверждённые task-iso-weeks*.md и независимый Python expected из
+`docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
+из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
+
+`logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
+со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
+Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
+информационные/строгий/мягкий сценарии исключены из активного каталога.
+Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
+передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
