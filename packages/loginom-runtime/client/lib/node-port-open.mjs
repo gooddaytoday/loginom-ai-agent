@@ -146,7 +146,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(!r||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode)fail('Port opening receipt missing or changed');
   if(r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
     ||r.port.parent!==r.node||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Retained port identity changed');
-  if(mode==='menu_issued') {
+  if(mode==='console_closed') {
+   if(r.phase!=='console_close_issued'||model!==r.graph||r.node.FLocked===true)fail('Console recovery owner changed');
+   const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(exact).filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
+   if(panels.some(e=>e!==r.console.panel))fail('Console replaced during port recovery');
+   if(panels.length)return {pending:true};
+   r.phase='reserved';r.consoleClosed=true;return {closed:true};
+  }
+  if(mode==='menu_issued'||mode==='console_close_issued') {
    const graph=r.graph.FDiagram.FmxGraph,drawings=exact(r.portTid).filter(e=>graph.container.contains(e));
    if(r.phase!=='reserved'||model!==r.graph||r.node.FLocked===true
     ||drawings.length!==1)fail('Port changed before menu gesture');
@@ -162,12 +169,53 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
     if(x>=0&&y>=0&&x<width&&y<height&&hit&&(hit===dom||dom.contains(hit)))point??={x,y};
    }
+   if(mode==='console_close_issued'&&point)fail('Console no longer covers port before Close');
    if(!point){
+    const hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
+    const panel=hit?.closest?.('[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"]');
+    const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(exact);
+    if(panel&&panels.length===1&&panels[0]===panel&&!r.consoleClosed&&panel.checkVisibility({checkVisibilityCSS:true})){
+     // Reuse the native split-grid/store binding used for execution inventory.
+     // Only completed records belonging to this prepared graph permit Close.
+     const base=panel.getAttribute('data-tid')+';ProgressForm;';
+     const grids=['treepanel;tree','grd;tbl'].map(t=>exact(base+'trpProgress;'+t));
+     if(grids.some(es=>es.length!==1||!panel.contains(es[0])))fail('Covering console grids unavailable');
+     const views=grids.map(es=>globalThis.Ext?.getCmp?.(es[0].id)),store=views[0]?.getStore?.(),root=store?.getRoot?.()??store?.getRootNode?.();
+     if(store?.$className!=='Ext.data.TreeStore'||store.isLoading?.()||!root?.isModel||!root.internalId
+       ||root.data?.loaded!==true||root.data.loading||views.some((v,i)=>v?.el?.dom!==grids[i][0]||v.getStore?.()!==store))fail('Covering console native binding unavailable');
+     const nodes=r.graph.FDiagram.FNodes.FCollection,seen=new Set();let owned=false;
+     const walk=records=>{
+      if(!Array.isArray(records))fail('Console process inventory unavailable');
+      for(const record of records){
+       if(seen.size>=2000||seen.has(record)||!record?.isModel||record.data?.loading||record.data?.Status!==3
+         ||record.data.CanCancelProcess!==false)fail('Console process is unsettled');
+       seen.add(record);
+       if(record.data.ModelNode){
+        if(nodes.filter(n=>n.data===record.data.ModelNode).length!==1)fail('Console belongs to another graph');
+        owned=true;
+       }
+       walk(record.childNodes);
+      }
+     };walk(root.childNodes);
+     if(!owned||[...document.querySelectorAll('.x-window,.x-menu')].some(e=>e!==panel&&e.checkVisibility({checkVisibilityCSS:true})))fail('Console recovery has a foreign owner or layer');
+     const buttons=exact(panel.getAttribute('data-tid')+';btnClose'),close=buttons[0],native=close&&globalThis.Ext?.getCmp?.(close.id);
+     if(buttons.length!==1||!panel.contains(close)||native?.el?.dom!==close||native.disabled===true
+       ||!close.checkVisibility({checkVisibilityCSS:true})||close.getAttribute('aria-disabled')==='true'
+       ||close.closest('.x-item-disabled,.x-btn-disabled'))fail('Console Close unavailable');
+     const cb=close.getBoundingClientRect(),x=cb.x+cb.width/2,y=cb.y+cb.height/2,top=document.elementFromPoint(x,y);
+     if(cb.width<=0||cb.height<=0||x<0||y<0||x>=width||y>=height||!(top===close||close.contains(top)))fail('Console Close is covered');
+     if(r.console&&(r.console.panel!==panel||r.console.close!==close||r.console.native!==native
+       ||r.console.store!==store||r.console.root!==root||views.some((v,i)=>v!==r.console.views[i])))fail('Console recovery identity changed');
+     r.console??={panel,close,native,store,root,views};
+     if(mode==='console_close_issued')r.phase='console_close_issued';
+     return {console:true,point:{x,y},console_tid:panel.getAttribute('data-tid')};
+    }
+    if(mode==='console_close_issued')fail('Owned console disappeared before Close');
     // Loginom can leave its hover tip over a freshly observed port. Move only
     // to a hit-tested empty point in this graph, then recheck the same owner.
-    const hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
-    const tooltip=hit?.closest?.('[data-tid="ttip"]');
-    if(tooltip?.getAttribute('data-tid')==='ttip'&&exact('ttip').length===1
+    const tooltip=hit?.closest?.('[data-tid="ttip"],[data-tid^="ttip-"]');
+    const tooltipTid=tooltip?.getAttribute('data-tid');
+    if(/^ttip(?:-\d+)?$/.test(tooltipTid??'')&&exact(tooltipTid).length===1
       &&tooltip.checkVisibility({checkVisibilityCSS:true})){
      for(const dy of [.5,.1,.9])for(const dx of [.5,.1,.9]){
       const x=Math.max(0,gb.x)+(Math.min(width,gb.x+gb.width)-Math.max(0,gb.x))*dx;
@@ -240,6 +288,20 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const target=await inspect('begin');trace.push({event:direction+'_port_reserved',...target});
   if(JSON.stringify(await readNode(page,task.binding))!==JSON.stringify(before))throw Error('Prepared node changed before port opening');
   let issued=await inspect('menu_issued');
+  if(issued.console){
+   trace.push({event:direction+'_port_console_observed',console_tid:issued.console_tid});
+   const close=await inspect('console_close_issued');
+   remaining();effect=true;
+   await page.mouse.click(close.point.x,close.point.y,{button:'left'});
+   const until=Date.now()+Math.min(1000,remaining());
+   while((await inspect('console_closed')).pending){
+    if(Date.now()>=until)throw Error('Owned console did not close before port opening');
+    await page.waitForTimeout(Math.min(100,until-Date.now(),remaining()));
+   }
+   effect=false;trace.push({event:direction+'_port_console_closed'});
+   if(JSON.stringify(await readNode(page,task.binding))!==JSON.stringify(before))throw Error('Prepared node changed after console Close');
+   issued=await inspect('menu_issued');
+  }
   if(issued.tooltip){
    const until=Date.now()+Math.min(1000,remaining());
    trace.push({event:direction+'_port_tooltip_observed',point:issued.point});

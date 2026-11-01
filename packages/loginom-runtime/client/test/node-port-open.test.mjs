@@ -3,6 +3,51 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {openPreparedOutputPort} from '../lib/node-port-open.mjs';
 
+for(const direction of ['input','output'])for(const fault of ['none','mf','foreign-store','foreign-node','no-owned-node','running','duplicate','foreign-close','disabled','covered-close','foreign-window','mask','changed-port','persistent','lost-reply','deadline','changed-before-close'])test(direction+' port recovers only its native completed graph console: '+fault,async()=>{
+ const f=fixture(direction);await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
+ const base=fault==='mf'?'MF;ConsoleForm':'ConsoleForm',panel=f.el(base),close=f.el(base+';btnClose');close.parent=panel;
+ panel.contains=e=>{for(let n=e;n;n=n.parent)if(n===panel)return true;return false;};
+ const left=f.el(base+';ProgressForm;trpProgress;treepanel;tree'),right=f.el(base+';ProgressForm;trpProgress;grd;tbl');left.parent=panel;right.parent=panel;
+ const cell=f.el(base+';ProgressForm;colProc');cell.parent=right;
+ const cover={parent:cell,getAttribute:name=>name==='class'?'x-grid-cell-inner ':null,closest:q=>q.includes('ConsoleForm')?panel:cell,
+  getBoundingClientRect:()=>({x:1118,y:757,width:160,height:23})};
+ panel.getBoundingClientRect=()=>({x:324,y:600,width:956,height:200});
+ close.getBoundingClientRect=()=>({x:1259,y:605,width:20,height:20});
+ f.portDom.getBoundingClientRect=()=>({x:1225,y:757,width:6,height:9});
+ const root={isModel:true,internalId:'1053',data:{loaded:true},childNodes:[{isModel:true,internalId:'last',data:{Status:fault==='running'?2:3,CanCancelProcess:false,ModelNode:fault==='foreign-node'?{}:f.node.data},childNodes:[]}]};
+ if(fault==='no-owned-node')delete root.childNodes[0].data.ModelNode;
+ const store={$className:'Ext.data.TreeStore',isLoading:()=>false,getRoot:()=>root};
+ f.nativeControls.set(left.id,{el:{dom:left},getStore:()=>store});f.nativeControls.set(right.id,{el:{dom:right},getStore:()=>fault==='foreign-store'?{}:store});
+ f.nativeControls.set(close.id,{el:{dom:fault==='foreign-close'?{}:close},disabled:fault==='disabled'});
+ if(fault==='duplicate')f.el(base);
+ const query=f.document.querySelectorAll;f.document.querySelectorAll=q=>{
+  if((fault==='foreign-window'&&q==='.x-window,.x-menu')||(fault==='mask'&&q.includes('[role="dialog"]')))return [{checkVisibility:()=>true}];
+  return query(q);
+ };
+ let covered=true,closes=0;
+ f.document.elementFromPoint=(x,y)=>y<650?(fault==='covered-close'?cover:close):(covered?cover:f.portDom);
+ const click=f.page.mouse.click;f.page.mouse.click=async(x,y,options)=>{
+  if(options.button==='right')return click(x,y,options);
+  closes++;assert.deepEqual([x,y],[1269,615]);
+  if(fault==='changed-port')f.port.data={};
+  if(fault==='lost-reply')throw Error('console close reply lost');
+  if(fault==='deadline')f.task.deadline=Date.now()-1;
+  if(fault!=='persistent'){covered=false;panel.visible=false;}
+ };
+ f.page.waitForTimeout=async ms=>{await new Promise(resolve=>setTimeout(resolve,ms));};
+ const evaluate=f.page.evaluate;f.page.evaluate=(fn,arg)=>{if(fault==='changed-before-close'&&arg.mode==='console_close_issued')f.port.data={};return evaluate(fn,arg);};
+ const started=Date.now(),r=await f.run();
+ if(['none','mf'].includes(fault)){
+  assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(closes,1);assert.equal(f.gestures.length,2);
+  assert.ok(r.trace.some(t=>t.event===direction+'_port_console_closed'));
+ }else{
+  assert.notEqual(r.status,'SUCCEEDED');assert.equal(f.gestures.length,0);
+  assert.equal(closes,['changed-port','persistent','lost-reply','deadline'].includes(fault)?1:0);
+  assert.ok(Date.now()-started<2000);
+  if(['persistent','lost-reply'].includes(fault)){assert.equal(r.status,'AMBIGUOUS');await f.run();assert.equal(closes,1);}
+ }
+});
+
 function fixture(direction='output') {
  class ModelForm{};class WizardTreeNode{};class ModelPortTreeNode{};class ModelOutputPortsTreeNode{};class ModelInputPortsTreeNode{};class ModelNodeTreeNode{};
  const prefix='MF;TF',elements=[],box={x:0,y:0,width:20,height:20};
@@ -193,15 +238,16 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
 
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
 
-for(const direction of ['input','output'])for(const variant of ['hidden','delayed','persistent','foreign','changed-port','no-neutral-point'])test(direction+' port tooltip recovery: '+variant,async()=>{
+for(const direction of ['input','output'])for(const tid of ['ttip','ttip-1','ttip-12','ttip-other','ttip-1-menu'])for(const variant of ['hidden','delayed','persistent','foreign','changed-port','no-neutral-point','duplicate'])test(direction+' port tooltip recovery: '+tid+' '+variant,async()=>{
  const f=fixture(direction),moves=[],waits=[];
  await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
  f.portDom.getBoundingClientRect=()=>({x:1225,y:757,width:6,height:9});
  const root=f.graph.FDiagram.FmxGraph.container;
  root.getBoundingClientRect=()=>({x:324,y:100,width:950,height:694});
- const tooltip=f.el(variant==='foreign'?'foreign-tooltip':'ttip');
+ const tooltip=f.el(variant==='foreign'?'foreign-tooltip':tid);
  tooltip.getAttribute=name=>name==='data-tid'?tooltip.tid:name==='class'?'x-tip x-layer x-tip-default x-border-box':null;
- const cover={getAttribute:()=>null,closest:()=>tooltip,getBoundingClientRect:()=>({x:1168,y:692,width:106,height:102})};
+ if(variant==='duplicate')f.el(tid);
+ const cover={tagName:'DIV',getAttribute:name=>name==='class'?'x-autocontainer-innerCt':name==='role'?'presentation':null,closest:()=>tooltip,getBoundingClientRect:()=>({x:1168,y:692,width:106,height:102})};
  let covered=true;
  f.document.elementFromPoint=(x,y)=>x>1200&&y>750?(covered?cover:f.portDom):root;
  f.graph.FDiagram.FmxGraph.getCellAt=(x,y)=>x>900&&y>650||variant==='no-neutral-point'?f.port.FCell:null;
@@ -219,16 +265,17 @@ for(const direction of ['input','output'])for(const variant of ['hidden','delaye
  };
  const started=Date.now();
  const r=await f.run();
- if(['hidden','delayed'].includes(variant)){
+ const recognized=/^ttip(?:-\d+)?$/.test(tid)&&!['foreign','duplicate'].includes(variant);
+ if(recognized&&['hidden','delayed'].includes(variant)){
   assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(moves.length,1);assert.equal(f.gestures.length,2);
   assert.ok(r.trace.some(t=>t.event===direction+'_port_tooltip_cleared'));
   assert.equal(waits.length,variant==='delayed'?1:0);
  }else{
   assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);
   assert.equal(f.gestures.length,0);assert.equal((direction==='input'?f.prep.inputPortOpenReceipts:f.prep.outputPortOpenReceipts).size,0);
-  assert.equal(moves.length,['foreign','no-neutral-point'].includes(variant)?0:1);
+  assert.equal(moves.length,!recognized||variant==='no-neutral-point'?0:1);
   assert.ok(waits.length<=11);assert.ok(Date.now()-started<2000);
-  if(variant==='persistent')assert.match(r.error,/ttip still covers port/);
+  if(recognized&&variant==='persistent')assert.match(r.error,/ttip still covers port/);
  }
 });
 
@@ -301,4 +348,45 @@ test('output wizard permits only its native disabled delete-column mask',async()
   assert.equal(result.status,variant==='valid'?'SUCCEEDED':'AMBIGUOUS',variant+': '+result.error);
   assert.equal(f.gestures.length,2,variant);
  }
+});
+
+
+for(const direction of ['input','output'])for(const fault of ['own','foreign','window'])test('real DOM console overlay before '+direction+' port: '+fault,{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER,timeout:30000,
+},async()=>{
+ const {chromium}=await import('playwright-core');
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
+  await page.setContent(`<style>body{margin:0}#graph{position:absolute;inset:0}#port{position:absolute;left:1225px;top:757px;width:6px;height:9px}
+   #console{position:absolute;left:324px;top:600px;width:956px;height:200px;z-index:10}#close{position:absolute;left:935px;top:5px;width:20px;height:20px;padding:0;border:0}
+   table{position:absolute;left:794px;top:157px;border-collapse:collapse}td{padding:0;width:160px;height:23px}.x-grid-cell-inner{width:160px;height:23px}</style>
+   <div data-tid="tab" class="x-tab-active"></div><div id="graph" data-tid="MF;TF;ModelForm;cmpDiagram"><div id="node" data-tid="MF;TF;Graph;Node"><div id="port" data-tid="MF;TF;Graph;Node;${direction==='input'?'Input':'Output'}_Data-0"></div></div></div>
+   <div id="console" data-tid="ConsoleForm"><button id="close" data-tid="ConsoleForm;btnClose">x</button>
+   <div id="left" data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"></div><div id="right" data-tid="ConsoleForm;ProgressForm;trpProgress;grd;tbl">
+   <table><tr><td data-tid="ConsoleForm;ProgressForm;colProc"><div class="x-grid-cell-inner"></div></td></tr></table></div></div>`);
+  await page.evaluate(fault=>{
+   class ModelForm{};const el=id=>document.getElementById(id),data={},node={FGuid:'node',data,FLocked:false,FCell:{}},port={FGuid:'port',data:{},parent:node,FCell:{},FPortIndex:0};
+   node.FPorts=[{FCollection:[port]}];const model=Object.assign(new ModelForm(),{
+    FDiagram:{FNodes:{FCollection:[node]},FmxGraph:{container:el('graph'),getCellAt:()=>port.FCell,
+     view:{getState:c=>({cell:c,shape:{node:c===node.FCell?el('node'):el('port')}})}}}
+   });
+   const workflow={},packageNode={},card={Controller:{FController:model}};
+   globalThis.bg={app:{Version:'7.4.2',ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}};
+   globalThis.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prep',{phase:'verified',workflowId:'flow',tab:document.querySelector('[data-tid="tab"]'),nodeTargetWorkflowNode:workflow,packageNode}]])};
+   const root={isModel:true,internalId:'1053',data:{loaded:true},childNodes:[{isModel:true,data:{Status:3,CanCancelProcess:false,ModelNode:fault==='foreign'?{}:data},childNodes:[]}]};
+   const store={$className:'Ext.data.TreeStore',isLoading:()=>false,getRoot:()=>root};
+   const components=new Map(['left','right','close'].map(id=>[id,{el:{dom:el(id)},getStore:()=>store}]));
+   globalThis.Ext={getCmp:id=>components.get(id)};
+   el('close').onclick=()=>{el('console').style.display='none';};
+   if(fault==='window'){const d=document.createElement('div');d.className='x-window';d.style='position:absolute;width:50px;height:50px';document.body.append(d);}
+  },fault);
+  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF',tab_tid:'tab'},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const clicks=[],click=page.mouse.click.bind(page.mouse);page.mouse.click=async(x,y,options)=>{clicks.push([x,y,options.button]);await click(x,y,options);if(options.button==='right')throw Error('fixture ends after native port gesture');};
+  const r=await openPreparedOutputPort(page,{binding,direction,port:0,operation_id:'open',origin:'null',build:'7.4.2',deadline:Date.now()+5000},async()=>({verified:true,surface:'graph',locked:false,node_id:'node'}));
+  if(fault==='own'){
+   assert.deepEqual(clicks,[[1269,615,'left'],[1228,761.5,'right']]);
+   assert.ok(r.trace.some(t=>t.event===direction+'_port_console_closed'));assert.match(r.error,/fixture ends/);
+  }else{assert.equal(r.status,'NOT_APPLIED',r.error);assert.deepEqual(clicks,[]);}
+ }finally{await browser.close();}
 });
