@@ -15,6 +15,7 @@ import {Page,runtime} from './executor-fixture.mjs';
 import {closeManagedResources} from '../../../src/managed-resources-close.mjs';
 import {createServer} from 'node:http';
 import {chromium} from 'playwright-core';
+import {stoppedImportOpen} from './stopped-import-open.mjs';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -83,6 +84,22 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:options=>{
   const f=current;
+  if(f.stoppedImport){
+    const node={document_id:'own-doc',workflow_id:'own-workflow',node_id:'source'};
+    const graph={complete:true,document_id:'own-doc',nodes:[],links:[],foreign_links:[]};
+    const adapter={observe:async request=>({...structuredClone(graph),workflow_ref:request.workflow_ref}),preflight:async()=>{},
+      positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),
+      mutate:async e=>{assert.equal(e.kind,'create');graph.nodes.push({ref:node,type:'imports.text',label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
+    f.runtime=executor.createActionRuntime({...options,nodeTargetAdapterFactory:()=>adapter,
+      nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate(){},configure(){throw Error('Late configure');}}]]),
+      nodeApplyDriverFactory:({operation})=>({verifySource:async()=>({verified:true,cleanup_complete:true}),
+        finish:async()=>{throw Error('Late finish');},waitExecution:async()=>{throw Error('Late execute');},
+        readOutput:async()=>{throw Error('Late read');},verifyContinuation:async()=>true,
+        mapPorts:async()=>({verified:true,cleanup_complete:true}),openWizard:async()=>{
+          f.opening=stoppedImportOpen(operation);throw Error('WIZARD_CONTEXT_CHANGED');
+        },releasePending:()=>f.opening.run()})});
+    return f.runtime;
+  }
   if(f.realExecutor){
     // Only the external node driver is controlled. Keep the production facade,
     // job runner, cache cleanup and bridge close path intact for this regression.
@@ -215,6 +232,42 @@ if(process.env.LOGINOM_DOCK_TEST_BROWSER)for(const [fault,delay] of [
   // the fixture's gesture counters, never to promote the cleanup decision.
   assert.deepEqual(await page.evaluate(()=>gestures),{close:1,avatar:1,logout:success?1:0});
   assert.equal(f.events.filter(e=>e==='package-cleanup').length,1);
+});
+
+test('LAB-666 stopped Import opening releases before package close/logout and managed ACK',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'cleanup-import-open-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const f=current={scenario:'opened-clean',stoppedImport:true,events:[],saves:0,path,catalog};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+  artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+  mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+  loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+ const client=new AgentClient({name:'stopped-import-cleanup',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path}})).isError,true);
+  f.runtime.startNodeApply({operation_id:'import-update',contract_revision:'1.0.0',document_id:'own-doc',
+   workflow_ref:{workflow_id:'own-workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+   target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],
+   finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+  const stopped=await f.runtime.waitNodeApply('import-update',{timeoutMs:1000});
+  assert.ok(stopped.outcome,JSON.stringify(stopped));
+  assert.equal(stopped.outcome.error.code,'NODE_APPLY_STOPPED');assert.equal(stopped.outcome.output.pending_phase,'open');
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+  const released=await f.runtime.recover('import-update',{strategy:'abandon_operation',recoveryOperationId:'release-import-update'});
+  const closed=await closeManagedResources({bridge,session},[]).then(()=>({ok:true}),error=>({ok:false,error:error.message}));
+  assert.equal(closed.ok,true,JSON.stringify({released,closed}));
+  assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));assert.equal(f.runtime.hasUnsettledWork(),false);
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+  const stages=(await readFile(join(directory,'resource-close.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+  assert.equal(stages.at(-1).stage,'complete');assert.equal(stages.at(-1).status,'fulfilled');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(f.opening.gestures,[{verb:'click',ref:'ui-cancel'}]);
+  assert.deepEqual(f.events.filter(e=>['package-cleanup','browser-close','remote-close'].includes(e)),['package-cleanup','remote-close','browser-close']);
+ }finally{await client.close().catch(()=>{});await bridge.close().catch(()=>{});await rm(directory,{recursive:true,force:true});}
 });
 
 for(const scenario of ['opened-clean','opened-dirty','opened-uncertain'])
