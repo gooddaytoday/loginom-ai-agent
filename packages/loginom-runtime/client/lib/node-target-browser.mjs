@@ -70,6 +70,10 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
+        // Linear regression replaces its caption when the wizard finishes,
+        // leaving an alternate SVG without TID. Rebind only the same native
+        // data port to the new caption with its exact previous suffix.
+        const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.
@@ -81,13 +85,15 @@ export async function readGraph(page, task) {
         if(!ptid && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && previous.nodeTid===tid
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedRegression)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedRegression?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
-              || (!previous && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+              || ((!previous || renamedRegression) && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+            if(renamedRegression && (candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if([...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
