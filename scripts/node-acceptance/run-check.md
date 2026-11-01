@@ -134,7 +134,12 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+`rest-get-plain`: один GET https://httpbin.org/status/200 без query-параметров
+и входной таблицы. Задача и независимый oracle —
+`docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
+CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
+
+Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 `join-right`, `join-full`, `join-difference` use the approved per-mode tasks,

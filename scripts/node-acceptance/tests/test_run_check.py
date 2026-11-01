@@ -1004,6 +1004,21 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
 
+    def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
+        case = runner.scenario('rest-get-plain')
+        self.assertIsNone(case['base'])
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertEqual([p for p in case['data'].iterdir() if p.suffix in ['.csv', '.xlsx']], [])
+        self.assertIn('без query-параметров и без входной таблицы', case['prompt'].read_text())
+        expected = runner.expected_for(case, '/test/plain.lgp')
+        self.assertEqual(expected['package_path'], '/test/plain.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual(output['rows'], [dict(ErrorCode=0, HttpStatusCode=200)])
+        self.assertEqual(output['output_node_type'], 'export_input')
+        self.assertEqual([c['name'] for c in output['columns']], ['ErrorCode', 'HttpStatusCode'])
+        result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
         self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
         case = runner.scenario('logreg-enter')

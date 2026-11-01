@@ -1,9 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateRestRequestParameters} from '../lib/rest-request-parameters.mjs';
+import {validateRestRequestParameters,restRequestParametersSchema} from '../lib/rest-request-parameters.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('plain GET accepts an empty query list and no table input through schema and runtime validation',()=>{
+ const p={connection:{name:'Plain',base_url:'https://httpbin.org/status/200',response_content_type:'text/html'},query_parameters:[]};
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ assert.equal(validate(p).valid,true);
+ for(const inputs of [[],request.inputs])assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',{...request,inputs}));
+ for(const finish of ['done','close'])assert.throws(()=>validateRestRequestParameters(p,'request',{...request,inputs:[],finish}),/finish=execute/);
+ for(const query_parameters of [undefined,null,{},Array(33).fill({name:'a',field:'a'})])
+  assert.throws(()=>validateRestRequestParameters({...p,query_parameters},'request',{...request,inputs:[]}));
+ assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,inputs:[]}),/one table input/);
+});
 test('REST response Content-Type is an explicit optional connection setting',()=>{
  for(const response_content_type of ['application/json','text/html']){
   const p=parameters();p.connection.response_content_type=response_content_type;
