@@ -102,10 +102,11 @@ export function selectColdOutputReads(graph,outputs,{exportInput,savedNode}={}){
   return {node,ports:ports.map(port=>({port,content_candidate:!requested.includes(port)}))};
  });
 }
-export function resolveExportInput(graph,{destination,destinations}={}){
+export function resolveExportInput(graph,{destination,destinations,type='exports.text'}={}){
  const error='COLD_EXTRA_OR_MISSING_OUTPUT_NODE';
  need(graph?.complete===true&&Array.isArray(graph.nodes)&&Array.isArray(graph.links),error);
- let exports=graph.nodes.filter(n=>n.type==='exports.text');
+ need(['exports.text','exports.excel'].includes(type),error);
+ let exports=graph.nodes.filter(n=>n.type===type);
  if(destination!==undefined){
   need(Array.isArray(destinations)&&destinations.length===exports.length
    &&new Set(destinations.map(d=>d.node_id)).size===exports.length
