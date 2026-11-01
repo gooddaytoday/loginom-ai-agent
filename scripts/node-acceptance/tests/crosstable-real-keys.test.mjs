@@ -18,6 +18,8 @@ assert e['package_path']=='/owned/real.lgp'
 v=e['outputs'][0]
 assert v['output_port']==0 and v['column_order']=='exact'
 assert v['ordered'] is True
+assert all(c.get('name_any') is True for c in v['columns'][2:])
+assert all(not c.get('name_any') for c in v['columns'][:2])
 assert [x['type'] for x in v['columns']]==['real','string','real','integer','real','integer']
 values=[[row[c['name']] for c in v['columns']] for row in v['rows']]
 rows={(x[0],x[1]):x[2:] for x in values}
@@ -36,6 +38,17 @@ with tempfile.TemporaryDirectory() as d:
    w=csv.writer(f);w.writerow([x['name'] for x in v['columns']])
    w.writerows([['?' if x is None else x for x in row] for row in rows])
  write(values);r.check_csv(p,v,null_marker='?')
+ # Category-based names are a valid native option, not fixed by task.md.
+ with p.open('w') as f:
+  w=csv.writer(f);w.writerow(['R','Segment','A_Amount_Sum','A_Amount_Count','B_Amount_Sum','B_Amount_Count'])
+  w.writerows([['?' if x is None else x for x in row] for row in values])
+ r.check_csv(p,v,null_marker='?')
+ # Flexible generated names must retain category/function order and values.
+ wrong=[row[:2]+row[4:]+row[2:4] for row in values]
+ write(wrong)
+ try:r.check_csv(p,v,null_marker='?')
+ except AssertionError:pass
+ else:raise AssertionError('swapped category values were accepted')
  wrong=[list(row) for row in values]
  next(row for row in wrong if row[0]==0.10000000000000002)[0]=0.1
  write(wrong)

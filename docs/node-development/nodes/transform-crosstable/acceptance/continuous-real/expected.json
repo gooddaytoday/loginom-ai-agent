@@ -32,21 +32,25 @@
         {
           "name": "C_1_Amount_Sum",
           "label_any": true,
+          "name_any": true,
           "type": "real"
         },
         {
           "name": "C_1_Amount_Count",
           "label_any": true,
+          "name_any": true,
           "type": "integer"
         },
         {
           "name": "C_2_Amount_Sum",
           "label_any": true,
+          "name_any": true,
           "type": "real"
         },
         {
           "name": "C_2_Amount_Count",
           "label_any": true,
+          "name_any": true,
           "type": "integer"
         }
       ],

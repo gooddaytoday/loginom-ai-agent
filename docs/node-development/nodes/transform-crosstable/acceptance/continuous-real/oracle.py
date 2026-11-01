@@ -22,7 +22,7 @@ def expected():
         'columns': [
             {'name': 'R', 'label': 'R', 'type': 'real'},
             {'name': 'Segment', 'label': 'Segment', 'type': 'string'},
-            *[{'name': f'C_{index}_Amount_{function}', 'label_any': True,
+            *[{'name': f'C_{index}_Amount_{function}', 'label_any': True, 'name_any': True,
                'type': 'real' if function == 'Sum' else 'integer'}
               for index in [1, 2] for function in ['Sum', 'Count']],
         ],
