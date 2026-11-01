@@ -6,8 +6,8 @@ export function replacementSources(configuration,mode){
  need(['replace','add'].includes(mode),'Verified replacement output mode required');
  const changed=new Set(configuration.rules.map(r=>r.field.name));
  return configuration.input_fields.flatMap(f=>{
-  const original={name:f.name,label:f.label,type:f.type};if(!changed.has(f.name))return [original];
-  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'}];
+  const original={name:f.name,label:f.label,type:f.type},rule=configuration.rules.find(r=>r.field.name===f.name);if(!changed.has(f.name))return [original];
+  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:rule.result_type??f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'},...(rule.precision>0?[{name:f.name+'_Delta',label:f.label+' Отклонение',type:'real'}]:[])];
  });
 }
 export function validateReplacementSources(configuration,native){

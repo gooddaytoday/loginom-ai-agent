@@ -7,8 +7,20 @@ function fixture(fault){
  const base='W;UnionDataWizard;',check=base+'normalHeaderCt;chk1_A',field=base+'normalHeaderCt;col1_A',option=base+'grdUnionData;grd-1;tbl;celleditor;cbx;boundlist;Right';
  const elements=[check,field].map(tid=>({...hit,tid,ref:tid,allowed_actions:['click']}));elements.push({tid:base+'cntUsePrefixes;cnt;chb;InputEl',ref:'prefix-use',allowed_actions:['set_checked']});for(const [key,part] of [['name','pedNamePrefix'],['label','pedDisplayNamePrefix']])elements.push({ref:'prefix-'+key,identity:{anchor_tid:base+part+';ValueControl'},signature:{tag:'input'},allowed_actions:['fill','press'],value:c.prefixes[key]});let pending;const s={wizard:{stage:'union',root_tid:'W'},node_union:c,ui:{elements}},actions=[];
  const channel={observe:async({ready,readUnion})=>{if(readUnion&&pending)throw Error('Uncommitted native value');assert.ok(ready(s));return structuredClone(s);},perform:async({resolve})=>{const a=resolve(s);actions.push(a);if(a.ref==='prefix-use')c.prefixes={...c.prefixes,enabled:a.checked};else if(a.ref.startsWith('prefix-')){const key=a.ref.slice(7);if(a.verb==='fill')pending={key,value:a.text};else {assert.equal(a.key,'Tab');c.prefixes={...c.prefixes,[key]:pending.value};pending=null;}}else if(a.ref===check){const had=c.mappings[0].pairs.length;c.mappings[0]={port:1,pairs:had?[]:[{main:'A',source:'Wrong'}],unmatched:had?['Wrong','Right']:['Right']};}else if(a.ref===field){c.editor={port:1,main:'A',record_id:'row-A',root_tid:base+'grdUnionData;grd-1;tbl;celleditor',choices_tid:option.slice(0,option.lastIndexOf(';'))};elements.push({...hit,tid:option,ref:option,allowed_actions:['click']});}else if(a.ref===option)c.mappings[0]={port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']};if(fault)throw Error(fault);}};
- return {c,actions,channel};
+ return {c,actions,channel,state:s};
 }
+test('union native automatic command is narrowed to explicit overrides and final readback',async()=>{
+ const f=fixture();for(const e of f.state.ui.elements)if(e.tid?.endsWith('col1_A'))e.allowed_actions.push('right_click');
+ const perform=f.channel.perform;f.channel.perform=async spec=>{
+  const a=spec.resolve(f.state);
+  if(a.verb==='right_click'){f.actions.push(a);f.state.ui.elements.push({tid:'mnUnionGrid;mniLinksAuto',ref:'auto',allowed_actions:['click']});return;}
+  if(a.ref==='auto'){f.actions.push(a);f.state.ui.elements.splice(f.state.ui.elements.findIndex(e=>e.ref==='auto'),1);f.c.mappings[0]={port:1,pairs:[{main:'A',source:'Wrong'}],unmatched:['Right']};return;}
+  return perform(spec);
+ };
+ const r=await configureUnion(f.channel,{...p,auto_match:'name_type'},{request:{finish:'done'}});
+ assert.deepEqual(r.configuration.mappings[0],{port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']});
+ assert.equal(f.actions.filter(a=>a.ref==='auto').length,1);assert.equal(f.actions[0].verb,'right_click');
+});
 test('union replaces the automatic compatible choice with the explicit source',async()=>{const f=fixture();const r=await configureUnion(f.channel,p,{request:{finish:'execute'}});assert.equal(r.configuration.mappings[0].pairs[0].source,'Right');assert.equal(f.actions.length,3);});
 test('union does not repeat a mapping gesture after losing its reply',async()=>{const f=fixture('lost response');await assert.rejects(configureUnion(f.channel,p,{request:{finish:'execute'}}),/lost response/);assert.equal(f.actions.length,1);});
 test('union Close leaves the entire draft unchanged',async()=>{const f=fixture(),before=structuredClone(f.c);const r=await configureUnion(f.channel,p,{request:{finish:'close'}});assert.equal(r.effect_possible,false);assert.deepEqual(f.c,before);assert.equal(f.actions.length,0);});

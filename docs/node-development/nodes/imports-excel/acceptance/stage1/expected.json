@@ -16,17 +16,20 @@
         {
           "name": "Id",
           "label": "Id",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         },
         {
           "name": "Region",
           "label": "Region",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Amount",
           "label": "Amount",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [

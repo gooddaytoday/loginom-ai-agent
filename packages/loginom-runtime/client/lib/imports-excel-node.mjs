@@ -55,7 +55,7 @@ export function verifyExcelFullCount(profileId,receipt,source,configuration,outp
 }
 export function excelSchemaSnapshot(configuration,mapping){
  need(configuration?.verified&&configuration.auto_detect==='Нет'&&configuration.columns?.length>0
-  &&configuration.columns.length<=8&&mapping?.verified&&mapping.inventory_complete&&mapping.source_identity_verified,
+  &&configuration.columns.length<=12&&mapping?.verified&&mapping.inventory_complete&&mapping.source_identity_verified,
   'LOGINOM_IMPORT_SCHEMA_CHANGED: complete Excel definitions and mapping required');
  const field=f=>Object.fromEntries(['field_id','index','name','label','type','data_kind','used','excluded','inherited'].filter(k=>Object.hasOwn(f,k)).map(k=>[k,f[k]]));
  return {auto_detect:configuration.auto_detect,header_rows:configuration.source.header_rows,whole_sheet:configuration.source.whole_sheet,

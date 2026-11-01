@@ -60,6 +60,23 @@ export async function configureUnion(channel,p,{request}){
  const wanted=resolveUnionTables(p,s.node_union.input_fields),changes=[];
  const click=async(tid,condition)=>{const old=s.node_union;await channel.perform({condition,initialObservation:s,ready:unionReady,identity:()=>semantic(old),resolve:s=>({verb:'click',ref:control(s,tid,'click').ref})});};
  const base=s.wizard.root_tid+';UnionDataWizard;';
+ if(p.auto_match&&s.node_union.input_fields[0].length){
+  const field=s.node_union.input_fields[0][0].name;
+  s=await revealUnionField(channel,s,1,field,'field');const before=s.node_union;
+  await channel.perform({condition:'open native union automatic mapping menu',initialObservation:s,ready:unionReady,
+   identity:()=>semantic(before),resolve:s=>({verb:'right_click',ref:control(s,cellTid(s,1,field,'field'),'right_click').ref})});
+  s=await channel.observe({condition:'native union automatic mapping menu',readUnion:true,
+   ready:s=>unionReady(s)&&s.ui.elements.some(e=>e.tid==='mnUnionGrid;mniLinksAuto'&&e.allowed_actions.includes('click'))});
+  need(same(semantic(before),semantic(s.node_union)),'Union settings changed while opening automatic mapping menu');
+  // Loginom offers one command: name/type followed by label/type. The
+  // existing explicit editor below restricts its result to the selected mode
+  // and restores every declared override, including explicit null sources.
+  await click('mnUnionGrid;mniLinksAuto','apply native union automatic mapping');
+  s=await channel.observe({condition:'native union automatic mapping readback',readUnion:true,
+   ready:s=>unionReady(s)&&!s.ui.elements.some(e=>e.tid==='mnUnionGrid;mniLinksAuto'&&e.allowed_actions.includes('click'))});
+  need(same(before.input_fields,s.node_union.input_fields)&&same(before.prefixes,s.node_union.prefixes),'Union inputs changed during automatic mapping');
+  changes.push({auto_match:p.auto_match});
+ }
  if(s.node_union.prefixes.enabled!==p.prefixes.enabled){
   const before=s.node_union;
   await channel.perform({condition:'set union prefix use',initialObservation:s,ready:unionReady,identity:()=>semantic(before),

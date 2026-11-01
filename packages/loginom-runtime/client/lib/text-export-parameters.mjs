@@ -19,6 +19,7 @@ export const EXPORT_FIELDS=Object.freeze({
 });
 const need=(v,m)=>{if(!v)throw Error(m);};
 export function validateExportDestination(value,directories=null){
+ need(typeof value==='string'&&/\.(csv|tsv)$/i.test(value),'Text export requires a CSV or TSV filename');
  return requireExportDestination(value,directories);
 }
 export function validateTextExportParameters(p,mode,r,directories=null){
@@ -37,7 +38,7 @@ export function validateTextExportParameters(p,mode,r,directories=null){
   need(!missing.length,'Invalid parameters.'+missing[0]+': required for a new export; missing fields: '+missing.join(', '));
  }
  if('destination'in p)validateExportDestination(p.destination,directories);
- for(const [k,values]of Object.entries({encoding:['UTF-8'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
+ for(const [k,values]of Object.entries({encoding:['UTF-8','Windows-1251'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
   decimal_separator:['.',','],text_qualifier:['"'],null_marker:['','?','null','NULL'],date_separator:['.','/','\\','-'],time_separator:[':', '.'],
   date_format:['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'],time_format:['h:mm','hh:mm','h:mm:ss','hh:mm:ss','hh:nn:ss.zzz'],
   true_value:['True','Истина','Да'],false_value:['False','Ложь','Нет'],overwrite:['reject','replace']}))
@@ -46,13 +47,13 @@ export function validateTextExportParameters(p,mode,r,directories=null){
  if(p.overwrite==='replace')need('destination'in p,'Replace requires an explicit destination on every operation');
 }
 export function nativeExportValue(key,value){
- return key==='encoding'?65001:key==='header'?{none:0,names:1,labels:2}[value]:key==='line_ending'?{LF:0,CRLF:1}[value]:value;
+ return key==='encoding'?{'UTF-8':65001,'Windows-1251':1251}[value]:key==='header'?{none:0,names:1,labels:2}[value]:key==='line_ending'?{LF:0,CRLF:1}[value]:value;
 }
 
 // Existing nodes may retain formats outside the candidate contract. Check the
 // observed final format before Done/Execute, including fields omitted by a patch.
 export function validateNativeExportFormat(values){
- for(const [key,allowed] of Object.entries({encoding:[65001],delimiter:[';',',','\t'],header:[0,1,2],line_ending:[0,1],bom:[true,false]}))
+ for(const [key,allowed] of Object.entries({encoding:[65001,1251],delimiter:[';',',','\t'],header:[0,1,2],line_ending:[0,1],bom:[true,false]}))
   need(allowed.includes(values[key]?.value),'Unsupported retained export '+key);
 }
 

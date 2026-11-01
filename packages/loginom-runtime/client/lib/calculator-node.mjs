@@ -318,7 +318,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Closing the inspected LinReg apply draft asynchronously replaces its SVG
     // body. Settle that selection by reading, before issuing the first click;
     // retain the original observation/operation deadlines and gesture guards.
-    const settleApply=implementation?.type==='datamining.lin_regression'&&operation.nodeApply.request.mode==='apply';
+    const settleApply=['datamining.lin_regression','preprocessing.binning'].includes(implementation?.type)&&operation.nodeApply.request.mode==='apply';
     const selection=s=>s.ui.elements.filter(e=>
      (e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
       ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')

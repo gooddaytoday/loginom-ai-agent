@@ -1,5 +1,52 @@
 Run live acceptance without repeatedly reading live logs:
 
+`date-time-minsec` uses the independent fixture under
+`docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
+minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
+inputs, then removal of only DateA minutes from the same node. Stock CSV,
+Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
+
+`clustering-normalized`: k-means, 12 объектов с X/Y в разных масштабах.
+На одном узле сначала none, затем standardize дважды с seed 42; оба порта,
+два CSV, Save и cold. Независимые геометрические инварианты проверяют каждую
+строку ровно один раз, три группы, отличие от raw-разбиения, центры как средние
+в исходных единицах (abs 1e-6), расстояния с выборочным SD и повторяемость seed.
+Cold читает сохранённые роли, NormType=5, k и seed без повторной настройки.
+Oracle/expected не передаются модели.
+
+`excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
+from a three-sheet workbook with different schemas. `excel-import-wide` imports
+all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-single` retains the original three-field, first-sheet fixture.
+Only the original XLSX and user task reach the model. Independent OpenPyXL
+oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
+`missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
+use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
+reach the model. Independent expected tables check numeric zero imputation,
+preserved zero/NULL and unprocessed fields, all-NULL, threshold and empty input.
+The main case changes mean to zero on the same node; each case uses CSV/Save/cold.
+
+`union-auto-match`: three inputs with reordered Code/Amount fields and one
+unpaired Extra column, name/type automatic matching, preserved duplicate rows,
+and repeated configuration of the same Union node. Independent CSV/typed cold
+expected is in `docs/node-development/nodes/union/acceptance/union-auto-match`.
+
+Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
+Only these translate their proposal into `sampling_modes`. The unchanged task
+and modes.csv go to the model; the oracle never does. Decision 1 checks two
+completed executions and exact typed source membership, with every CSV compared
+to the observed result. Configured sizes and seed are verified, but output sizes,
+quotas, source row order and P relations are not acceptance assertions.
+Cold validates the direct import → requested node → export graph and native
+field names/types. Native definition order is observed, not constrained. After
+Cancel, which can deselect/deactivate outputs, a fresh production execution
+reselects this node and verifies completion before reading any port. Two such
+rounds must match main. Field presentation permutations are normalized by
+verified names/types. Save, port proofs, cancellation and cleanup remain mandatory.
+Stratified, biased and uniform are not registered.
+Stock expected parsing, exact matching and existing scenarios are unchanged.
+
 ```sh
 python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n1,q7 --pair ~/.config/loginom-multica/cards/PAIR --cold
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
@@ -124,9 +171,15 @@ this also retains failures from the base scenario in the final result.
 `docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
 CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
 
-Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: replace-exact (precision zero regression), replace-nearest (numeric inclusive absolute tolerance, nearest/ties, patch, Delta), replace-convert, regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+`text-export-cp1251` uses its frozen task/expected/oracle under
+`nodes/text-export/acceptance/cp1251`: CP1251 input, Cyrillic labels/values,
+semicolon/CRLF, exact file bytes, then the same export node switched to UTF-8.
+Its two exports use independent byte checks; cold reads the final UTF-8 file.
+For a downloaded CP1251 file, direct cold-check supports explicit
+`--csv-encoding Windows-1251`; the default remains UTF-8.
 `join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
 CSV inputs and expected outputs in `docs/node-development/nodes/join/acceptance/`.
 Each runs independently with the stock CSV, Save, cold and cleanup checks.
@@ -202,7 +255,43 @@ large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
+`grouping-unique`: повторяющиеся клиенты по регионам, integer/string,
+NULL и пустая строка; count одновременно с unique_count. Одна Группировка
+перенастраивается и переименовывается. Task, независимый set/count oracle
+и expected: `docs/node-development/nodes/grouping/acceptance/unique/`.
+Модель получает только task и customers.csv; CSV, Save, cold и cleanup
+проверяются штатной оснасткой.
+
 To add a scenario for a new node:
+
+| Name | Stock fixture under docs/node-development/nodes | Acceptance |
+|---|---|---|
+| calculator-viewport | transform-calculator/acceptance/calculator-viewport | Nine calculators, distant financial node, export then fresh port/tooltip read; CSV/Save/cold/cleanup |
+| linreg-short | datamining-linregression/acceptance/linreg-short | Expected Loginom training error: two rows, four coefficients; Save/cleanup, no CSV |
+| throw1 | programming-javascript/acceptance/throw1 | Expected JavaScript exception; Save/cleanup, no CSV |
+| js-declared-empty | programming-javascript/acceptance/js-declared-empty | Positive declared Broken:real empty table; header-only CSV/Save/cold/cleanup |
+
+These four names run without private fixtures or `--case-root`.
+The private `execution_error: {"text": "..."}` oracle with `outputs: []`
+requires the expected text in a tool's error result (or native browser error
+snapshot) and in the final user response, no export request/downloaded CSV,
+Save after the error, normal close/logout without discard and runtime-close ACK.
+This is separate from `upload_only`: saving is required.
+No output port is required for an expected execution error; any returned
+ports still pass the stock native ownership/exactness/cleanup checks.
+Cold readback is inapplicable to the two expected execution errors; `--cold`
+continues to check all positive cases, including the declared empty table.
+Oracle contents never reach the model.
+
+`tree-repeat` and `tree-no-repeat` use the approved tasks under
+`trees-jsontotree/acceptance` and `trees-treetodata/acceptance`, respectively,
+and only the original `documents.csv`. Their independent expected files carry
+`export_destination: tree-result.csv`; the runner adds the owned export request
+when its filename is absent from the immutable task. Main acceptance checks
+every typed tree instance and schema field against `proposed_tree_output`.
+With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
+table is read with the existing completed-port reader. Repeat on/off run in
+separate chats, profiles and packages; no oracle content reaches the model.
 
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
@@ -218,7 +307,7 @@ To add a scenario for a new node:
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
 
 Offline tests: from `scripts/node-acceptance/tests`, run
-`python3 -m unittest test_run_check -v`.
+`python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
 
 CSV specification audit (the original 87 fixture names, including variants; D87 uses its generated manifest):
 
@@ -249,6 +338,12 @@ must close the pristine draft and log out without Save or discard, with a
 runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
+
+`crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
+ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
+`docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
+Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
+близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
 
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
@@ -282,3 +377,42 @@ runner допускает два ограничения нативного CSV w
 Cold сверяет исходный эталон без CSV-допусков; его FAIL всегда даёт итог FAIL.
 Ответ модели об ограничениях нативного экспорта проверяется по model.stdout
 при составлении отчёта (отдельного машинного oracle для текста ответа нет).
+
+`exports-excel` runs the approved XLSX sink task and cells.csv fixture from
+`nodes/exports-excel/acceptance`, retains `output_port:null`, and verifies the
+download with that node’s independent ZIP/XML oracle. `--cold` additionally
+checks the saved Excel destination/sheet/header/general format and freshly
+reads the connected table for native types, values and field order. It does
+not overwrite or reexecute the existing file sink. CSV/TSV cases retain their
+existing reader and `--csv` cold path.
+
+`acf-series`, `acf-update`, `acf-one`, `acf-eight`: Автокорреляция одной числовой
+серии во временной области, ЧАКФ выключена, 4/4/1/8 отсчётов включая лаг 0.
+Задания и независимые expected — `docs/node-development/nodes/research-autocorrelation/acceptance`.
+`acf-update` заменяет вход того же узла; остальные получают только series.csv.
+CSV и cold проверяют весь выход порта 0, порядок полей и лагов, точные Boolean/NULL,
+abs=1e-8 только для real, метки через label_any.
+
+`binning-count`, `binning-width`, `binning-frequency`, `binning-frequency-ties`,
+`binning-real`, `binning-integer`, `binning-apply`, `binning-retrain`, `binning-holdout`
+используют утверждённые task*.md/expected*.json из
+`docs/node-development/nodes/preprocessing-binning/acceptance`. Каждый запускается
+с отдельными входами, двумя CSV и cold-чтением обоих портов; apply/retrain заменяют
+источник того же импорта внутри одного сценария. NULL/пустая строка, типы, порядок
+полей и строк точны, Real abs/rel 1e-12.
+
+`smoothing-hp`: Сглаживание HP Lambda=1 для X/R, series → update на прежнем узле,
+фиксированный порядок RowID,X,R,Tag,X_S,R_S через autosync=false;
+приёмочный комплект `preprocessing-smoothing/acceptance`, ordered CSV/Save/cold.
+
+`date-time-iso` и `date-time-iso-empty`: четыре операции ISO-календаря в «Дата и время»,
+утверждённые task-iso-weeks*.md и независимый Python expected из
+`docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
+из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
+
+`logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
+со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
+Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
+информационные/строгий/мягкий сценарии исключены из активного каталога.
+Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
+передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.

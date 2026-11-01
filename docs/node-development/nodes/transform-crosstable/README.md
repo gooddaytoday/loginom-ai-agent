@@ -2,6 +2,13 @@
 
 Устойчивый ID: `component.transform.CrossTable`. Slug: `transform-crosstable`. Исторический подплан 15.
 
+Ключи строк: дискретные string/integer/real/boolean/datetime и непрерывные
+integer/real. Колонки требуют дискретных полей; типы и функции фактов сохраняют
+существующий контракт. Равные числовые ключи объединяются точно, без округления;
+NULL образует отдельную группу. Подробности — [наблюдения стенда](discovery.md).
+Сценарий `crosstable-real-keys` проверяет fixed → sliding на том же узле,
+сочетание real с дискретным ключом, NULL, CSV, Save и cold.
+
 [Подплан](plan.md) · [наблюдения стенда](discovery.md) · [реестр](../../registry.json).
 
 ## Состояние

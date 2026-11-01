@@ -1,0 +1,324 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.data_partition"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_node_label": "Случайные все",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "IsTestSet",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "IsTestSet": false,
+          "RowID": 1,
+          "Class": "A",
+          "Value": 10
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 2,
+          "Class": "A",
+          "Value": 20
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 3,
+          "Class": "A",
+          "Value": 30
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 4,
+          "Class": "A",
+          "Value": 40
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 5,
+          "Class": "A",
+          "Value": 50
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 6,
+          "Class": "A",
+          "Value": 60
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 7,
+          "Class": "A",
+          "Value": 70
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 8,
+          "Class": "A",
+          "Value": 80
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 9,
+          "Class": "A",
+          "Value": 90
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 10,
+          "Class": "A",
+          "Value": 100
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 11,
+          "Class": "B",
+          "Value": 110
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 12,
+          "Class": "B",
+          "Value": 120
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 13,
+          "Class": "B",
+          "Value": 130
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 14,
+          "Class": "B",
+          "Value": 140
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 15,
+          "Class": "B",
+          "Value": 150
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 16,
+          "Class": "B",
+          "Value": 160
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 17,
+          "Class": "B",
+          "Value": 170
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 18,
+          "Class": "B",
+          "Value": 180
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 19,
+          "Class": "B",
+          "Value": 190
+        },
+        {
+          "IsTestSet": false,
+          "RowID": 20,
+          "Class": "B",
+          "Value": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_node_label": "Случайные все",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Class": "A",
+          "Value": 10
+        },
+        {
+          "RowID": 2,
+          "Class": "A",
+          "Value": 20
+        },
+        {
+          "RowID": 3,
+          "Class": "A",
+          "Value": 30
+        },
+        {
+          "RowID": 4,
+          "Class": "A",
+          "Value": 40
+        },
+        {
+          "RowID": 5,
+          "Class": "A",
+          "Value": 50
+        },
+        {
+          "RowID": 6,
+          "Class": "A",
+          "Value": 60
+        },
+        {
+          "RowID": 7,
+          "Class": "A",
+          "Value": 70
+        },
+        {
+          "RowID": 8,
+          "Class": "A",
+          "Value": 80
+        },
+        {
+          "RowID": 9,
+          "Class": "A",
+          "Value": 90
+        },
+        {
+          "RowID": 10,
+          "Class": "A",
+          "Value": 100
+        },
+        {
+          "RowID": 11,
+          "Class": "B",
+          "Value": 110
+        },
+        {
+          "RowID": 12,
+          "Class": "B",
+          "Value": 120
+        },
+        {
+          "RowID": 13,
+          "Class": "B",
+          "Value": 130
+        },
+        {
+          "RowID": 14,
+          "Class": "B",
+          "Value": 140
+        },
+        {
+          "RowID": 15,
+          "Class": "B",
+          "Value": 150
+        },
+        {
+          "RowID": 16,
+          "Class": "B",
+          "Value": 160
+        },
+        {
+          "RowID": 17,
+          "Class": "B",
+          "Value": 170
+        },
+        {
+          "RowID": 18,
+          "Class": "B",
+          "Value": 180
+        },
+        {
+          "RowID": 19,
+          "Class": "B",
+          "Value": 190
+        },
+        {
+          "RowID": 20,
+          "Class": "B",
+          "Value": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.data_partition",
+      "output_node_label": "Случайные все",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Class",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

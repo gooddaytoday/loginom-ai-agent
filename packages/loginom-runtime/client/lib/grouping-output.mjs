@@ -1,6 +1,6 @@
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
-import {GROUPING_FUNCTIONS} from './grouping-parameters.mjs';
+import {GROUPING_FUNCTIONS,supportedGroupingMeasure} from './grouping-parameters.mjs';
 import {configureOutputFields,reorderOutputFields,configureOutputAutosync,excludeOutputField} from './port-mapping-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -8,9 +8,9 @@ export function groupingOutputDefinitions(configuration){
  const fields=configuration.keys.map(f=>({name:f.name,label:f.label,type:f.type,field:f.name,function:null}));
  for(const f of configuration.measures){
   const functions=Object.entries(GROUPING_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0);
-  need(functions.length>0&&(f.functions&~31)===0,'Unsupported grouping functions');
+  need(supportedGroupingMeasure(f),'Unsupported grouping functions');
   for(const [fn,v] of functions)fields.push({name:f.name+(functions.length>1?'_'+v.suffix:''),label:f.label+'|'+v.label,
-   type:fn==='sum'||fn==='avg'?'real':fn==='count'?'integer':f.type,field:f.name,function:fn});
+   type:fn==='sum'||fn==='avg'?'real':['count','unique_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
  }
  return fields;
 }

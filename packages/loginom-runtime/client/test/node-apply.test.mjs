@@ -24,6 +24,12 @@ const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
   read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}});
+test('Union automatic ambiguity preserves its typed pre-effect refusal through the public result',async()=>{
+ const f=fixture();f.drivers.prepareTarget=async()=>{throw Object.assign(Error('UNION_AUTO_MATCH_AMBIGUOUS: competing label/type pairs'),{
+  nodePhaseRefusal:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}});};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.error.code,'UNION_AUTO_MATCH_AMBIGUOUS');
+ assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.ok(!f.calls.includes('execute'));
+});
 function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const calls=[],records=[],operation={id:'apply1'};let time=1;
  const respond=(name,value={})=>async(...args)=>{calls.push(name);if(name===failAfter)throw Error('transport lost');return {verified:true,cleanup_complete:true,effect_possible:false,...value,...(name===badPhase?badResult:{})}};
@@ -69,6 +75,18 @@ test('full shell orders configuration before execution and binds empty fresh out
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
+});
+
+for(const [type,mode,preserve] of [['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','k_means',false]])
+for(const close of [true,false])test('saved-model intermediate finish guard '+type+'/'+mode+' close='+close,async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type,ref:node};p.mode=mode;
+ f.handlers.set(type,{revision:'guard-test',modes:[mode],validate:()=>{},output_wizard:'separate',configure:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:close?'close':'done',settings_applied:!close,draft_discarded:close,execution_started:false});
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:!preserve,execution_id:'execution1'});
+ const result=await f.run(p);
+ assert.equal(result.status,close===preserve?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+ if(close!==preserve){assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('execute'));}
 });
 
 test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{

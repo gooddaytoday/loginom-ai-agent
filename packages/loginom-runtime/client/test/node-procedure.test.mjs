@@ -838,6 +838,23 @@ for(const mode of ['ready','loading','unverified_without_mask','foreign_dialog',
  }
 });
 
+test('replacement type menu uses its unique portal only during replacement observation',async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'replace'}};
+ const node={...binding.node,verified:true,surface:'wizard'},base='MF;TF-1;WizrdMCF';
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},
+  wizard:{status:'observed',stage:'replacement',root_tid:base,root_ref:'wizard'},ui:{elements:[{tid:base+';ReplaceColumnsWizard;btnTypeChange;mn',ref:'menu'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const roots=[];
+ const channel=createNodeProcedure({operation:{id:'replacement-menu',deadline:10000,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>1,wait:async()=>{},record:async e=>structuredClone(e),execute:async code=>{
+   if(code.includes('function workspaceUiCapability')){if(!code.includes('"discover_roots":true'))roots.push(/"root_ref":"([^"]+)"/.exec(code)?.[1]);return {status:'SUCCEEDED',output:structuredClone(state)};}
+   return {verified:true,node_context:node};
+  }});
+ await channel.observe({condition:'replacement result type menu',readReplacement:true,ready:()=>true});assert.equal(roots.at(-1),'menu');
+ await channel.observe({condition:'ordinary wizard',ready:()=>true});assert.equal(roots.at(-1),'wizard');
+ state.ui.elements.push({...state.ui.elements[0],ref:'other'});await assert.rejects(channel.observe({condition:'ambiguous type menu',readReplacement:true,ready:()=>true}),/menu is ambiguous/);
+});
+
 test('Join link menu uses a unique bounded portal only during Join observation',async()=>{
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'join'}};
@@ -853,6 +870,23 @@ test('Join link menu uses a unique bounded portal only during Join observation',
  await channel.observe({condition:'Join remove menu',readJoin:true,ready:()=>true});assert.equal(roots.at(-1),'menu');
  await channel.observe({condition:'ordinary wizard',ready:()=>true});assert.equal(roots.at(-1),'wizard');
  state.ui.elements.push({tid:'mn',ref:'other'});await assert.rejects(channel.observe({condition:'ambiguous menu',readJoin:true,ready:()=>true}),/menu is ambiguous/);
+});
+
+test('Union automatic menu is read outside the wizard and refuses duplicate portals',async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'union'}};
+ const node={...binding.node,verified:true,surface:'wizard'};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},
+  wizard:{status:'observed',stage:'union',root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'mnUnionGrid',ref:'menu'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const roots=[];
+ const channel=createNodeProcedure({operation:{id:'union-menu',deadline:10000,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>1,wait:async()=>{},record:async e=>structuredClone(e),execute:async code=>{
+   if(code.includes('function workspaceUiCapability')){if(!code.includes('"discover_roots":true'))roots.push(/"root_ref":"([^"]+)"/.exec(code)?.[1]);return {status:'SUCCEEDED',output:structuredClone(state)};}
+   return {verified:true,node_context:node};
+  }});
+ await channel.observe({condition:'Union automatic menu',readUnion:true,ready:()=>true});assert.equal(roots.at(-1),'menu');
+ await channel.observe({condition:'ordinary wizard',ready:()=>true});assert.equal(roots.at(-1),'wizard');
+ state.ui.elements.push({tid:'mnUnionGrid',ref:'other'});await assert.rejects(channel.observe({condition:'duplicate Union menu',readUnion:true,ready:()=>true}),/menu is ambiguous/);
 });
 
 test('CrossTable editors are read through their portal only with matching native selected role',async()=>{
@@ -1129,6 +1163,16 @@ test('direct output read dispatches once and journals only confirmed bounded res
  assert.deepEqual(result,f.result);assert.equal(f.calls.length,1);assert.equal(f.calls[0].options.timeout,14999);
  assert.match(f.calls[0].code,/readNodePortOutput/);assert.equal(f.operation.cleanupConfirmed,true);
  assert.equal(f.records.at(-1).phase,'node_port_output_read');
+});
+
+test('direct tree refusal journals the bounded native diagnostic while the thrown error contains only its code',async()=>{
+ const diagnostic={stage:'container',parameters:{schema_index:0,row:0},native_response:{name:'NativeError',message:'private native reply'}};
+ const f=portReadFixture({envelope:{verified:false,cleanup_complete:true,reason:'tree_rpc_container',read_diagnostic:diagnostic}});
+ await assert.rejects(f.channel.readOutputPort(f.request),error=>{
+  assert.match(error.message,/tree_rpc_container/);assert.equal(error.message.includes('private native reply'),false);return true;
+ });
+ assert.equal(f.records.length,1);assert.equal(f.records[0].phase,'node_port_output_read_refused');
+ assert.deepEqual(f.records[0].diagnostic,diagnostic);assert.equal(f.operation.cleanupConfirmed,true);
 });
 
 test('direct output cancellation before dispatch publishes nothing and makes no call',async()=>{

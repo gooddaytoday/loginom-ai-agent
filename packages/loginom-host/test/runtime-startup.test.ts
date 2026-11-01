@@ -2,7 +2,9 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { fileURLToPath } from "node:url"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "../src/supervisor"
+import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
 for (const scenario of [
   { failure: "LOGINOM_BROWSER_START_FAILED", knowledge: false, validation: false, closed: false },
@@ -87,4 +89,60 @@ for (const knowledge of [true, false]) test(`startup diagnostic is private, reda
       for (const secret of ["PRIVATE-KEY", "unknown-password", "hidden-query", "u:p"]) expect(text).not.toContain(secret)
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
+}, 15000)
+
+for (const phase of ["initialize", "ready", "failure"]) test(`knowledge shutdown diagnostics: ${phase}`, async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
+  const directory = await mkdtemp(join(tmpdir(), "knowledge-shutdown-diagnostic-"))
+  const cleanup: (() => void | Promise<void>)[] = []
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) }, {
+    initialize: async () => {
+      entered.resolve()
+      if (phase === "initialize") await release.promise
+    },
+  })
+  const runtime = await superviseKnowledge({ node,
+    entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+    stateDir: directory, generation: 1, endpoint: server.endpoint,
+    apiKey: phase === "failure" ? "wrong-key" : "UNIT-NONSECRET", environment: {},
+  })
+  try {
+    expect(runtime.ready).toMatchObject({ started: true })
+    const catalog = runtime.request("list")
+    void catalog.catch(() => {})
+    if (phase === "initialize") {
+      await entered.promise
+      await runtime.close()
+      await expect(catalog).rejects.toThrow("LOGINOM_KNOWLEDGE_CLOSED")
+    }
+    if (phase === "ready") {
+      expect(await catalog).toHaveProperty("tools")
+      await runtime.close()
+    }
+    if (phase === "failure") {
+      await expect(catalog).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
+      await runtime.close()
+    }
+    expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    if (phase !== "failure") {
+      expect(await readdir(directory)).not.toContain("startup-failures.jsonl")
+      expect(await readdir(directory)).not.toContain("diagnostics")
+      return
+    }
+    const hostLog = await readFile(join(directory, "startup-failures.jsonl"), "utf8")
+    const [id] = await readdir(join(directory, "diagnostics"))
+    const diagnostic = await readFile(join(directory, "diagnostics", id, "events.jsonl"), "utf8")
+    for (const log of [hostLog, diagnostic]) {
+      expect(log).toContain("runtime.startup_failure")
+      expect(log).toContain('"code":"401"')
+    }
+  } finally {
+    release.resolve()
+    await runtime.close()
+    for (const callback of cleanup) await callback()
+    await rm(directory, { recursive: true, force: true })
+  }
 }, 15000)

@@ -174,3 +174,123 @@ bun -e 'import {nodeApplyInputSchema,nodeApiTools} from "./packages/loginom-runt
 отдельно при реализации. Это не замер всего MCP-конверта и не резерв для
 остальных узлов. Предел 46 000 Б не использован как стоп этапа 0; общий запас
 обеспечивает F2 (LAB-516). Схема здесь не правится.
+
+
+## Тип результата Замены — LAB-701, 01.11.2026
+
+Исследование на `v039@004e96dbfa47e8b5251493ab38ae5766ecc0fa5a`,
+mas, Loginom 7.4.2, Chromium 1246, `?testable=true`, worker назначенной пары.
+Штатные DOM-жесты по `data-tid`; материализованные локальные controls/stores
+только читались, внутренний JavaScript Loginom не менялся.
+
+Корень `MF;TF-1;WizrdMCF;ReplaceColumnsWizard;` (R).
+`btnTypeChange` — split button: клик по телу меню не открывает, `ArrowDown`
+открывает `btnTypeChange;mn`. Наблюдены `itmTypeChangeBoolean`,
+`itmTypeChangeDTime`, `itmTypeChangeFloat`, `itmTypeChangeInt`, `itmTypeChangeStr`.
+Тип подтверждается совпадением native `iconCls` с классом принадлежащего
+кнопке `btnIconEl`: `bg-TBGDataType-dtString/dtInteger/dtFloat/dtDateTime`.
+Входной `grdDataList` сохраняет `DataType`; целевой тип не хранится в этой записи.
+В точной таблице ключ хранит исходный `DataValueType`, замена — новый
+`ReplaceByType`. Это разные типы, а не изменение типа входного ключа.
+
+Редактор ключа `ReplaceEditor;fldVariant;ValueContainer;txt`, результата
+`ReplaceEditor-1;fldVariant;ValueContainer;Int64Field` (integer),
+`num` (real), `datetimefield` (datetime); Null — соответствующий `trg_SetNullTrigger`.
+Для datetime наблюдён `Ext.ux.DateTimeField`, ввод ISO `2026-11-01T00:00:00`
+после Tab дал native Date и отображение `11/01/2026, 00:00`.
+Материализованный `ReplaceRender` — Date; локальная ISO-дата читается без UTC-конверсии.
+Смена типа существующей таблицы преобразует её константы: integer 12 стал
+1900-01-11. Поэтому обработчик сначала удаляет запрошенную таблицу, затем
+выбирает тип и записывает полные новые пары. Незаданные поля не меняются.
+
+**Автоматического преобразования оставшегося текста нет.** Пара строка
+`"12"` → integer 12 и `other:null` дала значение 12; строки `bad`, пустая,
+`3.5`, `-7` и исходный NULL дали NULL, флаг true у всех шести строк.
+Даже синтаксически корректное число без пары не преобразуется.
+`cbxReplaceOther` содержит только «Не заменять», «На пропущенное», «На значение».
+При другом типе замены с `other:keep` нативная схема Code стала **variant**,
+с `other:null` — **integer**. Первая комбинация не входит в точный scalar-контракт
+и отклоняется до записи; предлагается явно выбрать null/value.
+Дата поддержана константами с целыми секундами и `other:null`; boolean и
+datetime other.value не входят в эту добавку. Regex остаётся строковым.
+
+Доказательства вне Git: `02-type-options.json`, `03-integer-type.json`,
+`05-output-type.json` (variant), `06-other-options.json`, `07-typed-integer-pair.json`,
+`08-scalar-schema.json`, `09-integer-output.json`, `10-date-editor.json`,
+`11-date-values.json`. Снимок сразу после жеста может предшествовать ответу
+сервера; окончательные значения подтверждены повторным чтением и выполнением.
+
+Новый аддитивный `rules[].result_type` — string/integer/real/datetime;
+пропуск равен входному типу. `type` и `from` сохраняют тип ключа, `to` и
+`other.value` используют тип результата. Новые typed-константы и их типы
+проходят обычные production readback, port-read, CSV и cold-check.
+Фикстура и независимый Python oracle — `acceptance/convert/`; сценарий
+`replace-convert` проверяет целые, вещественные, даты, незаданные числовые
+строки, плохой текст, NULL и пустые строки. Oracle готовится до модельных прогонов.
+
+
+### Отказ первого production-прогона и ограниченная правка меню
+
+Кандидат `0634be15ca7f5ea753b612a7a599c09a508e73c8`: во внутреннем
+`lab701-r1/execution-events.jsonl:376` и `:497` настройка нового и существующего
+узла завершилась `Replacement control unavailable: itmTypeChangeInt`.
+Меню видно в DOM, но оно — портал вне поддерева мастера; общий observer его
+не выдавал как регион, а процедура продолжала читать только мастер.
+Правка регистрирует единственный точный регион `btnTypeChange;mn` только для
+чтения настроек Замены. Референсы вариантов требуют native-привязку к кнопке,
+её меню и текущей записи входного поля; штатные visibility/hit-test и one-flight
+проверки сохраняются. Отдельные red→green тесты исполняют production observer
+и production выбор корня, включая чужое меню и дубликаты.
+Незатронутые Boolean/Variant-поля читаются как passthrough, без требования
+поддержки их редактора результата. Это не добавляет Boolean-правила.
+
+
+### Представление datetime в независимом expected.json
+
+Stock cold matcher требует локальное ISO с тремя цифрами миллисекунд даже
+для целых секунд (`2026-11-01T00:00:00.000`). Python oracle использует
+`isoformat(timespec="milliseconds")`; это формат ожидания, а не расширение
+редактора результата на дробные секунды. Исходная фикстура без `.000`
+отклонялась matcher при правильных типах и всех значениях cold-readback.
+Нормализация только формата ожидания даёт полное совпадение существующим
+stock matcher. Сам matcher, значения ожиданий и критерии не менялись;
+зачётные живые прогоны выполняются заново с этой фикстурой.
+
+
+## Числовая точность — LAB-728, 01.11.2026
+
+Этап 0 на `e66fd0d0500d715d8de138473ed9e54b5a2e86c0`, Loginom 7.4.2,
+Chromium 1246, mas, worker назначенной пары, `app/?testable=true`.
+Только DOM-жесты и чтение материализованных controls/stores.
+Корень R: `MF;TF-1;WizrdMCF;ReplaceColumnsWizard;`.
+
+- `edPrecision`: минимум 0, native max Infinity, шаг 0.01, decimalPrecision=2;
+  это **абсолютный допуск**, а не число знаков округления. Принимаются конечные
+  неотрицательные значения с максимум двумя десятичными знаками. Разделитель
+  читается у принадлежащего control, при записи обязательны blur и readback.
+- При 0.25 ключ 10 совпадает с 9.75 и 9.750001, но не с 9.749999.
+  У отрицательного ключа -10 границы -10.25/-9.75 также включены.
+- В перекрытии выбирается ближайший ключ; tie выбирает **больший**:
+  10.25 → 10.5 между 10 и 10.5. Повторено при допуске 0.5 и после
+  перестановки первых двух записей таблицы. Нестабильности не наблюдалось.
+- Integer использует тот же допуск: при 1 ключи 10/12 заменили 9/13,
+  8 остался без замены, tie 11 → 12. Ноль и отрицательный ноль совпали с 0.
+- Допуск >0 добавляет `<имя>_Delta` типа real с меткой «Отклонение»: ключ −
+  исходное значение, NULL без совпадения. Это поле есть и у integer,
+  независимо от replace/add; precision=0 не добавляет Delta.
+- После завершения и повторного открытия того же мастера прочитаны сохранённые
+  real precision=0.5 и integer precision=1. Константы и порядок сохранены.
+
+DOM результатов: `MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt;`
+с ячейками `R_0`, `R_2`, `R_4`, `R_Delta_4`, `I_2`, `I_Delta_2`;
+`I_Delta` имеет native icon `bg-TBGDataType-dtFloat-before`.
+Сырые снимки и cleanup — вложение карточки, не Git.
+Фикстура 26 строк, независимый Decimal-oracle и expected записаны до правки
+обработчика: [nearest](acceptance/nearest/task.md), [oracle](acceptance/nearest/oracle.py),
+[expected](acceptance/nearest/expected.json). Save/cold — отдельная приёмка.
+
+Приёмка LAB-728 уточнила арифметику Delta: это вычитание native binary64,
+а не десятичных рациональных значений. Например, 10 − 9.750001 даёт
+0.24999900000000075. Oracle выбирает ближайший ключ через Decimal,
+а Delta вычисляет независимым Python binary64-вычитанием; сверка остаётся точной.
+Первый запуск с десятичной Delta классифицирован как ошибка fixture, без зачёта.

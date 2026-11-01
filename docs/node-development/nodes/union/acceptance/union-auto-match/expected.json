@@ -1,0 +1,65 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "transform.union_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.union_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Extra",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Code": "A",
+          "Amount": 1.5,
+          "Extra": null
+        },
+        {
+          "Code": "A",
+          "Amount": 1.5,
+          "Extra": null
+        },
+        {
+          "Code": "B",
+          "Amount": 2.5,
+          "Extra": "second"
+        },
+        {
+          "Code": "A",
+          "Amount": 1.5,
+          "Extra": "repeat"
+        },
+        {
+          "Code": "C",
+          "Amount": 3.5,
+          "Extra": null
+        },
+        {
+          "Code": "C",
+          "Amount": 3.5,
+          "Extra": null
+        }
+      ]
+    }
+  ]
+}

@@ -13,10 +13,25 @@ function fixture(){
  for(const [k,s] of [['grdDataList',input],['grdReplaceItems',table]]){const e=element(base+k,root);components[e.id]={el:{dom:e},getStore:()=>s,getSelectionModel:()=>({getSelection:()=>selected})};}
  const values={cbxReplaceOther:0,chkCaseSensitivity:true,edPrecision:0,edtReplaceOther:'x'};
  for(const k of Object.keys(values)){const e=element(base+k,root);components[e.id]={el:{dom:e},getValue:()=>values[k]};}
- const masks=[];const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
- const addControl=(name,properties)=>{const e=element(base+name,root);components[e.id]={el:{dom:e},...properties};};
- return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
+ const target={type:null,badIcon:false},button=element(base+'btnTypeChange',root),icon=element(base+'icon',root);
+ components[button.id]={el:{dom:button},btnIconEl:{dom:icon},get iconCls(){return 'bg-TBGDataType-'+({2:'dtDateTime',3:'dtFloat',4:'dtInteger',5:'dtString'}[target.type??fields[0].data.DataType]);}};
+ icon.classList={contains:value=>!target.badIcon&&value===components[button.id].iconCls};
+ const masks=[];const context={Date,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
+ const addControl=(name,properties)=>{const e=all.find(e=>e.tid===base+name)??element(base+name,root);components[e.id]={el:{dom:e},...properties};};
+ return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,target,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
 }
+test('different key/result types follow the owned type icon and native pair types',()=>{
+ for(const [type,to,expected] of [[4,12,'12'],[3,1.25,1.25],[2,new Date(2026,10,1),'2026-11-01T00:00:00']]){
+  const f=fixture();f.target.type=type;f.values.cbxReplaceOther=1;
+  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'converted',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:type,ValueRender:'12',ReplaceRender:to}});
+  const r=f.read();assert.equal(r.verified,true);assert.equal(r.pairs[0].from.type,'string');assert.equal(r.pairs[0].to.value,expected);assert.equal(r.result_type,r.pairs[0].to.type);
+  f.target.badIcon=true;assert.equal(f.read().verified,false);
+  f.target.badIcon=false;f.pairs[0].data.ReplaceByType=5;assert.equal(f.read().verified,false);
+ }
+});
+test('unprocessed Boolean and Variant fields remain readable passthrough inventory',()=>{
+ for(const type of [1,6]){const f=fixture();f.fields[0].data.DataType=type;f.fields[0].data.ReplaceMode=0;f.pairs.splice(0,f.pairs.length);assert.equal(f.read().verified,true);}
+});
 test('real editor separators come from the exact owned local controls',()=>{
  const f=fixture();f.fields[0].data.DataType=3;
  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:3,ReplaceByType:3,ValueRender:1.25,ReplaceRender:9.125}});
@@ -41,3 +56,11 @@ test('reader refuses loading, pending responses, foreign selection and unsupport
 test('replacement read is bracketed by unchanged node ownership',async()=>{let i=0;const r=await readReplacementContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:++i}));assert.equal(r.verified,false);assert.equal((await readReplacementContext({}, {},async()=>({verified:true,surface:'wizard',output_port:{}}))).verified,false);});
 
 test('server refreshed Int64 words are decoded exactly without object methods',()=>{for(const [words,expected] of [[{lo:4294967295,hi:2147483647},'9223372036854775807'],[{lo:0,hi:2147483648},'-9223372036854775808']]){const f=fixture();f.fields[0].data.DataType=4;f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:4,ReplaceByType:4,ValueRender:1,ReplaceRender:words}});assert.equal(f.read().pairs[0].to.value,expected);}});
+
+test('numeric precision and its separator are read from the owned control',()=>{
+ for(const type of [3,4])for(const separator of ['.',',']){
+  const f=fixture();f.fields[0].data.DataType=type;f.pairs.splice(0,f.pairs.length);
+  f.addControl('edPrecision',{getValue:()=>0.25,decimalSeparator:separator});
+  const r=f.read();assert.equal(r.verified,true);assert.equal(r.precision,0.25);assert.equal(r.precision_decimal_separator,separator);
+ }
+});
