@@ -17,6 +17,8 @@ export function validateStartInput(input) {
     !isAbsolute(input.stateDir)
   )
     throw Error("LOGINOM_START_INVALID")
+  if (input.startupDeadline !== undefined && (!Number.isSafeInteger(input.startupDeadline) || input.startupDeadline <= 0))
+    throw Error("LOGINOM_START_INVALID")
   // Acceptance-only: the exact saved package the bridge closes during shutdown.
   const cleanup = input.acceptanceCleanupPackage ?? null
   const closeSavedPackageOnShutdown = input.closeSavedPackageOnShutdown === undefined ? false : input.closeSavedPackageOnShutdown

@@ -27,13 +27,24 @@ test('MCP application refusals remain typed normal content and the same connecti
   const sourceCalls=[];
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
+  const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
+  let failures = 0, preparedDrafts = 0;
+  const diagnostics = [];
+  const fail = phase => {
+    const target = fault?.split('-')[0];
+    const limit = fault?.endsWith('-two') ? 2 : 1;
+    if (target !== phase || failures >= limit) return;
+    failures++;
+    throw fault?.includes('semantic') ? Error('invalid catalog') : Object.assign(Error('TLS EOF'), { code: 'ECONNRESET' });
+  };
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
-    async connect(transport) { this.transport = transport; }
+    async connect(transport) { this.transport = transport; if (!this.browser) fail('initialize'); }
     async close() { this.transport?.onclose?.(); }
-    async listTools() { return { tools: [{ name: this.browser ? 'browser_run_code_unsafe' : 'read', inputSchema: { type: 'object', additionalProperties: true } }] }; }
+    async listTools() { if (!this.browser) fail('list'); return { tools: [{ name: this.browser ? 'browser_run_code_unsafe' : 'read', inputSchema: { type: 'object', additionalProperties: true } }] }; }
     async callTool(request) {
       if (!this.browser) {
+        fail('read');
         assert.equal(request.name, 'read');
         const text = catalog.files.get(request.arguments.uris[0]);
         assert.equal(typeof text, 'string');
@@ -43,6 +54,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls++;
       const code = request.arguments.code;
+      if (code.includes('async function prepareWorkspace(')) preparedDrafts++;
       const output = code.includes('async function prepareWorkspace(')
         ? { status: 'READY', target: compatibility, authenticated: true, created_draft: true, effect_possible: true, document_id: 'fixture-document', target_verified: true, package_ref: {path:null,persisted:false}, workflow_ref: { tab_tid: page.tabTid, prefix: page.prefix, workflow_id: 'fixture-workflow', navigation_path: preparationPath } }
         : code.includes('async function observeGeometry(')
@@ -88,7 +100,16 @@ test('MCP application refusals remain typed normal content and the same connecti
     const sourcePath=join(directory,'private-source.csv');await writeFile(sourcePath,'abc');
     const admitted=await session.artifactStore.admit({sourcePath,name:'sales.csv',bytes:3,
       sha256:createHash('sha256').update('abc').digest('hex')});
-    bridge = await createBridge(config, session);
+    const starting = createBridge(config, session, { startup: { onFailure: (error, detail) => diagnostics.push({ error, ...detail }) } });
+    if (fault?.endsWith('-two') || fault?.includes('semantic')) {
+      await assert.rejects(starting, /TLS EOF|invalid catalog/);
+      assert.equal(failures, fault.endsWith('-two') ? 2 : 1);
+      assert.equal(preparedDrafts, 0); assert.equal(browserCalls, 0);
+      assert.equal(diagnostics.length, failures);
+      return;
+    }
+    bridge = await starting;
+    if (fault) { assert.equal(failures, 1); assert.equal(diagnostics.length, 1); assert.equal(diagnostics[0].retry, true); }
     for (const key of ['DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR', 'WAYLAND_DISPLAY', 'XDG_SESSION_TYPE', 'XDG_CURRENT_DESKTOP']) {
       if (process.platform === 'linux' && process.env[key] && !process.env[key].startsWith('()'))
         assert.equal(browserEnvironment[key], process.env[key]);
@@ -156,6 +177,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.notEqual(prepared.isError, true, JSON.stringify(prepared));
     const metadata = JSON.parse(prepared.content[0].text);
     assert.equal(metadata.prepared, true);
+    assert.equal(preparedDrafts, 1, 'catalog retry must never repeat draft creation');
     assert.equal(metadata.source, 'bundled');
     assert.match(metadata.skillRevision, /^[a-f0-9]{64}$/);
     assert.equal(session.metadata.skillPath, resources.directory);

@@ -13,6 +13,7 @@ import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
+import { startupDiagnostic } from "../client/lib/catalog.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -20,6 +21,7 @@ const state = {
   starting: false,
   startupController: new AbortController(),
   startupCleanupFailed: false,
+  startupDiagnostics: [],
   closing: undefined,
   bridge: undefined,
   client: undefined,
@@ -101,7 +103,7 @@ async function handle(message) {
       state.owner = { chat: input.chat, generation: input.generation }
       state.uploadDirectory = `/${input.connection.username}`
       // Match the existing supervisor allowance; retries never restart it.
-      const deadline = Date.now() + (input.validation === true ? 210_000 : 120_000)
+      const deadline = Math.min(Date.now() + (input.validation === true ? 210_000 : 120_000), input.startupDeadline ?? Infinity)
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
@@ -180,13 +182,18 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport })
+      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
+          state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
+            [input.connection.apiKey, input.connection.password, input.connection.username]) })
+        } } })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       await state.bridge.server.connect(serverTransport)
       await state.client.connect(clientTransport)
       send({
         id: message.id,
+        startupDiagnostics: state.startupDiagnostics.splice(0),
         result: {
           ready: true,
           protocol: 1,
@@ -285,6 +292,10 @@ async function handle(message) {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && !state.startupDiagnostics.length)
+      state.startupDiagnostics.push({ phase: "runtime.start", retry: false,
+        error: startupDiagnostic(error, [message.input?.connection?.apiKey, message.input?.connection?.password,
+          message.input?.connection?.username]) })
     if (message.operation === "start" && error?.cause?.login) {
       // Validation deletes its generations/chat profile. Retain only the
       // sanitized login failure at the private state root, outside that tree.
@@ -295,7 +306,8 @@ async function handle(message) {
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, ...(artifactFailure(error) ?? { error: code }) }, message.operation === "close")
+    send({ id: message.id, ...(artifactFailure(error) ?? { error: code }),
+      ...(message.operation === "start" ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === "close")
     if (message.operation === "start") {
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.

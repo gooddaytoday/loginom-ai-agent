@@ -5,7 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from './catalog.mjs';
+import { catalogStartup, readCatalog, combineCatalogs, connectRemote, selectToolGroups } from './catalog.mjs';
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -91,7 +91,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -154,17 +154,18 @@ export async function createBridge(config, session, { browserTransport: managedB
   const redactor=createRedactor([config.apiKey]);
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, redactor });
+  const startup = catalogStartup(startupOptions);
   try {
-    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);
+    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; }), browser.connect(browserTransport)]);
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
-    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote), readCatalog(browser)]);
+    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote, { startup }), readCatalog(browser)]);
     if (!browserTools.some(tool => tool.name === 'browser_run_code_unsafe')) {
       throw new Error('The pinned browser runtime lacks the verified clipboard execution tool');
     }
     if (['executor-preview', 'executor-replay'].includes(config.mode)) {
       const replay = config.mode === 'executor-replay';
-      const pinned = await pinActionCatalog(remote, { runtimeIdentity: session.metadata, ...(replay ? {
+      const pinned = await pinActionCatalog(remote, { startup, runtimeIdentity: session.metadata, ...(replay ? {
         manifestUri: config.actionManifestUri, manifestSha256: config.actionManifestSha256, allowCandidate: true,
       } : {}) });
       pinnedActions = pinned;

@@ -1,25 +1,26 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import { combineCatalogs, connectRemote, readCatalog } from './catalog.mjs';
+import { catalogStartup, combineCatalogs, connectRemote, readCatalog } from './catalog.mjs';
 
 const names = new Set(['find', 'search', 'read', 'grep', 'glob', 'list', 'tree']);
 
-export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
+export async function createKnowledgeClient({ endpoint, apiKey }, signal, startupOptions = {}) {
   signal?.throwIfAborted();
   if (typeof apiKey !== 'string' || !apiKey.trim()) throw Error('LOGINOM_CONFIG_REQUIRED');
+  const startup = catalogStartup({ ...startupOptions, signal });
   const remote = await connectRemote(() => ({
     client: new Client({ name: 'loginom-ai-agent-knowledge', version: '0.1.0' }),
     transport: new StreamableHTTPClientTransport(new URL(endpoint), {
       requestInit: { headers: { Authorization: `Bearer ${apiKey}` }, redirect: 'error' },
     }),
-  }), { signal }).catch(error => {
+  }), { startup }).catch(error => {
     signal?.throwIfAborted();
     throw Error([401, 403].includes(error?.code ?? error?.status)
-      ? 'LOGINOM_KNOWLEDGE_AUTH_FAILED' : 'LOGINOM_KNOWLEDGE_UNAVAILABLE');
+      ? 'LOGINOM_KNOWLEDGE_AUTH_FAILED' : 'LOGINOM_KNOWLEDGE_UNAVAILABLE', { cause: error });
   });
   try {
-    const catalog = combineCatalogs({ remote: (await readCatalog(remote, { signal })).filter(tool => names.has(tool.name)) });
+    const catalog = combineCatalogs({ remote: (await readCatalog(remote, { startup })).filter(tool => names.has(tool.name)) });
     if (catalog.tools.length !== names.size) throw Error('LOGINOM_KNOWLEDGE_CATALOG_INVALID');
     const state = { closed: false, closing: undefined };
     const pending = new Map();
