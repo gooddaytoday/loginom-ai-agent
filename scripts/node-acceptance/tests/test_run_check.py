@@ -21,6 +21,22 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_union_auto_match_has_private_oracle_and_three_named_inputs(self):
+        case = runner.scenario('union-auto-match')
+        expected = runner.expected_for(case, '/test/union-auto-match.lgp')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertEqual(sorted(p.name for p in case['data'].glob('*.csv')), ['main.csv', 'second.csv', 'third.csv'])
+        self.assertEqual(expected['package_path'], '/test/union-auto-match.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual(output['output_node_type'], 'transform.union_data')
+        self.assertEqual(len(output['rows']), 6)
+        self.assertEqual(output['rows'][0], output['rows'][1])
+        self.assertEqual(output['rows'][4], output['rows'][5])
+        self.assertEqual(sum(r['Extra'] is None for r in output['rows']), 4)
+        oracle = subprocess.check_output([sys.executable, str(case['source'] / 'oracle.py')], text=True)
+        generated = json.loads(oracle)
+        self.assertEqual(generated['outputs'], expected['outputs'])
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)

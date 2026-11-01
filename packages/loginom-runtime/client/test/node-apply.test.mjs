@@ -24,6 +24,12 @@ const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
   read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}});
+test('Union automatic ambiguity preserves its typed pre-effect refusal through the public result',async()=>{
+ const f=fixture();f.drivers.prepareTarget=async()=>{throw Object.assign(Error('UNION_AUTO_MATCH_AMBIGUOUS: competing label/type pairs'),{
+  nodePhaseRefusal:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}});};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.error.code,'UNION_AUTO_MATCH_AMBIGUOUS');
+ assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.ok(!f.calls.includes('execute'));
+});
 function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const calls=[],records=[],operation={id:'apply1'};let time=1;
  const respond=(name,value={})=>async(...args)=>{calls.push(name);if(name===failAfter)throw Error('transport lost');return {verified:true,cleanup_complete:true,effect_possible:false,...value,...(name===badPhase?badResult:{})}};
