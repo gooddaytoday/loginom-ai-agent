@@ -55,7 +55,7 @@ RULES = (
     (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random')),
-    ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty')),
+    ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec')),
     ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),

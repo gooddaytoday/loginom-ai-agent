@@ -104,8 +104,9 @@ JavaScript не нужны. Для отбора факторов использ�
 ISO-год — `iso_year`, номер ISO-недели — `iso_week`, её понедельник в полночь —
 `iso_week_start`, день недели от понедельника 1 до воскресенья 7 — `day_of_week`.
 Эти признаки вычисляй данным узлом. Поддержаны также `quarter`, `month`,
-`day_of_month`, `hour`, `year_start`, `year_end`, `quarter_start`, `quarter_end`,
+`day_of_month`, `hour`, `minute`, `second`, `year_start`, `year_end`, `quarter_start`, `quarter_end`,
 `month_start`, `month_end`, `date`. На поле допускается до 12 преобразований.
+`minute` и `second` извлекают целые значения 0…59; пропуски остаются NULL.
 Каждый элемент `fields` заменяет полный набор преобразований указанного поля;
 для удаления одного признака перечисли все сохраняемые преобразования этого
 поля. Неуказанное второе поле сохраняется. На existing узле `parameters:{}`

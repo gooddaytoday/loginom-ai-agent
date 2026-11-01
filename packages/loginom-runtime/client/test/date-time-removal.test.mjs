@@ -9,6 +9,17 @@ function fixture(){
  return {original:{input_fields:[{name:'DateA',label:'Дата',type:'datetime'}],field_matrices:[{name:'DateA',matrix}]},
   parameters:{fields:[{field:{kind:'input_field',name:'DateA'},transformations:[]}]},baseline:{source_fields:[source],target_fields:[target]}};
 }
+test('minute removal binds its renamed MIN source and retains second from the same input',()=>{
+ const f=fixture();
+ f.original.field_matrices[0].matrix.forEach(r=>{r.number=r.func===13||r.func===14;});
+ f.parameters.fields[0].transformations=[{operation:'second',name:'Second',label:'Second'}];
+ const minute={record_id:'minute',name:'DateA_MIN_7',label:'Дата (Минуты)',type:'integer',required:true};
+ const second={record_id:'second',name:'DateA_SEC_3',label:'Дата (Секунды)',type:'integer',required:true};
+ f.baseline.source_fields=[second,minute];
+ f.baseline.target_fields=[second,minute].map((source,i)=>({...f.baseline.target_fields[0],record_id:String(i),field_id:String(i),name:i?'CustomMinute':'CustomSecond',source}));
+ const result=planDateTimeRemovals(f.original,f.parameters,f.baseline);
+ assert.deepEqual(result.map(r=>[r.operation,r.source.name,r.target.name]),[['minute','DateA_MIN_7','CustomMinute']]);
+});
 test('removal binds a renamed output through its original source, not its label or position',()=>{
  const f=fixture(),r=planDateTimeRemovals(f.original,f.parameters,f.baseline);
  assert.equal(r.length,1);assert.equal(r[0].target.name,'RenamedYear');assert.equal(r[0].target.field_id,'7');assert.equal(r[0].operation,'year');

@@ -1,5 +1,11 @@
 Run live acceptance without repeatedly reading live logs:
 
+`date-time-minsec` uses the independent fixture under
+`docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
+minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
+inputs, then removal of only DateA minutes from the same node. Stock CSV,
+Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
+
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
