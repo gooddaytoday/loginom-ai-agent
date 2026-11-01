@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureDateTime} from '../lib/date-time-procedure.mjs';
 const flags={DoDateTimeFirst:'first',DoDateTimeLast:'last',DoNumber:'number',DoString:'string'};
+test('minute and second use native numeric rows; removing minute preserves second and the other field',async()=>{
+ const f=fixture();
+ const fields=['A','B'].map(name=>({field:{kind:'input_field',name},transformations:['hour','minute','second'].map(operation=>({operation,name:name+'_'+operation,label:operation}))}));
+ await configureDateTime(f.channel,{fields},{inputMapping:f.inputMapping});
+ assert.deepEqual(f.matrices.A.filter(r=>r.number).map(r=>[r.func,r.iso]),[[12,false],[13,false],[14,false]]);
+ const beforeB=structuredClone(f.matrices.B);
+ await configureDateTime(f.channel,{fields:[{...fields[0],transformations:fields[0].transformations.filter(t=>t.operation!=='minute')}]},{inputMapping:f.inputMapping});
+ assert.deepEqual(f.matrices.A.filter(r=>r.number).map(r=>r.func),[12,14]);
+ assert.deepEqual(f.matrices.B,beforeB);
+});
 test('calendar and ISO flags use the exact native tuple and preserve the second field',async()=>{
  const f=fixture(),before=structuredClone(f.matrices.B);
  const operations=['year','iso_year','iso_week','iso_week_start','day_of_week'];

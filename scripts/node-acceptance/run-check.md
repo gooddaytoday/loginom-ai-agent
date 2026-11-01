@@ -1,11 +1,23 @@
 Run live acceptance without repeatedly reading live logs:
 
+`date-time-minsec` uses the independent fixture under
+`docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
+minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
+inputs, then removal of only DateA minutes from the same node. Stock CSV,
+Save, cold reexecution and cleanup checks apply; only task and CSV reach the model.
+
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
 `excel-import-single` retains the original three-field, first-sheet fixture.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
+`missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
+use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
+reach the model. Independent expected tables check numeric zero imputation,
+preserved zero/NULL and unprocessed fields, all-NULL, threshold and empty input.
+The main case changes mean to zero on the same node; each case uses CSV/Save/cold.
 
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
@@ -146,9 +158,15 @@ this also retains failures from the base scenario in the final result.
 `docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
 CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
 
-Supported names: regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: replace-convert, regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+`text-export-cp1251` uses its frozen task/expected/oracle under
+`nodes/text-export/acceptance/cp1251`: CP1251 input, Cyrillic labels/values,
+semicolon/CRLF, exact file bytes, then the same export node switched to UTF-8.
+Its two exports use independent byte checks; cold reads the final UTF-8 file.
+For a downloaded CP1251 file, direct cold-check supports explicit
+`--csv-encoding Windows-1251`; the default remains UTF-8.
 `join-right`, `join-full`, `join-difference` use the approved per-mode tasks,
 CSV inputs and expected outputs in `docs/node-development/nodes/join/acceptance/`.
 Each runs independently with the stock CSV, Save, cold and cleanup checks.

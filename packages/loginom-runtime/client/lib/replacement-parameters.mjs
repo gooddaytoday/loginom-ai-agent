@@ -2,13 +2,16 @@ const need=(v,m)=>{if(!v)throw Error(m);};
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const keys=(v,allowed)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>allowed.includes(k));
 export function validateReplacementValue(v,type){
- need(keys(v,['type','value'])&&Object.hasOwn(v,'value')&&v.type===type,'Replacement requires a typed value of the input type');
+ need(keys(v,['type','value'])&&Object.hasOwn(v,'value')&&v.type===type,'Replacement requires a typed value of the declared key/result type');
  if(v.value===null)return;
  if(type==='string')need(typeof v.value==='string'&&v.value.length<=2048&&!/[\x00\r\n]/.test(v.value),'Invalid replacement string');
  else if(type==='real')need(typeof v.value==='number'&&Number.isFinite(v.value),'Finite real replacement required');
  else if(type==='integer'){
   need(typeof v.value==='number'&&Number.isSafeInteger(v.value)||typeof v.value==='string'&&/^-?(0|[1-9]\d*)$/.test(v.value),'Exact integer replacement required; use a decimal string for Int64 values outside the safe JavaScript integer range');
   const n=BigInt(v.value);need(n>=-9223372036854775808n&&n<=9223372036854775807n,'Replacement integer outside Int64');
+ }else if(type==='datetime'){
+  need(typeof v.value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(v.value),'Replacement datetime requires local ISO including whole seconds, without timezone');
+  const date=new Date(v.value+'Z');need(Number.isFinite(+date)&&date.toISOString()===v.value+'.000Z','Invalid replacement calendar date');
  }else need(false,'Unsupported replacement type');
 }
 export function replacementValueKey(v,caseSensitive=true){
@@ -24,9 +27,14 @@ export function validateReplacementParameters(p,mode,r){
   need(Array.isArray(p.rules)&&p.rules.length>0&&p.rules.length<=128,'Nonempty replacement rules required');
   const fields=new Set();
   for(const [index,rule] of p.rules.entries()){
-   need(keys(rule,['field','type','pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
+   need(keys(rule,['field','type','result_type','pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
    need(!fields.has(rule.field.name.toLowerCase()),'Duplicate replacement field');fields.add(rule.field.name.toLowerCase());
    need(['string','integer','real'].includes(rule.type),'Replacement type unsupported');
+   const resultType=rule.result_type??rule.type;
+   need(['string','integer','real','datetime'].includes(resultType),'Replacement result_type unsupported');
+   need(mode==='exact'||resultType===rule.type,'Regex replacement result_type must remain string');
+   need(resultType===rule.type||rule.other?.mode!=='keep','Different replacement result_type with other.keep produces Variant; choose other.null or other.value');
+   need(resultType!=='datetime'||rule.other?.mode==='null','Datetime replacement requires other.null');
    if(mode==='regex')need(rule.type==='string'&&rule.case_sensitive===undefined&&rule.precision===undefined,'Regex requires string rules; omit case_sensitive and precision, use inline (?i)');
    if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
     'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires precision zero (precision=0) and forbids case_sensitive'));
@@ -34,7 +42,7 @@ export function validateReplacementParameters(p,mode,r){
    if(mode==='regex')need(rule.pairs.length>0,'Regex requires at least one pattern');
    const seen=new Set();
    for(const pair of rule.pairs){
-    need(keys(pair,['from','to']),'Invalid replacement pair');validateReplacementValue(pair.from,rule.type);validateReplacementValue(pair.to,rule.type);
+    need(keys(pair,['from','to']),'Invalid replacement pair');validateReplacementValue(pair.from,rule.type);validateReplacementValue(pair.to,resultType);
     if(mode==='regex'){
      validateReplacementRegex(pair.from.value);
      need(typeof pair.to.value==='string','Regex replacement must be a literal string constant');
@@ -45,7 +53,7 @@ export function validateReplacementParameters(p,mode,r){
    }
    if(mode==='regex')need(['keep','null'].includes(rule.other?.mode),'Regex remaining values support keep or null only');
    need(keys(rule.other,['mode','value'])&&['keep','null','value'].includes(rule.other.mode),'Explicit remaining-value policy required');
-   if(rule.other.mode==='value'){validateReplacementValue(rule.other.value,rule.type);need(rule.other.value.value!==null,'Remaining Null requires null mode');need(rule.type!=='real'||Number(rule.other.value.value.toFixed(2))===rule.other.value.value,'Loginom remaining-value real editor supports at most two decimal places');}else need(rule.other.value===undefined,'Unexpected remaining replacement value');
+   if(rule.other.mode==='value'){validateReplacementValue(rule.other.value,resultType);need(rule.other.value.value!==null,'Remaining Null requires null mode');need(resultType!=='real'||Number(rule.other.value.value.toFixed(2))===rule.other.value.value,'Loginom remaining-value real editor supports at most two decimal places');}else need(rule.other.value===undefined,'Unexpected remaining replacement value');
   }
  }
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Replacement accepts one table input');

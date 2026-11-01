@@ -1,3 +1,49 @@
+## Минуты и секунды: этап 0 (LAB-707)
+
+Наблюдение 01.11.2026 на Loginom 7.4.2 / mas3, Chromium 1246,
+`https://app.loginom.ai/app/?testable=true`, worker назначенной пары.
+Исходники — `004e96dbfa47e8b5251493ab38ae5766ecc0fa5a`.
+Сначала штатный `date-time-iso` на этом SHA подтвердил CSV, Save, cold и cleanup.
+В его собственном сохранённом пакете исследован тот же узел, без изменения
+данных импорта. До реализации сохранены фикстура, независимый Python oracle
+и [expected.json](acceptance/minsec/expected.json), коммит `3963096eee`.
+
+Корень — `MF;TF-1;WizrdMCF;DateReformWizard`; матрица — `;grdDataFormat`.
+Чтение cached store этой матрицы, связанного с точным DOM-корнем, подтвердило:
+
+| Операция | Ячейка после корня | Func | ISO8601 | Флаг | Native suffix / тип |
+|---|---|---|---|---|---|
+| `minute` / Минуты | `;colDoNumber_13` | 13 | false | DoNumber | MIN / integer |
+| `second` / Секунды | `;colDoNumber_14` | 14 | false | DoNumber | SEC / integer |
+
+Строки — обычная группа; `StringFmt` `%i` / `%s` не выбирались и не менялись.
+Числовые суффиксы DOM — наблюдённые адреса, а не native enum.
+Штатные checkbox и Next создали источники `DateA_MIN_1` / `DateA_SEC_1`,
+метки `DateA (Минуты)` / `DateA (Секунды)`, `DataType=4`.
+При ручной выходной раскладке источники добавлены через `rbLinks;DisplayEl`,
+точные `colSourceName_DateA_MIN_1` / `colSourceName_DateA_SEC_1` и
+`btnCreateMapping` в `DerivedDataSourceMappingEngineOutputPortWizard`.
+
+После Execute `mn;mniShowDataPreview` открыл
+`MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm`.
+Точность подтверждена **не форматированным временем preview**, а read-only
+чтением уже загруженного `$FHelper.$FData[0].$Values` этого DOM-bound dataset:
+13 строк, integer-метаданные двух новых колонок, 26 числовых/NULL ячеек.
+Никакие RPC, native handlers или методы вычисления не вызывались.
+Все 26 значений совпали с независимыми `datetime.minute` / `.second`
+для исходного `iso-weeks.csv`: например, `23:59:59 → 59/59`,
+`12:34:56 → 34/56`, `13:14:15 → 14/15`, NULL → NULL.
+Сырые DOM/cache и сравнение хранятся вне Git как доказательства карточки.
+После чтения возник штатный `msgbox` «Восстановление сессии / Обнаружен разрыв
+связи». Save и native cleanup исследовательского сеанса не подтверждены;
+восстановления и discard не выполнялись, browser context закрыт, профиль сохранён.
+Это ограничение исследования, не приёмочный PASS минут/секунд.
+
+[Сценарий minsec](acceptance/minsec/task.md) отдельно проверяет два поля,
+00/59, NULL и пустые ячейки, удаление только минуты DateA и сохранность DateB.
+Общий reader и механизм проверки не расширяются; действуют стандартные CSV,
+Save, cold и cleanup. `iso_week_end` по-прежнему исключён.
+
 ## ISO-недели: исследование этапа 0 (LAB-662)
 
 База исходников: `origin/v039@0fe0f467774afa7973cefd797a33a93605d50a65`.

@@ -28,10 +28,17 @@ export function readReplacementBrowser(prefix){
  if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true})&&!(disabledGrid?.disabled===true&&(!field||field.mode==='none')&&e.parentElement===disabledGrid.el.dom&&e.classList.contains('x-mask'))))return fail('replacement_mask');
  if(!field)return {verified:true,inventory_complete:true,input_fields:fields,selected:null,pairs:[],settings_applied:false};
  const rows=records(cmp('grdReplaceItems'),'bg.ext.CollectionListProxy',512);if(!rows)return fail('replacement_table_inventory');
+ const typeButton=cmp('btnTypeChange'),icon=typeButton?.btnIconEl?.dom;
+ const resultType=field.mode==='none'?field.type:Object.entries({string:'dtString',integer:'dtInteger',real:'dtFloat',datetime:'dtDateTime'})
+  .find(([,suffix])=>typeButton?.iconCls==='bg-TBGDataType-'+suffix&&icon&&roots[0].contains(icon)&&icon.classList.contains(typeButton.iconCls))?.[0];
+ if(!resultType)return fail('replacement_result_type');
  const typed=(v,type)=>{
   if(v===null)return {type,value:null};
   if(type==='string'&&typeof v==='string'&&v.length<=2048)return {type,value:v};
   if(type==='real'&&typeof v==='number'&&Number.isFinite(v))return {type,value:v};
+  if(type==='datetime'&&v instanceof Date&&Number.isFinite(+v)&&v.getMilliseconds()===0){
+   const z=(n,l=2)=>String(n).padStart(l,'0');return {type,value:`${z(v.getFullYear(),4)}-${z(v.getMonth()+1)}-${z(v.getDate())}T${z(v.getHours())}:${z(v.getMinutes())}:${z(v.getSeconds())}`};
+  }
   if(type==='integer'){
    let n;
    if(typeof v==='bigint'||typeof v==='number'&&Number.isSafeInteger(v))n=BigInt(v);
@@ -47,8 +54,8 @@ export function readReplacementBrowser(prefix){
   if(!r?.isModel||!id||seen.has(id)||![0,1].includes(d?.CollectionID))return fail('replacement_table_record');seen.add(id);
   if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType')&&!Object.hasOwn(d,'RegularExpression')&&!Object.hasOwn(d,'ReplacementType'))continue; // Empty group placeholder.
   groups.add(d.CollectionID);if(groups.size>1)return fail('replacement_mixed_exact_regex');
-  if(d.CollectionID===0?(types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type):(field.type!=='string'||d.ReplacementType!==0||typeof d.RegularExpression!=='string'||typeof d.Replacement!=='string'))return fail('replacement_unsupported_rule');
-  const from=typed(d.CollectionID===1?d.RegularExpression:d.ValueRender,field.type),to=typed(d.CollectionID===1?d.Replacement:d.ReplaceRender,field.type);
+  if(d.CollectionID===0?(types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==resultType):(field.type!=='string'||resultType!=='string'||d.ReplacementType!==0||typeof d.RegularExpression!=='string'||typeof d.Replacement!=='string'))return fail('replacement_unsupported_rule');
+  const from=typed(d.CollectionID===1?d.RegularExpression:d.ValueRender,field.type),to=typed(d.CollectionID===1?d.Replacement:d.ReplaceRender,resultType);
   if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.index===d.Index))return fail('replacement_typed_value');
   pairs.push({record_id:id,index:d.Index,from,to});
  }
@@ -56,13 +63,13 @@ export function readReplacementBrowser(prefix){
  const mode=otherControl?.getValue?.(),caseSensitive=caseControl?.getValue?.(),precision=precisionControl?.getValue?.();
  if(![0,1,2].includes(mode)||typeof caseSensitive!=='boolean'||typeof precision!=='number'||!Number.isFinite(precision))return fail('replacement_options');
  const other={mode:['keep','null','value'][mode]};
- if(mode===2){const c=cmp(field.type==='string'?'edtReplaceOther':field.type==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt'),v=c?.getValue?.();other.value=typed(v,field.type);if(!other.value)return fail('replacement_other_value');}
+ if(mode===2){const c=cmp(resultType==='string'?'edtReplaceOther':resultType==='real'?'edtReplaceOtherFloat':resultType==='integer'?'edtReplaceOtherInt':'unsupported'),v=c?.getValue?.();other.value=typed(v,resultType);if(!other.value)return fail('replacement_other_value');}
  const editors=exact(base+'ReplaceEditor').filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
  const separator=suffix=>{const c=cmp(suffix);return ['.',','].includes(c?.decimalSeparator)?c.decimalSeparator:null;};
- const real_decimal_separators=field.type==='real'?{
+ const real_decimal_separators=field.type==='real'||resultType==='real'?{
   from:separator('ReplaceEditor;fldVariant;ValueContainer;num'),
   to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
   other:separator('edtReplaceOtherFloat'),
  }:null;
- return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
+ return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,result_type:resultType,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
 }

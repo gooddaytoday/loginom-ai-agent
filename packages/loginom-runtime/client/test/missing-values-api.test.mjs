@@ -8,4 +8,7 @@ test('public missing values API accepts empty string constants and rejects incom
  await dispatchNodeApi(runtime,'dock_node_apply',request);assert.equal(calls.length,1);assert.deepEqual(handler.modes,['impute']);
  for(const mutate of [r=>delete r.parameters.max_nulls_percent,r=>r.parameters.fields[0].value=0,r=>r.parameters.fields[0].value='x'.repeat(2049),r=>r.parameters.fields[0].method='median',r=>r.parameters.ordered=true]){const r=structuredClone(request);mutate(r);await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',r));}
  assert.equal(calls.length,1);
+ const zero=structuredClone(request);zero.parameters.fields=[{field:{kind:'input_field',name:'Amount'},method:'zero'}];
+ await dispatchNodeApi(runtime,'dock_node_apply',zero);assert.equal(calls.length,2);
+ for(const value of [0,'0']){const invalid=structuredClone(zero);invalid.parameters.fields[0].value=value;await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',invalid));}
 });

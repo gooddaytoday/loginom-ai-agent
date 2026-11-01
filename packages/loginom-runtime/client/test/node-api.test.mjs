@@ -5,9 +5,9 @@ import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('model schema inventory pins ISO-calendar registration and excludes private cold windows',()=>{
+test('model schema inventory pins merged v0.3.9 registrations and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,93061,'fe49aff593fe14f6f9cdc26370378471decdfb251010c071628e185f460dce77'],
+  [nodeApiTools,93869,'7f9dd97b0e9caab40984d3ed1d092cd5bc39d58a68af6751aac2d3244d8364ec'],
   [nodeApiTools.map(userNodeTool),17361,'a9cdeea2ffe3ef38960f1a475674e60a269be89e1bf10debf5bf1a82a6544c45'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
