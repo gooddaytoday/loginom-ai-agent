@@ -158,7 +158,7 @@ this also retains failures from the base scenario in the final result.
 `docs/node-development/nodes/integration-restrequest/acceptance/plain/`;
 CSV и cold проверяют одну строку ErrorCode/HttpStatusCode, Save и cleanup обязательны.
 
-Supported names: replace-convert, regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
+Supported names: replace-exact (precision zero regression), replace-nearest (numeric inclusive absolute tolerance, nearest/ties, patch, Delta), replace-convert, regex-add, regex-replace, sampling, data-partition and their -null/-empty variants (sequential node acceptance), upload_only, logreg-enter, rest-get-plain, n1–n21, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 `text-export-cp1251` uses its frozen task/expected/oracle under

@@ -36,8 +36,8 @@ export function validateReplacementParameters(p,mode,r){
    need(resultType===rule.type||rule.other?.mode!=='keep','Different replacement result_type with other.keep produces Variant; choose other.null or other.value');
    need(resultType!=='datetime'||rule.other?.mode==='null','Datetime replacement requires other.null');
    if(mode==='regex')need(rule.type==='string'&&rule.case_sensitive===undefined&&rule.precision===undefined,'Regex requires string rules; omit case_sensitive and precision, use inline (?i)');
-   if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
-    'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires precision zero (precision=0) and forbids case_sensitive'));
+   if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:typeof rule.precision==='number'&&Number.isFinite(rule.precision)&&rule.precision>=0&&Number(rule.precision.toFixed(2))===rule.precision&&rule.case_sensitive===undefined,
+    'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires finite precision>=0 (precision=0 is exact), at most two decimal places, and forbids case_sensitive'));
    need(Array.isArray(rule.pairs)&&rule.pairs.length<=256,'Replacement table exceeds supported bound');
    if(mode==='regex')need(rule.pairs.length>0,'Regex requires at least one pattern');
    const seen=new Set();
@@ -67,8 +67,8 @@ export function validateReplacementParameters(p,mode,r){
 export function resolveReplacementParameters(p,fields){
  need(Array.isArray(fields)&&fields.length<=1000&&new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Complete unique replacement input schema required');
  for(const rule of p.rules??[]){const matches=fields.filter(f=>f.name===rule.field.name);need(matches.length===1,'Replacement input field missing: '+rule.field.name);need(matches[0].type===rule.type,'Replacement input type mismatch: '+rule.field.name);}
- const changed=new Set((p.rules??[]).map(r=>r.field.name)),names=new Set(fields.map(f=>f.name.toLowerCase()));
- for(const f of fields)if(changed.has(f.name))for(const suffix of p.output_mode==='add'?['_Replace','_Replaced']:['_Replaced']){const n=f.name+suffix;need(name(n)&&!names.has(n.toLowerCase()),'Replacement output collision: '+n);names.add(n.toLowerCase());}
+ const changed=new Map((p.rules??[]).map(r=>[r.field.name,r])),names=new Set(fields.map(f=>f.name.toLowerCase()));
+ for(const f of fields)if(changed.has(f.name))for(const suffix of [...(p.output_mode==='add'?['_Replace']:[]),'_Replaced',...(changed.get(f.name).precision>0?['_Delta']:[])]){const n=f.name+suffix;need(name(n)&&!names.has(n.toLowerCase()),'Replacement output collision: '+n);names.add(n.toLowerCase());}
  return p;
 }
 export function validateReplacementInputParameters(p,resolved,native){resolveReplacementParameters(p,resolved.fields??native.target_fields);}

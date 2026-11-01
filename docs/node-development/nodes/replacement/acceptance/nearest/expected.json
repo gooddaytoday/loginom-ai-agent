@@ -1,0 +1,293 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "R_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "R_Delta",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "I_Delta",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "R": 101,
+          "R_Replaced": true,
+          "R_Delta": 0.25,
+          "I": 1000,
+          "I_Replaced": true,
+          "I_Delta": 1.0
+        },
+        {
+          "Id": 2,
+          "R": 101,
+          "R_Replaced": true,
+          "R_Delta": 0.249999,
+          "I": 1000,
+          "I_Replaced": true,
+          "I_Delta": 0.0
+        },
+        {
+          "Id": 3,
+          "R": 9.749999,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 1200,
+          "I_Replaced": true,
+          "I_Delta": 1.0
+        },
+        {
+          "Id": 4,
+          "R": 101,
+          "R_Replaced": true,
+          "R_Delta": 0.0,
+          "I": 1200,
+          "I_Replaced": true,
+          "I_Delta": 0.0
+        },
+        {
+          "Id": 5,
+          "R": 200,
+          "R_Replaced": true,
+          "R_Delta": 0.25,
+          "I": 1200,
+          "I_Replaced": true,
+          "I_Delta": -1.0
+        },
+        {
+          "Id": 6,
+          "R": 200,
+          "R_Replaced": true,
+          "R_Delta": 0.249999,
+          "I": 8,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 7,
+          "R": 101,
+          "R_Replaced": true,
+          "R_Delta": -0.249999,
+          "I": 7,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 8,
+          "R": -100,
+          "R_Replaced": true,
+          "R_Delta": -0.25,
+          "I": -1000,
+          "I_Replaced": true,
+          "I_Delta": -1.0
+        },
+        {
+          "Id": 9,
+          "R": -100,
+          "R_Replaced": true,
+          "R_Delta": 0.25,
+          "I": -1000,
+          "I_Replaced": true,
+          "I_Delta": 0.0
+        },
+        {
+          "Id": 10,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": 0.0,
+          "I": 3000,
+          "I_Replaced": true,
+          "I_Delta": 0.0
+        },
+        {
+          "Id": 11,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": 0.0,
+          "I": 3000,
+          "I_Replaced": true,
+          "I_Delta": 0.0
+        },
+        {
+          "Id": 12,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": -0.25,
+          "I": 3000,
+          "I_Replaced": true,
+          "I_Delta": -1.0
+        },
+        {
+          "Id": 13,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": 0.25,
+          "I": 3000,
+          "I_Replaced": true,
+          "I_Delta": 1.0
+        },
+        {
+          "Id": 14,
+          "R": 11.0,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 20,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 15,
+          "R": 200,
+          "R_Replaced": true,
+          "R_Delta": -0.25,
+          "I": 21,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 16,
+          "R": 200,
+          "R_Replaced": true,
+          "R_Delta": 0.0,
+          "I": 22,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 17,
+          "R": 10.9,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 23,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 18,
+          "R": -9.749999,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": -1000,
+          "I_Replaced": true,
+          "I_Delta": 1.0
+        },
+        {
+          "Id": 19,
+          "R": -100,
+          "R_Replaced": true,
+          "R_Delta": -0.249999,
+          "I": -12,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 20,
+          "R": -100,
+          "R_Replaced": true,
+          "R_Delta": 0.249999,
+          "I": -8,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 21,
+          "R": -10.250001,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 2,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 22,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": -0.249999,
+          "I": -2,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 23,
+          "R": 0.250001,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 3,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 24,
+          "R": 300,
+          "R_Replaced": true,
+          "R_Delta": 0.249999,
+          "I": -3,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 25,
+          "R": -0.250001,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 4,
+          "I_Replaced": false,
+          "I_Delta": null
+        },
+        {
+          "Id": 26,
+          "R": 10.750001,
+          "R_Replaced": false,
+          "R_Delta": null,
+          "I": 5,
+          "I_Replaced": false,
+          "I_Delta": null
+        }
+      ]
+    }
+  ]
+}

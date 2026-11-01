@@ -71,5 +71,5 @@ export function readReplacementBrowser(prefix){
   to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
   other:separator('edtReplaceOtherFloat'),
  }:null;
- return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,result_type:resultType,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
+ return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,result_type:resultType,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,precision_decimal_separator:['.',','].includes(precisionControl.decimalSeparator)?precisionControl.decimalSeparator:null,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
 }
