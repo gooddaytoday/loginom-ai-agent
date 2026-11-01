@@ -27,6 +27,11 @@ reach the model. Independent expected tables check numeric zero imputation,
 preserved zero/NULL and unprocessed fields, all-NULL, threshold and empty input.
 The main case changes mean to zero on the same node; each case uses CSV/Save/cold.
 
+`union-auto-match`: three inputs with reordered Code/Amount fields and one
+unpaired Extra column, name/type automatic matching, preserved duplicate rows,
+and repeated configuration of the same Union node. Independent CSV/typed cold
+expected is in `docs/node-development/nodes/union/acceptance/union-auto-match`.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two
