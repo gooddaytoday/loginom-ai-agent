@@ -325,3 +325,7 @@ abs=1e-8 только для real, метки через label_any.
 с отдельными входами, двумя CSV и cold-чтением обоих портов; apply/retrain заменяют
 источник того же импорта внутри одного сценария. NULL/пустая строка, типы, порядок
 полей и строк точны, Real abs/rel 1e-12.
+
+`smoothing-hp`: Сглаживание HP Lambda=1 для X/R, series → update на прежнем узле,
+фиксированный порядок RowID,X,R,Tag,X_S,R_S через autosync=false;
+приёмочный комплект `preprocessing-smoothing/acceptance`, ordered CSV/Save/cold.

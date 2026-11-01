@@ -145,6 +145,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name == 'smoothing-hp':
+        src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

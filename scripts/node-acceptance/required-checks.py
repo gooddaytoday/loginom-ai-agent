@@ -42,6 +42,7 @@ RULES = (
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17',)),
+    ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),
     ((C + 'text-import-*.mjs', C + 'imports-excel-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
