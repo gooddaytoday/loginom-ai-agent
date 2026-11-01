@@ -26,6 +26,7 @@ const args = parseArgs({
     "xlsx-expected": { type: "string" },
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
+    'csv-encoding': { type: "string", default: 'UTF-8' },
     'exact-port-windows': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
@@ -75,7 +76,7 @@ const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
-const exportCsv=args.csv?{columns:parseExportCsvHeader(await readFile(resolve(args.csv),'utf8'),args['csv-delimiter']),
+const exportCsv=args.csv?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
  header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)

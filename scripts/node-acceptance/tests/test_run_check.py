@@ -21,6 +21,36 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_export_cp1251_catalog_and_same_node_switch(self):
+        case = runner.scenario('text-export-cp1251')
+        self.assertEqual(case['text_export_encodings'], ['cp1251', 'utf-8'])
+        self.assertEqual(case['csv_header'], 'labels')
+        self.assertEqual(case['export_count'], 2)
+        self.assertTrue((case['data'] / 'cp1251.csv').is_file())
+        expected = runner.expected_for(case, '/test/export.lgp')
+        self.assertEqual(len(expected['outputs']), 1)
+        self.assertEqual(expected['outputs'][0]['output_node_type'], 'export_input')
+        destinations = ['/test/legacy.csv', '/test/unicode.csv']
+        node = dict(document_id='doc', workflow_id='wf', node_id='sink')
+        replies = [(i + 1, dict(status='SUCCEEDED', configuration=dict(status='applied', readback=dict(
+            kind='text_export', destination=destination, node=node, settings=dict(encoding=encoding))),
+            output=dict(file_artifacts=[dict(destination=destination)])))
+            for i, (destination, encoding) in enumerate(zip(destinations, [1251, 65001]))]
+        runner.check_text_export_encodings(replies, destinations)
+        inspected = copy.deepcopy(replies)
+        inspected[1] = (2, dict(action_key='operation.inspect', output=dict(outcome=inspected[1][1])))
+        runner.check_text_export_encodings(inspected, destinations)
+        for change in [lambda r: r[1][1]['configuration']['readback']['settings'].update(encoding=1251),
+                       lambda r: r[1][1]['configuration']['readback'].update(node=dict(node_id='other')),
+                       lambda r: r[1][1]['output'].update(file_artifacts=[]),
+                       lambda r: r.reverse()]:
+            bad = copy.deepcopy(replies)
+            change(bad)
+            if bad == list(reversed(replies)):
+                bad = [(i + 1, reply) for i, (_, reply) in enumerate(bad)]
+            with self.assertRaises(AssertionError):
+                runner.check_text_export_encodings(bad, destinations)
+
     def test_sampling_invariant_scenarios_are_explicit_and_stock_expected_unchanged(self):
         for name in ['sampling-random', 'partition-random']:
             case = runner.scenario(name)

@@ -1,0 +1,17 @@
+{
+  "package_path": "/own/cp1251.lgp",
+  "nodes": [{"type": "imports.text"}, {"type": "exports.text"}],
+  "output_node_type": "export_input",
+  "column_order": "exact",
+  "ordered": true,
+  "columns": [
+    {"name": "Id", "label": "Код", "type": "integer"},
+    {"name": "Text", "label": "Текст", "type": "string"},
+    {"name": "Amount", "label": "Сумма", "type": "real"}
+  ],
+  "rows": [
+    {"Id": 1, "Text": "Привет; мир", "Amount": 1.25},
+    {"Id": 2, "Text": "Он сказал \"да\"", "Amount": -2.5},
+    {"Id": 3, "Text": "Ёжик", "Amount": 0}
+  ]
+}
