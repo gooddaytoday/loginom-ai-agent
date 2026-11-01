@@ -80,6 +80,10 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'clustering-normalized':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    input_files=['normalized.csv'], export_count=2)
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
@@ -1059,6 +1063,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('clustering_normalized'):
+            write(folder / 'clustering-replies.json', [o for _, o in replies])
+            self.phase('clustering-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-normalized.mjs',
+                folder / 'expected.json', folder / 'clustering-replies.json', folder / 'clustering-baseline.json'], folder, timeout=60)
         self.current['csv'] = D76_STATUS if any(self.current.get('d76', {}).values()) else 'PASS'
         return session, expected, actual, delimiter
 

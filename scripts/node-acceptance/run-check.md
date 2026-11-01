@@ -1,5 +1,13 @@
 Run live acceptance without repeatedly reading live logs:
 
+`clustering-normalized`: k-means, 12 объектов с X/Y в разных масштабах.
+На одном узле сначала none, затем standardize дважды с seed 42; оба порта,
+два CSV, Save и cold. Независимые геометрические инварианты проверяют каждую
+строку ровно один раз, три группы, отличие от raw-разбиения, центры как средние
+в исходных единицах (abs 1e-6), расстояния с выборочным SD и повторяемость seed.
+Cold читает сохранённые роли, NormType=5, k и seed без повторной настройки.
+Oracle/expected не передаются модели.
+
 Owner-approved #612 cases for v0.3.9: `sampling-random`, `partition-random`.
 Only these translate their proposal into `sampling_modes`. The unchanged task
 and modes.csv go to the model; the oracle never does. Decision 1 checks two

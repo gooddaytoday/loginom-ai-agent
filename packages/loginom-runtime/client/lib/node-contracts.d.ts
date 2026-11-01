@@ -312,7 +312,7 @@ export interface CrossTableConfigurationReadback {
 export interface ClusteringConfigurationReadback {
   kind: 'clustering'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'k_means'; features: string[];
-  clusters: number; seed: number; normalization: 'none'; package_persistence_verified: false;
+  clusters: number; seed: number; normalization: 'none' | 'standardize'; package_persistence_verified: false;
   training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string;
     source: Array<{node: NodeRef; output: number; input: 0}>};
 }
