@@ -59,7 +59,8 @@ RULES = (
     ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),
-    ((C + 'text-import-*.mjs', C + 'imports-excel-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single')),
+    ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
 )
 UNITS = {
     'host-unit': ('(cd packages/loginom-host && bun test)', '#447: runtime/src требует полный host bun test'),

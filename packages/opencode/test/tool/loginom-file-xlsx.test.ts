@@ -127,6 +127,15 @@ test("formula without cache is explicit incompleteness and sample refusal", asyn
   })
 })
 
+test("twelve-column worksheet returns complete import settings", async () => {
+  await fixture('<row r="1">' + Array.from({ length: 12 }, (_, i) => text(String.fromCharCode(65+i), 1, `Field${i}`)).join("") + '</row><row r="2">' + Array.from({ length: 12 }, (_, i) => num(String.fromCharCode(65+i), 2, String(i))).join("") + '</row>', async (path, dir) => {
+    const p = await profile(path, dir)
+    expect(p.settings_complete).toBe(true)
+    expect(p.settings.excel.columns).toHaveLength(12)
+    validateExcelParameters({ source: { artifact_id: "a", upload_operation_id: "u" }, excel: { ...p.settings.excel, source_path: "/wide.xlsx" } }, "xlsx", { inputs: [], mappings: [], finish: "done", read: { ports: [] } })
+  })
+})
+
 test("wide worksheet profiles within 8 KiB but is not importable", async () => {
   await fixture(
     '<row r="1">' +
@@ -142,7 +151,7 @@ test("wide worksheet profiles within 8 KiB but is not importable", async () => {
       const p = await profile(path, dir)
       expect(p.columns_total).toBe(120)
       expect(p.settings_complete).toBe(false)
-      expect(p.settings_incomplete_reason).toContain("1–8")
+      expect(p.settings_incomplete_reason).toContain("1–12")
       expect(Buffer.byteLength(JSON.stringify(p))).toBeLessThanOrEqual(8192)
       expect(p.continuation).not.toBeNull()
       const next = await profilePage(p.profile_id, dir, p.continuation!)
