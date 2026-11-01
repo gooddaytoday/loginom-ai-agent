@@ -166,8 +166,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     // Loginom can leave its hover tip over a freshly observed port. Move only
     // to a hit-tested empty point in this graph, then recheck the same owner.
     const hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
-    const tooltip=hit?.closest?.('[data-tid="ttip"]');
-    if(tooltip?.getAttribute('data-tid')==='ttip'&&exact('ttip').length===1
+    const tooltip=hit?.closest?.('[data-tid="ttip"],[data-tid^="ttip-"]');
+    const tooltipTid=tooltip?.getAttribute('data-tid');
+    if(/^ttip(?:-\d+)?$/.test(tooltipTid??'')&&exact(tooltipTid).length===1
       &&tooltip.checkVisibility({checkVisibilityCSS:true})){
      for(const dy of [.5,.1,.9])for(const dx of [.5,.1,.9]){
       const x=Math.max(0,gb.x)+(Math.min(width,gb.x+gb.width)-Math.max(0,gb.x))*dx;

@@ -488,7 +488,9 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
       const diagnostic=await page.evaluate(({sourceTid,rootTid})=>{
         const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
         const roots=exact(rootTid),sources=exact(sourceTid);
-        if(roots.length!==1||sources.length!==1||!roots[0].contains(sources[0]))return {source_identity_changed:true};
+        if(roots.length!==1||sources.length!==1||!roots[0].contains(sources[0]))return {source_identity_changed:true,source_tid:sourceTid.slice(0,96),
+          root_matches:roots.length,source_matches:sources.length,
+          graph_source_matches:roots.length===1?sources.filter(e=>roots[0].contains(e)).length:null};
         const e=sources[0],b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
         const describe=n=>n?{tag:n.tagName.toLowerCase().slice(0,24),tid:n.getAttribute('data-tid')?.slice(0,96)??null,
           role:n.getAttribute('role')?.slice(0,24)??null,class:n.getAttribute('class')?.slice(0,96)??null}:null;

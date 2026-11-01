@@ -109,6 +109,16 @@ test('covered link refusal preserves bounded real DOM blocker identity without a
    const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
    assert.equal(diagnostic.truncated,true);assert.ok(diagnostic.anchor.tid.length<96);return true;
   });
+  // The observed source_identity_changed branch must distinguish a missing
+  // source from an outline duplicate outside the prepared canvas.
+  await page.locator('#port').evaluate(e=>document.body.append(e.cloneNode(true)));
+  await assert.rejects(refuse(),error=>{
+   const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
+   assert.equal(diagnostic.source_identity_changed,true);
+   assert.equal(diagnostic.root_matches,1);assert.equal(diagnostic.source_matches,2);
+   assert.equal(diagnostic.graph_source_matches,1);
+   assert.ok(error.message.length<=1000);return true;
+  });
   assert.equal(moves,0);assert.equal(clicks,0);
  }finally{await browser.close();}
 });
