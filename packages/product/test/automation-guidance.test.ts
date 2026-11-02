@@ -41,3 +41,20 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toContain("Последний вычисляющий узел")
   expect(chain).toContain("После расчёта не вызывай")
 })
+
+test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
+  const trees = skill.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/node-settings.md", import.meta.url)).text()
+  const details = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+
+  expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
+  expect(trees).toContain("по просьбе о дереве")
+  expect(trees).toContain("без вложенных контейнеров")
+  expect(trees).toContain("trees.from_json")
+  expect(trees).toContain("trees.to_table")
+  expect(details).toMatch(/Response[\s\S]*?RequestID[\s\S]*?HttpStatusCode/)
+  expect(details).toContain("Nested containers in repeated records")
+  expect(details).toContain("operation.recover")
+  expect(details).toContain("не останавливай")
+  expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
+})
