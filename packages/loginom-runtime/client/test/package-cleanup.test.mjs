@@ -653,7 +653,10 @@ function failedOpenFixture(fault='none') {
   if(fault==='late modal'){f.state.openError=false;f.state.mask=false;}
   if(fault==='session after wait')m.FServerConnection.Session={};
   if(fault==='late wait')f.state.clock+=30000;
-  if(fault==='unclosable tab'){native.closable=f.events.filter(e=>e==='idle-wait').length>=2;}
+  if(fault==='unclosable tab'){
+   native.closable=f.events.filter(e=>e==='idle-wait').length>=2;
+   if(native.closable)node.Package={};
+  }
   if(fault==='vanished package'){f.state.count=0;f.state.tab=false;}
  };
  ok.click=()=>{f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
@@ -663,8 +666,9 @@ function failedOpenFixture(fault='none') {
  f.page.mouse={async click(){return ok.click();}};
  if(['unclosable tab','permanent unclosable'].includes(fault)){
   native.closable=false;
-  const running=node.HasRunningNodes;
-  node.HasRunningNodes=()=>{if(!native.closable)throw TypeError("Cannot read properties of undefined (reading 'HasRunningNodes')");return running();};
+  // The unfinished-package hypothesis needs the missing native Package;
+  // closable=false alone is also Loginom's normal single-tab policy.
+  node.Package=undefined;
  }
  if(fault==='vanished package'){
   const query=c.document.querySelectorAll;
@@ -688,6 +692,24 @@ for(const sample of ['p15 cold:1–2','LAB-173 p24 cold1:1–2'])test('D78 repla
  assert.ok(f.events.indexOf('error-ok')<f.events.indexOf('idle-wait'));
  assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
  assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));
+});
+
+// LAB-753 cold-execution-events.jsonl:1–2 and cold-result.json:12–17
+// retain D78 and OWNED_OPEN_LOADING, but do not retain closable/Package.
+// Loginom 7.4.2 MainForm.WorkspaceTabUpdateClosable makes the only tab
+// nonclosable even when its package is ready. That post-OK state is a
+// hypothesis for the historical failure, not a live D78 reproduction.
+for(const fault of ['none','dirty','running'])test('D78 sole saved-package tab uses native Close guards: '+fault,async()=>{
+ const f=failedOpenFixture(fault);
+ f.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().closable=false;
+ const result=await f.runFailed(),success=fault==='none';
+ assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
+ assert.equal(result.package_closed,success);assert.equal(result.logged_out,success);
+ assert.equal(result.unsaved_changes_discarded,false);assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.filter(e=>e==='close').length,success?1:0);
+ assert.equal(f.events.filter(e=>e==='logout').length,success?1:0);
+ assert.ok(f.events.includes('modified-read')||fault==='running');
+ if(!success)assert.equal(result.reason,fault==='dirty'?'UNSAVED_CHANGES':'RUNNING_NODES');
 });
 
 test('D78 late own modal disappearance is read-only settlement, never another OK',async()=>{
