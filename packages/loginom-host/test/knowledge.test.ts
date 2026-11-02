@@ -31,6 +31,9 @@ test("knowledge supervision sends only its own private payload and filters provi
           started:message.input.endpoint !== 'https://example.test/no-start'}});
       }
       if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+      if (message.operation === 'malformed-diagnostic') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE',
+        startupFailure:{stage:['catalog'],error_class:'Error',code:null,cause_codes:[],aborted:false,timeout:false,
+          elapsed_ms:1,body:'PRIVATE-NONSECRET-DIAGNOSTIC'}});
       if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
     });`,
     )
@@ -50,10 +53,15 @@ test("knowledge supervision sends only its own private payload and filters provi
     try {
       expect(runtime.ready).toEqual({ protocol: 1, generation: 17, started: true })
       expect(await runtime.request("list")).toEqual({ tools: [] })
+      await expect(runtime.request("malformed-diagnostic")).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
     } finally {
       await runtime.close()
     }
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    const receipt = await Bun.file(join(input.stateDir,
+      (await readdir(input.stateDir)).find(name => name.startsWith("runtime-close-"))!)).text()
+    expect(receipt).not.toContain("startup_failure")
+    expect(receipt).not.toContain("PRIVATE-NONSECRET-DIAGNOSTIC")
     await runtime.close()
     await expect(runtime.request("list")).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
     await expect(superviseKnowledge({ ...input, apiKey: "wrong-key" })).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")

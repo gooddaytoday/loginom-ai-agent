@@ -1,0 +1,156 @@
+{
+  "task_id": "cross-device-campaign-reach-detailed",
+  "dataset_sha256": {
+    "campaigns.csv": "c084a2565f86456d85a48e9fc1d9f4d63cc9a3c2731f79b44dbe9d5c15310215",
+    "identities.csv": "c1b1056d7e0f868a031b4964f3c42c3d7aa2602c406a36ef576a6dcc60dd782e",
+    "impressions.csv": "15619f11a99c6d0e47cc69f3879640980b55b6d5399b873aafa6797509d2c011"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "297c281b6460800dd2fcfc0c70301dd9097978f808e8befe0a68885ce74e5cb4"
+  },
+  "reference_sha256": "15b6cde2f741e4e562f6a6374eb4217014043d24219d5f0aee5bd0c7e4f40584",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published",
+    "binary_sha256": "c970efe51a57e8a8fc65c6eda6a18c4219db4463fa6939ba19aae5effcdbadee"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/impressions.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/identities.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/campaigns.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Это первая Authoring A1 из общего бюджета3 для P11. Создай НОВЫЙ native draft по неизменённой задаче и трём входам impressions.csv/identities.csv/campaigns.csv. После исключения MCP владельцем genuine normal startup подтверждён ready+manifest/штатнымClose/idle; старые файлы и чужие сценарии не изменяй.\nЕсли первый prepare вернёт ошибку, не повторяй prepare в этой попытке: честно сообщи блокер и остановись. Не заменяй native расчёт JavaScript, готовым ответом, внешним итоговым CSV или XML-правками.\nВыполни все созданные узлы и независимые ветви, включая три импорта. До экспорта получи пять заданных колонок; impressions/known_people/unknown_impressions — целые счётчики. Частота использует только идентифицированные показы и пуста при отсутствии известных людей. Реестр campaigns сохраняется полностью, в том числе кампании без показов; неизвестные устройства человека не образуют. Промежуточного округления нет.\nExisting target передавай точным текущим target.ref БЕЗ target.position. Сортируй campaign_id ASC, служебные поля не экспортируй. Состав пяти колонок точный; их порядок несущественен. Ровно один итоговый CSV: UTF-8, ;, заголовок, десятичная точка, двойная кавычка.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Получи actual execute/export/file_artifacts/Save receipts.\nПри неизвестном эффекте используй только existing inspect/recovery и следуй его фактическому outcome. Если released outcome запрещает повтор эффекта, не повторяй и не пересоздавай export; сохрани доступный partial и честно остановись. Не делай слепой retry того же owned QuickView. Save/readback не заменяют независимый audit и отдельный cold rerun.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T08:51:06+03:00",
+    "duration_s": 878,
+    "tokens": {
+      "input": 106476,
+      "output": 7046,
+      "reasoning": 2122
+    },
+    "tool_calls": 50,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": [],
+    "observed_total": 1,
+    "allowed_total": 3,
+    "loginom_tool_calls": 41
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 3-campaign register, 3 device/person identities and 7 impression events, frozen before manual gold and independent oracle under approved P11 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real users or a derived real-user snapshot. Case-sensitive ASCII string keys; unique campaign_id/event_id in their registers and device_id in identities; all impression campaign foreign keys exist; identities device→person is single-valued, multiple devices per person allowed; nonempty input cells/no NULL. Unknown impression devices intentionally lack identities. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv"
+    ],
+    "algorithm": "Independent raw-CSV event and unknown-event counters plus per-campaign person sets over the full campaigns register; device→person lookup before distinct counting, no deduplication of events, unknown devices excluded from person sets; ASCII sorting and identified-event numerator/known-person denominator with empty frequency when no people. Full manual 3×5 independently checked before native; no Loginom outputs used."
+  },
+  "native_evidence": {
+    "nodes_observed": 15,
+    "links_observed": 15,
+    "all_native_completed": true,
+    "counts_are_acceptance_gates": false,
+    "full_result_cells_checked": 15,
+    "count_texts_integer": 9,
+    "empty_frequency_cells": 2,
+    "save": {
+      "save_completed": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "modified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "original_close": {
+      "runtime": {
+        "closed_ack": true,
+        "exit_code": 0,
+        "exit_signal": null,
+        "request_error": null
+      },
+      "knowledge": {
+        "closed_ack": true,
+        "exit_code": 0,
+        "exit_signal": null,
+        "request_error": null
+      }
+    },
+    "post_attempt_idle": {
+      "writer": null,
+      "recovery": []
+    },
+    "independent_review": "APPROVE"
+  },
+  "cold_rerun": {
+    "reference_unchanged": true,
+    "raw_inputs_unchanged": true,
+    "new_export_after_one_park": true,
+    "full_result_cells_checked": 15,
+    "integer_texts": 9,
+    "empty_frequency_cells": 2,
+    "same_csv_bytes_as_cli": true,
+    "execution": "F9 first two imports; existing Execute all button once; no claim of fifteen separate F9 executions",
+    "all15native_green_observed": true,
+    "configure": false,
+    "save": false,
+    "closed_without_save": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "idle": {
+      "writer": null,
+      "recovery": []
+    },
+    "independent_review": "APPROVE"
+  },
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Info.xml Name=Unit1; not separately visited as a deep link",
+  "calibration_and_measurements": "pending",
+  "live_judge_actual": null,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

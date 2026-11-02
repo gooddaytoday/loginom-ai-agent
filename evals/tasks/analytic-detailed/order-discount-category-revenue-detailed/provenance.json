@@ -1,0 +1,175 @@
+{
+  "task_id": "order-discount-category-revenue-detailed",
+  "dataset_sha256": {
+    "lines.csv": "a776d2bb6fe08cf9e719f5fbc15f61626068670cd51336ca32db324097bd6886",
+    "orders.csv": "f25b18bd229679d58802c25d9df577ebc7a827e75f18cb95d203c03bc48454b5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "ecd71ab17d5d40b253a138603d2c161393b6893c36fcf5962cb4fddbc5a1b489"
+  },
+  "reference_sha256": "bd913ccdb018b5a57427c71891073ee6f59737239ce4af045f4f9986d730bf4d",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/orders.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Это первая Authoring A1 из общего бюджета3 для P14. Создай НОВЫЙ native draft по неизменённой задаче и двум входам orders.csv/lines.csv. Старые файлы и чужие сценарии не изменяй.\nЕсли первый prepare вернёт ошибку, не повторяй prepare в этой попытке: честно сообщи блокер и остановись. Не заменяй native расчёт JavaScript, готовым ответом, внешним итоговым CSV или XML-правками.\nВыполни все созданные узлы и независимые ветви, включая оба импорта. Скидка относится ко всему order_id; распределяй её пропорционально стоимости строк до скидки. Несколько строк одной категории одного заказа не увеличивают orders. Не округляй промежуточные части и суммы; финальная денежная запись имеет минимум две цифры после точки и достаточную точность для допуска задачи.\nExisting target передавай точным текущим target.ref БЕЗ target.position. Получи пять заданных колонок; orders — целый счётчик. Сортируй category ASC; служебные поля не экспортируй. Состав пяти колонок точный; их порядок несущественен. Ровно один итоговый CSV: UTF-8, ;, заголовок, десятичная точка, двойная кавычка.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Получи actual execute/export/file_artifacts/Save receipts.\nПри неизвестном эффекте используй только existing inspect/recovery и следуй его фактическому outcome. Если released outcome запрещает повтор эффекта, не повторяй и не пересоздавай export; сохрани доступный partial и честно остановись. Не делай слепой retry того же owned QuickView. Save/readback не заменяют независимый audit и отдельный cold rerun.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T10:16:55+03:00",
+    "duration_s": 878,
+    "tokens": {
+      "input": 127017,
+      "output": 8402,
+      "reasoning": 2628
+    },
+    "tool_calls": 58,
+    "tool_errors": 2,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "requested_service_tier": "priority",
+  "response_service_tier": "NOT_OBSERVED",
+  "speed_comparison": "NOT_MEASURED",
+  "api_model": "gpt-6-sol",
+  "authoring_budget": {
+    "observed_attempts": 1,
+    "allowed_attempts": 3,
+    "timeout_seconds": 1800,
+    "parallel": 1
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 3-order/7-line dataset frozen before manual gold and independent oracle under approved P14 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real sales data or a derived real-data snapshot. Case-sensitive ASCII keys/categories; orders.order_id and lines.line_id unique; every lines.order_id exists in orders. All cells nonempty/no NULL; qty positive integer, unit_price/order_discount nonnegative, each order gross positive. Repeated category within an order and multi-category orders intentional. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib collections",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-CSV Decimal qty*unit_price by line_id and totals by order_id; allocate discounts proportionally without intermediate rounding, aggregate category gross/discount, count distinct order_id with sets, net=gross-discount, ASCII sorting. Full manual 3×5 independently checked before native; no Loginom outputs used."
+  },
+  "native_observations": {
+    "nodes": 14,
+    "links": 14,
+    "XML_members": 7,
+    "counts_are_acceptance_gates": false,
+    "loginom_tool_calls": 53,
+    "original_close_receipts": "Both original model and knowledge runtimes: closed_ack=true, exit_code=0, request_error=null; post-idle writer=null/recovery=[]."
+  },
+  "authoring_history": {
+    "tool_errors": [
+      {
+        "tool_number": 39,
+        "operation": "reform-final-1",
+        "outcome": "NODE_APPLY_STOPPED/NOT_APPLIED",
+        "effect_possible": false,
+        "cleanup_complete": true,
+        "execution": "not_requested",
+        "cause": "Renames incorrectly sent in parameters.changes; output mapping required.",
+        "recovery": "40 corrected request: exclusions in changes, renames in mappings.output; new operation_id; 41 SUCCEEDED. No blind effect replay."
+      },
+      {
+        "tool_number": 45,
+        "operation": "prepare/open",
+        "cause": "Implicit prepare identity reused for a different request after successful initial6 READY/new_draft.",
+        "recovery": "46 inspect(prepare) completed tool state but FAILED/REQUEST_REJECTED, effect_possible=false, idle/cleanup_confirmed=true/effect_state=none. 47 global inspect SUCCEEDED/idle/none/recovery_options=[]. 48 new cold-open-1 READY exact saved package; created_draft=false/effect_possible=false/replayed=false."
+      }
+    ],
+    "sole_save": {
+      "tool_number": 44,
+      "operation_id": "save-package-1",
+      "action_key": "package.save_checkpoint",
+      "status": "SUCCEEDED",
+      "phase": "verified",
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "effect_possible": true,
+      "cleanup_complete": true,
+      "modified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "subsequent_CLI_readback": "49–52 observe; 53–58 execute both imports and final Reform with configuration not_requested/SUCCEEDED/fresh outputs. No new Save, export or draft. Not the required browser cold gate and does not change the original Save receipt."
+  },
+  "accepted_evidence": {
+    "native": {
+      "status": "APPROVE",
+      "review": "p14-native-review.md",
+      "sha256": "447b250210a29eb81d8ffce255ad71220275ffb1fb7d26d6e9d97141501cc039",
+      "root_fullread": true,
+      "full15_named_cells": true,
+      "all3_integer_counts": true,
+      "all9_money_texts_at_least2dec": true,
+      "server_and_local_LGP_equal": true
+    },
+    "browser_cold": {
+      "status": "APPROVE",
+      "review": "p14-cold-review.md",
+      "sha256": "9682094ec0e9b913b10d36344924b9ef15e7de11295d9eb98ac53264ca16c2db",
+      "root_fullread": true,
+      "exact_saved_package": true,
+      "single_park": true,
+      "new_CSV_full15_named_cells": true,
+      "server_LGP_and_two_raw_unchanged": true,
+      "Configure": false,
+      "Save": false,
+      "closed_without_Save": true,
+      "logout": true,
+      "own_tab_closed": true,
+      "post_idle": true,
+      "check_rerun_pass": true
+    },
+    "limitations": "Reuses accepted actual A1/browser-cold evidence; finalization is offline. Model/judge/calibration/sole measurements not run; pair acceptance pending."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

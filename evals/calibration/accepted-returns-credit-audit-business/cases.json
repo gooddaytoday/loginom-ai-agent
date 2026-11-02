@@ -1,0 +1,129 @@
+{
+  "sources": {
+    "SPEC.md": "e8b6b39a0bb672f826c6ca5fcaaa2d4bb908c3839d4ecedb102df8051c6ccade",
+    "acceptance.json": "814a831ce2f1176e4581222a59a17a34f33c3709176474e577a8b94fd1979f25",
+    "data/credits.csv": "92a0d78af28685932c0e3a4286529344b1b823f56175db769d6c8be69e366cbc",
+    "data/order_lines.csv": "1dc07ac0a05db4aef26eab7847462e33ddf47e8d12c8b725313dc55a50c4e061",
+    "data/returns.csv": "bd89e9a515e4f502a1736185c13d02bf8669b09648c983e7256b7605926d55c9",
+    "oracle.csv": "58943375ba1503d088eae58805b1d6b6fbe3b1dcb9bedc5b6be9dbeded519634",
+    "oracle.py": "b90a561f1a9013436d660acec6867d0a57aee9ef4334bf73769141e382347e94",
+    "provenance.json": "cc7ad79b0c058782e20502f3661c9f36397afb04a405767c0c6f056689b2c88c",
+    "reference.lgp": "da59b2cc8d5f7e6ee009bb4305055f4c8efe448bfb8c9f83c21ccbb0f3f152c6",
+    "task.json": "527d59c635f18e46bc0c141ebc01e98a2b05099858a4cf64baa80b72f62d3c4c"
+  },
+  "cases": [
+    {
+      "id": "rejected-returns-included",
+      "kind": "filter",
+      "expected_failed": [
+        "accepted-quantity",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"e39d412d-0c37-4240-a731-1ff4e04e5883\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtEqual\" CaseSensitive=\"true\">\n\t\t\t\t\t\t\t\t<CompareValue VarType=\"vrtString\">accepted</CompareValue>\n\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Guid=\"e39d412d-0c37-4240-a731-1ff4e04e5883\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtNotEqual\" CaseSensitive=\"true\">\n\t\t\t\t\t\t\t\t<CompareValue VarType=\"vrtString\">draft</CompareValue>\n\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "rejected-returns-included.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "if row[\"status\"] == \"accepted\":",
+            "to": "if row[\"status\"] != \"draft\":",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "credit-without-accepted-lost",
+      "kind": "column",
+      "expected_failed": [
+        "posted-credit-money",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Int(NVLF(credited_qty, 0))\"",
+          "to": "Expression=\"IFF(NVLF(accepted_qty, 0) &gt; 0, Int(NVLF(credited_qty, 0)), 0)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"NVLF(actual_credit, 0)\"",
+          "to": "Expression=\"IFF(NVLF(accepted_qty, 0) &gt; 0, NVLF(actual_credit, 0), 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "credit-without-accepted-lost.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "if row[\"status\"] == \"posted\":",
+            "to": "if row[\"status\"] == \"posted\" and accepted[row[\"order_line_id\"]] > 0:",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "no-accepted-inner",
+      "kind": "filter",
+      "expected_failed": [
+        "order-line-registry",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"a642b12a-47cf-4077-935d-0a21dbe29934\">\n\t\t\t\t\t\t\t\t<Left Name=\"order_line_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"order_line_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"a642b12a-47cf-4077-935d-0a21dbe29934\">\n\t\t\t\t\t\t\t\t<Left Name=\"order_line_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"order_line_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "no-accepted-inner.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for line in sorted(lines):",
+            "to": "for line in sorted(line for line in lines if accepted[line] > 0):",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "StrZero(Mod(Int(Round(Abs(expected_credit) * 100)), 100), 2)",
+          "to": "StrZero(Mod(Int(Round(Abs(expected_credit) * 100)), 100), 1)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "*(f\"{value:.2f}\" for value in [expected, actual, actual - expected])",
+            "to": "f\"{int(expected * 100) // 100}.{int(expected * 100) % 100:01d}\", f\"{actual:.2f}\", f\"{actual - expected:.2f}\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

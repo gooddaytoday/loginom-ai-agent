@@ -1,0 +1,72 @@
+{
+  "task_id": "invoice-first-payment-lag-detailed",
+  "dataset_sha256": {
+    "invoices.csv": "ebdbf121f0e1a66bde455399651fd06607766856ea6ef764c4005d5bb9998c91",
+    "payments.csv": "902f5f71dc4d49529c541f6082d8498a7d5b6e7346c45637b4e3ba514d497c95"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "076a8e36f9d0b7964cbb2957aad42f1880517fbea2114028d1d21e7828f51cf5"
+  },
+  "reference_sha256": "8df48fc5d5493f687021df8083a6993afdb8981afb849bc8d1ae4099c8042fba",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/invoices.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/payments.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T13:55:11+03:00",
+    "duration_s": 706,
+    "tokens": {
+      "input": 155651,
+      "output": 6086,
+      "reasoning": 803
+    },
+    "tool_calls": 40,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib datetime.datetime and decimal.Decimal",
+    "algorithm": "minimum eligible payment timestamp; calendar year/month delta and exact Decimal amount filter"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

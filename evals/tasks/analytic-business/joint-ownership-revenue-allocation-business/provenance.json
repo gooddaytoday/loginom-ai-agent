@@ -1,0 +1,39 @@
+{
+  "task_id": "joint-ownership-revenue-allocation-business",
+  "source_task": "joint-ownership-revenue-allocation-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/joint-ownership-revenue-allocation-detailed/provenance.json",
+  "dataset_sha256": {
+    "orders.csv": "173ce17b7ad09116159d34299ca1763eece02340810c77e0828259818bbe001e",
+    "ownership.csv": "01e58218b83fb0e1a4d4cf402754338796e0e79796b6ea83a4da54e1dadb18f0"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "16b57edda615fb54a8d529aca1674f0e73ad686be49aecba3402f7cd2ca47ae4"
+  },
+  "reference_sha256": "bfbbf6c311361d1acf9c986bb691b72e2038e90433f7f7cf89fdd6b55ffefacb",
+  "private_endpoint_omitted": true,
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic five-order full register and nine ownership relationships prepared under approved G05/P13 fixture plan and frozen before manual gold/oracle; zero share, missing bridge, invalid sum and two sides of the published admissibility tolerance; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real orders or a derived real-order snapshot. One monetary unit without additional charges. Unique order_id and (order_id,owner_id); all ownership order foreign keys exist; case-sensitive ASCII keys, all input cells nonempty/no NULL, nonnegative exact Decimal revenue/share, revenue has two decimal digits. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw ownership lists and Decimal sums over the complete orders register; inclusive abs(share_sum-1)<=0.000001 status, original-share allocation only for valid orders, preserved zero share/invalid rows/missing bridge and ASCII order; manual full10x7 independently checked before native, no Loginom outputs used."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

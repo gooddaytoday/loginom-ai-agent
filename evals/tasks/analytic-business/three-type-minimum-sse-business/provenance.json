@@ -1,0 +1,27 @@
+{
+  "task_id": "three-type-minimum-sse-business",
+  "source_task": "three-type-minimum-sse-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/three-type-minimum-sse-detailed/provenance.json",
+  "dataset_sha256": {
+    "objects.csv": "acb0985d5d0a85d0ae41e61bf5281e87002eabf8853209dbda2906118e177a87"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "52fbcc7274389019a7f5065a1c03fe4f1c3759604f0dbe762228cc8a4e4f4757"
+  },
+  "reference_sha256": "dd751c74def31679d7deec56e949d5ca718fecc55a0ff731f4ad327e73097462",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib fractions.Fraction",
+    "algorithm": "restricted-growth enumeration of 966 unlabelled partitions; independent pairwise SSE and separation bound"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

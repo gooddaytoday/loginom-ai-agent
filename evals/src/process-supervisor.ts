@@ -16,6 +16,7 @@ type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
   binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean
   awaitingExec?: boolean
+  ordinary?: boolean; exec?: { process: ProcessIdentity; observed_at: string }
 }
 export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: string }
 export type WriterIdentity = { device: number; inode: number; owner: string }
@@ -31,6 +32,8 @@ export type ProcessCleanup = {
   capture_complete: boolean
   observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement" | "systemd_post_exit"
   verification?: { observed_at: string; owned_remaining: number }[]
+  pre_shutdown_verification?: { observed_at: string; owned_remaining: number }[]
+  executableTransitions?: { original: ProcessIdentity; current: ProcessIdentity; observed_at: string }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
   observations?: { count: number; max_duration_ms: number; max_start_delay_ms?: number; max_gap_ms?: number }
   polling?: { interval_ms: number; observed_at: string }[]
@@ -636,6 +639,21 @@ export async function superviseProcess(input: {
     cleanup.error ??= "Launcher identity unavailable after dispatch"
     return undefined
   }) : undefined
+  const judgeScope = input.owner?.kind === "judge" && cleanup.observation_mode === "continuous" && !profile && !input.sandbox
+  const ordinary = (entry: ProcessView) => !/^(?:loginom-ai-|chrome|chromium)/.test(entry.name) &&
+    !/^(?:loginom-ai-|chrome|chromium)/.test(path.basename(entry.executable)) &&
+    !entry.args.some(arg => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg) || /(?:^|\s)--(?:type|user-data-dir)(?:=|\s|$)/.test(arg))
+  const observeExec = (entry: ProcessEntry, current: ProcessView) => {
+    const saved = entry.process
+    if (!judgeScope || !entry.ordinary || !entry.origin || saved.pid === cliPid || entry.origin.via === "cli" || entry.origin.via === "launcher" ||
+      entry.binding || entry.helper || entry.admission !== "allowed" && !entry.exec || !ordinary(current) ||
+      key(current) !== key(saved) || current.uid !== saved.uid || current.group !== saved.group || current.session !== saved.session ||
+      current.device === saved.device && current.inode === saved.inode) return false
+    entry.admission = "refused"
+    if (!entry.exec || !sameIdentity(current, entry.exec.process))
+      entry.exec = { process: identity(current), observed_at: new Date().toISOString() }
+    return true
+  }
   const track = (entry: ProcessView, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
     // Adoption retains launcher ownership, but loses the browser parent chain.
     // Keep it unadmitted until CLI identity or native admission resolves it.
@@ -645,11 +663,12 @@ export async function superviseProcess(input: {
     const awaitingExec = !input.sandbox && via !== "launcher" && entry.forked &&
       (via === "cli" || entry.device === cliInfo.dev && entry.inode === cliInfo.ino)
     const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry), awaitingExec,
-      admission: awaitingExec || browser && via === "subreaper" ? "pending" : "allowed" }
+      admission: awaitingExec || browser && via === "subreaper" ? "pending" : "allowed",
+      ordinary: judgeScope && ordinary(entry) && (!parent || ledger.get(key(parent))?.ordinary === true) }
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
-  let lastOwn: ProcessIdentity[] = []
+  let lastOwn: ProcessIdentity[] = [], judgeDrained = false
   if (root) {
     track(root, "launcher")
     cleanup.lifetime = { producer_pid: process.pid, owner: { ...(input.owner ?? { kind: "command", id: profile ?? input.cwd }) },
@@ -683,6 +702,7 @@ export async function superviseProcess(input: {
     for (const [id, entry] of ledger) if (!entry.origin && peerIds.has(id)) ledger.delete(id)
     for (const entry of ledger.values()) {
       if (!entry.origin) continue
+      if (entry.exec && entry.process.pid === cliPid) cleanup.error ??= `CLI executable identity differs PID ${cliPid}`
       const current = live.find((candidate) => candidate.pid === entry.process.pid)
       if (current && entry.awaitingExec && entry.admission !== "refused") {
         if (key(current) !== key(entry.process) || current.uid !== entry.process.uid || !root || !await hasOwnedAncestry(current.pid, [root])) {
@@ -698,7 +718,12 @@ export async function superviseProcess(input: {
           entry.admission = "refused"; cleanup.error ??= `CLI executable identity differs PID ${current.pid}`
         }
       }
+      // A known native role or ancestry cannot be forgotten after adoption.
+      entry.ordinary &&= (!current || ordinary(current)) &&
+        (!entry.origin.parent || ledger.get(entry.origin.parent)?.ordinary === true)
+      if (entry.exec && !entry.ordinary) cleanup.error ??= `Process identity changed PID ${entry.process.pid}`
       if (current && !sameIdentity(current, entry.process)) {
+        if (observeExec(entry, current)) continue
         entry.admission = "refused"
         cleanup.error ??= `Process identity changed PID ${entry.process.pid}`
       }
@@ -720,7 +745,8 @@ export async function superviseProcess(input: {
           : live.some((parent) => parent.pid === entry.parent && isWrapper(parent)) &&
             (namespacePid === null || cleanup.launcher!.cli_pid === null)))) &&
         live.some((parent) => parent.pid === entry.parent && ledger.get(key(parent))?.origin &&
-          sameIdentity(parent, ledger.get(key(parent))!.process) && (parent.pid !== root?.pid || reaperReady)))
+          (sameIdentity(parent, ledger.get(key(parent))!.process) || ledger.get(key(parent))!.exec &&
+            sameIdentity(parent, ledger.get(key(parent))!.exec!.process) && ordinary(parent)) && (parent.pid !== root?.pid || reaperReady)))
       if (!added.length) break
       added.forEach((entry) => {
         const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.get(key(candidate))?.origin)!
@@ -840,7 +866,10 @@ export async function superviseProcess(input: {
     }
     const owned = [...ledger.values()].filter((entry) => entry.origin)
     cleanup.processes = owned.map((entry) => entry.process)
-    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => entry.admission !== "allowed").map((entry) => entry.process)
+    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => entry.admission !== "allowed" &&
+      !(judgeDrained && entry.exec && !live.some(current => current.pid === entry.process.pid))).map((entry) => entry.process)
+    if (owned.some(entry => entry.exec)) cleanup.executableTransitions = owned.filter(entry => entry.exec).map(entry => ({ original: entry.process,
+      current: entry.exec!.process, observed_at: entry.exec!.observed_at }))
     cleanup.browserBindings = owned.filter((entry) => entry.binding).map((entry) => ({ process: entry.process, ...entry.binding! }))
     cleanup.admissions = [...ledger.values()].map((entry) => ({ pid: entry.process.pid, starttime: entry.process.starttime, status: entry.admission }))
     cleanup.origins = owned.map((entry) => {
@@ -923,7 +952,14 @@ export async function superviseProcess(input: {
         const signaled = await signalProcess(saved, signal)
         if (wrappers && saved.pid === cliPid && signaled) sandboxTerminated = true
       } catch (error) {
-        if (!gone(error)) { tracked.admission = "refused"; cleanup.error ??= message(error) }
+        if (gone(error)) continue
+        // A refused syscall may have raced an ordinary exec after the scan.
+        // Only a fresh complete read can classify it; the signal guard stays strict.
+        if (message(error) === `Process identity changed PID ${saved.pid}`) {
+          const current = await processView(saved.pid).catch(failure => { cleanup.error ??= message(failure); return undefined })
+          if (current && observeExec(tracked, current)) continue
+        }
+        tracked.admission = "refused"; cleanup.error ??= message(error)
       }
     }
   }
@@ -952,7 +988,8 @@ export async function superviseProcess(input: {
     // A failed pass is not an empty proof. Refuse the transition without
     // waiting on a stale snapshot or signaling identities we cannot inspect.
     if (!await checkedScan()) return []
-    return lastOwn.filter((entry) => (!root || key(entry) !== key(root)) && ledger.get(key(entry))?.admission === "allowed" && isWrapper(entry) === wrappers)
+    return lastOwn.filter((entry) => (!root || key(entry) !== key(root)) &&
+      (judgeScope || ledger.get(key(entry))?.admission === "allowed") && isWrapper(entry) === wrappers)
   }
   const soft = Math.min(deadline, Date.now() + 5_000)
   while ((await remaining()).length && Date.now() < soft) await Bun.sleep(100)
@@ -974,6 +1011,26 @@ export async function superviseProcess(input: {
   while (cliExitCode === undefined && proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) {
     await checkedScan()
     if (cliExitCode === undefined) await Bun.sleep(10)
+  }
+  if (judgeScope) {
+    cleanup.pre_shutdown_verification = []
+    while (Date.now() < deadline) {
+      if (!await checkedScan()) break
+      const controller = root ? await processView(root.pid).catch(error => { cleanup.error ??= message(error); return undefined }) : undefined
+      if (!root || !controller || !sameIdentity(controller, root)) {
+        cleanup.error ??= "Judge controller identity unavailable during drain"
+        break
+      }
+      const remaining = lastOwn.filter(entry => key(entry) !== key(root)).length
+      const blockers = [...ledger.values()].some(entry => entry.admission !== "allowed" && !entry.exec)
+      if (remaining || blockers) cleanup.pre_shutdown_verification = []
+      else {
+        cleanup.pre_shutdown_verification.push({ observed_at: new Date().toISOString(), owned_remaining: remaining })
+        if (cleanup.pre_shutdown_verification.length === 2) { judgeDrained = true; break }
+      }
+      await Bun.sleep(100)
+    }
+    if (!judgeDrained) cleanup.error ??= "Judge process drain unconfirmed"
   }
   if (root) await signalProcess(identity(root), "SIGTERM").catch((error) => { cleanup.error ??= message(error) })
   while (proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) await Bun.sleep(100)

@@ -1,0 +1,144 @@
+{
+  "sources": {
+    "SPEC.md": "d95074650185c71e1ea509ae7698754a3f2a93be396e9bb5dc560e4c86ea9687",
+    "acceptance.json": "64546fce79d1c1179bbfa2aebe19ba465d8a6c9a3db40a2c64b1e53383d27128",
+    "data/customers.csv": "82cfdccc476fbb106d19e8a6df62b1acc46e9f4139c119f62f976419da606ba4",
+    "data/sales_lines.csv": "077dd4b526a689931dede0998c34f2140d35e1f2027a05869ff5a7afcd05c394",
+    "oracle.csv": "755534b1865666f13edb433338c1b11f2d86a91d96331b4878418e29e399a23f",
+    "oracle.py": "c3dc175cde57dedc73794d3352b0ea566d71324ceea28f84746d6abe9f9c1bc6",
+    "provenance.json": "edfe7c8656ea6dd75fba2bbe7dd522499cb78841f11f940a82135bcfadc27e66",
+    "reference.lgp": "0813bfd127713d24a8e424887f62fb3451de72338b4524a165d3fc843cf87715",
+    "task.json": "bac5af8f1f8562dcf679ee25e557e595c646c11da20d9db690b7ff7524173f8e"
+  },
+  "cases": [
+    {
+      "id": "active-base-denominator",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"buyers / customers\"",
+          "to": "Expression=\"buyers / IFF(buyers &gt; 0, buyers, 1)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"revenue / customers\"",
+          "to": "Expression=\"revenue / IFF(buyers &gt; 0, buyers, 1)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "active-base-denominator.csv",
+      "expected_failed": [
+        "distinct-buyers",
+        "revenue-per-full-base",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "str(Decimal(purchased) / count)",
+            "to": "str(Decimal(purchased) / (purchased or 1))",
+            "count": 1
+          },
+          {
+            "from": "f\"{amount / count:.2f}\"",
+            "to": "f\"{amount / (purchased or 1):.2f}\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "rows-as-people",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(NVLF(sale_lines, 0) &gt; 0, 1, 0)\"",
+          "to": "Expression=\"NVLF(sale_lines, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "rows-as-people.csv",
+      "expected_failed": [
+        "distinct-buyers",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "buyers = set()",
+            "to": "buyers = []",
+            "count": 1
+          },
+          {
+            "from": "        buyers.add(row[\"customer_id\"])",
+            "to": "        buyers.append(row[\"customer_id\"])",
+            "count": 1
+          },
+          {
+            "from": "        purchased = len(members & buyers)",
+            "to": "        purchased = sum(customer in members for customer in buyers)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "zero-amount-buyer-missed",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(NVLF(sale_lines, 0) &gt; 0, 1, 0)\"",
+          "to": "Expression=\"IFF(NVLF(customer_revenue, 0) &gt; 0, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "zero-amount-buyer-missed.csv",
+      "expected_failed": [
+        "distinct-buyers",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        buyers.add(row[\"customer_id\"])",
+            "to": "        if Decimal(row[\"amount\"]) > 0:\n            buyers.add(row[\"customer_id\"])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "StrZero(Round((Round(revenue, 6) - Int(Round(revenue, 6))) * 1000000), 6)",
+          "to": "StrZero(Round((Round(revenue, 6) - Int(Round(revenue, 6))) * 1000000), 1)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{amount:.2f}\"",
+            "to": "f\"{int(amount)}.{int((amount % 1) * 1000000):01d}\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

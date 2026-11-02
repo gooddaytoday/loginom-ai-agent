@@ -1,0 +1,4 @@
+category;orders;gross_revenue;allocated_discount;net_revenue
+CAT_A;2;32.000000;26.000000;6.000000
+CAT_B;2;37.000000;12.000000;25.000000
+CAT_C;1;1.000000;1.000000;0.000000

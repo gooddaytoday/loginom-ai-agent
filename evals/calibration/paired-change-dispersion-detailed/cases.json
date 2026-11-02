@@ -1,0 +1,217 @@
+{
+  "sources": {
+    "task.json": "e20d705c7e69ccc3dd288bd028fb3738de9c7b91f2eeccd376b2e65a2930b4d5",
+    "reference.lgp": "c26414b2cb28912cc76c6c7dae88822ebfe9a6a11ae5488d434bbecc73bcae08",
+    "SPEC.md": "37ec2a2871bb4d160d5b3f8f6ff28698573fd0222cd1f589c61c02d46552c510",
+    "data/machines.csv": "e2ba8fee38451763431efb1cbe3869dae947ba9ef2c677714452c3390edfd63b",
+    "oracle.csv": "85bcb5acc050f602688d3ecaedfa3f237b8b6e9d1f6cc7e82498f115faf7f3e6",
+    "oracle.py": "defaf221daa3acf34a737abe510c4f1a163be596b7c992d9b7c6093f60f5a445"
+  },
+  "cases": [
+    {
+      "id": "reverse-change",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"after - before\"",
+          "to": "Expression=\"before - after\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "reverse-change.csv",
+      "expected_failed": [
+        "signed-mean",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "int(row[\"after\"]) - int(row[\"before\"])",
+            "to": "int(row[\"before\"]) - int(row[\"after\"])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "absolute-change",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"after - before\"",
+          "to": "Expression=\"Abs(after - before)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "absolute-change.csv",
+      "expected_failed": [
+        "signed-mean",
+        "sample-dispersion",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "int(row[\"after\"]) - int(row[\"before\"])",
+            "to": "abs(int(row[\"after\"]) - int(row[\"before\"]))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "population-sd",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(change_Count)\"/>",
+          "to": "<Item Name=\"sample_sd_change\" DataType=\"dtFloat\" Expression=\"change_StdDev * Sqrt((change_Count - 1) / change_Count)\"/>\n\t\t\t\t\t\t\t<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev * Sqrt((change_Count - 1) / change_Count) / Sqrt(change_Count)\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"change_StdDev\"/>",
+          "to": "<Mapping Source=\"sample_sd_change\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "population-sd.csv",
+      "expected_failed": [
+        "sample-dispersion",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "statistics.stdev(changes)",
+            "to": "statistics.pstdev(changes)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "se-divide-n",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(change_Count)\"/>",
+          "to": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / change_Count\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "se-divide-n.csv",
+      "expected_failed": [
+        "standard-error",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "sd / math.sqrt(len(changes))",
+            "to": "sd / len(changes)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "se-global-n",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(change_Count)\"/>",
+          "to": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(12)\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "se-global-n.csv",
+      "expected_failed": [
+        "standard-error",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "def summarize(rows):\n    groups = {}",
+            "to": "def summarize(rows):\n    rows = list(rows)\n    groups = {}",
+            "count": 1
+          },
+          {
+            "from": "sd / math.sqrt(len(changes))",
+            "to": "sd / math.sqrt(len(rows))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "double-count",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(change_Count)\"/>",
+          "to": "<Item Name=\"pairs\" DataType=\"dtInteger\" Expression=\"change_Count * 2\"/>\n\t\t\t\t\t\t\t<Item Name=\"se_change\" DataType=\"dtFloat\" Expression=\"change_StdDev / Sqrt(change_Count * 2)\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"change_Count\"/>",
+          "to": "<Mapping Source=\"pairs\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "double-count.csv",
+      "expected_failed": [
+        "pair-grain",
+        "standard-error",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "result.append((group, len(changes), statistics.mean(changes), sd, sd / math.sqrt(len(changes))))",
+            "to": "result.append((group, len(changes) * 2, statistics.mean(changes), sd, sd / math.sqrt(len(changes) * 2)))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"setting_group\"/>",
+          "to": "<Item Name=\"setting_group\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sort.csv",
+      "expected_failed": [
+        "export-contract",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "setting_group",
+          "descending": true
+        }
+      }
+    }
+  ]
+}

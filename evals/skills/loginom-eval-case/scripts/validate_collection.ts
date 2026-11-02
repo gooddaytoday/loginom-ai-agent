@@ -27,9 +27,9 @@ for (const task of tasks) {
     const oracle = readFileSync(path.join(task.dir, task.oracle), "utf8").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trimEnd()
     const parsed = oracleError(oracle, task.oracleTolerance)
     if (parsed) errors.push(`${task.id}: oracle.csv не разбирается harness: ${parsed}`)
-    if (resultItems.length === 1 && !resultItems[0].text.includes(oracle))
-      warnings.push(`${task.id}: пункт ${resultItems[0].id} не содержит oracle.csv целиком, а судья видит только текст пункта`)
-    if (oracle.split("\n").length > 51) warnings.push(`${task.id}: в oracle.csv больше 50 строк данных, пункт результата станет громоздким`)
+    if (resultItems.length === 1 && !resultItems[0]!.text.includes(oracle))
+      warnings.push(`${task.id}: пункт ${resultItems[0]!.id} не содержит oracle.csv целиком, а судья видит только текст пункта`)
+    if (oracle.split("\n").length > 51) warnings.push(`${task.id}: в oracle.csv больше 50 строк данных: большой текст для judge; сохраняйте полный результат и смысл задачи`)
   }
   if (!requiredItems) warnings.push(`${task.id}: нет пунктов required: true, правильный CSV компенсирует неверный граф`)
   if (checklist.length < 5 || checklist.length > 8) warnings.push(`${task.id}: в чеклисте ${checklist.length} пунктов, ожидается 5–8`)
@@ -73,7 +73,7 @@ function secretValues(envFile: string) {
     .flatMap((line) => {
       const match = /^([A-Z_]+)=(.*)$/.exec(line.trim())
       if (!match || !match[2]) return []
-      return ["KEY", "PASSWORD", "TOKEN"].some((word) => match[1].includes(word)) ? [Buffer.from(match[2])] : []
+      return ["KEY", "PASSWORD", "TOKEN"].some((word) => match[1]?.includes(word)) ? [Buffer.from(match[2])] : []
     })
 }
 

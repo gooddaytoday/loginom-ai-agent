@@ -1,0 +1,49 @@
+{
+  "task_id": "observed-purchase-cohort-retention-business",
+  "source_task": "observed-purchase-cohort-retention-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/observed-purchase-cohort-retention-detailed/provenance.json",
+  "dataset_sha256": {
+    "cohort_calendar.csv": "2d7f42ea91758247389c3fe8c63163e737970f422403907b89cd5ab71b30a8eb",
+    "purchase_lines.csv": "3aab0778269436cf035ba3a2d51e6fcda813ff0ce59ef9bfe0bfd92115ef13a5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "08225ecdbf36c7346d70cfed76d0ccfa2284125266aec76758301e33070e347f"
+  },
+  "reference_sha256": "a6c1c882d181f0439243489f8142f229894843f26e113b9ab35f6553c57f930c",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 11-sale-line/6-calendar-row dataset frozen before independent manual gold and oracle under approved G06 P17 fixture plan; no answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real transactions, or a derived real-data snapshot. invoice_id may repeat; only customer_id may be empty. ASCII case-sensitive keys. qty signed integer; amount nonnegative. Calendar PK(cohort_month,age_month), ages0..2, observed0/1; all calendar cohorts positive. Local Europe/Moscow ISO timestamps; Jan/Feb2026 observed, Mar/Apr not observed; no timezone conversion. First observed eligible purchase is not lifetime first purchase."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent eligibility over raw lines; per-customer sets of local activity months; minimum month cohort; cohort member sets; observed calendar iteration; distinct active customers/cohort size without intermediate rounding; full independent manual3x5 before native."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

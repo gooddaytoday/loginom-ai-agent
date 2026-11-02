@@ -1,0 +1,4 @@
+sku;warehouse;opening_qty;received_qty;issued_qty;expected_qty;counted_qty;quantity_deviation;value_deviation
+A;W1;10;4;3;11;10;-1;-2.50
+A;W2;20;0;5;15;17;2;6.00
+B;W1;7;0;0;7;8;1;1.20

@@ -21,12 +21,10 @@ if [ -e "$work/events.jsonl" ]; then
   echo "попытка уже запускалась: $work" >&2
   exit 2
 fi
-for writer in "$PROFILE/.writer" "$AGENT_REPO/evals/.profile/agent/.writer"; do
-  if [ -e "$writer" ]; then
-    echo "профиль занят: $writer" >&2
-    exit 3
-  fi
-done
+if [ -e "$PROFILE/.writer" ]; then
+  echo "профиль занят: $PROFILE/.writer" >&2
+  exit 3
+fi
 mkdir -p "$WORK_ROOT"
 for dir in "$WORK_ROOT" "$PROFILE"; do
   free_kb=$(df -Pk "$dir" | awk 'NR == 2 {print $4}')
@@ -46,7 +44,7 @@ fi
 
 mkdir -p "$work"
 printf '%s\n' "$name" > "$work/name"
-printf '%s\n' "$case_dir" > "$work/case"
+printf '%s\n' "$case_dir" > "$work.case"
 if ! bun "$here/prepare_attempt.ts" "$AGENT_REPO" "$case_dir" "$work" "/$LOGINOM_USERNAME/$name.lgp" "$name.result.csv"; then
   exit 2
 fi

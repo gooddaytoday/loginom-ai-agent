@@ -1,0 +1,78 @@
+{
+  "task_id": "daily-cash-bank-reconciliation-detailed",
+  "dataset_sha256": {
+    "bank_daily.csv": "7b87a2dc76ab541120f8a8aa00dc0527f741e0981a87283b23929459a232777c",
+    "cash_events.csv": "504388189e336b6a3690be985b7a252cb0929cd3c4240c7ba5bb7ee87e41c8e8",
+    "report_calendar.csv": "a2300e263e852998f48e4814d1362f8e82737894215896a97da16a80f8b11144"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "e81c1fde418172ba2f67b8c6053644224d8a23b9dee447639e6be288dfc98c97"
+  },
+  "reference_sha256": "0f983497d47658b1710782eacd682c3ba1fc0e16472bf41681ea4948bffd0842",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/cash_events.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/bank_daily.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/report_calendar.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T14:43:26+03:00",
+    "duration_s": 653,
+    "tokens": {
+      "input": 105191,
+      "output": 6496,
+      "reasoning": 1718
+    },
+    "tool_calls": 41,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib datetime.date/datetime and decimal.Decimal",
+    "algorithm": "calendar-driven independent daily grouping with datetime.strptime().date(); Decimal inflow/outflow and bank minus ledger"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

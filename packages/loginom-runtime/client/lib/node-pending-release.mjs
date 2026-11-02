@@ -136,6 +136,30 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  // visualizers open; return through the observed scenario control only.
  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
   cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
+ return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup});
+}
+
+// Browser recovery owns manual cleanup; this verifier observes only and never
+// upgrades the original failed receipt or claims that its draft was discarded.
+export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
+ deadline=operation.deadline,now=channel.now??Date.now}) {
+ const state=operation.nodeApply,node=state?.node,reference=operation.lastReceipt;
+ requireValue(state?.pending&&node&&!state.result,'Recovery requires an unresolved phase of a known node');
+ requireValue(Number.isFinite(deadline)&&now()<deadline,'Recovery requires an unexpired finite release deadline');
+ requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
+ if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
+  'The last output-port read has no confirmed settled cleanup');
+ requireValue(reference?.operation_id&&reference.action_key,'Recovery requires the original browser receipt identity');
+ const response=await readReceipt(reference);
+ requireValue(response?.state==='completed','The last browser call has not confirmed completion');
+ requireValue(response.receipt?.operation_id===reference.operation_id&&response.receipt.action_key===reference.action_key,
+  'The last browser receipt identity changed');
+ return verifyQuietNodeGraph({operation,channel,node,deadline,now,
+  cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}});
+}
+
+async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup}) {
+ requireValue(now()<deadline,'Original release graph deadline elapsed');
  const quiet=s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'
   &&sameNode(s.prepared_node_context,node)&&s.prepared_node_context.locked===false
   &&s.ui?.dialogs?.length===0&&s.ui?.masks?.length===0;

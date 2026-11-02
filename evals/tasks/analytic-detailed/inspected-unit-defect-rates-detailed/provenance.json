@@ -1,0 +1,157 @@
+{
+  "task_id": "inspected-unit-defect-rates-detailed",
+  "dataset_sha256": {
+    "defects.csv": "d50915244f8c45c74ee2c0c45eb731618bb897bb98271ce646d06fc0329fc312",
+    "inspections.csv": "3234de376046bba9ac97060689d8557eb1d1a60ddd31ce00cf1e83c5ba004350"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "1ba3ed87ddf8c720743696ea02a96e8bc94a28bf4eff85a28312c53c886f8090"
+  },
+  "reference_sha256": "9723c588f1f94c08a43a1093a5706a0f9eff0846eab596a8ade83306153be90d",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published",
+    "binary_sha256": "c970efe51a57e8a8fc65c6eda6a18c4219db4463fa6939ba19aae5effcdbadee"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true,
+    "api_model": "gpt-6-sol"
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/inspections.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/defects.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Это первая Authoring A1 из общего бюджета3 для P12. Создай НОВЫЙ native draft по неизменённой задаче и двум входам inspections.csv/defects.csv. Старые файлы и чужие сценарии не изменяй.\nЕсли первый prepare вернёт ошибку, не повторяй prepare в этой попытке: честно сообщи блокер и остановись. Не заменяй native расчёт JavaScript, готовым ответом, внешним итоговым CSV или XML-правками.\nВыполни все созданные узлы и независимые ветви, включая оба импорта. Зерно изделия — unit_id; повторные и разнотяжёлые замечания одного изделия не увеличивают флаги. Все проверенные изделия, в том числе чистые, остаются в основании долей и полном реестре сочетаний supplier_id/production_line. Обе доли в единицах, без промежуточного округления.\nExisting target передавай точным текущим target.ref БЕЗ target.position. Получи семь заданных колонок; inspected_units/defective_units/critical_units — целые счётчики. Сортируй supplier_id, затем production_line ASC; служебные поля не экспортируй. Состав семи колонок точный; их порядок несущественен. Ровно один итоговый CSV: UTF-8, ;, заголовок, десятичная точка, двойная кавычка.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Получи actual execute/export/file_artifacts/Save receipts.\nПри неизвестном эффекте используй только existing inspect/recovery и следуй его фактическому outcome. Если released outcome запрещает повтор эффекта, не повторяй и не пересоздавай export; сохрани доступный partial и честно остановись. Не делай слепой retry того же owned QuickView. Save/readback не заменяют независимый audit и отдельный cold rerun.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T09:39:23+03:00",
+    "duration_s": 528,
+    "tokens": {
+      "input": 93169,
+      "output": 4818,
+      "reasoning": 916
+    },
+    "tool_calls": 32,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": [],
+    "observed_total": 1,
+    "allowed_total": 3,
+    "loginom_tool_calls": 27
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "requested_service_tier": "priority",
+  "response_service_tier": "NOT_OBSERVED",
+  "speed_comparison": "NOT_MEASURED",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 6-unit inspections register and 5 defect records, frozen before manual gold and independent oracle under approved P12 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real production data or a derived real-data snapshot. Case-sensitive ASCII string keys; unique unit_id in inspections and defect_id in defects; every defects.unit_id exists in inspections. Nonempty cells/no NULL; severity integer 1/2/3. Multiple records, including repeated defect_code and severity for one unit, are intentional. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv"
+    ],
+    "algorithm": "Independent raw-CSV max severity per unit_id, then full inspections traversal with per supplier/line counts and max>0/max=3 flags; missing severity=0, shares over all inspected units, ASCII sorting, no intermediate rounding. Full manual 3×7 independently checked before native; no Loginom outputs used."
+  },
+  "native_evidence": {
+    "nodes_observed": 10,
+    "links_observed": 9,
+    "all_native_completed": true,
+    "counts_are_acceptance_gates": false,
+    "full_result_cells_checked": 21,
+    "count_texts_integer": 9,
+    "nonempty_correct_shares": 6,
+    "save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      },
+      "status": "SUCCEEDED",
+      "cleanup_complete": true,
+      "modified": false
+    },
+    "original_close": {
+      "runtime": {
+        "closed_ack": true,
+        "exit_code": 0,
+        "exit_signal": null,
+        "request_error": null
+      },
+      "knowledge": {
+        "closed_ack": true,
+        "exit_code": 0,
+        "exit_signal": null,
+        "request_error": null
+      }
+    },
+    "post_attempt_idle": {
+      "writer": null,
+      "recovery": []
+    },
+    "independent_review": "APPROVE"
+  },
+  "cold_rerun": {
+    "reference_unchanged": true,
+    "raw_inputs_unchanged": true,
+    "new_export_after_one_park": true,
+    "full_result_cells_checked": 21,
+    "integer_texts": 9,
+    "nonempty_correct_shares": 6,
+    "same_csv_bytes_as_cli": true,
+    "execution": "existing Выполнить все once; left6/right5 with one overlapping group; no per-node execution claim",
+    "all10native_green_observed": true,
+    "configure": false,
+    "save": false,
+    "closed_without_save": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "idle": {
+      "writer": null,
+      "recovery": []
+    },
+    "independent_review": "APPROVE"
+  },
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Info.xml Name=Unit1; not separately visited as a deep link",
+  "calibration_and_measurements": "pending",
+  "live_judge_actual": null,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

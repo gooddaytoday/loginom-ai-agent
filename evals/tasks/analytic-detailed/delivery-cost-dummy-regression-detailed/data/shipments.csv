@@ -1,0 +1,9 @@
+id;units;distance;service_type;cost
+S01;8;90;standard;146.50
+S02;11;130;express;215.00
+S03;8;110;standard;156.50
+S04;11;150;express;225.00
+S05;12;90;standard;157.50
+S06;15;130;express;226.00
+S07;12;110;standard;179.50
+S08;15;150;express;248.00

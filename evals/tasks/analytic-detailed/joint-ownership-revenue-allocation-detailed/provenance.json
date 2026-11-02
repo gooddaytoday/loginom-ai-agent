@@ -1,0 +1,84 @@
+{
+  "task_id": "joint-ownership-revenue-allocation-detailed",
+  "dataset_sha256": {
+    "orders.csv": "173ce17b7ad09116159d34299ca1763eece02340810c77e0828259818bbe001e",
+    "ownership.csv": "01e58218b83fb0e1a4d4cf402754338796e0e79796b6ea83a4da54e1dadb18f0"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "16b57edda615fb54a8d529aca1674f0e73ad686be49aecba3402f7cd2ca47ae4"
+  },
+  "reference_sha256": "bfbbf6c311361d1acf9c986bb691b72e2038e90433f7f7cf89fdd6b55ffefacb",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/orders.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/ownership.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Подготовь НОВЫЙ native draft по неизменённой задаче P13 и входам orders.csv/ownership.csv; прежние пакеты/CSV не изменяй.\nИспользуй полный реестр orders и исходный мост ownership: проверка суммы долей по заказу, левые соединения, статус и распределение только valid по исходной share. Не удаляй нулевую долю или заказ без моста, не нормализуй доли и не распределяй invalid_share_sum. Допуск допустимости 0.000001 включительный, отдельно от ±0.001 итогового CSV; не требуй точного сохранения выручки через коррекцию долей.\nСначала заверши весь численный расчёт без промежуточного округления. ДО Sort/export заверши семь заданных колонок: order_id,owner_id,revenue,share,share_sum,allocation_status,allocated_revenue. Все непустые revenue/allocated_revenue должны иметь ≥2 дробных цифр с точкой, включая нулевую valid allocation. Invalid allocated_revenue пуста; missing owner_id/share/share_sum/allocated_revenue пусты, не0/NULL-текст. Для share/share_sum нового минимума знаков нет.\nSort по order_id,owner_id ASC с пустым owner_id первым; служебные колонки не экспортируй. Порядок колонок при сверке несущественен, имена и полный состав обязательны.\nExisting target передавай точным текущим target.ref БЕЗ target.position. Исполни все созданные узлы/ветви, включая оба импорта; считай штатными узлами без JavaScript, готовых ответов, внешнего итогового CSV и XML-правок.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Один CSV UTF-8, ;, точные заголовки, десятичная точка, двойная кавычка; получи actual export/file_artifacts/Save receipts.\nТолько existing inspect/recovery; неизвестный эффект не повторяй. После подтверждённых cleanup/released retry тот же owned QuickView без новой конкретной причины не повторяй вслепую: штатно сохрани доступный partial и остановись. Новый конкретный cause диагностируй в бюджете.\nЧестно сообщи исполнение/пути/ограничения: файл не делает FAILED/AMBIGUOUS успехом; Save/readback не заменяют независимый native audit всех ветвей и отдельный cold rerun сохранённого сценария.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T00:52:37+03:00",
+    "duration_s": 607,
+    "tokens": {
+      "input": 115942,
+      "output": 5950,
+      "reasoning": 995
+    },
+    "tool_calls": 37,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic five-order full register and nine ownership relationships prepared under approved G05/P13 fixture plan and frozen before manual gold/oracle; zero share, missing bridge, invalid sum and two sides of the published admissibility tolerance; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real orders or a derived real-order snapshot. One monetary unit without additional charges. Unique order_id and (order_id,owner_id); all ownership order foreign keys exist; case-sensitive ASCII keys, all input cells nonempty/no NULL, nonnegative exact Decimal revenue/share, revenue has two decimal digits. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw ownership lists and Decimal sums over the complete orders register; inclusive abs(share_sum-1)<=0.000001 status, original-share allocation only for valid orders, preserved zero share/invalid rows/missing bridge and ASCII order; manual full10x7 independently checked before native, no Loginom outputs used."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,22 @@
+{
+  "task_id": "receivables-payments-credits-business",
+  "source_task": "receivables-payments-credits-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/receivables-payments-credits-detailed/provenance.json",
+  "dataset_sha256": {
+    "credit_notes.csv": "2eafbe73909d250f322fd7446872d421efc9d3cd103dd92fe9d28a958eee378f",
+    "invoices.csv": "ed654d8a7e7a3b37b809c5ab9b23dee4719183ad83838255ce97e40876088db8",
+    "payments.csv": "e54370f7a1ed41b0ffe09fc0e75b733564ca1c2e2583332b99a4f47c1749120e"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "8117c863a137f8b466899bfd702e28be4208898e05b8d060362bdb87ca0a3c6b"
+  },
+  "reference_sha256": "ebfd996db58e2dacb9163dd48f9351cbc916fcd50535f5d35a24befea51f5480",
+  "checks": {
+    "shared_inputs_identical": true,
+    "explicit_reference_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

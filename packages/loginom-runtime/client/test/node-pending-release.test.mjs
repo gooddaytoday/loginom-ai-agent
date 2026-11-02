@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
-import {releasePendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
+import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
 import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
@@ -19,16 +19,16 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false,views=false}={}) {
+function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,views=false,context=node}={}) {
  let open=wizard,visualizers=views;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
- const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'views'},
+ const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'views'},
   workflow_navigation:{status:'observed',control_ref:'ui-nav',control_tid:'MF;TF-1;path',path},
   ui:{elements:[{tid:'MF;TF-1;path',ref:'ui-nav',allowed_actions:['click']}],dialogs:[],masks:[]}}
   :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
-  prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard'},
+  prepared_node_context:{...context,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard'},
   ui:{elements:[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
-   ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:[]}};
+  :{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
+   ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:mask?[{ref:'ui-mask'}]:[]}};
  return {gestures,channel:{
   observe:async({ready})=>{const s=state();if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
   perform:async({resolve,initialObservation})=>{gestures.push(resolve(initialObservation));open=false;visualizers=false;}}};
@@ -219,6 +219,41 @@ test('an unobservable release surface asks the user to cancel the open wizard fi
 test('release refuses a graph that changes between quiet reads',async()=>{
  let reads=0;const graph=()=>{const g=graphOf();if(reads++)g.links.push({source:'other',target:'new',input:0});return g;};
  await assert.rejects(release(stopped({graph}),surface().channel),/graph changed/);
+});
+test('browser recovery refuses an unsafe native surface without a cleanup gesture',async()=>{
+ for(const options of [{wizard:true},{views:true},{locked:true},{dialog:true},{mask:true},
+  ...['document_id','workflow_id','node_id'].map(k=>({context:{...node,[k]:'foreign'}}))]) {
+  const s=surface(options),operation=stopped();let reads=0;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+  operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+  operation.nodeTargetAdapter.observe=async()=>{reads++;return graphOf();};
+  await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}),
+   /not on a quiet unlocked graph/,JSON.stringify(options));
+  assert.equal(reads,0);assert.deepEqual(s.gestures,[]);
+ }
+});
+test('browser recovery rechecks receipt, transport and port cleanup before observing the node',async()=>{
+ for(const fault of ['receipt','identity','transport','port','expired']) {
+  const operation=stopped(),s=surface();let reads=0;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+  operation.receipt={state:fault==='receipt'?'running':'completed',receipt:{operation_id:'apply:n7',
+   action_key:fault==='identity'?'foreign':'ui.act',cleanup_complete:false}};
+  operation.transportUncertain=fault==='transport';
+  if(fault==='port')operation.portReadCleanupComplete=false;
+  if(fault==='expired')operation.deadline=0;
+  s.channel.observe=async()=>{reads++;assert.fail('Unsettled work cannot authorize native reads');};
+  await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}));
+  assert.equal(reads,0);assert.deepEqual(s.gestures,[]);
+ }
+});
+test('browser recovery refuses a graph that changes after manual cleanup',async()=>{
+ let reads=0;
+ const operation=stopped({graph:()=>{const g=graphOf();if(reads++)g.links.push({source:'other',target:'new',input:0});return g;}});
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+ const s=surface();
+ await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}),/graph changed/);
+ assert.equal(reads,2);assert.deepEqual(s.gestures,[]);
 });
 
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,

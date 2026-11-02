@@ -185,7 +185,15 @@ binding обычный интервал возвращается к 100 мс; н
 сигналом identity и участники группы проверяются заново. Legacy numeric PGID,
 имя процесса, одиночный argv/cwd match не разрешают kill. Неизвестный owner,
 unreadable relevant identity, changed identity или непроверенный browser/helper
-означают failed cleanup, без завершения чужих процессов. Linux private
+означают failed cleanup, без завершения чужих процессов. Узкое исключение: continuous
+`owner.kind=judge` без profile/sandbox может подтвердить cleanup после естественного
+выхода ранее proven ordinary descendant, у которого изменились только executable
+device/inode при прежних PID/starttime, UID, PGID/SID. Launcher, selected CLI,
+sandbox wrapper, browser/helper и неизвестный origin исключены; changed image
+остаётся refused и не получает сигнал. Его переход сохраняется в evidence;
+только два полных пустых прохода с интервалом ≥100 мс при свежепроверенном живом
+исходном subreaper снимают этот blocker, включая поздних потомков/adoption.
+Остальные identity, чтение, capture/persistence failures остаются fatal. Linux private
 eval-profile не используется одновременно ручным CLI/Desktop.
 
 На timeout/abort SIGINT grace остаётся 30 с, затем SIGTERM 5 с и SIGKILL;

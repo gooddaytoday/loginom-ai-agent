@@ -1,0 +1,123 @@
+{
+  "sources": {
+    "SPEC.md": "7f8c082a48bb10b624d44838036c9919ee9fdf0364ef8d1d7bb2b8f70609e6a6",
+    "acceptance.json": "b3687ec19ad58e51b75df41486a25387bf223df325e2fee1e2950d029ba9db54",
+    "data/lines.csv": "a776d2bb6fe08cf9e719f5fbc15f61626068670cd51336ca32db324097bd6886",
+    "data/orders.csv": "f25b18bd229679d58802c25d9df577ebc7a827e75f18cb95d203c03bc48454b5",
+    "oracle.csv": "ecd71ab17d5d40b253a138603d2c161393b6893c36fcf5962cb4fddbc5a1b489",
+    "oracle.py": "53d83a99e1116ab8b39e7c2012d39635bc005e8830e987edc668b09a2d69b122",
+    "provenance.json": "3bc585fa0388ab859c6f61fa01919b616ee0bc7abfbeec24f4ac119613dee56a",
+    "reference.lgp": "bd913ccdb018b5a57427c71891073ee6f59737239ce4af045f4f9986d730bf4d",
+    "task.json": "a43a672e5a3af571f5532d79c25c1bf3ed40d15fec304adac9257251d32e4c48"
+  },
+  "cases": [
+    {
+      "id": "whole-discount-each-line",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"order_discount * line_gross / order_gross\"",
+          "to": "Expression=\"order_discount\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "order-discount-allocation",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    category_discount[category] += discounts[row[\"order_id\"]] * gross[row[\"line_id\"]] / totals[row[\"order_id\"]]",
+            "to": "    category_discount[category] += discounts[row[\"order_id\"]]",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "whole-discount-each-line.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "line-count-not-orders",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"c8e46200-9d79-493c-8033-6c361394e58b\" DisplayName=\"Заказ и категория\" VendorGuid=\"4d4f2852-8a7d-4993-84f0-5b488029b1a7\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\"/>\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\"/>\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\"/>\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\"/>\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\"/>\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_net\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_net\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"2\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_discount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_discount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_gross\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_gross\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"line_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Guid=\"c8e46200-9d79-493c-8033-6c361394e58b\" DisplayName=\"Заказ и категория\" VendorGuid=\"4d4f2852-8a7d-4993-84f0-5b488029b1a7\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\"/>\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\"/>\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\"/>\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\"/>\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\"/>\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_net\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_net\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"2\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_discount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_discount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_gross\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_gross\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"line_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"2\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "category-distinct-orders",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    orders[category].add(row[\"order_id\"])",
+            "to": "    orders[category].add(row[\"line_id\"])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "line-count-not-orders.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "cent-rounded-line-discount",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"order_discount * line_gross / order_gross\"",
+          "to": "Expression=\"Round(order_discount * line_gross / order_gross, 2)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "order-discount-allocation",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    category_discount[category] += discounts[row[\"order_id\"]] * gross[row[\"line_id\"]] / totals[row[\"order_id\"]]",
+            "to": "    category_discount[category] += (discounts[row[\"order_id\"]] * gross[row[\"line_id\"]] / totals[row[\"order_id\"]]).quantize(Decimal(\"0.01\"))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "cent-rounded-line-discount.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "net-adds-discount",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"line_gross - line_discount\"",
+          "to": "Expression=\"line_gross + line_discount\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "category-revenue",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "category_gross[category] - category_discount[category]",
+            "to": "category_gross[category] + category_discount[category]",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "net-adds-discount.csv",
+      "expected_oracle_pass": false
+    }
+  ]
+}

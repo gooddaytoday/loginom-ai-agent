@@ -1,0 +1,4 @@
+segment;customers;buyers;buyer_share;revenue;revenue_per_customer
+SEG_A;3;2;0.6666666666666666666666666667;42.00;14.00
+SEG_B;2;1;0.5;0.00;0.00
+SEG_C;1;0;0;0.00;0.00

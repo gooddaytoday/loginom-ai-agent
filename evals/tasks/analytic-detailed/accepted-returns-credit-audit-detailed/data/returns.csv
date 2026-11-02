@@ -1,0 +1,5 @@
+return_id;order_line_id;qty;status
+R01;L01;2;accepted
+R02;L01;1;accepted
+R03;L01;4;rejected
+R04;L03;2;accepted

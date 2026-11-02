@@ -1,0 +1,101 @@
+{
+  "sources": {
+    "SPEC.md": "2bd871f93e980f165043b286fe2e2b239433ac156c2ad1e19f490c2ad13a6eea",
+    "acceptance.json": "f69d3529f310037976f570459fed5fa22c03aa03e8ebbee3b6218325564852e1",
+    "data/employee_calendar.csv": "585558c4053a89ab5a006f116a1049a07f131a035ae3d5c8936c5645d16fa873",
+    "data/work_logs.csv": "684bacf933b889ea1ba360e19bf35b46bb3c6e1c2dcf69efda29657da9b3b279",
+    "oracle.csv": "6187a6112634453cb313e49a50d7eea4abb6de7b99704b6d7a421d94cc9ae4e5",
+    "oracle.py": "3a89e77e48511c17352a44f96e0a0dc3bf7d578c0434c677ccdb99e5c006af21",
+    "provenance.json": "d90e0b2b22f89035d43fcce03edbcdc2dda7c43b8c29574f433d31fb3c29a94f",
+    "reference.lgp": "c11d1376be066225aaf07a5cc01cdd76419292308fce5f1a7b872e51b294dbf6",
+    "task.json": "2c8b1403b0b7e5bfbf62be01fdd74fa1be54669bee63ed0eaf26625596d19b8c"
+  },
+  "cases": [
+    {
+      "id": "timestamp-not-day",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"EncodeDate(Year(timestamp), Month(timestamp), Day(timestamp))\"",
+          "to": "Expression=\"timestamp\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "timestamp-not-day.csv",
+      "expected_failed": [
+        "calendar-grain",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        day = datetime.strptime(row[\"timestamp\"], \"%Y-%m-%dT%H:%M:%S\").date().isoformat()",
+            "to": "        day = datetime.strptime(row[\"timestamp\"], \"%Y-%m-%dT%H:%M:%S\").isoformat()",
+            "count": 1
+          },
+          {
+            "from": "        actual = worked[row[\"employee_id\"], row[\"date\"]]",
+            "to": "        actual = worked[row[\"employee_id\"], row[\"date\"] + \"T00:00:00\"]",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "signed-daily-overtime",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(NVLF(logged_minutes, 0) &gt; planned_minutes, NVLF(logged_minutes, 0) - planned_minutes, 0)\"",
+          "to": "Expression=\"NVLF(logged_minutes, 0) - planned_minutes\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "signed-daily-overtime.csv",
+      "expected_failed": [
+        "daily-overtime",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        total[5] += max(0, actual - planned)",
+            "to": "        total[5] += actual - planned",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "zero-plan-attendance",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF((planned_minutes &gt; 0) AND (NVLF(logged_minutes, 0) &gt; 0), 1, 0)\"",
+          "to": "Expression=\"IFF(NVLF(logged_minutes, 0) &gt; 0, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "zero-plan-attendance.csv",
+      "expected_failed": [
+        "daily-attendance",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        total[1] += int(planned > 0 and actual > 0)",
+            "to": "        total[1] += int(actual > 0)",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

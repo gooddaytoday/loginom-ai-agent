@@ -1,0 +1,7 @@
+seat_id;account_id;enabled;billable
+S01;A01;1;1
+S02;A01;0;1
+S03;A01;1;0
+S04;A01;0;0
+S05;A04;1;1
+S06;A04;1;1

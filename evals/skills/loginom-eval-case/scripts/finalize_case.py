@@ -28,7 +28,7 @@ def main(case_dir, attempt_dir, scenario_url):
     failed = [gate for gate, passed in gates.items() if not passed]
     if failed:
         raise SystemExit(f"эталон не принят, не пройдено: {', '.join(failed)}")
-    if Path((attempt / "case").read_text(encoding="utf-8").strip()).resolve() != case.resolve():
+    if Path(Path(f"{attempt}.case").read_text(encoding="utf-8").strip()).resolve() != case.resolve():
         raise SystemExit("попытка относится к другому кейсу")
     previous = read_json(case / "provenance.json")
     number = int((attempt / "name").read_text(encoding="utf-8").strip().rsplit("-", 1)[-1])
@@ -56,7 +56,7 @@ def main(case_dir, attempt_dir, scenario_url):
         "attempt": {
             "number": number,
             # номера попыток идут подряд, а ранние попытки перестройки могут отсутствовать в WORK_ROOT
-            "total": max(number, len(list(attempt.parent.glob("attempt-*")))),
+            "total": max(number, sum(path.is_dir() for path in attempt.parent.glob("attempt-*"))),
             "assisted": hint_path.is_file(),
             "hint": hint_path.read_text(encoding="utf-8").strip() if hint_path.is_file() else None,
             "session_id": summary.get("sessionId"),

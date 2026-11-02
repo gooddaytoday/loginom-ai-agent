@@ -1,0 +1,40 @@
+{
+  "task_id": "inventory-ledger-reconciliation-business",
+  "source_task": "inventory-ledger-reconciliation-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/inventory-ledger-reconciliation-detailed/provenance.json",
+  "dataset_sha256": {
+    "movements.csv": "9c33e08d9e0c62cb26830498f1166b127b26df04aee11f8dc3c29a45ebe75fea",
+    "opening_stock.csv": "560c0d332e515c1d1477efc0ed2b5290025f593af39120040c010010fd14ea13",
+    "physical_count.csv": "2a8f3e5c66ab20dab33dd0e667b5c60e1f362b8ddc6b8b219448abfb21ee5bc9"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "2566921fcc607c41282b3d286f52ced32578caac93aad4cf529257b58f4e055e"
+  },
+  "reference_sha256": "528b29c16b9a6859fc9adf2678db9c92f0c587df480fdcb368f5273970632725",
+  "private_endpoint_omitted": true,
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw opening registry with per-pair incoming/outgoing Decimal ledger and physical count; full registry iteration, signed counted-minus-expected difference and fixed own-pair cost; independently checked full manual 3x9 ledger and total balance; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic three opening rows, three movement rows and three physical-count rows prepared under the approved P03 fixture plan and frozen before gold; raw quantities, directions and own-pair prices, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not real warehouse data. One quantity unit and one monetary unit without tax; fixed own-pair cost, complete unique opening/count registry and non-null valid movement references. No FIFO/average-cost valuation or zero monetary output witness."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

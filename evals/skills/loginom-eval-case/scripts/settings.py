@@ -5,7 +5,6 @@ from pathlib import Path
 SETTINGS_PATH = Path(os.environ.get("LOGINOM_EVAL_CASE_ENV", Path.home() / ".config/loginom-eval-case/env"))
 BASE = (
     "AGENT_REPO",
-    "VALIDATION_REPO",
     "CLI",
     "PROFILE",
     "LOGINOM_URL",

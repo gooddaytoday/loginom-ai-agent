@@ -1,0 +1,84 @@
+{
+  "task_id": "freight-weight-bill-audit-detailed",
+  "dataset_sha256": {
+    "carrier_bills.csv": "215175d6c69e7e05036d7586283b46153c7c97e053d4b9716322554cbb6e55ce",
+    "packages.csv": "7f11045cefc2564487f5239441dd309e4342e0ba4b77353682dc507e22151dcf",
+    "shipments.csv": "36854a4c6aad28a016be595556d7179b16550e519d08aa7bd898926df9c6bc8f",
+    "tariffs.csv": "ed074d85a876b66252b9e98ae1bdcd6c7aabd0020a07b34be22ab350dd667fd5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "974658bdcad4ab9c789e3a35200ef7fd7c8dc5e691fb5bf40e435b234adb45da"
+  },
+  "reference_sha256": "e9fac621f33360047f6742d6b4ade615bc3fc0634f4d3df7c83bcc2513b235e9",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/shipments.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/packages.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/tariffs.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/carrier_bills.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T14:19:57+03:00",
+    "duration_s": 882,
+    "tokens": {
+      "input": 213601,
+      "output": 7679,
+      "reasoning": 1497
+    },
+    "tool_calls": 54,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib decimal.Decimal and collections.defaultdict",
+    "algorithm": "independent shipment-register lookup; separate package weights and bill sums; exact decimal tariff arithmetic"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

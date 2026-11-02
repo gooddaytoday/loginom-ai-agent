@@ -1,0 +1,6 @@
+po_line_id;supplier_id;ordered_qty;agreed_unit_price
+P01;S1;10;10.00
+P02;S1;4;7.50
+P03;S2;3;5.00
+P04;S2;2;2.00
+P05;S2;1;1.00

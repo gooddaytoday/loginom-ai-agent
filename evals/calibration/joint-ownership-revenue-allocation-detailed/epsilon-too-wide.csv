@@ -1,0 +1,11 @@
+order_id;owner_id;revenue;share;share_sum;allocation_status;allocated_revenue
+O01;A;100.00;0.25;1.00;valid;25.0000
+O01;B;100.00;0.75;1.00;valid;75.0000
+O01;C;100.00;0;1.00;valid;0.00
+O02;A;60.00;0.4;0.9;invalid_share_sum;
+O02;B;60.00;0.5;0.9;invalid_share_sum;
+O03;;80.00;;;missing_ownership;
+O04;A;25.00;0.6;1.0000005;valid;15.000
+O04;B;25.00;0.4000005;1.0000005;valid;10.000012500
+O05;A;10.00;0.5;1.000002;valid;5.000
+O05;B;10.00;0.500002;1.000002;valid;5.00002000

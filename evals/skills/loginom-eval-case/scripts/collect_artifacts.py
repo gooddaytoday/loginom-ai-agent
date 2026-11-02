@@ -32,7 +32,7 @@ def main(attempt_dir, mode):
 
 
 def collect(settings, attempt, name, entries, results):
-    case = Path((attempt / "case").read_text(encoding="utf-8").strip())
+    case = Path(Path(f"{attempt}.case").read_text(encoding="utf-8").strip())
     started = datetime.datetime.fromisoformat((attempt / "started-at").read_text(encoding="utf-8").strip()).timestamp()
     receipts = []
     summary_path = attempt / "summary.json"

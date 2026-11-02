@@ -1,0 +1,28 @@
+{
+  "task_id": "invoice-first-payment-lag-business",
+  "source_task": "invoice-first-payment-lag-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/invoice-first-payment-lag-detailed/provenance.json",
+  "dataset_sha256": {
+    "invoices.csv": "ebdbf121f0e1a66bde455399651fd06607766856ea6ef764c4005d5bb9998c91",
+    "payments.csv": "902f5f71dc4d49529c541f6082d8498a7d5b6e7346c45637b4e3ba514d497c95"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "076a8e36f9d0b7964cbb2957aad42f1880517fbea2114028d1d21e7828f51cf5"
+  },
+  "reference_sha256": "8df48fc5d5493f687021df8083a6993afdb8981afb849bc8d1ae4099c8042fba",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib datetime.datetime and decimal.Decimal",
+    "algorithm": "minimum eligible payment timestamp; calendar year/month delta and exact Decimal amount filter"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

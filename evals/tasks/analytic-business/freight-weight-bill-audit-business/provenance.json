@@ -1,0 +1,30 @@
+{
+  "task_id": "freight-weight-bill-audit-business",
+  "source_task": "freight-weight-bill-audit-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/freight-weight-bill-audit-detailed/provenance.json",
+  "dataset_sha256": {
+    "carrier_bills.csv": "215175d6c69e7e05036d7586283b46153c7c97e053d4b9716322554cbb6e55ce",
+    "packages.csv": "7f11045cefc2564487f5239441dd309e4342e0ba4b77353682dc507e22151dcf",
+    "shipments.csv": "36854a4c6aad28a016be595556d7179b16550e519d08aa7bd898926df9c6bc8f",
+    "tariffs.csv": "ed074d85a876b66252b9e98ae1bdcd6c7aabd0020a07b34be22ab350dd667fd5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "974658bdcad4ab9c789e3a35200ef7fd7c8dc5e691fb5bf40e435b234adb45da"
+  },
+  "reference_sha256": "e9fac621f33360047f6742d6b4ade615bc3fc0634f4d3df7c83bcc2513b235e9",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib decimal.Decimal and collections.defaultdict",
+    "algorithm": "independent shipment-register lookup; separate package weights and bill sums; exact decimal tariff arithmetic"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

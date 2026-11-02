@@ -107,6 +107,13 @@
     После SIGINT/timeout CLI слота получает до 90 секунд на собственный teardown;
     общий бюджет cleanup supervisor-а — 120 секунд с учётом дальнейшей эскалации.
     Для остальных владельцев сохраняются 30 секунд ожидания и 60 секунд cleanup.
+    Continuous judge без profile/sandbox допускает естественный выход ранее proven
+    ordinary descendant после exec: неизменны PID/starttime, UID, PGID/SID, меняются
+    только executable device/inode. Launcher/selected CLI/wrapper/browser/helper и
+    неизвестный origin исключены. Changed image остаётся refused без сигналов;
+    переход сохраняется, blocker снимают лишь два полных пустых прохода ≥100 мс при
+    свежепроверенном живом исходном subreaper, включая late descendants/adoption.
+    Остальные identity/чтение/capture/persistence failures остаются fatal; budget 60 с.
 25. Все секреты, включая пароли пользователей, авторизацию модели/судьи и admin,
     остаются вне env агента/судьи и вне results/prompts/диагностики. Runtime-auth
     и подготовленные подключения используются без передачи секретов через env.

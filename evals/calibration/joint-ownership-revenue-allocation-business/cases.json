@@ -1,0 +1,123 @@
+{
+  "sources": {
+    "SPEC.md": "7965d3dc97cb92d9aaefe8ceb2b94ce66ff8a2dcfd520f6fffa630502aa5f4ff",
+    "acceptance.json": "4a8efe171a08a47eca53a2bd90bcaa38e12485b5faf7c1c81d1cb3dd5237ad82",
+    "data/orders.csv": "173ce17b7ad09116159d34299ca1763eece02340810c77e0828259818bbe001e",
+    "data/ownership.csv": "01e58218b83fb0e1a4d4cf402754338796e0e79796b6ea83a4da54e1dadb18f0",
+    "oracle.csv": "16b57edda615fb54a8d529aca1674f0e73ad686be49aecba3402f7cd2ca47ae4",
+    "oracle.py": "d80821129f70cf79f495c9d91ae0d92486ab2ebcb364a99b6eddce348caa2652",
+    "provenance.json": "0da06a2728b377532c3ac4b8c01ae2ae6babbc3b0ab134ed9ac3720b521bfd39",
+    "reference.lgp": "bfbbf6c311361d1acf9c986bb691b72e2038e90433f7f7cf89fdd6b55ffefacb",
+    "task.json": "6e9496bbbf23804e0aed6f8ffcc44b1ec0fde921dc209be177c30f17b0ec2e11"
+  },
+  "cases": [
+    {
+      "id": "missing-order-inner",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"5529aee9-8fc4-4363-bbd1-074868d8abc5\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"5529aee9-8fc4-4363-bbd1-074868d8abc5\">",
+          "count": 1
+        }
+      ],
+      "result_csv": "missing-order-inner.csv",
+      "expected_failed": [
+        "full-orders-and-ownership-grain",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            writer.writerow([order_id, \"\", str(revenue), \"\", \"\", \"missing_ownership\", \"\"])\n",
+            "to": "",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "epsilon-too-wide",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Abs(share_sum - 1) &lt;= 0.000001",
+          "to": "Abs(share_sum - 1) &lt;= 0.00001",
+          "count": 1
+        }
+      ],
+      "result_csv": "epsilon-too-wide.csv",
+      "expected_failed": [
+        "ownership-status-and-null",
+        "original-share-allocation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "valid = abs(share_sum - 1) <= Decimal(\"0.000001\")",
+            "to": "valid = abs(share_sum - 1) <= Decimal(\"0.00001\")",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "full-revenue-per-owner",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "revenue * share, Null",
+          "to": "revenue, Null",
+          "count": 1
+        }
+      ],
+      "result_csv": "full-revenue-per-owner.csv",
+      "expected_failed": [
+        "original-share-allocation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "str(revenue * share) if valid else \"\"",
+            "to": "str(revenue) if valid else \"\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Concat(revenue_text, &quot;.00&quot;)",
+          "to": "Concat(revenue_text, &quot;.0&quot;)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "str(revenue)",
+            "to": "f\"{revenue:.1f}\"",
+            "count": 2
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -20,7 +20,7 @@ import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
-import {releasePendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
@@ -462,6 +462,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
     return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
+   },
+   async recoveryReleasePending(state,{signal}={}){
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+    signal?.throwIfAborted();
+    return verifyRecoveredPendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
    async verifyContinuation(state,{signal}={}){
     if(state.output_mapping_recovered&&state.phases.at(-1)?.phase==='output_mapping'){

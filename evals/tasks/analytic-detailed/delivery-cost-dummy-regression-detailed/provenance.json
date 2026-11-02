@@ -1,0 +1,65 @@
+{
+  "task_id": "delivery-cost-dummy-regression-detailed",
+  "dataset_sha256": {
+    "shipments.csv": "d644374c70640199c9166a343dc8d85017eaab440a6e9c05ef16ca299e08bb50"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a9ce9f5bd86bedc3688dc14db797c380c65cb941bc9b608bae969a7fba7c66fd"
+  },
+  "reference_sha256": "a0dd2ae8d75b81ed1736b81059b27de8e3041ad048f1c8b611448293660e8764",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/shipments.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Авторинг reference P44, не измерение модели. Все исходные данные, определения и требуемая таблица находятся в задаче; готовые коэффициенты и oracle не предоставляются.\nИспользуй только настоящий native путь: Text Import → Calculator indicator express → LinRegression → native выход коэффициентов → преобразование названий/порядка/полей → Export. JavaScript, подмена готовым CSV и коэффициенты-константы запрещены.\nПри импорте units/distance/cost — непрерывные числовые признаки; числовой express из Calculator тоже должен быть непрерывным, id не является predictor. input_fields только units/distance/express, target_field cost; все исходные строки участвуют в training.\nСначала получи фактический каталог/описание операции. Native LinRegression в поддержанном срезе использует manual Enter. Подтверди по доступному реальному readback: intercept=true, norm_type=0, denormalize=true и partition=100/0/0. Если defaults не подходят, не утверждай их выставленными и не подменяй обучение расчётом вне native модели.\nВыход coefficients — port1 с факторами Name и значениями cost_coefficients; сначала прочитай настоящие имена и label константы. Дальнейшие native преобразования могут только привести реальные выходные коэффициенты к term/coefficient и порядку из задачи. Не вычисляй ответ по данным вне обученного native узла.\nСохраняй значимые промежуточные native checkpoints после импорта и обученной модели, затем итоговый пакет с экспортом. Итоговый CSV UTF-8 с разделителем ; и qualifier двойная кавычка, только два требуемых поля, без служебного ключа сортировки.\nПри отказе инструмента сохраняй точное свидетельство; не запускай другой apply поверх активной/неизвестной операции. Используй только предложенный штатный recovery; browser handoff лишь когда tool явно выдал такой next step, без выдуманных acknowledgement. Сохрани пакет и подтвердись фактическим результатом выполнения Export.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T10:57:32+03:00",
+    "duration_s": 1173,
+    "tokens": {
+      "input": 253408,
+      "output": 7526,
+      "reasoning": 2929
+    },
+    "tool_calls": 104,
+    "tool_errors": 8,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "numerical_library": "Python standard library fractions.Fraction"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

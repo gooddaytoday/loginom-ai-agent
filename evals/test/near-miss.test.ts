@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { cp, mkdtemp, mkdir, rm } from "node:fs/promises"
 import { loadTasks } from "../src/task"
 import { prepareCalibrationCases, type CalibrationCorpus } from "../src/calibration-cases"
 import { calibrate } from "../src/calibrate"
@@ -256,8 +256,78 @@ test("recommended percentage mutation preserves other metrics and fails the orac
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("calibration checker selects manifests from the requested collection", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-selection-"))
+  try {
+    const fixture = await sortCorpus(root)
+    const collection = path.join(root, "selected")
+    await cp(path.join(evalsRoot, "fixtures/calibration/sales-by-category"), path.join(collection, "sales-by-category"), { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures/calibration/abc-pareto-groups"), path.join(root, "other/abc-pareto-groups"), { recursive: true })
+    await cp(path.join(evalsRoot, "calibration/abc-pareto-groups"), path.join(fixture.corpusDir, "abc-pareto-groups"), { recursive: true })
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify({ ...fixture.corpus,
+      cases: fixture.corpus.cases.map((item) => ({ ...item, reproduce: { sort: { column: "revenue", descending: false } } })),
+    }))
+    const selected = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", collection, "--corpus", fixture.corpusDir], { stdout: "pipe", stderr: "pipe" })
+    const selectedOutput = await new Response(selected.stdout).text()
+    const selectedErrors = await new Response(selected.stderr).text()
+    expect({ code: await selected.exited, errors: selectedErrors }).toEqual({ code: 0, errors: "" })
+    expect(selectedOutput).toContain("1 tasks, 1 cases")
+    const unknown = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", collection, "--corpus", fixture.corpusDir, "--only", "abc-pareto-groups"], { stdout: "pipe", stderr: "pipe" })
+    await new Response(unknown.stderr).text()
+    expect(await unknown.exited).not.toBe(0)
+    const missing = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.join(root, "missing"), "--corpus", fixture.corpusDir], { stdout: "pipe", stderr: "pipe" })
+    await new Response(missing.stderr).text()
+    expect(await missing.exited).not.toBe(0)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("calibration checker uses task oracle tolerance", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-tolerance-"))
+  try {
+    const task = path.join(root, "tasks/sales-by-category")
+    const corpus = path.join(root, "corpus/sales-by-category")
+    await cp(path.join(evalsRoot, "fixtures/calibration/sales-by-category"), task, { recursive: true })
+    await mkdir(corpus, { recursive: true })
+    await Bun.write(path.join(corpus, "cases.json"), JSON.stringify({ sources: {}, cases: [] }))
+    await Bun.write(path.join(task, "task.json"), JSON.stringify({ ...await Bun.file(path.join(task, "task.json")).json(), oracle_tolerance: 0.001 }))
+    const baseline = await Bun.file(path.join(task, "oracle.csv")).text()
+    await Bun.write(path.join(task, "oracle.csv"), baseline.replace("128603.14", "128603.145"))
+    const delta005 = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.dirname(task), "--corpus", path.dirname(corpus)], { stdout: "pipe", stderr: "pipe" })
+    await new Response(delta005.stderr).text()
+    expect(await delta005.exited).not.toBe(0)
+    await Bun.write(path.join(task, "oracle.csv"), baseline.replace("128603.14", "128603.1405"))
+    const delta0005 = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.dirname(task), "--corpus", path.dirname(corpus)], { stdout: "pipe", stderr: "pipe" })
+    const errors = await new Response(delta0005.stderr).text()
+    expect({ code: await delta0005.exited, errors }).toEqual({ code: 0, errors: "" })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("calibration checker reproduces semicolon mutations", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-semicolon-"))
+  try {
+    const task = path.join(root, "tasks/sales-by-category")
+    const corpus = path.join(root, "corpus/sales-by-category")
+    await cp(path.join(evalsRoot, "fixtures/calibration/sales-by-category"), task, { recursive: true })
+    await cp(path.join(evalsRoot, "calibration/sales-by-category"), corpus, { recursive: true })
+    await Bun.write(path.join(task, "oracle.py"), (await Bun.file(path.join(task, "oracle.py")).text()).replace("csv.writer(target,", 'csv.writer(target, delimiter=";",'))
+    await Bun.write(path.join(task, "oracle.csv"), (await Bun.file(path.join(task, "oracle.csv")).text()).replaceAll(",", ";"))
+    const manifest = await Bun.file(path.join(corpus, "cases.json")).json() as CalibrationCorpus
+    const cases = manifest.cases.filter((item) => ["sort", "column"].includes(item.kind))
+    await Bun.write(path.join(corpus, "cases.json"), JSON.stringify({ sources: {}, cases }))
+    for (const item of cases) {
+      await Bun.write(path.join(corpus, item.result_csv), (await Bun.file(path.join(corpus, item.result_csv)).text()).replaceAll(",", ";"))
+    }
+    const semicolon = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.dirname(task), "--corpus", path.dirname(corpus)], { stdout: "pipe", stderr: "pipe" })
+    const output = await new Response(semicolon.stdout).text()
+    const errors = await new Response(semicolon.stderr).text()
+    expect({ code: await semicolon.exited, errors }).toEqual({ code: 0, errors: "" })
+    expect(output).toContain("1 tasks, 2 cases")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("analytic corpus covers all 35 tasks and all 114 applicable defects", async () => {
-  const files = await Array.fromAsync(new Bun.Glob("*/cases.json").scan(path.join(evalsRoot, "calibration")))
+  const ids = new Set((await loadTasks(path.join(evalsRoot, "tasks/analytic"))).map((task) => task.id))
+  const files = (await Array.fromAsync(new Bun.Glob("*/cases.json").scan(path.join(evalsRoot, "calibration")))).filter((file) => ids.has(path.dirname(file)))
   const corpora = await Promise.all(files.map(async (file) => await Bun.file(path.join(evalsRoot, "calibration", file)).json() as CalibrationCorpus))
   expect(files).toHaveLength(35)
   const counts = Object.fromEntries(["sort", "aggregate", "threshold", "filter", "column"].map((kind) =>
