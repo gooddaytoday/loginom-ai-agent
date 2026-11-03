@@ -64,6 +64,7 @@ async function fixture(
     });`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET\n")
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   return {
     host,
@@ -75,7 +76,6 @@ async function fixture(
       revision: 0,
       url: "http://unavailable.example/app/?custom=1",
       username: "user",
-      apiKey: { operation: "replace" as const, value: "UNIT-NONSECRET" },
       password: { operation: "replace" as const, value: "PRIVATE-NONSECRET-PASSWORD" },
     },
     async close() {
@@ -207,13 +207,13 @@ test.each([
       expect(await f.host.api.status()).toMatchObject({
         generation: 1,
         state: "ready",
-        hasApiKey: true,
         browser: { state: "failed", failure },
       })
       expect((await f.host.api.status()).failure).toBeUndefined()
       expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toMatchObject({
         url: f.candidate.url,
-        apiKey: f.candidate.apiKey.value,
+        // The built-in key is read from the resources and never stored with the connection.
+        apiKey: "",
         password: f.candidate.password.value,
       })
       expect(
@@ -299,7 +299,7 @@ test("a failed Help service cannot start browser validation", async () => {
   try {
     await expect(f.host.api.check(f.candidate)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
-    expect((await f.host.api.status()).hasApiKey).toBe(false)
+    expect((await f.host.api.status()).generation).toBe(0)
   } finally {
     await f.close()
   }
@@ -318,17 +318,17 @@ test("unexpected runtime failures do not become a successful browser warning or 
   }
 }, 15_000)
 
-test("invalid Help key cannot start browser validation or produce a save token", async () => {
+test("a rejected or missing built-in Help key cannot start browser validation or produce a save token", async () => {
   const f = await fixture("LOGINOM_LOGIN_UNAVAILABLE")
   try {
-    await expect(
-      f.host.api.check({
-        ...f.candidate,
-        apiKey: { operation: "replace", value: "WRONG-NONSECRET" },
-      }),
-    ).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
+    await writeFile(join(f.resources, "knowledge-key"), "WRONG-NONSECRET")
+    // A key sent by an older client would be accepted by the server, but it is never used.
+    const legacy = { ...f.candidate, apiKey: { operation: "replace" as const, value: "UNIT-NONSECRET" } }
+    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
+    await rm(join(f.resources, "knowledge-key"))
+    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_CONNECTION_CHECK_FAILED")
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
-    expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", generation: 0, hasApiKey: false })
+    expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", generation: 0 })
     await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow(
       "LOGINOM_VALIDATION_EXPIRED",
     )

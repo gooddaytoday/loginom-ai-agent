@@ -62,7 +62,6 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     baseline: undefined as Loginom.View | undefined,
     url: Product.connection.url as string,
     username: Product.connection.username as string,
-    apiKey: "",
     password: "",
     passwordMode: "empty" as "preserve" | "replace" | "empty",
     phase: "idle" as "idle" | "checking" | "saving" | "applying",
@@ -80,7 +79,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
   let disposed = false
   onCleanup(() => {
     disposed = true
-    setState({ apiKey: "", password: "" })
+    setState({ password: "" })
   })
   const busy = () => state.phase !== "idle"
   const pending = () => state.view?.state === "pending" || state.view?.state === "starting"
@@ -88,7 +87,6 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     !!state.baseline &&
     (state.url !== state.baseline.url ||
       state.username !== state.baseline.username ||
-      !!state.apiKey ||
       !!state.password ||
       (state.passwordMode === "empty") !== !state.baseline.hasPassword)
   const disabled = () => !state.baseline || busy() || pending()
@@ -104,7 +102,6 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       url: view.url,
       username: view.username,
       passwordMode: view.hasPassword ? "preserve" : "empty",
-      apiKey: "",
       password: "",
       message: undefined,
       checkedBrowser: undefined,
@@ -142,7 +139,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       error(value)
     }
   }
-  function edit(values: Partial<Pick<typeof state, "url" | "username" | "apiKey" | "password" | "passwordMode">>) {
+  function edit(values: Partial<Pick<typeof state, "url" | "username" | "password" | "passwordMode">>) {
     setState({ ...values, message: undefined, checkedBrowser: undefined, failed: false })
   }
   function requestClose() {
@@ -159,7 +156,6 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
         revision: state.baseline!.revision,
         url: state.url,
         username: state.username,
-        apiKey: state.apiKey ? { operation: "replace", value: state.apiKey } : { operation: "preserve" },
         password:
           state.passwordMode === "replace"
             ? { operation: "replace", value: state.password }

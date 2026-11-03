@@ -40,7 +40,7 @@ try {
   )
     throw Error("SECRET_DEFAULT_INVALID")
   const status = await page.evaluate(() => window.api.loginom.read())
-  if (status.hasApiKey || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
+  if (status.generation || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
   console.log(
     JSON.stringify({
       status: "PASS",

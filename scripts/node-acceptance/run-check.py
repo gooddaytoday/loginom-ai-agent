@@ -20,6 +20,8 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
+# Stand builds embed the knowledge service key like release builds do.
+KNOWLEDGE_KEY = Path.home() / '.config/loginom-ai-agent/mcp-api-key'
 DATA = REPO / 'docs/testing/loginom-ai-agent'
 SCENARIOS = {
     'C1': dict(model_timeout=2700),
@@ -34,6 +36,13 @@ D87 = {
     'X1': dict(attachment='path', generator=['--format', 'xlsx', '--rows', '500000'], heavy=True,
                pending='ожидает LAB-413: XLSX-переключение'),
 }
+
+
+def stand_knowledge_key():
+    # Passed only through the build environment; never argv, reports or case files.
+    key = os.environ.get('LOGINOM_MCP_API_KEY') or (KNOWLEDGE_KEY.read_text().strip() if KNOWLEDGE_KEY.is_file() else '')
+    if not key: raise RuntimeError(f'LOGINOM_MCP_API_KEY or {KNOWLEDGE_KEY} is required to build the CLI')
+    return key
 
 
 def pair_login(config, source):
@@ -767,7 +776,7 @@ class Runner:
                 restore_source_modes(source)
                 assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
                 bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1', LOGINOM_MCP_API_KEY=stand_knowledge_key())
                 # Keep Bun's shared warm cache; serialize installations across
                 # SHAs on this host, releasing the lock before compilation.
                 with (cache.parent / 'bun-install.lock').open('a') as install_lock:
@@ -784,6 +793,7 @@ class Runner:
                 self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
             meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
+        assert (build / 'resources/loginom/knowledge-key').is_file(), 'Build has no built-in knowledge key'
         self.report.update(build=str(build), metadata=meta)
         self.save()
         return build
@@ -1161,7 +1171,7 @@ class Runner:
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
-                    self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'], apiKey=login['api_key'])))
+                    self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
@@ -1177,7 +1187,7 @@ class Runner:
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('execution_error'):
                         r['cold'] = 'FAIL'
-                        write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
+                        write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'

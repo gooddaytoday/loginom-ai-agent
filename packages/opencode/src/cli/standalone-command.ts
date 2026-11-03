@@ -48,7 +48,6 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
                   "CLI_SETUP_TOO_LARGE",
                   "CLI_STDIN_REQUIRED",
                   "LOGINOM_CONFIG_REQUIRED",
-                  "LOGINOM_API_KEY_REQUIRED",
                   "LOGINOM_CANDIDATE_INVALID",
                   "LOGINOM_URL_INVALID",
                   "LOGINOM_USERNAME_INVALID",

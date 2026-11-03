@@ -19,7 +19,7 @@ const {createArtifactStore}=await load('client/lib/artifacts.mjs');
 const {createExecutionJournal}=await load('client/lib/execution-journal.mjs');
 const sid=randomUUID(),storage='/'+config.username,packagePath=storage+'/'+config.source_name+'.lgp';
 let cleanupPath=packagePath;
-const record=createExecutionJournal({directory:dir,metadata:{sessionId:sid},knownSecrets:[config.password,config.api_key]});
+const record=createExecutionJournal({directory:dir,metadata:{sessionId:sid},knownSecrets:[config.password]});
 const {context}=await loginBrowser({browserPath:resources.browserPath,profile:dir+'/browser',candidate:config,keepOpen:true,headless:false});
 const page=context.pages()[0];
 const execute=async code=>{const r=await new Function('page',`return (${code})(page)`)(page);await record({phase:'diagnostic_browser_return',value:r});return r;};
