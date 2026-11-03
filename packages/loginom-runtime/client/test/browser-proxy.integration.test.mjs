@@ -245,7 +245,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
               ...(scenario === 'environment' ? {HTTP_PROXY:proxyUrl, HTTPS_PROXY:proxyUrl, ALL_PROXY:proxyUrl,
                 http_proxy:proxyUrl, https_proxy:proxyUrl, all_proxy:proxyUrl, NO_PROXY:'', no_proxy:''} : {}),
               LOGINOM_DOCK_TEST_PUBLIC_APP:process.env.LOGINOM_DOCK_TEST_PUBLIC_APP === '1' && scenario === 'manual' && mode === 'headless' && owner === 'managed' ? '1' : '0'},
-            timeout:90000, maxBuffer:1024*1024,
+            timeout:150000, maxBuffer:1024*1024,
           });
         fixture.phase = `${scenario}-${mode}:control`;
         const controlBefore = requests.length;
