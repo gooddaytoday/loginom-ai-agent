@@ -179,7 +179,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Первые/последние N строк | `preprocessing.sampling`, `sequential` | `position:first/last`, размеры в строках. |
 | Последовательное разбиение | `preprocessing.data_partition`, `sequential` | Размеры train/test и порядок выделения; без обучения. |
 | Случайная выборка/разбиение | Те же sampling/data_partition, `mode:"random"` | Явные размеры и seed; повтор на том же источнике/seed. Stratified, biased и равномерный случайный метод: «Этот режим пока не поддерживается». Не подменяй эти режимы другим алгоритмом. |
-| Бинарная строковая цель, вероятность и отбор факторов | `datamining.log_regression`, `enter/forward/backward/stepwise` | `parameters.logistic.selection.criterion`: deviance/aic/aicc/bic/hqic; для Deviance задай применимые entry_significance/removal_significance. |
+| ЛогРег: прогноз/отбор | `datamining.log_regression`, `enter/forward/backward/stepwise` | [Подробности](references/node-settings.md). |
 | LinReg на новых данных | Обученный LinReg, `apply` | Сохранённые input_fields/target_field; enter обучает/переобучает. |
 | Календарные признаки datetime | `transform.date_time`, `calendar` | Год/квартал/месяц/день/час, границы периодов, ISO-год/неделя/понедельник. `iso_week_end` недоступен из-за ошибки Loginom: сообщи ограничение без подстановки вычисления. |
 
