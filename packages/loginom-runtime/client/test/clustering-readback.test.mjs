@@ -33,3 +33,11 @@ test('Done commits settings without claiming training and foreign settings refus
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>clusteringConfigurationReadback(input),/configuration owner/);
 });
+
+for(const [norm_type,normalization] of [[2,'scale_minus_one_one'],[3,'scale_zero_one'],[4,'absolute_scale']])test('readback names observed native scaling: '+normalization,()=>{
+ const input=candidate();
+ input.phases[1].value.configuration.normalization.forEach(f=>f.norm_type=norm_type);
+ assert.equal(clusteringConfigurationReadback(input).normalization,normalization);
+ input.phases[1].value.configuration.normalization[1].norm_type=5;
+ assert.throws(()=>clusteringConfigurationReadback(input),/normalization/);
+});
