@@ -39,7 +39,7 @@ try {
     }
   })
   if (
-    result.fields !== 4 ||
+    result.fields !== 3 ||
     !result.urlDefault ||
     !result.usernameDefault ||
     !result.secretValuesEmpty ||

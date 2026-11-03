@@ -80,9 +80,10 @@ try {
       ${process.env.LOGINOM_DOCK_TEST_PUBLIC_APP === '1' ? `
       const publicApp = await page.goto('https://app.loginom.ai/app/?testable=true', {waitUntil:'domcontentloaded', timeout:30000});
       if (!publicApp || publicApp.status() >= 400) throw Error('Public Loginom did not load');
-      await page.locator('[data-tid="LoginForm;Login;edtUsername"]').waitFor({timeout:15000});` : ''}
+      // The public app is far from CI runners; its login form can take longer than a local stand to boot.
+      await page.locator('[data-tid="LoginForm;Login;edtUsername"]').waitFor({timeout:40000});` : ''}
       return {args:command.result.value, token, identity, socket, url};
-    }`}}, undefined, {timeout:45000});
+    }`}}, undefined, {timeout:90000});
     const text = reply.content.filter(item => item.type === 'text').map(item => item.text).join('\n');
     assert.equal(reply.isError ?? false, false, text);
     const result = JSON.parse(text.match(/### Result\n([\s\S]*?)(?:\n###|$)/)[1]);
