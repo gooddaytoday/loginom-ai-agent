@@ -1,4 +1,5 @@
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
+import {configureOutputAutosync} from './port-mapping-procedure.mjs';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateSamplingParameters} from './sampling-parameters.mjs';
 import {samplingParametersSchema} from './node-api.mjs';
@@ -10,10 +11,17 @@ export function createSequentialNodeSupport(config,{type,validate,parameterSchem
  type,mode:'sequential',modes:['sequential','random','stratified','biased'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
  configurationObservation:{condition:'sequential settings',readSampling:true,ready:s=>['sampling','data_partition'].includes(s.wizard?.stage)&&s.node_sampling?.verified===true},
  configure:configureSampling,
- async configureAllOutputs(channel,c,p,mappings,finishWizard){
+ configureAllOutputs:configureSamplingOutputs,
+ readOutputs:readSamplingOutputs,
+});}
+
+export async function configureSamplingOutputs(channel,c,p,mappings,finishWizard){
   const ports=[];
   for(let port=0;port<(c.kind==='data_partition'?3:1);port++){
    await channel.openOutputPort(port);
+   // Autosync retains the method's referenced fields first after Save/reopen.
+   // Freeze the complete initial layout for the two new categorical modes.
+   if(c.new_node&&['stratified','biased'].includes(c.mode))await configureOutputAutosync(channel,false);
    const s=await channel.observe({condition:'sequential output '+port+' schema',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
    const m=s.node_mapping;
    if(!m.inventory_complete||!m.source_identity_verified||m.node_context.output_port?.port!==port)throw Error('Sequential output owner differs');
@@ -25,6 +33,4 @@ export function createSequentialNodeSupport(config,{type,validate,parameterSchem
    ports.push({port,schema,native_mapping:m,finish});
   }
   return {verified:true,cleanup_complete:true,effect_possible:true,ports};
- },
- readOutputs:readSamplingOutputs,
-});}
+ }
