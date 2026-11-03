@@ -1,19 +1,10 @@
 # Приёмка пошагового отбора — предложение LAB-655
 
 
-Текущий срез v0.3.9: Forward, Backward и Stepwise только со стандартным
-критерием и порогами Loginom (наблюдались Deviance, entry=0.05, removal=0.1).
-Выбор критериев и пользовательские пороги исключены из публичного контракта
-и активного каталога приёмки. Ниже сохранён приёмочный комплект этапа 0;
-его расширенные сценарии и `selection-schema.json` — историческое предложение,
-не поддерживаемый контракт. Активны только task-forward/backward/stepwise.md,
-обновлённые по решению владельца. CLI oracle по умолчанию использует 0.05/0.1;
-для каждого из этих трёх методов эталон expected.json остаётся прежним.
-
-Новый режим требует утверждения владельцем до изменения обработчика.
-Существующий Enter в базе уже реализован; его старый комплект остаётся
-регрессией. Этот каталог не регистрирует новые production-режимы.
-Новых механизмов верификации, допусков или общего бюджета не предлагается.
+Назначение LAB-765 для v040 включает Deviance/AIC/AICc/BIC/HQIC и
+пользовательские пороги. Обычные `logreg-forward/backward/stepwise` сохраняют
+Deviance 0.05/0.1 при отсутствии `selection`; `logreg-enter` — регрессия Enter.
+Проверки используют независимый oracle и полный порт 0 без изменения допусков.
 
 ## Данные и независимые ожидания
 
@@ -76,7 +67,7 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 
 | Task | Настройка | Expected / независимый результат |
 |---|---|---|
-| `task-stepwise-strict.md` | Deviance / entry=1e-9, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
+| `task-stepwise-strict.md` | Deviance / entry=1e-7, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
 | `task-stepwise-permissive.md` | Deviance / 0.95, 0.99 | `expected-permissive.json`, X+Noise |
 
 Строгий случай отличает слишком высокий/умолчательный entry; мягкий —
@@ -87,12 +78,14 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 python3 oracle.py --check
 python3 oracle.py --diagnostic
 python3 oracle.py actual.csv
-python3 oracle.py --entry 0.000000001 --removal 0.2 actual.csv
+python3 oracle.py --entry 0.0000001 --removal 0.2 actual.csv
 python3 oracle.py --entry 0.95 --removal 0.99 actual.csv
 node schema-size.mjs
 ```
 
-Регистрация сценариев в `run-check` — только этап 1 после утверждения среза.
+Сценарии `logreg-selection-forward/backward/stepwise` задают пороги
+0.01/0.2 по применимости. `logreg-stepwise-aic/aicc/bic/hqic/strict/permissive`
+задают отдельные пользовательские настройки. Все зарегистрированы в run-check.
 Для семи основных можно использовать существующий `source=selection`,
 `prompt=acceptance/task-*.md`, `data=selection/data`, `expected_name=expected.json`:
 stock CSV oracle вычисляет тот же результат; `--check` подтверждает все 15
@@ -100,17 +93,16 @@ stock CSV oracle вычисляет тот же результат; `--check` п
 свои настройки вызова oracle в их fixture, без расширения общего runner.
 Пока эти команды проверяют документы/CSV и не запускают модель.
 
-## Историческое предложение контракта этапа 0
+## Контракт v040
 
-Предложение: прежний `parameters.logistic` дополняется **selection** из
+Прежний `parameters.logistic` дополняется **selection** из
 `selection-schema.json`; mode — отдельное поле `forward|backward|stepwise`.
 Прежние четыре обязательных logistic-поля и Enter сохраняют свой смысл.
-Для новых режимов criterion обязателен. При Deviance Forward требует только
+Для пользовательского отбора criterion обязателен; без selection действуют прежние Deviance 0.05/0.1. При Deviance Forward требует только
 entry_significance, Backward — только removal_significance, Stepwise — оба,
-0 <= entry < removal < 1. Для информационных критериев p-поля запрещены.
-Это историческое предложение; пользовательские критерии и пороги
-в текущем срезе v0.3.9 не поддерживаются. Строгий entry=0 был отклонён
-после двух живых расхождений с независимым oracle.
+0 < entry < removal < 1. Для информационных критериев p-поля запрещены.
+Явный entry=0 отклоняется до UI: два живых опыта LAB-657 показали
+расхождение Loginom с независимым oracle. Строгая задача использует 1e-7.
 Пустые/неприменимые/некорректные параметры должны отклоняться до мутации;
 не выбирать вместо неизвестного метода Enter, другой критерий или auto.
 
@@ -135,33 +127,14 @@ Chromium, acceptance-tests при регистрации runner, прежний 
 Этап 0: сборок и модельных попыток нет. Native-опыт не доказывает ни 2/3,
 ни холодное сохранение, ни работу ещё не реализованного обработчика.
 
-## Стоимость схемы и реализации
+## Стоимость схемы и реализация
 
-`schema-size.mjs` импортирует production nodeApiTools, клонирует полную
-inputSchema dock_node_apply и считает UTF-8 JSON, включая descriptions:
-**43 329 → 44 074 Б, +745 Б**. Из них новые значения mode.enum — **+32 Б**,
-вложенный selection с enum пяти критериев и p-полями — **+713 Б**.
-До общего предела 46 000 Б остаётся 1 926 Б. Это точный размер данного
-предложения на указанной базе; иные тексты/условные схемы изменят результат.
-Production schema и её сжатие в этот PR не входят.
+`schema-size.mjs` импортирует production nodeApiTools и считает UTF-8 JSON
+полной inputSchema dock_node_apply вместе с descriptions. На базе v040:
+**40 219 → 40 932 Б, +713 Б**. Режимы уже зарегистрированы в базе, их
+стоимость повторно не добавляется. Предел остаётся 46 000 Б, запас 5 068 Б.
 
-Оценка: **3 цикла red→green** после утверждения: (1) новые режимы/контролы,
-валидация и честный readback, (2) численные сценарии/пороги/Save/cold,
-(3) стабильность и регрессия Enter. Ориентир правки клиента — 100–180 строк
-плюс тесты; это оценка, не реализованный diff и не разрешение общего рефакторинга.
-
-| Файлы клиента | Предполагаемая аддитивная правка |
-|---|---|
-| `log-regression-parameters.mjs` | Проверка mode/criterion/применимых p-полей |
-| `log-regression-node.mjs` | Дополнение списка modes и передача mode в настройку |
-| `log-regression-procedure.mjs` | Выбор наблюдённого метода, критерий после метода, пороги |
-| `log-regression-context.mjs` | Чтение трёх контролов отбора, disabled, importance/irremovable |
-| `log-regression-readback.mjs` | Наблюдённые mode/selection вместо константы enter |
-| `node-api.mjs`, `node-contracts.mjs`, `node-result-schema.mjs` | Аддитивные enum/selection/readback и описание типа |
-| `workspace-ui.mjs` | Три точных data-tid в существующем списке контролов LogRegression |
-
-`log-regression-output.mjs`, общий граф/обучение/чтение/бюджеты не требуют
-изменения по наблюдённому. Нужны только собственная ветка навыка
-`packages/product/skills/loginom-automation` и аддитивная регистрация принятых
-сценариев/required-checks на этапе 1. Потребность в общем алгоритме сверх
-этого — стоп с одним вопросом по карточке, не повод расширять текущий PR.
+Изменены собственные log-regression parameters/procedure/readback,
+аддитивные selection schema/readback и описание типа, раздел навыка,
+сценарии run-check и фиксация схемы в тестах. Общий граф, обучение,
+наблюдение, чтение выхода и бюджеты не меняются.
