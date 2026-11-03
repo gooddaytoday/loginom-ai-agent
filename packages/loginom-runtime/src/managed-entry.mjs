@@ -154,6 +154,8 @@ async function handle(message) {
         resultProfile: "user-v1",
         actionManifestUri: input.actionManifestUri,
         actionManifestSha256: input.actionManifestSha256,
+        // The pinned catalog ships in resources; the knowledge service is not consulted for it.
+        bundledCatalog: true,
         replayBootstrap: false,
         replayLoginUser: null,
         // Acceptance-only shutdown cleanup; the bridge binds it to the observed

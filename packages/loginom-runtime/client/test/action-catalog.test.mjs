@@ -4,9 +4,10 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { ACTION_CATALOG_ROOT, pinActionCatalog as pinRemoteActionCatalog, ACCEPTANCE_CHECKS, EXECUTOR_REVISION,
+import { ACTION_CATALOG_ROOT, BUNDLED_CATALOG_RELEASES, pinActionCatalog as pinRemoteActionCatalog, ACCEPTANCE_CHECKS, EXECUTOR_REVISION,
   validateReplayAcceptance, assertCatalogTarget, validateActionParameters } from '../lib/action-catalog.mjs';
 import { updateForE2E } from '../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult, makeCapabilityCode } from '../lib/executor.mjs';
@@ -87,7 +88,7 @@ test('native Save selector comes from the bundled resource, independently of the
   assert.ok(!code.includes('OtherButton'));
 });
 
-test('pins an exact candidate only for operator-selected replay and rejects it in the production runtime', async () => {
+async function candidateFixture() {
   const data = await fixture({ mutate(values) {
     values['actions.json'].catalog_version += '-candidate';
     values['selectors.json'].catalog_version += '-candidate';
@@ -99,12 +100,55 @@ test('pins an exact candidate only for operator-selected replay and rejects it i
   manifest.status = 'candidate';
   const manifestText = canonical(manifest);
   data.files.set(manifestUri, manifestText);
+  return { ...data, manifestUri, manifestText };
+}
+
+test('pins an exact candidate only for operator-selected replay and rejects it in the production runtime', async () => {
+  const data = await candidateFixture();
+  const { manifestUri, manifestText } = data;
   const pinned = await pinActionCatalog(data.remote, { manifestUri, manifestSha256: sha256(manifestText), allowCandidate: true });
   assert.equal(pinned.pins.catalogLifecycleStatus, 'candidate');
   assert.equal(data.reads.length, 4);
   assert.throws(() => createActionRuntime({ pinned, execute: async () => {} }).describe('node.add'), /not executable/);
   assert.equal(createActionRuntime({ pinned, allowCandidate: true, execute: async () => {} }).describe('node.add').action.status, 'candidate');
   await assert.rejects(pinActionCatalog(data.remote, { manifestUri, manifestSha256: sha256(manifestText) }), /requires replay mode/);
+});
+
+test('every release catalog pin resolves from the bundled client resources without a remote read', async () => {
+  const catalogs = JSON.parse(await readFile(new URL('../../../product/loginom-catalogs.json', import.meta.url), 'utf8'));
+  const release = JSON.parse(await readFile(new URL('../../../product/loginom-release.json', import.meta.url), 'utf8'));
+  assert.equal(catalogs['linux-x64'].actionManifestSha256, release.actionManifestSha256);
+  const remote = { callTool: async () => assert.fail('a bundled catalog must not be read from the knowledge service') };
+  for (const pin of Object.values(catalogs)) {
+    const pinned = await pinActionCatalog(remote, { manifestUri: pin.actionManifestUri, manifestSha256: pin.actionManifestSha256,
+      allowCandidate: true, releases: BUNDLED_CATALOG_RELEASES });
+    assert.equal(pinned.pins.actionManifestDigest, pin.actionManifestSha256);
+    assert.equal(pinned.pins.catalogLifecycleStatus, 'candidate');
+  }
+});
+
+test('a bundled pin verifies local bytes and refuses missing or unpinned releases', async () => {
+  const data = await candidateFixture();
+  const directory = await mkdtemp(join(tmpdir(), 'bundled-catalog-'));
+  try {
+    const releaseRoot = data.manifestUri.slice(0, -'/manifest.json'.length);
+    const version = releaseRoot.slice(releaseRoot.lastIndexOf('/') + 1);
+    await mkdir(join(directory, version));
+    for (const [uri, text] of data.files) if (uri.startsWith(releaseRoot + '/') && !uri.includes('/acceptance/'))
+      await writeFile(join(directory, version, uri.slice(releaseRoot.length + 1)), text);
+    const releases = pathToFileURL(directory + '/');
+    const options = { manifestUri: data.manifestUri, manifestSha256: sha256(data.manifestText), allowCandidate: true, releases };
+    assert.equal((await pinActionCatalog(data.remote, options)).pins.catalogLifecycleStatus, 'candidate');
+    assert.equal(data.reads.length, 0);
+    await writeFile(join(directory, version, 'actions.json'), data.files.get(`${releaseRoot}/actions.json`) + ' ');
+    await assert.rejects(pinActionCatalog(data.remote, options), /actions\.json digest mismatch/);
+    await assert.rejects(pinActionCatalog(data.remote, { ...options, manifestUri: `${ACTION_CATALOG_ROOT}/releases/absent/manifest.json` }),
+      /pinned action catalog absent is not bundled/);
+    await assert.rejects(pinActionCatalog(data.remote, { releases }), /requires an exact candidate pin/);
+    assert.equal(data.reads.length, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('rejects tampering, stale actions, server code and raw selectors before execution', async () => {

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.09.14-rc6-linux-candidate",
+  "status": "candidate",
+  "capability_abi": 1,
+  "min_executor_revision": "1.3.0",
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-linux-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "linux",
+    "browser": "chromium"
+  },
+  "created_at": "2026-09-14T00:00:00Z",
+  "files": {
+    "actions.json": "bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09",
+    "selectors.json": "32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba",
+    "source-index.json": "1d640c4f44bf6e90ec3b6965003e893faa131526fe2267dd04645ed0436e3349"
+  }
+}

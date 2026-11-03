@@ -1,8 +1,11 @@
 import { NODE_TYPES } from './node-contracts.mjs';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { ACTION_KEYS, CAPABILITIES, requireCapability } from './capability-registry.mjs';
 
 export const ACTION_CATALOG_ROOT = 'viking://resources/loginom-dock/catalogs/executor-preview';
+// Pinned release bytes shipped with the client, laid out as <catalog_version>/<file>.
+export const BUNDLED_CATALOG_RELEASES = new URL('../../executor/catalog-releases/', import.meta.url);
 export const CAPABILITY_ABI = 1;
 export const EXECUTOR_REVISION = '1.3.0';
 
@@ -332,14 +335,23 @@ async function readRemoteText(remote, uri, signal, startup) {
   return blocks[0].replace(/^=== .* ===\r?\n/, '');
 }
 
+async function readBundledText(releases, root, uri) {
+  const match = new RegExp(`^${root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/releases/([0-9A-Za-z][0-9A-Za-z.+-]*)/(manifest\\.json|${FILE_NAMES.map(name => name.replace('.', '\\.')).join('|')})$`).exec(uri);
+  if (!match) fail('bundled catalog read is outside the pinned release');
+  return readFile(new URL(`${match[1]}/${match[2]}`, releases), 'utf8').catch(() => fail(`pinned action catalog ${match[1]} is not bundled`));
+}
+
 function parseJson(text, where) {
   try { return JSON.parse(text); } catch { fail(`${where} is not valid JSON`); }
 }
 
 export async function pinActionCatalog(remote, {
   root = ACTION_CATALOG_ROOT, signal, startup, manifestUri = null, manifestSha256 = null, allowCandidate = false,
-  runtimeIdentity = null, targetIdentity = null,
+  runtimeIdentity = null, targetIdentity = null, releases = null,
 } = {}) {
+  if (releases !== null && manifestUri === null) fail('a bundled action catalog requires an exact candidate pin');
+  // A bundled pin never reads the catalog from the knowledge service.
+  const readText = releases === null ? uri => readRemoteText(remote, uri, signal, startup) : uri => readBundledText(releases, root, uri);
   let current;
   if (manifestUri !== null || manifestSha256 !== null) {
     if (!allowCandidate || typeof manifestUri !== 'string' || !SHA256.test(manifestSha256 ?? '')) {
@@ -364,7 +376,7 @@ export async function pinActionCatalog(remote, {
       fail('current.json replay acceptance reference is invalid');
     }
   }
-  const manifestText = await readRemoteText(remote, current.manifest_uri, signal, startup);
+  const manifestText = await readText(current.manifest_uri);
   if (digest(manifestText) !== current.manifest_sha256) fail('manifest digest mismatch');
   const manifest = parseJson(manifestText, 'manifest.json');
   // Admission changes only the pointer and adds acceptance. Tested release bytes
@@ -373,7 +385,7 @@ export async function pinActionCatalog(remote, {
   const actionStatuses = current.status === 'candidate' ? new Set(['candidate', 'stale']) : new Set(['candidate']);
   if (releaseRoot + '/manifest.json' !== current.manifest_uri || manifest.catalog_version !== current.catalog_version) fail('manifest identity does not match current.json');
   const texts = Object.fromEntries(await Promise.all(FILE_NAMES.map(async name => {
-    const text = await readRemoteText(remote, `${releaseRoot}/${name}`, signal, startup);
+    const text = await readText(`${releaseRoot}/${name}`);
     if (digest(text) !== manifest.files[name]) fail(`${name} digest mismatch`);
     return [name, text];
   })));
