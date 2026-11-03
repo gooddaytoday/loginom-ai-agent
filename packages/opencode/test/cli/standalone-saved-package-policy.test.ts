@@ -28,7 +28,7 @@ test.each(["run", "tui", "status"])("actual standalone entry enables package tea
         }
         if(m.method==='connection.status') process.send(${mode === "tui"
           ? "{id:m.id,error:'LOGINOM_NOT_READY'}"
-          : "{id:m.id,result:{state:'unconfigured',hasApiKey:false,hasPassword:false,generation:0,revision:0,url:'http://example.test/app',username:'user',folder:'/user'}}"});
+          : "{id:m.id,result:{state:'unconfigured',hasPassword:false,generation:0,revision:0,url:'http://example.test/app',username:'user',folder:'/user'}}"});
         if(m.method==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       });
     `)

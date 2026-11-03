@@ -71,7 +71,7 @@ try {
   assert.equal(sandbox.mode & 0o7777, 0o4755)
   const status = JSON.parse(await run("status", launcher, ["loginom", "status", "--format", "json"]))
   assert.equal(status.state, "unconfigured")
-  assert.equal(status.hasApiKey, false)
+  assert.equal(status.generation, 0)
   const resources = join(installed.destination, "resources/loginom")
   // verifyResources binds process.execPath to this installed tree, not the archive's Node.
   await run("browser", join(resources, "bin/node"), [

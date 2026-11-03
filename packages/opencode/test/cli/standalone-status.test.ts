@@ -256,7 +256,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
     const errors = new Response(child.stderr).text()
     expect(await child.exited).toBe(0)
     expect(await errors).toBe("")
-    expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
+    expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", generation: 0 })
     expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
@@ -343,6 +343,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       )
       await mkdir(join(bundle, "bin"), { recursive: true })
       await mkdir(join(bundle, "runtime/src"), { recursive: true })
+      await writeFile(join(bundle, "knowledge-key"), "private-setup-key")
       await symlink(bundledNode, join(bundle, "bin/node"))
       if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
       await cp(host, join(bundle, "host"), { recursive: true })
@@ -420,14 +421,14 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       expect(
         await command(
           ["setup", "--stdin-json"],
-          JSON.stringify({ apiKey: "private-setup-key", password: "initial-password" }),
+          // Older setup scripts still send a key; the built-in one is used and never stored.
+          JSON.stringify({ apiKey: "legacy-setup-key", password: "initial-password" }),
         ),
       ).toMatchObject({
         code: 0,
         result: {
           state: expect.stringMatching(/^(starting|ready)$/),
           generation: 1,
-          hasApiKey: true,
           hasPassword: true,
         },
       })
@@ -436,7 +437,6 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         result: {
           state: expect.stringMatching(/^(starting|ready)$/),
           generation: 2,
-          hasApiKey: true,
           hasPassword: false,
         },
       })
@@ -445,7 +445,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         await cliCredentials(process.platform, { root: join(profile, "loginom"), resources: bundle }).decode(
           persisted.secrets,
         ),
-      ).toEqual({ apiKey: "private-setup-key", password: "" })
+      ).toEqual({ apiKey: "", password: "" })
       expect(persisted.secrets.protection).toBe(
         process.platform === "darwin" ? "keychain" : process.platform === "win32" ? "dpapi" : "plaintext",
       )

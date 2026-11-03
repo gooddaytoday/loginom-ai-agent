@@ -31,27 +31,26 @@ try {
   const save = form.getByRole("button", { name: /^(Save and close|Сохранить и закрыть)$/ })
   const check = form.getByRole("button", { name: /^(Check connection|Проверить подключение)$/ })
   await expect(check).toBeEnabled()
-  await form.locator('input[type="password"]').nth(0).fill(input.connection.apiKey)
   await form.locator('input[type="url"]').fill(input.connection.url)
   await form.locator('input[autocomplete="username"]').fill(input.connection.username)
-  await form.locator('input[type="password"]').nth(1).fill(input.connection.password)
+  await form.locator('input[type="password"]').first().fill(input.connection.password)
   const before = await page.evaluate(() => window.api.loginom.read())
   await check.click()
   await expect(form.getByRole("status")).toContainText(/not been saved|ещё не сохранены/, { timeout: 180000 })
   const checked = await page.evaluate(() => window.api.loginom.read())
   assert.equal(checked.revision, before.revision)
-  assert.equal(checked.hasApiKey, false)
+  assert.equal(checked.generation, before.generation)
   await save.click()
   await expect(form).toHaveCount(0, { timeout: 240000 })
   const saved = await page.evaluate(() => window.api.loginom.read())
   assert.equal(saved.state, "ready")
-  assert.equal(saved.hasApiKey, true)
+  assert.ok(saved.generation > before.generation)
   assert.equal(saved.failure, undefined)
   await expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Loginom", exact: true }).click()
-  const key = form.locator('input[type="password"]').nth(0)
-  await expect(key).toHaveValue("")
-  await expect(key).toHaveAttribute("placeholder", "••••••••")
+  // The form has no key field: the knowledge service key is built into the application.
+  await expect(form.locator('input[type="password"]')).toHaveCount(1)
+  await expect(form.locator('input[type="password"]').first()).toHaveValue("")
   await expect(save).toBeDisabled()
   await check.click()
   await expect(form.getByRole("status")).toContainText(/Connection verified|Подключение проверено/, { timeout: 180000 })
@@ -69,8 +68,8 @@ try {
     realDockAndLoginom: true,
     checkDoesNotSave: true,
     saveClosesWindow: true,
-    maskedAfterReopen: true,
-    savedKeyCheck: true,
+    passwordClearedAfterReopen: true,
+    savedConnectionCheck: true,
     closeWithoutEdits: true,
   }
   await writeFile(join(evidence, "summary.json"), JSON.stringify(summary, null, 2))

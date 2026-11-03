@@ -98,7 +98,7 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   })
   try {
     expect(host.alive).toBe(true)
-    expect(await host.request("connection.status", {})).toMatchObject({ state: "unconfigured", hasApiKey: false })
+    expect(await host.request("connection.status", {})).toMatchObject({ state: "unconfigured", generation: 0 })
     const error = await host
       .request("connection.check", { apiKey: "private-sentinel" })
       .catch((error: Error) => error.message)
@@ -188,6 +188,7 @@ test.each(["ready", "close"])(
       `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
     )
     await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+    await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
     await mkdir(root, { recursive: true, mode: 0o700 })
     if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
@@ -224,7 +225,7 @@ test.each(["ready", "close"])(
       expect(settled.value).toBe(false)
       if (mode === "ready") {
         release.resolve()
-        expect(await readiness).toMatchObject({ state: "ready", generation: 1, hasApiKey: true })
+        expect(await readiness).toMatchObject({ state: "ready", generation: 1 })
       } else {
         await host.close()
         await expect(readiness).rejects.toThrow("LOGINOM_HOST_CLOSED")

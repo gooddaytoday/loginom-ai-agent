@@ -35,21 +35,20 @@ try {
       url: "http://loginom.test/app/",
       username: "user",
       folder: "/user",
-      hasApiKey: true,
       hasPassword: false,
       state: "ready",
     }
     let candidate
     let mode = "ready"
-    const calls = { checks: 0, saves: 0, preserved: 0 }
+    const calls = { checks: 0, saves: 0, keys: 0 }
     for (const name of ["loginom-read", "loginom-status", "loginom-check", "loginom-save"]) ipcMain.removeHandler(name)
     ipcMain.handle("loginom-read", () => view)
     ipcMain.handle("loginom-status", () => view)
     ipcMain.handle("loginom-check", (_event, input) => {
       calls.checks++
-      if (input.apiKey.operation === "preserve") calls.preserved++
-      if (input.apiKey.value === "invalid-test-key") throw Error("LOGINOM_KNOWLEDGE_AUTH_FAILED")
-      if (input.apiKey.value === "••••••••") throw Error("MASK_SUBMITTED_AS_KEY")
+      // The knowledge service key is built in; the form must never send one.
+      if ("apiKey" in input) calls.keys++
+      if (input.username === "rejected-key-user") throw Error("LOGINOM_KNOWLEDGE_AUTH_FAILED")
       candidate = input
       return { validationId: "test-validated", expiresAt: Date.now() + 60000 }
     })
@@ -81,10 +80,9 @@ try {
   await footerClose().click()
   await expect(form).toHaveCount(0)
   await open()
-  const key = () => form.locator('input[type="password"]').nth(0)
   const username = () => form.locator('input[autocomplete="username"]')
-  await expect(key()).toHaveValue("")
-  await expect(key()).toHaveAttribute("placeholder", "••••••••")
+  // Only the Loginom password remains secret in the form.
+  await expect(form.locator('input[type="password"]')).toHaveCount(1)
   await expect(form.getByRole("button", { name: saveName })).toBeDisabled()
   await expect(form.getByRole("button", { name: /Reload current settings|Загрузить текущие настройки/ })).toHaveCount(0)
   await page.screenshot({ path: join(evidence, "saved-key.png") })
@@ -122,13 +120,12 @@ try {
   await expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible()
   await open()
   await expect(username()).toHaveValue("checked-user")
-  await expect(key()).toHaveAttribute("placeholder", "••••••••")
-  await key().fill("invalid-test-key")
+  await username().fill("rejected-key-user")
   await form.getByRole("button", { name: saveName }).click()
-  await expect(form.getByRole("alert")).toContainText(/API key|API-ключ/)
-  await expect(key()).toHaveValue("invalid-test-key")
+  await expect(form.getByRole("alert")).toContainText(/Update the application|Обновите приложение/)
+  await expect(username()).toHaveValue("rejected-key-user")
   await page.screenshot({ path: join(evidence, "invalid-key.png") })
-  await key().fill("replacement-test-key")
+  await username().fill("replacement-user")
   await expect(form.getByRole("alert")).toHaveCount(0)
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
@@ -145,7 +142,7 @@ try {
 
   await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "pending"))
   await open()
-  await key().fill("pending-test-key")
+  await username().fill("pending-user")
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
   await expect(page.getByText(/Changes are saved and will apply|Изменения сохранены и будут применены/)).toBeVisible()
@@ -156,15 +153,15 @@ try {
   await page.screenshot({ path: join(evidence, "deferred-failure.png") })
   const calls = await application.evaluate(async ({ BrowserWindow }) => {
     return BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(
-      "window.api.loginom.read().then(v => ({ revision: v.revision, hasApiKey: v.hasApiKey }))",
+      "window.api.loginom.read().then(v => ({ revision: v.revision, hasApiKey: 'hasApiKey' in v }))",
     )
   })
-  assert.equal(calls.hasApiKey, true)
+  assert.equal(calls.hasApiKey, false)
   assert.equal(calls.revision, 5)
   const summary = {
     status: "PASS",
     version: await application.evaluate(({ app }) => app.getVersion()),
-    maskedKey: true,
+    noKeyField: true,
     closeMethods: 4,
     unsavedConfirmation: true,
     checkWithoutSave: true,

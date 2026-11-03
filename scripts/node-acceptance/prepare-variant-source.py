@@ -48,7 +48,7 @@ try:
     name=fixture['package_basename']
     if name!='lab12-stage2-source-v3.lgp' or fixture['kind']!='source_only' or fixture['derived_reports'] is not False:
         raise RuntimeError('SOURCE_ONLY_MANIFEST_INVALID')
-    write_private(attempt/'config.json',dict(url=login['url'],username=login['username'],password=login['password'],api_key=login['api_key'],source_name=name[:-4],reuse_existing=args.reuse_existing))
+    write_private(attempt/'config.json',dict(url=login['url'],username=login['username'],password=login['password'],source_name=name[:-4],reuse_existing=args.reuse_existing))
     write_private(attempt/'fixture.json',fixture)
     shutil.copyfile(source/'variant-source.csv',attempt/'types.csv')
     import hashlib
@@ -59,7 +59,7 @@ try:
     prepare_profile(profile,manifest['metadata']['channel'],config.get('model_cache_file'))
     launcher=dict(attempt=attempt,payload=payload,profile=profile,cwd=attempt,auth=Path(config['provider_auth_file']),pass_fds=(lock,))
     cli=payload/'bin/loginom-ai-agent-cli'
-    setup=dict(url=login['url'],username=login['username'],password=login['password'],apiKey=login['api_key'])
+    setup=dict(url=login['url'],username=login['username'],password=login['password'])
     for step in ['setup','status']:
         command=[cli,'loginom',step,'--format','json']
         if step=='setup':command+=['--stdin-json']

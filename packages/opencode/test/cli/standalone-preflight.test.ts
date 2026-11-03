@@ -254,11 +254,13 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
         join(fixture.bundle, "resource-manifest.json"),
         JSON.stringify({ ...manifest, endpoint: server.endpoint }),
       )
+      // The stored legacy key would be accepted; only the built-in key decides Help availability.
+      if (mode.includes("unavailable")) await writeFile(join(fixture.bundle, "knowledge-key"), "REJECTED-NONSECRET")
       const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
       await store.stage({
         generation: 1,
         revision: 1,
-        apiKey: mode.includes("unavailable") ? "REJECTED-NONSECRET" : "UNIT-NONSECRET",
+        apiKey: "UNIT-NONSECRET",
         password: "PRIVATE-NONSECRET",
         username: "user",
         url: "http://127.0.0.1:1/app/",
@@ -402,9 +404,11 @@ test.each(["valid-help", "invalid-key"])(
         await child.exited
       }
     }
+    if (mode === "invalid-key") await writeFile(join(fixture.bundle, "knowledge-key"), "WRONG-NONSECRET")
     try {
+      // An older setup script still sends a key that the server would accept; it is ignored.
       const setup = await command(["setup", "--stdin-json"], {
-        apiKey: mode === "valid-help" ? "UNIT-NONSECRET" : "WRONG-NONSECRET",
+        apiKey: "UNIT-NONSECRET",
         url: "http://127.0.0.1:1/app/",
         username: "user",
         password: "PRIVATE-NONSECRET",
@@ -412,7 +416,7 @@ test.each(["valid-help", "invalid-key"])(
       if (mode === "invalid-key") {
         expect(setup).toMatchObject({ exit: 1, result: { ok: false, code: "LOGINOM_KNOWLEDGE_AUTH_FAILED" } })
         await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
-        expect((await command(["status"])).result).toMatchObject({ state: "unconfigured", hasApiKey: false })
+        expect((await command(["status"])).result).toMatchObject({ state: "unconfigured", generation: 0 })
         return
       }
       expect(setup).toMatchObject({
@@ -420,7 +424,6 @@ test.each(["valid-help", "invalid-key"])(
         errors: "",
         result: {
           generation: 1,
-          hasApiKey: true,
           browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
         },
       })

@@ -53,7 +53,7 @@ Core workflow:
 
 - «Выбор агента» (`showCustomAgents`) включён по умолчанию для новых установок, в том числе после первичной инициализации Desktop/web. Уже инициализированные профили сохраняют выбор пользователя; регрессия — `src/context/settings.test.ts`.
 - `src/components/settings-loginom.tsx` is the shared first-run/settings form; `loginom-button.tsx` keeps access prominent. Desktop operations go through the platform/preload contract.
-- Ask API key, URL, username and password only. Default URL/username come from Product; password is empty and has no placeholder. Never add a folder input or folder availability check; use `/<username>` in runtime. Keep provider/model connection in the existing settings flow.
+- Ask URL, username and password only; the knowledge service key is built in and the form never sends one. Default URL/username come from Product; password is empty and has no placeholder. Never add a folder input or folder availability check; use `/<username>` in runtime. Keep provider/model connection in the existing settings flow.
 - Never render stored secrets back from main. Connection changes may be pending until the active generation is released; display the actual state rather than treating save as immediate activation.
 - New-chat branding comes from `@opencode-ai/ui/v2/wordmark-v2`, used by `src/pages/new-session/new-session-view.tsx`. The requested text is `Loginom AI`; changing the legacy Logo alone does not update this screen.
 - Validate UI in an isolated test application/profile, preserving the user's running session. See [desktop checks](../desktop/AGENTS.md) and [connection ownership](../desktop/src/main/loginom/AGENTS.md).

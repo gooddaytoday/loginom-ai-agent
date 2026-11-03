@@ -19,7 +19,7 @@ try:
  if verify_candidate(w,payload).returncode:raise RuntimeError('CANDIDATE_INVALID')
  out.mkdir(mode=0o700)
  l=c['loginom']
- write_private(out/'config.json',dict(url=l['url'],username=l['username'],password=l['password'],api_key=l['api_key'],source_name='lab12-stage2-source-v3',report_name='native-refusal-'+out.name))
+ write_private(out/'config.json',dict(url=l['url'],username=l['username'],password=l['password'],source_name='lab12-stage2-source-v3',report_name='native-refusal-'+out.name))
  source=w/'docs/node-development/nodes/transform-crosstable/acceptance'
  shutil.copyfile(source/'data/typed.csv',out/'typed.csv')
  write_private(out/'expected.json',json.loads((source/'expected.json').read_text())['outputs'][11])

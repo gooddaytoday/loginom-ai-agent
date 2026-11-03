@@ -100,6 +100,13 @@ export async function createLoginomHost(options: {
       signal,
     ).catch(startupFailure)
   }
+  // The knowledge service accepts the key built into the resources; the key a
+  // user saved with an older build is never sent. Release builds always carry
+  // the key; without one the knowledge entry refuses to start.
+  async function withKnowledgeKey(connection: ActiveConnection) {
+    const apiKey = await readFile(join(resources, "knowledge-key"), "utf8").catch(() => "")
+    return { ...connection, apiKey: apiKey.trim() }
+  }
   function startupFailure(error: unknown): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
     if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) {
@@ -111,8 +118,9 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(connection, signal) {
+      async check(candidate, signal) {
         signal?.throwIfAborted()
+        const connection = await withKnowledgeKey(candidate)
         const chat = randomUUID()
         try {
           const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
@@ -160,7 +168,8 @@ export async function createLoginomHost(options: {
           ])
         }
       },
-      async prepare(connection) {
+      async prepare(candidate) {
+        const connection = await withKnowledgeKey(candidate)
         const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
         const knowledge = await superviseKnowledge({
           node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),

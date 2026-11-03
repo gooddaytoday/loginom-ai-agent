@@ -31,6 +31,8 @@ if attachment_mode: (workspace/'sales.csv').write_bytes(csv)
 (bundle/'bin').mkdir(parents=True); (bundle/'runtime/src').mkdir(parents=True)
 (bundle/'bin/node').symlink_to(repo/'packages/desktop/resources/loginom/bin/node')
 (bundle/'resource-manifest.json').write_text(json.dumps({'endpoint':'https://example.test'}))
+# The built-in knowledge key; the fixture runtime starts only with it.
+(bundle/'knowledge-key').write_text('fixture-key')
 (bundle/'runtime/src/managed-entry.mjs').write_text('''import { appendFileSync, existsSync } from 'node:fs';
 appendFileSync(new URL('../../fixture-pids.jsonl', import.meta.url),JSON.stringify([process.pid,process.ppid])+'\\n');
 process.on('message', m => {
@@ -50,7 +52,7 @@ command=[binary] if binary else [bun,'run','src/standalone.ts']
 subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
 env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),LOGINOM_AI_AGENT_CLI_BUNDLE=str(bundle),LOGINOM_AI_AGENT_PURE='1',BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',TERM='xterm-256color')
 if not unconfigured and not onboarding:
- setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{"apiKey":"fixture-key"}',text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
+ setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{}',text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
  assert setup.returncode==0,setup.stderr
 elif prompt_mode:
  status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
@@ -128,7 +130,7 @@ if proxy_notice:
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
 child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
 os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
-setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('API-ключ',b'\x03' if cancel_setup else b'fixture-key\r'),('URL Loginom',b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
+setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
 if password_setup: setup_steps.append(('Новый пароль',b'fixture-password\r'))
 while child.poll() is None and time.monotonic()-start<(90 if attachment_mode else 30):
  if select.select([master],[],[],0.1)[0]:

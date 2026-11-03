@@ -46,6 +46,8 @@ export async function standaloneFixture(binary?: string) {
       ])
       expect({ buildExit, buildError, buildOutput }).toEqual({ buildExit: 0, buildError: "", buildOutput: "" })
       await copyProductSkillsFixture(bundle)
+      // The fake knowledge server accepts this built-in key.
+      await writeFile(join(bundle, "knowledge-key"), "UNIT-NONSECRET")
       await writeFile(
         join(bundle, "resource-manifest.json"),
         JSON.stringify({

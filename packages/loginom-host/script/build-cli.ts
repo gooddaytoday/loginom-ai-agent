@@ -77,6 +77,7 @@ try {
       browsers,
       target: { platform: process.platform, arch: process.arch },
       flavor: "cli",
+      knowledgeKey: process.env.LOGINOM_MCP_API_KEY,
     }),
   )
   await buildPhase("cli-node-host", () => buildNodeHost(join(resources, "host")))

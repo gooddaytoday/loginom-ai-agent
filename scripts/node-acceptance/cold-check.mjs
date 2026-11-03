@@ -452,7 +452,8 @@ page = context.pages()[0]
     },
   }
   const body = JSON.stringify(result, null, 2)
-  if (body.includes(config.api_key) || (loginPassword && body.includes(loginPassword))) throw Error("SECRET_IN_RESULT")
+  // run-check no longer writes api_key; an absent key must not match the text "undefined".
+  if ([config.api_key, loginPassword].filter(Boolean).some((secret) => body.includes(secret))) throw Error("SECRET_IN_RESULT")
   await writeFile(join(args.output, "result.json"), body + "\n")
   console.log(
     JSON.stringify({

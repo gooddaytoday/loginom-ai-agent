@@ -117,7 +117,7 @@ try {
   await form.waitFor({ timeout: 120000 })
   if ((await form.locator("input:not([type=checkbox])").count()) !== 4) throw Error("FOUR_FIELDS_REQUIRED")
   const status = await page.evaluate(() => window.api.loginom.read())
-  if (status.hasApiKey || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
+  if (status.generation || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
   await page.screenshot({ path: join(evidence, "first-launch.png") })
   await form.locator('[data-component="icon-button"][data-icon="close"]').click()
   await form.waitFor({ state: "hidden", timeout: 30000 })

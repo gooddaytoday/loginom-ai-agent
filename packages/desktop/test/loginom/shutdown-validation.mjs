@@ -31,7 +31,11 @@ async function processes() {
 for (const phase of ["navigation", "login-form"]) {
   const profile = await mkdtemp(join(tmpdir(), "desktop-validation-shutdown-"))
   const cleanup = []
-  const help = await knowledgeServer({ after: (callback) => cleanup.push(callback) })
+  // The tested executable carries the knowledge key it was built with.
+  const help = await knowledgeServer(
+    { after: (callback) => cleanup.push(callback) },
+    { apiKey: process.env.LOGINOM_MCP_API_KEY ?? "UNIT-NONSECRET" },
+  )
   const entered = Promise.withResolvers()
   const release = Promise.withResolvers()
   const http = createServer(async (request, response) => {
@@ -103,7 +107,6 @@ for (const phase of ["navigation", "login-form"]) {
           revision: current.revision,
           url,
           username: "user",
-          apiKey: { operation: "replace", value: "UNIT-NONSECRET" },
           password: { operation: "empty" },
         })
       } catch {

@@ -134,7 +134,7 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.status" || method === "connection.read") return host.api.status()
   if (method === "connection.ready") {
     const before = await host.api.status()
-    if (!before.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")
+    if (!before.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")
     await Promise.race([
       host.catalog(before.generation),
       stopped.promise.then(() => {
