@@ -1,4 +1,6 @@
 # Свертка столбцов (`transform.collapse_columns`)
 
-Перед настройкой прочитай общие правила [навыка](../../SKILL.md) и запроси `parameter_schema`.
-
+Для transform.collapse_columns, служащего промежуточным источником в расширенном
+графе, допускается finish="execute" с read:{ports:[0],sample_rows:0,
+require_exact_numbers:false}; это выполняет узел без чтения промежуточной таблицы.
+Изолированное native full-чтение Collapse не читает произвольный расширенный граф.
