@@ -6,11 +6,14 @@ import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {pinActionCatalog,BUNDLED_CATALOG_RELEASES} from '../lib/action-catalog.mjs';
 import {userNodeTool,userActionInventory} from '../lib/user-workflow.mjs';
-import {boundedUserToolReply} from '../lib/user-response-budget.mjs';
+import {boundedUserToolReply,JAVASCRIPT_DESCRIBE_WIRE_BUDGET} from '../lib/user-response-budget.mjs';
 import {createSkillLoader} from '../lib/skill.mjs';
 import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
+// Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
+// boundedUserToolReply below also enforces this limit on the complete JS wire reply.
+const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
@@ -22,7 +25,7 @@ test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  assert.ok(size<=20000,`${name}: ${size} bytes; headroom ${20000-size} bytes`);
 });
 
-test('every registered user-v1 node card fits within 12000 bytes',async t=>{
+test('every registered user-v1 node card fits its type budget',async t=>{
  const release=JSON.parse(await readFile(new URL('../../../product/loginom-release.json',import.meta.url),'utf8'));
  const pinned=await pinActionCatalog({callTool:()=>assert.fail('unexpected remote catalog read')},{
   manifestUri:release.actionManifestUri,manifestSha256:release.actionManifestSha256,
@@ -45,7 +48,7 @@ test('every registered user-v1 node card fits within 12000 bytes',async t=>{
  for(const card of cards)await t.test(card.type,()=>{
   assert.equal(card.candidate_node_apply_available,true,card.type);
   assert.ok(card.parameter_schema,`${card.type}: missing parameter_schema`);
-  const size=bytes(card);
-  assert.ok(size<=12000,`${card.type}: ${size} bytes; headroom ${12000-size} bytes`);
+  const size=bytes(card),budget=NODE_CARD_BUDGET_EXCEPTIONS[card.type]??12000;
+  assert.ok(size<=budget,`${card.type}: ${size} bytes; budget ${budget} bytes; headroom ${budget-size} bytes`);
  });
 });
