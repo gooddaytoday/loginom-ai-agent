@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import {randomUUID} from 'node:crypto';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
-import { pinActionCatalog, assertCatalogTarget, validateActionParameters } from './action-catalog.mjs';
+import { pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
@@ -95,6 +95,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
+  if (config.bundledCatalog !== undefined && typeof config.bundledCatalog !== 'boolean'
+      || config.bundledCatalog === true && config.mode !== 'executor-replay')
+    throw Error('Invalid bundled action catalog policy');
   // Browser recovery leases the managed user-v1 page only; other modes keep their own browser contract.
   if (config.browserRecovery !== undefined && typeof config.browserRecovery !== 'boolean'
       || config.browserRecovery === true && (config.mode !== 'executor-replay' || config.resultProfile !== 'user-v1'
@@ -167,6 +170,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       const replay = config.mode === 'executor-replay';
       const pinned = await pinActionCatalog(remote, { startup, runtimeIdentity: session.metadata, ...(replay ? {
         manifestUri: config.actionManifestUri, manifestSha256: config.actionManifestSha256, allowCandidate: true,
+        ...(config.bundledCatalog === true ? { releases: BUNDLED_CATALOG_RELEASES } : {}),
       } : {}) });
       pinnedActions = pinned;
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });

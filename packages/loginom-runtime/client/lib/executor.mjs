@@ -761,7 +761,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     const bind=(expected,direction,port)=>{
       const nodes=diagram.FNodes.FCollection.filter(n=>n.FGuid===expected.id);
       if(nodes.length!==1)throw Error('Link validation node changed');
-      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':(port.kind==='connection'?'Connection-':'Data-')+port.index);
+      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':(port.kind==='connection'?'Connection-':port.kind==='tree'?'DataTree-':'Data-')+port.index);
       const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.parent===node&&p.FCell?.parent===node.FCell
         &&(graph.view.getState(p.FCell)?.shape?.node?.getAttribute('data-tid')===tid||receipt.nodeTargetPortIdentities?.get(p)?.tid===tid));
       const elements=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];

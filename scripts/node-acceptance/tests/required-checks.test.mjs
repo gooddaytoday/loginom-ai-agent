@@ -57,6 +57,8 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
  ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
+ ['packages/loginom-runtime/client/lib/date-time-parameters.mjs','date-time-iso'],
+ ['packages/loginom-runtime/client/lib/date-time-removal.mjs','date-time-iso-empty'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();

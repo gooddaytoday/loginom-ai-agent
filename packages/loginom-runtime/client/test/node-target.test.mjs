@@ -84,6 +84,11 @@ test('graph phase creates, renames and connects three inputs under one operation
 test('invalid source output is rejected before creation',async()=>{
  const f=fixture(),r=request();r.inputs[0].output=4;assert.equal((await f.run(r)).status,'NOT_APPLIED');assert.equal(f.calls.length,0);
 });
+test('tree_io rejects a tree source for a tabular target before creation',async()=>{
+ const f=fixture();f.graph.nodes[0].output_kinds=['tree'];
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED');
+ assert.match(result.error,/Incompatible.*port/);assert.deepEqual(f.calls,[]);
+});
 test('lost response after drop retains pending and never creates a duplicate',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;f.adapter.mutate=async e=>{await mutate(e);throw new Error('lost response');};
  assert.equal((await f.run()).status,'AMBIGUOUS');assert.equal((await f.run()).status,'AMBIGUOUS');assert.deepEqual(f.calls,['create']);assert.equal(f.graph.nodes.length,2);

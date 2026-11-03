@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "autocorrelation": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "One exact numeric input field name. Replaces used roles; input row order defines time. Required for new nodes; omit on existing to preserve."
+        },
+        "lag_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Number of lags including lag 0; output is capped by input length. Required for new nodes; omit on existing to preserve."
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Time-domain ACF only; PACF off. New nodes require field and lag_count; existing omission preserves supported settings."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

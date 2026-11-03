@@ -1,0 +1,132 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.smoothing"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.smoothing",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "R_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 1,
+          "R": 0.25,
+          "Tag": "r1",
+          "X_S": 1.0,
+          "R_S": 0.25
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "R": 0.5,
+          "Tag": "r2",
+          "X_S": 2.0,
+          "R_S": 0.5
+        },
+        {
+          "RowID": 3,
+          "X": 3,
+          "R": 0.75,
+          "Tag": "r3",
+          "X_S": 3.0,
+          "R_S": 0.75
+        },
+        {
+          "RowID": 4,
+          "X": 4,
+          "R": 1.0,
+          "Tag": "r4",
+          "X_S": 4.0,
+          "R_S": 1.0
+        },
+        {
+          "RowID": 5,
+          "X": 5,
+          "R": 1.25,
+          "Tag": "r5",
+          "X_S": 5.0,
+          "R_S": 1.25
+        },
+        {
+          "RowID": 6,
+          "X": 6,
+          "R": 1.5,
+          "Tag": "r6",
+          "X_S": 6.0,
+          "R_S": 1.5
+        },
+        {
+          "RowID": 7,
+          "X": 7,
+          "R": 1.75,
+          "Tag": "r7",
+          "X_S": 7.0,
+          "R_S": 1.75
+        },
+        {
+          "RowID": 8,
+          "X": 8,
+          "R": 2.0,
+          "Tag": "r8",
+          "X_S": 8.0,
+          "R_S": 2.0
+        }
+      ]
+    }
+  ]
+}

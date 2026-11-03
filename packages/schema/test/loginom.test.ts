@@ -9,11 +9,12 @@ test("connection views keep Help readiness independent of browser status and leg
     url: "http://example.test",
     username: "user",
     folder: "/user",
-    hasApiKey: true,
     hasPassword: false,
     state: "ready" as const,
   }
   expect(Schema.decodeUnknownSync(Loginom.View)(legacy)).toEqual(legacy)
+  // Views from builds that still stored a user MCP key decode without it.
+  expect(Schema.decodeUnknownSync(Loginom.View)({ ...legacy, hasApiKey: true })).toEqual(legacy)
   expect(Schema.encodeSync(Loginom.View)({ ...legacy, browser: undefined })).toEqual(legacy)
   for (const browser of [
     { state: "unknown" as const },

@@ -1,0 +1,38 @@
+{
+  "encoding": "UTF-8",
+  "bom": false,
+  "delimiter": ";",
+  "line_ending": "LF",
+  "null_marker": "NULL",
+  "date_format": "yyyy/mm/dd",
+  "date_separator": "-",
+  "datetime_timezone": "none; civil values, preserve time",
+  "input_columns": [
+    {
+      "name": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "DateA",
+      "type": "datetime"
+    },
+    {
+      "name": "DateB",
+      "type": "datetime"
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "iso-weeks.csv",
+      "bytes": 538,
+      "sha256": "ac3c56750d7b8f9a12dc49ffc2e7058c4c7e249e79c6e44021c7b588d981406f",
+      "rows": 13
+    },
+    {
+      "file": "iso-weeks-empty.csv",
+      "bytes": 18,
+      "sha256": "5f715b15f024ef2fa95dc7743beebecf81d04bfa881bb098eaa4d0ab7a882b7f",
+      "rows": 0
+    }
+  ]
+}

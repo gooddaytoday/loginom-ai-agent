@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readCrossTableBrowser,readCrossTableContext} from '../lib/crosstable-context.mjs';
-import {crossTableRoleRemovalOrder} from '../lib/crosstable-procedure.mjs';
+import {crossTableRoleRemovalOrder,crossTableConfiguration} from '../lib/crosstable-procedure.mjs';
 function fixture(){
  const base='MF;TF-1;WizrdMCF;CrossTabWizard;',elements=new Map(),components=new Map();
  const root={checkVisibility:()=>true,contains:()=>true};elements.set(base.slice(0,-1),[root]);
@@ -26,6 +26,21 @@ test('cached CrossTable roles retain ordinals and never invent technical names',
  const f=fixture(),r=f.evaluate();assert.equal(r.verified,true);assert.equal(r.input_fields.length,3);
  assert.equal(r.input_fields[1].index,1);assert.equal(r.input_fields[1].name,undefined);
  assert.equal(r.input_fields[2].type,'real');assert.equal(r.options.pedSlidingUniqueValues.value,false);
+});
+test('saved continuous row roles bind native Disposition=2 without changing type or data kind',()=>{
+ for(const [nativeType,type] of [[3,'real'],[4,'integer']]){
+  const f=fixture();
+  Object.assign(f.records[0].data,{DataType:nativeType,DataKind:1,Disposition:2});
+  Object.assign(f.records[1].data,{Disposition:1});
+  Object.assign(f.records[2].data,{Disposition:3,GroupFunctions:3});
+  const context={verified:true,document_id:'doc',workflow_id:'wf',node_id:'cross'};
+  const native={...f.evaluate(),node_context:context};
+  const mapping={verified:true,inventory_complete:true,node_context:{...context,input_port:{port:0}},
+   target_fields:native.input_fields.map(x=>({...x,name:x.label}))};
+  const c=crossTableConfiguration(native,mapping);
+  assert.equal(c.row_keys[0].type,type);assert.equal(c.row_keys[0].data_kind,'Непрерывный');
+  assert.equal(c.row_keys[0].disposition,2);assert.deepEqual(c.facts[0].functions,['sum','count']);
+ }
 });
 test('native Variant fact retains undefined data kind without granting dimension semantics',()=>{
  const f=fixture();Object.assign(f.records[2].data,{DataType:6,DataKind:0,AvailableAggregationTypes:1934});

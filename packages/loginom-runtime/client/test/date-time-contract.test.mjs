@@ -16,6 +16,16 @@ test('existing empty parameters preserve; explicit empty field list clears only 
  assert.throws(()=>validateDateTimeParameters({fields:[{field:{kind:'input_field',name:'A'},transformations:[]}]},'calendar',request));
  assert.throws(()=>validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings:[{direction:'input',fields:[{source:{kind:'configured_field',name:'A'},excluded:true}]}]}));
 });
+test('minute and second validate through the production contract and resolve by input origin',()=>{
+ const p={fields:['A','B'].map(name=>({field:{kind:'input_field',name},transformations:['minute','second'].map(operation=>({operation,name:name+'_'+operation,label:operation}))}))};
+ validateDateTimeParameters(p,'calendar',request);
+ const sources=['B','A'].flatMap((name,i)=>[
+  field(name+'-s',name+'_SEC_'+(i+3),'Дата (Секунды)','integer',true),
+  field(name+'-m',name+'_MIN_'+(i+7),'Дата (Минуты)','integer',true)]);
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,source_fields:sources,target_fields:sources.map(source=>({source,name:source.name,label:source.label,excluded:false}))};
+ const result=resolveDateTimeOutput({input_fields:['A','B'].map(name=>({name,label:'Дата',type:'datetime'}))},p,native);
+ assert.deepEqual(result.map(r=>r.name),['B_second','B_minute','A_second','A_minute']);
+});
 test('explicit date output layout refuses autosync before changing a node',()=>{
  const mappings=[{direction:'output',port:0,autosync:true,fields:[{source:{kind:'configured_field',name:'A'}}]}];
  assert.throws(()=>validateDateTimeParameters({},'calendar',{target:{kind:'existing'},mappings}),/layout requires autosync disabled/);
@@ -28,10 +38,19 @@ test('effective input mapping is validated before its Done, preserving retained 
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'A',type:'string'}]},native));
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'Renamed',type:'datetime'}]},native));
 });
-test('unsupported ISO/string operations and repeated assignments are refused',()=>{
- for(const operation of ['iso_year','custom','week','to_string'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
+test('unsupported ISO end/string operations and repeated assignments are refused',()=>{
+ for(const operation of ['iso_week_end','custom','week','to_string'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
  const p=structuredClone(parameters);p.fields[0].transformations.push({...p.fields[0].transformations[0],name:'Other'});assert.throws(()=>validateDateTimeParameters(p,'calendar',request));
- assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,12);
+ assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,18);
+});
+test('four ISO-week operations validate and resolve distinct generated sources beside calendar year',()=>{
+ const operations=[['year','A_Y_1','Дата (Год)','integer'],['iso_year','A_Y_2','Дата (Год, ISO8601)','integer'],['iso_week','A_WY_7','Дата (Неделя, ISO8601)','integer'],['iso_week_start','A_YW_3','Дата (Год + Неделя, Первый день, ISO8601)','datetime'],['day_of_week','A_DW_1','Дата (День недели)','integer']];
+ const p={fields:[{field:{kind:'input_field',name:'A'},transformations:operations.map(([operation])=>({operation,name:operation,label:operation}))}]};
+ validateDateTimeParameters(p,'calendar',request);
+ const sources=operations.map(([,name,label,type],i)=>field(String(i),name,label,type,true)).reverse();
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,source_fields:sources,target_fields:sources.map(source=>({source,name:source.name,label:source.label,excluded:false}))};
+ const result=resolveDateTimeOutput({input_fields:[{name:'A',label:'Дата',type:'datetime'}]},p,native);
+ assert.deepEqual(result.map(r=>r.name),operations.map(([operation])=>operation).reverse());
 });
 const field=(record_id,name,label,type,required)=>({record_id,name,label,type,required});
 test('output origin uses exact input prefix/type/boundary with equal labels, never output order',()=>{

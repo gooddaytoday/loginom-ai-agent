@@ -1,0 +1,27 @@
+{
+  "proposal": true,
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [{"type": "exports.excel", "label_any": true}],
+  "output_node_type": "exports.excel",
+  "output_port": null,
+  "ordered": true,
+  "format": "xlsx",
+  "sheet_name": "Данные",
+  "header": "labels",
+  "filename": "excel-cells.xlsx",
+  "columns": [
+    {"name": "Id", "label": "Номер", "type": "integer"},
+    {"name": "Text", "label": "Текст", "type": "string"},
+    {"name": "Amount", "label": "Сумма", "type": "real", "tolerance": {"abs": 1e-9, "rel": 1e-12}},
+    {"name": "Occurred", "label": "Момент", "type": "datetime", "tolerance": {"abs_ms": 1}},
+    {"name": "Active", "label": "Активен", "type": "boolean"}
+  ],
+  "row_count": 5,
+  "rows": [
+    [1, "Кириллица", 1234.56789, "2024-02-29T12:30:00.000", true],
+    [2, "строка с \"кавычкой\"\nи переносом", 0, "2024-02-29T12:30:00.000", false],
+    [3, null, null, null, null],
+    [4, "", -2.5, "2024-02-29T12:30:00.000", false],
+    [5, "=SUM(A1:A2)", 10, "2024-02-29T12:30:00.000", true]
+  ]
+}

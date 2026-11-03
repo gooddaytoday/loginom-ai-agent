@@ -1,0 +1,265 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.date_time"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.date_time",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "DateA",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "DateB",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "A_Year",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_ISOYear",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_ISOWeek",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_WeekStart",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "B_Year",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_ISOYear",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_ISOWeek",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B_WeekStart",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "B_Weekday",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "DateA": "2015-12-31T23:59:59.000",
+          "DateB": "2016-01-04T00:00:00.000",
+          "A_Year": 2015,
+          "A_ISOYear": 2015,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2015-12-28T00:00:00.000",
+          "B_Year": 2016,
+          "B_ISOYear": 2016,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2016-01-04T00:00:00.000",
+          "B_Weekday": 1
+        },
+        {
+          "RowID": 2,
+          "DateA": "2016-01-01T00:00:00.000",
+          "DateB": "2015-12-31T23:59:59.000",
+          "A_Year": 2016,
+          "A_ISOYear": 2015,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2015-12-28T00:00:00.000",
+          "B_Year": 2015,
+          "B_ISOYear": 2015,
+          "B_ISOWeek": 53,
+          "B_WeekStart": "2015-12-28T00:00:00.000",
+          "B_Weekday": 4
+        },
+        {
+          "RowID": 3,
+          "DateA": "2016-01-03T12:34:56.000",
+          "DateB": "2016-01-04T00:00:00.000",
+          "A_Year": 2016,
+          "A_ISOYear": 2015,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2015-12-28T00:00:00.000",
+          "B_Year": 2016,
+          "B_ISOYear": 2016,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2016-01-04T00:00:00.000",
+          "B_Weekday": 1
+        },
+        {
+          "RowID": 4,
+          "DateA": "2016-01-04T00:00:00.000",
+          "DateB": "2016-01-03T12:34:56.000",
+          "A_Year": 2016,
+          "A_ISOYear": 2016,
+          "A_ISOWeek": 1,
+          "A_WeekStart": "2016-01-04T00:00:00.000",
+          "B_Year": 2016,
+          "B_ISOYear": 2015,
+          "B_ISOWeek": 53,
+          "B_WeekStart": "2015-12-28T00:00:00.000",
+          "B_Weekday": 7
+        },
+        {
+          "RowID": 5,
+          "DateA": "2018-12-31T23:59:59.000",
+          "DateB": "2019-01-01T00:00:00.000",
+          "A_Year": 2018,
+          "A_ISOYear": 2019,
+          "A_ISOWeek": 1,
+          "A_WeekStart": "2018-12-31T00:00:00.000",
+          "B_Year": 2019,
+          "B_ISOYear": 2019,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2018-12-31T00:00:00.000",
+          "B_Weekday": 2
+        },
+        {
+          "RowID": 6,
+          "DateA": "2020-12-28T13:14:15.000",
+          "DateB": "2021-01-03T23:59:59.000",
+          "A_Year": 2020,
+          "A_ISOYear": 2020,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Year": 2021,
+          "B_ISOYear": 2020,
+          "B_ISOWeek": 53,
+          "B_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Weekday": 7
+        },
+        {
+          "RowID": 7,
+          "DateA": "2021-01-01T00:00:00.000",
+          "DateB": "2021-01-04T00:00:00.000",
+          "A_Year": 2021,
+          "A_ISOYear": 2020,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Year": 2021,
+          "B_ISOYear": 2021,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2021-01-04T00:00:00.000",
+          "B_Weekday": 1
+        },
+        {
+          "RowID": 8,
+          "DateA": "2021-01-03T23:59:59.000",
+          "DateB": "2020-12-28T13:14:15.000",
+          "A_Year": 2021,
+          "A_ISOYear": 2020,
+          "A_ISOWeek": 53,
+          "A_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Year": 2020,
+          "B_ISOYear": 2020,
+          "B_ISOWeek": 53,
+          "B_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Weekday": 1
+        },
+        {
+          "RowID": 9,
+          "DateA": "2021-01-04T00:00:00.000",
+          "DateB": "2021-01-01T00:00:00.000",
+          "A_Year": 2021,
+          "A_ISOYear": 2021,
+          "A_ISOWeek": 1,
+          "A_WeekStart": "2021-01-04T00:00:00.000",
+          "B_Year": 2021,
+          "B_ISOYear": 2020,
+          "B_ISOWeek": 53,
+          "B_WeekStart": "2020-12-28T00:00:00.000",
+          "B_Weekday": 5
+        },
+        {
+          "RowID": 10,
+          "DateA": "2024-02-29T13:14:15.000",
+          "DateB": "2024-03-03T23:59:59.000",
+          "A_Year": 2024,
+          "A_ISOYear": 2024,
+          "A_ISOWeek": 9,
+          "A_WeekStart": "2024-02-26T00:00:00.000",
+          "B_Year": 2024,
+          "B_ISOYear": 2024,
+          "B_ISOWeek": 9,
+          "B_WeekStart": "2024-02-26T00:00:00.000",
+          "B_Weekday": 7
+        },
+        {
+          "RowID": 11,
+          "DateA": "2024-12-30T00:00:00.000",
+          "DateB": "2025-01-01T12:00:00.000",
+          "A_Year": 2024,
+          "A_ISOYear": 2025,
+          "A_ISOWeek": 1,
+          "A_WeekStart": "2024-12-30T00:00:00.000",
+          "B_Year": 2025,
+          "B_ISOYear": 2025,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2024-12-30T00:00:00.000",
+          "B_Weekday": 3
+        },
+        {
+          "RowID": 12,
+          "DateA": null,
+          "DateB": "2025-01-05T23:59:59.000",
+          "A_Year": null,
+          "A_ISOYear": null,
+          "A_ISOWeek": null,
+          "A_WeekStart": null,
+          "B_Year": 2025,
+          "B_ISOYear": 2025,
+          "B_ISOWeek": 1,
+          "B_WeekStart": "2024-12-30T00:00:00.000",
+          "B_Weekday": 7
+        },
+        {
+          "RowID": 13,
+          "DateA": "2025-01-06T00:00:00.000",
+          "DateB": null,
+          "A_Year": 2025,
+          "A_ISOYear": 2025,
+          "A_ISOWeek": 2,
+          "A_WeekStart": "2025-01-06T00:00:00.000",
+          "B_Year": null,
+          "B_ISOYear": null,
+          "B_ISOWeek": null,
+          "B_WeekStart": null,
+          "B_Weekday": null
+        }
+      ]
+    }
+  ]
+}

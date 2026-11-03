@@ -1,0 +1,25 @@
+{
+  "main": [
+    {"name":"Code","label":"Key","type":"string"},
+    {"name":"Amount","label":"Amount","type":"real"},
+    {"name":"CaseKey","label":"Caps","type":"string"},
+    {"name":"Wrong","label":"Wrong","type":"integer"},
+    {"name":"Left","label":"Shared","type":"string"},
+    {"name":"Right","label":"Shared","type":"string"}
+  ],
+  "joined": [
+    {"name":"Amount","label":"Amount","type":"real"},
+    {"name":"code","label":"Key","type":"string"},
+    {"name":"casekey","label":"Caps","type":"string"},
+    {"name":"Wrong","label":"Wrong","type":"string"},
+    {"name":"Other","label":"Shared","type":"string"},
+    {"name":"Solo","label":"Alone","type":"string"}
+  ],
+  "required_semantics": {
+    "wrong_type": "unmatched",
+    "no_pair": "separate_column",
+    "ambiguous_label_type": "typed_refusal_before_execute",
+    "explicit_null": "preserved",
+    "explicit_pair": "preserved"
+  }
+}

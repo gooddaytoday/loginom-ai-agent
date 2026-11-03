@@ -39,7 +39,7 @@ test('export validation refuses unsafe destinations and unsupported formats befo
 test('existing export patches reject unsupported retained formats before finish',()=>{
  const values=Object.fromEntries(Object.entries({encoding:65001,delimiter:';',header:1,line_ending:0,bom:false}).map(([k,value])=>[k,{value}]));
  assert.doesNotThrow(()=>validateNativeExportFormat(values));
- for(const [key,value] of Object.entries({encoding:1251,delimiter:' ',header:3,line_ending:2,bom:0}))assert.throws(()=>validateNativeExportFormat({...values,[key]:{value}}));
+ for(const [key,value] of Object.entries({encoding:1252,delimiter:' ',header:3,line_ending:2,bom:0}))assert.throws(()=>validateNativeExportFormat({...values,[key]:{value}}));
 });
 test('native output lease never becomes an input/upload grant and verifies real bytes',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'dock-export-'));try{

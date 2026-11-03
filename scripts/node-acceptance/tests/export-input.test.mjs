@@ -21,7 +21,7 @@ test('cold inspects saved export mapping after execution restores the complete d
    'createNodeProcedure','withBrowserReceipt','session','createNodeExecutionProcedure','performColdNodeAction',
    'runColdExecution','coldProcessObservation','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
    'readTableOutputPages','decodeTableOutput','returnFromOutputTable','writeFile','join','args','config',
-   'loginPassword','matchExpectedOutputs','resolveExportInput','selectColdOutputReads','observeExportDestinations','openColdOutputViews','openColdTableFilter','exportCsv','state'].join(',')}}=f;\n${body}\nreturn correspondence;`);
+   'loginPassword','matchExpectedOutputs','resolveExportInput','selectColdOutputReads','observeExportDestinations','openColdOutputViews','openColdTableFilter','exportCsv','state','sampling'].join(',')}}=f;\n${body}\nreturn correspondence;`);
  const fields=[{name:'Code',source_name:'Code',type:'string'},{name:'Status',source_name:'Status',type:'integer'}];
  const data=actual('rename',1).data;
  data.schema.push({name:'Status',label:'Status',type:'integer'});
@@ -94,6 +94,23 @@ test('CSV header reader respects BOM, quoting, escaped quotes, separators and em
   assert.throws(()=>parseExportCsvHeader(text),/COLD_EXPORT_CSV_INVALID/);
  assert.throws(()=>parseExportCsvHeader('a'.repeat(65537)),/COLD_EXPORT_CSV_HEADER_BOUND/);
  assert.throws(()=>parseExportCsvHeader('a|b','|'),/COLD_EXPORT_CSV_INVALID/);
+});
+
+test('cold CSV header decodes only the explicitly selected encoding, defaulting to UTF-8',async()=>{
+ const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
+ const declaration=source.slice(source.indexOf('const exportCsv='),source.indexOf('\n\nconst saved ='));
+ const decode=new (Object.getPrototypeOf(async function(){}).constructor)('args','readFile','resolve','parseExportCsvHeader',
+  declaration+';return exportCsv;');
+ const cp=Buffer.from([0xca,0xee,0xe4,0x3b,0xd2,0xe5,0xea,0xf1,0xf2,0x0d,0x0a]);
+ const args={csv:'download.csv','csv-delimiter':';','csv-header':'labels','csv-encoding':'Windows-1251'};
+ const read=async(_path,encoding)=>encoding?cp.toString(encoding):cp;
+ assert.deepEqual((await decode(args,read,x=>x,parseExportCsvHeader)).columns,['Код','Текст']);
+ const utf=Buffer.from('\uFEFFКод;Текст\r\n');
+ const utfRead=async(_path,encoding)=>encoding?utf.toString(encoding):utf;
+ delete args['csv-encoding'];
+ assert.deepEqual((await decode(args,utfRead,x=>x,parseExportCsvHeader)).columns,['Код','Текст']);
+ args['csv-encoding']='unsupported-encoding';
+ await assert.rejects(decode(args,read,x=>x,parseExportCsvHeader));
 });
 
 test('label headers require an explicit mode and unambiguous observed labels',()=>{

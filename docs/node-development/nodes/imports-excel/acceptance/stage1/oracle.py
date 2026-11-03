@@ -12,5 +12,5 @@ with ZipFile(root / "data/sales.xlsx") as z:
         records.append([strings[int(c.find("s:v", ns).text)] if c.get("t") == "s" else float(c.find("s:v", ns).text) for c in row])
 headers, *rows = records
 assert headers == ["Id", "Region", "Amount"]
-expected = {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.excel"}, {"type": "exports.text"}], "outputs": [{"output_node_type": "imports.excel", "output_port": 0, "columns": [{"name": n, "label": n, "type": t} for n, t in zip(headers, ["integer", "string", "real"])], "rows": [dict(zip(headers, [int(r[0]), r[1], r[2]])) for r in rows]}]}
+expected = {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.excel"}, {"type": "exports.text"}], "outputs": [{"output_node_type": "imports.excel", "output_port": 0, "columns": [{"name": n, "label": n, "label_any": True, "type": t} for n, t in zip(headers, ["integer", "string", "real"])], "rows": [dict(zip(headers, [int(r[0]), r[1], r[2]])) for r in rows]}]}
 (root / "expected.json").write_text(json.dumps(expected, ensure_ascii=False, indent=2) + "\n")

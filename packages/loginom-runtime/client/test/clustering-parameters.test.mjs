@@ -9,10 +9,13 @@ test('fixed clustering admits numeric feature roles and preserves omitted existi
  validateClusteringParameters({},'k_means',{...request,target:{kind:'existing'},inputs:[]});
 });
 test('unsupported training modes and malformed requests refuse before UI work',()=>{
- for(const patch of [{clusters:1},{clusters:2.5},{seed:-1},{seed:2147483648},{normalization:'standardize'},{auto:true},{features:[]},{features:[p.features[0],p.features[0]]}])
+ for(const patch of [{clusters:1},{clusters:2.5},{seed:-1},{seed:2147483648},{normalization:'minmax'},{auto:true},{features:[]},{features:[p.features[0],p.features[0]]}])
   assert.throws(()=>validateClusteringParameters({...p,...patch},'k_means',request),/Clustering:/);
  assert.throws(()=>validateClusteringParameters(p,'g_means',request),/fixed k_means/);
  assert.throws(()=>validateClusteringParameters(p,'k_means',{...request,mappings:[{direction:'output',port:0}]}),/mapping overrides/);
+});
+test('standardization is admitted through the production validator',()=>{
+ validateClusteringParameters({...p,normalization:'standardize'},'k_means',request);
 });
 test('identifiers, strings, unknown and discrete numeric fields cannot become features',()=>{
  for(const field of [{name:'X',type:'string',data_kind:'Дискретный'},{name:'X',type:'real',data_kind:'Дискретный'},{name:'Other',type:'real',data_kind:'Непрерывный'}])

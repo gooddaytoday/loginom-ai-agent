@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    }
+  ],
+  "outputs": [],
+  "execution_error": {
+    "text": "LAB669 intentional execution failure"
+  }
+}

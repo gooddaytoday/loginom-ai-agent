@@ -113,7 +113,8 @@ for (const [name, codec] of [
       f.runtime.prepare = prepare
       const restarted = await f.start()
       expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 2, state: "ready" })
-      expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: original.apiKey, password: original.password })
+      // The new generation does not carry the saved key forward; Help uses the built-in key.
+      expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: "", password: original.password })
       expect(await f.store.latestGeneration()).toBe(2)
       expect(await f.store.pending()).toBeUndefined()
     } finally { await f.close() }

@@ -3,7 +3,7 @@ import {observeReplacementOutputPolicy} from './replacement-output.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
+const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,...(r.result_type&&r.result_type!==r.input_fields.find(f=>f.name===r.selected).type?{result_type:r.result_type}:{}),pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
 const pairKeys=ps=>ps.map(p=>[replacementValueKey(p.from),replacementValueKey(p.to)]);
 export function replacementRealEditorText(value,separator){
  need(typeof value==='number'&&Number.isFinite(value),'Finite replacement real required');
@@ -99,6 +99,14 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    r=(await observe('replacement row deleted',r=>!r.pairs.some(p=>p.record_id===row.record_id))).node_replacement;
   }
   need(r.pairs.length===0,'Replacement table not cleared');
+  const resultType=rule.result_type??rule.type;
+  if((r.result_type??rule.type)!==resultType){
+   // The button is a split button: its body does not open the type menu.
+   // Clear old pairs first: Loginom otherwise converts their saved constants.
+   await act('btnTypeChange','press',{key:'ArrowDown'});
+   await act('itmTypeChange'+{string:'Str',integer:'Int',real:'Float',datetime:'DTime'}[resultType]);
+   r=(await observe('replacement result type applied',r=>r.result_type===resultType&&r.pairs.length===0)).node_replacement;
+  }
   for(const pair of rule.pairs){
    const before=r.pairs.map(p=>p.record_id);await act(add);
    r=(await observe('replacement row added',r=>r.pairs.length===before.length+1)).node_replacement;
@@ -106,32 +114,36 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    await gesture(rule.field.name,'pair','from',added[0].record_id,'double_click');
    await observe('replacement row editor opened',r=>r.editor_open);
    for(const [side,value] of [['ReplaceEditor',pair.from],['ReplaceEditor-1',pair.to]]){
-    const kind=rule.type==='string'?'txt':rule.type==='real'?'num':'Int64Field',suffix=side+';fldVariant;ValueContainer;'+kind;
+    const kind={string:'txt',real:'num',integer:'Int64Field',datetime:'datetimefield'}[value.type],suffix=side+';fldVariant;ValueContainer;'+kind;
     if(value.value===null)await act(suffix+';trg_SetNullTrigger');
     else{
      const s=await observe('typed replacement editor');const es=s.ui.elements.filter(e=>e.allowed_actions.includes('fill')&&(e.identity?.anchor_tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid?.startsWith(s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix+';')));
-     need(es.length===1,'Typed replacement input unavailable');const text=rule.type==='real'?replacementRealEditorText(value.value,s.node_replacement.real_decimal_separators?.[side==='ReplaceEditor'?'from':'to']):String(value.value);await channel.perform({condition:'fill typed replacement value',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id,side}),resolve:()=>({verb:'fill',ref:es[0].ref,text})});
+     need(es.length===1,'Typed replacement input unavailable');const text=value.type==='real'?replacementRealEditorText(value.value,s.node_replacement.real_decimal_separators?.[side==='ReplaceEditor'?'from':'to']):String(value.value);await channel.perform({condition:'fill typed replacement value',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id,side}),resolve:()=>({verb:'fill',ref:es[0].ref,text})});
+     if(value.type==='datetime')await act(suffix,'press',{key:'Tab'});
     }
    }
    const s=await observe('replacement row ready to commit');await channel.perform({condition:'commit replacement row',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid==='roweditorbuttons;update'&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement row update unavailable');return {verb:'click',ref:es[0].ref};}});
    r=(await observe('replacement pair committed',r=>!r.editor_open&&r.pairs.some(p=>p.record_id===added[0].record_id&&same(pairKeys([p]),pairKeys([pair]))))).node_replacement;
   }
   if(mode==='exact'&&rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
-  if(rule.type!=='string'&&r.precision!==0)await act('edPrecision','fill',{text:'0'});
+  if(rule.type!=='string'&&r.precision!==rule.precision){
+   await act('edPrecision','fill',{text:replacementRealEditorText(rule.precision,r.precision_decimal_separator)});
+   await act('edPrecision','press',{key:'Tab'});
+  }
   if(r.other.mode!==rule.other.mode){await act('cbxReplaceOther;trg_picker');await act('cbxReplaceOther;boundlist;'+{keep:'Не_заменять',null:'На_пропущенное',value:'На_значение'}[rule.other.mode]);}
   if(rule.other.mode==='value'){
    need(rule.other.value.value!==null,'Use remaining null mode for Null');
-   const suffix=rule.type==='string'?'edtReplaceOther':rule.type==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt';
+   const suffix=resultType==='string'?'edtReplaceOther':resultType==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt';
    const current=await observe('remaining replacement editor format');
-   await act(suffix,'fill',{text:rule.type==='real'?replacementRealEditorText(rule.other.value.value,current.node_replacement.real_decimal_separators?.other):String(rule.other.value.value)});
+   await act(suffix,'fill',{text:resultType==='real'?replacementRealEditorText(rule.other.value.value,current.node_replacement.real_decimal_separators?.other):String(rule.other.value.value)});
    await act('cbxReplaceOther','press',{key:'Tab'});
   }
   r=(await observe('complete replacement field readback')).node_replacement;
-  need(same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===0),'Replacement field readback differs');
+  need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===rule.precision),'Replacement field readback differs');
  }
  const expected=oldRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]),rules=[];
  for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name),mode));}
- for(const rule of expected){const actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:rule.type==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
+ for(const {result_type,...baseRule} of expected){const rule={...baseRule,...(result_type&&result_type!==baseRule.type?{result_type}:{})},actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:(rule.result_type??rule.type)==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
  state=await observe('replacement final owner');
  const schema=fields=>fields.map(({record_id,name,label,type})=>({record_id,name,label,type}));
  need(same(schema(state.node_replacement.input_fields),schema(baseline.input_fields)),'Replacement input identity changed');

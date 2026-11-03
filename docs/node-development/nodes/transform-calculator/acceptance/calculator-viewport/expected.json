@@ -1,0 +1,88 @@
+{
+  "nodes": [
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "finance.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Id",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Quantity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "UnitCost",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Cost",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Profit",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": "A",
+          "Quantity": 2,
+          "Price": 100,
+          "UnitCost": 60,
+          "Amount": 46,
+          "Revenue": 200,
+          "Cost": 120,
+          "Profit": 80
+        },
+        {
+          "Id": "B",
+          "Quantity": -1,
+          "Price": 20,
+          "UnitCost": 12,
+          "Amount": 56,
+          "Revenue": -20,
+          "Cost": -12,
+          "Profit": -8
+        },
+        {
+          "Id": "C",
+          "Quantity": 5,
+          "Price": 0,
+          "UnitCost": 1,
+          "Amount": 36,
+          "Revenue": 0,
+          "Cost": 5,
+          "Profit": -5
+        }
+      ]
+    }
+  ]
+}

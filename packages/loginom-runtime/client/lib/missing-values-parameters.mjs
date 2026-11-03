@@ -17,8 +17,8 @@ export function validateMissingValuesParameters(p,mode,r){
   for(const f of p.fields){
    need(object(f,['field','method','value'])&&object(f.field,['kind','name'])&&f.field.kind==='input_field'&&name(f.field.name),'Exact input field name required');
    need(!seen.has(f.field.name.toLowerCase()),'Duplicate missing values field');seen.add(f.field.name.toLowerCase());
-   need(['mean','constant'].includes(f.method),'Unsupported missing values method');
-   need(f.method==='mean'?!Object.hasOwn(f,'value'):typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value),'Only string constant accepts an explicit replacement value');
+   need(['mean','zero','constant'].includes(f.method),'Unsupported missing values method');
+   need(f.method!=='constant'?!Object.hasOwn(f,'value'):typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value),'Only string constant accepts an explicit replacement value');
   }
  }
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Missing values accepts one input');
@@ -39,10 +39,10 @@ export function resolveMissingValuesParameters(p,fields){
  need(Array.isArray(fields)&&fields.length<=1000&&fields.every(f=>name(f.name))&&new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Complete unique input schema required');
  need(Array.isArray(p.fields),'Complete processing fields required');
  return p.fields.map(f=>{
-  need(['mean','constant'].includes(f.method)&&(f.method!=='constant'||typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value)),'Unsupported saved missing values method/value');
+  need(['mean','zero','constant'].includes(f.method)&&(f.method!=='constant'||typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value)),'Unsupported saved missing values method/value');
   const matches=fields.filter(s=>s.name===f.field.name);need(matches.length===1,'Missing values input field is missing: '+f.field.name);
   const source=matches[0];
-  need(f.method==='mean'?['integer','real'].includes(source.type)&&source.data_kind==='Непрерывный':f.method==='constant'&&source.type==='string'&&source.data_kind==='Дискретный','Missing values method is incompatible with type/data kind: '+source.name);
+  need(f.method==='zero'?['integer','real'].includes(source.type)&&['Непрерывный','Дискретный'].includes(source.data_kind):f.method==='mean'?['integer','real'].includes(source.type)&&source.data_kind==='Непрерывный':f.method==='constant'&&source.type==='string'&&source.data_kind==='Дискретный','Missing values method is incompatible with type/data kind: '+source.name);
   return {...source,method:f.method,...(f.method==='constant'?{value:f.value}:{})};
  });
 }

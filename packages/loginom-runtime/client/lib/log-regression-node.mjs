@@ -7,7 +7,7 @@ import {logRegressionParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression: '+m);};
 export function createLogRegressionNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'datamining.log_regression',modes:['enter'],revision:'log-regression-v1-internal-1',parameterSchema:logRegressionParametersSchema,
+ type:'datamining.log_regression',modes:['enter','forward','backward','stepwise'],revision:'log-regression-v1-internal-1',parameterSchema:logRegressionParametersSchema,
  validate:validateLogRegressionParameters,validateInput:(p,resolved,native)=>resolveLogRegressionRoles(p,resolved.fields??native.target_fields),readback:logRegressionConfigurationReadback,
  configurationObservation:{condition:'logistic feature roles',readLogRegression:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_logregression?.verified===true},
  async configure(channel,p,context){

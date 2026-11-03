@@ -47,7 +47,7 @@ def expected(no_repeat=False):
         'proposal': 'Owner approval and tree_io required; not a runnable v0.3.8 scenario.',
         'package_path': '{{PACKAGE_PATH}}',
         'nodes': [{'type': 'imports.text'}, {'type': 'trees.from_json'}, {'type': 'trees.to_table'}],
-        'outputs': [{'output_node_type': 'trees.to_table', 'output_port': 0, 'ordered': True,
+        'outputs': [{'output_node_type': 'trees.to_table', 'output_port': 0, 'export_destination': 'tree-result.csv', 'ordered': True,
                      'column_order': 'exact', 'columns': columns, 'rows': rows}],
         'proposed_tree_output': {
             'output_node_type': 'trees.from_json', 'output_port': 0, 'port_kind': 'tree',

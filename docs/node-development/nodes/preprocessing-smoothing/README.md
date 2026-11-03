@@ -1,23 +1,21 @@
 # Сглаживание
 
-Устойчивый ID: `component.preprocessing.Smoothing`. Slug: `preprocessing-smoothing`. Исторический номер не назначен.
+Component ID: `component.preprocessing.Smoothing`, slug `preprocessing-smoothing`.
+Предложение runtime: `preprocessing.smoothing`, mode `hodrick_prescott`.
 
-[Подплан](plan.md) · [реестр](../../registry.json).
+[Подплан](plan.md) · [исследование](discovery.md) ·
+[приёмочный комплект](acceptance/README.md) · [реестр](../../registry.json).
 
-## Состояние
+Этап 0 LAB-642: `ready_for_development` на базе v039@3377e6b164bcf509a050fb1536bae8dbf8bece39.
+На стенде Loginom 7.4.2 подтверждены компонент, мастер, порты и HP-числа.
+Критерии — предложение для утверждения владельцем до отдельной карточки этапа 1.
+Обработчика и модельной приёмки пока нет; implementation/integration/release
+не повышаются. Runtime-код в docs-PR не изменён.
 
-Обработчика нет; `discovery_required`. Следующая карточка Multica — этап 0 (живое исследование), отдельно от реализации. Назначение этапа 1 требует закреплённого контракта и решения владельца по общим изменениям: W2.
-Живые наблюдения, CLI и численная приёмка не выполнялись; готовность реестра не менялась.
+Этап 1 — HP для выбранных continuous integer/real полей, lambda либо период,
+NULL, порядок, повторное выполнение прежнего узла, сохранение и cold reopen.
+Этап 2 — вейвлеты отдельным назначением с собственным oracle.
+Старые W2/W3 уже доступны в базе: tolerance, ordered и output_port.
+Для фиксированного порядка полей применяется существующий mappings с autosync=false.
 
-## Планируемый объём по этапам
-
-- Этап 1 — Ходрик–Прескотт.
-- Этап 2 — Три семейства вейвлетов.
-
-Общие изменения: W2 — допуск вещественных колонок, объявленный в expected.json до прогона.
-
-## Источники
-
-- [Сглаживание](https://help.loginom.ru/userguide/processors/preprocessing/smoothing.html) — `loginom-help@353e506b:data/processors/preprocessing/smoothing.md`.
-- `e2e-tests@486caef44:tests/toreview/acceptance/wizards/preprocessing/Smoothing/smoothing.ts и smoothing_helpers.ts — настройка HP/wavelet; :toreview` — прочитанные исходники, не результат выполнения.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; обработчика нет.
+[Loginom Help](https://help.loginom.ru/userguide/processors/preprocessing/smoothing.html).

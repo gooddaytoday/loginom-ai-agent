@@ -172,11 +172,16 @@ it.live("loads bundled skill resources without an external search executable", (
       const automation = yield* tool.execute({ name: "loginom-automation" }, context)
       expect(permissions).toEqual(["skill", "skill"])
       expect(activated.map((skill) => skill.name)).toEqual(["package-docs", "loginom-automation"])
+      expect(automation.metadata).toMatchObject({ truncated: false })
       expect(automation.output).toContain('<skill_content name="loginom-automation">')
       expect(automation.output).toContain(
         `<file>${join(resources, "skills/loginom-automation/references/browser.md")}</file>`,
       )
       expect(automation.output.match(/<file>/g)?.length).toBeLessThanOrEqual(10)
+      expect(automation.output).toContain(
+        `<file>${join(resources, "skills/loginom-automation/references/node-settings.md")}</file>`,
+      )
+      expect(automation.output).toEndWith("</skill_content>")
     }).pipe(
       Effect.provide(
         Layer.mock(Ripgrep.Service, {

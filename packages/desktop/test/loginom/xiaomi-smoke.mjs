@@ -31,7 +31,6 @@ try {
   const page = await application.firstWindow()
   const form = page.locator('[data-component="settings-loginom"]')
   await form.waitFor({ timeout: 120000 })
-  await form.locator('input[type="password"]').first().fill(config.api_key)
   await form.locator('input[type="url"]').fill(config.loginom_url)
   await form.locator('input[autocomplete="username"]').fill(config.workflow_profile.loginom_user)
   await form.locator('button[type="submit"]').click()

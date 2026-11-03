@@ -39,7 +39,7 @@ try {
     }
   })
   if (
-    result.fields !== 4 ||
+    result.fields !== 3 ||
     !result.urlDefault ||
     !result.usernameDefault ||
     !result.secretValuesEmpty ||
@@ -56,7 +56,6 @@ try {
   if (process.env.LOGINOM_AI_AGENT_TEST_CONFIG) {
     const config = JSON.parse(await readFile(process.env.LOGINOM_AI_AGENT_TEST_CONFIG, "utf8"))
     if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
-    await form.locator('input[type="password"]').first().fill(config.api_key)
     await form.locator('input[type="url"]').fill(config.loginom_url)
     await form.locator('input[autocomplete="username"]').fill(config.workflow_profile.loginom_user)
     await form.locator('button[type="submit"]').click()
@@ -101,16 +100,17 @@ try {
       throw Error(`NEW_CHAT_BRANDING_INVALID: ${JSON.stringify(brand)}`)
     console.log(JSON.stringify({ status: "PASS", newChatBrand: brand }))
     const safe = await page.evaluate(() => window.api.loginom.read())
-    if (!safe.hasApiKey || JSON.stringify(safe).includes(config.api_key)) throw Error("SECRET_READBACK_INVALID")
+    if (!safe.generation || "hasApiKey" in safe) throw Error("SECRET_READBACK_INVALID")
     const file = join(profile, "desktop/loginom/connection/connection.json")
     if (process.platform !== "win32" && (await stat(file)).mode % 512 !== 0o600)
       throw Error("SECRET_PERMISSIONS_INVALID")
     const stored = JSON.parse(await readFile(file, "utf8"))
     if (process.platform === "linux") {
-      if (stored.secrets?.apiKey !== config.api_key) throw Error("PLAINTEXT_POLICY_NOT_APPLIED")
+      // The built-in knowledge key is never stored with the connection.
+      if (stored.secrets?.apiKey !== "" || typeof stored.secrets?.password !== "string")
+        throw Error("PLAINTEXT_POLICY_NOT_APPLIED")
     } else {
-      if (!stored.secrets?.encrypted || JSON.stringify(stored).includes(config.api_key))
-        throw Error("SECRET_PROTECTION_INVALID")
+      if (!stored.secrets?.encrypted) throw Error("SECRET_PROTECTION_INVALID")
     }
     console.log("PASS: GUI connection check/save, safe IPC readback and platform credential storage")
     await application.close()
@@ -135,7 +135,7 @@ async function waitReady(page) {
     const current = await page.evaluate(() => window.api.loginom.status())
     if (current.failure || current.state === "recoverable-error")
       throw Error(current.failure ?? "RUNTIME_RESTORE_FAILED")
-    if (current.state === "ready" && current.hasApiKey) return
+    if (current.state === "ready" && current.generation) return
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
   throw Error("CONNECTION_READINESS_TIMEOUT")

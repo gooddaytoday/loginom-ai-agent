@@ -34,6 +34,9 @@ export async function stageResources(input: {
   browsers: string
   target: { platform: string; arch: string }
   flavor: "desktop" | "cli"
+  // Built-in knowledge service key; never committed. release.yml requires it,
+  // local and PR builds may stage without it.
+  knowledgeKey?: string
 }) {
   const target = `${input.target.platform}-${input.target.arch}`
   if (input.target.platform !== process.platform || input.target.arch !== process.arch)
@@ -100,6 +103,7 @@ export async function stageResources(input: {
   }
   await rm(staging, { recursive: true, force: true })
   await mkdir(join(staging, "bin"), { recursive: true })
+  if (input.knowledgeKey?.trim()) await Bun.write(join(staging, "knowledge-key"), input.knowledgeKey.trim())
   await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
   await cp(node, join(staging, pins.node))
   await cp(browsers, join(staging, "browsers"), {

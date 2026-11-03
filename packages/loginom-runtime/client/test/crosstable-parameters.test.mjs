@@ -44,6 +44,21 @@ test('ordered dimensions replace legacy column while all roles remain distinct',
  assert.deepEqual(plan.keys.map(f=>f.name),['Region','Month']);
  assert.throws(()=>validateCrossTableParameters({...parameters,columns:[field('Region')]},'pivot',r));
 });
+test('row keys admit continuous integer/real and discrete real without granting continuous column roles',()=>{
+ for(const type of ['integer','real'])for(const data_kind of ['Дискретный','Непрерывный']){
+  const xs=structuredClone(fields);Object.assign(xs[0],{type,data_kind});
+  for(const category_mode of ['fixed','sliding']){
+   const plan=resolveCrossTableParameters({...p,category_mode},xs);
+   assert.equal(plan.keys[0].type,type);assert.equal(plan.keys[0].data_kind,data_kind);
+  }
+  Object.assign(xs[1],{type,data_kind:'Непрерывный'});
+  assert.throws(()=>resolveCrossTableParameters(p,xs),/column dimensions require supported discrete fields/);
+ }
+ for(const patch of [{type:'variant'},{data_kind:'Неопределенное'},{type:'unknown'}]){
+  const xs=structuredClone(fields);Object.assign(xs[0],patch);
+  assert.throws(()=>resolveCrossTableParameters(p,xs),/row keys require supported/);
+ }
+});
 test('upstream name, kind, type and label are verified rather than inferred',()=>{
  for(const mutate of [xs=>xs[1].data_kind='Непрерывный',xs=>xs[2].type='string',xs=>xs[0].data_kind='Непрерывный',
   xs=>xs[1].name='Other',xs=>xs[2].label='A|B',xs=>xs[1].label=xs[0].label]){

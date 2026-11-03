@@ -4,6 +4,24 @@ import {validateReplacementParameters,validateReplacementValue,resolveReplacemen
 const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
+test('exact replacement distinguishes the input key type from the result type',()=>{
+ const p=params();p.rules[0].result_type='integer';p.rules[0].other={mode:'null'};
+ p.rules[0].pairs=[{from:value('unknown'),to:value(0,'integer')},{from:value(null),to:value(null,'integer')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ p.rules[0].pairs[0].to=value('0');
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/typed value/);
+ p.rules[0].pairs[0].to=value(0,'integer');p.rules[0].pairs[0].from=value(1,'integer');
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/typed value/);
+});
+test('conversion policies refuse Variant and validate real and datetime result literals',()=>{
+ const p=params(),r=p.rules[0];r.result_type='real';r.pairs=[{from:value('1.25'),to:value(1.25,'real')}];
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/produces Variant/);
+ r.other={mode:'value',value:value(-5.25,'real')};assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ r.other.value.value=-5.125;assert.throws(()=>validateReplacementParameters(p,'exact',request),/two decimal/);
+ r.result_type='datetime';r.other={mode:'null'};r.pairs=[{from:value('2024-02-29'),to:value('2024-02-29T00:00:00','datetime')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ for(const date of ['2023-02-29T00:00:00','2024-02-29','2024-02-29T00:00:00Z','2024-02-29T00:00:00.123']){r.pairs[0].to.value=date;assert.throws(()=>validateReplacementParameters(p,'exact',request),/datetime|calendar/);}
+});
 test('Null, empty string and literal null remain three distinct keys',()=>assert.equal(validateReplacementParameters(params(),'exact',request).rules[0].pairs.length,3));
 test('regex accepts ordered string constants and inline case flag, refusing unsupported semantics',()=>{
  const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Code'},type:'string',pairs:[{from:value('(?i)AB-([0-9]{2})'),to:value('SKU-$1')},{from:value('^AB-00$'),to:value('ZERO')}],other:{mode:'null'}}]};
@@ -24,7 +42,21 @@ test('case folding rejects conflicting keys before mutation',()=>{const p=params
 test('integers retain Int64 boundaries and reject rounded JS numbers',()=>{for(const n of ['9223372036854775807','-9223372036854775808'])assert.doesNotThrow(()=>validateReplacementValue(value(n,'integer'),'integer'));for(const n of [9223372036854775807,'9223372036854775808','-9223372036854775809'])assert.throws(()=>validateReplacementValue(value(n,'integer'),'integer'));});
 test('generated names cannot collide with retained source fields',()=>{const p=params(),f=[{name:'Category',type:'string'},{name:'Category_Replace',type:'string'}];assert.throws(()=>resolveReplacementParameters(p,f),/collision/);p.output_mode='replace';assert.doesNotThrow(()=>resolveReplacementParameters(p,f));});
 test('unknown fields and incompatible types fail source preflight',()=>{assert.throws(()=>resolveReplacementParameters(params(),[{name:'Other',type:'string'}]),/missing/);assert.throws(()=>resolveReplacementParameters(params(),[{name:'Category',type:'integer'}]),/type mismatch/);});
-test('unsupported modes and nonzero precision are refused',()=>{assert.throws(()=>validateReplacementParameters(params(),'regex',request));const p=params();p.rules[0]={field:{kind:'input_field',name:'Amount'},type:'real',precision:0.001,pairs:[],other:{mode:'keep'}};assert.throws(()=>validateReplacementParameters(p,'exact',request),/precision zero/);});
+test('numeric nearest precision accepts native hundredths and rejects rounding before mutation',()=>{
+ for(const type of ['integer','real']){
+  const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Amount'},type,precision:0,pairs:[],other:{mode:'keep'}}]};
+  for(const precision of [0,0.01,0.07,0.25,0.29,1,1.25,100]){p.rules[0].precision=precision;assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));}
+  for(const precision of [undefined,null,'0.25',-1,0.001,NaN,Infinity]){p.rules[0].precision=precision;assert.throws(()=>validateReplacementParameters(p,'exact',request),/precision/);}
+ }
+});
+test('nonzero precision reserves Delta names and partial patches preserve saved tolerance',async()=>{
+ const {resolveEffectiveReplacementParameters:resolve}=await import('../lib/replacement-parameters.mjs');
+ const r={field:{kind:'input_field',name:'Amount'},type:'real',precision:0.25,pairs:[],other:{mode:'keep'}};
+ const fields=[{name:'Amount',type:'real'},{name:'Amount_Delta',type:'real'}];
+ for(const output_mode of ['add','replace'])assert.throws(()=>resolveReplacementParameters({rules:[r],output_mode},fields),/collision: Amount_Delta/);
+ assert.doesNotThrow(()=>resolveReplacementParameters({rules:[{...r,precision:0}],output_mode:'replace'},fields));
+ assert.equal(resolve({},fields.slice(0,1),[r],'replace').rules[0].precision,0.25);
+});
 
 test('remaining real values that Loginom would round are rejected before mutation',()=>{const p=params();p.rules=[{field:{kind:'input_field',name:'Amount'},type:'real',precision:0,pairs:[],other:{mode:'value',value:value(-5.125,'real')}}];assert.throws(()=>validateReplacementParameters(p,'exact',request),/two decimal/);p.rules[0].other.value.value=-5.25;assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));});
 

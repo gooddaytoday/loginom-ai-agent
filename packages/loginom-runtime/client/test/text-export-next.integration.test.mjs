@@ -49,7 +49,7 @@ async function fixture(t,{fault,deadline=30000}={}){
    }
    if(this.preview)for(const [key,at]of Object.entries({delimiter:9700,encoding:14400,bom:14400,line_ending:17000,header:19500})){
     if(time<at||this[key])continue;this[key]=true;const [card,id]=fields[key];
-    control(this.preview,base+';'+card+';'+id+';ValueControl',fault==='unsupported'&&key==='encoding'?1251:values[key]);control(this.preview,base+';'+card+';'+id+';SwitchButton',false);
+    control(this.preview,base+';'+card+';'+id+';ValueControl',fault==='unsupported'&&key==='encoding'?1252:values[key]);control(this.preview,base+';'+card+';'+id+';SwitchButton',false);
    }
    if(time>=19700&&fault!=='deadline')this.masked=false;
    if(time>=10000&&fault==='owner')node.FGuid='foreign';

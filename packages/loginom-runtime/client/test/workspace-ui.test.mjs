@@ -878,6 +878,17 @@ test('context menu wrapper keeps its E2E identity alongside the anonymous ARIA c
   assert.equal((await page.act({verb:'click',ref:target.ref},snapshot)).status,'NOT_APPLIED');
 });
 
+test('Union detached automatic menu is discoverable and its exact wrapper can be clicked',async()=>{
+ const page=new Page(),menu=page.add('div','mnUnionGrid','',{x:30,y:100,width:220,height:60});
+ const wrapper=page.add('div','mnUnionGrid;mniLinksAuto','',{x:30,y:100,width:220,height:25},menu);
+ const inner=page.add('a',null,'Автоматически связать все поля',wrapper.box,wrapper);inner.attrs.role='menuitem';
+ const roots=await page.execute({mode:'observe',discover_roots:true}),root=roots.output.ui.elements.find(e=>e.tid==='mnUnionGrid');
+ assert.ok(root?.ref,'detached menu root must be discoverable');
+ const detail=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=detail.output.ui.elements.find(e=>e.tid==='mnUnionGrid;mniLinksAuto');assert.ok(target?.allowed_actions.includes('click'));
+ assert.equal((await page.act({verb:'click',ref:target.ref},detail.output)).status,'SUCCEEDED');
+});
+
 test('node settings affordance without button role is observable and guarded', async () => {
   const page = new Page();
   const settings = page.add('g', 'MF;TF-1;Graph;Текстовый_файл;Setting', '', {x:30,y:50,width:20,height:20});
@@ -1682,6 +1693,31 @@ function wizardStepFixture(page,direction='next') {
   return {base,form,marker,button,advance};
 }
 
+test('replacement type portal exposes only items owned by the selected field and split button',async()=>{
+ for(const foreign of [false,true]){
+  const page=new Page(),c=wizardStepFixture(page),base=c.base+';ReplaceColumnsWizard;';
+  page.context.innerWidth=1000;page.context.innerHeight=800;
+  c.marker.attrs['data-tid']=base+'grdDataList;tbl';
+  const grid=page.add('div',base+'grdDataList','',undefined,c.form);grid.id='replace-input';
+  const button=page.add('a',base+'btnTypeChange','Изменить тип замены',undefined,c.form);button.id='replace-type';
+  const menu=page.add('div',base+'btnTypeChange;mn','',{x:200,y:150,width:200,height:160});menu.id='replace-menu';
+  const item=page.add('div',base+'itmTypeChangeInt','Целый',{x:220,y:180,width:160,height:24},menu);item.id='replace-integer';item.attrs.role='menuitemcheckbox';
+  const selected={isModel:true,internalId:'field',data:{Name:'Code',ReplaceMode:1}},nativeMenu={el:{dom:foreign?{}:menu}};
+  const components={
+   'replace-input':{el:{dom:grid},getSelectionModel:()=>({getSelection:()=>[selected]}),getStore:()=>({getData:()=>({items:[selected]})})},
+   'replace-type':{el:{dom:button},menu:nativeMenu},
+   'replace-integer':{el:{dom:item},ownerCt:nativeMenu},
+  };
+  page.context.Ext={getCmp:id=>components[id]};
+  const roots=(await page.execute({mode:'observe',discover_roots:true})).output;
+  const root=roots.ui.elements.find(e=>e.tid===base+'btnTypeChange;mn');assert.ok(root);
+  const observed=(await page.execute({mode:'observe',root_ref:root.ref})).output;
+  const control=observed.ui.elements.find(e=>e.tid===base+'itmTypeChangeInt');
+  if(foreign)assert.equal(control?.replacement_field,undefined);
+  else{assert.equal(control?.replacement_field?.field_key,'Code');assert.ok(control.allowed_actions.includes('click'),JSON.stringify(control));}
+ }
+});
+
 test('calculator Preview rejects a native formula error before Next or Done',async()=>{
  const page=new Page(),c=wizardStepFixture(page);
  c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
@@ -1804,6 +1840,25 @@ test('supported transforms accept only owned conditional destinations after one 
  }
  const page=new Page();wizardStepFixture(page);const s=await page.observe(),b=s.ui.elements.find(e=>e.wizard_step);
  assert.throws(()=>validateUiAction({verb:'wizard_step',ref:b.ref,expected_stage:['output_mapping','done']},s),/supported transform/);
+});
+
+test('JSON tree conditional Next reaches only its owned tree output mapping or done',async()=>{
+ for(const destination of ['done','tree_output_mapping','input_mapping']){
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';JSONToTreeWizard;pedSourceColumn';
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+  assert.equal(snapshot.wizard.stage,'json_tree');
+  page.waitForTimeout=async ms=>page.clock.advance(ms);const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);c.marker.remove();
+   const marker=destination==='done'?';DoneWizard;edtDisplayName':destination==='tree_output_mapping'?';DataTreeNodesMappingEngineOutputPortWizard':';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+   page.add('div',c.base+marker,'',undefined,c.form);
+  };
+  const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:['tree_output_mapping','done']},snapshot);
+  assert.equal(result.status,destination==='input_mapping'?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+ }
+ const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+ const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ assert.throws(()=>validateUiAction({verb:'wizard_step',ref:button.ref,expected_stage:['tree_output_mapping','done']},snapshot),/JSON tree/);
 });
 
 test('wizard transition waits through a transient mask without repeating its click',async()=>{

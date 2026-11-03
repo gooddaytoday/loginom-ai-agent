@@ -1,0 +1,62 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "export_destination": "sheet-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "label_any": true,
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Region": "Север",
+          "Amount": 10.0
+        },
+        {
+          "Id": 2,
+          "Region": null,
+          "Amount": -2.5
+        },
+        {
+          "Id": 3,
+          "Region": "Юг",
+          "Amount": null
+        },
+        {
+          "Id": 4,
+          "Region": "Запад",
+          "Amount": 0.0
+        }
+      ]
+    }
+  ]
+}

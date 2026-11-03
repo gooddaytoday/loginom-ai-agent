@@ -1,0 +1,174 @@
+{
+  "series": {
+    "1": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      }
+    ],
+    "4": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      },
+      {
+        "lag": 1,
+        "acf": 0.47023809523809523,
+        "error": 0.3535533905932738,
+        "significant": true
+      },
+      {
+        "lag": 2,
+        "acf": 0.25,
+        "error": 0.42459506185692736,
+        "significant": false
+      },
+      {
+        "lag": 3,
+        "acf": -0.005952380952380952,
+        "error": 0.4426126597300262,
+        "significant": false
+      }
+    ],
+    "8": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      },
+      {
+        "lag": 1,
+        "acf": 0.47023809523809523,
+        "error": 0.3535533905932738,
+        "significant": true
+      },
+      {
+        "lag": 2,
+        "acf": 0.25,
+        "error": 0.42459506185692736,
+        "significant": false
+      },
+      {
+        "lag": 3,
+        "acf": -0.005952380952380952,
+        "error": 0.4426126597300262,
+        "significant": false
+      },
+      {
+        "lag": 4,
+        "acf": -0.2857142857142857,
+        "error": 0.4426226657809545,
+        "significant": false
+      },
+      {
+        "lag": 5,
+        "acf": -0.27976190476190477,
+        "error": 0.4651053509994748,
+        "significant": false
+      },
+      {
+        "lag": 6,
+        "acf": -0.44047619047619047,
+        "error": 0.485684741748541,
+        "significant": false
+      },
+      {
+        "lag": 7,
+        "acf": -0.20833333333333334,
+        "error": 0.5332864961364119,
+        "significant": false
+      }
+    ]
+  },
+  "update": {
+    "1": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      }
+    ],
+    "4": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      },
+      {
+        "lag": 1,
+        "acf": -0.8154761904761905,
+        "error": 0.3535533905932738,
+        "significant": true
+      },
+      {
+        "lag": 2,
+        "acf": 0.6309523809523809,
+        "error": 0.5396761568833572,
+        "significant": true
+      },
+      {
+        "lag": 3,
+        "acf": -0.47023809523809523,
+        "error": 0.6251204532454202,
+        "significant": false
+      }
+    ],
+    "8": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true
+      },
+      {
+        "lag": 1,
+        "acf": -0.8154761904761905,
+        "error": 0.3535533905932738,
+        "significant": true
+      },
+      {
+        "lag": 2,
+        "acf": 0.6309523809523809,
+        "error": 0.5396761568833572,
+        "significant": true
+      },
+      {
+        "lag": 3,
+        "acf": -0.47023809523809523,
+        "error": 0.6251204532454202,
+        "significant": false
+      },
+      {
+        "lag": 4,
+        "acf": 0.30952380952380953,
+        "error": 0.6678746496304884,
+        "significant": false
+      },
+      {
+        "lag": 5,
+        "acf": -0.19642857142857142,
+        "error": 0.6855711449474667,
+        "significant": false
+      },
+      {
+        "lag": 6,
+        "acf": 0.08333333333333333,
+        "error": 0.6925704590169492,
+        "significant": false
+      },
+      {
+        "lag": 7,
+        "acf": -0.041666666666666664,
+        "error": 0.6938227092089585,
+        "significant": false
+      }
+    ]
+  }
+}

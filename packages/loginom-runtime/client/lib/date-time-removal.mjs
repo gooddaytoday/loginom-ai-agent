@@ -54,11 +54,11 @@ export function planDateTimeRemovals(original,parameters,baseline){
   need(matrix&&input,'original date field required');
   const wanted=field.transformations.map(t=>DATE_TIME_OPERATIONS[t.operation]);
   for(const row of matrix)for(const [flag,key] of Object.entries({DoDateTimeFirst:'first',DoDateTimeLast:'last',DoNumber:'number',DoString:'string'})){
-   if(!row[key]||!row.iso&&wanted.some(o=>o.func===row.func&&o.flag===flag))continue;
-   const op=Object.values(DATE_TIME_OPERATIONS).find(o=>!row.iso&&o.func===row.func&&o.flag===flag);
+   if(!row[key]||wanted.some(o=>o.func===row.func&&o.iso===row.iso&&o.flag===flag))continue;
+   const op=Object.values(DATE_TIME_OPERATIONS).find(o=>o.iso===row.iso&&o.func===row.func&&o.flag===flag);
    need(op,'removing ISO/string/unsupported transformations is not supported');
    need(baseline,'original output bindings required before removing a transformation');
-   const label=input.label+' ('+op.label+(op.type==='datetime'&&op.func!==16?', '+(flag==='DoDateTimeFirst'?'Первый день':'Последний день'):'')+')';
+   const label=input.label+' ('+op.label+(op.type==='datetime'&&op.func!==16?', '+(flag==='DoDateTimeFirst'?'Первый день':'Последний день'):'')+(op.iso?', ISO8601':'')+')';
    const pattern=new RegExp('^'+escape(input.name+'_'+op.suffix)+'_[0-9]+$');
    const sources=baseline.source_fields.filter(s=>s.required&&s.type===op.type&&s.label===label&&pattern.test(s.name));
    need(sources.length===1,'unique original transformation source required');

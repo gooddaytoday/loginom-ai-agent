@@ -37,7 +37,7 @@ test("an unconfigured local run exposes diagnostics and defers connection errors
     })
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),
-    ).toMatchObject({ structuredContent: { state: "unconfigured", generation: 0, hasApiKey: false } })
+    ).toMatchObject({ structuredContent: { state: "unconfigured", generation: 0 } })
     await expect(client.request("acquire", { run: "duplicate", session: "chat" })).rejects.toThrow("LOGINOM_CALL_BUSY")
     await expect(
       client.request("call", { run: "one", name: "read", args: { uri: "Help/node.md" }, userMessage: "original" }),

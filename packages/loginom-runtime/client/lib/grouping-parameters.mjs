@@ -1,5 +1,8 @@
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
-export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'}});
+export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'}});
+const supportedMask=Object.values(GROUPING_FUNCTIONS).reduce((mask,f)=>mask|f.bit,0);
+export const supportedGroupingMeasure=f=>Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=supportedMask&&(f.functions&~supportedMask)===0
+ &&(!(f.functions&GROUPING_FUNCTIONS.unique_count.bit)||['integer','string'].includes(f.type));
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const field=v=>v&&Object.keys(v).sort().join(',')==='kind,name'&&v.kind==='input_field'&&name(v.name);
 export function validateGroupingParameters(p,mode,r) {
@@ -46,6 +49,7 @@ export function resolveGroupingParameters(p,fields) {
  const get=f=>{const matches=fields.filter(x=>x.name===f.name);requireValue(matches.length===1,'Grouping input field is missing: '+f.name);return matches[0];};
  const keys=p.group_by.map(get),measures=p.measures.map(m=>{
   const input=get(m.field);requireValue(!['sum','avg'].includes(m.function)||['integer','real'].includes(input.type),'Grouping function is incompatible with input type: '+m.field.name+'/'+m.function);
+  requireValue(m.function!=='unique_count'||['integer','string'].includes(input.type),'Grouping function is incompatible with input type: '+m.field.name+'/'+m.function);
   return {...m,input};
  });
  const fieldOrder=[...new Set(measures.map(m=>m.input.name))];

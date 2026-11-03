@@ -1,0 +1,60 @@
+{
+  "status": "proposal_not_registered",
+  "base_sha": "3377e6b164bcf509a050fb1536bae8dbf8bece39",
+  "mode_enum_additions": ["random", "random_uniform", "stratified", "biased"],
+  "reuse_parameters": ["count", "train_count", "test_count", "seed"],
+  "parameters_additions": {
+    "strata_fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {"type": "string", "enum": ["input_field"]},
+          "name": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "required": ["kind", "name"],
+        "additionalProperties": false
+      },
+      "description": "Observed discrete input fields defining strata; preserve unrequested mapping."
+    },
+    "bias_field": {
+      "type": "object",
+      "properties": {
+        "kind": {"type": "string", "enum": ["input_field"]},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "required": ["kind", "name"],
+      "additionalProperties": false,
+      "description": "Discrete input field for biased selection; initial slice uses one string field."
+    },
+    "bias_factors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "string", "maxLength": 128},
+          "factor": {"type": "number", "minimum": 0, "maximum": 1}
+        },
+        "required": ["value", "factor"],
+        "additionalProperties": false
+      },
+      "description": "Proposed complete factors for observed string categories; numeric/NULL categories deferred."
+    },
+    "group_size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "description": "Proposed uniform-random group size in rows; semantics require native confirmation."
+    }
+  },
+  "notes": [
+    "Enum additions are shared by both node types and counted once.",
+    "seed already exists in the complete dock_node_apply inputSchema; do not duplicate it.",
+    "This is a size estimate, not an approved public contract or an exhaustive parameter schema.",
+    "Do not infer biased output rows or quotas from factors until the acceptance criterion is approved."
+  ]
+}

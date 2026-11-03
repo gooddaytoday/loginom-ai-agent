@@ -1,0 +1,104 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.auto_correlation"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.auto_correlation",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Lag",
+          "label": "Лаг",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "X_ACF",
+          "label": "X: АКФ",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08
+          }
+        },
+        {
+          "name": "X_StdErr",
+          "label": "X: Ошибка",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08
+          }
+        },
+        {
+          "name": "X_Significant",
+          "label": "X: Значимость",
+          "label_any": true,
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        },
+        {
+          "Lag": 1,
+          "X_ACF": -0.8154761904761905,
+          "X_StdErr": 0.3535533905932738,
+          "X_Significant": true
+        },
+        {
+          "Lag": 2,
+          "X_ACF": 0.6309523809523809,
+          "X_StdErr": 0.5396761568833572,
+          "X_Significant": true
+        },
+        {
+          "Lag": 3,
+          "X_ACF": -0.47023809523809523,
+          "X_StdErr": 0.6251204532454202,
+          "X_Significant": false
+        },
+        {
+          "Lag": 4,
+          "X_ACF": 0.30952380952380953,
+          "X_StdErr": 0.6678746496304884,
+          "X_Significant": false
+        },
+        {
+          "Lag": 5,
+          "X_ACF": -0.19642857142857142,
+          "X_StdErr": 0.6855711449474667,
+          "X_Significant": false
+        },
+        {
+          "Lag": 6,
+          "X_ACF": 0.08333333333333333,
+          "X_StdErr": 0.6925704590169492,
+          "X_Significant": false
+        },
+        {
+          "Lag": 7,
+          "X_ACF": -0.041666666666666664,
+          "X_StdErr": 0.6938227092089585,
+          "X_Significant": false
+        }
+      ]
+    }
+  ]
+}

@@ -52,7 +52,7 @@ export async function configureMissingValues(channel,p){
    if(actual.method===wanted.method&&(wanted.method!=='constant'||actual.value===wanted.value))continue;
    await act(s,'open method '+field.name,s=>fieldControl(s,field.name,'method'),{verb:'click'});
    s=await observe('owned method editor');need(s.node_missing_values.editor?.field_name===field.name,'Foreign method editor');
-   const option=editorBase+';boundlist;'+(wanted.method==='mean'?'Заменять_средним':'Заменять_заданным_значением');
+   const option=editorBase+';boundlist;'+(wanted.method==='mean'?'Заменять_средним':wanted.method==='zero'?'Заменять_на_0':'Заменять_заданным_значением');
    await act(s,'select explicit method '+field.name,s=>control(s,option),{verb:'click'});
    s=await observe('method choice selected');
    if(actual.method!==wanted.method){

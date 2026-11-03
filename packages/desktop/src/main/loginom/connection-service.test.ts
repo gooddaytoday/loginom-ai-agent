@@ -53,7 +53,6 @@ test("safe views expose defaults and presence flags only; a successful save surv
     expect(await f.service.api.read()).toMatchObject({
       revision: 0,
       username: "user",
-      hasApiKey: false,
       hasPassword: false,
       folder: "/user",
       state: "unconfigured",
@@ -64,12 +63,12 @@ test("safe views expose defaults and presence flags only; a successful save surv
       revision: 1,
       username: "User",
       folder: "/User",
-      hasApiKey: true,
       hasPassword: false,
       state: "ready",
     })
     expect(JSON.stringify(await f.service.api.read())).not.toContain("private-api-key")
-    expect((await f.store.read())?.apiKey).toBe("private-api-key")
+    // A key sent by an older client is ignored; the built-in knowledge key is never stored.
+    expect((await f.store.read())?.apiKey).toBe("")
   } finally {
     await f.close()
   }
@@ -237,7 +236,7 @@ for (const url of ["file:///tmp/private", "https://user:password@example.test/",
   })
 }
 
-test("replacing pending settings preserves the new private key and commits only the latest candidate", async () => {
+test("replacing pending settings commits only the latest candidate", async () => {
   const f = await fixture()
   try {
     await save(f.service)
@@ -252,7 +251,7 @@ test("replacing pending settings preserves the new private key and commits only 
     expect(await f.service.api.status()).toMatchObject({ state: "pending", generation: 1, revision: 3 })
     run.release()
     await f.service.settled()
-    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "replacement-key" })
+    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "" })
   } finally {
     await f.close()
   }

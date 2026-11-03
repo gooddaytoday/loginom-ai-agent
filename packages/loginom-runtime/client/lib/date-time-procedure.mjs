@@ -25,7 +25,7 @@ export async function configureDateTime(channel,p,{inputMapping,beforeChanges,pr
   if(wanted.has(field.name)){
    const desired=wanted.get(field.name).map(t=>DATE_TIME_OPERATIONS[t.operation]);
    for(const row of original)for(const [flag,key] of Object.entries(flagKey)){
-    const checked=!row.iso&&desired.some(d=>d.func===row.func&&d.flag===flag);
+    const checked=desired.some(d=>d.func===row.func&&d.iso===row.iso&&d.flag===flag);
     const native=s.node_date_time.matrix.find(r=>r.func===row.func&&r.iso===row.iso);need(native,'matrix row disappeared');
     if(native[key]===checked)continue;
     for(let attempt=0;attempt<12;attempt++){

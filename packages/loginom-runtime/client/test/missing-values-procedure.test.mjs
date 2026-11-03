@@ -56,3 +56,24 @@ test('new mean selection is committed before trusting the cached record',async()
  const result=await configureMissingValues(channel,{ordered:false,max_nulls_percent:50,fields:[{field:{kind:'input_field',name:'Amount'},method:'mean'}]});
  assert.equal(result.configuration.fields[0].method,'mean');assert.equal(committed,true);assert.equal(actions.filter(a=>a.verb==='press').length,1);
 });
+
+test('zero uses the native method option and commits before trusting the record',async()=>{
+ const f=fixture(),base='root;DataRecoveryWizard;grdColumnsSettings;tbl;celleditor;cbx';
+ let selected=false,committed=false;const actions=[];
+ const snapshot=()=>({wizard:{stage:'missing_values',root_tid:'root'},node_missing_values:structuredClone(f.c),ui:{dialogs:[],elements:[
+  ...f.c.fields.flatMap(field=>['usage','method'].map(part=>({ref:field.name+':'+part,missing_values_field:{field_key:field.name,part},allowed_actions:['click']}))),
+  {ref:'zero',tid:base+';boundlist;Заменять_на_0',allowed_actions:['click']},
+  {ref:'editor',identity:{anchor_tid:base},allowed_actions:['press']}
+ ]}});
+ const channel={observe:async spec=>{if(committed){f.c.fields[0].method='zero';f.c.editor=null;}const s=snapshot();assert.equal(spec.ready(s),true);return s;},perform:async spec=>{
+  const a=spec.resolve(snapshot());actions.push(a);
+  if(a.ref==='Amount:method')f.c.editor={field_name:'Amount',record_id:'a',property:'method'};
+  if(a.ref==='zero')selected=true;
+  if(a.ref==='editor'){assert.equal(selected,true);assert.equal(a.key,'Enter');committed=true;}
+  if(a.ref==='Note:usage')f.c.fields[1].used=false;
+ }};
+ const result=await configureMissingValues(channel,{ordered:false,max_nulls_percent:50,fields:[{field:{kind:'input_field',name:'Amount'},method:'zero'}]});
+ assert.equal(result.configuration.fields[0].method,'zero');assert.equal(committed,true);
+ assert.deepEqual(actions.filter(a=>a.ref==='zero'),[{verb:'click',ref:'zero'}]);
+ assert.equal(actions.some(a=>a.verb==='fill'),false);
+});

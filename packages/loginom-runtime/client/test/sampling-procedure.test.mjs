@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {configureSampling} from '../lib/sampling-procedure.mjs';
 function fixture(partition=false){
  const base='MF;TF-1;WizrdMCF;'+(partition?'PartitionComponentWizard':'SamplingComponentWizard')+';',owner={verified:true,document_id:'d',workflow_id:'w',node_id:'n'};
- const state={stage:partition?'data_partition':'sampling',counts:partition?[0,0]:[0],groups:partition?['train','test','unused']:['sample','unused'],selected:null,draft:null,method:'Последовательный',generation:0,units:partition?['rows','rows']:['rows']},actions=[];
+ const state={stage:partition?'data_partition':'sampling',counts:partition?[0,0]:[0],groups:partition?['train','test','unused']:['sample','unused'],selected:null,draft:null,method:'Последовательный',seed:7,generation:0,units:partition?['rows','rows']:['rows']},actions=[];
  const labels={sample:'Выбранные',unused:'Неиспользуемые',train:'Обучающее множество',test:'Тестовое множество'};
  const editor=i=>base+'SizeGridForm;colAbsoluteSize;FloatPropEdit'+(i?'-'+i:'')+';PropContainer;ValueContainer;ValueControl';
- const snapshot=()=>({prepared_node_context:owner,wizard:{stage:state.stage,root_tid:'W'},node_sampling:{verified:true,inventory_complete:true,node_context:owner,base,kind:partition?'data_partition':'sampling',method:state.method,sequence_materialized:state.method==='Последовательный',
+ const snapshot=()=>({prepared_node_context:owner,wizard:{stage:state.stage,root_tid:'W'},node_sampling:{verified:true,inventory_complete:true,node_context:owner,base,kind:partition?'data_partition':'sampling',method:state.method,seed:state.seed,test_priority:false,sequence_materialized:state.method==='Последовательный',
   sizes:state.counts.map((_,index)=>({record_id:'size'+index,values:{SizePath:'Sampling.'+index}})),units:state.counts.map((count,index)=>({record_id:'size'+index,icon_ref:'unit'+index,absolute_size:count,absolute_control_tid:editor(index),unit:state.units[index],text:'',title:'',tooltip:'',class_name:''})),
   sequence:(state.method==='Последовательный'?state.groups:[]).map(group=>({record_id:group+':'+state.generation,text:labels[group],values:{Name:labels[group]},tids:[base+'group_'+group],selected:state.selected===group}))},
-  ui:{elements:[{ref:'method',tid:base+'pedSamplingMethod;ValueControl;trg_picker',allowed_actions:['click']},{ref:'sequential',tid:base+'pedSamplingMethod;ValueControl;boundlist;Последовательный',role:'option',label:'Последовательный',allowed_actions:['click']},...state.counts.flatMap((_,index)=>[
+  ui:{elements:[{ref:'method',tid:base+'pedSamplingMethod;ValueControl;trg_picker',allowed_actions:['click']},{ref:'sequential',tid:base+'pedSamplingMethod;ValueControl;boundlist;Последовательный',role:'option',label:'Последовательный',allowed_actions:['click']},...['Случайный','Стратифицированный','Отбор со смещением'].map((label,i)=>({ref:'mode'+i,tid:base+'pedSamplingMethod;ValueControl;boundlist;'+label,role:'option',label,allowed_actions:['click']})),{ref:'seed',tid:base+'RandSeedEdit;edtRandSeed;ValueControl',allowed_actions:['fill','press']},...state.counts.flatMap((_,index)=>[
    // Partition's summary repeats colSizeType_1, so the actual second-row
    // image is anchored at the unique table, not the duplicated cell tid.
    {ref:'unit'+index,identity:index?{anchor_tid:base+'SizeGridForm;grdDataSet;tbl',path:[0,1,0,0,1,0,0]}:{anchor_tid:base+'SizeGridForm;colSizeType_'+index,path:[0,0]},signature:{tag:'img'},role:'button',allowed_actions:['click']},
@@ -19,15 +19,18 @@ function fixture(partition=false){
    {ref:'next',tid:'W;btnNext',allowed_actions:['wizard_step']} ]}});
  const channel={observe:async({ready})=>{const s=snapshot();assert.ok(ready(s));return s;},perform:async spec=>{
   const s=snapshot();assert.ok(spec.ready(s));const a=spec.resolve(s);actions.push(a);
-  if(a.verb==='fill'){assert.equal(state.units[Number(a.ref.slice(4))],'rows');state.draft={index:Number(a.ref.slice(4)),count:Number(a.text)};}
-  if(a.verb==='press'){assert.equal(a.key,'Tab');state.counts[state.draft.index]=state.draft.count;}
+  if(a.verb==='fill'&&a.ref==='seed')state.draftSeed=Number(a.text);
+  if(a.verb==='press'&&a.ref==='seed')state.seed=state.draftSeed;
+  if(a.verb==='fill'&&a.ref!=='seed'){assert.equal(state.units[Number(a.ref.slice(4))],'rows');state.draft={index:Number(a.ref.slice(4)),count:Number(a.text)};}
+  if(a.verb==='press'&&a.ref!=='seed'){assert.equal(a.key,'Tab');state.counts[state.draft.index]=state.draft.count;}
   if(a.verb==='click'&&state.groups.includes(a.ref))state.selected=a.ref;
+  if(a.verb==='click'&&a.ref.startsWith('mode'))state.method=['Случайный','Стратифицированный','Отбор со смещением'][Number(a.ref.slice(4))];
   if(a.verb==='click'&&a.ref==='sequential')state.method='Последовательный';
   if(a.verb==='click'&&a.ref.startsWith('unit'))state.units[Number(a.ref.slice(4))]='rows';
   if(a.verb==='click'&&a.ref==='up'){const at=state.groups.indexOf(state.selected);[state.groups[at-1],state.groups[at]]=[state.groups[at],state.groups[at-1]];state.generation++;}
   if(a.verb==='wizard_step')state.stage='done';
  }};
- const run=(p,finish='execute')=>configureSampling(channel,p,{request:{target:{kind:'new'},finish},inputMapping:{verified:true,inventory_complete:true,target_fields:[{name:'RowID',label:'RowID',type:'integer',data_kind:'Дискретный'}]}});
+ const run=(p,finish='execute',mode='sequential')=>configureSampling(channel,p,{request:{target:{kind:'new'},finish,mode},inputMapping:{verified:true,inventory_complete:true,target_fields:[{name:'RowID',label:'RowID',type:'integer',data_kind:'Дискретный'}]}});
  return {state,actions,run};
 }
 test('production procedure binds embedded row editors and moves the observed unused group for last sampling',async()=>{
@@ -57,4 +60,16 @@ test('actual initial random method can create the sequence form, switch percent 
  const f=fixture();f.state.method='Случайный';f.state.units=['percent'];f.state.counts=[10];
  const r=await f.run({count:5,position:'last'});assert.deepEqual(r.configuration.counts,[5]);assert.deepEqual(r.configuration.groups,['unused','sample']);
  assert.equal(f.actions.filter(a=>a.ref==='unit0').length,1);assert.equal(f.state.method,'Последовательный');
+});
+
+test('random S/P switch method, commit seed and retain omitted parameters without sequential moves',async()=>{
+ for(const partition of [false,true]){
+  const f=fixture(partition);f.state.units=partition?['percent','percent']:['percent'];
+  const r=await f.run(partition?{train_count:8,test_count:4,seed:42}:{count:8,seed:42},'execute','random');
+  assert.equal(r.configuration.mode,'random');assert.equal(r.configuration.seed,42);
+  assert.deepEqual(r.configuration.counts,partition?[8,4]:[8]);assert.deepEqual(r.configuration.groups,[]);
+  assert.equal(f.actions.some(a=>a.ref==='up'),false);
+  assert.equal(f.actions.filter(a=>a.ref==='seed'&&a.verb==='press').length,1);
+  f.state.stage=partition?'data_partition':'sampling';const retained=await f.run({},'execute','random');assert.equal(retained.configuration.seed,42);
+ }
 });

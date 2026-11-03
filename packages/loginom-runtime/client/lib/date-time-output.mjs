@@ -8,7 +8,7 @@ const need=(v,m)=>{if(!v)throw Error('Date/time output: '+m);};
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 export function resolveDateTimeGeneratedSource(c,field,t,sources){
  const input=c.input_fields.find(i=>i.name===field.field.name),op=DATE_TIME_OPERATIONS[t.operation];need(input&&op,'configured input required');
- const label=input.label+' ('+op.label+(op.type==='datetime'&&op.func!==16?', '+(op.flag==='DoDateTimeFirst'?'Первый день':'Последний день'):'')+')';
+ const label=input.label+' ('+op.label+(op.type==='datetime'&&op.func!==16?', '+(op.flag==='DoDateTimeFirst'?'Первый день':'Последний день'):'')+(op.iso?', ISO8601':'')+')';
  const pattern=new RegExp('^'+escape(input.name+'_'+op.suffix)+'_[0-9]+$');
  const matches=sources.filter(source=>source.required&&source.type===op.type&&source.label===label&&pattern.test(source.name));
  need(matches.length===1,'ambiguous generated source: '+field.field.name+' '+t.operation);return matches[0];

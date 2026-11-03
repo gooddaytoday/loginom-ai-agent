@@ -65,6 +65,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile']) : {};
   if (data?.ports) output.ports = data.ports.map(port => {
+    if(port.port_kind==='tree')return pick(port,['port','port_guid','port_kind','fresh','execution_id','freshness_basis','tree','sample_complete']);
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'freshness_basis', 'read_limit', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations','full_import_verification']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
     value.sample = value.sample.map(row => row.map(cell => {
@@ -115,7 +116,7 @@ function previewLimitations(output) {
   const limitations=[];
   for(const port of output.ports??[])if(Number.isSafeInteger(port.row_count)&&port.sample_rows<port.row_count)
     limitations.push('Output port '+port.port+': only '+port.sample_rows+' of '+port.row_count+' rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output.');
-  for(const port of output.ports??[])if(port.sample.length){
+  for(const port of output.ports??[])if(port.sample?.length){
     const zeros=port.sample.reduce((count,row)=>count+row.filter(cell=>cell.is_null===false
       &&['integer','real'].includes(cell.type)&&((cell.value??cell.decimal)===0
         ||typeof (cell.value??cell.decimal)==='string'&&/^[+-]?0+(?:\.0*)?(?:[eE][+-]?\d+)?$/.test(cell.value??cell.decimal))).length,0);

@@ -79,3 +79,31 @@ test('the native Enter method picker is actionable through the serialized worksp
  const clicked=await page.act({verb:'click',ref:control.ref},observed);
  assert.equal(clicked.status,'SUCCEEDED',JSON.stringify(clicked.error));
 });
+
+
+test('selection details reader observes native disabled flags and refuses absent controls',()=>{
+ const base='MF;TF;WizrdMCF;LogRegressionWizard-1',elements=[],components={};
+ const element=tid=>{const e={id:'d'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);return e;};
+ element(base);
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.01,pedRemoveSignificance:0.2})){
+  const e=element(base+';'+name+';ValueControl');components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>name==='pedRemoveSignificance'};
+ }
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)));
+ assert.deepEqual(read().disabled,{pedRegSelQuality:false,pedAddSignificance:false,pedRemoveSignificance:true});
+ assert.equal(read().values.pedAddSignificance,0.01);
+ elements.pop();assert.equal(read().verified,false);
+});
+
+test('selection criterion picker is actionable through the serialized workspace observer',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+ const epsilon=page.add('div',base+';LogRegressionWizard-1;pedEpsilon','',undefined,form);
+ const criterion=page.add('div',base+';LogRegressionWizard-1;pedRegSelQuality','',undefined,form);
+ const owner=page.add('div',criterion.getAttribute('data-tid')+';ValueControl','',undefined,criterion);
+ const picker=page.add('div',owner.getAttribute('data-tid')+';trg_picker','',{x:100,y:100,width:20,height:20},owner);
+ const observed=await page.observe();assert.equal(observed.wizard.stage,'lin_regression_details');
+ const control=observed.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));
+ assert.ok(control?.allowed_actions.includes('click'));
+ assert.equal((await page.act({verb:'click',ref:control.ref},observed)).status,'SUCCEEDED');
+});

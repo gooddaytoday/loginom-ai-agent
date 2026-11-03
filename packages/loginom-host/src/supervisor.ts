@@ -194,7 +194,10 @@ async function superviseProcess(
     if (!request) return
     pending.delete(message.id)
     clearTimeout(request.timer)
-    if ("startupDiagnostics" in message && Array.isArray(message.startupDiagnostics)) {
+    // Setup may close an admitted knowledge child while its background catalog
+    // is still loading. That acknowledged owner cancellation is not a failed start.
+    if ("startupDiagnostics" in message && Array.isArray(message.startupDiagnostics)
+      && !(closing.promise && "error" in message && message.error === "LOGINOM_KNOWLEDGE_CLOSED")) {
       const events = message.startupDiagnostics.slice(0, 2).flatMap((item: unknown) => {
         if (!item || typeof item !== "object" || !("error" in item)) return []
         return [{ event: "runtime.startup_failure", generation: input.generation, pid: child.pid,

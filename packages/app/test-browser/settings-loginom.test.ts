@@ -15,7 +15,6 @@ function setup(initial: Partial<Loginom.View> = {}) {
     url: "http://loginom.test/app/",
     username: "user",
     folder: "/user",
-    hasApiKey: true,
     hasPassword: false,
     state: "ready",
     ...initial,
@@ -82,7 +81,7 @@ describe("Loginom settings", () => {
     f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
     try {
       await f.form.load()
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(false)
       expect(f.form.state.message).toBe("loginom.helpChecked")
       expect(f.form.state.checkedBrowser).toEqual(browser)
@@ -92,7 +91,7 @@ describe("Loginom settings", () => {
       await f.form.submit(true)
       expect(f.saves).toHaveLength(1)
       expect(f.closed[0].browser).toEqual(browser)
-      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.password).toBe("")
     } finally {
       f.dispose()
     }
@@ -169,7 +168,7 @@ describe("Loginom settings", () => {
     const f = setup({ state: "recoverable-error", recoveries: ids })
     try {
       await f.form.load()
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(true)
       expect(f.saves).toHaveLength(1)
       expect(f.closed).toHaveLength(0)
@@ -177,7 +176,7 @@ describe("Loginom settings", () => {
       expect(f.form.state.message).toBeUndefined()
       expect(f.form.state.view?.recoveries).toEqual(ids)
       expect(f.form.state.baseline?.revision).toBe(2)
-      expect(f.form.state.apiKey).toBe("replacement")
+      expect(f.form.state.password).toBe("replacement")
     } finally {
       f.dispose()
     }
@@ -186,7 +185,7 @@ describe("Loginom settings", () => {
     const f = setup()
     try {
       await f.form.load()
-      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.password).toBe("")
       expect(f.form.requestClose()).toBe(true)
       f.form.edit({ username: "changed" })
       expect(f.form.requestClose()).toBe(false)
@@ -206,7 +205,6 @@ describe("Loginom settings", () => {
     try {
       await f.form.load()
       f.form.edit({
-        apiKey: "new-test-key",
         url: "http://other.test/",
         username: "other",
         password: "new-test-password",
@@ -217,11 +215,10 @@ describe("Loginom settings", () => {
         revision: 1,
         url: "http://other.test/",
         username: "other",
-        apiKey: { operation: "replace", value: "new-test-key" },
         password: { operation: "replace", value: "new-test-password" },
       })
       expect(f.form.state.message).toBe("loginom.checked")
-      expect(f.form.state.apiKey).toBe("new-test-key")
+      expect(f.form.state.password).toBe("new-test-password")
       expect(f.saves).toHaveLength(0)
       expect(f.closed).toHaveLength(0)
       f.form.edit({ username: "another" })
@@ -236,7 +233,8 @@ describe("Loginom settings", () => {
       await f.form.load()
       await f.form.submit(false)
       expect(f.form.state.message).toBe("loginom.checkedSaved")
-      expect(f.checks[0].apiKey).toEqual({ operation: "preserve" })
+      // The built-in knowledge key replaced the user key; the form never sends one.
+      expect(f.checks[0]).not.toHaveProperty("apiKey")
       expect(f.checks[0].password).toEqual({ operation: "preserve" })
       await f.form.submit(true)
       expect(f.saves).toHaveLength(0)
@@ -248,47 +246,47 @@ describe("Loginom settings", () => {
     const f = setup()
     try {
       await f.form.load()
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(true)
       expect(f.checks).toHaveLength(1)
       expect(f.saves).toEqual([{ revision: 1, validationId: "checked" }])
       expect(f.closed).toHaveLength(1)
-      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.password).toBe("")
       expect(f.form.dirty()).toBe(false)
       expect(f.form.requestClose()).toBe(true)
     } finally {
       f.dispose()
     }
   })
-  test("rejected key keeps the form and draft; no persistence takes place", async () => {
+  test("a rejected built-in key keeps the form and draft; no persistence takes place", async () => {
     const f = setup()
     try {
       await f.form.load()
       f.api.check = async () => {
         throw Error("LOGINOM_KNOWLEDGE_AUTH_FAILED")
       }
-      f.form.edit({ apiKey: "incorrect" })
+      f.form.edit({ username: "draft" })
       await f.form.submit(true)
       expect(f.form.state.message).toBe("loginom.invalidKey")
-      expect(f.form.state.apiKey).toBe("incorrect")
+      expect(f.form.state.username).toBe("draft")
       expect(f.saves).toHaveLength(0)
       expect(f.closed).toHaveLength(0)
     } finally {
       f.dispose()
     }
   })
-  test("storage failure does not close the form or clear the entered key", async () => {
+  test("storage failure does not close the form or clear the entered password", async () => {
     const f = setup()
     try {
       await f.form.load()
       f.api.save = async () => {
         throw Error("LOGINOM_STORE_WRITE_FAILED")
       }
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(true)
       expect(f.closed).toHaveLength(0)
       expect(f.form.state.failed).toBe(true)
-      expect(f.form.state.apiKey).toBe("replacement")
+      expect(f.form.state.password).toBe("replacement")
     } finally {
       f.dispose()
     }
@@ -303,7 +301,7 @@ describe("Loginom settings", () => {
         calls++
         return checking.promise
       }
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       const save = f.form.submit(true)
       expect(f.form.requestClose()).toBe(false)
       await f.form.submit(true)
@@ -322,12 +320,12 @@ describe("Loginom settings", () => {
       const current = await f.api.read()
       f.api.save = async () => ({ ...current, state: "starting", revision: 2 })
       f.api.status = async () => ({ ...current, revision: 2, failure: "LOGINOM_RUNTIME_START_FAILED" })
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(true)
       expect(f.closed).toHaveLength(0)
       expect(f.form.state.failed).toBe(true)
       expect(f.form.state.baseline?.revision).toBe(2)
-      expect(f.form.state.apiKey).toBe("replacement")
+      expect(f.form.state.password).toBe("replacement")
     } finally {
       f.dispose()
     }
@@ -338,7 +336,7 @@ describe("Loginom settings", () => {
       await f.form.load()
       const current = await f.api.read()
       f.api.save = async () => ({ ...current, state: "pending", revision: 2 })
-      f.form.edit({ apiKey: "replacement" })
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
       await f.form.submit(true)
       expect(f.closed[0].state).toBe("pending")
       expect(f.form.requestClose()).toBe(true)
@@ -350,11 +348,11 @@ describe("Loginom settings", () => {
     const f = setup()
     try {
       await f.form.load()
-      f.form.edit({ apiKey: "replacement", username: "draft" })
+      f.form.edit({ password: "replacement", passwordMode: "replace", username: "draft" })
       f.update({ revision: 2, generation: 2, username: "external", failure: "LOGINOM_RUNTIME_START_FAILED" })
       await f.form.refresh()
       expect(f.form.state.username).toBe("draft")
-      expect(f.form.state.apiKey).toBe("replacement")
+      expect(f.form.state.password).toBe("replacement")
       expect(f.form.state.baseline?.revision).toBe(1)
       expect(f.form.state.view?.revision).toBe(2)
       f.form.discard()

@@ -21,8 +21,6 @@ export const dict = {
     "Не удалось применить сохранённые настройки Loginom. Откройте настройки Loginom и проверьте подключение.",
   "loginom.statusUnavailable":
     "Не удалось подтвердить применение сохранённых настроек. Откройте настройки Loginom и проверьте состояние подключения.",
-  "loginom.keyUnsaved": "Новый ключ ещё не сохранён.",
-  "loginom.keyStored": "Ключ сохранён. Чтобы заменить его, введите новый.",
   "loginom.checkedSaved": "Подключение проверено: AI-сервер доступен, вход в Loginom выполнен.",
   "loginom.refresh": "Обновить настройки",
   "loginom.discardTitle": "Закрыть без сохранения?",
@@ -32,7 +30,7 @@ export const dict = {
   "loginom.recoveryRequired":
     "Предыдущий запуск завершился до подтверждения операций Loginom. Проверьте их результат в веб-приложении Loginom перед продолжением. Операции не будут повторены автоматически; журналы сохранены.",
   "loginom.acknowledgeRecovery": "Результат проверен — завершить восстановление",
-  "loginom.invalidKey": "AI-сервер отклонил API-ключ. Проверьте ключ.",
+  "loginom.invalidKey": "Встроенный ключ AI-сервера недействителен. Обновите приложение.",
   "loginom.serverUnavailable": "AI-сервер недоступен. Проверьте сеть и повторите попытку.",
   "loginom.invalidPassword": "Loginom не подтвердил вход. Проверьте имя пользователя и пароль.",
   "loginom.accountMismatch": "Открыта сессия другого пользователя Loginom. Подключение не сохранено.",
@@ -43,13 +41,11 @@ export const dict = {
   "loginom.later": "Позже",
   "loginom.welcome": "Добро пожаловать в Loginom AI Agent",
   "loginom.description":
-    "Подключите AI-сервер и веб-приложение Loginom. Эти параметры всегда доступны в разделе Loginom.",
+    "Подключите веб-приложение Loginom. Эти параметры всегда доступны в разделе Loginom.",
   "loginom.desktopOnly": "Подключение Loginom доступно в установленном приложении.",
-  "loginom.apiKey": "API-ключ Loginom AI сервера",
   "loginom.url": "Адрес веб-приложения Loginom",
   "loginom.username": "Имя пользователя Loginom",
   "loginom.password": "Пароль Loginom",
-  "loginom.keySaved": "Ключ сохранён. Оставьте поле пустым, чтобы не менять его.",
   "loginom.passwordSaved": "Пароль сохранён. Введите новый или выберите использование пустого пароля.",
   "loginom.emptyPassword": "Использовать пустой пароль",
   "loginom.folder": "Папка пользователя в Loginom",

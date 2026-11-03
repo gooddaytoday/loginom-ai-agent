@@ -21,7 +21,7 @@ export function missingValuesConfigurationReadback({node,phases,operation_id}){
  need(c.fields.length===c.input_fields.length&&c.fields.every((f,i)=>f.name===c.input_fields[i].name&&f.type===c.input_fields[i].type&&f.data_kind===c.input_fields[i].data_kind&&typeof f.used==='boolean'),'processing inventory differs');
  const used=c.fields.filter(f=>f.used);need(used.length>0,'empty processing set');
  resolveMissingValuesParameters({fields:used.map(f=>({field:{kind:'input_field',name:f.name},method:f.method,...(f.method==='constant'?{value:f.value}:{})}))},c.input_fields);
- need(used.every(f=>f.method==='mean'?f.method_code===3:f.method_code===6&&typeof f.value==='string'),'method enum differs');
+ need(used.every(f=>f.method==='mean'?f.method_code===3:f.method==='zero'?f.method_code===11:f.method_code===6&&typeof f.value==='string'),'method enum differs');
  const linked=new Set();
  const output=m.target_fields.map((f,i)=>{
   const source=f.source??f.exclusion_source;

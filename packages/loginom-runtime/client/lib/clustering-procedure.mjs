@@ -57,8 +57,12 @@ export async function configureClustering(channel,p,{request,inputMapping}){
  let state=await norm('complete clustering normalizers');const baseline=state.node_clustering;
  const features=roles.configuration.fields.filter(f=>f.usage_type===3);
  need(same(baseline.fields.map(f=>f.name),features.map(f=>f.name)),'normalizer fields differ from the selected numeric features');
+ const wantedNorm=p.normalization===undefined&&request.target.kind==='existing'?baseline.fields[0]?.norm_type:p.normalization==='standardize'?5:0;
+ need([0,5].includes(wantedNorm)&&(p.normalization!==undefined||request.target.kind==='new'||baseline.fields.every(f=>f.norm_type===wantedNorm)),
+  'existing mixed or unsupported normalization requires an explicit none/standardize choice');
+ const normLabel=wantedNorm===5?'Стандартизация':'Нет';
  for(const field of baseline.fields){
-  state=await norm('normalizer before change');if(state.node_clustering.fields.find(f=>f.record_id===field.record_id)?.norm_type===0)continue;
+  state=await norm('normalizer before change');if(state.node_clustering.fields.find(f=>f.record_id===field.record_id)?.norm_type===wantedNorm)continue;
   const base=state.wizard.root_tid+';NormTuneWizard;',key=field.name.replace(/\s/g,'_').replace(/,/g,'');
   await channel.perform({condition:'select normalizer field '+field.name,initialObservation:state,ready:normReady,identity:()=>field,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===base+'colDisplayName_'+key&&e.allowed_actions.includes('click'),'Normalizer field unavailable').ref})});
@@ -70,20 +74,21 @@ export async function configureClustering(channel,p,{request,inputMapping}){
   const editorBase=state.node_clustering.editor.root_tid;
   await channel.perform({condition:'open native normalizer choices',initialObservation:state,ready:editor,identity:()=>field,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===editorBase+';cbxNormType;trg_picker'&&e.allowed_actions.includes('click'),'Normalizer picker unavailable').ref})});
-  state=await channel.observe({condition:'native no-normalization option',readClustering:true,ready:s=>editor(s)&&s.ui.elements.some(e=>e.label==='Нет'&&e.allowed_actions.includes('click')&&(e.role==='option'||e.tid?.startsWith(editorBase+';cbxNormType;boundlist;')))});
-  await channel.perform({condition:'select no normalization',initialObservation:state,ready:editor,identity:()=>field,
-   resolve:s=>({verb:'click',ref:one(s,e=>e.label==='Нет'&&e.allowed_actions.includes('click')&&(e.role==='option'||e.tid?.startsWith(editorBase+';cbxNormType;boundlist;')),'Unique no-normalization option required').ref})});
-  state=await channel.observe({condition:'no normalization in owned editor',readClustering:true,ready:s=>editor(s)&&s.node_clustering.editor.norm_type===0});
+  state=await channel.observe({condition:'native normalizer option',readClustering:true,ready:s=>editor(s)&&s.ui.elements.some(e=>e.label===normLabel&&e.allowed_actions.includes('click')&&(e.role==='option'||e.tid?.startsWith(editorBase+';cbxNormType;boundlist;')))});
+  await channel.perform({condition:'select '+normLabel,initialObservation:state,ready:editor,identity:()=>field,
+   resolve:s=>({verb:'click',ref:one(s,e=>e.label===normLabel&&e.allowed_actions.includes('click')&&(e.role==='option'||e.tid?.startsWith(editorBase+';cbxNormType;boundlist;')),'Unique normalizer option required').ref})});
+  state=await channel.observe({condition:'normalization in owned editor',readClustering:true,ready:s=>editor(s)&&s.node_clustering.editor.norm_type===wantedNorm});
   await channel.perform({condition:'commit owned normalizer once',initialObservation:state,ready:editor,identity:()=>field,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===editorBase+';btnApply'&&e.allowed_actions.includes('click'),'Normalizer OK unavailable').ref})});
-  state=await norm('normalizer committed');need(!state.node_clustering.editor&&state.node_clustering.fields.find(f=>f.record_id===field.record_id)?.norm_type===0,'normalizer was not committed');
+  state=await norm('normalizer committed');need(!state.node_clustering.editor&&state.node_clustering.fields.find(f=>f.record_id===field.record_id)?.norm_type===wantedNorm,'normalizer was not committed');
  }
- state=await norm('complete no-normalization readback');const normalization=state.node_clustering;
- need(normalization.fields.every(f=>f.norm_type===0)&&same(normalization.fields.map(({norm_type,...f})=>f),baseline.fields.map(({norm_type,...f})=>f)),'normalization changed other field settings');
- if(normalization.source_status==='Не активировано'){
+ state=await norm('complete normalization readback');const normalization=state.node_clustering;
+ need(normalization.fields.every(f=>f.norm_type===wantedNorm)&&same(normalization.fields.map(({norm_type,...f})=>f),baseline.fields.map(({norm_type,...f})=>f)),'normalization changed other field settings');
+ if(normalization.source_status!=='Вход активирован'){
   await channel.perform({condition:'activate current clustering input',initialObservation:state,ready:normReady,identity:s=>({node:s.prepared_node_context,fields:normalization.fields}),
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
-  state=await channel.observe({condition:'clustering input activated',readClustering:true,ready:s=>normReady(s)&&typeof s.node_clustering.source_status==='string'&&s.node_clustering.source_status!=='Не активировано'});
+  state=await channel.observe({condition:'clustering input activated',readClustering:true,ready:s=>normReady(s)&&['Вход активирован','Ошибка'].includes(s.node_clustering.source_status)});
+  need(state.node_clustering.source_status==='Вход активирован','normalization input activation failed; missing or invalid feature values must be corrected before Execute');
  }
  await next('normalization','clustering');
  const ready=s=>s.wizard?.stage==='clustering'&&s.node_clustering?.verified===true&&s.node_clustering.kind==='parameters';

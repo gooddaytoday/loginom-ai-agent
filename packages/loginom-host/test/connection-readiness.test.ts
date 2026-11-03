@@ -28,7 +28,8 @@ async function readinessFixture(options: Parameters<typeof knowledgeServer>[1]) 
       const child = await superviseKnowledge({
         node, entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
         stateDir: directory, generation: connection.generation, endpoint: server.endpoint,
-        apiKey: connection.apiKey, environment: {},
+        // Like the host, every generation uses the built-in key, not the saved one.
+        apiKey: "UNIT-NONSECRET", environment: {},
       })
       processes.push(child)
       const ready = child.request("list").then(() => undefined)

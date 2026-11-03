@@ -1,0 +1,9 @@
+Id;IntText;RealText;DateText;Keep
+1;12;1.25;2026-11-01;one
+2;-7;-2.5;2024-02-29;two
+3;bad;bad;bad;three
+4;NULL;NULL;NULL;four
+5;;;;five
+6;123;6.25;2025-12-31;six
+7;null;null;null;seven
+8;42;9.125;2024-01-01;eight

@@ -23,8 +23,6 @@ export const LOGINOM_ENGLISH = {
   "loginom.applyFailed": "Saved Loginom settings could not be applied. Open Loginom settings to review the connection.",
   "loginom.statusUnavailable":
     "Could not confirm whether the saved settings were applied. Open Loginom settings to check the status.",
-  "loginom.keyUnsaved": "The new key has not been saved yet.",
-  "loginom.keyStored": "A key is saved. Enter a new key to replace it.",
   "loginom.checkedSaved": "Connection verified: the AI server is accessible and Loginom sign-in succeeded.",
   "loginom.refresh": "Refresh settings",
   "loginom.discardTitle": "Close without saving?",
@@ -34,7 +32,7 @@ export const LOGINOM_ENGLISH = {
   "loginom.recoveryRequired":
     "The previous run ended before Loginom operations were confirmed. Check their results in the Loginom web application before continuing. Operations will not be replayed automatically; their journals are preserved.",
   "loginom.acknowledgeRecovery": "Results checked — finish recovery",
-  "loginom.invalidKey": "The AI server rejected the API key. Check your key.",
+  "loginom.invalidKey": "The built-in AI server key was rejected. Update the application.",
   "loginom.serverUnavailable": "The AI server is unavailable. Check the network and retry.",
   "loginom.invalidPassword": "Loginom did not confirm login. Check your username and password.",
   "loginom.accountMismatch": "The Loginom session belongs to another account. Settings were not saved.",
@@ -45,13 +43,11 @@ export const LOGINOM_ENGLISH = {
   "loginom.later": "Later",
   "loginom.welcome": "Welcome to Loginom AI Agent",
   "loginom.description":
-    "Connect your AI server and Loginom web application. You can change these settings anytime in Loginom.",
+    "Connect the Loginom web application. You can change these settings anytime in Loginom.",
   "loginom.desktopOnly": "Loginom connections are available in the desktop application.",
-  "loginom.apiKey": "Loginom AI server API key",
   "loginom.url": "Loginom web application URL",
   "loginom.username": "Loginom username",
   "loginom.password": "Loginom password",
-  "loginom.keySaved": "A key is saved. Leave this field empty to keep it.",
   "loginom.passwordSaved": "A password is saved. Enter a replacement or choose an empty password.",
   "loginom.emptyPassword": "Use an empty password",
   "loginom.folder": "Loginom user folder",

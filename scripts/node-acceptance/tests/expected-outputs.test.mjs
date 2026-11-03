@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {parseExpectedOutputs,matchExpectedOutputs} from '../expected-outputs.mjs';
 const columns=[{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'A|Amount|Сумма',type:'real'}];
 const report=value=>({output_node_type:'transform.cross_table',columns,rows:[{Region:'North',Amount:value}]});
 const actual=(id,value)=>({node:{node_id:id},type:'transform.cross_table',execution:{execution_id:id},data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'North'},{type:'real',is_null:false,value}]]}});
+test('registered Union automatic fixture passes the stock cold output parser',()=>{
+ const expected=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/union/acceptance/union-auto-match/expected.json',import.meta.url)));
+ expected.package_path='/test/union-auto-match.lgp';
+ const parsed=parseExpectedOutputs(expected);
+ assert.equal(parsed.outputs[0].output_node_type,'transform.union_data');assert.equal(parsed.outputs[0].output_port,0);
+ assert.equal(parsed.outputs[0].rows.length,6);
+});
 test('native binary64 decimal preserves signed zero across the browser JSON boundary',()=>{
  const a=actual('zero',0),cell=a.data.sample[0][1];
  Object.assign(cell,{representation:'binary64',precision:'17_significant_digits'});
