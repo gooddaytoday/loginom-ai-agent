@@ -16,8 +16,8 @@ FACTORS = ("X", "Noise")
 CRITERIA = ("deviance", "aic", "aicc", "bic", "hqic")
 
 
-def source():
-    with (ROOT / "fixtures/selection.csv").open(newline="", encoding="utf-8") as file:
+def source(path=None):
+    with (Path(path) if path else ROOT / "fixtures/selection.csv").open(newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         assert reader.fieldnames == ["RowID", "X", "Noise", "Target", "Note"]
         rows = [{"RowID": int(r["RowID"]), "X": float(r["X"]),
@@ -115,8 +115,8 @@ def select(rows, mode="stepwise", criterion="deviance", entry=0.05, removal=0.1)
     raise AssertionError("selection did not terminate")
 
 
-def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
-    rows = source()
+def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1, rows=None):
+    rows = source() if rows is None else rows
     model, _ = select(rows, mode, criterion, entry, removal)
     columns = [
         {"name": "PredictionEvent", "type": "boolean", "label_any": True},

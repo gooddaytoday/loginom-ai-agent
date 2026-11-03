@@ -67,18 +67,27 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 
 | Task | Настройка | Expected / независимый результат |
 |---|---|---|
-| `task-stepwise-strict.md` | Deviance / entry=1e-7, removal=0.2 | `expected-strict.json`, только константа, p=0.5 |
+| `task-stepwise-strict.md` | Deviance / entry=0.01, removal=0.2 | `stepwise-strict/expected.json`, только константа, p=0.5 |
 | `task-stepwise-permissive.md` | Deviance / 0.95, 0.99 | `expected-permissive.json`, X+Noise |
 
-Строгий случай отличает слишком высокий/умолчательный entry; мягкий —
-слишком низкий/умолчательный removal. Они также не должны передавать модели
+Строгий случай использует `stepwise-strict/data/selection.csv`: в исходном
+CSV изменены только Target строк 2–5 (yes) и 45–48 (no). Сохраняются
+64 строки, 32 yes / 32 no, все исходные типы и 21 NULL Note. Независимый LR
+даёт p(X)=0.0147697684: entry=0.05 включает X, entry=0.01 оставляет
+только константу, p=0.5. Это сохраняет различение ошибочного стандартного
+порога при значении, принимаемом UI. На первоначальном CSV p(X)=4.0353e-7,
+но UI округлил запрошенный 1e-7 до 0 (LAB-765 probe4 journal:502–509).
+Активный эталон строгого случая — `stepwise-strict/expected.json`;
+`expected-strict.json` остаётся историческим эталоном первоначального CSV.
+Мягкий случай на исходных данных отличает слишком низкий removal.
+Они также не должны передавать модели
 ожидаемый состав факторов. Численный oracle поддерживает оба случая явно:
 
 ```sh
 python3 oracle.py --check
 python3 oracle.py --diagnostic
 python3 oracle.py actual.csv
-python3 oracle.py --entry 0.0000001 --removal 0.2 actual.csv
+python3 stepwise-strict/oracle.py actual.csv
 python3 oracle.py --entry 0.95 --removal 0.99 actual.csv
 node schema-size.mjs
 ```
@@ -102,7 +111,7 @@ stock CSV oracle вычисляет тот же результат; `--check` п
 entry_significance, Backward — только removal_significance, Stepwise — оба,
 0 < entry < removal < 1. Для информационных критериев p-поля запрещены.
 Явный entry=0 отклоняется до UI: два живых опыта LAB-657 показали
-расхождение Loginom с независимым oracle. Строгая задача использует 1e-7.
+расхождение Loginom с независимым oracle. Строгая задача использует 0.01 и отдельный вход: см. ниже.
 Пустые/неприменимые/некорректные параметры должны отклоняться до мутации;
 не выбирать вместо неизвестного метода Enter, другой критерий или auto.
 

@@ -206,7 +206,7 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         if variant in ['stepwise-strict', 'stepwise-permissive']: source = source / variant
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
-                    data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+                    data=source / 'data' if variant == 'stepwise-strict' else acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']:
         acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         variant = name.removeprefix('logreg-')
