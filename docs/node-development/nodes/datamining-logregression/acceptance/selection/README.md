@@ -67,19 +67,24 @@ Oracle, expected, schema, discovery, выбор факторов и числен
 
 | Task | Настройка | Expected / независимый результат |
 |---|---|---|
-| `task-stepwise-strict.md` | Deviance / entry=0.01, removal=0.2 | `stepwise-strict/expected.json`, только константа, p=0.5 |
+| `task-stepwise-strict.md` | Deviance / entry=0.01, removal=0.2 | `stepwise-strict/expected.json`, X вместо X+Noise при стандартном пороге |
 | `task-stepwise-permissive.md` | Deviance / 0.95, 0.99 | `expected-permissive.json`, X+Noise |
 
-Строгий случай использует `stepwise-strict/data/selection.csv`: в исходном
-CSV изменены только Target строк 2–5 (yes) и 45–48 (no). Сохраняются
-64 строки, 32 yes / 32 no, все исходные типы и 21 NULL Note. Независимый LR
-даёт p(X)=0.0147697684: entry=0.05 включает X, entry=0.01 оставляет
-только константу, p=0.5. Это сохраняет различение ошибочного стандартного
-порога при значении, принимаемом UI. На первоначальном CSV p(X)=4.0353e-7,
-но UI округлил запрошенный 1e-7 до 0 (LAB-765 probe4 journal:502–509).
-Активный эталон строгого случая — `stepwise-strict/expected.json`;
-`expected-strict.json` остаётся историческим эталоном первоначального CSV.
-Мягкий случай на исходных данных отличает слишком низкий removal.
+Строгий случай утверждён в LAB-765 (`v040-scope`):
+`stepwise-strict/data/selection.csv` изменяет только Target строк
+21/29/52 на no и 20/26/35 на yes относительно основного CSV.
+Сохраняются 64 строки, 32 yes / 32 no, все исходные типы и 21 NULL Note.
+Независимый LR даёт p(Noise|X)=0.016398678864266943:
+стандартный entry=0.05 оставляет X+Noise, строгий entry=0.01 — X.
+Эталон `stepwise-strict/expected.json` вычисляется только stdlib MLE/LR oracle.
+Полный порт 0 — 64×9; RowID 1..64, exact cold-порядок четырёх служебных
+полей, затем X/Noise/Target/RowID/Note. CSV проверяется прежним независимым
+oracle по уникальным техническим именам и всем значениям; задачи оставляют
+его столбцы свободными. Private probe6 упал в generic matcher по порядку CSV;
+зарегистрированный logreg-stepwise-strict использует тот же узловой oracle,
+что остальные logreg-сценарии, а cold сохраняет exact-сравнение порядка.
+Исторический `expected-strict.json` относится к исходному CSV/нулевой модели
+и не используется активным строгим сценарием. Мягкий случай остаётся прежним.
 Они также не должны передавать модели
 ожидаемый состав факторов. Численный oracle поддерживает оба случая явно:
 

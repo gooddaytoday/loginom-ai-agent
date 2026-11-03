@@ -1176,6 +1176,10 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             output = runner.expected_for(case, '/test/selection.lgp')['outputs'][0]
             reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
             self.assertEqual(output, reference['outputs'][0])
+            self.assertEqual(output['column_order'], 'exact')
+            self.assertTrue(output['ordered'])
+            self.assertEqual([r['RowID'] for r in output['rows']], list(range(1, 65)))
+            self.assertEqual([c['name'] for c in output['columns']], ['PredictionEvent', 'PredictionProbability', 'ActualEvent', 'Target_predicted', 'X', 'Noise', 'Target', 'RowID', 'Note'])
             self.assertEqual(len(output['rows']), 64)
             self.assertEqual(len(output['columns']), 9)
             self.assertEqual(output['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
