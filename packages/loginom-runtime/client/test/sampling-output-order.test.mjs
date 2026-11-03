@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSamplingOutputs} from '../lib/sampling-node.mjs';
-import {samplingOutputColumns} from '../lib/sampling-output.mjs';
+import {samplingOutputColumns,validateSamplingOutputMapping} from '../lib/sampling-output.mjs';
 
 // LAB-764 cold.execution-events.jsonl:85–86: autosync reopened the saved
 // Class stratum before pass-through RowID/Value, despite the main definition.
@@ -16,7 +16,7 @@ test(`${kind} ${mode} new=${new_node}: save explicit order only for new modes`,a
    output_columns:{auto_sync:{status:'observed',value:values[port],ref:'auto'+port},
     page:{status:'complete_definition_page',schema_id:root+values[port],offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},
     fields:fields.map((f,index)=>({...f,index,status:'observed',source:{cell_ref:'cell'+index,status:'rendered_source',label:f.label,type:f.type}}))}},
-   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:values[port],node_context:{output_port:{port}},target_fields:fields},
+   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:values[port],source_fields:values[port]?fields:[],autosync:values[port],node_context:{output_port:{port}},target_fields:fields.map(f=>({...f,source:null,inherited:false,excluded:false}))},
    ui:{elements:[{ref:'auto'+port,tid:root+';DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',allowed_actions:['click']}]}};
  };
  const channel={openOutputPort:async p=>{port=p;},observe:async o=>{const s=snapshot();assert.ok(o.ready(s));return s;},
@@ -29,4 +29,19 @@ test(`${kind} ${mode} new=${new_node}: save explicit order only for new modes`,a
  const expected=!(new_node&&['stratified','biased'].includes(mode));
  assert.deepEqual(saved,values.map(()=>expected));
  assert.equal(result.ports.length,values.length);
+});
+
+test('frozen categorical output requires a complete exact input field set and the owned port',()=>{
+ const c={kind:'sampling',mode:'stratified',input_fields:[{name:'Id',label:'Id',type:'integer',data_kind:'Непрерывный'}]};
+ const m={verified:true,inventory_complete:true,source_identity_verified:false,autosync:false,source_fields:[],
+  node_context:{output_port:{port:0}},target_fields:[{...c.input_fields[0],source:null,excluded:false,inherited:false}]};
+ validateSamplingOutputMapping(c,m,0);
+ for(const mode of ['biased','stratified'])validateSamplingOutputMapping({...c,mode},m,0);
+ for(const mode of ['random','sequential'])assert.throws(()=>validateSamplingOutputMapping({...c,mode},m,0));
+ for(const mutate of [m=>m.inventory_complete=false,m=>m.autosync=true,m=>m.source_fields.push({name:'foreign'}),
+  m=>m.node_context.output_port.port=1,m=>m.target_fields[0].type='string',m=>m.target_fields[0].name='foreign',
+  m=>m.target_fields[0].label='foreign',m=>m.target_fields[0].inherited=true,m=>m.target_fields[0].excluded=true,
+  m=>m.target_fields[0].source={name:'foreign'},m=>m.target_fields.push({...m.target_fields[0]})]){
+  const bad=structuredClone(m);mutate(bad);assert.throws(()=>validateSamplingOutputMapping(c,bad,0));
+ }
 });

@@ -163,3 +163,20 @@ test('biased accepts variable sizes and quotas but requires the observed factors
   assert.throws(()=>checkSamplingMain(f.expected,f.replies,f.csvs),/BIAS_CHANGED/);
  }
 });
+
+test('cold admits the complete frozen categorical definition without claiming native source links',async()=>{
+ for(const mode of ['stratified','biased','random']){
+  const f=fixture(false,mode),node=f.actual[0].node,want=f.expected.outputs[0];
+  const mapping={verified:true,inventory_complete:true,source_identity_verified:false,autosync:false,source_fields:[],
+   node_context:{...node,output_port:{direction:'output',port:0}},
+   target_fields:want.columns.map(c=>({...c,excluded:false,inherited:false,source:null}))};
+  const channel={openOutputPort:async()=>{},observe:async o=>{assert.ok(o.ready({node_mapping:mapping}));return {node_mapping:mapping};}};
+  const load=async()=>({showMissingValuesMappingTable:async()=>{},closePreparedWizard:async()=>({verified:true,cleanup_complete:true,settings_applied:false})});
+  const run=()=>observeSamplingColdMapping({load,channel,node,port:0,expected:f.expected});
+  if(mode==='random'){await assert.rejects(run(),/MAPPING_OWNER/);continue;}
+  assert.deepEqual((await run()).columns,want.columns.map(({name,type})=>({name,type})));
+  for(const mutate of [m=>m.autosync=true,m=>m.source_fields.push({name:'foreign'}),m=>m.target_fields[0].inherited=true]){
+   const before=structuredClone(mapping);mutate(mapping);await assert.rejects(run(),/MAPPING_OWNER/);Object.assign(mapping,before);
+  }
+ }
+});

@@ -65,7 +65,9 @@ export async function observeSamplingColdMapping({load,channel,node,port,expecte
   const s=await channel.observe({condition:'sampling cold unchanged output definition',readMappings:true,
    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   const m=s.node_mapping,n=m.node_context;
-  need(m.source_identity_verified===true&&['document_id','workflow_id','node_id'].every(k=>n?.[k]===node[k])
+  const frozen=expected.sampling_modes.mode!=='random'&&m.autosync===false&&Array.isArray(m.source_fields)&&m.source_fields.length===0
+   &&m.target_fields.every(f=>f.source===null&&f.inherited===false&&!f.excluded);
+  need((m.source_identity_verified===true||frozen)&&['document_id','workflow_id','node_id'].every(k=>n?.[k]===node[k])
    &&n.output_port?.direction==='output'&&n.output_port.port===port,'MAPPING_OWNER');
   const columns=m.target_fields.map(({name,type})=>({name,type}));
   need(m.target_fields.every(f=>!f.excluded)&&sameFields(columns,want.columns)&&(expected.sampling_modes.mode==='random'||orderedFields(columns,want.columns)),'NATIVE_FIELDS');

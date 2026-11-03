@@ -5,7 +5,7 @@ import {validateSamplingParameters} from './sampling-parameters.mjs';
 import {samplingParametersSchema} from './node-api.mjs';
 import {configureSampling} from './sampling-procedure.mjs';
 import {samplingConfigurationReadback} from './sampling-readback.mjs';
-import {samplingOutputColumns,alignSamplingOutput,readSamplingOutputs} from './sampling-output.mjs';
+import {samplingOutputColumns,alignSamplingOutput,readSamplingOutputs,validateSamplingOutputMapping} from './sampling-output.mjs';
 export function createSamplingNodeSupport(config){return createSequentialNodeSupport(config,{type:'preprocessing.sampling',validate:validateSamplingParameters,parameterSchema:samplingParametersSchema});}
 export function createSequentialNodeSupport(config,{type,validate,parameterSchema}){return createTabularTransformNodeSupport(config,{
  type,mode:'sequential',modes:['sequential','random','stratified','biased'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
@@ -24,7 +24,7 @@ export async function configureSamplingOutputs(channel,c,p,mappings,finishWizard
    if(c.new_node&&['stratified','biased'].includes(c.mode))await configureOutputAutosync(channel,false);
    const s=await channel.observe({condition:'sequential output '+port+' schema',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
    const m=s.node_mapping;
-   if(!m.inventory_complete||!m.source_identity_verified||m.node_context.output_port?.port!==port)throw Error('Sequential output owner differs');
+   validateSamplingOutputMapping(c,m,port);
    const schema=m.target_fields.filter(f=>!f.excluded).map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
    if(c.new_node)alignSamplingOutput(schema,samplingOutputColumns(c,port));
    const definition=await readOutputDefinitionPages(channel,{expectedCount:m.target_fields.length});
