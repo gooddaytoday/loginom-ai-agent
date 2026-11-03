@@ -123,7 +123,6 @@ export async function connectionService(
       url: settingsAddress(current?.url ?? Product.connection.url),
       username: current?.username ?? Product.connection.username,
       folder: `/${current?.username ?? Product.connection.username}`,
-      hasApiKey: !!current?.apiKey,
       hasPassword: !!current?.password,
       browser: { ...state.browser },
       state:
@@ -255,9 +254,6 @@ export async function connectionService(
       if (candidate.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       validateAddress(candidate.url, candidate.username)
-      const apiKey =
-        candidate.apiKey.operation === "preserve" ? (state.pending ?? state.active)?.apiKey : candidate.apiKey.value
-      if (!apiKey) throw new Error("LOGINOM_API_KEY_REQUIRED")
       const password =
         candidate.password.operation === "preserve"
           ? ((state.pending ?? state.active)?.password ?? "")
@@ -272,7 +268,8 @@ export async function connectionService(
         // preserves saved URLs independently of this marker.
         urlSource: "explicit" as const,
         username: candidate.username,
-        apiKey,
+        // The knowledge service uses the built-in key; a key sent by older clients is ignored.
+        apiKey: "",
         password,
       }
       const controller = new AbortController()
@@ -304,7 +301,6 @@ export async function connectionService(
       if (
         state.active?.url === record.url &&
         state.active.username === record.username &&
-        state.active.apiKey === record.apiKey &&
         state.active.password === record.password
       )
         state.browser = { ...browser }

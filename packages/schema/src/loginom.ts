@@ -12,7 +12,8 @@ export const Candidate = Schema.Struct({
   revision: NonNegativeInt,
   url: Schema.String,
   username: Schema.String,
-  apiKey: SecretEdit,
+  // Older clients still send their own MCP key; the built-in key replaced it.
+  apiKey: Schema.optionalKey(SecretEdit),
   password: PasswordEdit,
 })
 export type Candidate = typeof Candidate.Type
@@ -35,7 +36,6 @@ export const View = Schema.Struct({
   url: Schema.String,
   username: Schema.String,
   folder: Schema.String,
-  hasApiKey: Schema.Boolean,
   hasPassword: Schema.Boolean,
   state: State,
   browser: optional(BrowserStatus),

@@ -114,11 +114,13 @@ test("restored Host starts only knowledge and local settled does not wait for th
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
   await store.stage({
     generation: 1,
     revision: 1,
-    apiKey: "UNIT-NONSECRET",
+    // A connection saved by an older build keeps its own key; Help uses the built-in one.
+    apiKey: "LEGACY-NONSECRET",
     password: "PRIVATE-NONSECRET-PASSWORD",
     username: "user",
     url: "http://unavailable.example/app/?custom=1",
@@ -158,7 +160,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
         args: {},
         userMessage: "original",
       }),
-    ).toMatchObject({ structuredContent: { state: "starting", generation: 1, hasApiKey: true } })
+    ).toMatchObject({ structuredContent: { state: "starting", generation: 1 } })
     await expect(
       client.request("call", {
         run: "before-ready",
@@ -193,7 +195,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
     })
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),
-    ).toMatchObject({ structuredContent: { state: "ready", generation: 1, hasApiKey: true } })
+    ).toMatchObject({ structuredContent: { state: "ready", generation: 1 } })
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(host.journal.pending()).toEqual([])
     expect(await readdir(join(root, "recovery"))).toEqual([])
