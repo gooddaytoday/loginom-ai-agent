@@ -5,6 +5,7 @@
   "playwright": "1.64.0-alpha-1789764292000",
   "chromiumRevision": "1246",
   "endpoint": "https://mcp.loginom.ai/mcp",
+  "reserveEndpoint": "https://mcp-reserve.loginom.ai/mcp",
   "actionManifestUri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
   "actionManifestSha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
   "target": "linux-x64",

@@ -5,6 +5,8 @@ import release from "../loginom-release.json"
 test("bundled MCP and first-run Loginom defaults use the public service addresses", () => {
   expect(Product.knowledgeEndpoint).toBe("https://mcp.loginom.ai/mcp")
   expect(release.endpoint).toBe(Product.knowledgeEndpoint)
+  expect(Product.knowledgeReserveEndpoint).toBe("https://mcp-reserve.loginom.ai/mcp")
+  expect(release.reserveEndpoint).toBe(Product.knowledgeReserveEndpoint)
   expect(Product.connection.url).toBe("https://app.loginom.ai")
 })
 

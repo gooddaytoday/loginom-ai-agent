@@ -10,6 +10,7 @@ import { connectionStore, type ActiveConnection } from "./connection/connection-
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
 import { fileReferences } from "./file-reference"
+import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
 export async function createLoginomHost(options: {
   root: string
@@ -35,7 +36,7 @@ export async function createLoginomHost(options: {
     number,
     {
       connection: ActiveConnection
-      knowledge: Awaited<ReturnType<typeof superviseKnowledge>>
+      knowledge: Awaited<ReturnType<typeof startKnowledge>>
       catalog: Promise<unknown>
       ready: Promise<void>
       children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>>
@@ -74,7 +75,14 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal, deadline?: number) {
+  async function launch(
+    connection: ActiveConnection,
+    chat: string,
+    endpoint: string,
+    validation = false,
+    signal?: AbortSignal,
+    deadline?: number,
+  ) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise(
       {
@@ -92,7 +100,7 @@ export async function createLoginomHost(options: {
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
-        endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+        endpoint,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
         ...(deadline !== undefined ? { startupDeadline: deadline } : {}),
@@ -108,6 +116,78 @@ export async function createLoginomHost(options: {
     }
     throw error
   }
+  // Knowledge and every chat runtime of a generation use one service. Only an
+  // unavailable primary moves it to the pinned reserve; a refused key stays put.
+  async function startKnowledge(connection: ActiveConnection, stateDir: string, signal?: AbortSignal) {
+    const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+    const override = environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT
+    const reserve: string | undefined =
+      override === undefined && typeof manifest.reserveEndpoint === "string" ? manifest.reserveEndpoint : undefined
+    const start = (endpoint: string) =>
+      superviseKnowledge(
+        {
+          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+          stateDir,
+          generation: connection.generation,
+          endpoint,
+          apiKey: connection.apiKey,
+          environment,
+        },
+        signal,
+      ).catch(startupFailure)
+    const endpoint: string = override ?? manifest.endpoint
+    const primary = await start(endpoint)
+    const knowledge = { child: primary, endpoint, closed: false }
+    // A silent connect hang would otherwise spend the whole startup retry budget on the primary.
+    const catalog = primary.request("list", undefined, reserve === undefined ? undefined : 15_000).catch(
+      async (error: unknown) => {
+        if (
+          reserve === undefined ||
+          knowledge.closed ||
+          !(error instanceof Error) ||
+          !["LOGINOM_KNOWLEDGE_UNAVAILABLE", "LOGINOM_RUNTIME_TIMEOUT"].includes(error.message)
+        )
+          throw error
+        await primary.close().catch(() => {
+          startupCleanup.failed = true
+        })
+        const fallback = await start(reserve)
+        knowledge.child = fallback
+        knowledge.endpoint = reserve
+        if (knowledge.closed) {
+          await fallback.close()
+          throw new Error("LOGINOM_KNOWLEDGE_CLOSED")
+        }
+        await recordLocalDiagnostics(
+          stateDir,
+          "startup",
+          [
+            {
+              event: "knowledge.endpoint_reserve",
+              generation: connection.generation,
+              endpoint: reserve,
+              reason: error.message,
+            },
+          ],
+          { knownSecrets: [connection.apiKey] },
+        ).catch(() => undefined)
+        return fallback.request("list")
+      },
+    )
+    void catalog.catch(() => undefined)
+    return Object.assign(knowledge, {
+      catalog,
+      // Chat runtimes start only after the generation has chosen its service.
+      selected:
+        reserve === undefined
+          ? Promise.resolve(endpoint)
+          : catalog.then(
+              () => knowledge.endpoint,
+              () => knowledge.endpoint,
+            ),
+    })
+  }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
@@ -115,33 +195,22 @@ export async function createLoginomHost(options: {
         signal?.throwIfAborted()
         const chat = randomUUID()
         try {
-          const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-          const knowledge = await superviseKnowledge(
-            {
-              node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-              entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-              stateDir: join(root, "validation", "knowledge", chat),
-              generation: connection.generation,
-              endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-              apiKey: connection.apiKey,
-              environment,
-            },
-            signal,
-          ).catch(startupFailure)
+          const knowledge = await startKnowledge(connection, join(root, "validation", "knowledge", chat), signal)
           const cancel = () => {
-            void knowledge.close().catch(() => undefined)
+            void knowledge.child.close().catch(() => undefined)
           }
           signal?.addEventListener("abort", cancel, { once: true })
           try {
             signal?.throwIfAborted()
-            await knowledge.request("list")
+            await knowledge.catalog
             signal?.throwIfAborted()
           } finally {
             signal?.removeEventListener("abort", cancel)
-            await knowledge.close()
+            knowledge.closed = true
+            await knowledge.child.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, true, signal).catch((error: unknown) => {
+          const child = await launch(connection, chat, knowledge.endpoint, true, signal).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
@@ -161,17 +230,8 @@ export async function createLoginomHost(options: {
         }
       },
       async prepare(connection) {
-        const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-        const knowledge = await superviseKnowledge({
-          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-          stateDir: join(root, "knowledge", String(connection.generation)),
-          generation: connection.generation,
-          endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-          apiKey: connection.apiKey,
-          environment,
-        }).catch(startupFailure)
-        const catalog = knowledge.request("list")
+        const knowledge = await startKnowledge(connection, join(root, "knowledge", String(connection.generation)))
+        const catalog = knowledge.catalog
         const ready = catalog.then(() => undefined)
         const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
@@ -190,8 +250,11 @@ export async function createLoginomHost(options: {
           },
           async close() {
             generations.delete(connection.generation)
+            knowledge.closed = true
             const results = await Promise.allSettled([
-              knowledge.close(),
+              knowledge.child.close(),
+              // A reserve that was starting during close is closed once it settles.
+              knowledge.selected.then(() => knowledge.child.close()),
               ...[...generation.children.values()].map(async (child) => (await child).close()),
             ])
             if (results.some((result) => result.status === "rejected"))
@@ -227,7 +290,7 @@ export async function createLoginomHost(options: {
     knowledge(generation: number) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
-      return current.knowledge
+      return current.knowledge.child
     },
     async catalog(generation: number) {
       const current = generations.get(generation)
@@ -265,7 +328,7 @@ export async function createLoginomHost(options: {
     async interruptAll() {
       const results = await Promise.allSettled(
         [...generations.values()].flatMap((generation) => [
-          generation.knowledge.request("interrupt", { all: true }),
+          generation.knowledge.child.request("interrupt", { all: true }),
           ...[...generation.children.values()].map(async (child) => (await child).request("interrupt")),
         ]),
       )
@@ -312,17 +375,19 @@ export async function createLoginomHost(options: {
       return retain(
         current,
         chat,
-        launch(current.connection, chat, false, startup?.signal, startup?.deadline).then(
-          (child) => {
-            service.browserStatus(generation, { state: "verified" })
-            return child
-          },
-          (error: unknown) => {
-            if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
-              service.browserStatus(generation, { state: "failed", failure: error.message })
-            throw error
-          },
-        ),
+        current.knowledge.selected
+          .then((endpoint) => launch(current.connection, chat, endpoint, false, startup?.signal, startup?.deadline))
+          .then(
+            (child) => {
+              service.browserStatus(generation, { state: "verified" })
+              return child
+            },
+            (error: unknown) => {
+              if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
+                service.browserStatus(generation, { state: "failed", failure: error.message })
+              throw error
+            },
+          ),
       )
     },
   }
