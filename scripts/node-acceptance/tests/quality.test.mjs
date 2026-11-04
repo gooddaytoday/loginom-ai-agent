@@ -23,7 +23,7 @@ print('PASS')`;
  const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
-test('Quality audit uses stock exact typed matching and refuses substitutions or recreated nodes',async()=>{
+async function qualityEvents(){
  const root=new URL('../../../docs/node-development/nodes/research-quality/acceptance/',import.meta.url);
  const initial=JSON.parse(await readFile(new URL('expected.json',root))),updated=JSON.parse(await readFile(new URL('expected-update.json',root)));
  const round=(expected,execution,source)=>({status:'SUCCEEDED',cleanup_complete:true,node:{node_id:'quality'},execution:{status:'completed',execution_id:execution},configuration:source?{readback:{kind:'quality'}}:{status:'not_requested'},
@@ -32,6 +32,10 @@ test('Quality audit uses stock exact typed matching and refuses substitutions or
    sample:o.rows.map(r=>o.columns.map(c=>{const value=r[c.name];return c.type==='variant'?{type:'variant',is_null:value===null,cell_type:value?.cell_type??'null',value:value?.cell_type==='real'?String(value.value):value?.value??null,precision:'exact_native',native:{tag:value===null?1:value.cell_type==='real'?5:8}}:{type:c.type,is_null:value===null,value:value===null?null:c.type==='integer'?String(value):value,precision:c.type==='real'?'17_significant_digits':c.type==='integer'?'exact_integer':'source_text',...(c.type==='real'&&value!==null?{representation:'binary64',decimal:String(value)}:{})};}))}))}});
  const imports=['diagnostic.csv','update.csv'].map(path=>({status:'SUCCEEDED',cleanup_complete:true,node:{node_id:'import'},execution:{status:'completed'},output:{ports:[]},configuration:{readback:{kind:'text_import',source:{source_path:path}}}}));
  const events=[...imports,round(initial,'first',true),round(updated,'last',false)];
+ return {initial,updated,events};
+}
+test('Quality audit uses stock exact typed matching and refuses substitutions or recreated nodes',async()=>{
+ const {initial,updated,events}=await qualityEvents();
  assert.equal(checkQualityMain(initial,updated,events).status,'PASS');
  for(const fault of ['null','subtype','ports','order','source','node']){
   const bad=structuredClone(events),last=bad[3];
@@ -42,5 +46,36 @@ test('Quality audit uses stock exact typed matching and refuses substitutions or
   if(fault==='source')bad[1].configuration.readback.source.source_path='diagnostic.csv';
   if(fault==='node')last.node.node_id='new-quality';
   assert.throws(()=>checkQualityMain(initial,updated,bad),/QUALITY_/);
+ }
+});
+
+// LAB-797 / run 1793771614014109253: journal lines 204, 377, 535, 628.
+// The update used finish=done (model.stdout:60); its receipt has no execution.
+async function reviewerSequence(){
+ const {initial,updated,events:[imported,configured,first,last]}=await qualityEvents();
+ configured.execution={status:'not_requested',execution_id:null};
+ configured.output={status:'not_refreshed',ports:[]};
+ configured.configuration.status='applied';
+ configured.configuration.readback.scope='observed_before_verified_finish';
+ return {initial,updated,events:[imported,first,configured,last]};
+}
+test('Quality accepts LAB-797 source update finished with done before downstream execution',async()=>{
+ const {initial,updated,events}=await reviewerSequence();
+ assert.deepEqual(checkQualityMain(initial,updated,events),{status:'PASS',node_id:'quality',execution_ids:['first','last'],ports:[0,1,2,3,4]});
+});
+test('Quality refuses unconfirmed done updates or updates after downstream execution',async()=>{
+ const {initial,updated,events}=await reviewerSequence();
+ for(const fault of ['failed','cleanup','discarded','readback','pending','source','node','late','stale']){
+  const bad=structuredClone(events),update=bad[2];
+  if(fault==='failed')update.status='FAILED';
+  if(fault==='cleanup')update.cleanup_complete=false;
+  if(fault==='discarded')update.configuration.status='discarded';
+  if(fault==='readback')delete update.configuration.readback.scope;
+  if(fault==='pending')update.execution.status='pending';
+  if(fault==='source')update.configuration.readback.source.source_path='diagnostic.csv';
+  if(fault==='node')update.node.node_id='new-import';
+  if(fault==='late')bad.push(bad.splice(2,1)[0]);
+  if(fault==='stale')bad[3].output=structuredClone(bad[1].output);
+  assert.throws(()=>checkQualityMain(initial,updated,bad),/QUALITY_/,fault);
  }
 });

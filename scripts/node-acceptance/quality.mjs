@@ -11,7 +11,8 @@ function* receipts(value){
 // compaction can omit whole sample rows; it cannot create acceptance evidence.
 export function checkQualityMain(initial,updated,events){
  const need=(v,m)=>{if(!v)throw Error('QUALITY_'+m);};
- const complete=[...receipts(events)].filter(r=>r.cleanup_complete===true&&r.execution.status==='completed');
+ const successful=[...receipts(events)].filter(r=>r.cleanup_complete===true);
+ const complete=successful.filter(r=>r.execution.status==='completed');
  const configured=complete.filter(r=>r.configuration?.readback?.kind==='quality');
  need(configured.length>0,'NATIVE_NODE_MISSING');
  const ids=new Set(configured.map(r=>r.node.node_id));need(ids.size===1,'NODE_REPLACED');
@@ -25,7 +26,11 @@ export function checkQualityMain(initial,updated,events){
  const matches=(r,want)=>want.outputs.every(o=>{const port=r.output.ports.find(p=>p.port===o.output_port);return port&&matchesExpectedOutput(port,o);});
  const first=rounds.findIndex(r=>matches(r,initial));need(first>=0,'INITIAL_VALUES');
  const last=rounds.findIndex((r,i)=>i>first&&matches(r,updated));need(last>first,'UPDATED_VALUES');
- const imports=complete.filter(r=>r.configuration?.readback?.kind==='text_import');
+ // Done commits the source without executing the import. A subsequent Quality
+ // execution must still prove the updated values on all five fresh outputs.
+ const imports=successful.slice(0,successful.indexOf(rounds[last])).filter(r=>r.configuration?.readback?.kind==='text_import'
+  &&(r.execution.status==='completed'||r.execution.status==='not_requested'&&r.configuration.status==='applied'
+   &&r.configuration.readback.scope==='observed_before_verified_finish'));
  need(new Set(imports.map(r=>r.node.node_id)).size===1&&new Set(imports.map(r=>r.configuration.readback.source.source_path)).size>=2,'SAME_IMPORT_UPDATED_SOURCE');
  return {node_id:id,execution_ids:[rounds[first].execution.execution_id,rounds[last].execution.execution_id],ports:[0,1,2,3,4],status:'PASS'};
 }
