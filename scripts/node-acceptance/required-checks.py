@@ -33,6 +33,7 @@ RULES = (
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
+    ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact',)),
     ((C + 'variables-calculator-*.mjs',), ('live-ui',), ('variables-calculator',)),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18', 'throw1', 'js-declared-empty')),
     ((C + 'node-port-*.mjs', C + 'node-output-context.mjs', C + 'node-read*.mjs',
