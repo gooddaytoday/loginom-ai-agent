@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins v0.4.0 Quality and Coarse Classes registrations and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,115955,'fa621342bd8e0ba9e0a502209e9fd11a17fd7f55f5f0ce10c82a83c66332f043'],
-  [nodeApiTools.map(userNodeTool),18154,'6437daaaf179b12b4c4260bad3347ab2a4cceb778c64de8269dbb95bbf7a2008'],
+  [nodeApiTools,122613,'1caf44b85cdf48f4f5d9f5e4a14f7f3dd8ccfe49eca704f8acbc692867d125ab'],
+  [nodeApiTools.map(userNodeTool),18264,'053dab4a539c2c1b0497d64e428c269b25e04f98e494652a9097e52252b2d393'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

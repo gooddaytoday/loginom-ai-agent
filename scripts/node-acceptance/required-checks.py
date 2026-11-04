@@ -49,6 +49,8 @@ RULES = (
      ('live-ui',), ('js-declared-empty',)),
     ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
     ((C + 'quality-*.mjs',), ('live-ui',), ('quality-default', 'quality-spikes')),
+
+    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2', 'clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
@@ -71,6 +73,9 @@ RULES = (
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat')),
     ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single')),
+    ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
+      'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
+     ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
      ('live-ui',), ('crosstable-real-keys',)),

@@ -204,8 +204,8 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {makeTextExportContextCode}=await load('client/lib/text-export-context.mjs');
  const destinations=[];
- for(const target of graph.nodes.filter(n=>['exports.text','exports.excel'].includes(n.type))){
-  const excel=target.type==='exports.excel',stage=excel?'excel_export':'text_export_params';
+ for(const target of graph.nodes.filter(n=>['exports.text','exports.excel','exports.lgd'].includes(n.type))){
+  const lgd=target.type==='exports.lgd',excel=target.type==='exports.excel',stage=lgd?'lgd_export':excel?'excel_export':'text_export_params';
   const channel=channelFor(target.ref,(includeInputFields?'export-input-':'export-destination-')+target.ref.node_id);
   const owned=s=>s.prepared_node_context?.verified===true
    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===target.ref[k]);
@@ -264,13 +264,13 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
     resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step')),'export Next').ref,expected_stage:stage})});
    s=await channel.observe({condition:'cold export destination rendered',ready:s=>s.wizard?.stage===stage});
    const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
-   const reader=excel?(await load('client/lib/exports-excel-context.mjs')).makeExcelExportContextCode:makeTextExportContextCode;
+   const reader=lgd?(await load('client/lib/lgd-export-context.mjs')).makeLgdExportContextCode:excel?(await load('client/lib/exports-excel-context.mjs')).makeExcelExportContextCode:makeTextExportContextCode;
    const observed=await execute(reader(binding));
    need(observed.verified===true&&observed.stage===stage&&observed.settings_applied===false
     &&observed.node_context?.verified===true&&observed.node_context.surface==='wizard'
     &&['document_id','workflow_id','node_id'].every(k=>observed.node_context?.[k]===target.ref[k])
     &&typeof observed.values?.destination?.value==='string','export destination unavailable');
-   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value]))}:{}),...(input_fields?{input_fields}:{})});
+   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(lgd?{lgd_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value]))}:{}),...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value]))}:{}),...(input_fields?{input_fields}:{})});
   }finally{
    const current=await channel.observe({condition:'cold export inspection cancellation surface',ready:()=>true});
    if(current.wizard?.status==='observed'){

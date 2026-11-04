@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "loginom_version": "7.4.2",
+  "files": [
+    {
+      "path": "variables.json",
+      "role": "authored_variables",
+      "bytes": 612,
+      "sha256": "0973a07a61a2d92c2152485697a5b4aed5f98fb8413bdcabb1224fb94f2442a6",
+      "encoding": "UTF-8"
+    },
+    {
+      "path": "source.lgp",
+      "role": "native_input_package",
+      "bytes": 6442,
+      "sha256": "62e9e59c5431e45d6a1fe0493db7ea2c63db31ff0ffacffef60833c4db2c1166",
+      "encoding": "ZIP/binary"
+    }
+  ],
+  "variable_order": [
+    "A",
+    "B",
+    "Text",
+    "Moment",
+    "Missing",
+    "Rate",
+    "Empty",
+    "Zero"
+  ],
+  "source": {
+    "component": "Calculator (variables)",
+    "native_engine": "TBGCalcVariables",
+    "icon": "bg-vendor-icon-calcvariables",
+    "output_port": 0,
+    "port_kind": "variables",
+    "table_input_required": false
+  },
+  "null": "JSON null; typed Null() in the source; CSV export marker ?",
+  "datetime": "civil YYYY-MM-DDTHH:MM:SS.mmm, no timezone",
+  "csv_export": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "header": "names",
+    "text_qualifier": "\"",
+    "null_marker": "?"
+  },
+  "note": "Input fixture only. No converter, result table, export or output visualizer. Native binary package bytes are pinned; expected values come from authored JSON."
+}

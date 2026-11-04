@@ -7,6 +7,23 @@ and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
 reexecutes the saved node without configuration. Only Moda/variant uses the
 bounded native decoder; ordinary scalar reading and other node limits are unchanged.
 
+`lgd-import`, `lgd-properties`, `lgd-corrupt`, `lgd-export` используют
+утверждённые задания LGD и бинарные fixtures этапа 0. Ожидания `expected-*-run.json`
+переносят независимые CSV/manifest-значения в штатную форму полного CSV/cold reader.
+Модели передаются только исходный LGD либо typed.csv + schema.json.
+LGD копируется без изменения байтов в рабочий каталог; в запрос добавляется
+его локальный путь для штатного `loginom_file_admit`. Бинарная часть провайдеру
+не передаётся: его API не поддерживает `application/octet-stream`.
+Положительные случаи проверяют все значения, типы, порядок, Save, cold и cleanup;
+дополнительный LGD-аудит читает сохранённый checksum, LZ4 и виды полей без настройки.
+Параметры источника проверяются до cold Execute, свойства выходных полей —
+после штатного выполнения и полного чтения: LGD материализует определения при выполнении.
+Экспорт проверяет собственный файловый результат без табличного output, непустой
+BGDATA/LZ4 файл и новый обратный импорт. Независимый BGDATA-decoder по решению
+владельца не применяется. Corrupt требует исходную ошибку checksum, сообщение
+пользователю и Save без успешного импорта; холодное выполнение отрицательного
+случая не запускается. Stock-проверки остальных сценариев сохранены.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
@@ -479,3 +496,8 @@ cold обоих портов с независимым Apriori oracle, точн�
 через autosync=false, CSV/Save/cold/cleanup; строки — мультимножество.
 Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
 модели передаются только соответствующее задание и перечисленные CSV.
+
+`ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
+по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
+Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
+CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.

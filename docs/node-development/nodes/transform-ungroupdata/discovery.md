@@ -14,7 +14,7 @@
 |---|---|
 | Палитра | `ModelForm;colVendors_Компоненты>Трансформация>Разгруппировка;TreeText` |
 | Component ID | `component.transform.UngroupData` из назначения; узел создан из указанной строки палитры |
-| Native fulltype | `not_checked`: собственный .lgp сохранён, штатное скачивание не доставило файл; component ID не подменяет fulltype |
+| Native fulltype | **`TBGUngroupDataEngine`** — LAB-785: штатно скачан собственный пакет, `Unit_0/Unit.xml` → `Component/Engine/@xsi:type`, сопоставлен GUID `256328b5-2749-4d0b-9dab-7718ccf9d24d`; VendorGuid `e7a4849d-3f92-4636-8efc-cae078129e65` |
 | Вход 0 | `Graph;<узел>;Input_Data-0`, «Разгруппируемые данные»: групповые итоги |
 | Вход 1 | `Graph;<узел>;Input_Data-1`, «Опорные данные»: группы, наименования, готовые доли |
 | Выход 0 | `Output_Data-0`, «Выход разгруппировки» |
@@ -183,3 +183,13 @@ Total/Share, несколько разгруппируемых полей, пр�
 
 Oracle и expected подготовлены до модельных прогонов; сырые снимки,
 квитанции, пакеты и журналы в PR не входят.
+
+## LAB-785: native identity
+
+Сохранён и штатно скачан собственный новый пакет в том же authenticated
+Playwright context. В Files выбран файл, затем явный пункт `mniDownload`
+(середина split-button раскрывает меню). Native Engine type выше получен
+из XML записи того же GUID, зафиксированного на живом графе.
+Подтверждены cached UI stores `FColumnsStore` / `FSupportColumnsStore`: роли
+Group=6, Total=7, Item=4, Share=9; reciprocal `LinkIndex` адресует индекс
+поля другого входа. RPC engine getters не использовались.

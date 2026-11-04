@@ -1,0 +1,13 @@
+{
+  "endpoint": "https://httpbin.org/anything",
+  "method": "GET",
+  "query_order": ["limit", "skip"],
+  "variables": [
+    {"name": "limit", "type": "integer"},
+    {"name": "skip", "type": "integer"}
+  ],
+  "cases": [
+    {"name": "initial", "limit": 3, "skip": 2, "export": "rest-variables-initial.csv"},
+    {"name": "updated", "limit": 5, "skip": 10, "export": "rest-variables-updated.csv"}
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.lgd",
+      "label_any": true
+    }
+  ],
+  "lgd": {
+    "kind": "standalone",
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": "string",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real",
+        "data_kind": "continuous",
+        "tolerance": {
+          "abs": 0,
+          "rel": 0
+        }
+      },
+      {
+        "name": "Occurred",
+        "label": "Occurred",
+        "type": "datetime",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Active",
+        "label": "Active",
+        "type": "boolean",
+        "data_kind": "discrete"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Active",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ]
+    }
+  ]
+}
