@@ -228,7 +228,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const target=record.target;
           if(record.type==='attributes' && record.attributeName==='style' && target?.isConnected
             && target.classList?.contains('CodeMirror-cursors')) {
-            const editor=target.closest('[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
+            const editor=target.closest('[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"],[data-tid$=";WizrdMCF;CalcVariablesWizard;cmpExpression"]');
             const wrapper=target.closest('.CodeMirror');
             const visibilityOnly=value=>value===null || typeof value==='string' && /^\s*(?:visibility\s*:\s*hidden\s*;?\s*)?$/.test(value);
             if(editor && wrapper && editor.contains(wrapper) && wrapper.CodeMirror?.getWrapperElement?.()===wrapper
