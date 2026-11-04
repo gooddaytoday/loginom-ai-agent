@@ -1,0 +1,74 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.to_table"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "variables.to_table",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "A",
+          "label": "Количество",
+          "type": "integer"
+        },
+        {
+          "name": "B",
+          "label": "Флаг",
+          "type": "boolean"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string"
+        },
+        {
+          "name": "Moment",
+          "label": "Момент",
+          "type": "datetime"
+        },
+        {
+          "name": "Missing",
+          "label": "Пропуск",
+          "type": "integer"
+        },
+        {
+          "name": "Rate",
+          "label": "Ставка",
+          "type": "real",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Empty",
+          "label": "Пустая строка",
+          "type": "string"
+        },
+        {
+          "name": "Zero",
+          "label": "Ноль",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "A": 7,
+          "B": false,
+          "Text": "Привет",
+          "Moment": "2026-01-02T03:04:05.006",
+          "Missing": null,
+          "Rate": 1.25,
+          "Empty": "",
+          "Zero": 0
+        }
+      ]
+    }
+  ]
+}
