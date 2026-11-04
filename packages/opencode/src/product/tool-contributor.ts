@@ -268,6 +268,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                   output: content,
                   metadata: {
                     generation: loginom.generation,
+                    ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
                     truncated: truncated.truncated,
                     ...(state === "pending" ? { loginomPending: true } : {}),
                     ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),

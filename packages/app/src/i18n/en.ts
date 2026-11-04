@@ -4,6 +4,7 @@ import { DESKTOP_NATIVE_ENGLISH, DESKTOP_UPDATER_ENGLISH } from "./desktop-nativ
 // byte-for-byte as the established fallback; do not invent translations.
 export const LOGINOM_ENGLISH = {
   ...DESKTOP_UPDATER_ENGLISH,
+  "session.file.unavailable": "File not found",
   "settings.updates.channel": "Updates",
   "settings.updates.stable": "Stable releases only (default)",
   "settings.updates.unstable": "Also unstable releases",

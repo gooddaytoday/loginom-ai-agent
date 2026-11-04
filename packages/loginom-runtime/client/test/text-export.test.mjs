@@ -49,6 +49,14 @@ test('native output lease never becomes an input/upload grant and verifies real 
   await assert.rejects(lease.verify('other.csv',bytes));await assert.rejects(lease.verify('test.csv',bytes-1));
   const descriptor=await lease.verify('test.csv',bytes);assert.equal(descriptor.bytes,bytes);assert.match(descriptor.sha256,/^[a-f0-9]{64}$/);assert.equal(descriptor.execution_id,'execution');
   await lease.retain();assert.deepEqual(store.list(),[]);assert.throws(()=>store.getUploadGrant(descriptor.artifact_id,'fake'));await assert.rejects(store.resolve(descriptor.artifact_id));
+  const receipt={state:'settled',status:'SUCCEEDED',output:{file_artifacts:[descriptor]}};
+  const original=JSON.stringify(receipt);
+  assert.deepEqual(await store.outputFiles(receipt),[{artifact_id:descriptor.artifact_id,path:lease.path,name:'test.csv'}]);
+  assert.equal(JSON.stringify(receipt),original,'private presentation lookup must not change the MCP receipt');
+  assert.deepEqual(await store.outputFiles({...receipt,state:'running'}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,status:'FAILED'}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,artifact_id:'foreign'}]}}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,sha256:'wrong'}]}}),[]);
   assert.equal((await store.resolveOutput(descriptor.artifact_id)).buffer.toString(),'id;text\n1;Привет\n');
   await writeFile(lease.path,'changed');await assert.rejects(store.resolveOutput(descriptor.artifact_id));
   await lease.release();await assert.rejects(store.resolveOutput(descriptor.artifact_id));

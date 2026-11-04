@@ -1300,6 +1300,7 @@ export const dict = {
   "session.header.reveal.finder": "Показать в Finder",
   "session.header.reveal.fileExplorer": "Показать в Проводнике",
   "session.header.reveal.containingFolder": "Открыть папку расположения",
+  "session.file.unavailable": "Файл не найден",
   "session.header.open.fileManager": "Файловый менеджер",
   "session.header.open.app.vscode": "VS Code",
   "session.header.open.app.cursor": "Cursor",
