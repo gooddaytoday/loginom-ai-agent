@@ -256,6 +256,24 @@ test("recommended percentage mutation preserves other metrics and fails the orac
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("calibration checker rejects missing or empty selected corpus", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-empty-"))
+  try {
+    await mkdir(path.join(root, "empty"))
+    const results = await Promise.all(["missing", "empty"].map(async (corpus) => {
+      const proc = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--corpus", path.join(root, corpus)], { stdout: "pipe", stderr: "pipe" })
+      const output = await new Response(proc.stdout).text()
+      const errors = await new Response(proc.stderr).text()
+      return { code: await proc.exited, output, errors }
+    }))
+    expect(results.map((result) => result.code)).toEqual([2, 2])
+    results.forEach((result) => {
+      expect(result.output).toBe("")
+      expect(result.errors).toContain("no calibration manifests for requested tasks")
+    })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("calibration checker selects manifests from the requested collection", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-selection-"))
   try {

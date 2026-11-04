@@ -46,6 +46,7 @@ def main():
   descriptions[description['id']]=description
  assert descriptions,('no tasks',args.tasks)
  names=args.only.split(',') if args.only else [name for name in descriptions if (args.corpus/name/'cases.json').exists()]
+ if not names:ap.error('no calibration manifests for requested tasks')
  assert all(name in descriptions for name in names),('unknown tasks',names)
  counts={k:0 for k in ['sort','aggregate','threshold','filter','column']}
  for name in names:

@@ -28,6 +28,7 @@ def main(case_dir, attempt_dir, scenario_url):
     failed = [gate for gate, passed in gates.items() if not passed]
     if failed:
         raise SystemExit(f"эталон не принят, не пройдено: {', '.join(failed)}")
+    model = summary["models"][0]
     if Path(Path(f"{attempt}.case").read_text(encoding="utf-8").strip()).resolve() != case.resolve():
         raise SystemExit("попытка относится к другому кейсу")
     previous = read_json(case / "provenance.json")
@@ -44,7 +45,7 @@ def main(case_dir, attempt_dir, scenario_url):
         "oracle_sha256": {path.name: digest(path) for path in sorted(case.glob("oracle.*")) if path.suffix != ".py"},
         "reference_sha256": digest(reference),
         "cli": {"binary": settings["CLI"], "version": version, "profile": Path(settings["PROFILE"]).name},
-        "model": {"id": settings["MODEL"], "variant": settings.get("VARIANT") or None, "confirmed_in_session_db": True},
+        "model": {"id": f'{model["providerID"]}/{model["modelID"]}', "variant": model["variant"], "confirmed_in_session_db": True},
         "loginom": {
             "url": settings["LOGINOM_URL"],
             "build": settings.get("LOGINOM_BUILD"),
