@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {variablesToTableConfigurationReadback} from '../lib/variables-vartodata-readback.mjs';
 const variables=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/variables-vartodata/fixtures/variables.json',import.meta.url)));
 function fixture(){
@@ -36,5 +38,15 @@ test('mapping source identity, ownership, scalar types and complete unique field
   f=>f.mapping.target_fields[1].source=f.mapping.source_fields[0],f=>f.mapping.target_fields[0].index=2,
   f=>f.mapping.source_fields[0].type='variant',f=>f.mapping.target_fields[0].type='string']){
   const f=fixture();change(f);assert.throws(()=>f.run());
+ }
+});
+test('the real committed readback fits its public result schema without claiming package persistence',()=>{
+ const f=fixture(),validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ const result={operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,execution:{status:'not_requested',execution_id:null},
+  output:{status:'not_refreshed',evidence_ref:null},package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback:f.run()}};
+ assert.equal(validate(result).valid,true);
+ for(const change of [r=>r.configuration.readback.mode='rows',r=>r.configuration.readback.package_persistence_verified=true,
+  r=>r.configuration.readback.receipt_ids.pop(),r=>delete r.configuration.readback.output_mapping.fields[0].source_name]){
+  const invalid=structuredClone(result);change(invalid);assert.equal(validate(invalid).valid,false);
  }
 });
