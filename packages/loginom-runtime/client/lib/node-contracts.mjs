@@ -6,7 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
-  ['variables.calculator','Калькулятор (переменные)','calcvariables',0,0,false,['expression'],'processors/variables/calc-variables.md'],
+  ['variables.calculator','Калькулятор (переменные)','calcvariables',0,0,false,['expression'],'processors/variables/variables-calc.md'],
   ['variables.user','Переменные сценария','modelvariables',0,0,false,['values'],'workflow/variables/scenario-variables.html'],
   ['transform.enrich_data','Дополнение данных','enrichdata',2,1,true,['left'],'processors/transformation/enrich-data.md'],
   ['research.quality','Качество данных','quality',1,5,false,['profile'],'processors/scrutiny/README.md'],
