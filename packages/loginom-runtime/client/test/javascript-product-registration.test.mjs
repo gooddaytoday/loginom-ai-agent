@@ -19,7 +19,8 @@ const request={operation_id:'product-js',contract_revision:'1.0.0',document_id:'
 
 test('product registration describes actual general JavaScript knowledge without an injected trial',()=>{
   const support=createCandidateNodeSupport(config),handler=support.nodeApplyHandlers.get('programming.javascript');
-  assert.equal(support.nodeApplyHandlers.size,44);
+  assert.equal(support.nodeApplyHandlers.size,47);
+  assert.equal(support.nodeApplyHandlers.has('variables.to_table'),true);
   assert.equal(support.nodeApplyHandlers.has('variables.user'),true);
   for(const type of ['research.auto_correlation','preprocessing.elim_outlier','preprocessing.sampling','preprocessing.data_partition','datamining.log_regression','research.corr_analysis','transform.sliding_window'])
     assert.equal(support.nodeApplyHandlers.has(type),true);

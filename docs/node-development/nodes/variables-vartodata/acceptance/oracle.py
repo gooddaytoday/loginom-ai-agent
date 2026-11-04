@@ -74,11 +74,21 @@ def expected(mode='columns'):
              'Value': None if v['value'] is None else {'cell_type': v['type'], 'value': v['value']}}
             for v in variables
         ]
-    return {
+    result = {
         'package_path': '{{PACKAGE_PATH}}',
         'nodes': [{'type': 'variables.to_table'}],
         'outputs': [output],
     }
+    if mode == 'columns':
+        # The source is the authored variable Calculator, not the unused user
+        # variables builtin. W1 audits its reciprocal edge; the complete table
+        # oracle independently proves all eight typed values and field metadata.
+        result['variable_inventory'] = {
+            'outputs': [],
+            'links': [{'source': {'type': 'bg-vendor-icon-calcvariables'}, 'output': 0,
+                       'target': {'type': 'variables.to_table'}, 'input': 0, 'kind': 'variables'}],
+        }
+    return result
 
 
 def check_csv(path, result):

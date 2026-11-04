@@ -41,7 +41,8 @@ export function wizardOpenBinding(state) {
  const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard'));
  requireValue(controls.length===1,'One prepared settings control is required');
  const labels=state.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.tid===n.tid+';Label;Label');
- return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
+ return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),
+  ...(labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'&&labels[0].signature.native_graph.icon==='bg-vendor-icon-variablestodata'?{variables_to_table:true}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
   graph_tid:n.tid,opening:structuredClone(controls[0].wizard_open)};
 }
 
@@ -121,7 +122,8 @@ export async function openPreparedWizard(channel) {
  const n=after.prepared_node_context,normalize=v=>typeof v==='string'?v.replace(/\s/g,''):'';
  const bound=n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof n[k]==='string'&&n[k]===binding.node[k]);
  const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
-  ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label);
+  ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label)
+  ||binding.variables_to_table===true&&after.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу';
  requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');

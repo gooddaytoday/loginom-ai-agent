@@ -27,6 +27,7 @@ RULES = (
     ((C + 'variables-datatovar-*.mjs', 'docs/node-development/nodes/variables-datatovar/acceptance/**', 'scripts/node-acceptance/variables-datatovar.mjs'), ('live-ui',), ('variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
+    ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns',)),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
     ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),

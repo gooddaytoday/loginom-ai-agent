@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
+import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
@@ -23,6 +24,7 @@ const node = (graph, id) => {
 // One comparison is shared by immediate verification and lost-reply recovery.
 export function verifyNodeTargetEffect(effect, after, positionMatches) {
   const before=effect.before,p=effect.parameters,kind=effect.kind;
+  if(kind==='connect')after=normalizeVariablesToTableLinkGraph(before,after,p.edge);
   if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref))return null;
   const keep=(g,ids,edges=[])=>({nodes:g.nodes.filter(n=>!ids.includes(n.ref.node_id)).map(domainNode),links:g.links.filter(e=>!edges.includes(edgeKey(e))),variable_links:(g.variable_links??[]).filter(e=>!edges.includes(edgeKey(e)))});
   if(kind==='create'){
@@ -350,7 +352,14 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     for(const edge of variableDesired){
       if((graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
       graph=await change('connect',{edge},(before,after)=>(after.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge))
-        &&unchangedExcept(before,after,[],[edgeKey(edge)]));
+        &&unchangedExcept(before,normalizeVariablesToTableLinkGraph(before,after,edge),[],[edgeKey(edge)]));
+    }
+    // Its first native variable link derives the default caption. Preserve an
+    // explicitly requested label after that owned transition, without relinking.
+    if(request.target.kind==='new'&&request.target.type==='variables.to_table'&&request.target.label!==undefined
+      &&node(graph,state.targetId).label!==request.target.label){
+      graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>
+        !!verifyNodeTargetEffect({kind:'rename',parameters:{ref:node(before,state.targetId).ref,label:request.target.label},before},after,adapter.positionMatches));
     }
     state.completed=true;state.final_graph=structuredClone(graph);
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),
