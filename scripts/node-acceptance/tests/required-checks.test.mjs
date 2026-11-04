@@ -64,7 +64,9 @@ for(const [path,scenario] of [
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
  assert.ok(ids(text).includes('live-ui'));assert.match(text,/run-check.py start/);
- assert.ok(text.includes(scenario));assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
+ assert.ok(text.includes(scenario));
+ if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator --pair/);
+ assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });
 
