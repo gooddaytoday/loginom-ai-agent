@@ -37,8 +37,9 @@ export function readColUnionBrowser(prefix){
  const selection=grid.getSelectionModel?.().getSelection?.();
  if(!Array.isArray(selection)||selection.length>1||selection.some(r=>!rows.includes(r)))return fail('col_union_selection');
  const row_count=['minimum','maximum','input'][values.pedTailsAlignType],padding=['null','repeat','last'][values.pedRowsPaddingType];
- const index=sources.findIndex(s=>s.port_guid===owner.FCurDataSourceGuid);
- if(row_count==='input'&&(index<0?selection.length!==0:selection.length!==1||selection[0]!==rows[index]))return fail('col_union_determining_source');
+ // PageExit commits this local selection to FCurDataSourceGuid. That cached
+ // committed GUID still has its old value while the user edits this page.
+ const index=selection.length===1?rows.indexOf(selection[0]):-1;
  return {verified:true,inventory_complete:true,state_source:'cached_col_union_editors',sources,
   settings:{row_count,padding,...(row_count==='input'?{determining_input:index<0?null:['main','attached'][index]}:{})},binding_ready:row_count!=='input'||index>=0,settings_applied:false};
 }
