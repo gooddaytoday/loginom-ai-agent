@@ -135,6 +135,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const allowedDataToVarFactorEditor=(dialog,state)=>{
     const native=state.node_datatovar,editor=state.wizard?.factor_editor,selected=native?.selections?.selected;
     return state.wizard?.stage==='datatovar'&&native?.verified===true&&native.inventory_complete===true
+      &&native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===state.prepared_node_context?.[k])
       &&editor?.status==='rendered_factor_options'&&editor.selected_field?.status==='rendered_selected'
       &&selected?.length===1&&native.fields?.filter(f=>f.record_id===selected[0]&&f.name===editor.selected_field.field_key&&f.role==='selected').length===1
       &&dialog.ref===editor.dialog_ref&&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';

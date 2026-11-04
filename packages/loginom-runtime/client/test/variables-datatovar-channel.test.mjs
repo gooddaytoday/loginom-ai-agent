@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 
-for(const fault of ['none','field','selection','owner','inventory','dialog'])test('DataToVar native factor observation preserves owner guards: '+fault,async()=>{
+for(const fault of ['none','field','selection','owner','missing_owner','unverified_owner','inventory','dialog'])test('DataToVar native factor observation preserves owner guards: '+fault,async()=>{
  const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
  const base=workflow_ref.prefix+';WizrdMCF',tid=base+';FactorEditDialog',node={document_id:'doc',workflow_id:'wf',node_id:'aggregate'};
  const owner={...node,verified:true,surface:'wizard',tid:base};
@@ -13,6 +13,8 @@ for(const fault of ['none','field','selection','owner','inventory','dialog'])tes
  if(fault==='field')native.fields[0].name='other';
  if(fault==='selection')native.selections.selected=['other'];
  if(fault==='owner')native.node_context={...owner,node_id:'other'};
+ if(fault==='missing_owner')delete native.node_context;
+ if(fault==='unverified_owner')native.node_context={...owner,verified:false};
  if(fault==='inventory')native.inventory_complete=false;
  if(fault==='dialog')state.ui.dialogs[0].identity.anchor_tid='Other;FactorEditDialog';
  let clock=1,reads=0;const roots=[];
