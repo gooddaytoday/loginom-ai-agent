@@ -342,7 +342,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
       output_mapping:[...[1,2,3,4].map(port=>';DerivedDataSourceMappingEngineOutputPortWizard-'+port+';btnAddMappingColumn'),';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
-      smoothing:';SmoothingWizard;grdColumnsSettings;tbl',sliding_window:';SlidingWindowWizard;grdColumns;tbl',elim_outlier:';ElimOutlierWizard;grdColumnsSettings;tbl',missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',crosstable:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
+      smoothing:';SmoothingWizard;grdColumnsSettings;tbl',sliding_window:';SlidingWindowWizard;grdColumns;tbl',elim_outlier:';ElimOutlierWizard;grdColumnsSettings;tbl',missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',variables_calculator:';CalcVariablesWizard;btnAddExpr',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',crosstable:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
       enrich:';EnrichDataWizard;grdEnrichData;grd-1;tbl',ungroup:';UngroupDataWizard;grdUngroupColumns;tbl',union:';UnionDataWizard;grdUnionData;grd-1;tbl',join:';JoinDataWizard;grdSourceColumns;tbl',row_filter:';FilterDataWizard;FilterDataPanel;tbl',field_parameters:';ReformColumnsWizard;grdTargetColumns;tbl',done:';DoneWizard;edtDisplayName'};
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
@@ -395,7 +395,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       '[data-tid$=";WizrdMCF;ExprDataEditForm"]',
       ...['edtName','edtDisplayName','cbxDataType'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+'"]';return [owner,owner+' input'];}),
       ...['chbIntermediate','chbCached'].flatMap(name=>['',';InputEl',';DisplayEl'].map(part=>'[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+part+'"]')),
-      '[data-tid$=";WizrdMCF;CalcDataWizard"]','[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
+      '[data-tid$=";WizrdMCF;CalcVariablesWizard"]','[data-tid$=";WizrdMCF;CalcVariablesWizard;btnAddExpr"]','[data-tid$=";WizrdMCF;CalcDataWizard"]','[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
       ...wizardButtons.map(name=>'[data-tid$=";WizrdMCF;'+name+'"]')].join(',');
     if (requestedRoot || discoverRoots) {
       // Native fixed queries discover global blockers/context without walking

@@ -9,8 +9,10 @@ export function validateVariablesCalculatorParameters(parameters,mode,request) {
   &&parameters.expressions.length>=1&&parameters.expressions.length<=32,'1–32 expressions required');
  requireValue(request?.target&&['new','existing'].includes(request.target.kind),'node target required');
  requireValue(Array.isArray(request.inputs)&&request.inputs.length===0,'table inputs are unsupported; use the variables port contract');
- requireValue(Array.isArray(request.mappings)&&request.mappings.length===0,'table mappings are unsupported');
+ requireValue(Array.isArray(request.mappings)&&request.mappings.every(m=>['variables','control'].includes(m.kind)&&m.direction==='input'&&m.port===0),'only typed variable/control input mappings are supported');
  if(request.read!==undefined)requireValue(Array.isArray(request.read.ports)&&request.read.ports.length===0,'table output reads are unsupported; use read.variable_ports');
+ if(request.read?.variable_ports!==undefined)requireValue(request.read.variable_ports.every(p=>p===0),'only variable output zero is supported');
+ requireValue((request.variable_inputs??[]).every(i=>i.input===0&&['variables','control'].includes(i.kind)),'only variable/control input zero is supported');
  const targets=new Set(),names=new Set();
  for(const e of parameters.expressions) {
   requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties].includes(k)),'unsupported expression parameter');
