@@ -1,0 +1,1139 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.col_union_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Минимум: пропуски",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Минимум: повтор набора",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Минимум: последняя запись",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Максимум: пропуски",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": null,
+          "Code": null,
+          "Amount": null,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Максимум: повтор набора",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Максимум: последняя запись",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Главная: пропуски",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Главная: повтор набора",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Главная: последняя запись",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Присоединённая: пропуски",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": null,
+          "Code": null,
+          "Amount": null,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Присоединённая: повтор набора",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Присоединённая: последняя запись",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 40,
+          "AttachedCode": "P",
+          "Rate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 50,
+          "AttachedCode": "Q",
+          "Rate": 1.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 60,
+          "AttachedCode": "R",
+          "Rate": 2.5
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 70,
+          "AttachedCode": "S",
+          "Rate": 3.5
+        }
+      ]
+    }
+  ]
+}
