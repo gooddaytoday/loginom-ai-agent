@@ -220,6 +220,15 @@ test('release refuses a graph that changes between quiet reads',async()=>{
  let reads=0;const graph=()=>{const g=graphOf();if(reads++)g.links.push({source:'other',target:'new',input:0});return g;};
  await assert.rejects(release(stopped({graph}),surface().channel),/graph changed/);
 });
+test('browser recovery proves an already quiet graph without claiming a cleanup effect',async()=>{
+ const s=surface(),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+ const proof=await verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt});
+ assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
+ assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});
+ assert.equal(operation.receipt.receipt.cleanup_complete,false);assert.deepEqual(s.gestures,[]);
+});
 test('browser recovery refuses an unsafe native surface without a cleanup gesture',async()=>{
  for(const options of [{wizard:true},{views:true},{locked:true},{dialog:true},{mask:true},
   ...['document_id','workflow_id','node_id'].map(k=>({context:{...node,[k]:'foreign'}}))]) {

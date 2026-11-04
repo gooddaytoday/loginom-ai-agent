@@ -136,7 +136,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  // visualizers open; return through the observed scenario control only.
  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
   cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
- return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup});
+ return verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation});
 }
 
 // Browser recovery owns manual cleanup; this verifier observes only and never
@@ -154,11 +154,11 @@ export async function verifyRecoveredPendingNode({operation,channel,readReceipt,
  requireValue(response?.state==='completed','The last browser call has not confirmed completion');
  requireValue(response.receipt?.operation_id===reference.operation_id&&response.receipt.action_key===reference.action_key,
   'The last browser receipt identity changed');
- return verifyQuietNodeGraph({operation,channel,node,deadline,now,
+ return verifyQuietNodeGraph({operation,channel,node,deadline,now,openingConfirmation:false,
   cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}});
 }
 
-async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup}) {
+async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup,openingConfirmation}) {
  requireValue(now()<deadline,'Original release graph deadline elapsed');
  const quiet=s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'
   &&sameNode(s.prepared_node_context,node)&&s.prepared_node_context.locked===false
