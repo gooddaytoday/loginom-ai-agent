@@ -44,7 +44,7 @@ export async function readGraph(page, task) {
     const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
     const collection = diagram.FNodes?.FCollection;
     if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
-    const nodeTypes = Object.values(types), byTid = new Map(),connectionPorts = new Map(),nativeBindings=[];
+    const nodeTypes = Object.values(types), byTid = new Map(),variableByTid=new Map(),connectionPorts = new Map(),nativeBindings=[];
     const nodes = collection.map(n => {
       const dom = graph.view.getState(n.FCell)?.shape?.node, tid = dom?.getAttribute('data-tid');
       if (!tid || !containers[0].contains(dom) || !n.FGuid || !n.FCell?.geometry) fail('Node identity is not rendered');
@@ -60,7 +60,7 @@ export async function readGraph(page, task) {
           || !containers[0].contains(labelElements[0]) || !visible(labelElements[0])))) fail('Node label is not bound to its rendered identity');
       const label = nativeLabel.FRawValue;
       const type = nodeTypes.find(t => t.icon_class === n.FIconCls)?.type ?? n.FIconCls;
-      const inputs = [], outputs = [], allPorts=[];
+      const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[];
       for (const ports of n.FPorts ?? []) for (const p of ports.FCollection ?? []) {
         const element = graph.view.getState(p.FCell)?.shape?.node;
         let ptid = element?.getAttribute('data-tid');
@@ -117,6 +117,17 @@ export async function readGraph(page, task) {
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
+        const variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+        if([3,4].includes(p.FSubType)&&!variable&&!control)fail('Variable port native identity changed');
+        if(variable||control){
+          const direction=control?'Input':variable[1],kind=control?'control':'variables',nativeIndex=control?0:Number(variable[2]);
+          if(!p.FGuid||!p.data||p.parent!==n||p.FCell.parent!==n.FCell
+            ||p.FType!==(direction==='Input'?0:1)||p.FSubType!==(control?4:3)
+            ||[...exact(ptid)].filter(e=>containers[0].contains(e)).length!==1)fail('Variable port native identity changed');
+          const descriptor={kind,port:0,port_guid:p.FGuid,native_index:nativeIndex};
+          (direction==='Input'?variableInputs:variableOutputs).push(descriptor);
+          variableByTid.set(ptid,{node:n.FGuid,direction,kind,port:p,descriptor});
+        }
         if(type==='programming.javascript' && m && (p.FType!==(m[1]==='Input'?0:1) || p.FSubType!==1))fail('JavaScript data port has a foreign native type');
         if(m?.[2] && (!p.FGuid || !p.data || p.parent!==n || p.FCell.parent!==n.FCell
           || p.FType!==(m[1]==='Input'?0:1)))fail('Tree port native identity changed');
@@ -127,6 +138,12 @@ export async function readGraph(page, task) {
         if (m) { (m[1] === 'Input' ? inputs : outputs).push(Number(m[3])); byTid.set(ptid, {node:n.FGuid,index:Number(m[3]),direction:m[1],kind:m[2]?'tree':'data'}); }
       }
       inputs.sort((a,b)=>a-b);outputs.sort((a,b)=>a-b);
+      for(const ports of [variableInputs,variableOutputs])for(const kind of ['variables','control']){
+        const selected=ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index);
+        if(new Set(selected.map(p=>p.native_index)).size!==selected.length||kind==='control'&&selected.length>1)fail('Ambiguous variable port indexes');
+        selected.forEach((p,i)=>{p.port=i;});
+      }
+      const variablePorts=variableInputs.length||variableOutputs.length?{variable_inputs:variableInputs,variable_outputs:variableOutputs}:{};
       const kinds={};
       for(const [direction,indexes] of [['Input',inputs],['Output',outputs]]){
         const ports=[...byTid.values()].filter(p=>p.node===n.FGuid&&p.direction===direction);
@@ -135,19 +152,27 @@ export async function readGraph(page, task) {
           kinds[direction.toLowerCase()+'_kinds']=indexes.map(index=>ports.find(p=>p.index===index).kind);
         }
       }
-      nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs],...kinds});
+      nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs],...kinds,...variablePorts});
       for(const p of byTid.values())if(p.node===n.FGuid)p.index=(p.direction==='Input'?inputs:outputs).indexOf(p.index);
       return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,dom_epoch:epoch(dom),
-        position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,
+        position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,...variablePorts,
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
-    const links=[],foreign_links=[],rest_connection_links=[];
+    const links=[],variable_links=[],foreign_links=[],rest_connection_links=[];
     for(const e of containers[0].querySelectorAll('[data-tid]')) {
       const tid=e.getAttribute('data-tid'), parts=tid.split(';Graph;'); if(parts.length!==2)continue;
       const body=parts[1];if(!/^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body))continue;
       const endpoints=body.split('|');
       const prefix=parts[0]+';Graph;',s=byTid.get(prefix+endpoints[0]+';'+endpoints[1]),t=byTid.get(prefix+endpoints[2]+';'+endpoints[3]);
-      if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index});}else {
+      const vs=variableByTid.get(prefix+endpoints[0]+';'+endpoints[1]),vt=variableByTid.get(prefix+endpoints[2]+';'+endpoints[3]);
+      if(vs||vt){
+        if(!vs||!vt||vs.direction!=='Output'||vt.direction!=='Input'||vs.kind!=='variables')fail('Incompatible variable/table link');
+        const edges=vs.port.FCell.edges?.filter(edge=>edge.source===vs.port.FCell&&edge.target===vt.port.FCell
+          &&vt.port.FCell.edges?.includes(edge)&&graph.view.getState(edge)?.shape?.node===e);
+        if(edges?.length!==1)fail('Variable link native reciprocity changed');
+        variable_links.push({source:vs.node,output:vs.descriptor.port,target:vt.node,input:vt.descriptor.port,kind:vt.kind,
+          source_port_guid:vs.port.FGuid,target_port_guid:vt.port.FGuid});
+      }else if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index});}else {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
@@ -158,9 +183,10 @@ export async function readGraph(page, task) {
       }
     }
     links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));foreign_links.sort();
-    if(links.length+foreign_links.length>400)fail('Graph link bound exceeded');
+    variable_links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    if(links.length+variable_links.length+foreign_links.length>400)fail('Graph link bound exceeded');
     rest_connection_links.sort((a,b)=>a.tid.localeCompare(b.tid));
-    return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
+    return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(variable_links.length?{variable_links}:{}),...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
   },task);
 }
@@ -673,7 +699,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       })`,deadline);
     },
     async preflight(value,graph,deadline){
-      if(value.inputs.length && !pinned?.actions?.get('link.create'))throw new Error('Pinned link.create primitive is required');
+      if((value.inputs.length||value.variable_inputs?.length) && !pinned?.actions?.get('link.create'))throw new Error('Pinned link.create primitive is required');
       if(!graph.interaction_ready)throw new Error('Drag surface is not ready');
       if(value.target.kind==='new'){
         const title=NODE_TYPES[value.target.type].title.replace(/\s/g,'_');
@@ -686,7 +712,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
       if(value.target.kind==='existing' && graph.nodes.find(n=>n.ref.node_id===value.target.ref.node_id)?.locked)throw new Error('Node is locked');
       // Cycles are rejected against the full tabular graph before any creation.
-      if(value.target.kind==='existing')for(const input of value.inputs){const seen=new Set(),queue=[value.target.ref.node_id];while(queue.length){const id=queue.pop();if(id===input.source.node_id)throw new Error('Requested link would create a cycle');if(seen.has(id))continue;seen.add(id);queue.push(...graph.links.filter(e=>e.source===id).map(e=>e.target));}}
+      if(value.target.kind==='existing')for(const input of [...value.inputs,...value.variable_inputs??[]]){const seen=new Set(),queue=[value.target.ref.node_id];while(queue.length){const id=queue.pop();if(id===input.source.node_id)throw new Error('Requested link would create a cycle');if(seen.has(id))continue;seen.add(id);queue.push(...[...graph.links,...graph.variable_links??[]].filter(e=>e.source===id).map(e=>e.target));}}
     },
     positionMatches:(node,position)=>Math.abs(node.position.x-Math.round(position.x/8)*8)<0.1&&Math.abs(node.position.y-Math.round(position.y/8)*8)<0.1,
     async mutate(effect,deadline,signal){
@@ -709,17 +735,23 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});
         const {native_bindings:bindings,...observed}=bindingGraph;
         if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_binding_graph_changed'};
+        const edge=effect.parameters.edge;
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
+          if(edge.kind){
+            const kind=direction==='outputs'?'variables':edge.kind,ports=matches.length===1?matches[0][direction==='outputs'?'variable_outputs':'variable_inputs']?.filter(p=>p.kind===kind&&p.port===index):[];
+            if(ports?.length!==1)throw Error('Exact variable port disappeared');
+            return {label:matches[0].label,index:ports[0].native_index,kind:kind==='control'?'control_var':'var'};
+          }
           if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact tabular port disappeared');
           const kind=matches[0][direction==='inputs'?'input_kinds':'output_kinds']?.[index]??'data';
           if(!['data','tree'].includes(kind))throw Error('Unknown owned port kind');
           return {label:matches[0].label,index:matches[0][direction][index],kind};
         };
-        const edge=effect.parameters.edge,bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
-        if(bound.source.kind!==bound.target.kind)throw Error('Incompatible source and target port kinds');
+        const bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
+        if(bound.source.kind!==bound.target.kind&&!(bound.source.kind==='var'&&bound.target.kind==='control_var'))throw Error('Incompatible source and target port kinds');
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_'+(bound.source.kind==='tree'?'DataTree-':'Data-')+bound.source.index});
+        const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_'+(bound.source.kind==='var'?'Var-':bound.source.kind==='tree'?'DataTree-':'Data-')+bound.source.index});
         graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()})`,deadline);
         if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});

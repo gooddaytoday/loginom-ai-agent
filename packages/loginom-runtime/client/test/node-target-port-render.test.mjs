@@ -40,7 +40,7 @@ function fixture({portIndex=0}={}){
   const source=add('connection','bg-vendor-icon-restclientconnection',sourceSuffix),target=add('rest','bg-vendor-icon-restclient',targetSuffix);
   if(tree)for(const [index,p] of [source.port,target.port].entries())Object.assign(p,{FGuid:'tree-port-'+index,data:{},FType:index===0?1:0});
   const tid='MF;TF-1;Graph;connection|'+sourceSuffix+'|rest|'+targetSuffix,dom=element(tid),edge={source:source.port.FCell,target:target.port.FCell};
-  source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid};
+  source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid,dom};
  };
  const addService=(tid=null)=>{
   const port={parent:node,FType:1,FSubType:10,FCell:{parent:node.FCell,visible:true}},dom=element(tid);
@@ -49,6 +49,35 @@ function fixture({portIndex=0}={}){
  };
  return {tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class;nodeTid='MF;TF-1;Graph;'+(factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
+test('W1 inventories variable ports by native kind without shifting table ordinals',async()=>{
+ const f=fixture({portIndex:2}),link=f.restLink();
+ const sourceTid='MF;TF-1;Graph;connection;Output_Var-4',targetTid='MF;TF-1;Graph;rest;Input_Var-1';
+ link.source.dom.getAttribute=()=>sourceTid;link.target.dom.getAttribute=()=>targetTid;
+ link.source.node.FIconCls='bg-vendor-icon-modelvariables';
+ for(const [i,p] of [link.source.port,link.target.port].entries())Object.assign(p,{FGuid:'shared-port',data:{},FType:i===0?1:0,FSubType:3});
+ // Remove the old service edge drawing from consideration: this test concerns inventory.
+ const g=await f.binding(),source=g.nodes.find(n=>n.ref.node_id==='connection'),target=g.nodes.find(n=>n.ref.node_id==='rest');
+ assert.equal(source.type,'variables.user');
+ assert.deepEqual(JSON.parse(JSON.stringify(source.variable_outputs)),[{kind:'variables',port:0,port_guid:'shared-port',native_index:4}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(target.variable_inputs)),[{kind:'variables',port:0,port_guid:'shared-port',native_index:1}]);
+ assert.deepEqual(Array.from(g.nodes.find(n=>n.ref.node_id==='n').outputs),[0]);
+ assert.deepEqual(Array.from(g.native_bindings.find(n=>n.node_id==='n').outputs),[2]);
+});
+for(const change of [p=>{p.parent={};},p=>{p.FCell.parent={};},p=>{p.FType=0;},p=>{p.FGuid=null;},p=>{p.data=null;}])test('W1 refuses a variable port with foreign native identity',async()=>{
+ const f=fixture(),link=f.restLink();link.source.dom.getAttribute=()=> 'MF;TF-1;Graph;connection;Output_Var-4';
+ Object.assign(link.source.port,{FGuid:'v',data:{},FType:1,FSubType:3});change(link.source.port);
+ await assert.rejects(f.binding(),/Variable port native identity/);
+});
+for(const kind of ['variables','control'])test('W1 native reciprocal '+kind+' edge stays outside tabular links',async()=>{
+ const f=fixture({portIndex:2}),l=f.restLink(),source='Output_Var-4',target=kind==='variables'?'Input_Var-1':'Input_ControlVar';
+ l.source.dom.getAttribute=()=> 'MF;TF-1;Graph;connection;'+source;l.target.dom.getAttribute=()=> 'MF;TF-1;Graph;rest;'+target;
+ l.dom.getAttribute=()=> 'MF;TF-1;Graph;connection|'+source+'|rest|'+target;
+ for(const [i,p] of [l.source.port,l.target.port].entries())Object.assign(p,{FGuid:'shared',data:{},FType:i===0?1:0,FSubType:i===0||kind==='variables'?3:4});
+ l.target.port.FCell.edges=[l.edge];
+ const graph=await f.binding();assert.deepEqual(Array.from(graph.links),[]);assert.deepEqual(Array.from(graph.foreign_links),[]);
+ assert.deepEqual(JSON.parse(JSON.stringify(graph.variable_links)),[{source:'connection',output:0,target:'rest',input:0,kind,source_port_guid:'shared',target_port_guid:'shared'}]);
+ l.target.port.FCell.edges=[];await assert.rejects(f.binding(),/native reciprocity/);
+});
 for(const direction of ['input','output'])test('tree_io binds '+direction+' DataTree ports without treating them as foreign controls',async()=>{
  const f=fixture();if(direction==='input')f.input();f.tree();
  const graph=await f.binding(),key=direction==='input'?'inputs':'outputs';

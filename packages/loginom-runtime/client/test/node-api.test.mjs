@@ -5,10 +5,10 @@ import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('model schema inventory pins v0.4.0 Quality and Coarse Classes registrations and excludes private cold windows',()=>{
+test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,121973,'608f3c7853ef7225dfe2280a5abe171d0ec2e2ade0fe1f01519627e90eba96f0'],
-  [nodeApiTools.map(userNodeTool),18224,'2275fac713475db1ddd00dfedbab944d66563b9fab42faab067c7ad20157eb93'],
+  [nodeApiTools,123084,'b7809a006496fcf909d76dae3a6c1296ccab5d8e1a060bc99d917f08a11f1e01'],
+  [nodeApiTools.map(userNodeTool),18599,'efc0878c12e3cb917831d33c790f59964962f7279d8b4ed03ac22a01059ee878'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -31,6 +31,17 @@ const fixture=()=>{
   runtime[name]=(...args)=>{calls.push({name,args});return {operation_id:'op',state:'running'};};
  return {runtime,calls};
 };
+test('W1 variable_inputs is optional and dispatched independently from table inputs',async()=>{
+ const f=fixture(),request={operation_id:'w1',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'wf',navigation_path:[{tid:'crumb',label:'Scenario'}]},
+  target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'wf',node_id:'target'}},inputs:[],mode:'request',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:5,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',request);
+ const link={source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:4,input:0,kind:'variables'};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[link]});
+ assert.deepEqual(f.calls[1].args[0].variable_inputs,[link]);
+ await assert.rejects(dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[{...link,kind:'data'}]}));
+ assert.equal(f.calls.length,2);
+});
 
 test('public apply mode reaches only the existing LinRegression handler',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
