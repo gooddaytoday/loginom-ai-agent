@@ -17,15 +17,19 @@ export function readCoarseClassesBrowser(prefix){
   const grids=[...modelRoots[0].querySelectorAll('[data-tid$=";grdBinning"]')];
   const grid=grids.length===1?globalThis.Ext?.getCmp?.(grids[0].id):null,store=grid?.getStore?.(),data=store?.getData?.(),rs=data?.items,source=data?.getSource?.()?.items;
   if(grid?.el?.dom!==grids[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(rs)||rs.length>1000||store.getCount?.()!==rs.length||source&&(source.length!==rs.length||source.some(r=>!rs.includes(r))))return fail('coarse_classes_model_inventory');
+  const usedElements=[...modelRoots[0].querySelectorAll('[data-tid$=";grdUsedColumns"]')],usedGrid=usedElements.length===1?globalThis.Ext?.getCmp?.(usedElements[0].id):null,usedStore=usedGrid?.getStore?.(),used=usedStore?.getData?.()?.items;
+  if(usedGrid?.el?.dom!==usedElements[0]||usedStore?.$className!=='Ext.data.Store'||usedStore.isLoading?.()||usedStore.isBufferedStore||!Array.isArray(used)||usedStore.getCount?.()!==used.length||used.length>1)return fail('coarse_classes_model_field_inventory');
+  if(used.length===0&&rs.length===0)return {verified:true,state:'settings',classes:[],total_iv:null};
+  const field=used[0]?.data;
+  if(!field||typeof field.Name!=='string'||field.DataType!==5||field.DataKind!==2||field.ColumnPurpose!==1||field.IsLocked!==false||field.IsEdited!==false||!Number.isInteger(field.Count)||field.Count<=0||rs.length!==field.Count||!Number.isFinite(field.TotalIV))return fail('coarse_classes_model_field');
   const classes=[];
   for(const r of rs){
-   if(!r?.isModel||!r.data)return fail('coarse_classes_model_record');
-   const read=names=>{const keys=Object.keys(r.data).filter(k=>names.includes(k.toLowerCase().replace(/_/g,'')));return keys.length===1?r.data[keys[0]]:undefined;};
-   const number=read(['classnumber','classnum','number']),category=read(['uniquevalue','value']),mark=read(['classmark','mark']),woe=read(['woe']),iv=read(['iv']);
-   if(!Number.isInteger(number)||number<0||typeof category!=='string'||typeof mark!=='string'||!Number.isFinite(woe)||!Number.isFinite(iv))return fail('coarse_classes_model_columns:'+Object.keys(r.data).join(','));
-   classes.push({number,category,mark,woe,iv});
+   const d=r?.data;
+   if(!r?.isModel||!Number.isInteger(d?.Index)||d.Index<0||typeof d.Mark!=='string'||!Number.isFinite(d.WoE)||!Number.isFinite(d.IV))return fail('coarse_classes_model_record');
+   classes.push({number:d.Index,mark:d.Mark,woe:d.WoE,iv:d.IV});
   }
-  return {verified:true,state:classes.length?'materialized':'settings',classes};
+  if(new Set(classes.map(c=>c.number)).size!==classes.length)return fail('coarse_classes_model_class_identity');
+  return {verified:true,state:'materialized',classes,total_iv:field.TotalIV,input_field:field.Name};
  }
  const roots=exact(base),root=roots[0];
  if(roots.length!==1||!root.checkVisibility({checkVisibilityCSS:true}))return fail('coarse_classes_root');
@@ -35,16 +39,9 @@ export function readCoarseClassesBrowser(prefix){
  if(view?.el?.dom!==root||!controller||controller.FWizardForm?.FView!==w)return fail('coarse_classes_page_owner');
  const queues=Object.getOwnPropertySymbols(w).filter(s=>s.description==='LockQueue');
  if(queues.length!==1||w[queues[0]]?.IsEmpty!==true)return fail('coarse_classes_pending');
- const candidates=[];
- for(const e of root.querySelectorAll('[data-tid]')){
-  const g=globalThis.Ext?.getCmp?.(e.id);
-  if(g?.el?.dom!==e||typeof g.getStore!=='function'||typeof g.getSelectionModel!=='function')continue;
-  const store=g.getStore(),data=store?.getData?.(),rs=data?.items,source=data?.getSource?.()?.items;
-  if(store?.$className!=='Ext.data.Store'||store.isBufferedStore||store.isLoading?.()||!Array.isArray(rs)||!rs.length||rs.length>1000||store.getCount?.()!==rs.length||source&&(source.length!==rs.length||source.some(r=>!rs.includes(r))))continue;
-  if(rs.every(r=>r?.isModel&&typeof r.data?.Name==='string'&&Number.isInteger(r.data?.ColumnPurpose)))candidates.push({g,rs});
- }
- if(candidates.length!==1)return fail('coarse_classes_field_inventory');
- const {g,rs}=candidates[0],selection=g.getSelectionModel().getSelection();
+ const g=cmp(base+';grdColumns'),store=g?.getStore?.(),data=store?.getData?.(),rs=data?.items,source=data?.getSource?.()?.items;
+ if(controller.constructor?.name!=='CoarseClassesWizard'||controller.FColumnsStore!==store||store?.$className!=='Ext.data.Store'||store.isBufferedStore||store.isLoading?.()||!Array.isArray(rs)||!rs.length||rs.length>1000||store.getCount?.()!==rs.length||source&&(source.length!==rs.length||source.some(r=>!rs.includes(r))))return fail('coarse_classes_field_inventory');
+ const selection=g.getSelectionModel?.().getSelection?.();
  if(!Array.isArray(selection)||selection.length>1||selection.some(r=>!rs.includes(r)))return fail('coarse_classes_selection');
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},kinds={0:'Неопределенное',1:'Непрерывный',2:'Дискретный'},fields=[];
  for(const [index,r] of rs.entries()){

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {validateCoarseClassesParameters,resolveCoarseClassesFields,validateCoarseClassesRows} from '../lib/coarse-classes-parameters.mjs';
+import {validateCoarseClassesParameters,resolveCoarseClassesFields} from '../lib/coarse-classes-parameters.mjs';
 import {coarseClassesOutputColumns} from '../lib/coarse-classes-output.mjs';
 
 const parameters={coarse_classes:{input_field:'Segment',target_field:'Target',event_value:'yes',partition:'automatic',min_class_percent:5,max_classes:2,uniformity_percent:0}};
@@ -23,15 +23,6 @@ test('coarse classes rejects edits in apply, invalid analytic settings and non-d
  assert.deepEqual(resolveCoarseClassesFields(parameters,fields).input_field,'Segment');
  assert.throws(()=>resolveCoarseClassesFields(parameters,fields.map(f=>({...f,data_kind:'Непрерывный'}))));
 });
-test('training rejects missing/nonbinary target and zero frequencies; apply keeps NULL targets',()=>{
- const rows=[['A','yes'],['A','no'],['B','yes'],['B','no']];
- const table={schema:fields.slice(1,3),rows};
- assert.doesNotThrow(()=>validateCoarseClassesRows(parameters,table));
- for(const bad of [[['A',null]],[['A','yes']],[['A','yes'],['A','no'],['B','no']],[['','yes'],['A','no']]])assert.throws(()=>validateCoarseClassesRows(parameters,{...table,rows:bad}));
- assert.doesNotThrow(()=>validateCoarseClassesRows(parameters,{...table,rows:[['B',null]]},['A','B']));
- assert.throws(()=>validateCoarseClassesRows(parameters,{...table,rows:[['C',null]]},['A','B']));
-});
-
 test('serialized observer binds coarse classes stages and actionable named role cells',async()=>{
  const {Page}=await import('./support/workspace-ui-fixture.mjs');
  for(const [suffix,stage] of [['CoarseClassesWizard-1','coarse_classes'],['CoarseClassesWizard-2','coarse_classes_model'],['DerivedDataSourceMappingEngineOutputPortWizard-2;btnAddMappingColumn','coarse_classes_mapping_2']]){
@@ -41,4 +32,16 @@ test('serialized observer binds coarse classes stages and actionable named role 
   const s=await p.observe();assert.equal(s.wizard.stage,stage);
   if(stage==='coarse_classes')assert.ok(s.ui.elements.find(e=>e.tid?.endsWith(';colColumnDisplayName_Segment'))?.allowed_actions.includes('click'));
  }
+});
+
+test('production envelope admits explicit three-port coarse classes requests',async()=>{
+ const {validateNodeApplyEnvelope}=await import('../lib/node-api.mjs');
+ assert.doesNotThrow(()=>validateNodeApplyEnvelope({target:{type:'preprocessing.coarse_classes'},parameters,mode:'internal',finish:'execute',read:{ports:[0,1,2]}}));
+});
+
+test('compact coarse classes request defaults to all three ports',async()=>{
+ const {createUserWorkflowBindings}=await import('../lib/user-workflow.mjs');
+ const b=createUserWorkflowBindings();b.remember({document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]}});
+ const r=b.expandNode({operation_id:'coarse',document_id:'doc',workflow_ref:{workflow_id:'flow'},target:{kind:'new',type:'preprocessing.coarse_classes'},parameters,finish:'execute'});
+ assert.deepEqual(r.read.ports,[0,1,2]);
 });

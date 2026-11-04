@@ -390,7 +390,7 @@ export interface CoarseClassesConfigurationReadback {
  mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic';
  min_class_percent: number; max_classes: number; uniformity_percent: number;
  roles: {name: string; role: 'unused' | 'input' | 'target'}[];
- state: 'settings' | 'materialized'; classes: {number: number; category: string; mark: string; woe: number; iv: number}[];
- training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: Pick<CoarseClassesConfigurationReadback,'state'|'classes'>};
+ state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;
+ training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: Pick<CoarseClassesConfigurationReadback,'state'|'classes'|'total_iv'>};
  output_mappings: BinningConfigurationReadback['output_mappings']; package_persistence_verified: false;
 }

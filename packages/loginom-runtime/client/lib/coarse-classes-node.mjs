@@ -18,17 +18,17 @@ export async function coarseClassesBeforeGraphExecute(options,ctx,c,channel){
  await openPreparedWizard(channel);
  const learned=await configureCoarseClasses(channel,{}, {request:{mode:'apply'},preconfiguration:{target_fields:c.fields}});
  await closePreparedWizard(channel);
- return {training:{...training,source,model:{state:'materialized',classes:learned.configuration.classes}}};
+ return {training:{...training,source,model:{state:'materialized',classes:learned.configuration.classes,total_iv:learned.configuration.total_iv}}};
 }
 export function createCoarseClassesNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
   type:'preprocessing.coarse_classes',modes:['internal','apply'],revision:'coarse-classes-v1-internal-1',parameterSchema:coarseClassesParametersSchema,
   validate:validateCoarseClassesParameters,validateInput:(p,resolved,native)=>resolveCoarseClassesFields(p,resolved.fields??native.target_fields),readback:coarseClassesConfigurationReadback,
-  configurationObservation:{condition:'owned coarseClasses numeric field page',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true},
+  configurationObservation:{condition:'owned coarse classes field page',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true},
   async beforeOpen(channel,request){
    if(request.mode!=='apply')return;
    await channel.openInputPort(0);
-   const s=await channel.observe({condition:'read saved coarseClasses input without commit',readMappings:true,ready:s=>s.node_mapping?.verified&&s.node_mapping.inventory_complete});
+   const s=await channel.observe({condition:'read saved coarse classes input without commit',readMappings:true,ready:s=>s.node_mapping?.verified&&s.node_mapping.inventory_complete});
    const mapping=s.node_mapping;need(mapping.source_identity_verified,'complete current saved input mapping required');
    await closePreparedWizard(channel);return mapping;
   },

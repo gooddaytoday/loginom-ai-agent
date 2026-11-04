@@ -276,7 +276,7 @@ export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool
 export function validateNodeApplyEnvelope(args) {
  // The registered three-output types extend the original public read bound.
  // The small structural validator does not interpret JSON Schema allOf.
- if(!['preprocessing.elim_outlier','preprocessing.data_partition'].includes(args.target?.type)&&args.read?.ports!==undefined)
+ if(!['preprocessing.coarse_classes','preprocessing.elim_outlier','preprocessing.data_partition'].includes(args.target?.type)&&args.read?.ports!==undefined)
   validateActionParameters(array(integer(0,1),2),args.read.ports,'parameters.read.ports');
  const javascript=args.target?.type==='programming.javascript';
  if(javascript){

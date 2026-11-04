@@ -29,16 +29,3 @@ export function resolveCoarseClassesFields(p,fields){
  }
  return c;
 }
-export function validateCoarseClassesRows(p,table,categories){
- resolveCoarseClassesFields(p,table.schema);
- const c=p.coarse_classes,x=table.schema.findIndex(f=>f.name===c.input_field),y=table.schema.findIndex(f=>f.name===c.target_field);
- need(Array.isArray(table.rows)&&table.rows.length>0,'complete nonempty input required');
- const counts=new Map(),labels=new Set();
- for(const row of table.rows){
-  need(Array.isArray(row)&&row.length===table.schema.length&&typeof row[x]==='string'&&row[x].length>0,'NULL/empty predictors are unsupported');
-  if(categories){need(categories.includes(row[x]),'unseen predictor category is unsupported');continue;}
-  need(typeof row[y]==='string'&&row[y].length>0,'training target must be nonmissing');
-  labels.add(row[y]);const n=counts.get(row[x])??[0,0];n[row[y]===c.event_value?0:1]++;counts.set(row[x],n);
- }
- if(!categories)need(labels.size===2&&labels.has(c.event_value)&&[...counts.values()].every(n=>n.every(v=>v>0)),'binary target, observed event and positive event/non-event frequencies per category required');
-}

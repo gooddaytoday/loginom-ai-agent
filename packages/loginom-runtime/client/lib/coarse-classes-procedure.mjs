@@ -68,9 +68,9 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  await next('coarse_classes','coarse_classes_model');
  // A model is admitted only from the visible native class grid. Merely saved
  // settings, an empty class page or an old preview cannot authorize apply.
- const model=applying?(await channel.observe({condition:'saved native coarse classes',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes_model'&&s.node_coarse_classes?.verified===true})).node_coarse_classes:{state:'settings',classes:[]};
+ const model=applying?(await channel.observe({condition:'saved native coarse classes',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes_model'&&s.node_coarse_classes?.verified===true})).node_coarse_classes:{state:'settings',classes:[],total_iv:null};
  if(applying){
-  if(model.state!=='materialized'){
+  if(model.state!=='materialized'||model.input_field!==configuration.input_field){
    const closed=await closePreparedWizard(channel);const error=Error('Coarse classes apply requires saved materialized classes; use internal to train current input');
    error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'coarse_classes_apply_preserved',proof:{closed}};throw error;
   }
@@ -78,5 +78,5 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  }
  await next('coarse_classes_model','output_mapping');await next('output_mapping','binning_ranges_mapping');await next('binning_ranges_mapping','coarse_classes_mapping_2');
  const done=await next('coarse_classes_mapping_2','done');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{...configuration,state:'settings',classes:[]},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{...configuration,state:'settings',classes:[],total_iv:null},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
