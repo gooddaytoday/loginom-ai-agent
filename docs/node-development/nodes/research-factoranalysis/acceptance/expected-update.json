@@ -15,7 +15,6 @@
     }
   ],
   "factor_signs": {
-    "status": "proposal_requires_acceptance_integration",
     "columns": [
       "Factor1",
       "Factor2"
@@ -23,8 +22,7 @@
     "ports": [
       0,
       1
-    ],
-    "rule": "one joint sign per factor across every score and loading; no factor permutation"
+    ]
   },
   "outputs": [
     {

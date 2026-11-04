@@ -19,6 +19,10 @@
 
 [research.corr_analysis](nodes/research.corr_analysis.md)
 
+## Факторный анализ
+
+[research.factor_analysis](nodes/research.factor_analysis.md)
+
 ## Тип результата Замены
 
 [transform.replace_columns](nodes/transform.replace_columns.md)

@@ -94,6 +94,12 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name in ['factor-pca', 'factor-retrain']:
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
+        update = name == 'factor-retrain'
+        return dict(source=src, prompt=src / ('task-update.md' if update else 'task.md'), data=src / 'data', base=None,
+                    input_files=['matrix.csv', 'update.csv'] if update else ['matrix.csv'], export_count=2,
+                    expected_name='expected-update.json' if update else 'expected.json')
     if name == 'clustering-normalized':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1126,6 +1132,20 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('factor_signs'):
+            rounds = {}
+            for _, reply in replies:
+                for owner, port in ports(reply):
+                    if owner.get('configuration', {}).get('readback', {}).get('kind') != 'factor_analysis': continue
+                    key = owner.get('execution', {}).get('execution_id')
+                    rounds.setdefault(key, {})[port['port']] = dict(node=owner['node'], type='research.factor_analysis',
+                        output_port=port['port'], execution=owner['execution'], data=port)
+            complete = [list(group.values()) for group in rounds.values() if set(group) == {0, 1}]
+            assert complete, 'FACTOR_BOTH_TYPED_OUTPUTS_MISSING'
+            write(folder / 'factor-actual.json', complete[-1])
+            self.phase('factor-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
+            expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)

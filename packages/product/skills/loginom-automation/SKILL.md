@@ -154,6 +154,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
 | Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
+| Факторный анализ | `research.factor_analysis` / pca_fixed | [читать](references/nodes/research.factor_analysis.md) |
 | REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
 | Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply | [читать](references/nodes/datamining.lin_regression.md) |
 | Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
