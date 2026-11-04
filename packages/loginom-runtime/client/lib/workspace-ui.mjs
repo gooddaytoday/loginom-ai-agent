@@ -1170,7 +1170,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1
               ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
-                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata,.bg-vendor-icon-ungroupdata').length===1
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1
+              ||(preparedInputPort.port===0&&e.textContent.trim()==='Разгруппируемые данные'
+                ||preparedInputPort.port===1&&e.textContent.trim()==='Данные для расчета долей')
+                &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-ungroupdata'
+                &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+                &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-ungroupdata').length===1
               // Union can also overflow its input folder and main table.
               ||preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
