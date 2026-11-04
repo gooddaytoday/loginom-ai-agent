@@ -236,6 +236,10 @@ jobs:
           rm -rf "$archive" ripgrep-15.1.0-x86_64-unknown-linux-musl
           rg --version
 
+      - name: Verify signed update feed publication
+        working-directory: script
+        run: bun test ./update-feed.test.ts
+
       - name: Run unit tests
         timeout-minutes: 30
         # The resume acceptance driver observes its owned X11 windows even when
