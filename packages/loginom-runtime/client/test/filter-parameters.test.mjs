@@ -61,3 +61,12 @@ test('Null string predicates have no case policy editor',()=>{
   for(const case_sensitive of [true,false])assert.throws(()=>validateFilterConditions({groups:[[condition(operator,'string',{case_sensitive})]]}),/case_sensitive/);
  }
 });
+
+test('control variable operands remain references for scalar and list conditions',()=>{
+ const conditions=[{field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>=',value:{kind:'variable',name:'limit'}},
+  {field:{kind:'input_field',name:'Category'},type:'string',operator:'in',values:{kind:'variable',name:'codes'},case_sensitive:false}];
+ assert.deepEqual(validateFilterConditions({groups:[conditions]}).groups[0],conditions);
+ for(const c of [{...conditions[0],type:'real'},{...conditions[0],field:{kind:'row_number'}},{...conditions[0],value:{kind:'variable',name:'limit',value:10}},
+  {...conditions[1],values:{kind:'variable',name:''}},{...conditions[0],operator:'between',lower:{kind:'variable',name:'limit'},upper:20}])
+  assert.throws(()=>validateFilterConditions({groups:[[c]]}));
+});

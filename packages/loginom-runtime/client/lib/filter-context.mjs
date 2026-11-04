@@ -39,19 +39,36 @@ export function readFilterBrowser(prefix){
    ||type==='boolean'&&typeof v!=='boolean'||type==='string'&&(typeof v!=='string'||v.length>256))throw Error('literal');
   if(!['integer','real','boolean','string'].includes(type))throw Error('unsupported literal');return v;
  };
+ // FVariablesData is the wizard's cached, fully materialized inventory.
+ // Compare complete native representations against this inventory; never trim
+ // a display suffix to manufacture a binding name.
+ const variables=controller.FVariablesData?.FVariables??[];
+ if(!Array.isArray(variables)||variables.length>1000)return fail('filter_variables_inventory');
+ const controlVariables=variables.map(v=>({name:v.DisplayName,type:types[v.DataType],index:v.Index,value:v.Value??null,is_null:v.IsNull}));
+ const bound=(text,type)=>{
+  const matches=variables.filter(v=>v.DataType===({integer:4,string:5})[type]
+   &&(text===v.DisplayName||typeof v.ValueAsString==='string'&&text===v.DisplayName+' ( '+v.ValueAsString+' )'));
+  if(matches.length!==1||typeof matches[0].DisplayName!=='string'||!Number.isInteger(matches[0].Index))throw Error('variable identity');
+  return {kind:'variable',name:matches[0].DisplayName};
+ };
  const rows=[],ids=new Set(),view=grid.getView?.();
  try{for(const [index,r] of records.entries()){
   const d=r?.data,id=String(r?.internalId??'');if(!r?.isModel||!id||ids.has(id))return fail('filter_record');ids.add(id);
   const row={record_id:id,index,kind:d.IsOperatorRecord===true?'or':'condition'};
   if(row.kind==='condition'){
-   if(![0,1].includes(d.RowNumberer)||typeof d.Name!=='string'||!Number.isInteger(d.RelationType)||typeof d.CaseSensitive!=='boolean'||d.UseVariables!==0)return fail('filter_condition_or_variables');
+   if(![0,1].includes(d.RowNumberer)||typeof d.Name!=='string'||!Number.isInteger(d.RelationType)||typeof d.CaseSensitive!=='boolean'||![0,1,128].includes(d.UseVariables))return fail('filter_condition_or_variables');
    const type=types[d.DataType]??null;
    if(type==='variant')return fail('filter_variant');
    Object.assign(row,{field:d.RowNumberer===1?{kind:'row_number'}:{kind:'input_field',name:d.Name},type,operator_code:d.RelationType,case_sensitive:d.CaseSensitive});
    // Persisted records omit inactive operands. Never decode stale/default
    // scalar slots for an interval, list or null/boolean predicate.
    if(type){
-    if([8,9].includes(d.RelationType))Object.assign(row,{lower:literal(d.CompareValueLowerBound,type),upper:literal(d.CompareValueUpperBound,type)});
+    if(d.UseVariables!==0){
+     if(d.RowNumberer!==0||!['integer','string'].includes(type))return fail('filter_variable_type');
+     if(d.UseVariables===1&&d.RelationType<=5)row.value=bound(d.CompareValue,type);
+     else if(d.UseVariables===128&&[10,11].includes(d.RelationType))row.values=bound(d.CompareValueListAsString,'string');
+     else return fail('filter_variable_operator');
+    }else if([8,9].includes(d.RelationType))Object.assign(row,{lower:literal(d.CompareValueLowerBound,type),upper:literal(d.CompareValueUpperBound,type)});
     else if([10,11].includes(d.RelationType)){
      if(!Array.isArray(d.CompareValueList))return fail('filter_list');
      row.values=d.CompareValueList.map(v=>literal(v,type));
@@ -106,6 +123,6 @@ export function readFilterBrowser(prefix){
   numericInputs.push({anchor_tid:el.closest('[data-tid]')?.getAttribute('data-tid'),decimal_separator:component.decimalSeparator});
  }
  const decimalSeparator=globalThis.Ext?.util?.Format?.decimalSeparator;
- return {verified:true,inventory_complete:true,state_source:'cached_filter_stores',input_fields:fields,rows,selection:selection.map(r=>String(r.internalId)),editor,dialogs,
+ return {verified:true,inventory_complete:true,state_source:'cached_filter_stores',control_variables:controlVariables,input_fields:fields,rows,selection:selection.map(r=>String(r.internalId)),editor,dialogs,
   numeric_inputs:numericInputs,datetime_inputs:datetimeInputs,decimal_separator:['.',','].includes(decimalSeparator)?decimalSeparator:null,settings_applied:false};
 }

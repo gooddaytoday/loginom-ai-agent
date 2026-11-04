@@ -174,7 +174,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
 | Вычисляемые формулы | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
 | Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
-| Фильтрация строк | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
+| Фильтр строк, включая условия из переменных | `transform.filter_data` / conditions | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |

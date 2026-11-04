@@ -2679,13 +2679,19 @@ function readRenderedInputMapping(observation) {
           const editor=plugin.activeEditor,root=editor?.el?.dom;
           if(root&&roots[0].contains(root)) {
             const metadata={record_id:String(context.record.internalId),part:'editor',field:context.field,wizard_root_ref:wizard.root_ref};
-            for(const e of [root,...root.querySelectorAll('input,[data-tid]')])if(/trg_picker$/.test(getTid(e)??'')||e.matches('input')||getTid(e)?.endsWith(';BooleanPropEdit;ValueControl'))filterCells.set(refOf(e),metadata);
-            const combos=[...root.querySelectorAll('[data-tid]')].map(e=>globalThis.Ext?.getCmp?.(e.id)).filter(c=>c?.$className==='Ext.form.field.ComboBox');
+            for(const e of [root,...root.querySelectorAll('input,[data-tid]')])if(/(?:trg_picker|SwitchButton)$/.test(getTid(e)??'')||e.matches('input')||getTid(e)?.endsWith(';BooleanPropEdit;ValueControl'))filterCells.set(refOf(e),metadata);
+            const combos=[...root.querySelectorAll('[data-tid]')].filter(visible).map(e=>globalThis.Ext?.getCmp?.(e.id)).filter(c=>c?.$className==='Ext.form.field.ComboBox');
             if(combos.length===1) {
               const c=combos[0],picker=c.picker,options=c.getStore?.().getData?.()?.items;
               if(picker?.pickerField===c&&Array.isArray(options)&&(context.field!=='Name'||c.getStore()===grid.Controller.FColumnInfoStore))for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]) {
                 const r=options.find(r=>String(r.internalId)===e.getAttribute('data-recordid'));
-                if(r)filterCells.set(refOf(e),{...metadata,part:'option',value:r.data.Value,label:r.data.DisplayText});
+                if(r){
+                  const variable=Object.values(r.data).find(v=>v&&typeof v==='object'&&Number.isInteger(v.Index)&&typeof v.DisplayName==='string'&&Number.isInteger(v.DataType));
+                  const inventory=grid.Controller.FVariablesData?.FVariables;
+                  if(getTid(c.el?.dom)?.endsWith(';VariableControl')&&Array.isArray(inventory)&&inventory.some(v=>v.Index===variable?.Index&&v.DisplayName===variable.DisplayName&&v.DataType===variable.DataType))
+                    filterCells.set(refOf(e),{...metadata,part:'variable_option',variable_name:variable.DisplayName,variable_index:variable.Index});
+                  else filterCells.set(refOf(e),{...metadata,part:'option',value:r.data.Value,label:r.data.DisplayText});
+                }
               }
             }
           }

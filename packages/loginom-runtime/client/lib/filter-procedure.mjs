@@ -1,4 +1,4 @@
-import {FILTER_OPERATORS,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
+import {FILTER_OPERATORS,isFilterVariable,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sameField=(a,b)=>a?.kind===b?.kind&&(a?.kind==='row_number'||a?.kind==='input_field'&&a.name===b.name);
@@ -10,6 +10,8 @@ export function filterConditionMatches(actual,wanted,code=FILTER_OPERATORS[wante
  const arity=FILTER_OPERATORS[wanted.operator]?.arity??1;
  if(wanted.type==='string'&&arity!==0&&actual.case_sensitive!==wanted.case_sensitive)return false;
  if(arity===0)return true;
+ const key=arity==='list'?'values':'value';
+ if(isFilterVariable(actual[key])||isFilterVariable(wanted[key]))return actual[key]?.kind==='variable'&&wanted[key]?.kind==='variable'&&actual[key].name===wanted[key].name;
  if(arity===2)return literal(actual.lower,wanted.lower,wanted.type)&&literal(actual.upper,wanted.upper,wanted.type);
  if(arity==='list')return actual.values?.length===wanted.values.length&&actual.values.every((v,i)=>literal(v,wanted.values[i],wanted.type));
  return literal(actual.value,wanted.value,wanted.type);
@@ -49,7 +51,7 @@ export async function configureFilter(channel,parameters){
   return {verified:true,cleanup_complete:true,effect_possible:false,baseline,configuration:baseline,groups,preserved:true};
  }
  validateFilterConditions(parameters);
- const groups=resolveFilterConditions(parameters,baseline.input_fields),expected=[];
+ const groups=resolveFilterConditions(parameters,baseline.input_fields,baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
   if(values.some(v=>v.length>19&&!v.endsWith('.000'))){
@@ -167,7 +169,24 @@ export async function configureFilter(channel,parameters){
     await action('commit typed filter value',s,s=>({verb:'press',ref:one(s,e=>predicate(e)&&e.allowed_actions.includes('press'),'Typed filter commit unavailable').ref,key:'Tab'}),identity);
     s=await observe('typed filter input committed');
    };
-   if(arity===2||arity==='list'){
+   const variable=arity==='list'?wanted.values:wanted.value;
+   if(isFilterVariable(variable)){
+    const editor=arity==='list'?'StringTriggerPropEdit':'VariantPropEdit';
+    const base=s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;'+editor;
+    const trigger=e=>e.tid===base+';VariableControl;trg_picker';
+    if(!s.ui.elements.some(trigger)){
+     await click('select variable filter operand mode',s,e=>e.tid===base+';SwitchButton',identity);
+     s=await observe('variable filter operand mode ready',s=>s.ui.elements.some(trigger));
+    }
+    await click('open bound filter variable choices',s,trigger,identity);
+    const option=e=>e.filter_cell?.record_id===id&&e.filter_cell.part==='variable_option'&&e.filter_cell.variable_name===variable.name;
+    s=await observe('exact mapped filter variable choice',s=>s.ui.elements.some(option));
+    await click('select exact mapped filter variable',s,option,identity);
+    s=await observe('filter variable selected');
+    const input=e=>e.signature.tag==='input'&&e.identity.anchor_tid===base+';VariableControl'&&e.allowed_actions.includes('press');
+    await action('commit filter variable binding',s,s=>({verb:'press',ref:one(s,input,'Filter variable commit input unavailable').ref,key:'Tab'}),identity);
+    s=await observe('filter variable binding committed',s=>same(current(s)[arity==='list'?'values':'value'],variable));
+   }else if(arity===2||arity==='list'){
     s=await observe('filter value dialog trigger',s=>s.ui.elements.some(e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker')&&e.allowed_actions.includes('click')));
     await click('open bound filter value dialog',s,e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker'),identity);
     const kind=arity===2?'range':'list';
