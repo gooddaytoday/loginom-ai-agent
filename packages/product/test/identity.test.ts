@@ -1,4 +1,8 @@
 import { expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { Product, productChannel, productName, productSlug } from "../src/index"
 import release from "../loginom-release.json"
 
@@ -30,16 +34,21 @@ test("identity cannot be changed after startup and has no update fallback", () =
 })
 
 test("the bundle bakes the feed parameter and defaults to disabled", async () => {
-  for (const value of [null, "https://example.test/updates/"]) {
-    const bundle = await Bun.build({
-      entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
-      target: "bun",
-      define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
-    })
-    expect(bundle.success).toBe(true)
-    const built = await import(
-      `data:text/javascript;base64,${Buffer.from(await bundle.outputs[0].text()).toString("base64")}`
-    )
-    expect(built.Product.updateFeed).toBe(value)
+  const root = await mkdtemp(join(tmpdir(), "loginom-feed-bundle-"))
+  try {
+    for (const [index, value] of [null, "", "https://example.test/updates/"].entries()) {
+      const bundle = await Bun.build({
+        entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
+        target: "bun",
+        define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
+      })
+      expect(bundle.success).toBe(true)
+      const file = join(root, `${index}.mjs`)
+      await Bun.write(file, bundle.outputs[0])
+      const built = await import(pathToFileURL(file).href)
+      expect(built.Product.updateFeed).toBe(value || null)
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
   }
 })
