@@ -7,7 +7,7 @@ import {createNodeProcedure} from '../lib/node-procedure.mjs';
 const defaultMessage='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
 function replay(fault,verb='train',options={}) {
  const message=options.message??defaultMessage;
- let clock=1,launched=false,closed=false;const records=[],actions=[];
+ let clock=1,launched=false,closed=false;const records=[],actions=[],nativeReads=[];
  const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
  const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const context={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Прогноз_Y',locked:false};
@@ -27,7 +27,7 @@ function replay(fault,verb='train',options={}) {
  if(fault==='root')processes.root_id='other';
  if(fault==='running')processes.processes[1].progress_state={...terminal,state:'running',terminal:false,can_cancel:true};
  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'browser',revision:1},scan:{complete:true},
-  prepared_node_context:context,wizard:{status:'absent'},ui:{masks:options.loadingRace&&launched&&clock<(options.loadingUntil??401)?[{ref:'graph-mask',kind:'modal_background',target_tid:'MF;TF-1;ModelForm',dialog_ref:null,graph_loading_owner_ref:'graph'}]:[],dialogs:launched&&!closed&&!(options.autoExpire&&clock>=(options.loadingRace?601:201))?[{ref:'ui-toast',identity:{anchor_tid:'toast',path:[]},title:'Ошибка',text:'[outside selected root]'}]:[],
+  prepared_node_context:context,wizard:{status:'absent'},ui:{masks:options.loadingRace&&launched&&clock<(options.loadingUntil??401)?[{ref:'graph-mask',kind:clock<(options.toastAt??0)?'busy':'modal_background',target_tid:'MF;TF-1;ModelForm',dialog_ref:null,graph_loading_owner_ref:'graph'}]:[],dialogs:launched&&clock>=(options.toastAt??0)&&!closed&&!(options.autoExpire&&clock>=(options.toastUntil??(options.loadingRace?601:201)))?[{ref:'ui-toast',identity:{anchor_tid:'toast',path:[]},title:'Ошибка',text:'[outside selected root]'}]:[],
    truncated:{dialogs:false,masks:false},elements:[{ref:'ui-launch',tid:'mn;mniTeachNode',label:'Обучить узел',allowed_actions:[verb==='train'?'click':verb]},
     {ref:'ui-progress',tid:'MF;cntMain;tlbMainToolbar;btnProgress',signature:{tag:'a'},enabled:true,allowed_actions:['click']} ]}});
  const operation={id:'own',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
@@ -36,7 +36,13 @@ function replay(fault,verb='train',options={}) {
   now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},record:async r=>{records.push(structuredClone(r));return structuredClone(r)},
   wrapMutation:(code,reference)=>({code,reference}),execute:async code=>{
    if(typeof code==='string') {
-    if(code.includes('async function readNodeProcesses('))return structuredClone(processes);
+    if(code.includes('async function readNodeProcesses(')){
+     const masked=state().ui.masks.length>0;
+     const result=options.consoleNotReady&&(masked||options.consoleStillUnready)
+      ?{verified:false,reason:'console_not_ready',node_context:context}:processes;
+     nativeReads.push({clock,masked,result:structuredClone(result)});
+     return structuredClone(result);
+    }
     const output=state();
     if(launched&&clock>=201)options.changeState?.(output);
     if(code.includes('"node_error_toast_observation":true')&&output.ui.dialogs.length){
@@ -50,7 +56,7 @@ function replay(fault,verb='train',options={}) {
    else {assert.equal(action.ref,'ui-close');closed=true;}
    return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.reference.id,cleanup_complete:true,effect_possible:true,output:state()};
   }});
- return {channel,actions,records,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
+ return {channel,actions,records,nativeReads,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
   await channel.observe({condition:'native launch available',readTraining:verb==='train',ready:()=>true});
   if(fault!=='no-baseline')await channel.bindExecutionBaseline?.({root_id:'root',node,roots:options.preProcess
    ?[{process_id:'1',record_id:'2858',completed:true},{process_id:'2',record_id:'3150',completed:true}]
@@ -173,5 +179,29 @@ test('toast plus graph mask cannot wait on an unowned pre-process failure',async
  const f=replay(undefined,'train',{preProcess:true,loadingRace:true,exclusive:false});
  await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);
  assert.equal(f.records.some(r=>r.phase==='node_execution_error_toast_mask_wait'),false);
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
+});
+
+// LAB-811 run 1:705–715: Train receipt, busy graph samples, then the same
+// graph mask plus an error toast; native history is console_not_ready until clear.
+test('LAB-811 masked console_not_ready waits for the graph before proving the native error',async()=>{
+ const f=replay(undefined,'train',{preProcess:true,loadingRace:true,consoleNotReady:true,
+  toastAt:601,loadingUntil:1001,toastUntil:1201,autoExpire:true});
+ await assert.rejects(f.run(),e=>e.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'
+  &&e.nodeExecutionFailure.native.message===defaultMessage);
+ assert.ok(f.clock>=1001&&f.clock<1201);
+ assert.ok(f.records.some(r=>r.phase==='node_execution_error_toast_mask_wait'));
+ assert.ok(f.nativeReads.length>0);
+ assert.ok(f.nativeReads.every(r=>!r.masked&&r.result.verified===true));
+ assert.equal(f.records.filter(r=>r.phase==='node_execution_error_toast_observed').length,1);
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
+});
+test('LAB-811 cannot report an error if native history remains unready after the mask clears',async()=>{
+ const f=replay(undefined,'train',{preProcess:true,loadingRace:true,consoleNotReady:true,consoleStillUnready:true});
+ await assert.rejects(f.run(),e=>!e.nodeExecutionFailure);
+ assert.ok(f.records.some(r=>r.phase==='node_execution_error_toast_mask_wait'));
+ assert.ok(f.nativeReads.length>0);
+ assert.ok(f.nativeReads.every(r=>!r.masked));
+ assert.equal(f.records.some(r=>r.phase==='node_execution_error_toast_observed'),false);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
 });

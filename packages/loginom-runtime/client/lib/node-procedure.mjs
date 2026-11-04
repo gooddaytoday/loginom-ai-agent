@@ -811,6 +811,43 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             reason:'Owned execution error toast gate refused',checks:toastGate,failed_conditions:Object.keys(toastGate).filter(k=>!toastGate[k]),
             launch:structuredClone(launchEvidence??null),outcome:structuredClone(result)});
         if(Object.entries(toastGate).every(([key,ok])=>ok||key==='masks_absent'&&ownToastMasks(result.output))) {
+          if(ownToastMasks(result.output)) {
+            // Native history deliberately refuses while the graph is masked.
+            // Only bind a read-only wait here; prove history after it clears.
+            const portal=result.output.ui.dialogs[0],detail=await readUi({mode:'observe',operation_id:id,...boundOptions,
+              root_ref:portal.ref,node_error_toast_observation:true,download_toast_observation:true,
+              expected_origin:targetOrigin,expected_build:targetBuild});
+            if(detail.status!=='SUCCEEDED')throw Error('Owned execution error toast could not be observed under graph mask');
+            assertContext(detail.output,true);
+            const state=detail.output,dialog=state.ui.dialogs[0];
+            if(state.ui.masks.length) {
+              const checks={toast_error_kind:dialog?.error_toast?.kind==='error',dialog_unique:state.ui.dialogs.length===1,
+                toast_identity:dialog?.identity?.anchor_tid==='toast',dialog_ref:dialog?.ref===portal.ref,
+                browser_document:state.dom_epoch.document===launchEvidence.browser_document,
+                after_launch:now()>=launchEvidence.started_at,launch_wait_active:now()<operation.deadline,
+                toast_absent_before_launch:launchEvidence.toast_absent===true,
+                exclusive_operation:operation.exclusiveNodeExecution?.()===true,
+                node_surface:state.prepared_node_context.surface==='graph',node_unlocked:state.prepared_node_context.locked===false,
+                wizard_absent:state.wizard?.status==='absent',masks_owned:ownToastMasks(state),
+                masks_unchanged:state.ui.masks.every(m=>result.output.ui.masks.some(old=>m.ref===old.ref
+                  &&m.graph_loading_owner_ref===old.graph_loading_owner_ref)),
+                same_wait:!settlingErrorToast||dialog?.ref===settlingErrorToast.ref
+                  &&JSON.stringify(dialog?.error_toast)===JSON.stringify(settlingErrorToast.error_toast)
+                  &&state.ui.masks.every(m=>settlingErrorToast.masks.some(old=>m.ref===old.ref
+                    &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))};
+              if(Object.values(checks).some(ok=>!ok)) {
+                await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+                  reason:'Owned execution error toast mask ownership refused',checks,
+                  failed_conditions:Object.keys(checks).filter(k=>!checks[k]),outcome:structuredClone(detail)});
+                throw Error('Owned execution error toast mask ownership refused');
+              }
+              settlingErrorToast??={...structuredClone(dialog),masks:structuredClone(state.ui.masks)};
+              await entry('node_execution_error_toast_mask_wait',{step,sample,internal_operation_id:id,condition,checks,
+                launch:structuredClone(launchEvidence),outcome:structuredClone(detail)});
+              satisfied=false;confirmations=0;previousIdentity=undefined;
+              continue;
+            }
+          }
           const portal=result.output.ui.dialogs[0],native=await read(makeNodeProcessContextCode(preparedNodeContext,{errorToast:true}),{timeout:readTimeout()});
           const detail=await readUi({mode:'observe',operation_id:id,...boundOptions,root_ref:portal.ref,
             node_error_toast_observation:true,download_toast_observation:true,expected_origin:targetOrigin,expected_build:targetBuild});
@@ -858,16 +895,6 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               ||state.ui.masks.some(m=>!settlingErrorToast.masks.some(old=>m.ref===old.ref
                 &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))))
               throw Error('Owned execution error toast settlement context changed');
-            // A toast reclassifies the graph's loading mask as modal_background.
-            // Prove the error's owner, then only wait; no refs become actionable.
-            if(ownToastMasks(state)&&[checks,reportChecks].some(proof=>Object.entries(proof)
-              .every(([key,ok])=>ok||key==='masks_absent'||key==='close_unique'))) {
-              settlingErrorToast??={...structuredClone(dialog),masks:structuredClone(state.ui.masks)};
-              await entry('node_execution_error_toast_mask_wait',{step,sample,internal_operation_id:id,condition,
-                launch:structuredClone(launchEvidence),outcome:structuredClone(detail)});
-              satisfied=false;confirmations=0;previousIdentity=undefined;
-              continue;
-            }
             if(Object.values(reportChecks).every(Boolean)) {
               const failure={code:'NODE_EXECUTION_FAILED',message:('Loginom сообщил после запуска: '+toast.message).slice(0,1000),
                 native:{source:'loginom_post_launch_error_toast',attribution:'own_action_wait',message:toast.message,
