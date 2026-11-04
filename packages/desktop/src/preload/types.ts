@@ -30,6 +30,7 @@ export type UpdaterAPI = {
   subscribe: (cb: (state: UpdaterState) => void) => Promise<() => void>
   check: () => Promise<UpdaterState>
   install: () => Promise<void>
+  setChannel: (channel: "stable" | "unstable") => Promise<UpdaterState>
 }
 
 export type LinuxDisplayBackend = "wayland" | "auto"

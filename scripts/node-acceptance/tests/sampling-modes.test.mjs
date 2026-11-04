@@ -21,13 +21,13 @@ function fixture(partition=false,mode='random',relaxed=false){
    sample:tables[i].map(r=>want.columns.map(c=>({type:c.type,value:c.type==='integer'?String(r[c.name]):r[c.name],is_null:false})))}})));
  const replies=['first','second'].map(execution_id=>({status:'SUCCEEDED',node:{node_id:'sample'},cleanup_complete:true,
   execution:{status:'completed',execution_id},configuration:{readback:{kind:partition?'data_partition':'sampling',mode,seed:42,
-   counts:Object.values(expected.sampling_modes.requested_sizes),test_priority:false,
+   counts:Object.values(expected.sampling_modes.requested_sizes),test_priority:false,strata_fields:mode==='stratified'?['Class']:[],bias_field:'Class',bias_factors:[{value:'A',factor:0.4},{value:'B',factor:1}],
 }},
   output:{ports:actual.filter(r=>r.execution.execution_id===execution_id).map(r=>r.data)}}));
  const csvs=[0,1].flatMap(()=>expected.outputs.map((want,i)=>[want.columns.map(c=>c.name),...tables[i].map(r=>want.columns.map(c=>String(r[c.name])))]));
  return {expected,actual,replies,csvs};
 }
-for(const partition of [false,true])for(const mode of ['random'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
+for(const partition of [false,true])for(const mode of ['random','stratified','biased'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
  const {expected,actual,replies,csvs}=fixture(partition,mode);
  assert.equal(parseSamplingExpected(expected).sample_rows,20);
  const baseline=checkSamplingMain(expected,[{output:{outcome:replies}},...replies],csvs);
@@ -50,7 +50,7 @@ test('random decision 1 accepts variable sizes, source ordering and independent 
   const f=fixture(partition,'random',true),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
   assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,false);
  }
- for(const mode of ['stratified','biased'])assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),mode,'/test/x.lgp'),/MODE_UNSUPPORTED/);
+
 });
 test('invariants reject missing or conflicting executions, foreign rows, values/types, repeat ordering, CSV and cleanup',()=>{
  const mutations=[
@@ -138,5 +138,45 @@ test('cold output definition uses owned port, complete native schema and verifie
   if(fault)await assert.rejects(result,/SAMPLING_/);
   else assert.deepEqual((await result).columns,want.columns.map(({name,type})=>({name,type})));
   assert.deepEqual(calls,[port,'table','cancel']);
+ }
+});
+test('stratified enforces cardinality, class quotas, port relations and native definition order',()=>{
+ for(const partition of [false,true]){
+  const bad=fixture(partition,'stratified',true);
+  assert.throws(()=>checkSamplingMain(bad.expected,bad.replies,bad.csvs),/ROW_COUNT/);
+  const f=fixture(partition,'stratified'),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+  const cold=structuredClone(f.actual);cold[0].sampling_mapping.columns.reverse();
+  assert.throws(()=>checkSamplingCold(f.expected,cold,baseline),/COLD_MAPPING_PROOF/);
+ }
+ const f=fixture(false,'stratified');
+ for(const r of f.replies)r.output.ports[0].sample=f.expected.sampling_modes.source.slice(0,8).map(row=>f.expected.outputs[0].columns.map(c=>({type:c.type,value:c.type==='integer'?String(row[c.name]):row[c.name],is_null:false})));
+ assert.throws(()=>checkSamplingMain(f.expected,f.replies,f.csvs),/CLASS_QUOTA/);
+ const p=fixture(true,'stratified');
+ for(const r of p.replies)r.output.ports[0].sample[0][0].value=true;
+ assert.throws(()=>checkSamplingMain(p.expected,p.replies,p.csvs),/COMBINED_RELATION/);
+});
+test('biased accepts variable sizes and quotas but requires the observed factors',()=>{
+ for(const partition of [false,true]){
+  const f=fixture(partition,'biased',true),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+  assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,false);
+  f.replies[0].configuration.readback.bias_factors[0].factor=0.5;
+  assert.throws(()=>checkSamplingMain(f.expected,f.replies,f.csvs),/BIAS_CHANGED/);
+ }
+});
+
+test('cold admits the complete frozen categorical definition without claiming native source links',async()=>{
+ for(const mode of ['stratified','biased','random']){
+  const f=fixture(false,mode),node=f.actual[0].node,want=f.expected.outputs[0];
+  const mapping={verified:true,inventory_complete:true,source_identity_verified:false,autosync:false,source_fields:[],
+   node_context:{...node,output_port:{direction:'output',port:0}},
+   target_fields:want.columns.map(c=>({...c,excluded:false,inherited:false,source:null}))};
+  const channel={openOutputPort:async()=>{},observe:async o=>{assert.ok(o.ready({node_mapping:mapping}));return {node_mapping:mapping};}};
+  const load=async()=>({showMissingValuesMappingTable:async()=>{},closePreparedWizard:async()=>({verified:true,cleanup_complete:true,settings_applied:false})});
+  const run=()=>observeSamplingColdMapping({load,channel,node,port:0,expected:f.expected});
+  if(mode==='random'){await assert.rejects(run(),/MAPPING_OWNER/);continue;}
+  assert.deepEqual((await run()).columns,want.columns.map(({name,type})=>({name,type})));
+  for(const mutate of [m=>m.autosync=true,m=>m.source_fields.push({name:'foreign'}),m=>m.target_fields[0].inherited=true]){
+   const before=structuredClone(mapping);mutate(mapping);await assert.rejects(run(),/MAPPING_OWNER/);Object.assign(mapping,before);
+  }
  }
 });

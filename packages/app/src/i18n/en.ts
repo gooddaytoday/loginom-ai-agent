@@ -1,8 +1,23 @@
-import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
+import { DESKTOP_NATIVE_ENGLISH, DESKTOP_UPDATER_ENGLISH } from "./desktop-native"
 
 // English is the designer-written source. Missing locales reuse these strings
 // byte-for-byte as the established fallback; do not invent translations.
 export const LOGINOM_ENGLISH = {
+  ...DESKTOP_UPDATER_ENGLISH,
+  "settings.updates.channel": "Updates",
+  "settings.updates.stable": "Stable releases only (default)",
+  "settings.updates.unstable": "Also unstable releases",
+  "settings.updates.managed": "Update settings are managed by your administrator.",
+  "settings.updates.disabled": "Updates are disabled.",
+  "settings.updates.unsupported": "This version is no longer supported by the server — please update.",
+  "settings.updates.available": "Version {{version}} is available",
+  "settings.updates.onClose":
+    "The update will be installed when you close the application. Active work postpones installation until the next exit.",
+  "settings.updates.download": "Download",
+  "settings.updates.closeAndUpdate": "Close and update",
+  "settings.updates.verificationFailed":
+    "Could not verify the update or contact the feed. Nothing was downloaded. See the logs for details.",
+
   "prompt.attachment.missingPath":
     "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
   "loginom.saveClose": "Save and close",

@@ -251,6 +251,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       state: updaterState,
       check: () => window.api.updater.check(),
       install: () => window.api.updater.install(),
+      setChannel: (channel) => window.api.updater.setChannel(channel),
     },
 
     exportDebugLogs: () => window.api.exportDebugLogs(),

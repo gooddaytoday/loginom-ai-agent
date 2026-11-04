@@ -151,8 +151,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
 | Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
-| Первые/последние/случайные N | `preprocessing.sampling` / sequential, random | [читать](references/nodes/preprocessing.sampling.md) |
-| Train/test по порядку/случайно | `preprocessing.data_partition` / sequential, random | [читать](references/nodes/preprocessing.data_partition.md) |
+|Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
+|Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
 | Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
@@ -169,13 +169,13 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |
 | Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |
 | Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |
-| Импорт Loginom Data | `imports.lgd` / native | [читать](references/nodes/imports.lgd.md) |
-| Экспорт Loginom Data | `exports.lgd` / native | [читать](references/nodes/exports.lgd.md) |
+|Импорт Loginom Data|`imports.lgd` / native|[читать](references/nodes/imports.lgd.md)|
+|Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
 | Вычисляемые формулы | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
 | Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтрация строк | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
-| Доли итогов | `transform.ungroup_data` / shares | [читать](references/nodes/transform.ungroup_data.md) |
+|Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
 | Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |

@@ -23,7 +23,7 @@ import {
   setTitlebar,
   updateTitlebar,
 } from "./windows"
-import type { UpdaterController } from "./updater-controller"
+import type { setupAutoUpdater } from "./updater"
 import { createUpdaterSubscriptions } from "./updater-subscriptions"
 import { createDesktopDraftStore } from "./draft-store"
 import { nativeT } from "./native-translations"
@@ -49,7 +49,7 @@ type Deps = {
   setDisplayBackend: (backend: string | null) => Promise<void> | void
   checkAppExists: (appName: string) => Promise<boolean> | boolean
   resolveAppPath: (appName: string) => Promise<string | null>
-  updater: UpdaterController
+  updater: ReturnType<typeof setupAutoUpdater>
   showUpdater: () => Promise<void> | void
   setBackgroundColor: (color: string) => void
   exportDebugLogs: () => Promise<string>
@@ -105,7 +105,8 @@ export function registerIpcHandlers(deps: Deps) {
   })
   ipcMain.handle("updater-unsubscribe", (event) => updaterSubscriptions.delete(event.sender.id))
   ipcMain.handle("updater-check", () => deps.updater.check())
-  ipcMain.handle("updater-install", () => deps.updater.install())
+  ipcMain.handle("updater-install", () => deps.updater.requestInstall())
+  ipcMain.handle("updater-set-channel", (_event, channel: "stable" | "unstable") => deps.updater.setChannel(channel))
   ipcMain.handle("set-background-color", (_event: IpcMainInvokeEvent, color: string) => deps.setBackgroundColor(color))
   ipcMain.handle("export-debug-logs", () => deps.exportDebugLogs())
   ipcMain.handle("set-force-focus", (event: IpcMainInvokeEvent, enabled: boolean) =>

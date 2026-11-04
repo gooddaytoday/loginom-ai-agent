@@ -297,9 +297,9 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
-    if(mode==='execute'&&!implementation){
-     // Preview creates native process groups. Capture them after the wizard
-     // and port commits, before attributing the one final graph launch.
+    if(mode==='execute'&&(!implementation||implementation.executionBaselineAfterConfigure?.(operation.nodeApply.request)===true)){
+     // Preview and opt-in node configuration can create native process groups.
+     // Capture them after port commits, before the one final graph launch.
      executionDriver=createNodeExecutionProcedure(channel,ctx.node);
      await executionDriver.prepare();
     }
