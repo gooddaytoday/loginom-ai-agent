@@ -246,6 +246,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.javascript_wizard_refusal=structuredClone(refusal.proof);
       }
       const importClosed=refusal?.proof?.closed;
+      if(name==='configure'&&request.target.type==='imports.lgd'&&refusal?.verification==='lgd_import_native_refused'
+        &&refusal.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&refusal.execution_started===false
+        &&importClosed?.verified===true&&importClosed.cleanup_complete===true&&importClosed.draft_discarded===true
+        &&importClosed.settings_applied===false&&importClosed.execution_started===false
+        &&importClosed.node_context?.verified===true&&importClosed.node_context.surface==='graph'
+        &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+      }
       if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source_switch&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&(refusal.verification===(request.target.type==='imports.excel'?'excel_import_source_switch_schema_refused':'text_import_source_switch_schema_refused')&&['configure','output_mapping','finish'].includes(name)

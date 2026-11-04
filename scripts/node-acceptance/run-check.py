@@ -1003,6 +1003,10 @@ class Runner:
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
         if lgd_corrupt:
+            for _, event in events:
+                part = event.get('part', {})
+                if event.get('type') == 'tool_use' and part.get('tool') == 'loginom_dock_node_apply':
+                    assert part.get('state', {}).get('input', {}).get('target', {}).get('type') == 'imports.lgd', 'LGD_CORRUPT_SUBSTITUTE_NODE'
             errors = []
             for _, event in events:
                 part = event.get('part', {})

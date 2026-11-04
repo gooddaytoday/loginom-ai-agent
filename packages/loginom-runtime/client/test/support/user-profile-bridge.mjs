@@ -128,6 +128,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(Object.hasOwn(result, 'instructions'), false);
     assert.deepEqual(result.input_artifacts, []);
     assert.ok(result.knowledge.node_types.length > 0);
+    for(const type of ['imports.lgd','exports.lgd'])assert.ok(result.knowledge.node_types.some(node=>node.type===type));
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
     assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
     // LAB-450: prepare -> local profile/scan/sample/admit (no browser calls)

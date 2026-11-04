@@ -9,7 +9,21 @@ import {nodeApiTools} from '../lib/node-api.mjs';
 import {userNodeTool,createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 import {lgdExportNext} from '../lib/lgd-export-procedure.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
 const request=type=>({target:{kind:'new',type},inputs:type==='exports.lgd'?[{}]:[],mappings:[],read:{ports:type==='exports.lgd'?[]:[0],sample_rows:0,require_exact_numbers:false}});
+test('LGD checksum refusal releases only a proven discarded own wizard and never executes',async()=>{
+ for(const foreign of [false,true]){
+  const node={document_id:'doc',workflow_id:'workflow',node_id:'node'},operation={id:'lgd-corrupt'},phases=[];
+  const request={operation_id:operation.id,contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},target:{kind:'new',type:'imports.lgd'},inputs:[],mode:'native',parameters:{},mappings:[],finish:'execute',read:{ports:[0],sample_rows:5,require_exact_numbers:true},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}};
+  const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+  const refusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,execution_started:false,verification:'lgd_import_native_refused',proof:{closed:{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,execution_started:false,node_context:{...node,node_id:foreign?'other':'node',verified:true,surface:'graph'}}}};
+  const h=new Map([['imports.lgd',{revision:'test',modes:['native'],validate:()=>{},configure:async()=>{throw Object.assign(Error('Контрольная сумма блока не совпадает'),{nodePhaseRefusal:refusal});}}]]);
+  const drivers={verifySource:ok,prepareTarget:async()=>({...await ok(),node}),mapPorts:ok,openWizard:ok,finish:()=>assert.fail('must not finish'),waitExecution:()=>assert.fail('must not execute')};
+  const r=await applyNode({operation,request,handlers:h,drivers,now:()=>1,record:async e=>{phases.push(e);return structuredClone(e);}});
+  assert.equal(r.status,foreign?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!foreign);
+  assert.equal(r.pending_phase,foreign?'configure':null);assert.match(r.error.message,/Контрольная сумма/);
+ }
+});
 test('LGD import and export register distinct native palette types and sink ports',()=>{
  const h=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers;
  for(const type of ['imports.lgd','exports.lgd']){
