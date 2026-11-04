@@ -5,6 +5,7 @@ import { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { withStandaloneCancellation } from "./standalone-cancellation"
 import { acquireProfile, profileEnvironment } from "./profile"
+import { notifyUpdate } from "./update-notifier"
 
 export async function standalone(
   args: string[],
@@ -77,15 +78,22 @@ async function executeProfile(
       delete process.env[key]
     })
   Object.assign(process.env, environment, { LOGINOM_AI_AGENT_CHANNEL: channel })
+  const notifier = new AbortController()
+  const notification = notifyUpdate({ ...profile.paths, signal: notifier.signal })
   // Only the private launcher's acknowledged cleanup can release a failed start.
   // Other callback failures retain the guard for offline recovery.
-  const failure = await execute(args, profile.paths).catch(async (error: unknown) => {
-    const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
-    if (!(error instanceof NodeHostStartupError)) throw error
-    if (error.cleanupError !== undefined) process.stderr.write("LOGINOM_HOST_CLEANUP_FAILED\n")
-    if (!error.cleanupConfirmed) throw error
-    return error
-  })
+  const failure = await execute(args, profile.paths)
+    .finally(async () => {
+      notifier.abort()
+      await notification
+    })
+    .catch(async (error: unknown) => {
+      const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
+      if (!(error instanceof NodeHostStartupError)) throw error
+      if (error.cleanupError !== undefined) process.stderr.write("LOGINOM_HOST_CLEANUP_FAILED\n")
+      if (!error.cleanupConfirmed) throw error
+      return error
+    })
   try {
     if (temporary) {
       await fs.unlink(path.join(temporary, "tmp"))
