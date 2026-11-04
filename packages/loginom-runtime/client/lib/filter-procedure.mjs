@@ -1,4 +1,6 @@
 import {FILTER_OPERATORS,isFilterVariable,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {openPreparedWizard} from './node-wizard-open.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sameField=(a,b)=>a?.kind===b?.kind&&(a?.kind==='row_number'||a?.kind==='input_field'&&a.name===b.name);
@@ -40,17 +42,48 @@ export function filterInputText(value,type,decimalSeparator='.',datetimeCombo=fa
 
 // Complete replacement with observed, identity-bound gestures. A lost reply
 // escapes through the common receipt/reconciliation mechanism; never re-add.
-export async function configureFilter(channel,parameters){
+export async function configureFilter(channel,parameters,{newNode=false}={}){
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
  let s=await observe('complete filter baseline');
- const baseline=s.node_filter;
+ let baseline=s.node_filter;
  if(parameters.groups===undefined){
   need(Object.keys(parameters).length===0&&!baseline.dialogs.length&&!baseline.editor,'Saved filter must be settled before reuse');
   const groups=filterGroupsFromNative(baseline);
   return {verified:true,cleanup_complete:true,effect_possible:false,baseline,configuration:baseline,groups,preserved:true};
  }
  validateFilterConditions(parameters);
+ if(newNode){
+  const references=parameters.groups.flat().flatMap(c=>isFilterVariable(c.value??c.values)?[{name:(c.value??c.values).name,type:c.values?'string':c.type}]:[]);
+  if(references.length){
+   resolveFilterConditions(parameters,baseline.input_fields);
+   const variables=references.map(ref=>{
+    const matches=baseline.control_variables?.filter(v=>v.name===ref.name)??[];
+    need(matches.length===1,'Missing or ambiguous mapped filter variable: '+ref.name);
+    need(matches[0].type===ref.type&&typeof matches[0].is_null==='boolean','Filter variable type or NULL differs: '+ref.name);
+    return matches[0];
+   });
+   if(variables.some(v=>v.is_null)){
+    // Only a new, untouched wizard may refresh its initial NULL cache. The
+    // shared close/open drivers retain receipt and node ownership guards.
+    const before=s,node=s.prepared_node_context;
+    const owner=n=>n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof node?.[k]==='string'&&n[k]===node[k]);
+    need(owner(node)&&owner(baseline.node_context)&&s.wizard.owner_context?.status==='observed'
+     &&baseline.inventory_complete===true&&!baseline.editor&&!baseline.dialogs.length
+     &&baseline.rows.every(r=>r.kind==='condition'&&r.field?.kind==='input_field'&&r.field.name===''&&r.type===null),'New filter cache refresh requires its untouched owned wizard');
+    const fields=f=>f.input_fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
+    const bindings=f=>f.control_variables.map(({name,type,index})=>({name,type,index}));
+    const wizard=w=>({node:{tid:w.owner_context.node.tid,label:w.owner_context.node.label},path:w.owner_context.path.map(({tid,label})=>({tid,label}))});
+    await closePreparedWizard(channel,{initialObservation:s});
+    await openPreparedWizard(channel);
+    s=await observe('new filter control cache reread');
+    need(owner(s.prepared_node_context)&&owner(s.node_filter.node_context)&&s.wizard.root_tid===before.wizard.root_tid
+     &&same(wizard(s.wizard),wizard(before.wizard)),'Reopened filter node or wizard identity changed');
+    need(same(fields(s.node_filter),fields(baseline))&&same(bindings(s.node_filter),bindings(baseline)),'Reopened filter input schema or control binding identity changed');
+    baseline=s.node_filter;
+   }
+  }
+ }
  const groups=resolveFilterConditions(parameters,baseline.input_fields,baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
