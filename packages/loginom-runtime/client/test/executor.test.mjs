@@ -923,3 +923,18 @@ test('unread prepared Save-copy rejects a changed initial binding: '+fault,async
  assert.equal(page.storage.size,0,'reject before Save');
  assert.equal(receipt.nodeTargetWorkflowNode,undefined);
 });
+
+for(const action of ['package.save_checkpoint','package.save_as'])test(action+' accepts the observed builtin without a Label;Label',async()=>{
+  const page=linkPage();
+  page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+  page.nodes[1].ports.push('Input_Var-1');
+  page.edges=['Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+  const elements=page.elements.bind(page);
+  page.elements=()=>{
+    const result=elements();
+    for(const e of result)if(e.tid===(page.graphPrefix??page.prefix)+';Graph;Переменные_сценария;Label;Label')e.visible=false;
+    return result;
+  };
+  const result=await run(page,action,{path:'/user/data/packages/unlabelled-variables.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+});

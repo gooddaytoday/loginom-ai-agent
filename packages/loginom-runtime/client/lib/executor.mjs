@@ -890,8 +890,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if(prefixes.length>1)throw new Error('Multiple native graph namespaces in the active container');
       const native=prefixes[0]??null,tids=graph.map(e=>e.getAttribute('data-tid'));
       const linkedVariables=tids.some(t=>t.startsWith(native+'Переменные_сценария|Output_Var-'));
-      const labels=[...new Set(tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
-        .filter(t=>t && (t!=='Переменные_сценария'||linkedVariables)))].sort();
+      const labels=[...new Set([
+        ...tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
+          .filter(t=>t && t!=='Переменные_сценария'),
+        ...(linkedVariables && tids.includes(native+'Переменные_сценария')?['Переменные_сценария']:[])
+      ])].sort();
       const actionable=tids.filter(t=>{charge();const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body)
         || labels.some(label=>body===label || body===label+';Label;Label' || body===label+';Setting'
           || body.startsWith(label+';') && /;(?:Input|Output)_[^;]+$/.test(body));});
