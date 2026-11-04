@@ -19,6 +19,17 @@ import {
 const file = { url: "loginom-ai-agent-linux-x86_64.AppImage", sha512: Buffer.alloc(64).toString("base64") }
 const feed = "https://updates.example.test/agent/"
 
+test("update policy loads with Node ESM dependency resolution used by Electron", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE ?? Bun.which("node")
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const child = Bun.spawn(
+    [node, "--input-type=module", "--eval", `await import(${JSON.stringify(new URL("./update-policy.ts", import.meta.url).href)})`],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+  expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+})
+
 test("accepts a hashed asset within the own product feed", () => {
   expect(() => validateUpdate({ version: "0.1.1", files: [file] }, feed, "prod")).not.toThrow()
 })

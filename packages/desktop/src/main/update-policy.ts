@@ -1,6 +1,6 @@
 import { Product } from "@loginom-ai-agent/product"
 import { UPDATE_PUBLIC_KEYS, verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
-import { parseUpdateInfo } from "electron-updater/out/providers/Provider"
+import { parseUpdateInfo } from "electron-updater/out/providers/Provider.js"
 import type { UpdateInfo } from "electron-updater"
 import type { AppUpdater } from "electron-updater/out/AppUpdater"
 import type { ProxyConfig } from "electron"
