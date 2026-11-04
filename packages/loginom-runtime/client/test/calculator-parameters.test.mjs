@@ -8,6 +8,18 @@ const expression=(name,index=0)=>({name,index,record_id:'r'+index,expression_id:
 const observed=()=>({verified:true,inventory_complete:true,mode:'expression',expressions:[expression('A'),expression('B',1)]});
 const inputs=[{name:'Amount',type:'real'}];
 const request=()=>({target:{kind:'existing'},inputs:[],read:{ports:[0]},mappings:[]});
+test('calculator accepts its table mappings alongside one ordinary W1 variable mapping',()=>{
+ const r={...request(),variable_inputs:[{kind:'variables',input:0}],mappings:[
+  {direction:'input',port:0},{direction:'output',port:0},
+  {kind:'variables',direction:'input',port:0,autosync:false,fields:[{source:{kind:'configured_field',name:'Amount'}}]}]};
+ assert.doesNotThrow(()=>validateCalculatorParameters({expressions:[]},'expression',r));
+ for(const patch of [{kind:'control'},{port:1},{direction:'output'}]){
+  const bad=structuredClone(r);Object.assign(bad.mappings[2],patch);
+  assert.throws(()=>validateCalculatorParameters({expressions:[]},'expression',bad));
+ }
+ const duplicate=structuredClone(r);duplicate.mappings.push(duplicate.mappings[2]);
+ assert.throws(()=>validateCalculatorParameters({expressions:[]},'expression',duplicate));
+});
 test('published calculator schema and handler agree on new expressions and saved patches',()=>{
  const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
  const added={target:{kind:'new'},name:'Ratio',label:'Ratio',type:'real',formula:'Amount / 3',replace:false};

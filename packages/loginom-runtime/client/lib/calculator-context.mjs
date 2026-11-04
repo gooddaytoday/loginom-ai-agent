@@ -14,7 +14,7 @@ export async function readCalculatorContext(page,binding,readNode=readPreparedNo
   return {...result,node_context:after};
 }
 
-// Read the bounded, unfiltered local Ext store and the active CodeMirror document.
+// Read the complete local Ext source and the active CodeMirror document.
 // The selected record's Expression is only flushed by Loginom on selection/Next;
 // its editor is therefore authoritative while it remains selected. Never load a
 // proxy or evaluate a formula to obtain this configuration evidence.
@@ -62,19 +62,33 @@ export function readCalculatorBrowser(prefix) {
   const fieldGrids=exact(base+'grdFields'),fieldGrid=fieldGrids.length===1&&globalThis.Ext?.getCmp?.(fieldGrids[0].id);
   if(!fieldGrid||fieldGrid.el?.dom!==fieldGrids[0]||!root.contains(fieldGrids[0]))return fail('calculator_input_grid');
   const fieldStore=fieldGrid.getStore?.(),fieldData=fieldStore?.getData?.(),fieldRecords=fieldData?.items,fieldSource=fieldData?.getSource?.()?.items;
+  const inputs=fieldSource??fieldRecords;
   if(fieldStore?.$className!=='Ext.data.Store'||fieldStore.isBufferedStore||fieldStore.isLoading?.()
     ||!Array.isArray(fieldRecords)||fieldRecords.length>1000||fieldStore.getCount?.()!==fieldRecords.length
-    ||![0,fieldRecords.length].includes(fieldStore.getTotalCount?.())||fieldSource&&(!Array.isArray(fieldSource)||fieldSource.length!==fieldRecords.length||new Set(fieldSource).size!==fieldRecords.length||fieldSource.some(r=>!fieldRecords.includes(r))))return fail('calculator_input_filtered');
-  const fields=[],fieldNames=new Set(),fieldIds=new Set();
-  for(const r of fieldRecords) {
+    ||!Array.isArray(inputs)||inputs.length>1000||new Set(inputs).size!==inputs.length
+    ||![0,fieldRecords.length,inputs.length].includes(fieldStore.getTotalCount?.())
+    ||new Set(fieldRecords).size!==fieldRecords.length||fieldRecords.some(r=>!inputs.includes(r)))return fail('calculator_input_filtered');
+  // Native Fields/Variables buttons filter one complete cached group. Any
+  // partial group or unrelated filter still refuses; never load a proxy.
+  if(inputs.length!==fieldRecords.length&&!['Fields','Variables'].some(group=>{
+    const selected=inputs.filter(r=>r?.data?.GroupType===group);
+    return selected.length===fieldRecords.length&&selected.every(r=>fieldRecords.includes(r));
+  }))return fail('calculator_input_filtered');
+  const fields=[],variables=[],fieldNames=new Set(),variableNames=new Set(),fieldIds=new Set();
+  for(const r of inputs) {
     const d=r?.data,id=String(r?.internalId??'');
-    if(!r?.isModel||!d||!id||fieldIds.has(id)||d.GroupType!=='Fields'||typeof d.Name!=='string'||!d.Name||fieldNames.has(d.Name.toLowerCase())
-      ||typeof d.DisplayName!=='string'||!types[d.DataType]||typeof d.Replaced!=='boolean')return fail('calculator_input_record');
-    fieldIds.add(id);fieldNames.add(d.Name.toLowerCase());fields.push({record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],replaced:d.Replaced});
+    if(!r?.isModel||!d||!id||fieldIds.has(id)||!['Fields','Variables'].includes(d.GroupType)||typeof d.Name!=='string'||!d.Name
+      ||d.Name.length>256||typeof d.DisplayName!=='string'||d.DisplayName.length>256||!types[d.DataType]
+      ||d.GroupType==='Fields'&&typeof d.Replaced!=='boolean')return fail('calculator_input_record');
+    const names=d.GroupType==='Fields'?fieldNames:variableNames;
+    if(names.has(d.Name.toLowerCase()))return fail('calculator_input_record');
+    fieldIds.add(id);names.add(d.Name.toLowerCase());
+    const value={record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType]};
+    if(d.GroupType==='Fields')fields.push({...value,replaced:d.Replaced});else variables.push(value);
   }
   const errorControls=exact(prefix+';WizrdMCF;btnError');
   const error=errorControls.length===1?errorControls[0].getAttribute('data-qtip'):null;
   return {verified:true,mode:'expression',inventory_complete:true,state_source:'cached_expression_store_and_selected_editor',
-    expressions,input_fields:fields,settings_applied:false,syntax_validity:'unverified',
+    expressions,input_fields:fields,input_variables:variables,settings_applied:false,syntax_validity:'unverified',
     syntax_error:typeof error==='string'&&error.length>0?error.slice(0,4096):null};
 }

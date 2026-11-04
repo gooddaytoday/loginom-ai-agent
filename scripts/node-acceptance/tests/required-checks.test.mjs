@@ -49,6 +49,7 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['packages/loginom-runtime/client/lib/calculator-context.mjs','calculator-vars-update'],
  ['packages/loginom-runtime/client/lib/workspace-ui.mjs','s5'],
  ['packages/loginom-runtime/client/lib/observation-pages.mjs','s5'],
  ['packages/loginom-runtime/client/lib/node-procedure.mjs','s1'],
