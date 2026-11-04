@@ -955,7 +955,12 @@ class Runner:
             target = workspace / file.name
             if target.exists(): continue
             shutil.copyfile(file, target)
-            command += ['--file', target]
+            if spec.get('lgd') and target.suffix.lower() == '.lgd':
+                # Native binary input uses the existing local-path admission flow.
+                prompt += f'\nИсходный файл LGD: {target}.'
+            else:
+                command += ['--file', target]
+        (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
@@ -1026,10 +1031,13 @@ class Runner:
                     elif isinstance(value, list): pending.extend(value)
             pattern = r'контрольн[^\n]*сумм|checksum'
             assert any(re.search(pattern, error, re.I) for error in errors), 'LGD_CHECKSUM_REFUSAL_MISSING'
+            assert any(o.get('status') == 'FAILED' and o.get('cleanup_complete') is True
+                       and o.get('execution', {}).get('status') == 'not_requested'
+                       and o.get('output', {}).get('ports') == []
+                       and re.search(pattern, o.get('error', {}).get('message', ''), re.I)
+                       for _, o in replies), 'LGD_CHECKSUM_REFUSAL_UNSETTLED'
             answer = '\n'.join(event.get('part', {}).get('text', '') for _, event in events if event.get('type') == 'text')
             assert re.search(pattern, answer, re.I), 'LGD_CHECKSUM_REFUSAL_NOT_REPORTED'
-            self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
-            return session, expected, None, None
         if execution_error:
             # Only tool results are evidence: request inputs contain the intentional
             # exception too, and must never establish an observed Loginom failure.
@@ -1114,7 +1122,8 @@ class Runner:
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
-        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error) or delivered else None
+        assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
+        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error or lgd_corrupt) or delivered else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -1131,6 +1140,9 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if lgd_corrupt:
+            self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
+            return session, expected, None, None
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None
