@@ -204,6 +204,17 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-retrain':
+        src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
+        return dict(source=src, prompt=src / 'task-retrain.md',
+                    data=src.parent / 'fixtures', input_files=['transactions.csv', 'length.csv'],
+                    base=None, expected_name='length/expected.json', export_count=2)
+    if name in ['assnrules-basic', 'assnrules-length']:
+        src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
+        variant = src / 'length' if name == 'assnrules-length' else src
+        return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
+                    expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
+                    input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
