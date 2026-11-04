@@ -47,7 +47,7 @@ function fixture({portIndex=0}={}){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class;nodeTid='MF;TF-1;Graph;'+(cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class;nodeTid='MF;TF-1;Graph;'+(factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 for(const direction of ['input','output'])test('tree_io binds '+direction+' DataTree ports without treating them as foreign controls',async()=>{
  const f=fixture();if(direction==='input')f.input();f.tree();
@@ -255,6 +255,26 @@ test('CrossTable automatic caption changes preserve native ownership, DOM unique
   f=>f.rename('Output_Data-1'),f=>f.rename('Input_Data-0'),f=>f.rename('Output_Var-0'),f=>f.changeDocument()]){
   const f=fixture();f.node.FIconCls=NODE_TYPES['transform.cross_table'].icon_class;
   f.rename('Output_Data-0','R');await f.read();f.rename();change(f);
+  await assert.rejects(f.binding(),/Visible port identity|Prepared graph document changed/);
+ }
+});
+// LAB-788 :532/:584/:557: alternate Output_Data-1 shape retains the old caption binding.
+for(const suffix of ['Input_Data-0','Output_Data-0','Output_Data-1'])test('factor analysis rebinds only the same '+suffix+' after caption replacement',async()=>{
+ const f=fixture({portIndex:Number(suffix.at(-1))});f.node.FIconCls=NODE_TYPES['research.factor_analysis'].icon_class;
+ if(suffix.startsWith('Input_'))f.input();await f.read();f.rename(suffix);
+ const bound=await f.binding(),direction=suffix.startsWith('Input_')?'inputs':'outputs';
+ assert.deepEqual(Array.from(bound.native_bindings[0][direction]),[Number(suffix.at(-1))]);
+});
+test('factor analysis waits for observable port rendering after rename',async()=>{
+ const f=fixture({portIndex:1});f.node.FIconCls=NODE_TYPES['research.factor_analysis'].icon_class;
+ await f.read();f.rename();f.hide();await assert.rejects(f.binding(),/Visible port identity/);
+ f.paintWith(()=>f.show());assert.equal((await f.read()).complete,true);
+});
+test('factor analysis rename retains native ownership, exact suffix and unique rendered cell guards',async()=>{
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.losePortTid(),f=>{f.port.FGuid='foreign';},f=>{f.port.data={};},
+  f=>{f.port.parent={};},f=>{f.port.FCell={...f.port.FCell};},f=>{f.port.FCell.parent={};},f=>{f.port.FType=0;},f=>{f.port.FSubType=9;},
+  f=>f.rename('Output_Data-0'),f=>f.rename('Input_Data-1'),f=>f.rename('Output_Var-1'),f=>f.changeDocument()]){
+  const f=fixture({portIndex:1});f.node.FIconCls=NODE_TYPES['research.factor_analysis'].icon_class;await f.read();f.rename();change(f);
   await assert.rejects(f.binding(),/Visible port identity|Prepared graph document changed/);
  }
 });
