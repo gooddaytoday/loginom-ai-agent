@@ -27,6 +27,8 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 Если upload подтверждён, а open не удался, следуй выданному `next_step` с
 серверным путём и исходным `operation_id`; новый local-path вызов загружает новую копию.
 
+Факторный анализ: [research.factor_analysis](references/nodes/research.factor_analysis.md), `pca_fixed`.
+
 ## Кластеризация
 
 Для k-means по признакам в разных единицах либо по просьбе пользователя задай

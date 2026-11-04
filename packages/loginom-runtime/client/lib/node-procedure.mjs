@@ -5,6 +5,7 @@ import {makeLinRegressionContextCode} from './linregression-context.mjs';
 import {makeAutoCorrelationContextCode} from './auto-correlation-context.mjs';
 import {makeCorrAnalysisContextCode} from './corr-analysis-context.mjs';
 import {makeElimOutlierContextCode} from './elim-outlier-context.mjs';
+import {makeFactorAnalysisContextCode} from './factor-analysis-context.mjs';
 import {makeClusteringContextCode} from './clustering-context.mjs';
 import {readGraph} from './node-target-browser.mjs';
 import {NODE_TYPES} from './node-contracts.mjs';
@@ -397,7 +398,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -646,6 +647,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readCorrAnalysis){
           result.output.node_corr_analysis=await read(makeCorrAnalysisContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_corr_analysis.node_context&&JSON.stringify(canonical(result.output.node_corr_analysis.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Correlation native owner changed during observation');
+        }
+        if(readFactorAnalysis){
+          result.output.node_factor_analysis=await read(makeFactorAnalysisContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_factor_analysis.node_context&&JSON.stringify(canonical(result.output.node_factor_analysis.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Factor analysis native owner changed during observation');
         }
         if(readClustering){
           result.output.node_clustering=await read(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1103,6 +1108,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           mappingEditor:initialObservation?.node_mapping_editor,
           readLogRegression:initialObservation?.node_logregression!==undefined,
           readLinRegression:initialObservation?.node_linregression!==undefined,
+          readFactorAnalysis:initialObservation?.node_factor_analysis!==undefined,
           readClustering:initialObservation?.node_clustering!==undefined,
           readAutoCorrelation:initialObservation?.node_auto_correlation!==undefined,
           readCorrAnalysis:initialObservation?.node_corr_analysis!==undefined,
