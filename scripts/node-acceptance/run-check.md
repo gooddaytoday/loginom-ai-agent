@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`quality-default` and `quality-spikes` use the approved five-output fixtures in
+`nodes/research-quality/acceptance/`. Only task/data reach the model. The stock
+typed matcher checks full production receipts before and after the same Import
+and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
+reexecutes the saved node without configuration. Only Moda/variant uses the
+bounded native decoder; ordinary scalar reading and other node limits are unchanged.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
@@ -446,3 +453,12 @@ main использует typed matcher, CSV сверяется с его зна
 cold обоих портов с независимым Apriori oracle, точными типами/NULL/ID.
 `assnrules-retrain` сначала обучает на transactions.csv, затем заменяет вход
 на length.csv и переобучает тот же узел; CSV/Save/cold проверяют конечные 0/1.
+
+`enrich-data-left`, `enrich-data-composite`: Дополнение данных, `left`, выход 0.
+Первый сценарий сохраняет все сочетания двух справочников, меняет данные
+первого справочника на том же узле импорта: 8 → 13 → 8 → 13 строк.
+Второй использует один справочник и составной ключ Code+Zone.
+Точные значения, NULL отдельно от пустой строки, метки, типы, порядок полей
+через autosync=false, CSV/Save/cold/cleanup; строки — мультимножество.
+Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
+модели передаются только соответствующее задание и перечисленные CSV.

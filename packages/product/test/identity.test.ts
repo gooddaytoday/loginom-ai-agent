@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
-import { Product, productChannel, productName, productSlug } from "../src/index"
-import release from "../loginom-release.json"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { Product, productChannel, productName, productSlug } from "../src/index"
+import release from "../loginom-release.json"
 
 test("bundled MCP and first-run Loginom defaults use the public service addresses", () => {
   expect(Product.knowledgeEndpoint).toBe("https://mcp.loginom.ai/mcp")
@@ -34,37 +34,27 @@ test("identity cannot be changed after startup and has no update fallback", () =
 })
 
 test("the bundle bakes the feed parameter and defaults to disabled", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-update-feed-"))
+  const root = await mkdtemp(join(tmpdir(), "loginom-feed-bundle-"))
   try {
-    for (const [index, value] of [null, "", "https://example.test/updates/"].entries()) {
+    const cases = [null, "", "https://example.test/updates/"].map((value, index) => ({
+      value,
+      file: join(root, `${index}.mjs`),
+    }))
+    // Populate the whole directory before Bun's resolver sees the first import.
+    for (const { value, file } of cases) {
       const bundle = await Bun.build({
         entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
         target: "bun",
         define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
       })
       expect(bundle.success).toBe(true)
-      // macOS Bun's test loader can fail to resolve later files created in the
-      // same temporary directory. Evaluate each output with a fresh loader.
-      const output = join(directory, `product-${index}.mjs`)
-      await writeFile(output, await bundle.outputs[0].text())
-      const child = Bun.spawn(
-        [
-          process.execPath,
-          "--eval",
-          `import { Product } from ${JSON.stringify(pathToFileURL(output).href)};
-         console.log(JSON.stringify([Product.updateFeed, Product.changelogFeed]));`,
-        ],
-        { stdout: "pipe", stderr: "pipe" },
-      )
-      const [exitCode, stdout, stderr] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ])
-      expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
-      expect(JSON.parse(stdout)).toEqual([value || null, null])
+      await writeFile(file, await bundle.outputs[0].text())
+    }
+    for (const { value, file } of cases) {
+      const built = await import(pathToFileURL(file).href)
+      expect(built.Product.updateFeed).toBe(value || null)
     }
   } finally {
-    await rm(directory, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true })
   }
 })

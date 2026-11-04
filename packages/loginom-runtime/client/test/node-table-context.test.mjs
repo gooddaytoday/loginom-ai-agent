@@ -37,16 +37,57 @@ function fixture() {
  class BrowseViewPagingProxy{};
  const paging=Object.assign(new BrowseViewPagingProxy(),{FViewDataInvalid:false,FRequiredPrepareViewData:false,FTotalRowCount:3,FPageIndex:0,FPageSize:1000000});
  const base={FView:{el:{dom:root}},FStatus:4,FBrowseViewDataProxyController:paging,FBrowseViewDataSourceController:{FDataStore:store},FBrowseViewColumnsController:{FColumnNames:names}};
- const model={FViewDescList:{[table.view_guid]:{BaseView:base}}};
+ const model={FViewDescList:{[table.view_guid]:{BaseView:base}}},card={Controller:{FController:model}};
  const context=vm.createContext({Object,document:{querySelectorAll:q=>q==='.x-mask-msg,.bg-mask-message'?[]:[...elements.values()].filter(e=>e.attrs['data-tid']===JSON.parse(q.slice(10,-1)))},
-   Ext:{getCmp:id=>views[id]},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}},
+   Ext:{getCmp:id=>views[id]},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},
    getComputedStyle:()=>({display:'block',visibility:'visible'}),innerWidth:1000,innerHeight:800});
  const page={evaluate:(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  const outputs={verified:true,tables:[{...table,active:true}],node_context:node},readOutputs=async()=>structuredClone(outputs);
  const request={row_offset:0,row_limit:10,column_offset:0,column_limit:8};
- return {el,page,table,node,readOutputs,outputs,request,root,left,right,base,paging,store,views,records,cells,rows,columns,names,nulls,header};
+ return {el,page,table,node,readOutputs,outputs,request,root,left,right,base,paging,store,views,records,cells,rows,columns,names,nulls,header,model,card};
 }
 const read=f=>readNodeTable(f.page,{},f.table,f.request,f.readOutputs);
+function headerCellCollision(icon='bg-vendor-icon-enrichdata') {
+ const f=fixture();f.names[1]='Id_1';f.columns[1].dataIndex='Id_1';
+ f.columns[1].el.dom.attrs['data-tid']=f.table.table_tid+';normalHeaderCt;Id_1';
+ for(const [i,record] of f.records.entries()){
+  record.data.Id_1=record.data.Text;delete record.data.Text;
+  f.cells[i*3+1].attrs['data-tid']=f.columns[1].el.dom.attrs['data-tid']+'_'+i;
+ }
+ f.model.FModelNode={};
+ f.card.Controller.Node={data:{iconCls:icon,node:{FGuid:f.node.node_id,FModelNode:f.model.FModelNode}},parentNode:null};
+ return f;
+}
+test('Enrich header Id_1 remains distinct from the Id cell with native render suffix _1',async()=>{
+ const f=headerCellCollision(),r=await read(f);assert.equal(r.verified,true,JSON.stringify(r));
+ assert.deepEqual(r.columns.map(c=>c.name),['Id','Id_1','Amount']);
+ assert.equal(r.rows[1].cells[0].text,'2');assert.equal(r.rows[1].cells[1].text,'');
+ assert.equal(r.rows[2].cells[1].is_null,true);
+});
+for(const icon of ['bg-vendor-icon-join','bg-vendor-icon-union',''])
+test('header-cell collision keeps the default refusal for '+(icon||'untyped owner'),async()=>{
+ assert.equal((await read(headerCellCollision(icon))).reason,'table_column_identity');
+});
+test('Enrich header scoping refuses a foreign owner and a duplicate inside its header',async()=>{
+ for(const fault of ['node','model','header']){
+  const f=headerCellCollision();
+  if(fault==='node')f.card.Controller.Node.data.node.FGuid='foreign';
+  if(fault==='model')f.card.Controller.Node.data.node.FModelNode={};
+  if(fault==='header'){
+   const duplicate=f.el('duplicate-header');duplicate.attrs['data-tid']=f.columns[1].el.dom.attrs['data-tid'];f.header.children.push(duplicate);
+  }
+  assert.equal((await read(f)).reason,'table_column_identity',fault);
+ }
+});
+test('other node types do not invoke a model owner accessor for header scoping',async()=>{
+ const f=headerCellCollision('bg-vendor-icon-union');
+ Object.defineProperty(f.model,'FModelNode',{get(){throw Error('owner getter must remain unused')}});
+ assert.equal((await read(f)).reason,'table_column_identity');
+});
+test('a missing header remains an ordinary identity refusal',async()=>{
+ const f=fixture();delete f.columns[0].el;
+ assert.equal((await read(f)).reason,'table_column_identity');
+});
 test('Table reads complete small output from matching native cache strings and rendered cells',async()=>{
  const f=fixture(),r=await read(f);assert.equal(r.verified,true,JSON.stringify(r));assert.equal(r.row_total,3);
  assert.equal(r.rows[1].cells[1].text,'');assert.equal(r.rows[2].cells[1].is_null,true);
