@@ -1,3 +1,4 @@
+import {parseExpectedVariableInventory,matchVariableInventoryOutput,matchVariableInventoryLinks} from '../expected-outputs.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -186,4 +187,25 @@ test('explicit factor_signs permits only a shared factor sign across scores/load
  assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
  bad[0].data.sample[1][0].value=2;bad[1].data.sample[0][0].value=1;
  assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
+});
+
+const variableExpected={package_path:'/own/v.lgp',nodes:[{type:'variables.user'}],outputs:[],variable_inventory:{outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'enabled',type:'boolean',value:false},{name:'empty',type:'string',value:''},{name:'n',type:'integer',value:null}]}]}};
+const variableActual=()=>({kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'read-new',execution_id:null,fresh:true,complete:true,count:3,
+ completeness:{count:3,store_count:3,unique_ids:3,loaded:true},variables:variableExpected.variable_inventory.outputs[0].variables.map((v,index)=>({id:index,index,name:v.name,label:v.name,type:v.type,cell:{type:v.type,is_null:v.value===null,value:v.value}}))});
+test('W1 cold variable-only fixture needs explicit typed inventory and preserves the old table parser',()=>{
+ assert.deepEqual(parseExpectedOutputs(variableExpected),{multiple:true,outputs:[]});assert.ok(parseExpectedVariableInventory(variableExpected));
+ assert.throws(()=>parseExpectedOutputs({...variableExpected,variable_inventory:undefined}),/EXPECTED_OUTPUTS_INVALID/);
+ assert.equal(matchVariableInventoryOutput(variableActual(),variableExpected.variable_inventory.outputs[0]),true);
+});
+for(const fault of ['missing','null-false','duplicate','partial','fake-execution','wrong-source','package-modified'])test('W1 cold variable matcher refuses '+fault,()=>{
+ const a=variableActual();if(fault==='missing')a.variables.pop();if(fault==='null-false')a.variables[0].cell.is_null=true;
+ if(fault==='duplicate')a.variables[1].id=0;if(fault==='partial')a.completeness.store_count=2;
+ if(fault==='fake-execution')a.execution_id='fake';if(fault==='wrong-source')a.native_source='VariablesForm';if(fault==='package-modified')a.package_modified=true;
+ assert.throws(()=>matchVariableInventoryOutput(a,variableExpected.variable_inventory.outputs[0]));
+});
+test('W1 cold variable/control links match exact typed namespaces and reject an ambiguous node',()=>{
+ const graph={nodes:[{ref:{node_id:'s'},type:'variables.user'},{ref:{node_id:'t'},type:'transform.calculator'}],variable_links:[{source:'s',output:4,target:'t',input:0,kind:'control',source_port_guid:'s4',target_port_guid:'c'}]};
+ const inventory={links:[{source:{type:'variables.user'},output:4,target:{type:'transform.calculator'},input:0,kind:'control'}]};
+ assert.equal(matchVariableInventoryLinks(graph,inventory).length,1);graph.variable_links[0].kind='variables';assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
+ graph.variable_links[0].kind='control';graph.nodes.push({ref:{node_id:'other'},type:'transform.calculator'});assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
 });

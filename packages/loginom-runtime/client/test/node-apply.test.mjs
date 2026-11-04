@@ -792,3 +792,10 @@ test('failed final readback cannot certify settlement without an exact durable c
   assert.equal(f.operation.nodeApply.result,undefined);
  }
 });
+
+for(const owned of [false,true])test('W1 variable output requires an owned completed process before reading: '+owned,async()=>{
+ const f=fixture(),r=request();r.read.variable_ports=[0];
+ f.drivers.waitExecution=async()=>{f.calls.push('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'execution1',...(owned?{owner_verified:true,process_id:'1.1',process_record_id:'p'}:{})};};
+ f.drivers.readOutput=async()=>{f.calls.push('read');return {verified:true,cleanup_complete:true,status:'complete',execution_id:'execution1',evidence_ref:'e',ports:[{port:0,fresh:true}],variable_ports:[{port:0,kind:'variables',source:'execution',native_source:'VariablesForm',execution_id:'execution1',fresh:true,complete:true,read_id:'new-read',count:0,variables:[],completeness:{count:0,store_count:0,unique_ids:0}}]};};
+ const result=await f.run(r);assert.equal(result.status,owned?'SUCCEEDED':'AMBIGUOUS');assert.equal(f.calls.includes('read'),owned);
+});

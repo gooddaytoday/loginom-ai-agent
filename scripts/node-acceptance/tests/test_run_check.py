@@ -21,6 +21,17 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
+        case = runner.scenario('variables-user')
+        expected = runner.expected_for(case, '/own/variables-user.lgp')
+        self.assertTrue(case['variable_only'])
+        self.assertEqual(expected['outputs'], [])
+        self.assertEqual(expected['variable_inventory']['outputs'][0]['port'], 4)
+        self.assertEqual([v['name'] for v in expected['variable_inventory']['outputs'][0]['variables']],
+                         ['limit', 'skip', 'sentinel', 'enabled', 'empty', 'missing', 'zero'])
+        self.assertTrue(case['oracle'].is_file())
+        self.assertNotIn('expected-user', case['prompt'].read_text())
+
     def test_assnrules_fixture_ports_and_model_boundary(self):
         for name, counts in [('assnrules-basic', [4, 2]), ('assnrules-length', [6, 6])]:
             case = runner.scenario(name)

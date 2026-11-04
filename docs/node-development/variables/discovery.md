@@ -382,3 +382,40 @@ discovery за модельный PASS. Бюджет W1 больше прежн�
 независимый `oracle.py`, `expected-initial.json`, `expected.json` созданы
 до первого выполнения REST в этом исследовании. Подробности запуска и границ
 проверки — [acceptance/README.md](acceptance/README.md). Новый источник не нужен.
+
+
+## Аддитивный контракт W1 после native-проверки 04.11.2026
+
+`variable_inputs` допускает новый target: source проверяется до создания,
+целевой native порт — после. `kind:"control", input:0` показывает скрытый
+управляющий порт штатной командой. Конфликтующую автоматическую связь можно
+снять только при наличии receipt её создания в этой операции.
+
+`read.variable_ports:[0]` задаёт отдельное пространство ordinals.
+`output.variable_ports[]` содержит `port`, `port_guid`, `kind:"variables"`,
+`read_id`, `execution_id`, `source`, `native_source`, `fresh`, `complete`, `count`,
+`variables:[{id,index,name,label,type,cell}]` и
+`completeness:{count,store_count,unique_ids,loaded}`. Integer cell хранит точную
+десятичную строку. NULL, false, 0 и пустая строка различаются.
+
+У исполняемого источника `source:"execution"`, `native_source:"VariablesForm"`;
+reader проверяет новый завершённый process, native owner и полный UI store.
+DataToVar native Sum выдаёт finite real: reader использует существующий binary64
+decoder; это не разрешает запись real через builtin values handler.
+Builtin `variables.user` использует `source:"snapshot"`,
+`native_source:"VariablesEditValuesWizard"`, `execution_id:null`: только root
+user output 4, независимое открытие и Cancel. Снимок требует чистый пакет и
+повторно проверяет modified=false; он не выполняет Save или Execute.
+
+Cold принимает optional `variable_inventory:{outputs,links}`. Output:
+`{node:{type,label?},port,variables:[{name,label?,type,value}]}`. Link:
+`{source:{type,label?},output,target:{type,label?},input,kind}`. При наличии
+этого inventory разрешён variable-only `outputs:[]`; прежний табличный matcher
+не меняется. Builtin читается снимком до executable источников, остальные —
+после нового Execute. Native связи сверяются до и после чтения.
+
+## W1 additive contract checkpoint
+
+`mappings[].kind` is optional (`variables` or `control`); omission keeps table semantics. W1 maps observed input ports only, control ordinal 0. Use `variable_inputs` to reveal/connect a hidden control port first. `fields` is a complete connected layout; `changes` patches names/labels while retaining unmentioned rows and local defaults. Sources use `configured_field` names resolved against the owned native records. Exclusions and unconfirmed types refuse before field edits; no variable data_kind is introduced.
+
+The writer owns TuneVariablesMappingWizard and independently reopens it after Done. Name/label edits, order and autosync retain native ConnectedRecord identity, IDs, types, default values, usage and description. Native metadata edits may set OriginType=1 while ConnectedRecord remains bound; OriginType alone cannot establish locality. `configuration.variable_mappings` carries complete accepted native readbacks and their count/store/ID proofs. These input mappings never change existing table indices or REST query encoding.

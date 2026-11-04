@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,123146,'2f2e15cd088c8ae6bee82987fbaea14d99332768921885dd7819cff116a60ea9'],
-  [nodeApiTools.map(userNodeTool),18630,'105542763fe951eb3357932ec35b27733a08326be11e5325a61eddb2fa06091d'],
+  [nodeApiTools,125511,'acbeb15e3639f7492d5eed72fbe3615bbf0d4f1e71a62c2efcf0d006ca415f2e'],
+  [nodeApiTools.map(userNodeTool),19541,'d2e7bdce309909f864624933ba6c88a489888d39ee791204541549b2c71ee13a'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -209,4 +209,11 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
  const incomplete=structuredClone(cross);delete incomplete.parameters.facts;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',incomplete),/typed facts required/);
  assert.equal(calls.length,3);
+});
+
+test('W1 variable reread selection is additive and distinct from table ports',async()=>{
+ let received;const runtime={tools:nodeApiTools,startNodeRead:args=>{received=args;return {status:'pending'};}};
+ const args={operation_id:'fresh',source_operation_id:'executed',read:{ports:[],variable_ports:[0]}};
+ await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(received,args);
+ await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_read',{...args,read:{...args.read,variable_ports:[100]}}));
 });
