@@ -245,3 +245,20 @@ test('XLSX preflight and download retain exact byte/hash verification and format
   assert.equal(r.output.bytes_verified,false);
  }finally{await wrong.cleanup();}
 });
+
+test('LGD delivery verifies original binary bytes and refuses a changed server copy',async()=>{
+ const bytes=Buffer.from([0x42,0x47,0x44,0x41,0x54,0x41,0,0xff]);
+ for(const changed of [false,true]){
+  const f=await fixture({name:'source.LGD',bytes});
+  try{
+   assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name:'source.LGD'}));
+   if(changed)f.page.downloadBytes=Buffer.from([...bytes.subarray(0,-1),0xfe]);
+   const r=await f.rt.verifyArtifact(await f.request());
+   assert.equal(r.status,changed?'FAILED':'SUCCEEDED');
+   assert.equal(r.output.bytes_verified,!changed);
+   if(changed)assert.equal(r.error.code,'DOWNLOADED_ARTIFACT_MISMATCH');
+   else assert.equal(r.output.sha256,createHash('sha256').update(bytes).digest('hex'));
+   assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+  }finally{await f.cleanup();}
+ }
+});

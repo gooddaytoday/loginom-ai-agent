@@ -1,5 +1,24 @@
 # LGD: этап 0 LAB-772
 
+## Уточнение этапа 1 LAB-784, 04.11.2026
+
+На mas под собственной парой повторно исследован новый пакет Loginom 7.4.2.
+Бинарный `source.lgd` (334 байта, SHA-256 из `fixtures/files.json`) доставлен
+штатным byte/hash lifecycle после аддитивного допуска LGD. Фикстура унаследована
+из `origin/lgd-discovery`; candidate handler её не генерировал. Независимые
+значения и свойства по-прежнему задаёт Python-oracle из CSV/manifest.
+Импорт прошёл `ImportNativePreviewWizard` → `ColumnsMappingEngineOutputPortWizard`
+→ `DoneWizard` → Execute. Наблюдаемые параметры: checksum=true, LZ4,
+«Сжатых данных», «64-битная система», подключение «Локальное».
+Экспорт подключён к этому выходу: `ExportNativeParamsWizard` → `DoneWizard`
+→ Execute; файл появился в собственной файловой папке.
+Нативные значения compression=2, checksum=1, string cache=131072.
+Сохранённый и скачанный через Files пакет содержит `Unit_0/Unit.xml`:
+`Engine xsi:type="TBGImportNative"` / `Engine xsi:type="TBGExportNative"`.
+Это подтверждение сериализованного типа движка, не отдельного RPC FullType.
+Пакет штатно закрыт, logout подтверждён; сырые доказательства в карточке.
+Ручное исследование не заменяет модельные прогоны и cold-приёмку кандидата.
+
 Статус **blocked; предложение для утверждения**, 04.11.2026.
 База `origin/v040@2910b8782c1ad8c016c6fc478369ddd179457e3e`;
 клиент Linux x64, mas. Исследован только новый собственный черновик пары из
