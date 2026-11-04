@@ -190,7 +190,7 @@ test('contract rejects foreign references, dual targets and absent ports',()=>{
 test('selected cards distinguish semantics, support and all cache pins',()=>{
  const types=['transform.join_data','transform.union_data'];const a=describeNodeTypes(types,{runtime:'1',skill:'a'});const b=describeNodeTypes(types,{runtime:'1',skill:'b'});
  assert.match(a[0].semantics,/keys/);assert.match(a[1].semantics,/duplicates/);assert.notEqual(a[0].cache_key,b[0].cache_key);assert.equal(a[0].full_node_apply_available,false);
- assert.throws(()=>describeNodeTypes(['transform.col_union_data']));assert.throws(()=>describeNodeTypes([types[0],types[0]]));
+ assert.throws(()=>describeNodeTypes(['transform.not_registered']));assert.throws(()=>describeNodeTypes([types[0],types[0]]));
 });
 test('lost-reply recovery requires both a completed receipt and the exact graph delta',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;let first=true;

@@ -449,6 +449,19 @@ abs=1e-8 только для real, метки через label_any.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
 
+`colunion-edit`, `colunion-repeat`, `colunion-matrix-regular`, `colunion-matrix-reverse`,
+`colunion-matrix-empty-main`, `colunion-matrix-empty-attached`, `colunion-matrix-both-empty`:
+Соединение двух таблиц по позиции; утверждённые task*.md и независимые expected
+из `transform-coluniondata/acceptance`. Модель получает только задание и выбранные
+CSV. Полный CSV, точные типы/значения/порядок, оба Code, Save/cold/cleanup.
+Для живой приёмки матрицы разделены без изменения исходных expected:
+`colunion-matrix-regular-a/b/c`, `colunion-matrix-reverse-a/b/c` — по четыре
+Соединения; `colunion-matrix-{empty-main,empty-attached,both-empty}-{minimum,maximum,main,attached}`
+— по три Соединения одного правила длины. Каждая часть имеет собственное
+задание, пакет и cold, получает прежние входы и выбирает непересчитанное
+подмножество outputs исходной матрицы. Всего 18 частей, 60 матричных выходов;
+с неизменёнными edit/repeat — 62 выхода ровно один раз. Лимит модели 1800 с.
+
 `clustering-scale-minus-one-one`, `clustering-scale-zero-one`, `clustering-scale-absolute`:
 k-means с нативной нормировкой [-1;1], [0;1] и max-abs соответственно.
 Только task и scaling.csv передаются модели. Stdlib oracle вычисляет
