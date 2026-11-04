@@ -1,5 +1,5 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
-import {validateFilterConditions,resolveFilterConditions} from './filter-parameters.mjs';
+import {validateFilterConditions,resolveFilterConditions,isFilterVariable} from './filter-parameters.mjs';
 import {configureFilter} from './filter-procedure.mjs';
 import {configureFilterOutputs,readFilterOutputs} from './filter-output.mjs';
 import {filterConfigurationReadback} from './filter-readback.mjs';
@@ -42,6 +42,15 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
 
 export async function prepareFilterInput(options,ctx,{channel}){
  const request=options.operation.nodeApply.request;
+ // A new control edge initially exposes NULL local values to the filter
+ // wizard. Commit the unchanged W1 mapping first to materialize its source;
+ // preserve explicit mappings already completed by the shared driver.
+ if(request.target.kind==='new'&&request.finish!=='close'&&request.variable_inputs?.some(i=>i.kind==='control')
+  &&request.parameters?.groups?.flat().some(c=>isFilterVariable(c.value??c.values))
+  &&!request.mappings?.some(m=>m.kind==='control')){
+  const mapped=await channel.mapVariablePort({direction:'input',kind:'control',port:0});
+  need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'Filter control mapping materialization is unconfirmed');
+ }
  if(request.target.kind!=='existing'||request.finish!=='execute'||request.inputs.length!==0)return;
  const state=await channel.observe({condition:'existing filter before input schema refresh',readOutputs:true,
   ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
