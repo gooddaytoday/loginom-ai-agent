@@ -2633,8 +2633,9 @@ test('prepared wizard opening retries one refused sample and preserves native ow
  }
 });
 
-test('LGD saved wizard opening waits for owned rendering and refuses changed owners',async()=>{
- for(const type of ['import','export'])for(const fault of [null,'owner','dialog','foreign','expired','unbound']) {
+test('LGD saved wizard opening waits for owned rendering and refuses changed owners',async t=>{
+ for(const type of ['import','export'])for(const fault of [null,'owner','dialog','foreign','expired','unbound','preview','preview_only','preview_late','preview_expired','preview_owner','preview_foreign','preview_dialog','preview_outside','preview_duplicate','preview_unbound']) {
+  const preview=fault?.startsWith('preview');if(type==='export'&&preview)continue;
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;';
   const panel=page.add('div',base+'NavigationBar;NavigationPanel');let path='';
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']){
@@ -2644,12 +2645,15 @@ test('LGD saved wizard opening waits for owned rendering and refuses changed own
   const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;LGD','',undefined,graph);
   page.add('span',base+'Graph;LGD;Label;Label','LGD',undefined,body);
   page.add('g',base+'Graph;LGD;Setting','',{x:500,y:300,width:30,height:30},graph);
-  let waits=0,wizard,mask;
-  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',node_id:fault==='owner'&&waits>=1?'other':'node',
+  let waits=0,wizard,mask,previewMask;
+  const addPreview=()=>{previewMask=page.add('div',base+'WizrdMCF;ImportNativePreviewWizard;frmPreview','',undefined,fault==='preview_outside'?page.document.body:wizard);
+   previewMask.attrs.class='bg-mask-message';previewMask.attrs['bg-mask-text']='Подготовка предпросмотра';
+   if(fault==='preview_duplicate')page.add('div',previewMask.attrs['data-tid'],'',undefined,wizard);};
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',node_id:(fault==='owner'||fault==='preview_owner')&&waits>=1?'other':'node',
    surface:page.events.includes('click')?'wizard':'graph',tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;LGD')});
   page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,kind:'workspace-ui',opening_timeout_ms:20000,
-    ...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},binding));
+    ...(['unbound','preview_unbound'].includes(fault)?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},binding));
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);graph.remove();wizard=page.add('div',base+'WizrdMCF');
    page.add('input',base+'WizrdMCF;'+(type==='import'?'ImportNativePreviewWizard':'ExportNativeParamsWizard')+';edtFileName','',undefined,wizard);
@@ -2657,22 +2661,34 @@ test('LGD saved wizard opening waits for owned rendering and refuses changed own
    page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-'+(type==='import'?'importnative':'exportnative');
    const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>LGD>Настройка','Настройка',undefined,panel);
    page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+   if(preview){if(fault!=='preview_only')wizard.attrs.class='bg-mask-message';if(fault!=='preview_late')addPreview();}
    if(fault==='expired'){wizard.attrs.class='bg-mask-message';mask=page.add('div',null,'Загрузка...',undefined,wizard);mask.attrs.class='x-mask-msg';}
   };
   const evaluate=page.evaluate.bind(page);
   page.evaluate=async(fn,arg)=>{const out=await evaluate(fn,arg);
-   if(arg?.discoverRoots===false&&page.events.includes('click')&&waits<30&&out.wizard)out.wizard.owner_context={status:'unobserved'};
+   if(!preview&&arg?.discoverRoots===false&&page.events.includes('click')&&waits<30&&out.wizard)out.wizard.owner_context={status:'unobserved'};
    return out;
   };
   page.waitForTimeout=async ms=>{clock.advance(ms);waits++;
-   if(fault==='dialog'&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
-   if(fault==='foreign'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if((fault==='dialog'||fault==='preview_dialog')&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
+   if((fault==='foreign'||fault==='preview_foreign')&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(preview&&waits===2){wizard.attrs.class='';if(fault==='preview_late')addPreview();}
+   if(preview&&fault!=='preview_expired'&&waits===60)previewMask.attrs.class='';
   };
   const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
-  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',type+':'+fault+JSON.stringify(result.error));
+  const success=!fault||['preview','preview_only','preview_late'].includes(fault);
+  assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',type+':'+fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(!fault){assert.equal(waits,30);assert.ok(result.trace.some(e=>e.event==='wizard_open_verified'));}
-  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(preview&&success){
+   assert.equal(waits,60);const started=result.trace.find(e=>e.event==='lgd_wizard_open_wait_started'),finished=result.trace.find(e=>e.event==='lgd_wizard_open_wait_finished');
+   assert.equal(started.initial_observation.wizard.owner_context.status,'observed');
+   assert.equal(started.initial_observation.wizard.owner_context.opening_verified,false);
+   assert.equal(finished.mask_present,false);assert.equal(finished.waited_samples,60);assert.equal(finished.owner_confirmed,true);
+   if(fault!=='preview_late')assert.equal(started.initial_observation.ui.masks.find(m=>m.target_tid?.endsWith(';frmPreview')).import_preview_owner_ref,started.initial_observation.wizard.root_ref);
+   t.diagnostic(JSON.stringify({case:fault,initial_owner:'observed',opening_verified:false,waited_samples:finished.waited_samples,finished_at_ms:finished.at_ms,mask_present:finished.mask_present}));
+  }
+  if(['expired','preview_expired'].includes(fault))assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
  }
 });
 
