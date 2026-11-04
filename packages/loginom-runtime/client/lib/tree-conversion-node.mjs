@@ -37,7 +37,8 @@ export function createTreeConversionNodeSupport(config,{table}){
    const inventory=await options.execute(makeNodeOutputContextCode({document_id:r.document_id,workflow_ref:r.workflow_ref,node:input.source}),{timeout:Math.max(5000,ctx.deadline-Date.now()+5000)});
    need(inventory?.verified&&inventory.ports?.some(p=>p.index===input.output&&p.active&&p.port_guid===port.port_guid),'Conversion source port changed');
    if(table){
-    const previous=r.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,r.target.ref)).at(-1)?.outcome?.output?.configuration?.readback:null;
+    const previous=r.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,r.target.ref)&&h.cleanup_confirmed&&h.outcome?.status==='SUCCEEDED'
+     &&h.outcome.cleanup_complete&&h.outcome.output.cleanup_complete&&h.outcome.output.configuration?.readback?.kind==='table_to_tree').at(-1)?.outcome.output.configuration.readback:null;
     const nodes=r.parameters.nodes??previous?.nodes;need(nodes,'Existing structure requires its verified local readback');validateTableTreeSource(port,nodes);
    }else validateSerializationTree(port);
    const event={phase:'tree_conversion_source_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,source_execution_id:out.execution.execution_id};
@@ -91,7 +92,7 @@ export function createTreeConversionNodeSupport(config,{table}){
       await observe('conversion complete node definition',c=>c.editor?.name===node.name&&c.editor.label===node.label&&c.editor.is_container===(node.type==='object')&&c.editor.is_array===node.is_array&&(node.type==='object'||c.editor.type===node.type));
       await act('EditDataTreeNodeDefForm;btnApply');await observe('conversion node inserted',c=>!c.editor&&c.nodes.some(n=>n.path===node.path));
      }
-     await act(s.node_tree.base+'btnClearLinks');
+     await observe('conversion replacement leaves are unbound',c=>c.nodes.every(n=>n.type==='object'||n.source_field===''));
      for(const node of p.nodes.filter(n=>n.source_field)){
       await observe('conversion explicit field link');const target=s.node_tree.nodes.find(n=>n.path===node.path),source=s.node_tree.source_fields.find(f=>f.name===node.source_field&&f.type===node.type);
       need(target?.tid&&source?.tid,'Conversion mapping identity unavailable');
@@ -104,8 +105,10 @@ export function createTreeConversionNodeSupport(config,{table}){
     await observe('conversion complete structure',c=>!p.nodes||same(c.nodes.map(declared),p.nodes));
     validateTreeConversionParameters({nodes:s.node_tree.nodes.map(declared)},'manual_structure',{...request,target:{...request.target,kind:'existing'},inputs:[]});
    }else{
+    for(const [field,definition] of Object.entries(treeToJsonParametersSchema.properties))if(p[field]===undefined)
+     need(s.node_tree[field]===(definition.const??definition.enum[0]),'Unsupported retained serialization '+field);
     for(const [key,field,wanted] of [['pedRootExcluded','exclude_root',true],['pedPrettifyJSON','pretty',false],['pedDisplayNameAsKey','keys','names'],['pedMultiRowOutput','multi_row',false],['pedDateTimeIsISO8601','datetime','iso8601']]){
-     await observe('serialization '+field);if(s.node_tree[field]!==wanted)await act(s.node_tree.base+key+';ValueControl;DisplayEl');
+     await observe('serialization '+field);if(p[field]!==undefined&&s.node_tree[field]!==wanted)await act(s.node_tree.base+key+';ValueControl;DisplayEl');
     }
     await observe('serialization settings verified',c=>c.exclude_root===true&&c.pretty===false&&c.keys==='names'&&c.multi_row===false&&c.datetime==='iso8601');
    }
