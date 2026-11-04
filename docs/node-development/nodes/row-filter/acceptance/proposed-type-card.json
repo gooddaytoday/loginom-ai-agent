@@ -28,7 +28,7 @@
   "catalog_add_available": false,
   "platform_availability": "requires_live_preflight",
   "full_node_apply_available": false,
-  "cache_key": "d48b7ea95d7cdd97e58a6024985e965876e50ea3a1365ecf67f4c9903a6d70cb",
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
   "candidate_node_apply_available": true,
   "candidate_apply_tool": "dock_node_apply",
   "candidate_modes": [
