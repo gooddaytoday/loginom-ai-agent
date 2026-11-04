@@ -1,0 +1,7 @@
+RowID,Key,Amount,Note
+1,1,1.25,first
+2,2,2.5,""
+3,3,-0.125,?
+4,?,0,missing-key
+5,1,4.75,repeat-main
+6,4,8,unmatched
