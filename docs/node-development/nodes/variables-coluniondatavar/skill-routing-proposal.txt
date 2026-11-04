@@ -1,0 +1,1 @@
+| `variables.column_union` | Соединение переменных | [Справка](references/nodes/variables.column_union.md) |

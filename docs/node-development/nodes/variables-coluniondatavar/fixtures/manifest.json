@@ -1,0 +1,31 @@
+{
+  "encoding": "UTF-8",
+  "format": "JSON typed scalars; native LGP ZIP",
+  "null": "JSON null, declared type preserved",
+  "order": [
+    "left",
+    "right"
+  ],
+  "sources": {
+    "left": {
+      "node_id": "9b4490d1-cfe1-4604-9b7f-fd39a02cfa22",
+      "output_port": 0,
+      "port_kind": "variables"
+    },
+    "right": {
+      "node_id": "7b7e24a9-478b-41c5-bab0-392fb3ad18ef",
+      "output_port": 0,
+      "port_kind": "variables"
+    }
+  },
+  "files": {
+    "inputs.json": {
+      "bytes": 1030,
+      "sha256": "54478a2c1124b80631820892f041a25ffa5554b51c69b354ab1c0e9e979ee6ad"
+    },
+    "source.lgp": {
+      "bytes": 6625,
+      "sha256": "8fe1ec33135e16e316789bd25b79ef2c1de7767d2178375b05b6ad30609d0662"
+    }
+  }
+}
