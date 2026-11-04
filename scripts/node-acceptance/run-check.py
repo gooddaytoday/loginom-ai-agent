@@ -104,6 +104,14 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt']:
+        export = name == 'lgd-export'
+        node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')
+        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt'}[name]
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
+                    data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
+                    expected_name='expected-' + variant + '-run.json', base=None, lgd=variant,
+                    oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
         kind = name.removeprefix('clustering-scale-')
@@ -207,6 +215,17 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding']:
+        node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
+        task, expected, inputs, count = {
+            'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
+            'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
+            'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
+            'ungroup-rounding': ('rounding/task.md', 'rounding/expected.json', ['balance-totals.csv', 'balance-shares.csv', 'round-totals.csv', 'round-shares.csv'], 5),
+        }[name]
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures', base=None, expected_name=expected,
+                    input_files=inputs, export_count=count)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -694,6 +713,15 @@ def port_failure(replies, journal):
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
 
 
+def check_lgd_import_result(replies, row_count):
+    assert any(o.get('status') == 'SUCCEEDED'
+               and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import'
+               and o.get('execution', {}).get('status') == 'completed'
+               and any(p.get('port') == 0 and p.get('sample_complete') is True
+                       and p.get('row_count') == row_count and port_path(owner, p) is not None
+                       for owner, p in ports(o)) for _, o in replies), 'LGD_IMPORT_FULL_RESULT_MISSING'
+
+
 def check_tree(port, expected):
     tree = port.get('tree', {})
     assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
@@ -970,6 +998,9 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('lgd') == 'roundtrip':
+            lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
+            prompt = prompt.replace('{{EXPORT_DIRECTORY}}/roundtrip.lgd', lgd_destination)
         if spec.get('local_file') and spec['attachment'] == 'path':
             prompt = prompt.replace('{{SOURCE_PATH}}', str(spec['local_file']))
             if spec.get('upload_only') and str(spec['local_file']) not in prompt:
@@ -981,6 +1012,7 @@ class Runner:
             prompt += '\nНазови узел дерева «' + labels[0] + '», узел JSON «' + labels[1] + '».'
         rejection = expected.get('rejection')
         execution_error = expected.get('execution_error')
+        lgd_corrupt = spec.get('lgd') == 'corrupt'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -996,8 +1028,8 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('upload_only') or rejection or execution_error: exports = []
-        if not exports and not spec.get('upload_only') and not rejection and not execution_error:
+        if spec.get('upload_only') or rejection or execution_error or lgd_corrupt: exports = []
+        if not exports and not spec.get('upload_only') and not rejection and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -1008,11 +1040,12 @@ class Runner:
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not rejection and not execution_error: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not rejection and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
+        if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -1034,7 +1067,12 @@ class Runner:
             target = workspace / file.name
             if target.exists(): continue
             shutil.copyfile(file, target)
-            command += ['--file', target]
+            if spec.get('lgd') and target.suffix.lower() == '.lgd':
+                # Native binary input uses the existing local-path admission flow.
+                prompt += f'\nИсходный файл LGD: {target}.'
+            else:
+                command += ['--file', target]
+        (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
@@ -1086,6 +1124,39 @@ class Runner:
             return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
+        if lgd_corrupt:
+            for _, event in events:
+                part = event.get('part', {})
+                if event.get('type') == 'tool_use' and part.get('tool') == 'loginom_dock_node_apply':
+                    assert part.get('state', {}).get('input', {}).get('target', {}).get('type') == 'imports.lgd', 'LGD_CORRUPT_SUBSTITUTE_NODE'
+            errors, refusals = [], []
+            for _, event in events:
+                part = event.get('part', {})
+                state = part.get('state', {})
+                if event.get('type') != 'tool_use' or state.get('status') not in ['completed', 'error']: continue
+                try: value = json.JSONDecoder().raw_decode(state.get('output' if state['status'] == 'completed' else 'error', ''))[0]
+                except (ValueError, TypeError): continue
+                pending = [value]
+                while pending:
+                    value = pending.pop()
+                    if isinstance(value, dict):
+                        if value.get('status') == 'SUCCEEDED' and value.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import':
+                            raise AssertionError('LGD_CORRUPT_SUCCESS_FORBIDDEN')
+                        error = value.get('error', {})
+                        if isinstance(error, dict):
+                            errors.append(error.get('message', ''))
+                            if value.get('status') == 'FAILED': refusals.append(value)
+                        pending.extend(value.values())
+                    elif isinstance(value, list): pending.extend(value)
+            pattern = r'контрольн[^\n]*сумм|checksum'
+            assert any(re.search(pattern, error, re.I) for error in errors), 'LGD_CHECKSUM_REFUSAL_MISSING'
+            assert any(o.get('status') == 'FAILED' and o.get('cleanup_complete') is True
+                       and o.get('execution', {}).get('status') == 'not_requested'
+                       and o.get('output', {}).get('ports') == []
+                       and re.search(pattern, o.get('error', {}).get('message', ''), re.I)
+                       for o in refusals), 'LGD_CHECKSUM_REFUSAL_UNSETTLED'
+            answer = '\n'.join(event.get('part', {}).get('text', '') for _, event in events if event.get('type') == 'text')
+            assert re.search(pattern, answer, re.I), 'LGD_CHECKSUM_REFUSAL_NOT_REPORTED'
         if execution_error:
             # Only tool results are evidence: request inputs contain the intentional
             # exception too, and must never establish an observed Loginom failure.
@@ -1170,7 +1241,8 @@ class Runner:
         paths = {port_path(owner, p) for _, o in replies for owner, p in ports(o)} - {None}
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
-        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error) or delivered else None
+        assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
+        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error or lgd_corrupt) or delivered else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -1197,12 +1269,29 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if lgd_corrupt:
+            self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
+            return session, expected, None, None
+        if spec.get('lgd'):
+            check_lgd_import_result(replies, len(expected['outputs'][0]['rows']))
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None
         if rejection:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
+        if spec.get('lgd') == 'roundtrip':
+            assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
+                       and o.get('configuration', {}).get('readback', {}).get('destination') == lgd_destination
+                       and o.get('configuration', {}).get('readback', {}).get('settings', {}).get('compression') == 2
+                       and o.get('configuration', {}).get('readback', {}).get('settings', {}).get('checksum') == 1
+                       and not o.get('output', {}).get('ports')
+                       and any(f.get('destination') == lgd_destination and f.get('bytes', 0) > 0 for f in o.get('output', {}).get('file_artifacts', []))
+                       for _, o in replies), 'LGD_SINK_FILE_EVIDENCE_MISSING'
+            lgd_file = downloaded_csv(profile, lgd_destination)
+            binary = lgd_file.read_bytes()
+            assert len(binary) > 20 and binary[:6] == b'BGDATA' and binary[16:20] == bytes.fromhex('04224d18'), 'LGD_LZ4_HEADER'
+            shutil.copyfile(lgd_file, folder / 'roundtrip.lgd')
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
             actual = folder / Path(destinations[0]).name
@@ -1306,7 +1395,7 @@ class Runner:
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('execution_error'):
+                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
@@ -1360,7 +1449,7 @@ def main():
         spec = scenario(name, args.case_root, cases=args.cases)
         if spec.get('generated'): continue
         assert spec['prompt'].is_file(), 'Scenario prompt missing'
-        assert args.case_root or (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
+        assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
         expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
