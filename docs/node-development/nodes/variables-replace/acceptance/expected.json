@@ -1,0 +1,219 @@
+{
+  "status": "proposal_pending_criteria_and_W1",
+  "initial": {
+    "output_node_type": "variables.replace",
+    "port_kind": "variables",
+    "output_port": 0,
+    "ordered": true,
+    "variables": [
+      {
+        "name": "Count",
+        "label": "Количество",
+        "type": "integer",
+        "value": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "value": 2.5,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "Color",
+        "label": "Цвет",
+        "type": "string",
+        "value": "blue"
+      },
+      {
+        "name": "Case",
+        "label": "Регистр",
+        "type": "string",
+        "value": "Red"
+      },
+      {
+        "name": "Enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "Missing",
+        "label": "Нет значения",
+        "type": "string",
+        "value": "missing"
+      },
+      {
+        "name": "Empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": "blank"
+      },
+      {
+        "name": "Zero",
+        "label": "Ноль",
+        "type": "integer",
+        "value": null
+      },
+      {
+        "name": "Untouched",
+        "label": "Без изменений",
+        "type": "integer",
+        "value": 7
+      },
+      {
+        "name": "NullInt",
+        "label": "Пустое целое",
+        "type": "integer",
+        "value": null
+      }
+    ]
+  },
+  "updated": {
+    "output_node_type": "variables.replace",
+    "port_kind": "variables",
+    "output_port": 0,
+    "ordered": true,
+    "variables": [
+      {
+        "name": "Count",
+        "label": "Количество",
+        "type": "integer",
+        "value": 8
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "value": 2.5,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "Color",
+        "label": "Цвет",
+        "type": "string",
+        "value": "blue"
+      },
+      {
+        "name": "Case",
+        "label": "Регистр",
+        "type": "string",
+        "value": "Red"
+      },
+      {
+        "name": "Enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "Missing",
+        "label": "Нет значения",
+        "type": "string",
+        "value": "missing"
+      },
+      {
+        "name": "Empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": "blank"
+      },
+      {
+        "name": "Zero",
+        "label": "Ноль",
+        "type": "integer",
+        "value": null
+      },
+      {
+        "name": "Untouched",
+        "label": "Без изменений",
+        "type": "integer",
+        "value": 7
+      },
+      {
+        "name": "NullInt",
+        "label": "Пустое целое",
+        "type": "integer",
+        "value": null
+      }
+    ]
+  },
+  "source_updated": {
+    "output_node_type": "variables.replace",
+    "port_kind": "variables",
+    "output_port": 0,
+    "ordered": true,
+    "variables": [
+      {
+        "name": "Count",
+        "label": "Количество",
+        "type": "integer",
+        "value": 8
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "value": 2.5,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "Color",
+        "label": "Цвет",
+        "type": "string",
+        "value": "green"
+      },
+      {
+        "name": "Case",
+        "label": "Регистр",
+        "type": "string",
+        "value": "Red"
+      },
+      {
+        "name": "Enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "Missing",
+        "label": "Нет значения",
+        "type": "string",
+        "value": "missing"
+      },
+      {
+        "name": "Empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": "blank"
+      },
+      {
+        "name": "Zero",
+        "label": "Ноль",
+        "type": "integer",
+        "value": null
+      },
+      {
+        "name": "Untouched",
+        "label": "Без изменений",
+        "type": "integer",
+        "value": 7
+      },
+      {
+        "name": "NullInt",
+        "label": "Пустое целое",
+        "type": "integer",
+        "value": null
+      }
+    ]
+  }
+}
