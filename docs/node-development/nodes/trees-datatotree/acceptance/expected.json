@@ -1,0 +1,350 @@
+{
+  "proposal": "LAB-770 approved criteria; stage 1 separately assigned; no run PASS",
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "trees.from_table",
+      "label": "OrderTree"
+    },
+    {
+      "type": "trees.to_json",
+      "label": "OrdersJSON"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "trees.to_json",
+      "output_node_label": "OrdersJSON",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "JSON",
+          "name_any": true,
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "JSON": "{\"items\":[{\"RowID\":1,\"OrderID\":10,\"ExternalID\":9007199254740993,\"details\":{\"SKU\":\"A\",\"Qty\":2,\"Price\":1.25,\"Active\":false,\"Note\":null}},{\"RowID\":2,\"OrderID\":10,\"ExternalID\":9007199254740993,\"details\":{\"SKU\":\"B\",\"Qty\":0,\"Price\":0.5,\"Active\":true,\"Note\":\"\"}},{\"RowID\":3,\"OrderID\":20,\"ExternalID\":9007199254740994,\"details\":{\"SKU\":\"Кофе\",\"Qty\":null,\"Price\":2.0,\"Active\":false,\"Note\":\"Он сказал \\\"да\\\"\\nстрока\"}}]}"
+        }
+      ]
+    }
+  ],
+  "proposed_json_comparison": {
+    "output_port": 0,
+    "ordered": true,
+    "document_count": 1,
+    "mode": "decoded_json_values",
+    "tolerance": {
+      "abs": 0,
+      "rel": 0
+    },
+    "object_key_order": "ignore; tree schema order exact",
+    "array_order": "exact",
+    "duplicate_keys": "reject",
+    "int64": "exact; no binary64 conversion",
+    "null_is_distinct_from": [
+      "empty string",
+      "zero",
+      "false"
+    ],
+    "note": "Existing cold checker compares strings; rows.JSON is a semantic witness, not a required escape spelling. Requires approved scoped adapter before runs."
+  },
+  "proposed_tree_output": {
+    "output_node_type": "trees.from_table",
+    "output_node_label": "OrderTree",
+    "output_port": 0,
+    "port_kind": "tree",
+    "ordered": true,
+    "tolerance": {
+      "abs": 0,
+      "rel": 0
+    },
+    "schema_field_order": [
+      "items"
+    ],
+    "item_field_order": [
+      "RowID",
+      "OrderID",
+      "ExternalID",
+      "details"
+    ],
+    "schema_types": {
+      "/items": "object_array",
+      "/items/RowID": "integer",
+      "/items/OrderID": "integer",
+      "/items/ExternalID": "integer",
+      "/items/details": "object",
+      "/items/details/SKU": "string",
+      "/items/details/Qty": "integer",
+      "/items/details/Price": "real",
+      "/items/details/Active": "boolean",
+      "/items/details/Note": "string"
+    },
+    "document": {
+      "path": "",
+      "type": "object",
+      "children": [
+        {
+          "path": "/items",
+          "type": "array",
+          "children": [
+            {
+              "path": "/items/0",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/0/RowID",
+                  "type": "integer",
+                  "value": "1"
+                },
+                {
+                  "path": "/items/0/OrderID",
+                  "type": "integer",
+                  "value": "10"
+                },
+                {
+                  "path": "/items/0/ExternalID",
+                  "type": "integer",
+                  "value": "9007199254740993"
+                },
+                {
+                  "path": "/items/0/details",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/0/details/SKU",
+                      "type": "string",
+                      "value": "A"
+                    },
+                    {
+                      "path": "/items/0/details/Qty",
+                      "type": "integer",
+                      "value": "2"
+                    },
+                    {
+                      "path": "/items/0/details/Price",
+                      "type": "real",
+                      "value": "1.25"
+                    },
+                    {
+                      "path": "/items/0/details/Active",
+                      "type": "boolean",
+                      "value": false
+                    },
+                    {
+                      "path": "/items/0/details/Note",
+                      "type": "null",
+                      "value": null
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "path": "/items/1",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/1/RowID",
+                  "type": "integer",
+                  "value": "2"
+                },
+                {
+                  "path": "/items/1/OrderID",
+                  "type": "integer",
+                  "value": "10"
+                },
+                {
+                  "path": "/items/1/ExternalID",
+                  "type": "integer",
+                  "value": "9007199254740993"
+                },
+                {
+                  "path": "/items/1/details",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/1/details/SKU",
+                      "type": "string",
+                      "value": "B"
+                    },
+                    {
+                      "path": "/items/1/details/Qty",
+                      "type": "integer",
+                      "value": "0"
+                    },
+                    {
+                      "path": "/items/1/details/Price",
+                      "type": "real",
+                      "value": "0.5"
+                    },
+                    {
+                      "path": "/items/1/details/Active",
+                      "type": "boolean",
+                      "value": true
+                    },
+                    {
+                      "path": "/items/1/details/Note",
+                      "type": "string",
+                      "value": ""
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "path": "/items/2",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/2/RowID",
+                  "type": "integer",
+                  "value": "3"
+                },
+                {
+                  "path": "/items/2/OrderID",
+                  "type": "integer",
+                  "value": "20"
+                },
+                {
+                  "path": "/items/2/ExternalID",
+                  "type": "integer",
+                  "value": "9007199254740994"
+                },
+                {
+                  "path": "/items/2/details",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/2/details/SKU",
+                      "type": "string",
+                      "value": "Кофе"
+                    },
+                    {
+                      "path": "/items/2/details/Qty",
+                      "type": "null",
+                      "value": null
+                    },
+                    {
+                      "path": "/items/2/details/Price",
+                      "type": "real",
+                      "value": "2.0"
+                    },
+                    {
+                      "path": "/items/2/details/Active",
+                      "type": "boolean",
+                      "value": false
+                    },
+                    {
+                      "path": "/items/2/details/Note",
+                      "type": "string",
+                      "value": "Он сказал \"да\"\nстрока"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "instance_count": 32,
+    "note": "Proposal. Verify actual schema and complete instances independently of the JSON output.",
+    "nested_field_order": {
+      "/items/details": [
+        "SKU",
+        "Qty",
+        "Price",
+        "Active",
+        "Note"
+      ]
+    },
+    "schema_node_count": 11,
+    "declared_schema": [
+      {
+        "path": "",
+        "name": "Root",
+        "label": "Root",
+        "type": "object",
+        "is_array": false
+      },
+      {
+        "path": "/items",
+        "name": "items",
+        "label": "items",
+        "type": "object",
+        "is_array": true
+      },
+      {
+        "path": "/items/RowID",
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer",
+        "is_array": false
+      },
+      {
+        "path": "/items/OrderID",
+        "name": "OrderID",
+        "label": "OrderID",
+        "type": "integer",
+        "is_array": false
+      },
+      {
+        "path": "/items/ExternalID",
+        "name": "ExternalID",
+        "label": "ExternalID",
+        "type": "integer",
+        "is_array": false
+      },
+      {
+        "path": "/items/details",
+        "name": "details",
+        "label": "details",
+        "type": "object",
+        "is_array": false
+      },
+      {
+        "path": "/items/details/SKU",
+        "name": "SKU",
+        "label": "SKU",
+        "type": "string",
+        "is_array": false
+      },
+      {
+        "path": "/items/details/Qty",
+        "name": "Qty",
+        "label": "Qty",
+        "type": "integer",
+        "is_array": false
+      },
+      {
+        "path": "/items/details/Price",
+        "name": "Price",
+        "label": "Price",
+        "type": "real",
+        "is_array": false
+      },
+      {
+        "path": "/items/details/Active",
+        "name": "Active",
+        "label": "Active",
+        "type": "boolean",
+        "is_array": false
+      },
+      {
+        "path": "/items/details/Note",
+        "name": "Note",
+        "label": "Note",
+        "type": "string",
+        "is_array": false
+      }
+    ]
+  }
+}

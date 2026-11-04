@@ -1,0 +1,1 @@
+Конечные классы (`preprocessing.coarse_classes`): перед обучением или apply прочитай `references/nodes/coarse-classes.md`.

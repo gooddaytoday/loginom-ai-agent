@@ -1,0 +1,197 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.assn_rules"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.assn_rules",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ItemsetID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Width",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Support",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Item_0",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Item_1",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ItemsetID": 1,
+          "Width": 1,
+          "Support": 1.0,
+          "Item_0": "A",
+          "Item_1": null
+        },
+        {
+          "ItemsetID": 2,
+          "Width": 1,
+          "Support": 0.75,
+          "Item_0": "B",
+          "Item_1": null
+        },
+        {
+          "ItemsetID": 3,
+          "Width": 2,
+          "Support": 0.75,
+          "Item_0": "A",
+          "Item_1": "B"
+        },
+        {
+          "ItemsetID": 4,
+          "Width": 1,
+          "Support": 0.75,
+          "Item_0": "C",
+          "Item_1": null
+        },
+        {
+          "ItemsetID": 5,
+          "Width": 2,
+          "Support": 0.75,
+          "Item_0": "A",
+          "Item_1": "C"
+        },
+        {
+          "ItemsetID": 6,
+          "Width": 2,
+          "Support": 0.5,
+          "Item_0": "B",
+          "Item_1": "C"
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.assn_rules",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RuleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Support",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Confidence",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Lift",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Item_0_A",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Item_0_C",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RuleID": 1,
+          "Support": 0.75,
+          "Confidence": 0.75,
+          "Lift": 1.0,
+          "Item_0_A": "A",
+          "Item_0_C": "B"
+        },
+        {
+          "RuleID": 2,
+          "Support": 0.75,
+          "Confidence": 1.0,
+          "Lift": 1.0,
+          "Item_0_A": "B",
+          "Item_0_C": "A"
+        },
+        {
+          "RuleID": 3,
+          "Support": 0.75,
+          "Confidence": 0.75,
+          "Lift": 1.0,
+          "Item_0_A": "A",
+          "Item_0_C": "C"
+        },
+        {
+          "RuleID": 4,
+          "Support": 0.75,
+          "Confidence": 1.0,
+          "Lift": 1.0,
+          "Item_0_A": "C",
+          "Item_0_C": "A"
+        },
+        {
+          "RuleID": 5,
+          "Support": 0.5,
+          "Confidence": 0.6666666666666667,
+          "Lift": 0.8888888888888888,
+          "Item_0_A": "B",
+          "Item_0_C": "C"
+        },
+        {
+          "RuleID": 6,
+          "Support": 0.5,
+          "Confidence": 0.6666666666666667,
+          "Lift": 0.8888888888888888,
+          "Item_0_A": "C",
+          "Item_0_C": "B"
+        }
+      ]
+    }
+  ]
+}
