@@ -3,6 +3,12 @@ import {pathToFileURL} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {parseExpectedVariableInventory,matchVariableInventoryOutput} from './expected-outputs.mjs';
+export async function saveVariablesColumnUnionSource(runtime,path,upload){
+ if(upload?.status!=='SUCCEEDED'||upload.destination!==path||upload.upload_completion_verified!==true||upload.cleanup_complete!==true)throw Error('VARIABLES_SOURCE_SAVE_OWNED_UPLOAD_REQUIRED');
+ const saved=await runtime.run('package.save_checkpoint',{path,conflict_policy:'replace'},{operationId:'source-save'});
+ if(saved.status!=='SUCCEEDED'||saved.output?.save_completed!==true)throw Error('VARIABLES_SOURCE_SAVE:'+JSON.stringify(saved));
+ return saved;
+}
 export async function deliverVariablesColumnUnionSource(runtime,request){
  let delivered=await runtime.deliverPackageArtifact(request);
  for(let attempt=0;attempt<3;attempt++){
@@ -53,6 +59,7 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
   const directory=config.package.substring(0,config.package.lastIndexOf('/'));
   const binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
   const actions=JSON.parse(await readFile(root+'/runtime/executor/catalog/actions.json','utf8')).actions;
+  actions.find(action=>action.action_key==='package.save_checkpoint').effect.allowed_roots=[directory];
   const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
   const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId});
   const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},
@@ -62,8 +69,11 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
   if(delivered.outcome?.status!=='SUCCEEDED')throw Error('VARIABLES_SOURCE_UPLOAD:'+JSON.stringify(delivered));
   const prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-open',intent:'open_package',packagePath:config.package}));
   if(prepared.status!=='READY')throw Error('VARIABLES_SOURCE_OPEN');
+  const saved=await saveVariablesColumnUnionSource(runtime,config.package,delivered.outcome);
+  await writeFile(output+'/source-save.json',JSON.stringify(saved));
   const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:prepared.document_id,account:config.login.username,packagePath:config.package,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid}));
-  await writeFile(output+'/result.json',JSON.stringify({delivered:delivered.outcome,cleanup}));
+  await record({phase:'variables_column_union_source_cleanup',cleanup});
+  await writeFile(output+'/result.json',JSON.stringify({delivered:delivered.outcome,saved,cleanup}));
   if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('VARIABLES_SOURCE_CLEANUP');
  }finally{await context.close();}
 }

@@ -1,9 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource} from '../variables-column-union.mjs';
+import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource,saveVariablesColumnUnionSource} from '../variables-column-union.mjs';
 const load=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-'+name+'-run.json',import.meta.url)));
 const initial=load('initial'),updated=load('updated');
+test('source Save targets only the completed owned upload and requires a completed native save',async()=>{
+ const calls=[],path='/worker/new-copy.lgp',proof={status:'SUCCEEDED',destination:path,upload_completion_verified:true,cleanup_complete:true};
+ const runtime={run:async(...args)=>{calls.push(args);return {status:'SUCCEEDED',output:{save_completed:true}};}};
+ await saveVariablesColumnUnionSource(runtime,path,proof);
+ assert.deepEqual(calls[0],['package.save_checkpoint',{path,conflict_policy:'replace'},{operationId:'source-save'}]);
+ for(const patch of [{destination:'/worker/foreign.lgp'},{upload_completion_verified:false},{status:'AMBIGUOUS'},{cleanup_complete:false}]){
+  calls.length=0;await assert.rejects(()=>saveVariablesColumnUnionSource(runtime,path,{...proof,...patch}));assert.equal(calls.length,0);
+ }
+ runtime.run=async()=>({status:'FAILED',output:{save_completed:false}});
+ await assert.rejects(()=>saveVariablesColumnUnionSource(runtime,path,proof),/SOURCE_SAVE/);
+});
 test('fixture delivery resumes only an explicit settled checkpoint before upload and never restarts delivery',async()=>{
  const request={operation_id:'source'},calls=[];
  const checkpoint={outcome:{status:'NOT_APPLIED',effect_possible:false,upload_submitted_or_unknown:false,inspection_required:false,cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume'}}};
