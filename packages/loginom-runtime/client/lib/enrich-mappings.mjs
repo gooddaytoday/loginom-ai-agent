@@ -15,7 +15,7 @@ export async function configureEnrichInputs(channel,mappings,ctx,request,finishW
  need(graph?.complete&&target?.type==='transform.enrich_data','Verified enrichment graph required');
  const count=request.parameters.enrichment?request.parameters.enrichment.tables.length+1:target.inputs.length;
  need(count>=2&&count<=3,'One or two enrichment lookups required');
- const observations=[],ports=Array.from({length:count},(_,i)=>i),sources=ports.map(port=>{
+ const observations=[],ports=Array.from({length:count},(_,i)=>i),sourceOutputs=ports.map(port=>{
   const edges=graph.links.filter(e=>e.target===node.node_id&&e.input===port);
   need(edges.length===1,'Exact connected enrichment input required');
   const edge=edges[0],source=graph.nodes.find(n=>n.ref.node_id===edge.source);
@@ -55,7 +55,7 @@ export async function configureEnrichInputs(channel,mappings,ctx,request,finishW
   const native_mapping=s.node_mapping,definition=await readOutputDefinitionPages(channel,{expectedCount:native_mapping.target_fields.length});
   need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===native_mapping.target_fields[i][k])),'Enrich input rendered definition differs');
   const finish=await finishWizard('done',true,definition);
-  results.push({port,source:sources[port],native_mapping,definition,changes,finish});
+  results.push({port,source:sourceOutputs[port],native_mapping,definition,changes,finish});
  }
  return {verified:true,cleanup_complete:true,effect_possible:true,ports:results.sort((a,b)=>a.port-b.port),source_identity_verified:true};
 }
