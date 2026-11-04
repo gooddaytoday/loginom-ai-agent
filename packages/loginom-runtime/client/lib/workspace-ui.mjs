@@ -870,6 +870,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
       const titles=matching(';cardWizardPanel;p.h;p.t');
       const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
+        if(key==='coarse_classes_mapping_2'&&!(tids.get(base+';CoarseClassesWizard-1')??[]).some(element=>form.contains(element)))return [];
         const counts=[suffixes].flat().map(suffix=>matching(suffix).length);
         // The same input card can show both its grid and Add button. Neither
         // duplicate markers nor a second native card establish a unique stage.

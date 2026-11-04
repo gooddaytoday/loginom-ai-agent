@@ -29,6 +29,7 @@ test('serialized observer binds coarse classes stages and actionable named role 
   const p=new Page(),base='MF;TF-1;WizrdMCF',root=p.add('div',base,'',{x:0,y:70,width:900,height:600});
   const card=p.add('div',base+';'+suffix,'',{x:10,y:80,width:500,height:400},root);
   if(stage==='coarse_classes')p.add('td',base+';CoarseClassesWizard-1;colColumnDisplayName_Segment','Segment',{x:40,y:120,width:100,height:25},card);
+  if(stage==='coarse_classes_mapping_2')p.add('div',base+';CoarseClassesWizard-1','',undefined,root).style.display='none';
   const s=await p.observe();assert.equal(s.wizard.stage,stage);
   if(stage==='coarse_classes')assert.ok(s.ui.elements.find(e=>e.tid?.endsWith(';colColumnDisplayName_Segment'))?.allowed_actions.includes('click'));
  }
@@ -44,4 +45,11 @@ test('compact coarse classes request defaults to all three ports',async()=>{
  const b=createUserWorkflowBindings();b.remember({document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]}});
  const r=b.expandNode({operation_id:'coarse',document_id:'doc',workflow_ref:{workflow_id:'flow'},target:{kind:'new',type:'preprocessing.coarse_classes'},parameters,finish:'execute'});
  assert.deepEqual(r.read.ports,[0,1,2]);
+});
+
+test('a generic third output mapping is not classified as a coarse classes wizard',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const p=new Page(),base='MF;TF-1;WizrdMCF',root=p.add('div',base);
+ p.add('div',base+';DerivedDataSourceMappingEngineOutputPortWizard-2;btnAddMappingColumn','',undefined,root);
+ const s=await p.observe();assert.equal(s.wizard.stage,null);assert.equal(s.wizard.stage_status,'unrecognized');
 });

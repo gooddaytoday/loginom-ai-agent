@@ -47,8 +47,17 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
   }
   if(role==='input'&&s.node_coarse_classes.settings.fine_classes!==false)await act('chkUseFineClassesBinning;ValueControl',{verb:'set_checked',checked:false},f);
   if(role==='target'&&s.node_coarse_classes.settings.event_value!==wanted.event_value){
-   await act('cbxEventValue;ValueContainer;txt-1',{verb:'fill',text:wanted.event_value},f);
-   await act('cbxEventValue;ValueContainer;txt-1',{verb:'press',key:'Tab'},f);
+   const path=s.node_coarse_classes.settings.event_control;need(typeof path==='string','rendered target event editor required');
+   if(path.endsWith(';cbx')){
+    await act(path+';trg_picker',{verb:'click'},f);
+    const owner=s.wizard.root_tid+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;'+path+';boundlist;';
+    s=await observeCoarseClasses(channel,'native exact event option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner)&&e.label===wanted.event_value));
+    await channel.perform({condition:'select observed target event',initialObservation:s,ready:coarseClassesReady,identity:()=>f,
+     resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner)&&e.label===wanted.event_value&&e.allowed_actions.includes('click'),'exact native event option required').ref})});
+    s=await observeCoarseClasses(channel,'selected target event readback',s=>s.node_coarse_classes.settings.event_value===wanted.event_value);
+   }else{
+    await act(path,{verb:'fill',text:wanted.event_value},f);await act(path,{verb:'press',key:'Tab'},f);
+   }
    need(s.node_coarse_classes.settings.event_value===wanted.event_value,'event label readback differs');
   }
  }

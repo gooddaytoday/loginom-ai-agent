@@ -54,8 +54,13 @@ export function readCoarseClassesBrowser(prefix){
  for(const [key,path] of Object.entries({role:'cbxColumnPurpose',min_class_percent:'edtMinimalClassRate;ValueControl',max_classes:'edtDesiredClassCount;ValueControl',uniformity_percent:'edtUniformityCoefficient;ValueControl',fine_classes:'chkUseFineClassesBinning;ValueControl'})){
   const c=cmp(controlBase+path);settings[key]=typeof c?.getValue==='function'?c.getValue():null;
  }
- const event=cmp(controlBase+'cbxEventValue;ValueContainer;txt-1');
- settings.event_value=typeof event?.getValue==='function'?event.getValue():null;
+ const eventPaths=['cbxEventValue;ValueContainer;txt','cbxEventValue;ValueContainer;txt-1','cbxEventValue;ValueContainer;cbx'];
+ const events=eventPaths.map(path=>({path,control:cmp(controlBase+path)})).filter(e=>e.control?.el?.dom?.checkVisibility({checkVisibilityCSS:true}));
+ if(events.length>1)return fail('coarse_classes_event_ambiguous');
+ const event=events[0];
+ settings.event_control=event?.path??null;
+ settings.event_value=event?(event.path.endsWith(';cbx')?event.control.getRawValue?.():event.control.getValue?.()):null;
+ if(selected?.role==='target'&&typeof settings.event_value!=='string')return fail('coarse_classes_event_pending');
  if(selected&&settings.role!=={unused:0,input:1,target:4}[selected.role])return fail('coarse_classes_selection_binding');
  if(selected?.role==='input'&&(!['min_class_percent','max_classes','uniformity_percent'].every(k=>Number.isFinite(settings[k]))||typeof settings.fine_classes!=='boolean'))return fail('coarse_classes_settings_pending');
  return {verified:true,inventory_complete:true,binding_ready:true,fields,selected,settings,settings_applied:false};
