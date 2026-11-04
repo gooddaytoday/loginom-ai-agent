@@ -131,6 +131,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
+  const builtinSnapshot=request.target.type==='variables.user'&&request.mode===NODE_READ_MODE;
   const separateOutput=handler.output_wizard==='separate';
   const javascriptConfigurationOnly=request.target.type==='programming.javascript'
     &&handler.materialize_output===true&&request.finish!=='execute';
@@ -476,6 +477,17 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&(request.read.coverage!=='full'||request.target.type!=='programming.javascript'
           ||value.status==='complete'&&value.ports.every(p=>p.sample_complete===true&&p.sample_rows===p.row_count)),
         'Output is not bound to the requested execution, ports or full JavaScript row coverage')});
+      state.output=output;
+    }
+    if(builtinSnapshot){
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:true,verify:value=>requireValue(
+        value.status==='complete'&&value.source==='snapshot'&&value.native_source==='VariablesEditValuesWizard'&&value.execution_id===null
+        &&typeof value.evidence_ref==='string'&&value.ports?.length===0&&value.variable_ports?.length===1
+        &&value.variable_ports[0].port===4&&value.variable_ports[0].source==='snapshot'&&value.variable_ports[0].native_source==='VariablesEditValuesWizard'
+        &&value.variable_ports[0].execution_id===null&&value.variable_ports[0].fresh===true&&value.variable_ports[0].complete===true
+        &&value.variable_ports[0].package_modified===false&&typeof value.variable_ports[0].read_id==='string'&&value.variable_ports[0].read_id.length>0
+        &&value.variable_ports[0].count===value.variable_ports[0].variables?.length&&value.variable_ports[0].completeness?.loaded===true
+        &&['count','store_count','unique_ids'].every(k=>value.variable_ports[0].completeness[k]===value.variable_ports[0].count),'Builtin snapshot is incomplete, modified or misidentified')});
       state.output=output;
     }
     check();

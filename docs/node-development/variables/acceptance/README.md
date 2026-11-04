@@ -77,3 +77,9 @@ base URL, порядок query-параметров, их field bindings и на
 LAB-820). Задание, fixture и оба expected зафиксированы до этих выполнений.
 Полная модельная цепочка со string-конверсией, разбором и двумя экспортами здесь
 не запускалась; принятый runtime-handler переменных этой правкой не появляется.
+
+Standalone W1: `variables-user` uses `task-user.md`, `expected-user-initial.json`
+and `expected-user.json`. Its oracle is the `variables-user` command in
+`scripts/node-acceptance/expected-outputs.mjs`: verified journal snapshots,
+values-only patch, stable IDs/types and two independent rereads; no CSV.
+Cold uses optional variable_inventory with the production snapshot reader.

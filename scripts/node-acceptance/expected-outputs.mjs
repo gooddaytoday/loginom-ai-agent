@@ -393,3 +393,37 @@ export function matchVariableInventoryLinks(graph,inventory){
   need(matches.length===1&&typeof matches[0].source_port_guid==='string'&&typeof matches[0].target_port_guid==='string','COLD_VARIABLE_LINK_MISMATCH');return matches[0];
  });
 }
+
+export function auditUserVariableHistory(events,initial,final){
+ const before=parseExpectedVariableInventory(initial)?.outputs,after=parseExpectedVariableInventory(final)?.outputs;
+ need(before?.length===1&&after?.length===1&&before[0].node.type==='variables.user'&&after[0].node.type==='variables.user','USER_VARIABLE_ORACLE_INVALID');
+ const requests=events.flatMap((e,index)=>e.phase==='node_apply_prepared'?[{index,request:e.request,operation_id:e.operation_id}]:[]);
+ need(requests.every(e=>e.request?.target?.type==='variables.user'),'UNEXPECTED_VARIABLE_SCENARIO_NODE');
+ const snapshots=events.flatMap((e,index)=>{
+  const r=e.result;
+  return e.phase==='node_checkpoint'&&r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.node&&r.execution?.status==='not_requested'&&r.execution.execution_id===null
+   ?(r.output?.variable_ports??[]).map(output=>({index,result:r,output})):[];
+ });
+ const matches=(s,want)=>{try{return matchVariableInventoryOutput(s.output,want);}catch{return false;}};
+ const first=snapshots.find(s=>matches(s,before[0]));need(first,'USER_INITIAL_SNAPSHOT_MISSING');
+ const updated=snapshots.filter(s=>s.index>first.index&&matches(s,after[0]));
+ need(updated.length>=2&&new Set(updated.map(s=>s.output.read_id)).size>=2&&new Set(updated.map(s=>s.result.operation_id)).size>=2,'USER_INDEPENDENT_REREADS_MISSING');
+ const reread=updated.find(s=>s.output.read_id!==updated[0].output.read_id&&s.result.operation_id!==updated[0].result.operation_id);
+ const sameOwner=s=>['document_id','workflow_id','node_id'].every(k=>s.result.node[k]===first.result.node[k]);
+ need(updated.every(s=>sameOwner(s)&&s.output.variables.every(v=>{const old=first.output.variables.find(x=>x.name===v.name);return old&&JSON.stringify(old.id)===JSON.stringify(v.id)&&old.type===v.type;})),'USER_IDS_TYPES_OR_OWNER_CHANGED');
+ const patches=requests.filter(e=>e.index>first.index&&e.index<updated[0].index&&e.request.mode==='values');
+ const changed=new Set();
+ for(const {request,operation_id} of patches){
+  need(request.target.kind==='existing'&&request.target.ref.node_id===first.result.node.node_id
+   &&events.some(e=>e.phase==='node_checkpoint'&&e.result?.operation_id===operation_id&&e.result.status==='SUCCEEDED'
+    &&e.result.configuration?.readback?.values_are==='independent_owned_user_variables'),'USER_PATCH_NOT_VERIFIED');
+  for(const v of request.parameters.variables){need(v.type==='integer'&&v.value===({limit:5,skip:10})[v.name],'USER_PATCH_CHANGED_UNREQUESTED_VALUE');changed.add(v.name);}
+ }
+ need(changed.size===2,'USER_VALUES_ONLY_PATCH_MISSING');
+ need(!requests.some(e=>e.index>updated[0].index&&e.index<reread.index&&e.request.mode==='values'),'USER_REREAD_RECONFIGURED');
+ return {status:'PASS',snapshots:updated.length+1,node:first.result.node,initial_read_id:first.output.read_id,updated_read_ids:updated.map(s=>s.output.read_id)};
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='variables-user'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditUserVariableHistory(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
+}

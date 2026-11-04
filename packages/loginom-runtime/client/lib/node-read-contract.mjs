@@ -67,11 +67,30 @@ function retainedMappingSchemas(node,sourceId,type){
   return {port:m.port,schema};
  });
 }
-export function buildNodeReadRequest(args,source){
+export function buildNodeReadRequest(args,source,{saves=[]}={}){
  if(source?.kind==='browser_recovery')return buildRecoveredReadRequest(args,source);
  const outcome=source?.outcome,node=outcome?.output,request=source?.parameters;
  // A release after a stopped read keeps the verified configuration and the
  // completed execution; only its output was not refreshed.
+ if(request?.target?.type==='variables.user'){
+  need(outcome.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true&&node.node&&node.execution?.status==='not_requested'
+   &&node.execution.execution_id===null,'Builtin snapshot requires a successful local builtin operation with confirmed cleanup');
+  need(!(args.read?.ports?.length)&&(args.read?.variable_ports===undefined||JSON.stringify(args.read.variable_ports)==='[4]'),'Builtin snapshot reads user output four only');
+  let workflow=request.workflow_ref;
+  const sameWorkflow=(a,b)=>a&&b&&['workflow_id','tab_tid','prefix'].every(k=>a[k]===b[k])&&a.navigation_path?.length===b.navigation_path?.length
+    &&a.navigation_path.every((c,i)=>c.tid===b.navigation_path[i].tid&&c.label===b.navigation_path[i].label);
+  for(const save of saves){
+   const o=save?.outcome;
+   if(save?.action?.action_key!=='package.save_checkpoint'||o?.action_key!=='package.save_checkpoint'||o.status!=='SUCCEEDED'||o.cleanup_complete!==true
+    ||o.output?.save_completed!==true||o.output.workflow_preserved!==true||o.output.reopened!==false)continue;
+   for(const c of o.output.workflow_continuations??[])if(c.document_id===node.node.document_id&&sameWorkflow(c.previous_workflow_ref,workflow)
+     &&['workflow_id','tab_tid','prefix'].every(k=>c.workflow_ref?.[k]===workflow[k]))workflow=c.workflow_ref;
+  }
+  const budget=args.budget_ms??300000;
+  return {operation_id:args.operation_id,contract_revision:request.contract_revision,document_id:node.node.document_id,workflow_ref:structuredClone(workflow),
+   target:{kind:'existing',type:'variables.user',ref:structuredClone(node.node)},inputs:[],mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id},
+   mappings:[],finish:'done',read:{ports:[],variable_ports:[4],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
+ }
  const releasedRead=outcome?.status==='FAILED'&&node?.checkpoint_kind==='local_node_released'&&node.released_phase==='read';
  need((outcome?.status==='SUCCEEDED'||releasedRead)&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&!['exports.text','exports.excel','exports.lgd'].includes(request?.target?.type),
@@ -126,6 +145,11 @@ function buildRecoveredReadRequest(args,receipt){
 export function nodeReadHandler(handler){
  return {revision:handler.revision+':read-existing-v1',modes:[NODE_READ_MODE],
   validate(parameters,mode,request){
+   if(request.target.type==='variables.user'){
+    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&!(request.variable_inputs?.length)&&request.mappings.length===0
+      &&request.finish==='done'&&request.read.ports.length===0&&JSON.stringify(request.read.variable_ports)==='[4]'&&request.read.coverage===undefined
+      &&parameters&&Object.keys(parameters).join(',')==='source_operation_id'&&typeof parameters.source_operation_id==='string','Builtin snapshot cannot execute, configure or read other ports');return;
+   }
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
     &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');

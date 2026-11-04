@@ -302,3 +302,16 @@ test('W1 variable-only reread retains its typed selection and still requests a r
   const invalid=structuredClone(s);mutate(invalid);assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[],variable_ports:[0]}},invalid));
  }
 });
+
+test('W1 builtin snapshot follows only confirmed same-document Save continuations without rewriting its source',()=>{
+ const s=source();s.parameters.target.type='variables.user';s.outcome.output.execution={status:'not_requested',execution_id:null};s.outcome.output.output={ports:[]};
+ const original=structuredClone(s),old=s.parameters.workflow_ref,next={...old,navigation_path:[{tid:'saved',label:'Saved'}]};
+ const save={action:{action_key:'package.save_checkpoint'},outcome:{action_key:'package.save_checkpoint',status:'SUCCEEDED',cleanup_complete:true,
+  output:{save_completed:true,workflow_preserved:true,reopened:false,workflow_continuations:[{document_id:'doc',previous_workflow_ref:old,workflow_ref:next}]}}};
+ const r=buildNodeReadRequest({operation_id:'snapshot',source_operation_id:'values'},s,{saves:[save]});
+ assert.equal(r.finish,'done');assert.deepEqual(r.read.variable_ports,[4]);assert.deepEqual(r.workflow_ref,next);assert.deepEqual(s,original);
+ for(const change of [v=>v.outcome.status='FAILED',v=>v.outcome.output.reopened=true,v=>v.outcome.output.workflow_continuations[0].document_id='foreign',v=>v.outcome.output.workflow_continuations[0].workflow_ref.prefix='MF;TF-2']){
+  const invalid=structuredClone(save);change(invalid);assert.deepEqual(buildNodeReadRequest({operation_id:'snapshot',source_operation_id:'values'},s,{saves:[invalid]}).workflow_ref,old);
+ }
+ assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[0]}},s));
+});
