@@ -84,12 +84,12 @@ export function createCandidateNodeSupport(config) {
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
   const drivers=(()=>{
-  if(type==='variables.to_table')return variablesToTable.nodeApplyDriverFactory(options);
   if(type==='variables.user')return userVariables.nodeApplyDriverFactory(options);
   if(readOnly||['integration.rest_request','transform.join_data'].includes(type)){
    return readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
   }
+  if(type==='variables.to_table')return variablesToTable.nodeApplyDriverFactory(options);
   if(type==='research.quality')return quality.nodeApplyDriverFactory(options);
   if(type==='imports.lgd')return lgdImport.nodeApplyDriverFactory(options);
   if(type==='exports.lgd')return lgdExport.nodeApplyDriverFactory(options);

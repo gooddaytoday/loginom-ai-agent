@@ -80,11 +80,11 @@ def expected(mode='columns'):
         'outputs': [output],
     }
     if mode == 'columns':
-        # W1's existing inventory also audits reciprocal typed edges. The
-        # authored source fixture has no user variables; its clean snapshot
-        # enables that audit without replacing the eight-field table oracle.
+        # The source is the authored variable Calculator, not the unused user
+        # variables builtin. W1 audits its reciprocal edge; the complete table
+        # oracle independently proves all eight typed values and field metadata.
         result['variable_inventory'] = {
-            'outputs': [{'node': {'type': 'variables.user'}, 'port': 4, 'variables': []}],
+            'outputs': [],
             'links': [{'source': {'type': 'bg-vendor-icon-calcvariables'}, 'output': 0,
                        'target': {'type': 'variables.to_table'}, 'input': 0, 'kind': 'variables'}],
         }

@@ -4776,6 +4776,9 @@ function readRenderedInputMapping(observation) {
               ||!['document_id','workflow_id','node_id'].every(k=>typeof beforeNode?.[k]==='string'&&beforeNode[k]===afterNode[k])))return false;
             const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
             const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
+            const variableCaptionAlias=fresh.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу'
+              &&labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'
+              &&labels[0].signature.native_graph.icon==='bg-vendor-icon-variablestodata';
             const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
               &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
               &&beforeNode.node_id===task.prepared_node_context.node.node_id
@@ -4785,7 +4788,7 @@ function readRenderedInputMapping(observation) {
                 ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner.node.tid
                   &&beforeNode.pending_wizard_node.label===owner.node.label
                 :labels.length===1&&normalizeLabel(labels[0].label)!==''
-                  &&normalizeLabel(labels[0].label)===normalizeLabel(owner.node.label));
+                  &&(normalizeLabel(labels[0].label)===normalizeLabel(owner.node.label)||variableCaptionAlias));
             return (guidOwnerMatches||owner.node.tid===opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label)
               &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path);
           };

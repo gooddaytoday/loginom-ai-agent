@@ -350,7 +350,10 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&p
 export function parseExpectedVariableInventory(expected){
  if(expected.variable_inventory===undefined)return null;
  const v=expected.variable_inventory;
- need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&v.outputs.length>0&&v.outputs.length<=16
+ const tableLinkOnly=v?.outputs?.length===0&&Array.isArray(v.links)&&v.links.length>0
+  &&Array.isArray(expected.outputs)&&expected.outputs.some(o=>o.output_node_type==='variables.to_table'&&o.output_port===0)
+  &&v.links.every(l=>l?.target?.type==='variables.to_table'&&l.kind==='variables');
+ need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&(v.outputs.length>0||tableLinkOnly)&&v.outputs.length<=16
   &&(v.links===undefined||Array.isArray(v.links)&&v.links.length<=100),'EXPECTED_VARIABLE_INVENTORY_INVALID');
  const selector=s=>s&&Object.keys(s).every(k=>['type','label'].includes(k))&&typeof s.type==='string'&&s.type.length>0
   &&(s.label===undefined||typeof s.label==='string'&&s.label.length>0);

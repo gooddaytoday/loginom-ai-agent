@@ -72,15 +72,7 @@
     }
   ],
   "variable_inventory": {
-    "outputs": [
-      {
-        "node": {
-          "type": "variables.user"
-        },
-        "port": 4,
-        "variables": []
-      }
-    ],
+    "outputs": [],
     "links": [
       {
         "source": {
