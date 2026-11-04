@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -21,6 +22,128 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_csv_without_header_checks_the_first_json_cell(self):
+        output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
+                      rows=[dict(JSON='{"id":10,"children":[{"name":"Продажи"}]}')])
+        stream = io.StringIO()
+        csv.writer(stream).writerow(['{"children":[{"name":"Продажи"}],"id":10}'])
+        self.assertEqual(self.csv_result(output, stream.getvalue()), ',')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, stream.getvalue().replace('10', '11'))
+        with self.assertRaises((AssertionError, csv.Error)):
+            self.csv_result(output, 'JSON\n' + stream.getvalue())
+        with self.assertRaises(AssertionError):
+            self.csv_result({k: v for k, v in output.items() if k != 'header'}, stream.getvalue())
+
+    def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
+        output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
+                      rows=[dict(A=1, B=1), dict(A=2, B=3)])
+        self.csv_result(output, '1,1\n2,3\n')
+        for data, error in [('1,1\n3,2\n', 'CSV_VALUES'), ('1,1\n', 'CSV_ROW_COUNT')]:
+            with self.subTest(data=data), self.assertRaisesRegex(AssertionError, error):
+                self.csv_result(output, data)
+        for data in ['1,1,1\n2,3\n', '1,1\n2\n']:
+            with self.subTest(data=data), self.assertRaises((AssertionError, csv.Error)):
+                self.csv_result(output, data)
+        self.csv_result(dict(output, rows=[]), '')
+        with self.assertRaisesRegex(AssertionError, 'CSV_ROW_COUNT'):
+            self.csv_result(output, '')
+        with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
+            self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
+
+    def refusal_run(self, root, variant=None):
+        case = root / 'cases/safe-refusal'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Обработай недоступный тип данных.')
+        expected = dict(nodes=[], outputs=[], refusal=dict(text='Не могу: этот тип данных не поддерживается.'))
+        if variant == 'import node': expected['nodes'] = [dict(type='imports.text')]
+        if variant == 'invalid oracle': expected['refusal']['text'] = ' '
+        if variant == 'conflicting oracle': expected['rejection'] = dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')
+        if variant == 'outputs': expected['outputs'] = [dict(output_node_type='transform.group_data')]
+        runner.write(case / 'expected.json', expected)
+        out = root / 'run'
+        out.mkdir()
+        (root / 'pair').mkdir()
+        runner.write(root / 'pair/worker.json', dict(package_directory='/test', loginom=dict(
+            username='test', password='test', url='https://example.test')))
+        runner.write(out / 'request.json', dict(cases=str(case.parent), pair=str(root / 'pair'), cold=True))
+        runner.write(out / 'results.json', dict(head='a' * 40, tree='b' * 40, started=time.time(),
+                     runs=[dict(scenario=case.name, status='PENDING')]))
+        instance = runner.Runner(out)
+        phases = []
+        def phase(name, command, folder, **kwargs):
+            phases.append(name)
+            instance.report['phase'] = name
+            profile = out / case.name / 'profile'
+            if name == 'setup':
+                (profile / 'data').mkdir(parents=True)
+                (profile / 'config').mkdir()
+                runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+            if name != 'model': return
+            # Honor any generated export instruction at the process boundary;
+            # the old runner then indexes outputs[0] although the list is empty.
+            for destination in re.findall(r'/test/[\w-]+\.csv', command[-1]):
+                (profile / Path(destination).name).write_text('Value\n1\n')
+            events = [dict(type='tool_use', sessionID='session', part=dict(tool='loginom_dock_action_run',
+                state=dict(status='completed', input=dict(action_key='package.save_as'), output=json.dumps(dict(
+                    status='SUCCEEDED', action_key='package.save_as', output=dict(save_completed=True))))))]
+            if variant == 'save': events.clear()
+            if variant in ['result node', 'export node', 'failed result node', 'import node']:
+                tool = 'loginom_dock_node_apply'
+                kind = ('exports.text' if variant == 'export node' else
+                        'imports.text' if variant == 'import node' else 'programming.javascript')
+                events.append(dict(type='tool_use', sessionID='session', part=dict(tool=tool, state=dict(
+                    status='error' if variant == 'failed result node' else 'completed',
+                    input=dict(target=dict(kind='new', type=kind)), output='{}'))))
+            if variant == 'legacy result node':
+                events.append(dict(type='tool_use', sessionID='session', part=dict(tool='loginom_dock_action_run',
+                    state=dict(status='completed', input=dict(action_key='node.add',
+                        parameters=dict(component_key='transform.group_data')), output='{}'))))
+            if variant == 'csv': (profile / 'unexpected.csv').write_text('result\n1\n')
+            if variant != 'answer':
+                events.append(dict(type='text', sessionID='session', part=dict(text=(
+                    'Готово.' if variant == 'explanation' else 'Не могу: этот тип данных не поддерживается.'))))
+            (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+            runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=variant != 'cleanup', logged_out=True))
+            if variant != 'ack': runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+            instance.run()
+        result = runner.read(out / 'results.json')['runs'][0]
+        return result, phases, out / case.name / case.name
+
+    def test_private_refusal_skips_csv_and_cold_without_leaking_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, phases, folder = self.refusal_run(Path(directory))
+            self.assertEqual(result['status'], 'PASS', result)
+            self.assertEqual(result['refusal'], 'PASS')
+            self.assertEqual(result['save'], 'PASS')
+            self.assertEqual(result['cleanup'], 'main PASS')
+            self.assertEqual(phases, ['setup', 'model'])
+            self.assertIn('expected refusal', result['csv'])
+            self.assertIn('expected refusal', result['cold'])
+            self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
+            self.assertNotIn('не поддерживается', (folder / 'task.md').read_text())
+
+    def test_private_refusal_allows_only_declared_input_imports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, phases, _ = self.refusal_run(Path(directory), 'import node')
+            self.assertEqual(result['status'], 'PASS', result)
+            self.assertEqual(phases, ['setup', 'model'])
+
+    def test_private_refusal_rejects_missing_explanation_effects_and_bad_oracles(self):
+        for variant, error in [('answer', 'REFUSAL_NOT_REPORTED'), ('explanation', 'REFUSAL_NOT_REPORTED'),
+                               ('result node', 'UNEXPECTED_NODE'), ('export node', 'UNEXPECTED_NODE'),
+                               ('legacy result node', 'UNEXPECTED_NODE'),
+                               ('failed result node', 'UNEXPECTED_NODE'),
+                               ('csv', 'UNEXPECTED_CSV'), ('save', 'SAVE_NOT_CONFIRMED'),
+                               ('cleanup', 'MAIN_CLEANUP_UNCONFIRMED'), ('ack', 'RUNTIME_CLOSE_ACK_MISSING'),
+                               ('invalid oracle', 'INVALID_REFUSAL_ORACLE'),
+                               ('conflicting oracle', 'INVALID_REFUSAL_ORACLE'), ('outputs', 'INVALID_REFUSAL_ORACLE')]:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.refusal_run(Path(directory), variant)
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertEqual(result['failure_class'], error)
+
     def test_typed_variant_csv_uses_existing_scalar_rules_and_null_collision_guard(self):
         expected = dict(columns=[dict(name='Value', type='variant')], rows=[dict(Value=v) for v in [
             dict(cell_type='integer', value=7), dict(cell_type='boolean', value=False),

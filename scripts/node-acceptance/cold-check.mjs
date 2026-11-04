@@ -80,7 +80,7 @@ const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
-const exportCsv=args.csv?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
+const exportCsv=args.csv&&expectedOutputs.at(-1)?.header!==false?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
  header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)
@@ -431,7 +431,7 @@ page = context.pages()[0]
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
    state.exportObservation={node_id:savedExport.node_id,input_fields:savedExport.input_fields,
     ...(exportCsv?{csv_order:exportCsv}: {})};
-   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
+   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact'&&o.header!==false)&&!exportCsv)
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
