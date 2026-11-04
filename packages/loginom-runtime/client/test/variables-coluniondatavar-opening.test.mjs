@@ -5,7 +5,7 @@ import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixt
 import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
 
 test('union opens its observed mapping wizard through only its exact native information toast',async()=>{
- for(const fault of [null,'text','type','node','stage']){
+ for(const fault of [null,'slow','timeout','text','type','node','stage']){
   const {page,body}=scriptGraphFixture('Union',fault==='type'?'bg-vendor-icon-calcvariables':'bg-vendor-icon-unionvariables');
   const base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');let path='',toast,waits=0;
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']){
@@ -23,10 +23,13 @@ test('union opens its observed mapping wizard through only its exact native info
    toast=page.add('div','toast','',{x:600,y:600,width:300,height:100});toast.attrs.role='dialog';page.add('h1',null,'Информация',undefined,toast).attrs.role='heading';
    page.add('div',null,fault==='text'?'Other information':'Мастера настройки для "Union" не существует. Будут отображены страницы настройки полей и/ или описания узла.',undefined,toast);
   };
-  page.waitForTimeout=async ms=>{page.clock.advance(ms);if(++waits===3)toast.remove();};
-  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
-  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',String(fault)+JSON.stringify(result.error));
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);if(++waits===(fault==='slow'?55:fault==='timeout'?Infinity:3))toast.remove();};
+  const action={verb:'begin_wizard',ref:button.ref};
+  const result=await page.execute({mode:'act',operation_id:'test-primitive',action,snapshot,...(['slow','timeout'].includes(fault)?{opening_timeout_ms:15000}:{})});
+  assert.equal(result.status,fault&&fault!=='slow'?'AMBIGUOUS':'SUCCEEDED',String(fault)+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(!fault)assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,3);
+  if(fault==='slow')assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,55);
+  if(fault==='timeout')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
  }
 });

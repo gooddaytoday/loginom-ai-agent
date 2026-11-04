@@ -4591,7 +4591,7 @@ function readRenderedInputMapping(observation) {
                 // Observe the same completed gesture within its remaining node
                 // budget; all owner checks and graph settlement still apply.
                 if((qualityInformation||variablesUnionInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
-                  && (transientToastReads<50 || qualityInformation&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
+                  && (transientToastReads<50 || (qualityInformation||variablesUnionInformation)&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;
                 }
