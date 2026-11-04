@@ -1,0 +1,119 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.column_union"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.column_union"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "a0",
+            "label": "Параметр",
+            "type": "integer",
+            "value": 11
+          },
+          {
+            "name": "title",
+            "label": "Заголовок",
+            "type": "string",
+            "value": "Левый"
+          },
+          {
+            "name": "empty",
+            "label": "Пустая строка",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "enabled",
+            "label": "Включено",
+            "type": "boolean",
+            "value": true
+          },
+          {
+            "name": "ratio",
+            "label": "Доля",
+            "type": "real",
+            "value": 0.125
+          },
+          {
+            "name": "missing",
+            "label": "Нет значения",
+            "type": "integer",
+            "value": null
+          },
+          {
+            "name": "a1",
+            "label": "Параметр",
+            "type": "integer",
+            "value": 29
+          },
+          {
+            "name": "a2",
+            "label": "Параметр",
+            "type": "integer",
+            "value": 37
+          },
+          {
+            "name": "title_1",
+            "label": "Заголовок",
+            "type": "string",
+            "value": "Правый"
+          },
+          {
+            "name": "enabled_1",
+            "label": "Включено",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "ratio_1",
+            "label": "Доля",
+            "type": "real",
+            "value": 0.1
+          },
+          {
+            "name": "zero",
+            "label": "Ноль",
+            "type": "integer",
+            "value": 0
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator",
+          "label": "Параметр, Заголовок, Пустая строка (+3)"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.column_union"
+        },
+        "input": 0,
+        "kind": "variables"
+      },
+      {
+        "source": {
+          "type": "variables.calculator",
+          "label": "Параметр, Параметр, Заголовок, Включено, Доля (+1)"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.column_union"
+        },
+        "input": 1,
+        "kind": "variables"
+      }
+    ]
+  }
+}
