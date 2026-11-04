@@ -10,6 +10,19 @@ import {userNodeTool,createUserWorkflowBindings} from '../lib/user-workflow.mjs'
 import {makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 import {lgdExportNext} from '../lib/lgd-export-procedure.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
+import {verifyLgdOutputMapping} from '../lib/lgd-import-node.mjs';
+test('LGD native source inventory omits kind while target retains observed kind and exact source order',()=>{
+ const sources=[{record_id:'1',index:0,name:'RecordId',label:'Идентификатор',type:'integer'},
+  {record_id:'2',index:1,name:'Amount',label:'Сумма',type:'real'}];
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,source_fields:sources,
+  target_fields:sources.map((s,i)=>({...s,record_id:'target'+i,excluded:false,data_kind:i?'Непрерывный':'Дискретный',source:structuredClone(s)}))};
+ assert.equal(verifyLgdOutputMapping(mapping),mapping);
+ for(const mutate of [m=>m.target_fields.reverse(),m=>m.target_fields[0].name='Other',m=>m.target_fields[0].label='Other',
+  m=>m.target_fields[0].type='real',m=>m.target_fields[0].excluded=true,m=>m.target_fields[0].source.record_id='foreign',
+  m=>m.target_fields[0].data_kind='unknown']){
+  const changed=structuredClone(mapping);mutate(changed);assert.throws(()=>verifyLgdOutputMapping(changed),/properties changed/);
+ }
+});
 const request=type=>({target:{kind:'new',type},inputs:type==='exports.lgd'?[{}]:[],mappings:[],read:{ports:type==='exports.lgd'?[]:[0],sample_rows:0,require_exact_numbers:false}});
 test('LGD checksum refusal releases only a proven discarded own wizard and never executes',async()=>{
  for(const foreign of [false,true]){

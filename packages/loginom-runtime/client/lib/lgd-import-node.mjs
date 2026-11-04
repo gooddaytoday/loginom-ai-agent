@@ -7,6 +7,14 @@ import {withBrowserReceipt} from './executor.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('LGD import: '+m);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
+export function verifyLgdOutputMapping(m){
+ need(m.inventory_complete&&m.source_identity_verified&&m.source_fields.length>0&&m.source_fields.length===m.target_fields.length
+  &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime'].includes(f.type)
+   &&['Дискретный','Непрерывный'].includes(f.data_kind)&&!f.excluded&&f.source
+   &&JSON.stringify(f.source)===JSON.stringify(m.source_fields[i])
+   &&['name','label','type'].every(k=>f[k]===m.source_fields[i][k])),'native LGD output properties changed');
+ return m;
+}
 export function lgdImportReadback({node,phases,operation_id}){
  const phase=name=>{const p=phases.filter(p=>p.phase===name);need(p.length===1&&p[0].status==='verified'&&p[0].receipt_id===operation_id+':'+name&&p[0].value?.verified===true&&p[0].value.cleanup_complete===true,'verified '+name+' required');return p[0];};
  const configured=phase('configure'),saved=phase('node_finish'),mapped=phase('output_mapping'),finished=phase('finish');
@@ -49,9 +57,7 @@ export function createLgdImportNodeSupport(config){
    },
    async configureOutput(channel){
     const s=await channel.observe({condition:'LGD complete output mapping',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
-    const m=s.node_mapping;
-    need(m.inventory_complete&&m.source_identity_verified&&m.source_fields.length>0&&m.source_fields.length===m.target_fields.length
-     &&m.target_fields.every((f,i)=>['integer','real','string','boolean','datetime'].includes(f.type)&&!f.excluded&&f.source&&['name','label','type','data_kind'].every(k=>f[k]===m.source_fields[i][k]&&f[k]===f.source[k])),'native LGD output properties changed');
+    const m=verifyLgdOutputMapping(s.node_mapping);
     return verified({native_mapping:m,source_identity_verified:true});
    },
   }).nodeApplyDriverFactory(options);
