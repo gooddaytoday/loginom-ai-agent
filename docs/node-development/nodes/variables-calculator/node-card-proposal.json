@@ -1,0 +1,92 @@
+{
+  "type": "variables.calculator",
+  "title": "Калькулятор (переменные)",
+  "candidate_modes": [
+    "expression"
+  ],
+  "platform_availability": "requires_live_preflight",
+  "semantics": "Create ordered integer/real/string/boolean variables without a table or required input. Constants or native expressions; Expr.name can refer to an earlier expression. Preserve typed NULL separately from empty string, false and zero. Output variables port 0; Execute evaluates current values, with no training model. Optional upstream variables depend on W1. Reject datetime, variant, JavaScript, intermediate/replacement/cache controls in stage 1. Integer acceptance is restricted to safe IEEE754 integer values; never claim exactness beyond the reader contract.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "Create or update scalar variables; stage 1 excludes intermediate, replacement, cache and reorder controls.",
+    "additionalProperties": false,
+    "properties": {
+      "expressions": {
+        "type": "array",
+        "description": "1–32 ordered changes. New requires all name/label/type/formula fields; new node replaces the blank Expr1. Patches preserve unlisted expressions and their order.",
+        "minItems": 1,
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "description": "Ordered scalar expression patch; unlisted saved expressions stay unchanged.",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "type": "object",
+              "description": "Choose one new or existing expression.",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "description": "new adds a variable; existing patches one saved expression.",
+                  "maxLength": 128,
+                  "enum": [
+                    "new",
+                    "existing"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Exact saved expression name; required only for existing.",
+                  "maxLength": 128
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "description": "Technical output name. Required for new; existing omission preserves it.",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+            },
+            "label": {
+              "type": "string",
+              "description": "Display label independent of name. Required for new; omission preserves existing.",
+              "maxLength": 120
+            },
+            "type": {
+              "type": "string",
+              "description": "Output type; no inference. Required for new; omission preserves existing.",
+              "maxLength": 128,
+              "enum": [
+                "integer",
+                "real",
+                "string",
+                "boolean"
+              ]
+            },
+            "formula": {
+              "type": "string",
+              "description": "Native Loginom expression, not JavaScript. Quotes for strings, TRUE/FALSE, NULL; Expr.name refers to an earlier expression. Required for new; omission preserves existing.",
+              "maxLength": 2048
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional expression description; omission preserves existing.",
+              "maxLength": 512
+            }
+          },
+          "required": [
+            "target"
+          ]
+        }
+      }
+    },
+    "required": [
+      "expressions"
+    ]
+  },
+  "port_contract_dependency": "W1; proposal only, not registered"
+}
