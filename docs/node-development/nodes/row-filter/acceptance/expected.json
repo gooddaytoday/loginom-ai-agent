@@ -1,0 +1,91 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 4,
+          "Amount": 20,
+          "Category": "C"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Amount": 5,
+          "Category": "A"
+        },
+        {
+          "RowID": 2,
+          "Amount": 10,
+          "Category": "B"
+        },
+        {
+          "RowID": 3,
+          "Amount": 15,
+          "Category": "A"
+        },
+        {
+          "RowID": 5,
+          "Amount": null,
+          "Category": "B"
+        },
+        {
+          "RowID": 6,
+          "Amount": 10,
+          "Category": "a"
+        }
+      ]
+    }
+  ]
+}
