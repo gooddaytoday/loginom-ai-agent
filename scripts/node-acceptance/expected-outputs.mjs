@@ -28,12 +28,13 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination'];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination','header'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
  need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&parseExpectedVariableInventory(expected)?.outputs.length>0),'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
+   &&(!Object.hasOwn(output,'header')||typeof output.header==='boolean')
    &&(!Object.hasOwn(output,'column_order')||['exact','any'].includes(output.column_order))
    &&(!Object.hasOwn(output,'output_port')||Number.isSafeInteger(output.output_port)&&output.output_port>=0)
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
