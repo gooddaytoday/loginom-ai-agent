@@ -10,6 +10,11 @@ const request=()=>({operation_id:'values',contract_revision:'1.0.0',document_id:
  target:{kind:'existing',type:'variables.user',ref:node},inputs:[],mode:'values',parameters:{variables:[{name:'limit',type:'integer',value:3}]},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:1000,execute_ms:1000,total_ms:5000}});
 const support=createUserVariablesNodeSupport({});
+test('production builtin driver satisfies the executor lifecycle interface without enabling Execute',async()=>{
+ const drivers=support.nodeApplyDriverFactory({operation:{id:'values',parameters:request()},execute:()=>assert.fail('No browser access at construction')});
+ for(const name of ['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput'])assert.equal(typeof drivers[name],'function',name);
+ await assert.rejects(drivers.waitExecution(),/cannot execute/);
+});
 test('user values refuses unsafe types and unsupported operations before any UI driver',()=>{
  assert.doesNotThrow(()=>validateNodeApplyRequest(request(),support.nodeApplyHandlers));
  for(const v of [{name:'x',type:'integer',value:9007199254740992},{name:'x',type:'integer',value:1.5},{name:'x',type:'real',value:1},

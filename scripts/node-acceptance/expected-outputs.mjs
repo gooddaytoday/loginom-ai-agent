@@ -375,7 +375,7 @@ export function matchVariableInventoryOutput(output,want){
  const snapshot=want.node.type==='variables.user',c=output?.completeness;
  need(output?.kind==='variables'&&output.port===want.port&&output.complete===true&&output.fresh===true&&typeof output.read_id==='string'&&output.read_id.length>0
   &&output.source===(snapshot?'snapshot':'execution')&&output.native_source===(snapshot?'VariablesEditValuesWizard':'VariablesForm')
-  &&(snapshot?output.execution_id===null:typeof output.execution_id==='string'&&output.execution_id.length>0)
+  &&(snapshot?output.execution_id===null&&output.package_modified===false:typeof output.execution_id==='string'&&output.execution_id.length>0)
   &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
   &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
   &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');

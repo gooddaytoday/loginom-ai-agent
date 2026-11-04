@@ -23,7 +23,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  const inspect=mode=>page.evaluate(({task,mode})=>{
   const direction=task.direction??'output',input=direction==='input',control=task.kind==='control',variables=task.kind==='variables';
-  if(variables&&(input||task.port!==4))throw Error('Only builtin user output four is editable');
+  if(variables&&!input&&task.port!==4)throw Error('Only builtin user output four is editable');
   if(control&&(!input||task.port!==0))throw Error('Control input only');
   if(!['input','output'].includes(direction))throw Error('Invalid port direction');
   const b=task.binding,app=globalThis.bg?.app,p=globalThis.__loginomDockPreparationV1;
@@ -93,7 +93,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   const blocked=blockers.find(e=>{
    const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
-   const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
+   const ownDisabledHeader=(control||variables&&input)&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
     &&column?.$className==='Ext.grid.column.Action'&&column.el.dom===parent&&column.disabled===true&&roots.length===1&&roots[0].contains(parent)
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
@@ -138,7 +138,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const ns=d.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
    if(ns?.length!==1||ns[0].FLocked===true)fail('Port opening node unavailable');
    const node=ns[0],nodeDom=d.FmxGraph.view.getState(node.FCell)?.shape?.node,tid=nodeDom?.getAttribute('data-tid');
-   if(variables&&(node.FIconCls!=='bg-vendor-icon-modelvariables'||!(prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode)))fail('Root builtin variables required');
+   if(variables&&!input&&(node.FIconCls!=='bg-vendor-icon-modelvariables'||!(prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode)))fail('Root builtin variables required');
    if(!tid||!roots[0].contains(nodeDom)||!Array.isArray(node.FPorts)||node.FPorts.length>16)fail('Port opening graph binding');
    const candidates=[];
    for(const list of node.FPorts){if(!Array.isArray(list.FCollection)||list.FCollection.length>100)fail('Port inventory bound');candidates.push(...list.FCollection);}
@@ -151,7 +151,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     // A just-cancelled builtin wizard can retain a duplicate output-3 SVG.
     // Only output 4 participates in the user-value operation; bind its exact
     // live hit and retained native identity without borrowing other outputs.
-    if(variables&&suffix!=='4')continue;
+    if(variables&&!input&&suffix!=='4')continue;
     if(control?suffix!=='':!/^[0-9]{1,2}$/.test(suffix))fail('Unknown output port identifier');
     const index=control?candidates.findIndex(p=>p.FCell===d.FmxGraph.view.getState(p.FCell)?.cell&&d.FmxGraph.view.getState(p.FCell)?.shape?.node===dom):Number(suffix),box=dom.getBoundingClientRect();
     if(index<0)fail('Control port native ordinal unavailable');
@@ -171,12 +171,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     if(p.port.FPortIndex!==undefined&&p.port.FPortIndex!==p.nativeIndex)fail('Port native hit identity unavailable');
    }
    if(new Set(ports.map(v=>v.index)).size!==ports.length||new Set(ports.map(v=>v.port.FGuid)).size!==ports.length)fail('Duplicate output ports');
-   const target=variables?ports.find(p=>p.index===4):ports[task.port];if(!target)fail('Requested output port absent');
-   if(variables){
+   const target=variables&&!input?ports.find(p=>p.index===4):ports[task.port];if(!target)fail('Requested output port absent');
+   if(variables&&!input){
     const previous=prepared.nodeTargetPortIdentities?.get(target.port);
     if(target.port.FType!==1||target.port.FSubType!==3||!previous||previous.graph!==d.FmxGraph||previous.node!==node
       ||previous.cell!==target.port.FCell||previous.guid!==target.port.FGuid||previous.data!==target.port.data||previous.tid!==target.tid)fail('Retained builtin user output identity changed');
    }
+   if(variables&&input&&(target.port.FType!==0||target.port.FSubType!==3))fail('Variable input native kind changed');
    if(exact('mn').some(e=>e.checkVisibility({checkVisibilityCSS:true})))fail('An existing context menu is open');
    const rec={direction,...(variables?{kind:'variables'}:{}),request:JSON.stringify(b)+':'+task.port,phase:'reserved',graph:model,node,nodeData:node.data,
     port:target.port,portData:target.port.data,portGuid:target.port.FGuid,portDom:target.dom,
@@ -307,7 +308,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const wizardTree=card.Controller.Node?.data?.node,portTree=wizardTree?.ParentNode,group=portTree?.ParentNode,nodeTree=group?.ParentNode;
    const roots=exact(b.workflow_ref.prefix+';WizrdMCF');
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
-    ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof (variables?app.ModelServiceNodeTreeNode:app.ModelNodeTreeNode))
+    ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof (variables&&!input?app.ModelServiceNodeTreeNode:app.ModelNodeTreeNode))
     ||nodeTree.FGuid!==r.node_id||nodeTree.FModelNode!==r.node.data||portTree.FModelNodePort!==r.port.data
     ||portTree.FIndex!==r.nativeIndex||nodeTree.ParentNode!==r.workflow
     ||model?.constructor?.name!=='WizardModelComponentForm'||!(input||variables?model.FModelSocket:model.FModelEnginePort)||model.FModelNode

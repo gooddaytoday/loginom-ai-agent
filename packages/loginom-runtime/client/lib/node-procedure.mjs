@@ -1,3 +1,4 @@
+import {makeVariablePortMappingCode} from './variable-port-mapping.mjs';
 import {readQualityPortOutput} from './quality-moda.mjs';
 import {makeCoarseClassesContextCode} from './coarse-classes-context.mjs';
 import {makeAssnRulesContextCode} from './assn-rules-context.mjs';
@@ -348,6 +349,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async readVariablePort({port,execution}) {return crossTableOwnedStep('variable_output',{port,execution},makeNodeVariableOutputCode);},
     async probeUserVariables({allowDirty=false}={}) {return crossTableOwnedStep('user_probe',{probe_only:true,allow_dirty:allowDirty},makeUserVariablesSnapshotCode);},
     async configureUserVariables(variables,finish) {return crossTableOwnedStep('user_values',{variables,finish},makeUserVariablesConfigureCode);},
+    async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},

@@ -1,3 +1,4 @@
+import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
@@ -36,13 +37,14 @@ export function validateNodeApplyRequest(request, handlers) {
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
-      && Object.keys(mapping).every(k=>['direction','port','autosync','fields','changes'].includes(k))
+      && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
-    const key = mapping.direction + ':' + mapping.port;
+    if(mapping.kind!==undefined){validateVariablePortMapping(mapping);requireValue(request.mode!==NODE_READ_MODE&&request.target.type!=='variables.user'&&request.finish!=='close','Variable mapping cannot configure a builtin, reread or cancelled draft');}
+    const key = (mapping.kind??'table')+':'+mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
-    requireValue(mapping.changes===undefined||mapping.direction==='output'&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
+    requireValue(mapping.changes===undefined||(mapping.direction==='output'||mapping.kind!==undefined)&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
     const entries=mapping.fields??mapping.changes;
     if (entries !== undefined) {
       requireValue(Array.isArray(entries) && entries.length <= 1000, 'Bounded mapping fields required');
@@ -89,7 +91,7 @@ export function validateNodeApplyRequest(request, handlers) {
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
   // A handler rejects unsupported mapping/read modes and parameters here, before
   // even the target phase can create a node. Validation must be pure.
-  handler.validate(request.parameters, request.mode, request);
+  handler.validate(request.parameters, request.mode, request.mappings.some(m=>m.kind!==undefined)?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request);
   return {graph,handler};
 }
 
@@ -503,6 +505,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
+    if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});

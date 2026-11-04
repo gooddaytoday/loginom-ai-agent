@@ -7,7 +7,7 @@ const final=JSON.parse(readFileSync(new URL('../../../docs/node-development/vari
 function history(){
  const node={document_id:'doc',workflow_id:'wf',node_id:'user'};
  const snapshot=(id,expected)=>({phase:'node_checkpoint',result:{operation_id:id,status:'SUCCEEDED',cleanup_complete:true,node,
-  execution:{status:'not_requested',execution_id:null},output:{variable_ports:[{kind:'variables',port:4,complete:true,fresh:true,source:'snapshot',native_source:'VariablesEditValuesWizard',execution_id:null,read_id:id,
+  execution:{status:'not_requested',execution_id:null},output:{variable_ports:[{kind:'variables',port:4,complete:true,fresh:true,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,execution_id:null,read_id:id,
    count:7,completeness:{loaded:true,count:7,store_count:7,unique_ids:7},variables:expected.variable_inventory.outputs[0].variables.map((v,i)=>({id:i,...v,cell:{type:v.type,is_null:v.value===null,value:v.type==='integer'&&v.value!==null?String(v.value):v.value,...(v.type==='integer'&&v.value!==null?{precision:'exact_integer'}:{})}}))}]}}});
  return [snapshot('initial',initial),{phase:'node_apply_prepared',operation_id:'patch',request:{target:{type:'variables.user',kind:'existing',ref:node},mode:'values',parameters:{variables:[{name:'limit',type:'integer',value:5},{name:'skip',type:'integer',value:10}]}}},
   {phase:'node_checkpoint',result:{operation_id:'patch',status:'SUCCEEDED',configuration:{readback:{values_are:'independent_owned_user_variables'}}}},snapshot('updated',final),snapshot('reread',final)];

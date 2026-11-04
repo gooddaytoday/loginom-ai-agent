@@ -413,3 +413,9 @@ Cold принимает optional `variable_inventory:{outputs,links}`. Output:
 этого inventory разрешён variable-only `outputs:[]`; прежний табличный matcher
 не меняется. Builtin читается снимком до executable источников, остальные —
 после нового Execute. Native связи сверяются до и после чтения.
+
+## W1 additive contract checkpoint
+
+`mappings[].kind` is optional (`variables` or `control`); omission keeps table semantics. W1 maps observed input ports only, control ordinal 0. Use `variable_inputs` to reveal/connect a hidden control port first. `fields` is a complete connected layout; `changes` patches names/labels while retaining unmentioned rows and local defaults. Sources use `configured_field` names resolved against the owned native records. Exclusions and unconfirmed types refuse before field edits; no variable data_kind is introduced.
+
+The writer owns TuneVariablesMappingWizard and independently reopens it after Done. Name/label edits, order and autosync retain native ConnectedRecord identity, IDs, types, default values, usage and description. Native metadata edits may set OriginType=1 while ConnectedRecord remains bound; OriginType alone cannot establish locality. `configuration.variable_mappings` carries complete accepted native readbacks and their count/store/ID proofs. These input mappings never change existing table indices or REST query encoding.

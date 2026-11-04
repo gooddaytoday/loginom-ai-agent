@@ -190,17 +190,17 @@ test('explicit factor_signs permits only a shared factor sign across scores/load
 });
 
 const variableExpected={package_path:'/own/v.lgp',nodes:[{type:'variables.user'}],outputs:[],variable_inventory:{outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'enabled',type:'boolean',value:false},{name:'empty',type:'string',value:''},{name:'n',type:'integer',value:null}]}]}};
-const variableActual=()=>({kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',read_id:'read-new',execution_id:null,fresh:true,complete:true,count:3,
+const variableActual=()=>({kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'read-new',execution_id:null,fresh:true,complete:true,count:3,
  completeness:{count:3,store_count:3,unique_ids:3,loaded:true},variables:variableExpected.variable_inventory.outputs[0].variables.map((v,index)=>({id:index,index,name:v.name,label:v.name,type:v.type,cell:{type:v.type,is_null:v.value===null,value:v.value}}))});
 test('W1 cold variable-only fixture needs explicit typed inventory and preserves the old table parser',()=>{
  assert.deepEqual(parseExpectedOutputs(variableExpected),{multiple:true,outputs:[]});assert.ok(parseExpectedVariableInventory(variableExpected));
  assert.throws(()=>parseExpectedOutputs({...variableExpected,variable_inventory:undefined}),/EXPECTED_OUTPUTS_INVALID/);
  assert.equal(matchVariableInventoryOutput(variableActual(),variableExpected.variable_inventory.outputs[0]),true);
 });
-for(const fault of ['missing','null-false','duplicate','partial','fake-execution','wrong-source'])test('W1 cold variable matcher refuses '+fault,()=>{
+for(const fault of ['missing','null-false','duplicate','partial','fake-execution','wrong-source','package-modified'])test('W1 cold variable matcher refuses '+fault,()=>{
  const a=variableActual();if(fault==='missing')a.variables.pop();if(fault==='null-false')a.variables[0].cell.is_null=true;
  if(fault==='duplicate')a.variables[1].id=0;if(fault==='partial')a.completeness.store_count=2;
- if(fault==='fake-execution')a.execution_id='fake';if(fault==='wrong-source')a.native_source='VariablesForm';
+ if(fault==='fake-execution')a.execution_id='fake';if(fault==='wrong-source')a.native_source='VariablesForm';if(fault==='package-modified')a.package_modified=true;
  assert.throws(()=>matchVariableInventoryOutput(a,variableExpected.variable_inventory.outputs[0]));
 });
 test('W1 cold variable/control links match exact typed namespaces and reject an ambiguous node',()=>{

@@ -133,7 +133,16 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,verifySource:async(...args)=>{
+  return {...drivers,mapPorts:async(mappings,ctx)=>{
+   const requested=mappings.filter(m=>m.kind!==undefined);if(!requested.length)return drivers.mapPorts(mappings,ctx);
+   options.operation.deadline=ctx.deadline;
+   const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,maxSteps:512,
+    targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
+    wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+   const variable_mappings=[];for(const mapping of requested){const value=await channel.mapVariablePort(mapping);variable_mappings.push({...value.mapping,node:ctx.node,source_identity_verified:true,independent_readback:value.independent_readback});}
+   const result=await drivers.mapPorts(mappings.filter(m=>m.kind===undefined),ctx);
+   return {...result,effect_possible:true,variable_mappings};
+  },verifySource:async(...args)=>{
    const checked=await verifyDeferredTextImportSources(options.operation.parameters,options.nodeHistory?.(),options.resolveStorageSource);
    const value=await drivers.verifySource(...args);
    return checked.length?{...value,switched_sources:checked}:value;

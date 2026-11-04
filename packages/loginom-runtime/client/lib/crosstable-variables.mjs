@@ -26,13 +26,19 @@ export function createUserVariablesNodeSupport(config){
   const quiet=async ctx=>{enter(ctx);const result=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
    if(!result.verified||result.surface!=='graph'||result.locked)throw Error('Owned quiet user variable graph required');return verified({node_context:result});};
   return {
-   async verifySource(p,ctx){enter(ctx);try{return await channel.probeUserVariables({allowDirty:request.mode==='values'});}catch(error){
+   async verifySource(p,ctx){enter(ctx);try{
+    const graph=await operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
+    if(graph?.complete!==true||graph.document_id!==request.document_id||JSON.stringify(graph.workflow_ref)!==JSON.stringify(request.workflow_ref)
+      ||graph.nodes.filter(n=>n.ref.node_id===binding.node.node_id&&n.type==='variables.user').length!==1)throw Error('Complete owned builtin source graph required');
+    return await channel.probeUserVariables({allowDirty:request.mode==='values'});
+   }catch(error){
     const r=error.receipt;if(r?.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true)error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }},
    mapPorts:async(mappings,ctx)=>{if(mappings.length)throw Error('Builtin user mappings are unsupported');return quiet(ctx);},openWizard:quiet,
    async configureValues(p,ctx){enter(ctx);return channel.configureUserVariables(p.variables,request.finish);},
    async finish(mode,ctx){return {...await quiet(ctx),mode,execution_id:null,execution_started:false,settings_applied:mode==='done',draft_discarded:mode==='close'};},
    async finishGraph(mode,ctx){if(mode!=='done')throw Error('Builtin snapshot never executes');return {...await quiet(ctx),mode,execution_id:null,execution_started:false,settings_applied:false};},
+   async waitExecution(){throw Error('Builtin user variables cannot execute');},
    async readOutput(read,ctx){enter(ctx);if(read.ports.length||JSON.stringify(read.variable_ports)!=='[4]')throw Error('Only user variable output four can be snapshotted');
     const result=await channel.readUserVariables();return verified({effect_possible:true,status:'complete',source:'snapshot',native_source:'VariablesEditValuesWizard',execution_id:null,
      evidence_ref:ctx.receipt_id,ports:[],variable_ports:[result.output]});},
