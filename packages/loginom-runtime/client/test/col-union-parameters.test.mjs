@@ -4,8 +4,8 @@ import {validateColUnionParameters,resolveColUnionParameters} from '../lib/col-u
 
 const request=()=>({target:{kind:'new'},inputs:[0,1].map(input=>({input})),mappings:[],finish:'execute',read:{ports:[0]}});
 test('positional union accepts every row rule and padding, preserving exact logical ports',()=>{
- for(const row_count of ['minimum','maximum','input'])for(const padding of ['null','repeat','last']){
-  const col_union={row_count,padding,...(row_count==='input'?{determining_input:'attached'}:{})};
+ for(const [row_count,determining_input] of [['minimum'],['maximum'],['input','main'],['input','attached']])for(const padding of ['null','repeat','last']){
+  const col_union={row_count,padding,...(row_count==='input'?{determining_input}:{})};
   assert.doesNotThrow(()=>validateColUnionParameters({col_union},'positional',request()));
   assert.deepEqual(resolveColUnionParameters({col_union},null),col_union);
  }

@@ -65,7 +65,7 @@ export function validateUiAction(action, snapshot) {
   if (action.verb === 'set_checked' && typeof action.checked !== 'boolean') throw new Error('set_checked requires a boolean checked value');
   if (snapshot) {
     if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&action.expected_stage[0]==='tree_output_mapping'&&snapshot.wizard?.stage!=='json_tree')throw new Error('Tree conditional destinations require JSON tree configuration');
-    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['json_tree','tree_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
+    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['json_tree','tree_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','join','union','col_union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
     if(action.verb==='wizard_step' && (snapshot.wizard?.status!=='observed' || snapshot.wizard.stage===action.expected_stage))throw new Error('wizard_step requires a different destination stage and an observed wizard');
     if (!Array.isArray(snapshot.ui?.elements)) throw new Error('UI action requires an observation snapshot');
     for (const ref of refs) {

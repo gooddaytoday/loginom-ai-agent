@@ -294,7 +294,12 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         if(await find(tid+';Input_Add;Data').count()===1)return 'choose';
         return null;
       });
-      if(choice==='choose'){const data=find(tid+';Input_Add;Data');await point(data);await data.click({timeout:remaining()});}
+      if(choice==='choose'){
+        // ColUnionData renders its menu text as a sibling SVG group over Data.
+        // Bind that exact owned label rather than accepting a covering element.
+        const ownLabel=before.nodes.find(n=>n.ref.node_id===p.ref.node_id)?.type==='transform.col_union_data';
+        const data=find(tid+';Input_Add;Data'+(ownLabel?';Label':''));await point(data);await data.click({timeout:remaining()});
+      }
 
     }else if(kind==='remove_link'){
       // Logical tabular indexes exclude service ports. REST input 0 is
