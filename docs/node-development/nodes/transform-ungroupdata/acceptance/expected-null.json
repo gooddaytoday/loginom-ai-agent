@@ -1,0 +1,94 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.ungroup_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Total_Rounded",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "OutputValue",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Group": "X",
+          "Total": 20.0,
+          "Total_Rounded": 20.0,
+          "Item": "c",
+          "OutputValue": 10.0
+        },
+        {
+          "Group": "D",
+          "Total": 8.0,
+          "Total_Rounded": 8.0,
+          "Item": null,
+          "OutputValue": 8.0
+        },
+        {
+          "Group": "G",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "a",
+          "OutputValue": 25.0
+        },
+        {
+          "Group": "G",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "d",
+          "OutputValue": 75.0
+        }
+      ]
+    }
+  ]
+}
