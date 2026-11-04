@@ -12,8 +12,8 @@ test('Coarse classes fits the approved model-visible budgets',async()=>{
  const card=describeNodeTypes(['preprocessing.coarse_classes'],{},new Map(),createCandidateNodeSupport({}).nodeApplyHandlers)[0];
  assert.ok(bytes(card)<=12000);
  const main=await readFile(new URL('../../../product/skills/loginom-automation/SKILL.md',import.meta.url),'utf8');
- const node=await readFile(new URL('../../../product/skills/loginom-automation/references/nodes/coarse-classes.md',import.meta.url),'utf8');
+ const node=await readFile(new URL('../../../product/skills/loginom-automation/references/nodes/preprocessing.coarse_classes.md',import.meta.url),'utf8');
  assert.ok(bytes(main)<=40000,bytes(main));assert.ok(bytes(node)<=6000);
- assert.match(main,/references\/nodes\/coarse-classes.md/);
+ assert.match(main,/references\/nodes\/preprocessing.coarse_classes.md/);
  assert.doesNotMatch(node,/\$(?:\d+|ARGUMENTS)/);
 });
