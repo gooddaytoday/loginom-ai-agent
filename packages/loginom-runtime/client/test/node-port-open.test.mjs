@@ -116,17 +116,18 @@ function groupingBusy(f){
  f.flags.graphMasks=[panel];return panel;
 }
 
-for(const stage of ['begin','menu_issued','open_issued'])test('Grouping waits for its bound graph mask at '+stage,async()=>{
+for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
  const f=fixture('input');let waits=0;
- if(stage==='begin')groupingBusy(f);
+ const busy=()=>{groupingBusy(f);f.node.FIconCls='bg-vendor-icon-'+icon;};
+ if(stage==='begin')busy();
  if(stage==='menu_issued'){
   const read=f.readNode;let reads=0;
-  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)groupingBusy(f);return result;};
+  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)busy();return result;};
   f.run=()=>openPreparedOutputPort(f.page,f.task,runRead);
  }
  if(stage==='open_issued'){
   const locator=f.page.locator;f.page.locator=s=>{
-   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)groupingBusy(f);};return l;
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)busy();};return l;
   };
  }
  f.page.waitForTimeout=async()=>{
@@ -314,6 +315,21 @@ test('Union dynamic SVG creation index is rebound to the native tabular ordinal'
 
 test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async()=>{
  const f=fixture('input');f.node.FIconCls='bg-vendor-icon-uniondata';f.task.port=2;f.port.FPortIndex=2;f.portTree.FIndex=2;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const ports=[0,1].map(i=>{const p={FGuid:'prior-'+i,FCell:{},FPortIndex:i,data:{},parent:f.node};const dom=f.el('MF;TF;Graph;Node;Input_Data-'+i);dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:i*30,y:0,width:20,height:20});return {p,dom};});
+ f.portDom.getBoundingClientRect=()=>({x:60,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(...ports.map(x=>x.p));
+ f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?ports[0].p.FCell:x<60?ports[1].p.FCell:f.port.FCell;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
+});
+
+test('Enrich dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.port,0);assert.equal(r.port_guid,'port');
+ const bad=fixture('input');bad.node.FIconCls='bg-vendor-icon-enrichdata';bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
+});
+
+test('Enrich third port keeps logical 2, SVG 3 and native tree 2 distinct',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.task.port=2;f.port.FPortIndex=2;f.portTree.FIndex=2;
  f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
  const ports=[0,1].map(i=>{const p={FGuid:'prior-'+i,FCell:{},FPortIndex:i,data:{},parent:f.node};const dom=f.el('MF;TF;Graph;Node;Input_Data-'+i);dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:i*30,y:0,width:20,height:20});return {p,dom};});
  f.portDom.getBoundingClientRect=()=>({x:60,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(...ports.map(x=>x.p));

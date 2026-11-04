@@ -21,13 +21,13 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
   const before=await readOutputs(page,binding,readNode);
   if(before.verified!==true||before.tables?.filter(t=>t.active&&t.view_guid===table.view_guid&&t.port_guid===table.port_guid&&t.table_tid===table.table_tid).length!==1)
     return {verified:false,reason:'active_table_binding'};
-  const result=await page.evaluate(({table,request})=>{
+  const result=await page.evaluate(({table,request,nodeContext})=>{
     const fail=(reason,extra={})=>({verified:false,reason,...extra});
     const own=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const visible=e=>{const b=e.getBoundingClientRect(),s=getComputedStyle(e);return b.width>0&&b.height>0&&s.display!=='none'&&s.visibility!=='hidden';};
     const roots=exact(table.table_tid);if(roots.length!==1||!visible(roots[0]))return fail('table_root');
-    const root=roots[0],model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+    const root=roots[0],card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.(),model=card?.Controller?.FController;
     const desc=model?.FViewDescList?.[table.view_guid],base=desc?.BaseView;
     if(base?.FView?.el?.dom!==root||base.FStatus!==4)return fail('table_not_ready');
     if([...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible))return fail('table_masked');
@@ -51,10 +51,21 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
     const definitions=[],types={dtInteger:'integer',dtFloat:'real',dtString:'string',dtBoolean:'boolean',dtDateTime:'datetime',dtVariant:'variant'};
     const headerRoot=exact(table.table_tid+';normalHeaderCt');
     if(headerRoot.length!==1||views[1].headerCt.el?.dom!==headerRoot[0])return fail('table_header_binding');
+    // Enrich can generate RefName_1, whose header tid also names a rendered
+    // RefName cell at suffix _1. Bind this exception to the same native owner;
+    // other types retain document-wide uniqueness. Cell reads stay row-bound.
+    let enrichOwners=0;
+    const ownerRecords=new Set();
+    for(let record=card?.Controller?.Node;record&&ownerRecords.size<32&&!ownerRecords.has(record);record=own(record,'parentNode')){
+      ownerRecords.add(record);const data=own(record,'data'),owner=own(data,'node');
+      if(own(data,'iconCls')==='bg-vendor-icon-enrichdata'&&own(owner,'FGuid')===nodeContext?.node_id
+        &&own(model,'FModelNode')&&own(owner,'FModelNode')===own(model,'FModelNode'))enrichOwners++;
+    }
     for(const [index,c] of headers.entries()) {
       const el=c.el?.dom,tid=el?.getAttribute('data-tid'),classes=(el?.getAttribute('class')??'').split(/\s+/);
       const found=classes.filter(c=>/^bg-TBGDataType-dt\w+-before$/.test(c)).map(c=>types[c.slice(15,-7)]);
-      if(!el||!headerRoot[0].contains(el)||!tid?.startsWith(table.table_tid+';normalHeaderCt;')||exact(tid).length!==1
+      const matches=typeof tid==='string'?[...exact(tid)].filter(candidate=>enrichOwners!==1||headerRoot[0].contains(candidate)):[];
+      if(!el||!headerRoot[0].contains(el)||!tid?.startsWith(table.table_tid+';normalHeaderCt;')||matches.length!==1||matches[0]!==el
         ||found.length!==1||!found[0]||el.textContent.length>2048)return fail('table_column_identity');
       definitions.push({index,name:c.dataIndex,label:el.textContent,type:found[0],header_tid:tid});
     }
@@ -163,7 +174,7 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
         next_column_offset:request.column_offset+fields.length<names.length?request.column_offset+fields.length:null,
         next_row_offset:request.row_offset+values.length<total?request.row_offset+values.length:null},
       value_source:'rendered_cell_and_cached_value_text',null_display:true,unfiltered_verified:false,execution_freshness_verified:false,numeric_precision_verified:false};
-  },{table,request});
+  },{table,request,nodeContext:before.node_context});
   const after=await readOutputs(page,binding,readNode);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'table_context_changed'};
   return {...result,node_context:after.node_context};
