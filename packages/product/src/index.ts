@@ -1,3 +1,5 @@
+declare const __LOGINOM_AI_AGENT_UPDATE_FEED__: string | undefined
+
 export const Product = Object.freeze({
   name: "Loginom AI Agent",
   slug: "loginom-ai-agent",
@@ -10,7 +12,9 @@ export const Product = Object.freeze({
   // OpenCode base before product migration: d848db933^:packages/opencode/package.json.
   opencodeCompatibilityVersion: "1.18.31",
   database: "loginom-ai-agent.db",
-  updateFeed: null as string | null,
+  // Desktop's build defines this value; an empty build has no update fallback.
+  updateFeed:
+    typeof __LOGINOM_AI_AGENT_UPDATE_FEED__ === "string" ? __LOGINOM_AI_AGENT_UPDATE_FEED__.trim() || null : null,
   changelogFeed: null as string | null,
   documentation: "https://github.com/gooddaytoday/loginom-ai-agent#readme",
   support: "https://github.com/gooddaytoday/loginom-ai-agent/issues",

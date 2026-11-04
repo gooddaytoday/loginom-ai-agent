@@ -12,7 +12,9 @@ export function updaterAction(state: UpdaterState | undefined) {
     case "downloading":
       return { label: "settings.updates.action.downloading" as const }
     case "ready":
-      return { label: "toast.update.action.installRestart" as const, run: "install" as const }
+      return { label: "settings.updates.closeAndUpdate" as const, run: "install" as const }
+    case "available":
+      return { label: "settings.updates.download" as const, run: "download" as const }
     case "installing":
       return { label: "settings.updates.action.installing" as const }
     case "disabled":
@@ -29,8 +31,21 @@ export function useUpdaterAction() {
 
   return {
     action,
+    state: () => platform.updater?.state(),
+    async setChannel(channel: "stable" | "unstable") {
+      try {
+        await platform.updater?.setChannel?.(channel)
+      } catch {
+        showToast({ title: language.t("common.requestFailed"), description: language.t("settings.updates.managed") })
+      }
+    },
     async run() {
       const run = action().run
+      if (run === "download") {
+        const state = platform.updater?.state()
+        if (state?.status === "available") platform.openExternal(state.url)
+        return
+      }
       if (run === "install") return platform.updater?.install()
       if (run !== "check") return
 
@@ -44,7 +59,10 @@ export function useUpdaterAction() {
         })
       }
       if (state?.status === "error") {
-        showToast({ title: language.t("common.requestFailed"), description: state.message })
+        showToast({
+          title: language.t("common.requestFailed"),
+          description: language.t("settings.updates.verificationFailed"),
+        })
       }
     },
   }

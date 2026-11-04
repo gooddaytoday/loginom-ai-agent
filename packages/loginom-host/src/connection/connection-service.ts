@@ -360,6 +360,13 @@ export async function connectionService(
   progress()
   return {
     beginClose,
+    // Launcher-only update gate. Keep lease activity out of the public settings API.
+    updateWorkState() {
+      return {
+        activeWork: [...leases.values()].some((lease) => lease.active),
+        unsettledWork: [...leases.values()].some((lease) => lease.recovery) || Boolean(recovery?.pending().length),
+      }
+    },
     api,
     browserStatus(generation: number, browser: Loginom.BrowserStatus) {
       if (state.closing || generation !== state.active?.generation) return

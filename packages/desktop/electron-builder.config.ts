@@ -36,7 +36,12 @@ const config: Configuration = {
   // electron-builder uses productName for /opt, while desktop metadata keeps the display name.
   productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
   artifactName: Product.artifactName,
-  publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
+  publish: process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim()
+    ? {
+        provider: "generic",
+        url: new URL("stable/", process.env.LOGINOM_AI_AGENT_UPDATE_FEED.trim().replace(/\/?$/, "/")).href,
+      }
+    : null,
   // Native backend dependencies run in the bundled Node sidecar. Renderer/main
   // dependencies use N-API or platform packages already selected by the lockfile.
   npmRebuild: false,

@@ -9,6 +9,18 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { pathToFileURL } from "node:url"
 
+test("configured feed produces stable generic metadata without an upstream fallback", async () => {
+  const previous = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+  try {
+    process.env.LOGINOM_AI_AGENT_UPDATE_FEED = "https://releases.example.test/agent"
+    const config = (await import("./electron-builder.config.ts?feed=example")).default
+    expect(config.publish).toEqual({ provider: "generic", url: "https://releases.example.test/agent/stable/" })
+  } finally {
+    if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    else process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previous
+  }
+})
+
 for (const channel of ["dev", "beta", "prod"] as const) {
   test(`isolates the ${channel} package and cannot publish upstream`, async () => {
     const previous = process.env.LOGINOM_AI_AGENT_CHANNEL
@@ -23,7 +35,14 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     expect(config.linux?.executableName).toBe(productSlug(channel))
     expect(config.deb?.packageName).toBe(productSlug(channel))
     expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(Product.channels[channel])
-    expect(config.publish).toBeNull()
+    expect(config.publish).toEqual(
+      process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim()
+        ? {
+            provider: "generic",
+            url: new URL("stable/", process.env.LOGINOM_AI_AGENT_UPDATE_FEED.trim().replace(/\/?$/, "/")).href,
+          }
+        : null,
+    )
     expect(config.protocols).toEqual({ name: Product.name, schemes: [Product.scheme] })
     expect(JSON.stringify(config)).not.toContain("opencode")
     expect(config.extraResources).not.toContainEqual(expect.objectContaining({ filter: ["opencode-cli*"] }))

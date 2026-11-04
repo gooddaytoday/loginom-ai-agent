@@ -28,3 +28,19 @@ test("identity cannot be changed after startup and has no update fallback", () =
   expect(Product.updateFeed).toBeNull()
   expect(Product.wordmark).toBe("Loginom AI")
 })
+
+test("Desktop may bake an update feed, while an empty build stays disabled", async () => {
+  for (const feed of ["", "https://releases.example.test/agent/"]) {
+    const build = await Bun.build({
+      entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
+      target: "bun",
+      define: { __LOGINOM_AI_AGENT_UPDATE_FEED__: JSON.stringify(feed) },
+    })
+    expect(build.success).toBe(true)
+    const module = await import(
+      "data:text/javascript;base64," + Buffer.from(await build.outputs[0].text()).toString("base64")
+    )
+    expect(module.Product.updateFeed).toBe(feed || null)
+    expect(module.Product.changelogFeed).toBeNull()
+  }
+})

@@ -1,5 +1,4 @@
 import { app } from "electron"
-import { Product } from "@loginom-ai-agent/product"
 
 type Channel = "dev" | "beta" | "prod"
 const raw = import.meta.env.LOGINOM_AI_AGENT_CHANNEL
@@ -10,4 +9,5 @@ export const BUILD_SOURCE = {
   sourceDirty: import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY,
 }
 
-export const UPDATER_ENABLED = app.isPackaged && CHANNEL !== "dev" && Product.updateFeed !== null
+// An administrator may supply a feed even when the build does not have one.
+export const UPDATER_ENABLED = app.isPackaged && CHANNEL !== "dev"

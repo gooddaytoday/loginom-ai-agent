@@ -19,6 +19,7 @@ test("work state of an unconfigured chat is local and never creates a runtime", 
   try {
     await host.settled()
     expect(await host.workState(0, "chat")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    expect(await host.updateWorkState()).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
     expect(await readdir(root)).not.toContain("runtime")
     expect(await readdir(root)).not.toContain("inputs")
     expect(host.journal.pending()).toEqual([])
@@ -102,6 +103,7 @@ test("work state rereads the existing child after asynchronous changes and never
     ]) {
       await runtime.request("fixture.state", work)
       expect(await f.host.workState(1, "chat")).toEqual(work)
+      expect(await f.host.updateWorkState()).toEqual(work)
     }
     expect(await f.host.workState(1, "other-chat")).toEqual({
       activeWork: false,
@@ -129,6 +131,7 @@ test("malformed work status is rejected instead of authorizing an idle transitio
     ]) {
       await runtime.request("fixture.state", invalid)
       await expect(f.host.workState(1, "chat")).rejects.toThrow("LOGINOM_REPLY_INVALID")
+      await expect(f.host.updateWorkState()).rejects.toThrow("LOGINOM_REPLY_INVALID")
     }
     expect(f.host.journal.pending()).toEqual([])
   } finally {
@@ -146,6 +149,7 @@ test.each(["lost", "stale"])("%s runtime cannot report idle or be restarted by a
     }
     if (kind === "stale") f.host.markRuntimeStale("chat")
     await expect(f.host.workState(1, "chat")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
+    await expect(f.host.updateWorkState()).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
     expect((await readFile(f.launches, "utf8")).trim().split("\n")).toHaveLength(1)
   } finally {
     await f.close()
