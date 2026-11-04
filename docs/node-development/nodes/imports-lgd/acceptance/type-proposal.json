@@ -1,0 +1,55 @@
+{
+  "type": "imports.lgd",
+  "title": "Импорт — Loginom Data файл",
+  "tabular_inputs": 0,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "native"
+  ],
+  "semantics": "Read one admitted standalone LGD into output table 0, retaining field names, labels, scalar types, data kinds, field/row order and NULL versus empty string. parameters.source identifies the completed delivery; lgd_import.checksum=verify. No training. Corruption refuses; never disable checksums. Done saves settings without execution; Close discards the draft. DDF, Variant, variables and non-default compression are outside this slice.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "New import requires source and checksum. Existing {} preserves saved source/settings.",
+    "properties": {
+      "source": {
+        "type": "object",
+        "description": "Completed admitted LGD attachment; reuse existing artifact delivery contract.",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Artifact ID returned by completed delivery."
+          },
+          "upload_operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Operation ID of that same completed delivery."
+          }
+        },
+        "required": [
+          "artifact_id",
+          "upload_operation_id"
+        ],
+        "additionalProperties": false
+      },
+      "lgd_import": {
+        "type": "object",
+        "description": "LGD read settings; unsupported modes refuse before mutation.",
+        "properties": {
+          "checksum": {
+            "type": "string",
+            "enum": [
+              "verify"
+            ],
+            "description": "Always verify stored checksums; never retry damaged LGD with checks disabled."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  }
+}
