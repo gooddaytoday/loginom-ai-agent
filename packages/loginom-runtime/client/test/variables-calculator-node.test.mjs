@@ -8,6 +8,7 @@ test('variables calculator registers a native scalar handler independently of ta
  const handler=support.nodeApplyHandlers.get('variables.calculator');assert.ok(handler);
  assert.deepEqual(handler.modes,['expression']);assert.equal(NODE_TYPES['variables.calculator'].tabular_outputs,0);
  assert.equal(NODE_TYPES['variables.calculator'].variable_outputs,1);assert.equal(NODE_TYPES['variables.calculator'].palette_group,'Переменные');
+ assert.equal(NODE_TYPES['variables.user'].palette_group,'Трансформация');
  assert.ok(nodeApplyInputSchema.properties.target.properties.type.enum.includes('variables.calculator'));
  const request={target:{kind:'new'},inputs:[],mappings:[],read:{ports:[],variable_ports:[0]}};
  handler.validate({expressions:[{target:{kind:'new'},name:'a',label:'A',type:'integer',formula:'NULL'}]},'expression',request);
