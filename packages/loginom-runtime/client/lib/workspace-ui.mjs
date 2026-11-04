@@ -2132,12 +2132,19 @@ function readRenderedInputMapping(observation) {
       }
     }
     if(wizard.status==='observed'&&wizard.stage==='col_union'){
+      const fields={};
       for(const [name,key] of [['padding','pedRowsPaddingType'],['row_count','pedTailsAlignType']]){
         const ownerTid=wizard.root_tid+';ColUnionDataWizard;'+key+';ValueControl';
         const owners=tids.get(ownerTid)??[],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
-        if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(inputs[0]))
-          wizardCombos.set(ownerTid,{name,scope:'col_union',owner_ref:refOf(owners[0]),input_ref:refOf(inputs[0]),root_ref:wizard.root_ref,value:String(inputs[0].value??'')});
+        const owned=owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&!sensitive(owners[0])&&!sensitive(inputs[0]);
+        if(!owned){fields[name]={status:'unobserved'};continue;}
+        const value=String(inputs[0].value??''),owner_ref=refOf(owners[0]),input_ref=refOf(inputs[0]);
+        if(enabled(inputs[0])&&value.length<=256)
+          wizardCombos.set(ownerTid,{name,scope:'col_union',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+        fields[name]={status:'observed',value:value.slice(0,256),value_length_utf16:value.length,truncated:value.length>256,
+          owner_ref,input_ref,enabled:enabled(inputs[0]),read_only:inputs[0].readOnly===true,value_kind:'displayed_input_text'};
       }
+      wizard.settings={status:'draft_ui_values',applied_verified:false,fields};
     }
     if(wizard.status==='observed' && wizard.stage==='join') {
       const ownerTid=wizard.root_tid+';JoinDataWizard;pedJoinType;ValueControl';
