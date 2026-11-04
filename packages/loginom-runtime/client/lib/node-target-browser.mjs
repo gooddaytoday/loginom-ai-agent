@@ -289,15 +289,21 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
     }else if(kind==='add_input'){
       const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add);effectPossible=true;await add.click({timeout:remaining()});
+      const ownLabel=before.nodes.find(n=>n.ref.node_id===p.ref.node_id)?.type==='transform.col_union_data';
       const choice=await wait('additional_table_input_or_type_menu',async()=>{
-        if(await page.locator('[data-tid^='+JSON.stringify(tid+';Input_Data-')+']').count()>p.input)return 'created';
+        if(ownLabel){
+          // SVG copies/descendants are not allocated input ports. The complete
+          // native reader retains GUID, cell and rendered-port ownership checks.
+          const current=await read(page,task),owners=current.nodes.filter(n=>n.ref.node_id===p.ref.node_id);
+          if(owners.length!==1||owners[0].type!=='transform.col_union_data')throw Error('ColUnion input owner changed');
+          if(owners[0].inputs.length>p.input)return 'created';
+        }else if(await page.locator('[data-tid^='+JSON.stringify(tid+';Input_Data-')+']').count()>p.input)return 'created';
         if(await find(tid+';Input_Add;Data').count()===1)return 'choose';
         return null;
       });
       if(choice==='choose'){
         // ColUnionData renders its menu text as a sibling SVG group over Data.
         // Bind that exact owned label rather than accepting a covering element.
-        const ownLabel=before.nodes.find(n=>n.ref.node_id===p.ref.node_id)?.type==='transform.col_union_data';
         const data=find(tid+';Input_Add;Data'+(ownLabel?';Label':''));await point(data);await data.click({timeout:remaining()});
       }
 
