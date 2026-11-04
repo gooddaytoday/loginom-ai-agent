@@ -21,7 +21,8 @@ export async function configureFactorAnalysisOutputs(channel,c,p,mappings,finish
   need(baseline.target_fields.length===expected.length&&expected.every(e=>baseline.target_fields.some(f=>f.name===e.name&&f.label===e.label&&f.type===e.type&&!f.excluded)),'native output fields differ');
   await configureOutputAutosync(channel,false);
   s=await observe('PCA mapping before ordering');
-  await reorderOutputFields(channel,expected.map(e=>s.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
+  if(s.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
+   await reorderOutputFields(channel,expected.map(e=>s.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
   s=await observe('stable PCA output mapping');const mapping=s.node_mapping;
   need(mapping.autosync===false,'autosync must be disabled');
   alignFactorAnalysisOutput(mapping.target_fields,expected);

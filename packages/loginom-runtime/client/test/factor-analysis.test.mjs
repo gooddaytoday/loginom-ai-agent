@@ -128,3 +128,24 @@ test('observed PCA radio DisplayEl controls select fixed count and no rotation',
  assert.equal(r.configuration.rotation,'none');assert.equal(r.configuration.factors,2);assert.equal(r.configuration.output_cap,false);
  assert.deepEqual(actions.filter(a=>a.verb==='set_checked').map(a=>a.ref),['pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl','pedRotationType;ValueControl;radiofield;DisplayEl','cntOutFactorsMax;cnt;chb;InputEl']);
 });
+
+test('canonical intrinsic PCA mappings do not require an unmaterialized source reorder',async()=>{
+ const {configureFactorAnalysisOutputs}=await import('../lib/factor-analysis-output.mjs');
+ const {runInNewContext}=await import('node:vm');
+ const config={fields},closed=[],reordered=[];let port,current;
+ const channel={async openOutputPort(p){port=p;current={verified:true,inventory_complete:true,source_identity_verified:false,source_fields:[],autosync:true,
+  target_fields:factorAnalysisOutputColumns(config,p).map((f,i)=>({...f,record_id:'r'+i}))};},
+  async observe({ready}){const s={wizard:{stage:'output_mapping'},node_mapping:current};assert.equal(ready(s),true);return s;}};
+ const execute=runInNewContext('('+configureFactorAnalysisOutputs.toString()+')',{
+  need:(v,m)=>{if(!v)throw Error(m);},factorAnalysisOutputColumns,alignFactorAnalysisOutput,
+  configureOutputAutosync:async(c,value)=>{assert.equal(c,channel);current.autosync=value;},
+  reorderOutputFields:async()=>{reordered.push(port);throw Error('unmaterialized source reorder');},
+  readOutputDefinitionPages:async()=>({fields:current.target_fields}),
+ });
+ const result=await execute(channel,config,{},[],async(mode,isPort)=>{assert.equal(mode,'done');assert.equal(isPort,true);closed.push(port);});
+ assert.deepEqual(reordered,[]);assert.deepEqual(closed,[0,1]);assert.equal(result.ports.length,2);
+ assert.ok(result.ports.every(p=>p.mapping.autosync===false));
+ const original=channel.openOutputPort;
+ channel.openOutputPort=async p=>{await original(p);[current.target_fields[0],current.target_fields[1]]=[current.target_fields[1],current.target_fields[0]];};
+ await assert.rejects(()=>execute(channel,config,{},[],async()=>{}),/unmaterialized source reorder/);
+});
