@@ -9,8 +9,9 @@ export type NodeTarget<T extends NodeType = NodeType> =
   | {kind: 'new'; type: T; label?: string; position: Position}
   | {kind: 'existing'; type: T; ref: NodeRef; label?: string; position?: Position};
 export interface InputLink { source: NodeRef; output: number; input: number }
+export interface VariableInputLink extends InputLink { kind: 'variables' | 'control' }
 export interface NodeTargetRequest<T extends NodeType = NodeType> {
-  document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[];
+  document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[]; variable_inputs?: VariableInputLink[];
 }
 export interface FieldRef { schema_id: string; field_id: string }
 /** Refers to this operation's fully configured source, resolved locally before mapping. */

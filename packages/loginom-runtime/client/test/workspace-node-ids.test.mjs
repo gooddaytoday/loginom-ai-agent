@@ -12,6 +12,26 @@ function fixture(){
  node.FGuid=first;node.FIconCls='bg-vendor-icon-javascript';
  return {page,tid,body,graph,node};
 }
+test('W1 observation and paging retain builtin identity and typed port ordinals',async()=>{
+ const {page,node,tid}=fixture();node.FIconCls='bg-vendor-icon-modelvariables';
+ for(const index of [0,1,2,3,4]){
+  page.add('g',tid+';Output_Var-'+index,'',{x:140,y:100+index*12,width:10,height:10});
+  node.FPorts[1].FCollection.at(-1).FSubType=3;
+ }
+ const raw=await page.execute({mode:'observe'}),n=raw.output.nodes[0];
+ assert.equal(n.type,'variables.user');assert.deepEqual(n.target_modes,['existing']);
+ assert.deepEqual(n.variable_outputs.map(p=>[p.kind,p.port,p.native_index]),[0,1,2,3,4].map(p=>['variables',p,p]));
+ assert.equal(createObservationPages().retain(raw).output.nodes[0].variable_outputs.length,5);
+ assert.deepEqual(page.events,[]);
+});
+test('W1 control and ordinary variable ordinal zero remain independent',async()=>{
+ const {page,node,tid}=fixture();node.FIconCls='bg-vendor-icon-restclient';
+ for(const [suffix,subtype] of [['Input_Var-1',3],['Input_ControlVar',4]]){
+  page.add('g',tid+';'+suffix,'',{x:40,y:110+subtype*12,width:10,height:10});node.FPorts[0].FCollection.at(-1).FSubType=subtype;
+ }
+ const n=(await page.observe()).nodes[0];
+ assert.deepEqual(n.variable_inputs.map(p=>[p.kind,p.port,p.native_index]),[['variables',0,1],['control',0,0]]);
+});
 
 test('saved graph exposes the native GUID without using its label as node identity',async()=>{
  const {page,node}=fixture(),snapshot=await page.observe();

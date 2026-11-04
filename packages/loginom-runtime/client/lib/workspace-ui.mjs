@@ -780,7 +780,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const ownedGraph=element=>!!graphPrefix && graphContainer.contains(element) && (getTid(element)??'').startsWith(graphPrefix);
     // Native type, not an editable graph label, owns the extra script deny.
     // Build once per observation; unconfirmed controls never inherit permission.
-    const nativeGraphControls=new Map(),nativeGraphLinks=new Set();
+    const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map();
     const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
       ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
     if(graphQueryable&&graphPrefix){
@@ -839,6 +839,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             const element=value(value(getState.call(view,portCell),'shape'),'node'),portTid=getTid(element);
             if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
             const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
+            const suffix=portTid.slice(tid.length+1),variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+            if(unique(element)&&portData&&(variable&&subtype===3&&type===(variable[1]==='Input'?0:1)||control&&subtype===4&&type===0)){
+              const inventory=nativeVariablePorts.get(guid)??{variable_inputs:[],variable_outputs:[]};
+              inventory[type===0?'variable_inputs':'variable_outputs'].push({kind:control?'control':'variables',native_index:control?0:Number(variable[2]),port_guid:portGuid});
+              nativeVariablePorts.set(guid,inventory);
+            }
           }
         }
         // Links are out of this node-control policy only when their native
@@ -3529,8 +3535,13 @@ function readRenderedInputMapping(observation) {
       // A saved node's GUID comes only from the existing native/DOM binding,
       // never from its editable label or an arbitrary DOM attribute.
       const native=node&&nativeGraphControl(node);
+      const variablePorts=native?.node_id&&nativeVariablePorts.get(native.node_id);
+      if(variablePorts)for(const ports of Object.values(variablePorts))for(const kind of ['variables','control'])
+        ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
+        ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
+        ...(variablePorts??{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });
