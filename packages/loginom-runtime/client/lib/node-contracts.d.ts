@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): AssnRulesConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -315,6 +315,14 @@ export interface ClusteringConfigurationReadback {
   clusters: number; seed: number; normalization: 'none' | 'standardize'; package_persistence_verified: false;
   training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string;
     source: Array<{node: NodeRef; output: number; input: 0}>};
+}
+
+export interface AssnRulesConfigurationReadback {
+  kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; mode: 'fp_growth'; transaction_field: string; item_field: string;
+  min_support_pct: number; min_confidence_pct: number; max_items: 2;
+  min_lift: 0; singletons: true; consequence_limit: 1;
+  training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
 }
 
 export interface LinRegressionConfigurationReadback {
