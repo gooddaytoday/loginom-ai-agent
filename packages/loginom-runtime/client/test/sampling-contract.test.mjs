@@ -7,7 +7,7 @@ test('sequential sampling and partition are installed with explicit row counts a
  const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
  for(const type of ['preprocessing.sampling','preprocessing.data_partition']){
   assert.ok(handlers.has(type),type);
-  assert.deepEqual(NODE_TYPES[type].modes,['sequential','random']);
+  assert.deepEqual(NODE_TYPES[type].modes,['sequential','random','stratified','biased']);
  }
  assert.equal(NODE_TYPES['preprocessing.data_partition'].tabular_outputs,3);
  const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema;
@@ -71,4 +71,13 @@ test('readback refuses missing/foreign receipts and cannot claim package persist
  const foreign=structuredClone(phases);foreign[1].value.configuration.node_context.node_id='other';
  assert.throws(()=>samplingConfigurationReadback({node,phases:foreign,operation_id:'op'}));
  assert.throws(()=>samplingConfigurationReadback({node,phases:phases.slice(1),operation_id:'op'}));
+ for(const mode of ['stratified','biased']){
+  const frozen=structuredClone(phases),configuration=frozen[1].value.configuration;
+  Object.assign(configuration,{mode,seed:42,input_fields:fields});
+  const mapping=frozen[3].value.ports[0].native_mapping;
+  Object.assign(mapping,{source_identity_verified:false,autosync:false,source_fields:[],target_fields:fields.map(f=>({...f,source:null,inherited:false,excluded:false}))});
+  assert.equal(samplingConfigurationReadback({node,phases:frozen,operation_id:'op'}).mode,mode);
+  configuration.mode='random';
+  assert.throws(()=>samplingConfigurationReadback({node,phases:frozen,operation_id:'op'}));
+ }
 });

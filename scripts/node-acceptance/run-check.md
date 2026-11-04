@@ -51,7 +51,11 @@ Cancel, which can deselect/deactivate outputs, a fresh production execution
 reselects this node and verifies completion before reading any port. Two such
 rounds must match main. Field presentation permutations are normalized by
 verified names/types. Save, port proofs, cancellation and cleanup remain mandatory.
-Stratified, biased and uniform are not registered.
+Stratified and biased are registered as `sampling-stratified`, `sampling-biased`,
+`partition-stratified`, `partition-biased`. Stratified additionally checks exact
+size, Class quotas and combined/train/test relations. Biased checks repeats and
+exact typed membership without sizes or quotas. Both require saved native field
+order; uniform remains unsupported.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh

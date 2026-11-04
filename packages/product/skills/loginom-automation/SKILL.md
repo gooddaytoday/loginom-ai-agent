@@ -151,8 +151,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
 | Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
-| Первые/последние/случайные N | `preprocessing.sampling` / sequential, random | [читать](references/nodes/preprocessing.sampling.md) |
-| Train/test по порядку/случайно | `preprocessing.data_partition` / sequential, random | [читать](references/nodes/preprocessing.data_partition.md) |
+| Выборка: порядок/случайно/страты/смещение | `preprocessing.sampling` / sequential, random, stratified, biased | [читать](references/nodes/preprocessing.sampling.md) |
+| Train/test: порядок/случайно/страты/смещение | `preprocessing.data_partition` / sequential, random, stratified, biased | [читать](references/nodes/preprocessing.data_partition.md) |
 | Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
