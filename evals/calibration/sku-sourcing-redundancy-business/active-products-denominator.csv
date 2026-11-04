@@ -1,0 +1,4 @@
+category;products;no_supplier;one_supplier;multiple_suppliers;single_source_share
+CAT_A;3;1;1;1;0.5
+CAT_B;2;1;1;0;1
+CAT_C;1;1;0;0;0

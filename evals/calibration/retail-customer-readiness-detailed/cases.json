@@ -1,0 +1,127 @@
+{
+  "sources": {
+    "SPEC.md": "046c19e2c00eebbe11858fc897ad1357c177ec6b8650059b9f445ca5d9e75e86",
+    "acceptance.json": "12a4c43823fdd0fbc355e61b269a91f9db288ed8b06e44d9c075118283c0cdd7",
+    "data/categories.csv": "33debd5bcc581e37548094b5311d275ec9b622bc890183af71067ef744e47f9c",
+    "data/synthetic-boundary.csv": "a41b6d82a766c20a63bc317fe091861aa775cdad204a623c0124742796027f3d",
+    "data/uci-retail.csv": "5497e6a87f8ac496f6b1160266bb92d9cbc68e6e939e2d14b7de42aa95769c08",
+    "oracle.csv": "c097da7390b2bf8906fdfbe959c2c0f572d3ae3247f0f843d09be5c61b82f760",
+    "oracle.py": "85665d8d56ca5b8c0aa43e526de78e4bbfe0705a209c59350499f39e1d810f28",
+    "provenance.json": "96ace62b88c16826853912fdca2b841bb3daa9e8305694eb13881c74d729f2a9",
+    "reference.lgp": "33ab91c1268097e59b253b33a4acf6b2c947903d91b06b8766c8468e5d2d3ed1",
+    "task.json": "11b94c23d3b3fceff107d9216ac94eb39001687e3a52b6888f355649a5454372"
+  },
+  "cases": [
+    {
+      "id": "description-first",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(NVL(CustomerID, &quot;&quot;) = &quot;&quot;, &quot;missing_customer&quot;, IF(NVL(Description, &quot;&quot;) = &quot;&quot;, &quot;missing_description&quot;,",
+          "to": "IF(NVL(Description, &quot;&quot;) = &quot;&quot;, &quot;missing_description&quot;, IF(NVL(CustomerID, &quot;&quot;) = &quot;&quot;, &quot;missing_customer&quot;,",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "exclusive-quality-priority",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "\"missing_customer\" if row[\"CustomerID\"] == \"\" else\n                \"missing_description\" if row[\"Description\"] == \"\" else",
+            "to": "\"missing_description\" if row[\"Description\"] == \"\" else\n                \"missing_customer\" if row[\"CustomerID\"] == \"\" else",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "description-first.csv"
+    },
+    {
+      "id": "invoices-as-rows",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"InvoiceNo_Count\"/>",
+          "to": "<Mapping Source=\"line_count_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "distinct-invoices-complete-domain",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "writer.writerow([bucket, rows, len(invoices), revenue])",
+            "to": "writer.writerow([bucket, rows, rows, revenue])",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "invoices-as-rows.csv"
+    },
+    {
+      "id": "absolute-quantity",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Quantity * UnitPrice\"",
+          "to": "Expression=\"Abs(Quantity) * UnitPrice\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "signed-line-revenue",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Decimal(row[\"Quantity\"]) * Decimal(row[\"UnitPrice\"])",
+            "to": "abs(Decimal(row[\"Quantity\"])) * Decimal(row[\"UnitPrice\"])",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "absolute-quantity.csv"
+    },
+    {
+      "id": "reverse-category-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"sort_order\"/>",
+          "to": "<Item Name=\"sort_order\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "distinct-invoices-complete-domain",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "quality_bucket",
+          "order": [
+            "missing_customer",
+            "missing_description",
+            "credit_note",
+            "sale"
+          ],
+          "descending": true
+        }
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-category-order.csv"
+    }
+  ]
+}

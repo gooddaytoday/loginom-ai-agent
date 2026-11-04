@@ -1,0 +1,148 @@
+{
+  "task_id": "revenue-per-open-store-day-detailed",
+  "dataset_sha256": {
+    "operating_calendar.csv": "b83b6631039d514fed85fa40002b0689f1f98ce8ee76ff93bc1f8c4dd82a415e",
+    "sales_lines.csv": "b535adb40672f0a3dc1ec265141e9535007a662a0b69d96cd530db498af3270c"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "36fbd06f1b336965a46542a4533e6ab2f376239cbec05e8e8a2ef3f32c8ffa1c"
+  },
+  "reference_sha256": "d24cedd5eb26aeef11735242af8a974bc1851955c7644bcffbe266010e2027f8",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/operating_calendar.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/sales_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T22:55:56+03:00",
+    "duration_s": 777,
+    "tokens": {
+      "input": 111816,
+      "output": 7097,
+      "reasoning": 2271
+    },
+    "tool_calls": 48,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Six complete operating-calendar rows and five sales events frozen before separate manual3x6 and stdlib Decimal oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK calendar(store_id,date), sale_id; all sales FK to calendar; nonempty ASCII/case-sensitive keys/day_type; published HOLIDAY/WORKDAY overrides weekday. Local Europe/Moscow ISO date/time without conversion. Positive amount in one synthetic monetary unit, no tax/fees. Full-calendar denominator and no-sales zero groups; descriptive normalization only."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent Decimal raw-sales ledger by local store/date over complete calendar registry, then group exposure count/revenue and revenue/days. Separate manual full18 after raw freeze before oracle/native; no intermediate rounding."
+  },
+  "native_verification": {
+    "actual_review": "SPEC+QUALITY32 APPROVE/rootFULLREAD40856e CLOSED",
+    "observed_nodes": 12,
+    "observed_links": 11,
+    "node_names_counts_layout_are_not_acceptance_gates": true,
+    "full_cells": 18,
+    "integer_count_texts": 3,
+    "money_texts_at_least_two_decimals": 6,
+    "empty_cells": 0,
+    "no_JS_or_static_gold": true,
+    "tool_errors": 1,
+    "failed_operation": "final-csv-fields: NOT_APPLIED / NODE_APPLY_STOPPED / Reform output name collision; effect_possible=false; cleanup_complete=true; no node mutation",
+    "resolution": "final-csv-fields-v2 corrected original field renames before formatted fields; SUCCEEDED same A1, no additional authoring attempt",
+    "skill_duplicate": "same ID/input/output/timing, metadata activation enrichment, not an additional tool execution",
+    "memory_tool_calls_zero_means": "zero writing calls; readonly Help/bundled skill reads did occur",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "content_verification": "Collected XML and full CSV independently checked; original Save flags preserved",
+    "ordinary_cleanup": "saved package Close/logout; original Runtime+Knowledge ACK and actual exit0/noSignal; idle verified"
+  },
+  "cold_verification": {
+    "root_actual": "a2edd0 PASS; combined independent review pending",
+    "run_all_calls": 1,
+    "native_nodes_green": 12,
+    "active_ports": 37,
+    "LGP_and_both_raw_SHA_stat_unchanged": true,
+    "new_export_bytes": 171,
+    "full18_by_named_columns": true,
+    "column_order_changed_permitted": true,
+    "integer_texts": 3,
+    "money_texts_at_least_two_decimals": 6,
+    "empty_cells": 0,
+    "Save_calls": 0,
+    "NoSave": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "browser_tabs_after": [],
+    "image_limitation": "Initial cold-right.png partial post-scroll paint; cold-export.png complete fresh right view and cold-left.png first6; no execution repeated"
+  },
+  "measurement": {
+    "requested_service_tier": "STANDARD",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G06 after all5dispositions/whole-group prerequisites; P17 ONLY-B conditional; no new P24 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

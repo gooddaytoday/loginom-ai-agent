@@ -1,0 +1,237 @@
+{
+  "task_id": "obligation-deadline-snapshot-detailed",
+  "dataset_sha256": {
+    "obligations.csv": "660621379042700bb7ada585a1daf5ce695701c2b5a6e63e67dda60c0366b5da"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "b78be299377017f68532378d38f6ad7a5979ba01b182088ad340d85c7bdf460d"
+  },
+  "reference_sha256": "10ae3c3cb1bdeb8d70aef4e2bfa20cb7695808e258b429f5c51e3d7f201042c9",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/obligations.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T22:03:22+03:00",
+    "duration_s": 494,
+    "tokens": {
+      "input": 86356,
+      "output": 4497,
+      "reasoning": 1200
+    },
+    "tool_calls": 28,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Eight original obligations frozen before independent manual3x8 and stdlib oracle; no answer columns or external real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK id; ASCII case-sensitive id/team; only completed_at nullable. Local Europe/Moscow timestamps; fixed snapshot2026-03-15 12:00:00. observed iff nonempty completion<=snapshot; four mutually exclusive classes; due-only denominator deadline<=snapshot; sole empty T_B/2026-04.violation_share; no money/minprecision share requirement."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent per-id datetime observation/classification and Decimal due-only division over full team/deadline-month registry. Complete separate manual3x8 after raw freeze before oracle/native. No intermediate rounding."
+  },
+  "authoring_budget": {
+    "attempts_used": 1,
+    "total_pair_attempt_budget": 3,
+    "reset": false,
+    "hint": false
+  },
+  "actual_save": {
+    "status": "SUCCEEDED",
+    "action_key": "package.save_checkpoint",
+    "action_revision": "2",
+    "operation_id": "save-package-1",
+    "phase": "verified",
+    "effect_possible": true,
+    "output": {
+      "package_ref": {
+        "kind": "package",
+        "path": "PRIVATE_STORAGE",
+        "active_identity": "PRIVATE_STORAGE"
+      },
+      "reopened": false,
+      "workflow_preserved": true,
+      "save_completed": true,
+      "persisted_content_verified": false,
+      "workflow_continuations": [
+        {
+          "document_id": "PRIVATE_ID",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "workflow_id": "PRIVATE_ID-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>analytic_detailed_obligation_deadline_snapshot_detailed_1",
+                "label": "analytic_detailed_obligation_deadline_snapshot_detailed_1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>analytic_detailed_obligation_deadline_snapshot_detailed_1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>analytic_detailed_obligation_deadline_snapshot_detailed_1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ]
+          }
+        }
+      ],
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      },
+      "reporting_constraints": [
+        "Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.",
+        "Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу."
+      ]
+    },
+    "error": null,
+    "cleanup_complete": true,
+    "result_version": "user-v1"
+  },
+  "observed_execution": {
+    "requested_service_tier": "STANDARD/default",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "reference_evidence": {
+    "native": {
+      "qa_path": "PRIVATE_ARCHIVE",
+      "qa_snapshot_sha256": "e26dbf6596899cc158780b136228d03af4dcf83455912646e7ecdfa6652d853a",
+      "actual_review": {
+        "path": "PRIVATE_ARCHIVE",
+        "sha256": "554514d764adabbb2568ffa1cd5f398eb655200f07d38d498071296033bab034",
+        "root_FULLREAD": "4721fd",
+        "SPEC": "APPROVE",
+        "QUALITY": "APPROVE",
+        "mandatory": []
+      },
+      "full_cells": 24,
+      "integer_texts": 15,
+      "sole_empty": "T_B/2026-04.violation_share",
+      "unique_tools": 27,
+      "tool_errors": 0,
+      "memory_writes": 0,
+      "original_close_receipts": [
+        {
+          "path": "PRIVATE_ARCHIVE",
+          "sha256": "e886131d3a4f7516bf18110381905ad1be6389b6744b7830e4ff3da7a6f9dc2f",
+          "receipt": {
+            "version": 1,
+            "started_at": "2026-10-31T19:11:35.361Z",
+            "completed_at": "2026-10-31T19:11:35.986Z",
+            "request_error": null,
+            "closed_ack": true,
+            "exit_code": 0,
+            "exit_signal": null
+          }
+        },
+        {
+          "path": "PRIVATE_ARCHIVE",
+          "sha256": "96a903d89732568082955d8d4805247011ed6472a1513f692115cd236b8e7214",
+          "receipt": {
+            "version": 1,
+            "started_at": "2026-10-31T19:11:35.361Z",
+            "completed_at": "2026-10-31T19:11:35.372Z",
+            "request_error": null,
+            "closed_ack": true,
+            "exit_code": 0,
+            "exit_signal": null
+          }
+        }
+      ],
+      "original_native_storage_sha256": "cd66d084feca97674e63818b778c668274498fcf81c291f19969db72159cf11e"
+    },
+    "cold": {
+      "qa_path": "PRIVATE_ARCHIVE",
+      "qa_snapshot_sha256": "e6f8128b179998484be8583bf8aa774081577eb1ebede80ddebd4c4e02137b50",
+      "actual_review": {
+        "path": "PRIVATE_ARCHIVE",
+        "sha256": "2cd2b1e0782ea0ea7815b08391b04ffda43d9cacb4920c48e0c0b5ffc6ff11ab",
+        "root_FULLREAD": "792ad1",
+        "SPEC": "APPROVE",
+        "QUALITY": "APPROVE",
+        "mandatory": []
+      },
+      "new_result_sha256": "b78be299377017f68532378d38f6ad7a5979ba01b182088ad340d85c7bdf460d",
+      "new_result_bytes": 160,
+      "one_RunAll": {
+        "at": "2026-10-31T19:22:25.425Z",
+        "action": "observed toolbar control [private locator] Выполнить все",
+        "clicks": 1,
+        "configure_calls": 0,
+        "save_calls": 0,
+        "package_omitted": "private instance storage; not published"
+      },
+      "server_LGP_raw_SHA_stat_unchanged": true,
+      "NoSave_logout_tab15_closed": true,
+      "immutable_source_count": 16,
+      "current_postcold_storage_sha256": "727ec46ee66c7fa51c70721d5477d224fc88e168bb092e18cfbf9640c04902c5"
+    }
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "group_gate": "G06 after all5dispositions and whole-group prerequisites; P17 ONLY-B conditional, no new ONLY-B P19 requirement"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

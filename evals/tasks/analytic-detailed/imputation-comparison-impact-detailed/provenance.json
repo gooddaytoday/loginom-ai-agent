@@ -1,0 +1,160 @@
+{
+  "task_id": "imputation-comparison-impact-detailed",
+  "dataset_sha256": {
+    "jobs.csv": "c542b890a14cbc95049f244b50fd3c89663e9f812fab013b6c53022135860570"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a2a47708bf32590df8190ca2e6b4eadfd5e3128789e13d1421ef021467377fa2"
+  },
+  "reference_sha256": "ab70089f37263824db55822f2f9c1c826ebf819832e6ccaf3740aada218adf49",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/jobs.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-11-01T07:10:18+03:00",
+    "duration_s": 539,
+    "tokens": {
+      "input": 100938,
+      "output": 4976,
+      "reasoning": 808
+    },
+    "tool_calls": 37,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "jobs.csv",
+    "selection": "Exact six jobs frozen before independent manual/oracle/native; J01 observed0, J03/J05/J06 numeric NULL, DEP_C no original observations",
+    "units": "processing_hours in hours; no dates/money",
+    "transformations": "None beyond synthetic CSV serialization; empty numeric field encodes NULL; original0 remains observed"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only global mean of original known hours including0; department original counts/observed mean plus completed mean; full independent manual before source/native"
+  },
+  "native_verification": {
+    "actual_review": "actual33 APPROVE/rootFULLREADe89488 CLOSED",
+    "observed_nodes": 9,
+    "observed_links": 9,
+    "node_names_counts_layout_are_not_acceptance_gates": true,
+    "full_cells": 18,
+    "integer_counter_texts": 9,
+    "sole_empty_cell": [
+      "DEP_C",
+      "observed_mean"
+    ],
+    "no_JS_or_static_gold": true,
+    "imputation": {
+      "engine": "TBGDataRecoveryEngine",
+      "field": "processing_hours",
+      "ActionNull": "anMean",
+      "MaxNullsPercent": 100,
+      "ordered": false,
+      "actual_default_RandSeed": 692293402,
+      "selected_method": "deterministic arithmetic mean; stochastic-step seed42 rule not invoked"
+    },
+    "tool_errors": 1,
+    "failed_operation": "join-dept-001 NOT_APPLIED/NODE_APPLY_STOPPED inactive input0; effect_possible=false/cleanup_complete=true",
+    "resolution": "refresh-original-001 activates original branch then join-dept-002 succeeds within same A1, no reset/hint/new attempt/browser recovery",
+    "skill_duplicate": "Same callID/input/output, second metadata adds activation; whole event equality not claimed",
+    "DB_prompt_format": "Exterior quotes plus one inner escape add3bytes:10505 vs10502; remainder exact/literal newlines, no byte-equality/valid-JSON claim",
+    "memory_context": "0 memory-writing counter; readonly Help/skill reads present, autocontext absence NOT_ATTESTED",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "outcome_limit": "Original Save data/goal verification not promoted to verified",
+    "ordinary_cleanup": "Own saved package Close/logout; original Runtime+Knowledge ACK and actualexit0/noSignal, own CLI-chat/Dock/document/account/path binding; subsequent two-pass idle/config preservation; no new CLI probe"
+  },
+  "cold_verification": {
+    "root_actual": "cold-server-after c4ebb353 / idle-after-cold d857ed77 VERIFIED; combined independent review pending",
+    "run_all_calls": 1,
+    "run_at": "2026-11-01T04:32:23.747Z",
+    "native_nodes_green": 9,
+    "service_nodes_green": 1,
+    "ports_observed_before_after": 27,
+    "server_LGP_raw_SHA_stat_unchanged": true,
+    "new_export_bytes": 136,
+    "new_export_mtime_UTC": "2026-11-01T04:32:24.185534100Z",
+    "full18_by_named_columns": true,
+    "integer_texts": 9,
+    "sole_empty_cell": [
+      "DEP_C",
+      "observed_mean"
+    ],
+    "Save_calls": 0,
+    "Configure_calls": 0,
+    "NoSave": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "browser_tabs_after": [],
+    "UI_observer_notes": "Immediate AX may precede async UI; first two domSnapshot outputs were not emitted, not evidence of empty page. Saved subsequent DOM proves actual states; no action/RunAll repeated."
+  },
+  "measurement": {
+    "requested_service_tier": "STANDARD",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies; no new pair-only blind-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

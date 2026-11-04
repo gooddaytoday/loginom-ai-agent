@@ -1,0 +1,49 @@
+{
+  "task_id": "sku-sourcing-redundancy-business",
+  "source_task": "sku-sourcing-redundancy-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/sku-sourcing-redundancy-detailed/provenance.json",
+  "dataset_sha256": {
+    "products.csv": "f63df26dfab919bb70720e8aedcd2d2326114a6e26caab4855c072dad5c51910",
+    "supplier_quotes.csv": "e40dcc210dffc938eb8491b136ee1147f11b5e2fc46d74282a0a02da52adb6a4"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a862bdd8e3f931c40723f65824697d8c5d7dc63acb2a0315aff08d70d9a6f0ee"
+  },
+  "reference_sha256": "7471e5f501a7c2d799585d46440da4956bd3e632070e6ca6ae51fdefb4941f41",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Six products and seven supplier quotes frozen before separate manual full3x6/individual SKU classification and stdlib sets/Decimal oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK products.sku and quote_id; quotes.sku FK to full products; nonempty ASCII/case-sensitive sku/category/supplier_id; active integer0/1. Distinct supplier separately per SKU only active1. Full products includes only-inactive and no-quote SKU/CAT_C; source structure does not measure reliability or interchangeability. No money/time fields."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent active supplier sets separately per SKU over complete products registry; category full products count and exclusive0/1/atleast2 classes, Decimal one/full-products share. Separate manual full18 after raw freeze before oracle/native; no intermediate rounding or share minimum precision."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G06 after all5dispositions/whole-group prerequisites; P17 ONLY-B conditional; no new P15 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

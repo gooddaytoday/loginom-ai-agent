@@ -1,0 +1,50 @@
+{
+  "task_id": "imputation-comparison-impact-business",
+  "source_task": "imputation-comparison-impact-detailed",
+  "source_provenance": "../../analytic-detailed/imputation-comparison-impact-detailed/provenance.json",
+  "reference_origin": "Shared genuine detailed CLI A1 reference verified native and cold; no separate B authoring model/session/attempt claimed",
+  "dataset_sha256": {
+    "jobs.csv": "c542b890a14cbc95049f244b50fd3c89663e9f812fab013b6c53022135860570"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a2a47708bf32590df8190ca2e6b4eadfd5e3128789e13d1421ef021467377fa2"
+  },
+  "reference_sha256": "ab70089f37263824db55822f2f9c1c826ebf819832e6ccaf3740aada218adf49",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "jobs.csv",
+    "selection": "Exact six jobs frozen before independent manual/oracle/native; J01 observed0, J03/J05/J06 numeric NULL, DEP_C no original observations",
+    "units": "processing_hours in hours; no dates/money",
+    "transformations": "None beyond synthetic CSV serialization; empty numeric field encodes NULL; original0 remains observed"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only global mean of original known hours including0; department original counts/observed mean plus completed mean; full independent manual before source/native"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies; no new pair-only blind-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

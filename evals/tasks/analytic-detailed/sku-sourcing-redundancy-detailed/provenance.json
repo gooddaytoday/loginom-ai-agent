@@ -1,0 +1,149 @@
+{
+  "task_id": "sku-sourcing-redundancy-detailed",
+  "dataset_sha256": {
+    "products.csv": "f63df26dfab919bb70720e8aedcd2d2326114a6e26caab4855c072dad5c51910",
+    "supplier_quotes.csv": "e40dcc210dffc938eb8491b136ee1147f11b5e2fc46d74282a0a02da52adb6a4"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a862bdd8e3f931c40723f65824697d8c5d7dc63acb2a0315aff08d70d9a6f0ee"
+  },
+  "reference_sha256": "7471e5f501a7c2d799585d46440da4956bd3e632070e6ca6ae51fdefb4941f41",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/products.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/supplier_quotes.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T23:26:47+03:00",
+    "duration_s": 651,
+    "tokens": {
+      "input": 93337,
+      "output": 6132,
+      "reasoning": 783
+    },
+    "tool_calls": 42,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Six products and seven supplier quotes frozen before separate manual full3x6/individual SKU classification and stdlib sets/Decimal oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK products.sku and quote_id; quotes.sku FK to full products; nonempty ASCII/case-sensitive sku/category/supplier_id; active integer0/1. Distinct supplier separately per SKU only active1. Full products includes only-inactive and no-quote SKU/CAT_C; source structure does not measure reliability or interchangeability. No money/time fields."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent active supplier sets separately per SKU over complete products registry; category full products count and exclusive0/1/atleast2 classes, Decimal one/full-products share. Separate manual full18 after raw freeze before oracle/native; no intermediate rounding or share minimum precision."
+  },
+  "native_verification": {
+    "actual_review": "SPEC+QUALITY32 APPROVE/rootFULLREADcd3887 CLOSED",
+    "observed_nodes": 12,
+    "observed_links": 11,
+    "node_names_counts_layout_are_not_acceptance_gates": true,
+    "full_cells": 18,
+    "integer_counter_texts": 12,
+    "partition_all3": true,
+    "CAT_C_retained": true,
+    "empty_cells": 0,
+    "no_JS_or_static_gold": true,
+    "tool_errors": 1,
+    "failed_operation": "export-result-1: NOT_APPLIED/NODE_APPLY_STOPPED, Graph gesture refused before effect: Requested drop surface is not reachable; effect_possible=false/cleanup_complete=true/no node or execution",
+    "resolution": "export-result-2 removed target.position only apart from new operation_id; SUCCEEDED same A1, not new authoring attempt",
+    "skill_duplicate": "same ID/input/output/timing, metadata.activation enrichment, not additional execution",
+    "memory_tool_calls_zero_means": "zero writing calls; readonly Help/bundled workflow skill reads did occur",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "content_verification": "Collected XML and full CSV independently checked; original Save flags preserved",
+    "ordinary_cleanup": "saved package Close/logout; original Runtime+Knowledge ACK and actual exit0/noSignal; idle verified"
+  },
+  "cold_verification": {
+    "root_actual": "866002 PASS; combined independent review pending",
+    "run_all_calls": 1,
+    "native_nodes_green": 12,
+    "active_ports": 36,
+    "LGP_and_both_raw_SHA_stat_unchanged": true,
+    "new_export_bytes": 149,
+    "full18_by_named_columns": true,
+    "integer_texts": 12,
+    "partition_all3": true,
+    "share_correct": true,
+    "empty_cells": 0,
+    "Save_calls": 0,
+    "NoSave": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "browser_tabs_after": [],
+    "image_limitation": "Initial cold-right.png partial paint; cold-export.png complete fresh view, no extra execution",
+    "observer_history": "Initial check_reference invocation omitted case argument and failed before checker write; collector succeeded once; only checker corrected, no recollect or rerun. DOM initial display used _Info rather than actual ;Info, corrected readonly on same records."
+  },
+  "measurement": {
+    "requested_service_tier": "STANDARD",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G06 after all5dispositions/whole-group prerequisites; P17 ONLY-B conditional; no new P15 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,7 @@
+sku;expiry_class;lots;on_hand_qty;reserved_qty;free_qty;free_value
+SKU_A;expired;2;18;5;13;36.00
+SKU_A;within_horizon;1;5;0;5;20.00
+SKU_A;later;1;7;0;7;10.50
+SKU_B;expired;1;3;0;3;18.00
+SKU_B;within_horizon;1;4;0;4;8.00
+SKU_B;later;1;6;6;0;0.00

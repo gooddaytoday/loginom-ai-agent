@@ -10,7 +10,9 @@ def run_recipe(task,recipe):
    assert source.count(e['from'])==e['count'],(task,e)
    source=source.replace(e['from'],e['to'])
   (d/'oracle.py').write_text(source)
-  subprocess.run(['python3',str(d/'oracle.py')],check=True,capture_output=True)
+  completed=subprocess.run(['python3',str(d/'oracle.py')],check=True,capture_output=True)
+  if not (d/'oracle.csv').exists():
+   (d/'oracle.csv').write_bytes(completed.stdout)
   with (d/'oracle.csv').open(newline='') as source:
    delimiter=csv.Sniffer().sniff(source.readline(),delimiters=',;').delimiter
    source.seek(0);rows=list(csv.reader(source,delimiter=delimiter))
