@@ -94,6 +94,12 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name in ['factor-pca', 'factor-retrain']:
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
+        update = name == 'factor-retrain'
+        return dict(source=src, prompt=src / ('task-update.md' if update else 'task.md'), data=src / 'data', base=None,
+                    input_files=['matrix.csv', 'update.csv'] if update else ['matrix.csv'], export_count=2,
+                    expected_name='expected-update.json' if update else 'expected.json')
     if name == 'clustering-normalized':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -156,6 +162,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data',
                     input_files=['keys.csv'], base=None, expected_name='expected.json')
+    if name in ['table-tree-json', 'json-tree-json']:
+        slug = 'trees-datatotree' if name == 'table-tree-json' else 'trees-treetojson'
+        src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
+                    input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
     if name in ['tree-repeat', 'tree-no-repeat']:
         nodes = REPO / 'docs/node-development/nodes'
         src = nodes / 'trees-jsontotree/acceptance'
@@ -225,6 +236,17 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-retrain':
+        src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
+        return dict(source=src, prompt=src / 'task-retrain.md',
+                    data=src.parent / 'fixtures', input_files=['transactions.csv', 'length.csv'],
+                    base=None, expected_name='length/expected.json', export_count=2)
+    if name in ['assnrules-basic', 'assnrules-length']:
+        src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
+        variant = src / 'length' if name == 'assnrules-length' else src
+        return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
+                    expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
+                    input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -471,6 +493,24 @@ def export_null_marker(events, destination):
     return marker
 
 
+def json_ast(text):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result: raise ValueError('Duplicate JSON key')
+            result[key] = value
+        return result
+    def reject(value): raise ValueError('Nonfinite JSON')
+    def typed(value):
+        if value is None: return ('null',)
+        if isinstance(value, bool): return ('boolean', value)
+        if isinstance(value, (int, Decimal)): return ('number', Decimal(value))
+        if isinstance(value, str): return ('string', value)
+        if isinstance(value, list): return ('array', tuple(typed(v) for v in value))
+        return ('object', tuple((k, typed(v)) for k, v in sorted(value.items())))
+    return typed(json.loads(text, parse_float=Decimal, object_pairs_hook=pairs, parse_constant=reject))
+
+
 def check_csv(path, expected, header='names', *, column_order=None, null_marker='', scenario_name=None, d76=None,
               export_events=(), destination=None):
     delimiter = csv_delimiter(path)
@@ -503,6 +543,9 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     def equal(value, col, target):
         if target is None: return value == null_marker
         if infer_marker and value == null_marker: return False
+        if col.get('comparison') == 'json_ast':
+            try: return json_ast(value) == json_ast(target)
+            except (ValueError, TypeError): return False
         if limitation(value, col, target): return True
         if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
             try:
@@ -646,6 +689,13 @@ def check_tree(port, expected):
     for path, kind in expected['schema_types'].items():
         actual = [n for n in schema if n['path'] == path]
         assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+    for path, order in expected.get('nested_field_order', {}).items():
+        parent = next(n for n in schema if n['path'] == path)
+        assert [schema[i]['name'] for i in parent['children']] == order, 'TREE_NESTED_ORDER'
+    if 'declared_schema' in expected:
+        assert len(schema) == expected['schema_node_count'], 'TREE_SCHEMA_COUNT'
+        for actual, want in zip(schema, expected['declared_schema']):
+            assert all(actual.get(k) == v for k, v in want.items()), 'TREE_DECLARED_SCHEMA'
     wanted = []
     def walk(node, parent=None, schema_path=''):
         index = len(wanted)
@@ -909,6 +959,9 @@ class Runner:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
+        if spec.get('tree_conversion'):
+            labels = [n['label'] for n in expected['nodes'] if n.get('label')]
+            prompt += '\nНазови узел дерева «' + labels[0] + '», узел JSON «' + labels[1] + '».'
         rejection = expected.get('rejection')
         execution_error = expected.get('execution_error')
         if execution_error is not None:
@@ -1102,9 +1155,19 @@ class Runner:
         if expected.get('proposed_tree_output'):
             trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
             assert trees, 'TREE_READ_MISSING'
+            matched_trees = 0
             for owner, port in trees:
                 assert port_path(owner, port) == 'port', 'TREE_READ_OWNERSHIP'
-                check_tree(port, expected['proposed_tree_output'])
+                contract = expected['proposed_tree_output']
+                if contract.get('output_node_type'):
+                    kind = {'trees.from_table': 'table_to_tree', 'trees.from_json': 'json_to_tree'}[contract['output_node_type']]
+                    identities = {o.get('node', {}).get('node_id') for _, reply in replies for o, _ in ports(reply) if o.get('configuration', {}).get('readback', {}).get('kind') == kind}
+                    assert len(identities) == 1, 'TREE_SELECTED_NODE_AMBIGUOUS'
+                    if owner.get('node', {}).get('node_id') not in identities: continue
+                    assert port.get('port') == contract.get('output_port', 0), 'TREE_OUTPUT_PORT'
+                check_tree(port, contract)
+                matched_trees += 1
+            assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
         cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
         acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
@@ -1126,6 +1189,20 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('factor_signs'):
+            rounds = {}
+            for _, reply in replies:
+                for owner, port in ports(reply):
+                    if owner.get('configuration', {}).get('readback', {}).get('kind') != 'factor_analysis': continue
+                    key = owner.get('execution', {}).get('execution_id')
+                    rounds.setdefault(key, {})[port['port']] = dict(node=owner['node'], type='research.factor_analysis',
+                        output_port=port['port'], execution=owner['execution'], data=port)
+            complete = [list(group.values()) for group in rounds.values() if set(group) == {0, 1}]
+            assert complete, 'FACTOR_BOTH_TYPED_OUTPUTS_MISSING'
+            write(folder / 'factor-actual.json', complete[-1])
+            self.phase('factor-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
+            expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)

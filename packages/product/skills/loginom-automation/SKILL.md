@@ -148,15 +148,19 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
+| Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
+| Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 | Первые/последние/случайные N | `preprocessing.sampling` / sequential, random | [читать](references/nodes/preprocessing.sampling.md) |
 | Train/test по порядку/случайно | `preprocessing.data_partition` / sequential, random | [читать](references/nodes/preprocessing.data_partition.md) |
 | Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
 | Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
+| Факторный анализ | `research.factor_analysis` / pca_fixed | [читать](references/nodes/research.factor_analysis.md) |
 | REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
 | Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply | [читать](references/nodes/datamining.lin_regression.md) |
 | Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
+| Ассоциативные правила | `datamining.assn_rules` / fp_growth | [читать](references/nodes/datamining.assn_rules.md) |
 | Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
 | Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
 | Заполнение NULL | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |

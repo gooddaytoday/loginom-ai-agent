@@ -62,7 +62,7 @@ function catalog(types) {
    selectorCatalogDigest:'b'.repeat(64),e2eCommit:'c'.repeat(40),actionManifestDigest:'d'.repeat(64),
    catalogLifecycleStatus:'candidate',acceptanceVerified:false,acceptanceDigest:null,
    compatibilityProfile:{profile_id:'source-fixture-linux',loginom_build:'7.4.2',platform:'linux',browser:'chromium'}};
- return userActionInventory({actions:[],node_types:describeNodeTypes(types??[...handlers.keys()],
+ return userActionInventory({actions:[],node_types:describeNodeTypes(types??[...[...handlers.keys()].filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript'],
    {...pins,skillRevision:'e'.repeat(64),loginomProfile:pins.compatibilityProfile},new Map(),handlers,'7.4.2'),session_manifest:pins});
 }
 
@@ -78,7 +78,7 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
  }
- const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,33);
+ const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,32);
  assert.ok(bytes(all)>46000);
  const refused=boundedUserToolReply(all,{tool:'dock_action_describe'}),value=JSON.parse(refused.content[0].text);
  assert.equal(refused.isError,true);assert.equal(value.result_delivery,'refused');

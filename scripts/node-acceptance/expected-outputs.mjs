@@ -1,3 +1,4 @@
+import {sameJsonValues} from './tree-conversion.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 // Read the first CSV record, including quoted separators/newlines and UTF-8 BOM.
 // The complete downloaded file is checked by the scenario's file oracle.
@@ -60,6 +61,7 @@ export function parseExpectedOutputs(expected){
   for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
    &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
     ||typeof r[c.name]==='number'&&Number.isFinite(r[c.name])),'EXPECTED_CATEGORIES_INVALID');
+  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&c.comparison==='json_ast','EXPECTED_COMPARISON_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -221,10 +223,31 @@ function matchesCell(cell,column,want,coarseBound=false){
   return Number.isFinite(difference)?difference<=Math.max(abs,rel*Math.abs(want))
    :Math.abs(value/2-want/2)<=Math.max(abs/2,rel*(Math.abs(want)/2));
  }
+ if(column.comparison==='json_ast')return type==='string'&&sameJsonValues(value,want);
  if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
 }
-export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv}={}){
+export function alignFactorSigns(actual,outputs,rule){
+ if(rule===undefined)return outputs;
+ need(rule&&Object.keys(rule).every(k=>['columns','ports'].includes(k))&&Array.isArray(rule.columns)&&rule.columns.length>0&&rule.columns.length<=128
+  &&new Set(rule.columns).size===rule.columns.length&&rule.columns.every(n=>typeof n==='string')
+  &&JSON.stringify(rule.ports)==='[0,1]','EXPECTED_FACTOR_SIGNS_INVALID');
+ need(outputs.length===2&&rule.ports.every(port=>outputs.some(o=>o.output_node_type==='research.factor_analysis'&&o.output_port===port&&o.ordered===true&&o.column_order==='exact'
+  &&rule.columns.every(name=>o.columns.some(c=>c.name===name&&c.type==='real'&&c.tolerance)))),'EXPECTED_FACTOR_SIGNS_INVALID');
+ const anchor=outputs.find(o=>o.output_port===1),tables=actual.filter(a=>a.type==='research.factor_analysis'&&a.output_port===1);
+ need(tables.length===1,'FACTOR_SIGN_ANCHOR_MISSING');
+ const data=tables[0].data,signs={};
+ for(const name of rule.columns){
+  const index=data.schema?.findIndex(c=>c.name===name),row=anchor.rows.findIndex(r=>typeof r[name]==='number'&&r[name]!==0);
+  need(index>=0&&row>=0,'FACTOR_SIGN_ANCHOR_INVALID');
+  const cell=data.sample?.[row]?.[index],value=Number(cell?.value);
+  need(cell?.type==='real'&&cell.is_null===false&&Number.isFinite(value)&&value!==0,'FACTOR_SIGN_ANCHOR_INVALID');
+  signs[name]=Math.sign(value)===Math.sign(anchor.rows[row][name])?1:-1;
+ }
+ return outputs.map(o=>({...o,rows:o.rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,signs[k]&&v!==null?v*signs[k]:v])))}));
+}
+export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv,factorSigns}={}){
+ outputs=alignFactorSigns(actual,outputs,factorSigns);
  need(allowExtraPortReads?actual.length>=outputs.length:actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
  const used=new Set(),matches=[];
@@ -311,4 +334,14 @@ function matchIndices(options,unique=false){
  };
  const result=run();
  return result&&(!unique||!result.some((column,row)=>run(row,column)!==null))?result:null;
+}
+
+// run-check uses the same typed matcher before its existing CSV checks.
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='factor-signs'){
+ const {readFileSync,writeFileSync}=await import('node:fs');
+ const expected=JSON.parse(readFileSync(process.argv[3],'utf8')),actual=JSON.parse(readFileSync(process.argv[4],'utf8'));
+ const {outputs}=parseExpectedOutputs(expected);
+ const aligned=alignFactorSigns(actual,outputs,expected.factor_signs);
+ matchExpectedOutputs(actual,aligned);
+ writeFileSync(process.argv[5],JSON.stringify({...expected,outputs:aligned}));
 }

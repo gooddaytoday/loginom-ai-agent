@@ -96,7 +96,7 @@ export function createUserWorkflowBindings() {
       const ref = references.get(key(request.document_id, request.workflow_ref?.workflow_id));
       if (!ref) throw Error('UNKNOWN_PREPARED_WORKFLOW: use document_id and workflow_id issued together by successful dock_prepare. No node operation started.');
       const ports=request.finish!=='execute'||['exports.text','exports.excel'].includes(request.target.type)?[]:
-        request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
+        request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
       let parameters=request.parameters;
       if(request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
         parameters={...exportCreationDefaults,...parameters};

@@ -21,6 +21,17 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_assnrules_fixture_ports_and_model_boundary(self):
+        for name, counts in [('assnrules-basic', [4, 2]), ('assnrules-length', [6, 6])]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/test/assnrules.lgp')
+            self.assertEqual(case['export_count'], 2)
+            self.assertEqual([len(output['rows']) for output in expected['outputs']], counts)
+            self.assertEqual([output['output_port'] for output in expected['outputs']], [0, 1])
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
+            self.assertNotIn('expected', case['prompt'].read_text())
+
     def test_missing_zero_fixtures_and_independent_oracle(self):
         for name, kind in [('missing-zero', 'core'), ('missing-zero-threshold', 'threshold'),
                            ('missing-zero-empty', 'empty'), ('missing-mean', 'mean')]:

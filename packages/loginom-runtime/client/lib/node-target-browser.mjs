@@ -70,14 +70,15 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
-        // Binning, linear regression and CrossTable replace captions after configuration,
+        // Binning, regression, CrossTable and factor analysis replace captions after configuration,
         // leaving an alternate SVG without data-tid. Rebind only the same
         // native data port with its exact previous suffix; other types retain
         // the previous caption restriction and exact cached-TID lookup.
         const renamedBinning=['preprocessing.binning','preprocessing.coarse_classes'].includes(type) && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
-        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable;
+        const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.

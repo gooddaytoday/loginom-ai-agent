@@ -174,3 +174,16 @@ test('cold preserves expected negative zero including exact native decimal strin
   assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
  }
 });
+
+test('explicit factor_signs permits only a shared factor sign across scores/loadings',()=>{
+ const columns=[{name:'Factor1',type:'real',label_any:true,tolerance:{abs:1e-8,rel:1e-10}}];
+ const outputs=[0,1].map(output_port=>({output_node_type:'research.factor_analysis',output_port,ordered:true,column_order:'exact',columns,rows:[{Factor1:1},{Factor1:-2}]}));
+ const rows=[0,1].map(output_port=>({node:{node_id:'factor'},type:'research.factor_analysis',output_port,data:{schema:columns,row_count:2,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'real',is_null:false,value:-1}],[{type:'real',is_null:false,value:2}]]}}));
+ const factorSigns={columns:['Factor1'],ports:[0,1]};
+ assert.equal(matchExpectedOutputs(rows,outputs,{factorSigns}).length,2);
+ assert.throws(()=>matchExpectedOutputs(rows,outputs));
+ const bad=structuredClone(rows);bad[0].data.sample[1][0].value=-2;
+ assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
+ bad[0].data.sample[1][0].value=2;bad[1].data.sample[0][0].value=1;
+ assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
+});

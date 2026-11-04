@@ -122,7 +122,7 @@ def expectation(scenario):
     else:
         tree['schema_node_count'] = 8
         tree['labels'] = 'label_any; technical names and types exact'
-    return dict(proposal='LAB-770 approved criteria; stage 1 separately assigned; no run PASS',
+    result = dict(proposal='LAB-770 approved criteria; stage 1 separately assigned; no run PASS',
                 package_path='{{PACKAGE_PATH}}', nodes=nodes,
                 outputs=[dict(output_node_type='trees.to_json', output_node_label=output_label,
                               output_port=0, ordered=True, column_order='exact',
@@ -135,6 +135,12 @@ def expectation(scenario):
                     null_is_distinct_from=['empty string', 'zero', 'false'],
                     note='Existing cold checker compares strings; rows.JSON is a semantic witness, not a required escape spelling. Requires approved scoped adapter before runs.'),
                 proposed_tree_output=tree)
+    result['outputs'][0]['columns'][0]['comparison'] = 'json_ast'
+    result['outputs'][0]['export_destination'] = 'tree-json-result.csv'
+    result['tree_outputs'] = [tree]
+    result['tree_settings'] = {'serialization': dict(exclude_root=True, pretty=False, keys='names', multi_row=False, datetime='iso8601')}
+    if scenario == 'table': result['tree_settings']['nodes'] = schema
+    return result
 
 
 def self_check(expected, scenario):

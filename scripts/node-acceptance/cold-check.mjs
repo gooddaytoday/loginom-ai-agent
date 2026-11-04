@@ -1,3 +1,4 @@
+import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
 import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
@@ -36,6 +37,7 @@ const args = parseArgs({
 if (!args.config || !args.resources || !args.saved || !args.expected || !args.output)
   throw Error("Required: --config --resources --saved --expected --output")
 
+const treeAuditPath=new URL('./run-check.py',import.meta.url).pathname
 const root = resolve(args.resources)
 const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
 const { verifyResources } = await load("src/resources.mjs")
@@ -220,6 +222,13 @@ page = context.pages()[0]
   }
 
   const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+  if(expected.tree_outputs){
+   for(const contract of expected.tree_outputs){
+    const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
+    if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
+    reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
+   }
+  }
   if(expected.clustering_normalized){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
@@ -228,7 +237,7 @@ page = context.pages()[0]
   }
   const actual=[],ownedExecutions=[];
   const readPlans=sampling?[...reads,...reads]:reads;
-  for(const [outputIndex,{node:target,ports}] of readPlans.entries()){
+  for(const [outputIndex,{node:target,ports,treeContract}] of readPlans.entries()){
   const node=target.ref;
 
   const operation = {
@@ -276,6 +285,10 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
+   const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
+   await record({phase:'cold_tree_saved_settings',node,...settings});
+  }
   let javascriptAdmission;
   if(target.type==='programming.javascript'){
    const {createJavascriptSourceAdmission}=await load('client/lib/javascript-source-admission.mjs');
@@ -328,8 +341,16 @@ page = context.pages()[0]
    if(!useNative)await closeOwnedNativePreview(channel,ctx,ownedPreview.port,ownedPreview.preview.root_tid);
   }
 
+  if(treeContract){
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind!=='tree'||read.output?.fresh!==true||read.output.execution_id!==execution.execution_id)throw Error('COLD_TREE_READ_INCOMPLETE');
+   execFileSync('python3',['-B','-c',"import importlib.util,json,sys;spec=importlib.util.spec_from_file_location('runner',sys.argv[1]);r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r);v=json.load(sys.stdin);r.check_tree(v['port'],v['expected'])",treeAuditPath],{input:JSON.stringify({port:read.output,expected:treeContract}),stdio:['pipe','pipe','pipe']});
+   state.treeOutputs??=[];state.treeOutputs.push({node,execution,output:read.output});
+   await record({phase:'cold_tree_read_verified',node,execution,output:read.output});
+   continue;
+  }
   let data;
-  if(target.type==='trees.to_table'){
+  if(['trees.to_table','trees.to_json'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
@@ -409,7 +430,7 @@ page = context.pages()[0]
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
-  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
@@ -445,6 +466,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(state.treeOutputs?{tree_outputs:state.treeOutputs}:{}),
     ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {
       package_closed: cleanup.package_closed === true,
