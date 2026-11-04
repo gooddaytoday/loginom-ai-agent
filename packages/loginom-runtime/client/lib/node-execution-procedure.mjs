@@ -88,7 +88,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
     ...(launched()&&consoleControl&&tid===button&&verb==='click'?{settleProcessConsole:consoleControl}:{}),
-    ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
+    ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:tid==='ConsoleForm;btnUnpin'?{confirmIdentity:s=>s.dom_epoch}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole(condition='process console visible',ready=()=>true,extra={}) {
@@ -163,7 +163,11 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
       const menuReady=s=>consoleVisible(s)&&control(s,grid,'right_click').length===1;
-      let s=await (keepConsoleOpen?openConsole():openConsole('process console menu settled',menuReady,
+      // History polling can repaint a long console after its UI snapshot.
+      // Pin using control-only quiet observations, including no-effect refreshes;
+      // capture the complete native inventory only after the pin has settled.
+      let s=await (keepConsoleOpen?openConsole('process console pin controls settled',()=>true,
+        {readProcesses:false,readProcessControls:true,confirmIdentity:s=>s.dom_epoch}):openConsole('process console menu settled',menuReady,
         {confirmIdentity:consoleMenuIdentity}));
       if(keepConsoleOpen) {
         const pinned=s=>consoleVisible(s)&&control(s,'ConsoleForm;btnPin').length===1
@@ -172,7 +176,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
           requireValue(control(s,'ConsoleForm;btnUnpin').length===1
             &&control(s,'ConsoleForm;btnPin').length===0,'Owned process console pin state unavailable');
           await act(s,'ConsoleForm;btnUnpin');
-          s=await observe('owned process console pinned before launch',pinned);
+          s=await observe('owned process console pinned before launch',pinned,{readProcesses:false,readProcessControls:true});
         }
       }
       // A long buffered process list can repaint after the panel becomes
