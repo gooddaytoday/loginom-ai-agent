@@ -126,6 +126,30 @@ for(const fault of [null,'document','workflow','tab','offscreen','disabled','mas
   assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
  }
 });
+for(const tabs of [[null,null],[null,'tab','tab'],[null,'tab','foreign'],[null,'tab',null],[undefined],['tab',null]])test('Files toolbar pins the first tab after an empty workspace: '+JSON.stringify(tabs),async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let reads=0,opened=false;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;s.workflow_ref=null;s.file_storage={status:'unobserved'};
+  s.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'}];
+  if(options.rootRef){
+   s.active_tab_ref=tabs[Math.min(reads++,tabs.length-1)];
+   s.observation_id='toolbar-'+reads;
+   s.ui.elements.push({tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',ref:'files-'+reads,enabled:true,visible:true,
+    allowed_actions:['click'],interaction:{state:reads>=tabs.length?'point_observed':'outside_viewport'}});
+  }else delete s.active_tab_ref;
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){assert.equal(a.ref,'files-'+tabs.length);assert.equal(o.observationId,'toolbar-'+tabs.length);
+   opened=true;f.calls.push('Files');return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request),safe=tabs.every(t=>t===null)||tabs.join(',')===',tab,tab';
+ assert.equal(result.outcome.status,safe?'SUCCEEDED':'NOT_APPLIED',JSON.stringify(result));
+ assert.equal(opened,safe);assert.equal(f.calls.filter(c=>c==='upload').length,safe?1:0);
+ if(!safe)assert.match(result.error.message,/toolbar tab changed/);
+});
 test('delivery navigates exact authorized folders and reuses upload and byte verification once',async()=>{
  const f=fixture(),first=f.service.deliver(request),second=f.service.deliver(request);assert.equal(first,second);assert.equal(f.service.busy,true);
  const result=await first;assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(result.outcome.destination,'/user/dock-p3/input.csv');
