@@ -11,7 +11,7 @@ function fixture(){
  const mapping={verified:true,inventory_complete:true,source_identity_verified:true,node_context:{...owner,output_port:{port:0}},autosync:true,
   source_fields:sources,target_fields:sources.map((s,index)=>({...s,record_id:'target-'+index,excluded:false,source:s}))};
  const finish={verified:true,cleanup_complete:true,settings_applied:true,mode:'done',node_context:owner};
- const values={configure:{configuration:{verified:true,inventory_complete:true,node_context:owner,mode:'columns'},validation:{status:'accepted_by_loginom_next',node_context:owner}},
+ const values={target:{target:{variable_links:[{source:'source',output:0,target:'n',input:0,kind:'variables',source_port_guid:'sg',target_port_guid:'tg'}]}},configure:{configuration:{verified:true,inventory_complete:true,node_context:owner,mode:'columns'},validation:{status:'accepted_by_loginom_next',node_context:owner}},
   node_finish:finish,output_mapping:{native_mapping:mapping,finish},finish:{...finish,mode:'execute'}};
  const phases=Object.entries(values).map(([phase,value])=>({phase,receipt_id:'op:'+phase,status:'verified',value:Object.assign(value,{verified:true,cleanup_complete:true})}));
  return {node,operation_id:'op',phases,mapping,values,run(){return variablesToTableConfigurationReadback(this);}};
@@ -19,7 +19,7 @@ function fixture(){
 test('configuration readback retains mode and complete native output metadata in fixture order without copying values',()=>{
  const f=fixture(),r=f.run();assert.equal(r.mode,'columns');assert.equal(r.package_persistence_verified,false);
  assert.deepEqual(r.output_mapping.fields.map(({name,label,type})=>({name,label,type})),variables.map(({name,label,type})=>({name,label,type})));
- assert.equal(JSON.stringify(r).includes('Привет'),false);assert.equal(r.receipt_ids.length,4);
+ assert.equal(JSON.stringify(r).includes('Привет'),false);assert.equal(r.receipt_ids.length,5);
 });
 test('a requested orientation, draft or partial receipt cannot stand in for observed committed settings',()=>{
  for(const change of [f=>f.values.configure.configuration.mode='rows',f=>f.values.configure.configuration.verified=false,

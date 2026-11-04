@@ -74,11 +74,21 @@ def expected(mode='columns'):
              'Value': None if v['value'] is None else {'cell_type': v['type'], 'value': v['value']}}
             for v in variables
         ]
-    return {
+    result = {
         'package_path': '{{PACKAGE_PATH}}',
         'nodes': [{'type': 'variables.to_table'}],
         'outputs': [output],
     }
+    if mode == 'columns':
+        # W1's existing inventory also audits reciprocal typed edges. The
+        # authored source fixture has no user variables; its clean snapshot
+        # enables that audit without replacing the eight-field table oracle.
+        result['variable_inventory'] = {
+            'outputs': [{'node': {'type': 'variables.user'}, 'port': 4, 'variables': []}],
+            'links': [{'source': {'type': 'bg-vendor-icon-calcvariables'}, 'output': 0,
+                       'target': {'type': 'variables.to_table'}, 'input': 0, 'kind': 'variables'}],
+        }
+    return result
 
 
 def check_csv(path, result):

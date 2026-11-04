@@ -8,8 +8,13 @@ export function variablesToTableConfigurationReadback({node,phases,operation_id}
    &&p.value?.verified===true&&p.value.cleanup_complete===true,'verified '+name);
   return p;
  };
- const configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
+ const targeted=receipt('target'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
  const c=configured.value.configuration,m=mapped.value.native_mapping;
+ const links=targeted.value.target?.variable_links;
+ need(Array.isArray(links)&&links.length===1,'one verified variable edge required');
+ const edge=links[0];
+ need(edge.kind==='variables'&&edge.target===node.node_id&&edge.input===0&&typeof edge.source==='string'&&edge.source!==node.node_id
+  &&Number.isInteger(edge.output)&&edge.output>=0&&[edge.source_port_guid,edge.target_port_guid].every(v=>typeof v==='string'&&v.length>0),'typed variable edge ownership');
  need(c?.verified===true&&c.inventory_complete===true&&owner(c.node_context)&&c.mode==='columns','observed columns configuration');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'native validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)
@@ -31,6 +36,6 @@ export function variablesToTableConfigurationReadback({node,phases,operation_id}
  });
  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'unique output names');
  return {kind:'variables_to_table',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
-  receipt_ids:[configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'columns',
+  receipt_ids:[targeted,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'columns',variable_input:{kind:'variables',source:{document_id:node.document_id,workflow_id:node.workflow_id,node_id:edge.source},output:edge.output,input:0,source_port_guid:edge.source_port_guid,target_port_guid:edge.target_port_guid},
   output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
 }

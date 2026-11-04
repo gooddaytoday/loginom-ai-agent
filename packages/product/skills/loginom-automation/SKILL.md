@@ -143,6 +143,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
+| Переменные в столбцы | `variables.to_table` / columns | [читать](references/nodes/variables.to_table.md) |
 | User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
 | Качество таблицы | `research.quality` / `profile` | [Пять выходов](references/nodes/research.quality.md), `parameters:{}`. |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
