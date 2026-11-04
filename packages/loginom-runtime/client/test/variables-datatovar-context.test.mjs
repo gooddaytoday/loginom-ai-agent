@@ -36,3 +36,12 @@ test('DataToVar native reader refuses changed or port wizard owners',async()=>{
  assert.equal((await readDataToVarContext(page,binding,async()=>({verified:true,surface:'wizard',node_id:++n}))).verified,false);
  assert.equal((await readDataToVarContext(page,binding,async()=>({verified:true,surface:'wizard',input_port:{port:0}}))).verified,false);
 });
+
+test('invalid native records expose bounded scalar shape for diagnosing a refused read',()=>{
+ const f=fixture();delete f.records[0].data.GroupFunctions;
+ f.records[0].data.NativeMask=31;f.records[0].data.Nested={untrusted:'value'};
+ const r=f.read();assert.equal(r.verified,false);assert.equal(r.reason,'datatovar_input_record');
+ assert.equal(r.record_shape.record_id,'r0');assert.equal(r.record_shape.data.NativeMask,31);
+ assert.equal(r.record_shape.data.Nested,'[object]');assert.equal(r.record_shape.data.Name,'RowID');
+ assert.equal(Object.hasOwn(r.record_shape.data,'GroupFunctions'),false);
+});

@@ -36,7 +36,13 @@ export function readDataToVarBrowser(prefix){
  for(const r of records){
   const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||ids.has(id)||typeof d?.Name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(d.Name)||names.has(d.Name.toLowerCase())
-   ||typeof d.DisplayName!=='string'||d.DisplayName.length>256||!types[d.DataType]||!Number.isSafeInteger(d.GroupFunctions)||d.GroupFunctions<0||d.GroupFunctions>16383)return fail('datatovar_input_record');
+   ||typeof d.DisplayName!=='string'||d.DisplayName.length>256||!types[d.DataType]||!Number.isSafeInteger(d.GroupFunctions)||d.GroupFunctions<0||d.GroupFunctions>16383){
+   // A refused read must retain enough bounded native shape to distinguish a
+   // model mismatch from incomplete data, without traversing native objects.
+   const scalar=v=>v===null||typeof v==='boolean'?v:typeof v==='number'?Number.isFinite(v)?v:'[nonfinite]':typeof v==='string'?v.slice(0,256):'['+typeof v+']';
+   return {...fail('datatovar_input_record'),record_shape:{record_id:id.slice(0,128),is_model:r?.isModel===true,
+    data:Object.fromEntries(Object.entries(d??{}).slice(0,32).map(([k,v])=>[k.slice(0,128),scalar(v)]))}};
+  }
   const settings={};
   for(const key of ['Index','Separator','Wrapper','UniqueOnly','Sort','SortDirection'])if(Object.hasOwn(d,key)){
    if(!['string','boolean','number'].includes(typeof d[key])||typeof d[key]==='number'&&!Number.isFinite(d[key])
