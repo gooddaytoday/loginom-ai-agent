@@ -11,7 +11,7 @@ test('ungroup registers two native inputs/outputs and only shares with bounded m
  const tool=nodeApiTools.find(t=>t.name==='dock_node_apply'),compact=userNodeTool(tool),card=describeNodeTypes(['transform.ungroup_data'],{},new Map(),support.nodeApplyHandlers)[0];
  assert.ok(Buffer.byteLength(JSON.stringify({name:compact.name,description:compact.description,inputSchema:compact.inputSchema}))<=20000);
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
- const skill=readFileSync(new URL('../../../product/skills/loginom-automation/references/nodes/transform-ungroupdata.md',import.meta.url));
+ const skill=readFileSync(new URL('../../../product/skills/loginom-automation/references/nodes/transform.ungroup_data.md',import.meta.url));
  assert.ok(skill.length<=6000);assert.doesNotMatch(skill.toString(),/\$(?:\d+|ARGUMENTS)/);
  assert.ok(card.parameter_schema.properties.ungroup);
 });
