@@ -144,6 +144,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
+| Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
 | Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |

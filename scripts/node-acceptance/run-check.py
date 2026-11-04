@@ -163,6 +163,13 @@ def scenario(name, case_root=None, *, cases=None):
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
 
+    if name in ['coarse-classes-train', 'coarse-classes-apply']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        applying = name == 'coarse-classes-apply'
+        return dict(source=src, prompt=src / ('task-apply.md' if applying else 'task.md'),
+                    data=src / 'data', base=None, export_count=3,
+                    input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
+                    expected_name='expected-apply.json' if applying else 'expected.json')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
