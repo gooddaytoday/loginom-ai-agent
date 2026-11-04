@@ -11,19 +11,34 @@ import { runtime } from "./runtime"
 import type { ActiveScenario, Options, ProjectOptions, Result, Scenario, ScenarioContext, SeededContext } from "./types"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import os from "node:os"
 
 export function runScenario(options: Options) {
   return (scenario: Scenario) => {
     if (scenario.kind === "todo") return Effect.succeed({ status: "skip", scenario } as Result)
-    return runActive(options, scenario).pipe(
-      Effect.timeoutOrElse({
-        duration: options.scenarioTimeout,
-        orElse: () => Effect.die(new Error(`scenario timed out after ${Duration.format(options.scenarioTimeout)}`)),
-      }),
-      Effect.as({ status: "pass", scenario } as Result),
-      Effect.catchCause((cause) => Effect.succeed({ status: "fail" as const, scenario, message: Cause.pretty(cause) })),
-      Effect.scoped,
-    )
+    return Effect.suspend(() => {
+      // Effect timeouts await interruption and scoped finalizers. A stuck
+      // uninterruptible acquire/release can therefore outlive that timeout.
+      const deadline = setTimeout(() => {
+        const load = os.loadavg()
+        console.error(
+          `scenario ${scenario.name} (${scenario.method} ${scenario.path}) timed out after ${Duration.format(options.scenarioTimeout)} including scope cleanup; load1=${load[0].toFixed(2)} load5=${load[1].toFixed(2)}; rerun with --trace`,
+        )
+        process.exit(1)
+      }, Duration.toMillis(options.scenarioTimeout))
+      return runActive(options, scenario).pipe(
+        Effect.timeoutOrElse({
+          duration: options.scenarioTimeout,
+          orElse: () => Effect.die(new Error(`scenario timed out after ${Duration.format(options.scenarioTimeout)}`)),
+        }),
+        Effect.as({ status: "pass", scenario } as Result),
+        Effect.catchCause((cause) =>
+          Effect.succeed({ status: "fail" as const, scenario, message: Cause.pretty(cause) }),
+        ),
+        Effect.scoped,
+        Effect.ensuring(Effect.sync(() => clearTimeout(deadline))),
+      )
+    })
   }
 }
 
