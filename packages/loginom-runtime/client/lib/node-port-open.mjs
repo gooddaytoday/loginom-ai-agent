@@ -44,7 +44,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&roots.length===1&&roots[0]===e&&e.getAttribute('data-tid')===b.workflow_ref.prefix+';ModelForm'&&model.FView?.el?.dom===e
     &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
     &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
-    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FIconCls==='bg-vendor-icon-groupdata'&&nodes[0].FLocked===false
+    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls)&&nodes[0].FLocked===false
     &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
       &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
       &&(r.port.FPortIndex===undefined||r.port.FPortIndex===r.nativeIndex));
@@ -159,7 +159,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // Union's dynamic tabular inputs retain an SVG creation index that includes
    // the hidden variable socket. Their native tree indexes are tabular ordinals.
    // Rebind on every opening; the exact cell, GUID and tree owner remain required.
-   const dynamicUnion=input&&node.FIconCls==='bg-vendor-icon-uniondata';
+   const dynamicUnion=input&&['bg-vendor-icon-uniondata','bg-vendor-icon-enrichdata'].includes(node.FIconCls);
    for(const [ordinal,p] of ports.entries()){
     p.nativeIndex=dynamicUnion?ordinal:p.index;
     if(p.port.FPortIndex!==undefined&&p.port.FPortIndex!==p.nativeIndex)fail('Port native hit identity unavailable');

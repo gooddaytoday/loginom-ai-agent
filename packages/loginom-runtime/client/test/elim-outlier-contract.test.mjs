@@ -59,7 +59,7 @@ test('public apply/read accepts all three outlier ports while old type and recei
  assert.equal(published(partition).valid,true);
  for(const type of ['datamining.clustering','transform.filter_data','transform.calculator'])assert.throws(()=>validateNodeApplyEnvelope({...r,target:{...r.target,type}}));
  assert.equal(published({...r,target:{...r.target,type:'datamining.clustering'}}).valid,false);
- assert.throws(()=>validateActionParameters(nodeApplyInputSchema,{...r,read:{...r.read,ports:[3]}}));
+ assert.throws(()=>validateNodeApplyEnvelope({...r,read:{...r.read,ports:[3]}}));
  assert.doesNotThrow(()=>validateActionParameters(nodeOutputReadInputSchema,{operation_id:'read',source_operation_id:'detect',read:{ports:[0,1,2],sample_rows:100,require_exact_numbers:true}}));
  const node={document_id:'doc',workflow_id:'wf',node_id:'clustering'};
  const source={parameters:{...r,target:{type:'datamining.clustering'}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[0,1].map(port=>({port,schema:[{name:'X',label:'X',type:'real'}]}))}}}};

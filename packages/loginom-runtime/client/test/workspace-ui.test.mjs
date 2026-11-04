@@ -4755,7 +4755,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=['group','sorting','crosstable','calculator','reform','filter','javascript','clustering','linregression'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting','crosstable','calculator','reform','filter','javascript','clustering','linregression'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':(vendor==='union'||vendor==='enrich'&&port>1)?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -4770,7 +4770,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  const nodeIcon={clustering:'bg-vendor-icon-clusterization',linregression:'bg-vendor-icon-linregression',javascript:'bg-vendor-icon-javascript',calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
+  const nodeIcon={clustering:'bg-vendor-icon-clusterization',linregression:'bg-vendor-icon-linregression',javascript:'bg-vendor-icon-javascript',calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',enrich:'bg-vendor-icon-enrichdata',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
   crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
@@ -4898,6 +4898,16 @@ test('owned Union input observes its numbered hidden appended-table breadcrumb',
   // Loginom 7.4.2 live: a long Union label pushes 'Присоединяемая таблица 2' and
   // 'Настройка' into the breadcrumb overflow while input2 is bound natively.
   const {page}=await joinInputPortOverflowFixture('valid',2,'union');
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица 2');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+});
+
+test('owned Enrich input observes its numbered hidden appended-table breadcrumb',async()=>{
+  // Loginom 7.4.2 live: a long Enrich label pushes 'Присоединяемая таблица 2' and
+  // 'Настройка' into the breadcrumb overflow while input2 is bound natively.
+  const {page}=await joinInputPortOverflowFixture('valid',2,'enrich');
   const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
   assert.equal(full.wizard.input_port_context.status,'observed');
   assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица 2');

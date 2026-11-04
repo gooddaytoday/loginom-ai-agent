@@ -43,6 +43,10 @@
 
 [transform.join_data](nodes/transform.join_data.md)
 
+## Дополнение данных
+
+[transform.enrich_data](nodes/transform.enrich_data.md)
+
 ## Выборка и разбиение
 
 [preprocessing.sampling](nodes/preprocessing.sampling.md) · [preprocessing.data_partition](nodes/preprocessing.data_partition.md)
