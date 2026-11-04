@@ -10,9 +10,10 @@ test('rendered UI creates the stage-0 expressions, changes limit and preserves t
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
 },async t=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
- const page=await browser.newPage();
+ for(const fault of ['background','transient','foreign']){
+ const page=await browser.newPage();t.after(()=>page.close());
  await page.route('http://variables.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('http://variables.test/');
- await page.evaluate(()=>{
+ await page.evaluate(fault=>{
   const root=document.createElement('div'),base='MF;TF;WizrdMCF;CalcVariablesWizard',editor='MF;TF;WizrdMCF;ExprEditForm';root.dataset.tid=base;document.body.append(root);
   const components=new Map();let serial=0;
   const make=(parent,tid,tag='div')=>{const e=document.createElement(tag);e.id='c'+serial++;e.dataset.tid=tid;parent.append(e);return e;};
@@ -30,8 +31,10 @@ test('rendered UI creates the stage-0 expressions, changes limit and preserves t
   const button=(tid,text,click)=>{const e=make(root,base+';'+tid,'button');e.textContent=text;e.onclick=click;components.set(e.id,{el:{dom:e},disabled:false});};
   const open=add=>{
    adding=add;draft=add?{Name:'Expr'+(records.length+1),DisplayName:'Выражение'+(records.length+1),DataType:3,Description:'',Intermediate:false}:structuredClone(selected.data);
-   const mask=document.createElement('div');mask.className='x-mask';mask.style='position:fixed;inset:0;z-index:1;background:#ccc8';root.append(mask);
+   const mask=document.createElement('div');mask.className='bg-mask-message';mask.style='position:fixed;inset:0;z-index:1;background:#ccc8';document.body.append(mask);
    const dialog=make(document.body,editor);dialog.setAttribute('role','dialog');dialog.style='position:absolute;left:350px;top:20px;background:white;border:1px solid black;padding:10px;z-index:2';
+   if(fault==='transient'){dialog.append(mask);mask.style.zIndex='3';setTimeout(()=>mask.remove(),150);}
+   if(fault==='foreign'){const other=document.createElement('div');other.setAttribute('role','dialog');other.textContent='Foreign';other.style='position:absolute;left:800px;top:20px;width:100px;height:50px';document.body.append(other);}
    for(const [key,prop] of [['edtName','Name'],['edtDisplayName','DisplayName'],['txtDescription','Description']]){
     const field=make(dialog,editor+';'+key),control=document.createElement('input');control.value=draft[prop];control.oninput=()=>{draft[prop]=control.value;};field.append(control);components.set(field.id,{el:{dom:field},getValue:()=>control.value});
    }
@@ -45,18 +48,21 @@ test('rendered UI creates the stage-0 expressions, changes limit and preserves t
   };
   button('btnAddExpr','Добавить',()=>open(true));button('btnExprEdit','Свойства',()=>open(false));render();
   globalThis.Ext={getCmp:id=>components.get(id)};globalThis.bg={app:{Version:'7.4.2'}};
- });
+ },fault);
  const binding={document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'node'}},owner={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node'};
  const readNode=async()=>owner;
  let before=await readVariablesCalculatorContext(page,binding,readNode);assert.equal(before.verified,true);
  const parameters={expressions:fixture.expressions.map(e=>({target:{kind:'new'},...e}))};
  const plan=resolveVariablesCalculatorPatch(parameters,before,{newNode:true});
  const task={binding,plan,origin:'http://variables.test',build:'7.4.2',deadline:Date.now()+15000};
- const created=await configureVariablesCalculator(page,task,readNode);assert.equal(created.status,'SUCCEEDED',created.error);
+ const created=await configureVariablesCalculator(page,task,readNode);
+ if(fault==='foreign'){assert.equal(created.status,'AMBIGUOUS');assert.equal(await page.locator('[data-tid$=";colExpressionName_Expr1"]').count(),1);continue;}
+ assert.equal(created.status,'SUCCEEDED',created.error);
  assert.deepEqual(created.configuration.expressions.map(({name,label,type,formula})=>({name,label,type,formula})),fixture.expressions);
  before=await readVariablesCalculatorContext(page,binding,readNode);
  const patch={expressions:[{target:{kind:'existing',name:'limit'},formula:'120'}]};
  const changed=await configureVariablesCalculator(page,{...task,plan:resolveVariablesCalculatorPatch(patch,before)},readNode);
  assert.equal(changed.status,'SUCCEEDED',changed.error);assert.equal(changed.configuration.expressions[0].formula,'120');
  assert.deepEqual(changed.configuration.expressions.slice(1).map(e=>({...e,selected:false})),before.expressions.slice(1).map(e=>({...e,selected:false})));
+ }
 });
