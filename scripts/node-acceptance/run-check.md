@@ -501,3 +501,10 @@ cold обоих портов с независимым Apriori oracle, точн�
 по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
 Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
 CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.
+
+`variables-calculator` uses the approved eight ordered scalar expressions from
+`nodes/variables-calculator/acceptance/task.md`: create with limit 100, patch
+only limit to 120, freshly execute and Save. Typed variable output 0 and native
+configuration receipts establish both states, stable IDs/types and preservation
+of unrequested expressions. Stock W1 typed cold execution and cleanup apply.
+Only the user task reaches the model; expected values and oracle stay private.
