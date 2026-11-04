@@ -3,6 +3,15 @@ import {pathToFileURL} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {parseExpectedVariableInventory,matchVariableInventoryOutput} from './expected-outputs.mjs';
+export async function deliverVariablesColumnUnionSource(runtime,request){
+ let delivered=await runtime.deliverPackageArtifact(request);
+ for(let attempt=0;attempt<3;attempt++){
+  const o=delivered.outcome;
+  if(o?.next_step?.tool!=='dock_artifact_delivery_resume'||o.cleanup_complete!==true||o.inspection_required!==false||o.upload_submitted_or_unknown!==false)break;
+  delivered=await runtime.resumeArtifactDelivery({operation_id:request.operation_id,resume_id:'source-resume-'+attempt,budget_ms:120000});
+ }
+ return delivered;
+}
 export function auditVariablesColumnUnionHistory(events,initial,final){
  const need=(v,m)=>{if(!v)throw Error('VARIABLES_COLUMN_UNION_'+m);};
  const before=parseExpectedVariableInventory(initial).outputs[0],after=parseExpectedVariableInventory(final).outputs[0];
@@ -49,7 +58,7 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
   const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},
    execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding});
   const bytes=await readFile(fixture),artifact=await artifactStore.admit({sourcePath:fixture,name:config.package.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:'reject'}});
-  const delivered=await runtime.deliverPackageArtifact({operation_id:'source-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
+  const delivered=await deliverVariablesColumnUnionSource(runtime,{operation_id:'source-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
   if(delivered.outcome?.status!=='SUCCEEDED')throw Error('VARIABLES_SOURCE_UPLOAD:'+JSON.stringify(delivered));
   const prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-open',intent:'open_package',packagePath:config.package}));
   if(prepared.status!=='READY')throw Error('VARIABLES_SOURCE_OPEN');

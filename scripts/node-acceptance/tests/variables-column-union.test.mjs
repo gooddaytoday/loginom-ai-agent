@@ -1,9 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesColumnUnionHistory} from '../variables-column-union.mjs';
+import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource} from '../variables-column-union.mjs';
 const load=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-'+name+'-run.json',import.meta.url)));
 const initial=load('initial'),updated=load('updated');
+test('fixture delivery resumes only an explicit settled checkpoint before upload and never restarts delivery',async()=>{
+ const request={operation_id:'source'},calls=[];
+ const checkpoint={outcome:{status:'NOT_APPLIED',effect_possible:false,upload_submitted_or_unknown:false,inspection_required:false,cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume'}}};
+ const runtime={deliverPackageArtifact:async r=>{calls.push(r);return checkpoint;},resumeArtifactDelivery:async r=>{calls.push(r);return {outcome:{status:'SUCCEEDED'}};}};
+ assert.equal((await deliverVariablesColumnUnionSource(runtime,request)).outcome.status,'SUCCEEDED');
+ assert.equal(calls.length,2);assert.equal(calls[1].operation_id,'source');assert.ok(calls[1].resume_id);
+ for(const patch of [{inspection_required:true},{cleanup_complete:false},{upload_submitted_or_unknown:true}]){
+  calls.length=0;runtime.deliverPackageArtifact=async()=>({...checkpoint,outcome:{...checkpoint.outcome,...patch}});
+  assert.equal((await deliverVariablesColumnUnionSource(runtime,request)).outcome.status,'NOT_APPLIED');assert.equal(calls.length,0);
+ }
+});
 function history(){
  const node={document_id:'doc',workflow_id:'wf',node_id:'u'},inputs=[0,1].map(input=>({kind:'variables',input,output:0,source:{...node,node_id:'s'+input}}));
  const checkpoint=(id,expected)=>({phase:'node_checkpoint',result:{status:'SUCCEEDED',cleanup_complete:true,node,execution:{status:'completed',execution_id:id},
