@@ -1,0 +1,157 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.ungroup_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Total_Rounded",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "OutputValue",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Group": "G",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "a",
+          "OutputValue": 25.0
+        },
+        {
+          "Group": "G",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "b",
+          "OutputValue": 75.0
+        },
+        {
+          "Group": "H",
+          "Total": 10.0,
+          "Total_Rounded": 10.0,
+          "Item": "c",
+          "OutputValue": 2.0
+        },
+        {
+          "Group": "H",
+          "Total": 10.0,
+          "Total_Rounded": 10.0,
+          "Item": "d",
+          "OutputValue": 3.0
+        },
+        {
+          "Group": "H",
+          "Total": 10.0,
+          "Total_Rounded": 10.0,
+          "Item": "e",
+          "OutputValue": 5.0
+        },
+        {
+          "Group": "N",
+          "Total": 80.0,
+          "Total_Rounded": 80.0,
+          "Item": "f",
+          "OutputValue": 20.0
+        },
+        {
+          "Group": "N",
+          "Total": 80.0,
+          "Total_Rounded": 80.0,
+          "Item": "g",
+          "OutputValue": 20.0
+        },
+        {
+          "Group": "Z",
+          "Total": 30.0,
+          "Total_Rounded": 30.0,
+          "Item": "h",
+          "OutputValue": 0.0
+        },
+        {
+          "Group": "Z",
+          "Total": 30.0,
+          "Total_Rounded": 30.0,
+          "Item": "i",
+          "OutputValue": 30.0
+        },
+        {
+          "Group": "NEG",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "j",
+          "OutputValue": 0.0
+        },
+        {
+          "Group": "NEG",
+          "Total": 100.0,
+          "Total_Rounded": 100.0,
+          "Item": "k",
+          "OutputValue": 125.0
+        },
+        {
+          "Group": null,
+          "Total": 20.0,
+          "Total_Rounded": 20.0,
+          "Item": "n",
+          "OutputValue": 20.0
+        },
+        {
+          "Group": "",
+          "Total": 16.0,
+          "Total_Rounded": 16.0,
+          "Item": "o",
+          "OutputValue": 16.0
+        }
+      ]
+    }
+  ]
+}
