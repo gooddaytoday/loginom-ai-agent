@@ -122,7 +122,11 @@ const joinConfigurationReadback=object({kind:values('join'),scope:values('observ
  input_mappings:{...array(object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:boundedFields(readbackMappingField)})),minItems:2,maxItems:2},
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
  package_persistence_verified:{type:'boolean',const:false}});
-const colUnionConfigurationReadback=object({kind:values('col_union'),scope:values('observed_before_verified_finish'),node:ref,receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('positional'),settings:object({row_count:values('minimum','maximum','input'),padding:values('null','repeat','last'),determining_input:values('main','attached')},['row_count','padding']),input_mappings:{...array(object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:boundedFields(readbackMappingField)})),minItems:2,maxItems:2},output_mapping:object({port:{const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),package_persistence_verified:{const:false}});
+const colUnionConfigurationReadback=object({kind:values('col_union'),scope:values('observed_before_verified_finish'),node:ref,
+ receipt_ids:{type:'array',items:str,minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('positional'),
+ settings:object({row_count:values('minimum','maximum','input'),padding:values('null','repeat','last'),determining_input:values('main','attached')},['row_count','padding']),
+ input_mappings:{type:'array',items:object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:{type:'array',items:readbackMappingField,maxItems:1000}}),minItems:2,maxItems:2},
+ output_mapping:object({port:{const:0},autosync:bool,fields:{type:'array',items:object({...readbackMappingField.properties,excluded:bool}),maxItems:1000}}),package_persistence_verified:{const:false}});
 const unionConfigurationReadback=object({kind:values('union'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('append_all'),
  prefixes:object({enabled:bool,name:str,label:str}),tables:{...array(object({port:{type:'integer',minimum:1,maximum:14},fields:boundedFields(object({source:str,main:nullable(str)}))})),minItems:1,maxItems:14},
