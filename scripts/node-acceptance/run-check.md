@@ -428,3 +428,8 @@ k-means с нативной нормировкой [-1;1], [0;1] и max-abs со
 назначения, оба порта, центры в исходных единицах, Distance в нормированных,
 порядок полей, типы, CSV/Save/cold и сохранённый NormType проверяются.
 Допуски real abs=1e-8/rel=1e-10. Каждый метод меняет raw-разбиение.
+
+`coarse-classes-train` и `coarse-classes-apply`: один дискретный Segment,
+бинарная Target, автоматические конечные классы. Приёмочный комплект —
+`preprocessing-coarseclasses/acceptance`; три CSV в порядке портов 0/1/2,
+Save/cold/cleanup. Apply заменяет источник того же импорта, сохраняя обучение.

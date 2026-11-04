@@ -1164,10 +1164,25 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
             self.assertEqual(output, reference['outputs'][0])
 
-    def test_logreg_custom_selection_cases_are_not_in_v039_catalog(self):
-        for variant in ['aic', 'aicc', 'bic', 'hqic', 'strict', 'permissive']:
-            with self.assertRaises(ValueError):
-                runner.scenario('logreg-stepwise-' + variant)
+    def test_logreg_custom_selection_cases_keep_oracle_private_and_exact(self):
+        for variant in ['selection-forward', 'selection-backward', 'selection-stepwise',
+                        'stepwise-aic', 'stepwise-aicc', 'stepwise-bic', 'stepwise-hqic',
+                        'stepwise-strict', 'stepwise-permissive']:
+            case = runner.scenario('logreg-' + variant)
+            self.assertEqual(case['prompt'].name, 'task-' + variant + '.md')
+            self.assertTrue(case['prompt'].is_file())
+            self.assertEqual(sorted(p.name for p in case['data'].iterdir()), ['selection.csv'])
+            self.assertIsNone(case['base'])
+            output = runner.expected_for(case, '/test/selection.lgp')['outputs'][0]
+            reference = json.loads(subprocess.check_output([sys.executable, '-B', case['source'] / 'oracle.py']))
+            self.assertEqual(output, reference['outputs'][0])
+            self.assertEqual(output['column_order'], 'exact')
+            self.assertTrue(output['ordered'])
+            self.assertEqual([r['RowID'] for r in output['rows']], list(range(1, 65)))
+            self.assertEqual([c['name'] for c in output['columns']], ['PredictionEvent', 'PredictionProbability', 'ActualEvent', 'Target_predicted', 'X', 'Noise', 'Target', 'RowID', 'Note'])
+            self.assertEqual(len(output['rows']), 64)
+            self.assertEqual(len(output['columns']), 9)
+            self.assertEqual(output['columns'][1]['tolerance'], {'abs': 1e-8, 'rel': 1e-10})
 
     def test_p25_source_oracle_and_strict_result(self):
         case = runner.scenario('p25')
