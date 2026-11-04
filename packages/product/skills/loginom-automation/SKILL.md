@@ -437,3 +437,6 @@ operation_id на том же узле. После подтверждённой 
 
 Для тренда Ходрика–Прескотта выбирай `preprocessing.smoothing` / `hodrick_prescott`; перед настройкой прочитай [детали параметров, NULL и выходов](references/node-settings.md#сглаживание-ходрикапрескотта). Не заменяй узел Калькулятором или JavaScript.
 После замены файла выполняй прежний узел, не пересоздавай его.
+
+Таблица → дерево: `trees.from_table/manual_structure` — [параметры](references/nodes/trees-from-table.md).
+Дерево → JSON: `trees.to_json/serialize` — [параметры](references/nodes/trees-to-json.md).

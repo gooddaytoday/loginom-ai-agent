@@ -1,8 +1,9 @@
+import {readTreeConversionBrowser} from './tree-conversion-context.mjs';
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
 export function makeTreeWizardContextCode(binding){
  validatePreparedNodeContext(binding);
- return `async page=>{const readNode=${readPreparedNodeContext.toString()},b=${JSON.stringify(binding)};const before=await readNode(page,b);if(!before.verified||before.surface!=='wizard'||before.input_port||before.output_port)return {verified:false,reason:'tree_wizard_owner'};const value=await page.evaluate(${readTreeWizardBrowser.toString()},b.workflow_ref.prefix);const after=await readNode(page,b);return JSON.stringify(before)===JSON.stringify(after)?{...value,node_context:after}:{verified:false,reason:'tree_wizard_changed'};}`;
+ return `async page=>{const readNode=${readPreparedNodeContext.toString()},b=${JSON.stringify(binding)};const before=await readNode(page,b);if(!before.verified||before.surface!=='wizard'||before.input_port||before.output_port)return {verified:false,reason:'tree_wizard_owner'};const newer=await page.evaluate(${readTreeConversionBrowser.toString()},b.workflow_ref.prefix);const value=newer.applicable?newer:await page.evaluate(${readTreeWizardBrowser.toString()},b.workflow_ref.prefix);const after=await readNode(page,b);return JSON.stringify(before)===JSON.stringify(after)?{...value,node_context:after}:{verified:false,reason:'tree_wizard_changed'};}`;
 }
 
 // Cached form controls and native tree-store records only. Never apply a
