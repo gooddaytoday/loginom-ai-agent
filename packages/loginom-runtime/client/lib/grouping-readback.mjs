@@ -5,7 +5,7 @@ export function groupingConfigurationReadback({node,phases,operation_id}){
  const receipt=name=>{const xs=phases.filter(p=>p.phase===name),p=xs[0];need(xs.length===1&&p.status==='verified'&&p.receipt_id===operation_id+':'+name&&p.value?.verified===true&&p.value.cleanup_complete===true,'verified '+name);return p;};
  const input=receipt('input_mapping'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
  const c=configured.value.configuration,m=mapped.value.native_mapping,im=input.value.native_mapping;
- need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.keys?.length&&c.measures?.length,'grouping configuration owner');
+ need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.keys?.length&&Array.isArray(c.measures),'grouping configuration owner');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'grouping validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)
   &&finished.value.settings_applied===true&&['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'grouping finish');

@@ -13,7 +13,7 @@ export function validateGroupingParameters(p,mode,r) {
  if(!preserved){
   requireValue(Array.isArray(p.group_by)&&p.group_by.length>0&&p.group_by.length<=128&&p.group_by.every(field),'Ordered nonempty grouping keys required');
   requireValue(new Set(p.group_by.map(f=>f.name.toLowerCase())).size===p.group_by.length,'Duplicate grouping key');
-  requireValue(Array.isArray(p.measures)&&p.measures.length>0&&p.measures.length<=256,'Nonempty grouping measures required');
+  requireValue(Array.isArray(p.measures)&&p.measures.length<=256,'Grouping measures array required; use [] for unique key combinations');
   const pairs=new Set(),names=new Set(p.group_by.map(f=>f.name.toLowerCase()));
   for(const m of p.measures){
    requireValue(m&&Object.keys(m).sort().join(',')==='field,function,label,name'&&field(m.field)&&Object.hasOwn(GROUPING_FUNCTIONS,m.function),'Invalid grouping measure');

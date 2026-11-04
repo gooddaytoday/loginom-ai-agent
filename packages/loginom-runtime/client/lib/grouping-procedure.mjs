@@ -7,7 +7,7 @@ export async function configureGrouping(channel,p){
  const observe=condition=>channel.observe({condition,readGrouping:true,ready});
  const before=await observe('complete grouping inventory'),baseline=before.node_grouping;
  if(p.group_by===undefined){
-  need(baseline.keys.length&&baseline.measures.length&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
+  need(baseline.keys.length&&Array.isArray(baseline.measures)&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
   return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,preservation:{unchanged:true}};
  }
  const plan=resolveGroupingParameters(p,baseline.input_fields),wanted=new Map([...plan.keys.map(f=>[f.name,6]),...plan.functions.map(f=>[f.name,7])]);
