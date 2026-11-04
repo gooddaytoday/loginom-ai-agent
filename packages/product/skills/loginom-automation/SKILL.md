@@ -160,6 +160,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
 | Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply | [читать](references/nodes/datamining.lin_regression.md) |
 | Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
+| Ассоциативные правила | `datamining.assn_rules` / fp_growth | [читать](references/nodes/datamining.assn_rules.md) |
 | Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
 | Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
 | Заполнение NULL | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |

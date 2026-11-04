@@ -1,4 +1,5 @@
 import {makeCoarseClassesContextCode} from './coarse-classes-context.mjs';
+import {makeAssnRulesContextCode} from './assn-rules-context.mjs';
 import {makeBinningContextCode} from './binning-context.mjs';
 import {makeSamplingContextCode} from './sampling-context.mjs';
 import {makeLogRegressionContextCode} from './log-regression-context.mjs';
@@ -400,7 +401,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -421,7 +422,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -635,6 +636,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
+        }
+        if(readAssnRules){
+          result.output.node_assn_rules=await read(makeAssnRulesContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_assn_rules.node_context&&JSON.stringify(canonical(result.output.node_assn_rules.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Association rules native owner changed during observation');
         }
         if(readLogRegression){
           result.output.node_logregression=await read(makeLogRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1114,6 +1119,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readNavigation:initialObservation?.node_navigation_read===true,
           readMappings:initialObservation?.node_mapping!==undefined,
           mappingEditor:initialObservation?.node_mapping_editor,
+          readAssnRules:initialObservation?.node_assn_rules!==undefined,
           readLogRegression:initialObservation?.node_logregression!==undefined,
           readLinRegression:initialObservation?.node_linregression!==undefined,
           readFactorAnalysis:initialObservation?.node_factor_analysis!==undefined,

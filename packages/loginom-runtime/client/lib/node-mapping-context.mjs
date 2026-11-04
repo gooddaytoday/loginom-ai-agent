@@ -18,7 +18,10 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
   if(editor&&(!before.input_port||before.input_port.direction!=='input'||before.input_port.port!==0
     ||before.input_port.port_guid!==editor.port_guid||before.input_port.opening_operation_id!==editor.opening_operation_id))
     return {verified:false,reason:'mapping_editor_owner'};
-  const result=await page.evaluate(readBrowser,editor?{prefix:binding.workflow_ref.prefix,editor}:binding.workflow_ref.prefix);
+  // Only the native, receipt-bound input owner selects the extra role set.
+  const nodeType=before.input_port?.direction==='input'&&before.input_port.port===0
+    &&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules':undefined;
+  const result=await page.evaluate(readBrowser,editor||nodeType?{prefix:binding.workflow_ref.prefix,editor,node_type:nodeType}:binding.workflow_ref.prefix);
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'mapping_node_changed'};
   return {...result,node_context:after};
@@ -27,6 +30,8 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
 // Only local UI stores are read. No model loads, server requests or dataset APIs.
 export function readMappingBrowser(request) {
   const prefix=typeof request==='string'?request:request.prefix,editor=typeof request==='string'?null:request.editor;
+  const inputRolesByType={'datamining.assn_rules':[0,1,2,3,4,5,6,7,8,9]};
+  const inputRoles=Object.hasOwn(inputRolesByType,request?.node_type)?inputRolesByType[request.node_type]:[0,1,2,3,4,5,6,7];
   const fail=reason=>({verified:false,reason,source_identity_verified:false});
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
   const exact=tid=>[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid);
@@ -120,7 +125,7 @@ export function readMappingBrowser(request) {
   const describe=r=>({record_id:String(r.internalId),field_id:String(r.data.ID),index:r.data.Index,
     name:r.data.Name,label:r.data.DisplayName,type:types[r.data.DataType],required:r.data.Required});
   for(const target of targets) {
-    if(input&&(![0,1,2,3,4,5,6,7].includes(target.data.UsageType)||typeof target.data.ReverseBroken!=='boolean'||target.data.ReverseBroken))return fail('mapping_input_usage');
+    if(input&&(!inputRoles.includes(target.data.UsageType)||typeof target.data.ReverseBroken!=='boolean'||target.data.ReverseBroken))return fail('mapping_input_usage');
     if(![0,1,2].includes(target.data.DataKind))return fail('mapping_target_kind');
     if(grouped&&typeof target.data.IsDerived!=='boolean')return fail('mapping_inherited');
     const source=target.data.ConnectedRecord;

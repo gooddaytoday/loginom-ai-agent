@@ -440,3 +440,9 @@ K=2, без вращения. Оба порта: 8 строк факторов �
 `factor_signs` в expected разрешает один общий знак на фактор в обоих портах;
 main использует typed matcher, CSV сверяется с его знаком, cold — тем же matcher.
 Без этого поля сравнение остаётся прежним. CSV/Save/cold/cleanup обязательны.
+`assnrules-basic` и `assnrules-length`: частые наборы и правила FP-Growth,
+поддержка 50%, достоверность 60%, max_items=2; вход Transaction/Item.
+Источник — `datamining-assnrules/acceptance` и `length/`; два CSV, Save,
+cold обоих портов с независимым Apriori oracle, точными типами/NULL/ID.
+`assnrules-retrain` сначала обучает на transactions.csv, затем заменяет вход
+на length.csv и переобучает тот же узел; CSV/Save/cold проверяют конечные 0/1.
