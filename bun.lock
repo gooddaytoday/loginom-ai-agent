@@ -14,6 +14,7 @@
       },
       "devDependencies": {
         "@actions/artifact": "5.0.1",
+        "@smithy/fetch-http-handler": "5.3.6",
         "@tsconfig/bun": "catalog:",
         "@types/mime-types": "3.0.1",
         "@typescript/native-preview": "catalog:",
@@ -423,6 +424,7 @@
         "@types/node": "catalog:",
         "@typescript/native-preview": "catalog:",
         "@valibot/to-json-schema": "1.6.0",
+        "app-builder-lib": "26.15.2",
         "electron": "42.3.3",
         "electron-builder": "26.15.2",
         "electron-vite": "^5",

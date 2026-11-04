@@ -28,3 +28,18 @@ test("identity cannot be changed after startup and has no update fallback", () =
   expect(Product.updateFeed).toBeNull()
   expect(Product.wordmark).toBe("Loginom AI")
 })
+
+test("the bundle bakes the feed parameter and defaults to disabled", async () => {
+  for (const value of [null, "https://example.test/updates/"]) {
+    const bundle = await Bun.build({
+      entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
+      target: "bun",
+      define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
+    })
+    expect(bundle.success).toBe(true)
+    const built = await import(
+      `data:text/javascript;base64,${Buffer.from(await bundle.outputs[0].text()).toString("base64")}`
+    )
+    expect(built.Product.updateFeed).toBe(value)
+  }
+})

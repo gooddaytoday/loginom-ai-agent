@@ -1,3 +1,6 @@
+// Replaced by the bundler; runtime environment variables cannot redirect packaged updates.
+declare const LOGINOM_AI_AGENT_UPDATE_FEED: string | null
+
 export const Product = Object.freeze({
   name: "Loginom AI Agent",
   slug: "loginom-ai-agent",
@@ -10,7 +13,7 @@ export const Product = Object.freeze({
   // OpenCode base before product migration: d848db933^:packages/opencode/package.json.
   opencodeCompatibilityVersion: "1.18.31",
   database: "loginom-ai-agent.db",
-  updateFeed: null as string | null,
+  updateFeed: typeof LOGINOM_AI_AGENT_UPDATE_FEED === "undefined" ? null : LOGINOM_AI_AGENT_UPDATE_FEED || null,
   changelogFeed: null as string | null,
   documentation: "https://github.com/gooddaytoday/loginom-ai-agent#readme",
   support: "https://github.com/gooddaytoday/loginom-ai-agent/issues",
