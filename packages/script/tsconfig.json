@@ -4,6 +4,5 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "noUncheckedIndexedAccess": false
-  },
-  "include": ["src", "../../script/update-feed.ts", "../../script/update-feed.test.ts"]
+  }
 }

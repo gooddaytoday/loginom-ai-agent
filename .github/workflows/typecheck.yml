@@ -23,6 +23,11 @@ jobs:
       - name: Run typecheck
         run: bun turbo typecheck --continue --concurrency=2
 
+      # The publisher uses root dependencies, absent from the scanner-only install.
+      - name: Check update feed publisher types
+        working-directory: packages/script
+        run: bun run typecheck:update-feed
+
   generated-fork:
     runs-on: ubuntu-24.04
     steps:
