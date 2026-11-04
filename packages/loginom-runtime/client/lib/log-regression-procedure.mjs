@@ -110,7 +110,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  let selection;
  const cutoffs=[];
  if(mode!=='enter'){
-  const criteria={deviance:[0,'Deviance'],aic:[1,'AIC'],aicc:[2,'AICc'],bic:[3,'BIC'],hqic:[4,'Ханнана—Куинна']};
+  const criteria={deviance:[0,'Deviance'],aic:[1,'Информационный критерий Акаике'],aicc:[2,'Информационный критерий Акаике скорректированный'],bic:[3,'Информационный критерий Байеса'],hqic:[4,'Информационный критерий Ханнана-Куинна']};
   const wanted=p.selection??{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})};
   await choose('pedRegSelQuality',criteria[wanted.criterion][1],criteria[wanted.criterion][0],'details');
   need(state.node_logregression.disabled?.pedRegSelQuality===false,'selection criterion must be editable');
