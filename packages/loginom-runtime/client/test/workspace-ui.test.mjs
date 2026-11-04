@@ -6189,9 +6189,11 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile','importnative'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
+    if(vendor==='importnative')for(const e of page.document.all())if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard','DataSetOutputSocketWizard');
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
     const socket=find('>Result'),settings=find('>Settings'),done=find(';btnDone');
     socket.children[0].attrs.class='bg-vendor-icon-'+socketIcon;
