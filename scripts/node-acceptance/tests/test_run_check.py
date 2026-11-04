@@ -21,6 +21,23 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_datatovar_catalog_keeps_oracle_private_and_requests_ordered_variable_output(self):
+        for name, files in [('variables-datatovar', ['values.csv', 'replace.csv']),
+                            ('variables-datatovar-null', ['null.csv']), ('variables-datatovar-empty', ['values.csv'])]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/datatovar.lgp')
+            self.assertTrue(case['variable_only'])
+            self.assertEqual(case['variable_audit'], 'variables-datatovar')
+            self.assertEqual(case['input_files'], files)
+            self.assertEqual(expected['outputs'], [])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertTrue(output['ordered'])
+            self.assertEqual(output['node']['type'], 'variables.from_table')
+            self.assertEqual([v['name'] for v in output['variables']], ['X_Sum', 'X_Count', 'X_Min', 'X_Max', 'X_Avg'])
+            self.assertTrue(case['oracle'].is_file())
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
@@ -42,6 +59,39 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue(case['prompt'].is_file())
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
+
+    def test_variable_only_model_requires_its_oracle_without_inventing_a_table_failure(self):
+        for oracle_fails in [False, True]:
+            with self.subTest(oracle_fails=oracle_fails), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+                for path in [folder, profile, workspace]: path.mkdir()
+                runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True, 'unsaved_changes_discarded': False})
+                runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+                event = {'type': 'tool_use', 'sessionID': 'own-session', 'part': {'tool': 'loginom_dock_action_run', 'state': {
+                    'status': 'completed', 'output': json.dumps({'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}}
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                calls = []
+                def phase(name, command, *args, **kwargs):
+                    calls.append(name)
+                    if name == 'model': (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                    elif name == 'variable-oracle':
+                        self.assertTrue((folder / 'variable-events.json').is_file())
+                        self.assertIn('variables-user', list(map(str, command)))
+                        if oracle_fails: raise RuntimeError('typed inventory rejected')
+                    else: self.fail('Unexpected phase ' + name)
+                with patch.object(instance, 'phase', side_effect=phase):
+                    if oracle_fails:
+                        with self.assertRaisesRegex(RuntimeError, 'typed inventory rejected'):
+                            instance.model('variables-user', folder, profile, workspace, '/test/result.lgp', {'package_directory': '/test'}, root / 'build')
+                    else:
+                        result = instance.model('variables-user', folder, profile, workspace, '/test/result.lgp', {'package_directory': '/test'}, root / 'build')
+                        self.assertEqual(result[-2:], (None, None))
+                        self.assertEqual(instance.current['port-read'], 'PASS')
+                        self.assertEqual(instance.current['read-path'], 'snapshot')
+                self.assertEqual(calls, ['model', 'variable-oracle'])
+                self.assertNotIn('failure_class', instance.current)
 
     def test_missing_zero_fixtures_and_independent_oracle(self):
         for name, kind in [('missing-zero', 'core'), ('missing-zero-threshold', 'threshold'),

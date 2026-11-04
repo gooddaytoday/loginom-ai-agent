@@ -39,6 +39,7 @@ import {makeFilterContextCode} from './filter-context.mjs';
 import {makeDuplicatesContextCode} from './duplicates-context.mjs';
 import {makeReformContextCode} from './reform-context.mjs';
 import {makeGroupingContextCode} from './grouping-context.mjs';
+import {makeDataToVarContextCode} from './variables-datatovar-context.mjs';
 import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
@@ -133,6 +134,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.wizard.factor_editor.selected_field?.status==='rendered_selected'
     &&dialog.ref===state.wizard.factor_editor.dialog_ref
     &&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  const allowedDataToVarFactorEditor=(dialog,state)=>{
+    const native=state.node_datatovar,editor=state.wizard?.factor_editor,selected=native?.selections?.selected;
+    return state.wizard?.stage==='datatovar'&&native?.verified===true&&native.inventory_complete===true
+      &&native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===state.prepared_node_context?.[k])
+      &&editor?.status==='rendered_factor_options'&&editor.selected_field?.status==='rendered_selected'
+      &&selected?.length===1&&native.fields?.filter(f=>f.record_id===selected[0]&&f.name===editor.selected_field.field_key&&f.role==='selected').length===1
+      &&dialog.ref===editor.dialog_ref&&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  };
   const allowedSamplingFactorEditor=(dialog,state)=>{
     const n=state.node_sampling,field=n?.bias_fields?.rows?.filter(r=>r.selected),category=n?.bias?.rows?.filter(r=>r.selected);
     return ['sampling','data_partition'].includes(state.wizard?.stage)&&n?.kind===state.wizard.stage
@@ -190,7 +199,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
   const allowedTreeConversionEditor=(dialog,state)=>{const c=state.node_tree,portal=c?.editor??c?.delete_confirmation;return state.wizard?.stage==='table_tree'&&c?.verified===true&&portal&&c.selected.length===1&&c.selected[0]===portal.selected_record_id&&(portal.root_tid==='msgbox'?state.ui.elements.some(e=>e.tid==='msgbox;tlb;yes'&&e.signature?.dialog_ref===dialog.ref):dialog.identity?.anchor_tid===portal.root_tid);};
-  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedDataToVarFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -423,7 +432,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -444,7 +453,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readDataToVar || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -552,7 +561,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readNavigation&&!navigationRoot)throw Error('Prepared workflow navigation region unavailable');
         const outputEditors=['output_mapping','input_mapping'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===(wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm')):[];
         if(outputEditors.length>1)throw Error('Output field editor is ambiguous');
-        const editorSuffix=wizard?.stage==='calculator'?';ExprDataEditForm':wizard?.stage==='grouping'?';FactorEditDialog':null;
+        const editorSuffix=wizard?.stage==='calculator'?';ExprDataEditForm':['grouping','datatovar'].includes(wizard?.stage)?';FactorEditDialog':null;
         const expressionEditors=editorSuffix?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+editorSuffix):wizard?.stage==='field_parameters'?(roots.output.ui?.elements??[]).filter(e=>['EditReformColumnDefForm',wizard.root_tid+';EditReformColumnDefForm'].includes(e.tid)):[];
         if(expressionEditors.length>1)throw Error('Calculator expression editor is ambiguous');
         // This is read-only root selection. The subsequent full read must prove
@@ -693,6 +702,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           result.output.node_tree=await read(makeTreeWizardContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_tree.node_context&&JSON.stringify(canonical(result.output.node_tree.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Tree conversion native owner changed during observation');
         }
+        if(readDataToVar&&result.output.wizard?.stage==='datatovar'
+          &&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid===result.output.wizard.root_tid+';FactorEditDialog')){
+          result.output.node_datatovar=await read(makeDataToVarContextCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=result.output.node_datatovar;
+          if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
+            throw Error('Table-to-variables factor native owner changed during observation');
+        }
         if(readSampling&&['sampling','data_partition'].includes(result.output.wizard?.stage)
           &&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid===result.output.wizard.root_tid+';FactorEditDialog')){
           result.output.node_sampling=await read(makeSamplingContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -780,7 +796,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // prepared node before and after. Preserve them in the same journal
         // observation; they are not an execution or data-freshness claim.
         for (const [requested,key,makeCode] of [[readOutputs,'node_outputs',makeNodeOutputContextCode], [readMappings,'node_mapping',makeNodeMappingContextCode],
-          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
+          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readDataToVar,'node_datatovar',makeDataToVarContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
           const native=await read(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1209,6 +1225,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,
+          readDataToVar:initialObservation?.node_datatovar!==undefined,
           readCrossTable:initialObservation?.node_crosstable!==undefined,
           readSmoothing:initialObservation?.node_smoothing!==undefined,readSampling:initialObservation?.node_sampling!==undefined,readTrees:initialObservation?.node_tree!==undefined,
           readSlidingWindow:initialObservation?.node_sliding_window!==undefined,

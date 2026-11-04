@@ -95,7 +95,7 @@ export function createUserWorkflowBindings() {
     expandNode(request) {
       const ref = references.get(key(request.document_id, request.workflow_ref?.workflow_id));
       if (!ref) throw Error('UNKNOWN_PREPARED_WORKFLOW: use document_id and workflow_id issued together by successful dock_prepare. No node operation started.');
-      const ports=request.finish!=='execute'||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
+      const ports=request.finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
         request.target.type==='research.quality'?[0,1,2,3,4]:request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
       let parameters=request.parameters;
       if(request.target.kind==='new'&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
@@ -111,7 +111,8 @@ export function createUserWorkflowBindings() {
         }};
       }
       return { ...request,parameters, workflow_ref: structuredClone(ref),mappings:request.mappings??[],
-        read:{ports,sample_rows:ports.length?5:0,require_exact_numbers:false,...request.read},
+        read:{ports,sample_rows:ports.length?5:0,require_exact_numbers:false,
+          ...(request.target.type==='variables.from_table'&&request.finish==='execute'?{variable_ports:[0],require_exact_numbers:true}:{}),...request.read},
         // Native wide-column setup can consume the shared total allowance;
         // explicit caller deadlines remain binding.
         budgets:{configure_ms:600000,execute_ms:120000,total_ms:Math.max(600000,request.budgets?.configure_ms??0,request.budgets?.execute_ms??0),...request.budgets} };

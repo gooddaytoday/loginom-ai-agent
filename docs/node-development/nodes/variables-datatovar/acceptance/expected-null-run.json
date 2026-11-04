@@ -1,0 +1,63 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.from_table"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.from_table"
+        },
+        "port": 0,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "X_Sum",
+            "label": "X|Сумма",
+            "type": "real",
+            "value": 6.0,
+            "tolerance": {
+              "abs": 1e-12,
+              "rel": 1e-12
+            }
+          },
+          {
+            "name": "X_Count",
+            "label": "X|Количество",
+            "type": "integer",
+            "value": 3
+          },
+          {
+            "name": "X_Min",
+            "label": "X|Минимум",
+            "type": "integer",
+            "value": 2
+          },
+          {
+            "name": "X_Max",
+            "label": "X|Максимум",
+            "type": "integer",
+            "value": 4
+          },
+          {
+            "name": "X_Avg",
+            "label": "X|Среднее",
+            "type": "real",
+            "value": 3.0,
+            "tolerance": {
+              "abs": 1e-12,
+              "rel": 1e-12
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
