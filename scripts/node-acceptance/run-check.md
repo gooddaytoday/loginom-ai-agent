@@ -235,6 +235,23 @@ the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
+Each output may declare `header: false` in private `expected.json` for a CSV
+without a header (including a single JSON cell). Columns then declare CSV
+positions, and every record, including the first, is checked as data. Omitted
+or `true` keeps the existing names/labels header checks. Cold readback checks
+the saved native output and Export input mapping without treating a data cell
+as a header.
+
+For a general safe refusal, use `outputs: []` and
+`refusal: {"text":"Не могу выполнить запрос: этот тип данных не поддерживается."}`.
+The nonempty `text` is a required substring of the final answer; choose a
+phrase containing both the refusal and its explanation. `nodes` may list only
+allowed input imports (or be empty); creating result or Export nodes fails.
+CSV export instructions are not appended, and CSV/cold checks are inapplicable,
+including with `--cold`. Save, close/logout and runtime ACK remain required.
+The oracle and refusal text never reach the model. `refusal` cannot be combined
+with `rejection` or `execution_error`; the S-tamper rejection below is unchanged.
+
 For the S-tamper negative case, use `outputs: []` and
 `rejection: {"code":"LOGINOM_FILE_CHANGED","node_type":"transform.group_data"}`
 in private `expected.json`. PASS requires a successful replacement export,

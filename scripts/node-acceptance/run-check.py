@@ -582,9 +582,13 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                        for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
     elif null_marker is None:
         null_marker = ''
-    assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
-    assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
-    assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
+    has_header = expected.get('header', True)
+    assert isinstance(has_header, bool), 'INVALID_CSV_HEADER'
+    if has_header:
+        assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
+    data_rows = rows[1:] if has_header else rows
+    assert all(len(row) == len(columns) for row in data_rows), 'CSV_ROW_WIDTH'
+    assert len(data_rows) == len(expected['rows']), 'CSV_ROW_COUNT'
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned and only apply to types300.
@@ -657,17 +661,20 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     def fits(name, col):
         return (col.get('label_any') if header == 'labels' else col.get('name_any')) or name == (col.get('label', col['name']) if header == 'labels' else col['name'])
 
-    if (column_order or expected.get('column_order')) == 'exact':
+    if not has_header:
+        # Without names/labels, expected columns declare CSV positions.
+        indices = list(range(len(columns)))
+    elif (column_order or expected.get('column_order')) == 'exact':
         assert all(fits(name, col) for name, col in zip(rows[0], columns)), 'CSV_COLUMN_ORDER'
         indices = list(range(len(columns)))
     else:
         flexible = any(c.get('label_any') if header == 'labels' else c.get('name_any') for c in columns)
         indices = matching([[i for i, name in enumerate(rows[0]) if fits(name, col)
-                             and (not flexible or matching([[j for j, row in enumerate(rows[1:])
+                             and (not flexible or matching([[j for j, row in enumerate(data_rows)
                                   if equal(row[i], col, want[col['name']])] for want in expected['rows']]) is not None)]
                             for col in columns], unique=flexible)
         assert indices is not None, 'CSV_COLUMN_ORDER'
-    options = [[j for j, row in enumerate(rows[1:]) if all(equal(row[indices[i]], col, want[col['name']])
+    options = [[j for j, row in enumerate(data_rows) if all(equal(row[indices[i]], col, want[col['name']])
                 for i, col in enumerate(columns))] for want in expected['rows']]
     categories = [i for i, col in enumerate(columns) if col.get('category_labels_any')]
     pairs = matching(options, unique=bool(categories)) if not expected.get('ordered') else (
@@ -676,14 +683,14 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     for i in categories:
         forward, reverse = {}, {}
         for want, actual in enumerate(pairs):
-            key, value = expected['rows'][want][columns[i]['name']], rows[actual + 1][indices[i]]
+            key, value = expected['rows'][want][columns[i]['name']], data_rows[actual][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
     if scenario_name == 'types300' and d76 is not None:
         counts = dict(negative_zero=0, midnight_date=0)
         for want, actual in enumerate(pairs):
             for i, col in enumerate(columns):
-                kind = limitation(rows[actual + 1][indices[i]], col, expected['rows'][want][col['name']])
+                kind = limitation(data_rows[actual][indices[i]], col, expected['rows'][want][col['name']])
                 if kind: counts[kind] += 1
         d76.update(counts)
     return delimiter
@@ -1036,8 +1043,15 @@ class Runner:
             labels = [n['label'] for n in expected['nodes'] if n.get('label')]
             prompt += '\nНазови узел дерева «' + labels[0] + '», узел JSON «' + labels[1] + '».'
         rejection = expected.get('rejection')
+        refusal = expected.get('refusal')
         execution_error = expected.get('execution_error')
         lgd_corrupt = spec.get('lgd') == 'corrupt'
+        if refusal is not None:
+            assert (isinstance(refusal, dict) and set(refusal) == {'text'}
+                    and isinstance(refusal['text'], str) and refusal['text'].strip()
+                    and expected['outputs'] == [] and not rejection and not execution_error
+                    and not spec.get('upload_only') and not lgd_corrupt
+                    and all(n['type'].startswith('imports.') for n in expected['nodes'])), 'INVALID_REFUSAL_ORACLE'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -1053,8 +1067,8 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('upload_only') or rejection or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('upload_only') and not rejection and not execution_error and not lgd_corrupt:
+        if spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -1065,7 +1079,7 @@ class Runner:
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not rejection and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
@@ -1149,6 +1163,25 @@ class Runner:
             return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
+        if refusal:
+            allowed = {n['type'] for n in expected['nodes']}
+            for _, event in events:
+                part = event.get('part', {})
+                if event.get('type') != 'tool_use': continue
+                request = part.get('state', {}).get('input', {})
+                if part.get('tool') == 'loginom_dock_node_apply':
+                    assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
+                if part.get('tool') == 'loginom_dock_action_run' and request.get('action_key') == 'node.add':
+                    assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
+            answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
+                           if event.get('type') == 'text'), (None, ''))
+            assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
+            assert not any(p.is_file() and not any(
+                re.fullmatch(r'[0-9a-f]{64}-\d+-' + re.escape(name), p.name)
+                and hashlib.sha256(p.read_bytes()).digest() == digest
+                for name, digest in inputs.items()) for p in profile.rglob('*.csv')), 'UNEXPECTED_CSV'
+            self.current.update(refusal='PASS', refusal_location=str(folder / 'model.stdout') + ':' + str(answer[0]))
         if lgd_corrupt:
             for _, event in events:
                 part = event.get('part', {})
@@ -1267,7 +1300,7 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
-        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error or lgd_corrupt) or delivered else None
+        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or refusal or execution_error or lgd_corrupt) or delivered else None
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -1294,6 +1327,9 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if refusal:
+            self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
+            return session, expected, None, None
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
             return session, expected, None, None
@@ -1420,7 +1456,7 @@ class Runner:
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
+                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
