@@ -1,0 +1,23 @@
+{
+  "fixture": "rest-variables.json",
+  "bytes": 402,
+  "sha256": "4938e40afff087ec0df238b2fdc0c681ecce5be5c6553dc2f6817d7af689fb9c",
+  "encoding": "UTF-8",
+  "network": false,
+  "source": "approved existing REST acceptance service, httpbin /anything",
+  "csv": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      "limit",
+      "skip",
+      "url"
+    ],
+    "types": [
+      "string",
+      "string",
+      "string"
+    ]
+  }
+}
