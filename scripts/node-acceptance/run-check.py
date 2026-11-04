@@ -89,15 +89,15 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
-    if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty']:
-        variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty'}[name]
+    if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none']:
+        variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty', 'row-filter-none': 'none'}[name]
         node = REPO / 'docs/node-development/nodes/row-filter'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-variable-' + variant + '.md'),
                     data=node / 'fixtures', base=None,
                     input_files=['variables-empty.csv' if variant == 'empty' else 'variables.csv'],
                     export_count=2 if variant == 'empty' else 4,
-                    expected_name='expected.json' if variant == 'mixed' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
-                    filter_initial=None if variant == 'empty' else 'expected-' + variant + '-initial.json')
+                    expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
+                    filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'

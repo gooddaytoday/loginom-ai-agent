@@ -86,5 +86,40 @@
         }
       ]
     }
-  ]
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "limit",
+            "type": "integer",
+            "value": 100
+          },
+          {
+            "name": "codes",
+            "type": "string",
+            "value": "C"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
 }

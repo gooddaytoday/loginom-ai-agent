@@ -7,7 +7,7 @@ test('row-filter scenarios use approved tasks, exact fixtures and stock typed co
  const code=`import importlib.util,json
 s=importlib.util.spec_from_file_location('run_check','scripts/node-acceptance/run-check.py')
 m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-print(json.dumps([{k:str(v) if hasattr(v,'__fspath__') else v for k,v in m.scenario(n).items()} for n in ['row-filter-variables','row-filter-list','row-filter-scalar','row-filter-empty']]))`;
+print(json.dumps([{k:str(v) if hasattr(v,'__fspath__') else v for k,v in m.scenario(n).items()} for n in ['row-filter-variables','row-filter-list','row-filter-scalar','row-filter-empty','row-filter-none']]))`;
  const specs=JSON.parse(execFileSync('python3',['-c',code],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'}));
  for(const spec of specs){
   assert.match(spec.prompt,/row-filter\/acceptance\/task-variable-/);

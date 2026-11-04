@@ -2686,7 +2686,7 @@ function readRenderedInputMapping(observation) {
               if(picker?.pickerField===c&&Array.isArray(options)&&(context.field!=='Name'||c.getStore()===grid.Controller.FColumnInfoStore))for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]) {
                 const r=options.find(r=>String(r.internalId)===e.getAttribute('data-recordid'));
                 if(r){
-                  const variable=Object.values(r.data).find(v=>v&&typeof v==='object'&&Number.isInteger(v.Index)&&typeof v.DisplayName==='string'&&Number.isInteger(v.DataType));
+                  const variable=getTid(c.el?.dom)?.endsWith(';VariableControl')?r.get?.(r.getFields?.()[2]?.getName?.()):null;
                   const inventory=grid.Controller.FVariablesData?.FVariables;
                   if(getTid(c.el?.dom)?.endsWith(';VariableControl')&&Array.isArray(inventory)&&inventory.some(v=>v.Index===variable?.Index&&v.DisplayName===variable.DisplayName&&v.DataType===variable.DataType))
                     filterCells.set(refOf(e),{...metadata,part:'variable_option',variable_name:variable.DisplayName,variable_index:variable.Index});
