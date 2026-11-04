@@ -4,7 +4,8 @@
   "license": "MIT",
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "typecheck:update-feed": "tsgo --noEmit -p tsconfig.update-feed.json"
   },
   "dependencies": {
     "@zip.js/zip.js": "2.7.62",
