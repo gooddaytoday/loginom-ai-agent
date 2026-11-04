@@ -41,11 +41,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const ownGroupingGraphMask=e=>{
    const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    const nodes=model?.FDiagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
-   return input&&model instanceof app.ModelForm&&card.Controller.Node?.data?.node===prepared.nodeTargetWorkflowNode
+   const user=variables&&!input&&task.port===4&&prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode;
+   return (input||user)&&model instanceof app.ModelForm&&card.Controller.Node?.data?.node===prepared.nodeTargetWorkflowNode
     &&roots.length===1&&roots[0]===e&&e.getAttribute('data-tid')===b.workflow_ref.prefix+';ModelForm'&&model.FView?.el?.dom===e
     &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
     &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
-    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls)&&nodes[0].FLocked===false
+    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FLocked===false
+    &&(user?nodes[0].FIconCls==='bg-vendor-icon-modelvariables':['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls))
     &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
       &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
       &&(r.port.FPortIndex===undefined||r.port.FPortIndex===r.nativeIndex));
@@ -125,7 +127,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    }catch{}
    fail('Port opening blocked'+detail);
   }
-  // A completed Grouping/rename can still leave its native graph busy. Wait
+  // Grouping/rename or user-variable Done can leave its native graph busy. Wait
   // for this exact surface to settle; never issue a port gesture through it.
   if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy'};
   if(mode==='begin') {
