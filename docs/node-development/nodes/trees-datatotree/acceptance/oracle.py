@@ -122,7 +122,7 @@ def expectation(scenario):
     else:
         tree['schema_node_count'] = 8
         tree['labels'] = 'label_any; technical names and types exact'
-    return dict(proposal='LAB-770; blocked pending approval of shared UI and scoped JSON comparison; no run PASS',
+    return dict(proposal='LAB-770 approved criteria; stage 1 separately assigned; no run PASS',
                 package_path='{{PACKAGE_PATH}}', nodes=nodes,
                 outputs=[dict(output_node_type='trees.to_json', output_node_label=output_label,
                               output_port=0, ordered=True, column_order='exact',

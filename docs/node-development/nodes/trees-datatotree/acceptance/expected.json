@@ -1,5 +1,5 @@
 {
-  "proposal": "LAB-770; blocked pending approval of shared UI and scoped JSON comparison; no run PASS",
+  "proposal": "LAB-770 approved criteria; stage 1 separately assigned; no run PASS",
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {
