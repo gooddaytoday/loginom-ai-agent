@@ -15,6 +15,8 @@
 
 - Build standalone native entry with `bun script/build.ts --standalone --single --skip-install` using the project-pinned Bun. Output is isolated in `dist-standalone`; this is not the complete Loginom resource archive. Model snapshot is embedded from Product pins.
 
+- Standalone update notices use only the build-time `LOGINOM_AI_AGENT_UPDATE_FEED`, never upstream feeds. Empty means no checks. Feed and download URLs must use HTTPS. The notification runs alongside the command with a 2.5 s timeout and a daily attempt stamp in `data/update-notifier.json`; command completion cancels it. It writes one line to terminal stderr only, honors CI and `LOGINOM_AI_AGENT_NO_UPDATE_NOTIFIER=1`, and never installs a binary. `config/updates.json` in the CLI profile may select `{"channel":"stable"}` or `{"channel":"unstable"}` (default stable). The machine `policy.json` overrides this channel and disables notices with `{"updates":"off"}`: `/etc/loginom-ai-agent/` on Linux, `%ProgramData%\\Loginom AI Agent\\` on Windows, `/Library/Application Support/Loginom AI Agent/` on macOS. The shared `@loginom-ai-agent/product/update-signature` module owns the keys and verifies the exact `cli.json` bytes before any notice; malformed or unavailable metadata stays silent. Source tests do not establish installed/native acceptance.
+
 ## Database
 
 - **Schema**: Drizzle schema lives in `packages/core/src/**/*.sql.ts`.
