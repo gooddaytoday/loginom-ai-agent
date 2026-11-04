@@ -11,6 +11,8 @@ export function createSequentialNodeSupport(config,{type,validate,parameterSchem
  type,mode:'sequential',modes:['sequential','random','stratified','biased'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
  configurationObservation:{condition:'sequential settings',readSampling:true,ready:s=>['sampling','data_partition'].includes(s.wizard?.stage)&&s.node_sampling?.verified===true},
  configure:configureSampling,
+ // Reading biased categories executes inputs while the wizard is open.
+ executionBaselineAfterConfigure:request=>request.mode==='biased',
  configureAllOutputs:configureSamplingOutputs,
  readOutputs:readSamplingOutputs,
 });}
