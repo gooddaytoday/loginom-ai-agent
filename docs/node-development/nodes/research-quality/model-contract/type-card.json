@@ -1,0 +1,30 @@
+{
+  "type": "research.quality",
+  "title": "Качество данных",
+  "palette_group": "Исследование",
+  "icon_class": "bg-vendor-icon-quality",
+  "tabular_inputs": 1,
+  "tabular_outputs": 5,
+  "additional_tabular_inputs": false,
+  "modes": ["profile"],
+  "semantics": "Profile every input field using the observed Loginom 7.4.2 native Quality defaults. Integer/real continuous fields and discrete strings only in this proposal. Read ALL five outputs from one execution: 0 OutData, 1 OutDataOut, 2 OutDataExtr, 3 OutDataNull, 4 SummaryTable. In the observed default configuration, 0 and 3 preserve the entire input and 1/2 are empty even when summary Out/Extr counts are positive. Port captions do not define row filters. Summary has one row per input field in source order: N is its one-based ordinal, DisplayName is its label, DataType/DataKind are native labels, Null/Out/Extr are per-field counts, Avg excludes NULL, Median is the upper middle observation, and Moda is histogram-based for continuous numbers and frequency-based for discrete strings. Empty string is a value. Numeric Moda and string Moda share a variant column. Never claim exact variant values from ordinary formatted Table text. No dedicated algorithm wizard exists; five output mapping pages and Done are observed. Native Train is available; the same-data Train/Execute trial did not change the first output. Saved-model apply is not an admitted mode. No data correction or row removal is promised by profile.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "proposal",
+  "configuration_handler": "quality-v1-proposal",
+  "configuration_status": "proposal_pending_approval",
+  "platform_availability": "requires_live_preflight",
+  "candidate_node_apply_available": false,
+  "candidate_modes": ["profile"],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false,
+    "description": "Must be {} in profile mode. The native node has no dedicated parameter page. Hidden MaxNullsPercent and per-field correction actions are not writable parameters in this proposal. Use ordinary input/output mappings only within the approved default scope; unsupported types or non-default configurations must refuse before mutation. Existing parameters:{} preserves native settings. No numeric magic enums, thresholds, model or imputation options are accepted."
+  },
+  "limitations": [
+    "Proposal only: no runtime handler is installed by this documentation.",
+    "All five ports and the variant mode metric must pass independent acceptance before availability is advertised.",
+    "General reader recognition for the five Quality mapping pages is approved for stage 1; binning behavior must remain unchanged.",
+    "Port admission and exact variant read limitations are recorded separately in discovery.md."
+  ]
+}

@@ -1,4 +1,4 @@
-# Факторный анализ
+# Факторный анализ (`research.factor_analysis`)
 
 `research.factor_analysis`, mode `pca_fixed`: метод главных компонент,
 заданное число факторов, `rotation:"none"`. По умолчанию native включает
