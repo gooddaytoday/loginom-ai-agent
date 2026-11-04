@@ -57,7 +57,9 @@ class LgdTests(unittest.TestCase):
                            'error': {'message': 'Контрольная сумма блока не совпадает'}}
                 def phase(name, command, folder, **kwargs):
                     events = [{'type': 'tool_use', 'sessionID': 'session', 'part': {'tool': 'loginom_dock_node_apply', 'state': {
-                        'status': 'completed', 'input': {'target': {'type': 'imports.lgd'}}, 'output': json.dumps(failure)}}},
+                        'status': 'completed', 'input': {'target': {'type': 'imports.lgd'}}, 'output': json.dumps({'state': 'running'})}}},
+                        {'type': 'tool_use', 'sessionID': 'session', 'part': {'tool': 'loginom_dock_node_wait', 'state': {
+                            'status': 'error', 'error': json.dumps(failure)}}},
                         {'type': 'tool_use', 'sessionID': 'session', 'part': {'state': {'status': 'completed', 'output': json.dumps({
                             'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}},
                         {'type': 'text', 'sessionID': 'session', 'part': {'text': failure['error']['message']}}]

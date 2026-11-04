@@ -1021,7 +1021,7 @@ class Runner:
                 part = event.get('part', {})
                 if event.get('type') == 'tool_use' and part.get('tool') == 'loginom_dock_node_apply':
                     assert part.get('state', {}).get('input', {}).get('target', {}).get('type') == 'imports.lgd', 'LGD_CORRUPT_SUBSTITUTE_NODE'
-            errors = []
+            errors, refusals = [], []
             for _, event in events:
                 part = event.get('part', {})
                 state = part.get('state', {})
@@ -1035,7 +1035,9 @@ class Runner:
                         if value.get('status') == 'SUCCEEDED' and value.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import':
                             raise AssertionError('LGD_CORRUPT_SUCCESS_FORBIDDEN')
                         error = value.get('error', {})
-                        if isinstance(error, dict): errors.append(error.get('message', ''))
+                        if isinstance(error, dict):
+                            errors.append(error.get('message', ''))
+                            if value.get('status') == 'FAILED': refusals.append(value)
                         pending.extend(value.values())
                     elif isinstance(value, list): pending.extend(value)
             pattern = r'контрольн[^\n]*сумм|checksum'
@@ -1044,7 +1046,7 @@ class Runner:
                        and o.get('execution', {}).get('status') == 'not_requested'
                        and o.get('output', {}).get('ports') == []
                        and re.search(pattern, o.get('error', {}).get('message', ''), re.I)
-                       for _, o in replies), 'LGD_CHECKSUM_REFUSAL_UNSETTLED'
+                       for o in refusals), 'LGD_CHECKSUM_REFUSAL_UNSETTLED'
             answer = '\n'.join(event.get('part', {}).get('text', '') for _, event in events if event.get('type') == 'text')
             assert re.search(pattern, answer, re.I), 'LGD_CHECKSUM_REFUSAL_NOT_REPORTED'
         if execution_error:
