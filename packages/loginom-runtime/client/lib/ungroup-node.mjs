@@ -30,7 +30,9 @@ export async function preflightUngroup(options,ctx,config){
   }
  }
  try{
-  resolveUngroupFields(request.parameters.ungroup,schemas);
+  // Preview proves names/types, while complete native port mappings below
+  // retain the strict data_kind check before any input mapping commit.
+  resolveUngroupFields(request.parameters.ungroup,schemas,{requireKinds:request.target.kind==='existing'});
   const fields=ungroupOutputFields({input_fields:schemas,ungroup:request.parameters.ungroup});
   need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'generated names conflict; rename inputs explicitly');
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
