@@ -1,0 +1,7 @@
+Code,Zone,Name
+1,A,north
+1,B,south
+2,A,east
+?,A,null-code
+1,?,null-zone
+1,"",empty-zone
