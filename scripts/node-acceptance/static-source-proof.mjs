@@ -136,7 +136,29 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
   while(cursor){need(++pages<=32,'storage page bound');const n=await runtime.observe({cursor});need(n.status==='SUCCEEDED'&&n.output.observation_id===s.observation_id,'storage observation changed');for(const k of ['elements','dialogs','masks'])s.ui[k].push(...n.output.ui[k]);cursor=n.output.page?.next_cursor;}
   return s;
  };
- const act=async(s,e,verb='click',extra={})=>{const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');};
+ const act=async(s,e,verb='click',extra={})=>{
+  const ownFolder=verb==='double_click'&&s.file_storage?.directory==='/'&&e.label===account
+   &&e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+account&&e.storage_entry?.kind==='folder';
+  for(let attempt=0;attempt<2;attempt++){
+   const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});
+   if(attempt===0&&ownFolder&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
+    &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'){
+    // Only the assigned folder can be retried, after rediscovering its row.
+    // A fresh epoch is expected; a different window, directory or dialog is not.
+    const found=await read({scope:'roots',storageName:account});
+    const fresh=await detail(found,one(found.ui.elements.filter(x=>x.tid===e.tid),'storage navigation uncertain'));
+    const matches=fresh.ui.elements.filter(x=>x.tid===e.tid&&x.label===account
+     &&x.storage_entry?.kind==='folder'&&x.allowed_actions.includes(verb)&&x.interaction?.state==='point_observed');
+    need(fresh.dom_epoch.document===s.dom_epoch.document&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(s.workflow_ref)
+     &&fresh.file_storage?.status==='observed'&&fresh.file_storage.directory==='/'
+     &&JSON.stringify(fresh.package_identity)===JSON.stringify(s.package_identity)
+     &&[s,fresh].every(x=>x.authenticated&&x.origin===s.origin&&x.loginom_build===s.loginom_build&&!x.ui.dialogs.length&&!x.ui.masks.length)
+     &&matches.length===1,'storage navigation uncertain');
+    s=fresh;e=matches[0];continue;
+   }
+   need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');return;
+  }
+ };
  const ready=async(fn,predicate)=>{const deadline=Date.now()+15000;for(;;){const s=await fn();if(s&&predicate(s))return s;need(Date.now()<deadline,'storage readiness timeout');await new Promise(r=>setTimeout(r,100));}};
  const roots=async()=>{
   // Storage navigation may finish while observation pages are being read.
