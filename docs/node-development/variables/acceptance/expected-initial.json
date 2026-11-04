@@ -1,0 +1,42 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "rest-variables-initial.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "limit",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "skip",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "limit": "3",
+          "skip": "2",
+          "url": "https://httpbin.org/anything?limit=3&skip=2"
+        }
+      ]
+    }
+  ]
+}
