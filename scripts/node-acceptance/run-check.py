@@ -89,6 +89,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
+        kind = name.removeprefix('clustering-scale-')
+        return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
+                    input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
     if name == 'clustering-normalized':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -158,6 +163,13 @@ def scenario(name, case_root=None, *, cases=None):
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
 
+    if name in ['coarse-classes-train', 'coarse-classes-apply']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        applying = name == 'coarse-classes-apply'
+        return dict(source=src, prompt=src / ('task-apply.md' if applying else 'task.md'),
+                    data=src / 'data', base=None, export_count=3,
+                    input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
+                    expected_name='expected-apply.json' if applying else 'expected.json')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
@@ -212,6 +224,15 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
+                'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',
+                'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
+        acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        variant = name.removeprefix('logreg-')
+        source = acceptance / 'selection'
+        if variant in ['stepwise-strict', 'stepwise-permissive']: source = source / variant
+        return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
+                    data=source / 'data' if variant == 'stepwise-strict' else acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']:
         acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         variant = name.removeprefix('logreg-')
@@ -1136,7 +1157,7 @@ class Runner:
                 sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))
                 continue
             if (re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression'
-                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']):
+                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)

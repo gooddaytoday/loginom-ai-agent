@@ -74,3 +74,7 @@
 ## Квантование числового поля
 
 [preprocessing.binning](nodes/preprocessing.binning.md)
+
+## Конечные классы
+
+[preprocessing.coarse_classes](nodes/preprocessing.coarse_classes.md)

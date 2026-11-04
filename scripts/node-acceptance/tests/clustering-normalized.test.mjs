@@ -56,3 +56,28 @@ test('registered scenario exposes only user task and data to the model',()=>{
  const c=JSON.parse(result.stdout);assert.match(c.prompt,/normalized\/task.md$/);assert.match(c.data,/normalized\/data$/);
  assert.equal(c.export_count,'2');assert.equal(c.base,'None');
 });
+
+for(const kind of ['minus-one-one','zero-one','absolute'])test('scaling oracle and catalog: '+kind,()=>{
+ const source=new URL('../scaling/',root),file=new URL('expected-'+kind+'.json',source);
+ const want=JSON.parse(readFileSync(file,'utf8'));
+ const oracle=spawnSync('python3',[new URL('oracle.py',source).pathname,kind],{encoding:'utf8'});
+ assert.equal(oracle.status,0,oracle.stderr);assert.deepEqual(JSON.parse(oracle.stdout),want);
+ const tables=want.outputs.map(o=>({type:'datamining.clustering',output_port:o.output_port,data:{
+  schema:o.columns.map(({name,type})=>({name,type})),row_count:o.rows.length,sample_complete:true,precision:{numbers_verified:true},
+  sample:o.rows.map(row=>o.columns.map(c=>({type:c.type,is_null:false,value:c.type==='integer'?String(row[c.name]):row[c.name]})))}}));
+ assert.equal(checkClusteringRound(want,tables).length,2);
+ const receipt={status:'SUCCEEDED',cleanup_complete:true,node:{node_id:'one'},execution:{status:'completed',execution_id:'scaled'},
+  configuration:{readback:{kind:'clustering',seed:42,clusters:3,features:['X','Y'],normalization:want.clustering_normalized.normalization}},
+  output:{ports:tables.map(r=>({...r.data,port:r.output_port,fresh:true,freshness_basis:'completed_execution_port_source',execution_id:'scaled'}))}};
+ assert.equal(checkClusteringMain(want,[receipt]).execution_ids.length,1);
+ for(const change of [r=>r.configuration.readback.normalization='standardize',r=>r.output.ports[0].sample[0][1].value=0,
+  r=>r.output.ports[1].sample[0][1].value+=0.001,r=>r.output.ports[0].schema.reverse(),
+  r=>r.output.ports[0].sample[0][4].type='real',r=>r.output.ports[0].sample[0][0].value=99]){
+  const wrong=structuredClone(receipt);change(wrong);assert.throws(()=>checkClusteringMain(want,[wrong]),/CLUSTERING_NORMALIZED/);
+ }
+ const catalog=spawnSync('python3',['-B','-c',"import importlib.util,json; s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py'); r=importlib.util.module_from_spec(s); s.loader.exec_module(r); c=r.scenario('clustering-scale-"+kind+"'); print(json.dumps({k:str(v) for k,v in c.items()}))"],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
+ assert.equal(catalog.status,0,catalog.stderr);
+ const config=JSON.parse(catalog.stdout);
+ assert.equal(config.expected_name,'expected-'+kind+'.json');assert.match(config.prompt,new RegExp('task-'+kind+'\\.md$'));
+ assert.equal(config.input_files,"['scaling.csv']");assert.equal(config.export_count,'2');
+});

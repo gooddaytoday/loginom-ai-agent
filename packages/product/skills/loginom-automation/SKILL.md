@@ -144,6 +144,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
+| Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
 | Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
@@ -155,7 +156,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
 | REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
 | Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply | [читать](references/nodes/datamining.lin_regression.md) |
-| Кластеризация k-means | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
+| Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
 | Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
 | Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
 | Заполнение NULL | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |

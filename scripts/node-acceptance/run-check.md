@@ -426,3 +426,16 @@ abs=1e-8 только для real, метки через label_any.
 Соединение двух таблиц по позиции; утверждённые task*.md и независимые expected
 из `transform-coluniondata/acceptance`. Модель получает только задание и выбранные
 CSV. Полный CSV, точные типы/значения/порядок, оба Code, Save/cold/cleanup.
+
+`clustering-scale-minus-one-one`, `clustering-scale-zero-one`, `clustering-scale-absolute`:
+k-means с нативной нормировкой [-1;1], [0;1] и max-abs соответственно.
+Только task и scaling.csv передаются модели. Stdlib oracle вычисляет
+преобразования и Lloyd k-means независимо; номера кластеров свободны,
+назначения, оба порта, центры в исходных единицах, Distance в нормированных,
+порядок полей, типы, CSV/Save/cold и сохранённый NormType проверяются.
+Допуски real abs=1e-8/rel=1e-10. Каждый метод меняет raw-разбиение.
+
+`coarse-classes-train` и `coarse-classes-apply`: один дискретный Segment,
+бинарная Target, автоматические конечные классы. Приёмочный комплект —
+`preprocessing-coarseclasses/acceptance`; три CSV в порядке портов 0/1/2,
+Save/cold/cleanup. Apply заменяет источник того же импорта, сохраняя обучение.
