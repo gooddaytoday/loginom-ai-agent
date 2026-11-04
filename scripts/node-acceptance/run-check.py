@@ -203,6 +203,15 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
+                'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',
+                'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
+        acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
+        variant = name.removeprefix('logreg-')
+        source = acceptance / 'selection'
+        if variant in ['stepwise-strict', 'stepwise-permissive']: source = source / variant
+        return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
+                    data=source / 'data' if variant == 'stepwise-strict' else acceptance / 'selection/data', base=None, expected_name='expected.json')
     if name in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']:
         acceptance = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         variant = name.removeprefix('logreg-')
@@ -1127,7 +1136,7 @@ class Runner:
                 sampling_csvs.append(list(csv.reader(io.StringIO(actual.read_text(encoding='utf-8-sig')), delimiter=delimiter)))
                 continue
             if (re.fullmatch(r'n(?:1[3-9]|20)', src.name) or src.parent.name == 'datamining-logregression'
-                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise']):
+                    or case in ['logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive']):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
                 # The CSV oracle owns its documented value/order freedoms.
                 delimiter = csv_delimiter(actual)
