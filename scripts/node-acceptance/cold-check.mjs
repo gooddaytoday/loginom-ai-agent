@@ -1,3 +1,4 @@
+import {inspectSavedLgd} from './lgd-cold.mjs'
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
 import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
@@ -175,6 +176,7 @@ page = context.pages()[0]
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');

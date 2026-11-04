@@ -1,5 +1,17 @@
 Run live acceptance without repeatedly reading live logs:
 
+`lgd-import`, `lgd-properties`, `lgd-corrupt`, `lgd-export` используют
+утверждённые задания LGD и бинарные fixtures этапа 0. Ожидания `expected-*-run.json`
+переносят независимые CSV/manifest-значения в штатную форму полного CSV/cold reader.
+Модели передаются только исходный LGD либо typed.csv + schema.json.
+Положительные случаи проверяют все значения, типы, порядок, Save, cold и cleanup;
+дополнительный LGD-аудит читает сохранённый checksum, LZ4 и виды полей без настройки.
+Экспорт проверяет собственный файловый результат без табличного output, непустой
+BGDATA/LZ4 файл и новый обратный импорт. Независимый BGDATA-decoder по решению
+владельца не применяется. Corrupt требует исходную ошибку checksum, сообщение
+пользователю и Save без успешного импорта; холодное выполнение отрицательного
+случая не запускается. Stock-проверки остальных сценариев сохранены.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty

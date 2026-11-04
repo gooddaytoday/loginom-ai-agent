@@ -675,7 +675,7 @@ export function makeServerSourceDownloadCode(options) {
   const name=options.artifact?.name;
   if(!b||!Number.isSafeInteger(b.bytes)||b.bytes<0||typeof b.mtime!=='string'||!b.mtime
     ||!Number.isSafeInteger(options.deadline_at)||options.deadline_at<=Date.now()
-    ||!name||!/\.(csv|tsv|txt|xlsx)$/i.test(name)||b.destination!==b.directory+'/'+name
+    ||!name||!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(name)||b.destination!==b.directory+'/'+name
     ||s.file_storage?.directory!==b.directory||m.length!==1||m[0].label!==name
     ||m[0].tid!==s.workflow_ref?.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)
     ||m[0].storage_entry?.bytes!==b.bytes||m[0].storage_entry?.mtime!==b.mtime
@@ -718,18 +718,18 @@ export function makeNativeOutputDownloadCode(options){
 
 // Trusted adapter only: every public reference must additionally be checked
 // against createObservationPages.assertIssued before this code is constructed.
-// This candidate covers CSV/TSV/TXT/XLSX double-click downloads only; package files require
+// This candidate covers CSV/TSV/TXT/XLSX/LGD double-click downloads only; package files require
 // an explicit download command instead of opening their scenario.
 export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xlsx|lgd)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
-    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLSX file');
+    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLSX/LGD file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   // Upload may have observed the folder tree. Verification owns the separately
-  // issued exact CSV/TSV/TXT/XLSX ref, so its narrow reads must follow that file, not the
+  // issued exact CSV/TSV/TXT/XLSX/LGD ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
@@ -2758,7 +2758,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
         const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
-        if(!/\.(csv|tsv|txt|xlsx)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX');
+        if(!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
         const id=request.operation_id,signature='storage.source:'+path;
         if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
         if(auxiliary.has(id)){
@@ -3488,7 +3488,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally {running=false;}
     },
     preflightDeliveredArtifact(artifact,snapshot) {
-      if(!/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLSX files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(!/\.(?:csv|tsv|txt|xlsx|lgd)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLSX/LGD files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
