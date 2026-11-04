@@ -218,6 +218,11 @@ function matchesCell(cell,column,want,coarseBound=false){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
    ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value)return false;
   value=Number(cell.decimal);
+ }else if(cell.type==='real'&&cell.precision==='17_significant_digits'
+  &&cell.representation===undefined&&cell.value===undefined){
+  // Compact user-v1 receipts retain the exact decimal instead of binary64/value.
+  if(typeof cell.decimal!=='string'||!cell.decimal.trim()||!Number.isFinite(Number(cell.decimal)))return false;
+  value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof want!=='number'||!Number.isFinite(want))return false;
@@ -243,7 +248,7 @@ export function alignFactorSigns(actual,outputs,rule){
  for(const name of rule.columns){
   const index=data.schema?.findIndex(c=>c.name===name),row=anchor.rows.findIndex(r=>typeof r[name]==='number'&&r[name]!==0);
   need(index>=0&&row>=0,'FACTOR_SIGN_ANCHOR_INVALID');
-  const cell=data.sample?.[row]?.[index],value=Number(cell?.value);
+  const cell=data.sample?.[row]?.[index],value=Number(cell?.decimal??cell?.value);
   need(cell?.type==='real'&&cell.is_null===false&&Number.isFinite(value)&&value!==0,'FACTOR_SIGN_ANCHOR_INVALID');
   signs[name]=Math.sign(value)===Math.sign(anchor.rows[row][name])?1:-1;
  }
