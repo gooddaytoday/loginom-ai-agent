@@ -19,7 +19,14 @@ import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
-import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, startSession, write as writeLog } from "./logging"
+import {
+  exportDebugLogs,
+  initCrashReporter,
+  initLogging,
+  startNetLog,
+  startSession,
+  write as writeLog,
+} from "./logging"
 import { createMenu } from "./menu"
 import {
   finishFirstLaunchOnboarding,
@@ -174,7 +181,10 @@ const main = Effect.gen(function* () {
     stopping ??= (async () => {
       try {
         // Startup can still be admitting the backend when Cmd+Q arrives.
-        await serverStarting?.then((started) => started.listener.stop(), () => undefined)
+        await serverStarting?.then(
+          (started) => started.listener.stop(),
+          () => undefined,
+        )
         await killSidecar()
       } finally {
         wslServers.stopAll()
@@ -246,11 +256,19 @@ const main = Effect.gen(function* () {
     emitDeepLinks([url])
   })
 
+  let updater: ReturnType<typeof setupAutoUpdater> | undefined
   app.on(
     "before-quit",
     createQuitHandler({
       markQuitting: setAppQuitting,
-      stop: stopSidecars,
+      stop: async () => {
+        // Inspect Host work before shutdown cancels it. A busy/unknown Host skips
+        // this close; autoInstallOnAppQuit stays false, including after download.
+        // Restart/signal paths may already have stopped the Host. Its cleared work
+        // state must never be treated as evidence that this close began idle.
+        if (!stopping && updater?.getState().status === "ready") await updater.install()
+        await stopSidecars()
+      },
       quit: () => app.quit(),
       onError: (error) => logger.error("application shutdown failed", error),
     }),
@@ -302,13 +320,30 @@ const main = Effect.gen(function* () {
   app.setAsDefaultProtocolClient(Product.scheme)
   registerRendererProtocol()
   setDockIcon()
-  const updater = setupAutoUpdater(stopSidecars)
+  updater = setupAutoUpdater({
+    stop: stopSidecars,
+    workState: async () => {
+      const host = await loginomStarting
+      if (!host) throw Error("LOGINOM_HOST_UNAVAILABLE")
+      return host.updateWorkState()
+    },
+    stopAdmission: () => {
+      void loginomStarting?.then((host) => host.beginClose())
+    },
+    proxy: async () => {
+      const result = await systemProxy?.result
+      return { ...process.env, ...(systemProxyEnabled() ? result?.environment : undefined) }
+    },
+    systemProxyEnabled,
+  })
+  const desktopUpdater = updater
   const menuDeps = {
     trigger: (id: string) => {
       const win = getLastFocusedWindow()
       if (win) sendMenuCommand(win, id)
     },
-    checkForUpdates: () => void showUpdaterDialog(updater, true),
+    checkForUpdates: () => void showUpdaterDialog(desktopUpdater, true),
+    updaterEnabled: () => desktopUpdater.getState().status !== "disabled",
     relaunch,
   }
   if (stopping) return
@@ -338,8 +373,8 @@ const main = Effect.gen(function* () {
     setDisplayBackend: async () => undefined,
     checkAppExists: (appName) => checkAppExists(appName),
     resolveAppPath: async (appName) => resolveAppPath(appName),
-    updater,
-    showUpdater: () => showUpdaterDialog(updater, true),
+    updater: desktopUpdater,
+    showUpdater: () => showUpdaterDialog(desktopUpdater, true),
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
@@ -349,10 +384,14 @@ const main = Effect.gen(function* () {
     systemProxyEnabled,
   })
   registerWslIpcHandlers(wslServers)
-  void updater.start()
-  const updateTimer = setInterval(() => void updater.check(), 10 * 60 * 1000)
+  const updateStartupTimer = setTimeout(() => void desktopUpdater.start(), 45_000)
+  updateStartupTimer.unref()
+  const updateTimer = setInterval(() => void desktopUpdater.check(), 4 * 60 * 60 * 1000)
   updateTimer.unref()
-  app.once("will-quit", () => clearInterval(updateTimer))
+  app.once("will-quit", () => {
+    clearTimeout(updateStartupTimer)
+    clearInterval(updateTimer)
+  })
   yield* Effect.promise(() => startNetLog()).pipe(
     Effect.catch((error) =>
       Effect.sync(() => {

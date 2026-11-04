@@ -1,4 +1,26 @@
 export const dict = {
+  "desktop.updater.verificationFailed":
+    "Не удалось проверить обновление. Загрузка отменена. Проверьте фид и подпись в журнале.",
+  "desktop.updater.deferred":
+    "Агент работает или есть незавершённые операции. Обновление отложено до следующего закрытия приложения.",
+  "desktop.updater.available": "Доступна версия {{version}}.",
+  "desktop.updater.download": "Скачать",
+  "desktop.updater.onClose": "Версия {{version}} загружена и будет установлена при закрытии приложения.",
+  "desktop.updater.closeAndUpdate": "Закрыть и обновить",
+  "settings.updates.channel": "Обновления",
+  "settings.updates.stable": "Только стабильные (по умолчанию)",
+  "settings.updates.unstable": "Также нестабильные",
+  "settings.updates.managed": "Настройки обновлений заданы администратором.",
+  "settings.updates.disabled": "Обновления выключены.",
+  "settings.updates.unsupported": "Эта версия больше не поддерживается сервером — обновитесь",
+  "settings.updates.available": "Доступна версия {{version}}",
+  "settings.updates.onClose":
+    "Обновление установится при закрытии приложения. При активной работе установка откладывается до следующего закрытия.",
+  "settings.updates.download": "Скачать",
+  "settings.updates.closeAndUpdate": "Закрыть и обновить",
+  "settings.updates.verificationFailed":
+    "Не удалось проверить обновление или связаться с фидом. Загрузка отменена. Подробности — в журнале.",
+
   "prompt.attachment.missingPath":
     "У вложения нет пути на диске. Сохраните файл и приложите его через выбор файла либо укажите путь.",
   "loginom.saveClose": "Сохранить и закрыть",

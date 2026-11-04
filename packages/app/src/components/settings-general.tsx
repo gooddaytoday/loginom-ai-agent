@@ -691,6 +691,40 @@ export const SettingsGeneral: Component = () => {
           </div>
         </SettingsRow>
 
+        <Show when={updater.state()?.settings}>
+          <SettingsRow
+            title={language.t("settings.updates.channel")}
+            description={updater.state()?.settings?.managed ? language.t("settings.updates.managed") : undefined}
+          >
+            <select
+              data-tid="update-channel"
+              class="rounded px-2 py-1 bg-background-base text-text-base"
+              aria-label={language.t("settings.updates.channel")}
+              disabled={updater.state()?.settings?.channelLocked}
+              value={updater.state()?.settings?.channel ?? "stable"}
+              onChange={(event) => void updater.setChannel(event.currentTarget.value as "stable" | "unstable")}
+            >
+              <option value="stable">{language.t("settings.updates.stable")}</option>
+              <option value="unstable">{language.t("settings.updates.unstable")}</option>
+            </select>
+          </SettingsRow>
+          <Show when={updater.state()?.settings?.enabled === false}>
+            <p data-tid="update-disabled">{language.t("settings.updates.disabled")}</p>
+          </Show>
+        </Show>
+        <Show when={updater.state()?.unsupported}>
+          <p role="alert" data-tid="update-unsupported">
+            {language.t("settings.updates.unsupported")}
+          </p>
+        </Show>
+        <Show when={updater.state()?.status === "ready"}>
+          <p data-tid="update-on-close">{language.t("settings.updates.onClose")}</p>
+        </Show>
+        <Show when={updater.state()?.status === "error"}>
+          <p role="alert" data-tid="update-error">
+            {language.t("settings.updates.verificationFailed")}
+          </p>
+        </Show>
         <SettingsRow
           title={language.t("settings.updates.row.check.title")}
           description={language.t("settings.updates.row.check.description")}

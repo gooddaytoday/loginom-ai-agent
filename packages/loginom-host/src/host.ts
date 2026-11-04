@@ -214,6 +214,35 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    async updateWorkState() {
+      if (lost.size || stale.size || startupCleanup.failed || shutdown.failed)
+        throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
+      const states = await Promise.all(
+        [...generations.values()].flatMap((generation) =>
+          [...generation.children.values()].map(async (child) => {
+            const result = await (await child).request("work", undefined, 5000)
+            if (
+              !result ||
+              typeof result !== "object" ||
+              !("activeWork" in result) ||
+              typeof result.activeWork !== "boolean" ||
+              !("unsettledWork" in result) ||
+              typeof result.unsettledWork !== "boolean" ||
+              !("dispatching" in result) ||
+              typeof result.dispatching !== "boolean"
+            )
+              throw Error("LOGINOM_REPLY_INVALID")
+            return result
+          }),
+        ),
+      )
+      const leases = service.updateWorkState()
+      return {
+        activeWork: leases.activeWork || states.some((state) => state.activeWork),
+        unsettledWork: leases.unsettledWork || states.some((state) => state.unsettledWork),
+        dispatching: states.some((state) => state.dispatching),
+      }
+    },
     browserRecovery: options.browserRecovery === true,
     references,
     async close() {

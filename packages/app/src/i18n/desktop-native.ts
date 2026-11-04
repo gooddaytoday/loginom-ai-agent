@@ -221,6 +221,17 @@ function locale(value: string) {
   }
 }
 
+export const DESKTOP_UPDATER_ENGLISH = {
+  "desktop.updater.verificationFailed":
+    "Update verification failed. Nothing was downloaded. Check the update feed and signature in the logs.",
+  "desktop.updater.deferred":
+    "The agent is working or has unsettled operations. The update will wait until the next application exit.",
+  "desktop.updater.available": "Version {{version}} is available.",
+  "desktop.updater.download": "Download",
+  "desktop.updater.onClose": "Version {{version}} is downloaded and will be installed when you close the application.",
+  "desktop.updater.closeAndUpdate": "Close and update",
+} as const
+
 export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "File",
@@ -319,6 +330,7 @@ export const DESKTOP_NATIVE_ENGLISH = {
 
   "desktop.picker.error.notSelected": "File was not selected by the picker",
   "desktop.picker.error.sizeLimit": "Selected attachments exceed the {{limit}} MB limit",
+  ...DESKTOP_UPDATER_ENGLISH,
 } as const
 
 export type DesktopNativeKey = keyof typeof DESKTOP_NATIVE_ENGLISH
