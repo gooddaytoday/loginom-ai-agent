@@ -1,3 +1,4 @@
+import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
@@ -20,10 +21,10 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
  */
 export function validateNodeApplyRequest(request, handlers) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
-    'mode','parameters','mappings','finish','read','budgets']);
+    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[])]);
   requireValue(id(request.operation_id) && request.contract_revision === NODE_CONTRACT_REVISION,
     'Unsupported node.apply operation ID or contract revision');
-  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs'].map(k=>[k,request[k]]));
+  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
   const installed = handlers.get(request.target.type);
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
@@ -36,13 +37,14 @@ export function validateNodeApplyRequest(request, handlers) {
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
-      && Object.keys(mapping).every(k=>['direction','port','autosync','fields','changes'].includes(k))
+      && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
-    const key = mapping.direction + ':' + mapping.port;
+    if(mapping.kind!==undefined){validateVariablePortMapping(mapping);requireValue(request.mode!==NODE_READ_MODE&&request.target.type!=='variables.user'&&request.finish!=='close','Variable mapping cannot configure a builtin, reread or cancelled draft');}
+    const key = (mapping.kind??'table')+':'+mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
-    requireValue(mapping.changes===undefined||mapping.direction==='output'&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
+    requireValue(mapping.changes===undefined||(mapping.direction==='output'||mapping.kind!==undefined)&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
     const entries=mapping.fields??mapping.changes;
     if (entries !== undefined) {
       requireValue(Array.isArray(entries) && entries.length <= 1000, 'Bounded mapping fields required');
@@ -68,7 +70,7 @@ export function validateNodeApplyRequest(request, handlers) {
       }
     }
   }
-  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
+  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[]),...(Object.hasOwn(request.read??{},'variable_ports')?['variable_ports']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
   if(request.read.coverage==='full')requireValue(request.finish==='execute'&&JSON.stringify(request.read.ports)==='[0]'
     &&(['transform.collapse_columns','transform.cross_table'].includes(request.target.type)
@@ -80,13 +82,16 @@ export function validateNodeApplyRequest(request, handlers) {
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
     && Number.isInteger(request.read.sample_rows) && request.read.sample_rows>=0 && request.read.sample_rows<=100
     && typeof request.read.require_exact_numbers==='boolean', 'Invalid output read request');
+  if(request.read.variable_ports!==undefined)requireValue(Array.isArray(request.read.variable_ports)&&request.read.variable_ports.length<=16
+    &&new Set(request.read.variable_ports).size===request.read.variable_ports.length&&request.read.variable_ports.every(p=>Number.isInteger(p)&&p>=0&&p<100)
+    &&(request.finish==='execute'||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
   requireValue(request.finish==='execute' || request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
   // A handler rejects unsupported mapping/read modes and parameters here, before
   // even the target phase can create a node. Validation must be pure.
-  handler.validate(request.parameters, request.mode, request);
+  handler.validate(request.parameters, request.mode, request.mappings.some(m=>m.kind!==undefined)?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request);
   return {graph,handler};
 }
 
@@ -128,6 +133,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
+  const builtinSnapshot=request.target.type==='variables.user'&&request.mode===NODE_READ_MODE;
   const separateOutput=handler.output_wizard==='separate';
   const javascriptConfigurationOnly=request.target.type==='programming.javascript'
     &&handler.materialize_output===true&&request.finish!=='execute';
@@ -370,6 +376,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
+          &&(!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
           &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
@@ -460,14 +467,29 @@ export async function applyNode({request, operation, handlers, drivers, record,
       if(terminal)return terminal;
       // Output reading has its own work (formats, paging, restoration). The
       // configuration limit does not cap it; the total operation deadline still does.
-      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||request.read.variable_ports?.length>0||handler.fileOutput===true,verify:value=>requireValue(
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length
+        && (request.read.variable_ports===undefined||request.read.variable_ports.length===0&&!value.variable_ports?.length||Array.isArray(value.variable_ports)&&value.variable_ports.length===request.read.variable_ports.length
+          &&value.variable_ports.every((p,i)=>p.port===request.read.variable_ports[i]&&p.kind==='variables'&&p.source==='execution'&&p.native_source==='VariablesForm'
+            &&p.execution_id===state.execution.execution_id&&p.fresh===true&&p.complete===true&&typeof p.read_id==='string'&&p.read_id.length>0
+            &&p.count===p.variables?.length&&p.count===p.completeness?.count&&p.count===p.completeness.store_count&&p.count===p.completeness.unique_ids))
         && value.ports.every((p,i)=>p.port===request.read.ports[i] && p.fresh===true)
         &&(request.read.coverage!=='full'||request.target.type!=='programming.javascript'
           ||value.status==='complete'&&value.ports.every(p=>p.sample_complete===true&&p.sample_rows===p.row_count)),
         'Output is not bound to the requested execution, ports or full JavaScript row coverage')});
+      state.output=output;
+    }
+    if(builtinSnapshot){
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:true,verify:value=>requireValue(
+        value.status==='complete'&&value.source==='snapshot'&&value.native_source==='VariablesEditValuesWizard'&&value.execution_id===null
+        &&typeof value.evidence_ref==='string'&&value.ports?.length===0&&value.variable_ports?.length===1
+        &&value.variable_ports[0].port===4&&value.variable_ports[0].source==='snapshot'&&value.variable_ports[0].native_source==='VariablesEditValuesWizard'
+        &&value.variable_ports[0].execution_id===null&&value.variable_ports[0].fresh===true&&value.variable_ports[0].complete===true
+        &&value.variable_ports[0].package_modified===false&&typeof value.variable_ports[0].read_id==='string'&&value.variable_ports[0].read_id.length>0
+        &&value.variable_ports[0].count===value.variable_ports[0].variables?.length&&value.variable_ports[0].completeness?.loaded===true
+        &&['count','store_count','unique_ids'].every(k=>value.variable_ports[0].completeness[k]===value.variable_ports[0].count),'Builtin snapshot is incomplete, modified or misidentified')});
       state.output=output;
     }
     check();
@@ -483,6 +505,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
+    if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
