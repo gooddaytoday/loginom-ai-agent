@@ -284,6 +284,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        variant = name.removeprefix('variables-datatovar').lstrip('-')
+        expected = 'expected-' + variant + '-run.json' if variant else 'expected-run.json'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'), data=src.parent / 'fixtures',
+                    input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
+                    expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
+                    variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-user':
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
@@ -1278,9 +1286,9 @@ class Runner:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'variable-events.json', evidence)
-            self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], 'variables-user',
-                src / 'expected-user-initial.json', folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': 'snapshot'})
+            self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
+                src / spec.get('variable_initial_name', 'expected-user-initial.json'), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'snapshot')})
             return session, expected, None, None
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
