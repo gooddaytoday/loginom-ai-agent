@@ -282,10 +282,11 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
-          result,
+          result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },

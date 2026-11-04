@@ -236,13 +236,13 @@ export function registerIpcHandlers(deps: Deps) {
     })
   })
 
-  ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string) => {
+  ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string, options?: { checkOnly?: boolean }) => {
     const exists = await stat(path).then(
       () => true,
       () => false,
     )
     if (!exists) return false
-    shell.showItemInFolder(path)
+    if (!options?.checkOnly) shell.showItemInFolder(path)
     return true
   })
 

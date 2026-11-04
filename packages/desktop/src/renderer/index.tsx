@@ -234,8 +234,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       }
       return window.api.openPath(path, app)
     },
-    async revealPath(path: string) {
-      return window.api.revealPath(path)
+    async revealPath(path: string, options?: { checkOnly?: boolean }) {
+      return window.api.revealPath(path, options)
     },
 
     storage,

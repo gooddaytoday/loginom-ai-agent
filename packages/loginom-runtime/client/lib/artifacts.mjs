@@ -226,6 +226,19 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
       return pending;
     },
     async resolveOutput(artifactId){const item=outputs.get(artifactId);if(!item)throw Error('Unknown session output');await item.check();return {descriptor:structuredClone(item.descriptor),buffer:await readVerified(item.path,item.descriptor,maxBytes)};},
+    // Private Desktop presentation data. Never infer a host path from a server
+    // destination, or add these paths to the model-facing MCP receipt.
+    async outputFiles(receipt) {
+      if(receipt?.state!=='settled'||receipt.status!=='SUCCEEDED'||!Array.isArray(receipt.output?.file_artifacts))return [];
+      const files=[];
+      for(const file of receipt.output.file_artifacts) {
+        const item=outputs.get(file?.artifact_id);
+        if(!item||!['destination','execution_id','sha256','bytes'].every(key=>file[key]===item.descriptor[key]))continue;
+        await item.check();
+        files.push({artifact_id:file.artifact_id,path:item.path,name:item.descriptor.name});
+      }
+      return files;
+    },
     get outputSessionId(){return sessionId;},
     // Managed private IPC only. Host has already checked its opaque reservation
     // and generation; the runtime rechecks original metadata without a copy/hash.
