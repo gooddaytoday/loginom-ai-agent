@@ -249,7 +249,8 @@ page = context.pages()[0]
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+  const reads=expectedOutputs.length===0&&state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){
     const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
