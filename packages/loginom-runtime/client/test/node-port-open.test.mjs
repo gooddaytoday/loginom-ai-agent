@@ -321,6 +321,21 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
 });
 
+test('Enrich dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.port,0);assert.equal(r.port_guid,'port');
+ const bad=fixture('input');bad.node.FIconCls='bg-vendor-icon-enrichdata';bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
+});
+
+test('Enrich third port keeps logical 2, SVG 3 and native tree 2 distinct',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.task.port=2;f.port.FPortIndex=2;f.portTree.FIndex=2;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const ports=[0,1].map(i=>{const p={FGuid:'prior-'+i,FCell:{},FPortIndex:i,data:{},parent:f.node};const dom=f.el('MF;TF;Graph;Node;Input_Data-'+i);dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:i*30,y:0,width:20,height:20});return {p,dom};});
+ f.portDom.getBoundingClientRect=()=>({x:60,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(...ports.map(x=>x.p));
+ f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?ports[0].p.FCell:x<60?ports[1].p.FCell:f.port.FCell;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
+});
+
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
 
 for(const direction of ['input','output'])for(const tid of ['ttip','ttip-1','ttip-12','ttip-other','ttip-1-menu'])for(const variant of ['hidden','delayed','persistent','foreign','changed-port','no-neutral-point','duplicate'])test(direction+' port tooltip recovery: '+tid+' '+variant,async()=>{

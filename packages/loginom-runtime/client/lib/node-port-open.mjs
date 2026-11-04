@@ -159,7 +159,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // Union's dynamic tabular inputs retain an SVG creation index that includes
    // the hidden variable socket. Their native tree indexes are tabular ordinals.
    // Rebind on every opening; the exact cell, GUID and tree owner remain required.
-   const dynamicUnion=input&&node.FIconCls==='bg-vendor-icon-uniondata';
+   const dynamicUnion=input&&['bg-vendor-icon-uniondata','bg-vendor-icon-enrichdata'].includes(node.FIconCls);
    for(const [ordinal,p] of ports.entries()){
     p.nativeIndex=dynamicUnion?ordinal:p.index;
     if(p.port.FPortIndex!==undefined&&p.port.FPortIndex!==p.nativeIndex)fail('Port native hit identity unavailable');

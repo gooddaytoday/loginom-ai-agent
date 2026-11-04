@@ -179,6 +179,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
 | Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |
 | Добавление строк таблиц | `transform.union_data` / append_all | [читать](references/nodes/transform.union_data.md) |
+| Дополнение данных | `transform.enrich_data` / left | [читать](references/nodes/transform.enrich_data.md) |
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или

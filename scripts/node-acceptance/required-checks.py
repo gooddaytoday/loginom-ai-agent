@@ -27,6 +27,7 @@ RULES = (
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
+    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
     ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),
     ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
