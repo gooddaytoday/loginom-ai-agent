@@ -338,7 +338,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       text_export_params:';ExportTextFileParamsWizard;edtFileName',
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
-      output_mapping:[';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
+      output_mapping:[...[1,2,3,4].map(port=>';DerivedDataSourceMappingEngineOutputPortWizard-'+port+';btnAddMappingColumn'),';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
       smoothing:';SmoothingWizard;grdColumnsSettings;tbl',sliding_window:';SlidingWindowWizard;grdColumns;tbl',elim_outlier:';ElimOutlierWizard;grdColumnsSettings;tbl',missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',crosstable:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
       enrich:';EnrichDataWizard;grdEnrichData;grd-1;tbl',union:';UnionDataWizard;grdUnionData;grd-1;tbl',join:';JoinDataWizard;grdSourceColumns;tbl',row_filter:';FilterDataWizard;FilterDataPanel;tbl',field_parameters:';ReformColumnsWizard;grdTargetColumns;tbl',done:';DoneWizard;edtDisplayName'};
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
@@ -869,9 +869,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const form=wizardForms[0],base=getTid(form);
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
       const titles=matching(';cardWizardPanel;p.h;p.t');
+      // Quality owns five native derived-output cards. Their fixed inventory
+      // distinguishes its -1 page from Binning's two-card ranges wizard.
+      const qualityPages=[0,1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard'+(port?'-'+port:''));
+      const qualityWizard=qualityPages.every(name=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name)+']')];return es.length===1&&form.contains(es[0]);});
       const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
         if(key==='coarse_classes_mapping_2'&&!(tids.get(base+';CoarseClassesWizard-1')??[]).some(element=>form.contains(element)))return [];
-        const counts=[suffixes].flat().map(suffix=>matching(suffix).length);
+        const counts=[suffixes].flat().map(suffix=>key==='binning_ranges_mapping'&&qualityWizard||key==='output_mapping'&&!qualityWizard&&/Wizard-[1-4];/.test(suffix)?0:matching(suffix).length);
         // The same input card can show both its grid and Add button. Neither
         // duplicate markers nor a second native card establish a unique stage.
         if(key==='input_mapping'&&counts[0]===1&&counts[1]===1)counts[1]=0;
@@ -1401,7 +1405,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     scanStage='output_definitions';
     if(wizard.status==='observed' && ['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
-      const mappingForms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
+      const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
         (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(visible).length===1);
       const base=wizard.root_tid+';'+(reform?'ReformColumnsWizard':mappingForms.length===1?mappingForms[0]:'__unobserved__')+';';
       const cells=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colName_') && wizardForms[0].contains(e)
@@ -4496,11 +4500,22 @@ function readRenderedInputMapping(observation) {
               const fresh=await readUi();
               if(!lifecycleContextMatches(fresh)){
                 if(await deleteLostLinks(fresh))continue;
+                const qualityOpening=current.ui.elements.find(e=>e.ref===task.action.ref);
+                const qualityLabel=current.ui.elements.find(e=>e.graph_node?.part==='label'
+                  &&e.tid===current.prepared_node_context?.tid+';Label;Label')?.label;
+                const qualityInformation=task.action.verb==='begin_wizard'&&task.prepared_node_context
+                  &&qualityOpening?.signature?.native_graph?.icon==='bg-vendor-icon-quality'
+                  &&fresh.prepared_node_context?.verified===true
+                  &&['document_id','workflow_id','node_id'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context?.[k])
+                  &&fresh.ui.dialogs.length===1&&fresh.ui.dialogs[0].identity?.anchor_tid==='toast'
+                  &&fresh.ui.dialogs[0].title==='Информация'
+                  &&typeof qualityLabel==='string'&&qualityLabel.length>0
+                  &&fresh.ui.dialogs[0].text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.';
                 // A bound Execute can leave a native toast beyond 50 reads.
                 // Observe the same completed gesture within its remaining node
                 // budget; all owner checks and graph settlement still apply.
-                if(['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb) && lifecycleContextMatches(fresh,true)
-                  && (transientToastReads<50 || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
+                if((qualityInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
+                  && (transientToastReads<50 || qualityInformation&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;
                 }

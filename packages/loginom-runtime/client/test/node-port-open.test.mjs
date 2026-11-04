@@ -116,17 +116,18 @@ function groupingBusy(f){
  f.flags.graphMasks=[panel];return panel;
 }
 
-for(const stage of ['begin','menu_issued','open_issued'])test('Grouping waits for its bound graph mask at '+stage,async()=>{
+for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
  const f=fixture('input');let waits=0;
- if(stage==='begin')groupingBusy(f);
+ const busy=()=>{groupingBusy(f);f.node.FIconCls='bg-vendor-icon-'+icon;};
+ if(stage==='begin')busy();
  if(stage==='menu_issued'){
   const read=f.readNode;let reads=0;
-  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)groupingBusy(f);return result;};
+  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)busy();return result;};
   f.run=()=>openPreparedOutputPort(f.page,f.task,runRead);
  }
  if(stage==='open_issued'){
   const locator=f.page.locator;f.page.locator=s=>{
-   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)groupingBusy(f);};return l;
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)busy();};return l;
   };
  }
  f.page.waitForTimeout=async()=>{

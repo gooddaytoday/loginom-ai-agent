@@ -97,6 +97,13 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='composite/expected.json' if composite else 'expected.json',
                     input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
                     ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
+    if name in ['quality-default', 'quality-spikes']:
+        src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
+        case = src / 'probe' if name == 'quality-spikes' else src
+        prefix = 'probe/' if name == 'quality-spikes' else ''
+        return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
+                    export_count=5, expected_name=prefix + 'expected-update.json',
+                    quality_initial_name=prefix + 'expected.json')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
         kind = name.removeprefix('clustering-scale-')
@@ -564,6 +571,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
+        if scenario_name in ['quality-default', 'quality-spikes'] and col['type'] == 'variant':
+            return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())
         if col['type'] in ['integer', 'real']:
             try:
@@ -992,6 +1001,7 @@ class Runner:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         for name, destination in zip(exports, destinations):
@@ -1036,6 +1046,11 @@ class Runner:
             try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
             except (ValueError, TypeError): continue
             if isinstance(reply, dict): replies.append((n, reply))
+        if case in ['quality-default', 'quality-spikes']:
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'quality-events.json', evidence)
+            self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
         if spec.get('upload_only'):
             calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
                      if event.get('type') == 'tool_use']

@@ -20,7 +20,7 @@ test('native enrich icon has its own callable handler and model-facing parameter
  assert.ok(handler);
  assert.deepEqual(handler.modes,['left']);
  assert.ok(handler.parameter_schema.properties.enrichment);
- assert.throws(()=>describeNodeTypes(Object.keys(NODE_TYPES)),/thirty-two/);
+ assert.throws(()=>describeNodeTypes([...Object.keys(NODE_TYPES),type.type]),/distinct supported node types/);
 });
 
 test('unchanged enrich execution preserves settings; source or mapping edits cannot bypass configuration',()=>{

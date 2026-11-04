@@ -1,3 +1,4 @@
+import {readQualityPortOutput} from './quality-moda.mjs';
 import {makeCoarseClassesContextCode} from './coarse-classes-context.mjs';
 import {makeAssnRulesContextCode} from './assn-rules-context.mjs';
 import {makeBinningContextCode} from './binning-context.mjs';
@@ -239,7 +240,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       operation.portReadCleanupComplete=false;
       operation.cleanupConfirmed=false;
       let result;
-      try{result=await execute(code,{timeout:Math.max(5000,operation.deadline-now()+5000)});}
+      try{result=(operation.nodeApply?.request??operation.parameters)?.target?.type==='research.quality'&&request.port===4
+       ?await readQualityPortOutput(execute,preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline})
+       :await execute(code,{timeout:Math.max(5000,operation.deadline-now()+5000)});}
       catch(error){operation.transportUncertain=true;throw error;}
       const context=result?.node_context;
       const owner=context?.verified===true&&context.document_id===preparedNodeContext.document_id

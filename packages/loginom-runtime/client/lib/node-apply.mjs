@@ -293,9 +293,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.export_destination_conflict=refusal.verification==='text_export_conflict_rejected';
       }
-      if(name==='input_mapping'&&request.target.type==='research.duplicates'&&refusal?.phase===name
+      if(name==='input_mapping'&&['research.quality','research.duplicates'].includes(request.target.type)&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&refusal.settings_unchanged===true&&refusal.verification==='duplicates_input_validation_refused'){
+        &&refusal.settings_unchanged===true&&refusal.verification===(request.target.type==='research.quality'?'quality_input_validation_refused':'duplicates_input_validation_refused')){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
