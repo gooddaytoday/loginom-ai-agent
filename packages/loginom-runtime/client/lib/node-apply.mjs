@@ -20,10 +20,10 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
  */
 export function validateNodeApplyRequest(request, handlers) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
-    'mode','parameters','mappings','finish','read','budgets']);
+    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[])]);
   requireValue(id(request.operation_id) && request.contract_revision === NODE_CONTRACT_REVISION,
     'Unsupported node.apply operation ID or contract revision');
-  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs'].map(k=>[k,request[k]]));
+  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
   const installed = handlers.get(request.target.type);
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
