@@ -1,0 +1,7 @@
+RowID,Amount,Category
+1,5,A
+2,10,B
+3,15,A
+4,20,C
+5,?,B
+6,10,a

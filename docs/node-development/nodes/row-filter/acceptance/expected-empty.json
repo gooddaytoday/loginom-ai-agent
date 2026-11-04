@@ -1,0 +1,59 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "type": "transform.filter_data",
+  "title": "Фильтр строк",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-filterdata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "conditions",
+    "row_number"
+  ],
+  "semantics": "conditions: AND inside groups, OR between groups. Literals remain supported. Optional W1 variable_inputs kind control input 0; table input 0, outputs 0/1. value:{kind:variable,name} references an integer/string scalar; values:{kind:variable,name} references a string containing a simple comma-separated integer/string list. Use exact mapped variable name, never its current value as a literal. String case_sensitive is explicit. Existing parameters:{} preserves bindings. Unsupported: variable ranges, real/boolean/datetime/variant, row_number, NULL variables, quoted/list-separator-bearing elements. Read both outputs after source changes; Save and cold use W1 unchanged.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "filter-v3-internal-1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/transformation/row-filter/README.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "d48b7ea95d7cdd97e58a6024985e965876e50ea3a1365ecf67f4c9903a6d70cb",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "conditions"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "input_field",
+                      "row_number"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "<",
+                  "<=",
+                  ">",
+                  ">=",
+                  "=",
+                  "<>",
+                  "is_null",
+                  "not_null",
+                  "between",
+                  "not_between",
+                  "in",
+                  "not_in",
+                  "contains",
+                  "not_contains",
+                  "starts_with",
+                  "not_starts_with",
+                  "ends_with",
+                  "not_ends_with",
+                  "is_true",
+                  "is_false"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "integer",
+                  "real",
+                  "string",
+                  "datetime",
+                  "boolean"
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "variable"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "lower": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "upper": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "values": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    "maxItems": 128,
+                    "minItems": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "variable"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "case_sensitive": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "operator",
+              "type"
+            ],
+            "additionalProperties": false,
+            "description": "datetime literals: local ISO date+time with seconds (2024-01-01T00:00:00), optional .sss; no date-only/timezone. Inner group=AND; groups=OR. Variable operands: value for integer/string scalar comparisons < <= > >= = <>; values for in/not_in on integer/string using a string variable containing a simple comma-separated list. Exact mapped control-input name. Other variable operands are unsupported."
+          },
+          "maxItems": 128,
+          "minItems": 1
+        },
+        "maxItems": 64,
+        "minItems": 1
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {}
+}
