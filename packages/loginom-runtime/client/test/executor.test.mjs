@@ -484,6 +484,37 @@ test('save graph fingerprint preserves port ordinal across numeric reindex, with
   const observed = await runtime(page).observe();
   assert.equal(observed.output.package_identity.path, '/user/data/packages/reindexed.lgp');
 });
+for(const action of ['package.save_checkpoint','package.save_as']){
+  test(action+' preserves a linked ordinary scenario variable input',async()=>{
+    const page=linkPage();
+    page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+    page.nodes[1].ports.push('Input_Var-1');
+    page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0',
+      'Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+    const result=await run(page,action,{path:'/user/data/packages/variables.lgp',conflict_policy:'fail'});
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+    assert.ok(page.storage.has('/user/data/packages/variables.lgp'));
+  });
+  test(action+' keeps an unlinked builtin outside the legacy graph fingerprint',async()=>{
+    const page=linkPage();
+    page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+    const result=await run(page,action,{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+    if(action==='package.save_as'){
+      const reopened=result.trace.find(t=>t.event==='reopened_package_observed');
+      assert.ok(reopened);assert.equal(reopened.graph.nodes.includes('Переменные_сценария'),false);
+    }
+  });
+}
+test('saved variable links still reject a changed input ordinal after reopen',async()=>{
+  const page=linkPage();
+  page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+  page.nodes[1].ports.push('Input_Var-1','Input_Var-2');
+  page.edges=['Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+  page.onReopen=item=>{item.edges[0]='Переменные_сценария|Output_Var-4|Приёмник|Input_Var-2';};
+  const result=await run(page,'package.save_as',{path:'/user/data/packages/changed-variable.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.graph_matches,false);
+});
 
 test('save fingerprint rejects changed port ordinal, direction, missing port and extra port', async () => {
   for (const mutate of [
