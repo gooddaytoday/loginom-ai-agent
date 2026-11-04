@@ -192,6 +192,20 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
+    if name in ['colunion-edit', 'colunion-repeat', 'colunion-matrix-regular', 'colunion-matrix-reverse',
+                'colunion-matrix-empty-main', 'colunion-matrix-empty-attached', 'colunion-matrix-both-empty']:
+        src = REPO / 'docs/node-development/nodes/transform-coluniondata/acceptance'
+        variant = name.removeprefix('colunion-')
+        matrix = variant.startswith('matrix-')
+        kind = variant.removeprefix('matrix-')
+        inputs = {'empty-main': ['empty-main.csv', 'attached.csv'],
+                  'empty-attached': ['main.csv', 'empty-attached.csv'],
+                  'both-empty': ['empty-main.csv', 'empty-attached.csv'],
+                  'reverse': ['main.csv', 'attached-long.csv']}.get(kind, ['main.csv', 'attached.csv'])
+        return dict(source=src, prompt=src / ('task.md' if variant == 'edit' else 'task-' + variant + '.md'),
+                    data=src.parent / 'fixtures', input_files=inputs, base=None,
+                    expected_name=('matrix/' + kind + '.json') if matrix else 'expected-repeat.json' if variant == 'repeat' else 'expected.json',
+                    export_count=12 if matrix else 1)
     if name == 'union-auto-match':
         src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

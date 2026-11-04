@@ -420,3 +420,9 @@ abs=1e-8 только для real, метки через label_any.
 информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
+
+`colunion-edit`, `colunion-repeat`, `colunion-matrix-regular`, `colunion-matrix-reverse`,
+`colunion-matrix-empty-main`, `colunion-matrix-empty-attached`, `colunion-matrix-both-empty`:
+Соединение двух таблиц по позиции; утверждённые task*.md и независимые expected
+из `transform-coluniondata/acceptance`. Модель получает только задание и выбранные
+CSV. Полный CSV, точные типы/значения/порядок, оба Code, Save/cold/cleanup.

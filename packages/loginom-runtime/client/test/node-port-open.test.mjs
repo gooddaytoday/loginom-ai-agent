@@ -321,6 +321,16 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
 });
 
+test('positional union attached input keeps logical/native 1 while its SVG index is 2',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-coluniondata';f.task.port=1;f.port.FPortIndex=1;f.portTree.FIndex=1;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Data-2';f.portDom.getAttribute=()=>f.portDom.tid;
+ const prior={FGuid:'main',FCell:{},FPortIndex:0,data:{},parent:f.node};
+ const dom=f.el('MF;TF;Graph;Node;Input_Data-0');dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:0,y:0,width:20,height:20});
+ f.portDom.getBoundingClientRect=()=>({x:30,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(prior);
+ f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?prior.FCell:f.port.FCell;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,1);assert.equal(r.native_index,1);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-2');
+});
+
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
 
 for(const direction of ['input','output'])for(const tid of ['ttip','ttip-1','ttip-12','ttip-other','ttip-1-menu'])for(const variant of ['hidden','delayed','persistent','foreign','changed-port','no-neutral-point','duplicate'])test(direction+' port tooltip recovery: '+tid+' '+variant,async()=>{

@@ -410,10 +410,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (userProfile && actionRuntime) {
             const first = !userBundleDelivered;
             const ready = session.metadata.workspaceReady === true;
-            const bundle = first ? compactKnowledgeBundle(actionRuntime.describe({
-              action_keys: ['package.save_checkpoint'],
-              node_types: actionRuntime.describe().available_node_types,
-            })) : null;
+            const types=first?actionRuntime.describe().available_node_types:[];
+            const descriptions=first?Array.from({length:Math.ceil(types.length/32)},(_,index)=>actionRuntime.describe({
+              action_keys:['package.save_checkpoint'],node_types:types.slice(index*32,index*32+32),
+            })):[];
+            const bundle=first?compactKnowledgeBundle({...descriptions[0],node_types:descriptions.flatMap(d=>d.node_types)}):null;
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),
