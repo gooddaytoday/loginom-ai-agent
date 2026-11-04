@@ -32,6 +32,12 @@ test('W1 control and ordinary variable ordinal zero remain independent',async()=
  const n=(await page.observe()).nodes[0];
  assert.deepEqual(n.variable_inputs.map(p=>[p.kind,p.port,p.native_index]),[['variables',0,1],['control',0,0]]);
 });
+test('W1 builtin remains observable without a visible Label cell',async()=>{
+ const {page,node,tid}=fixture();node.FIconCls='bg-vendor-icon-modelvariables';
+ page.document.querySelectorAll('[data-tid='+JSON.stringify(tid+';Label;Label')+']')[0].remove();
+ const state=await page.observe();assert.equal(state.nodes.length,1);assert.equal(state.nodes[0].type,'variables.user');
+ assert.equal(state.nodes[0].node_id,first);
+});
 
 test('saved graph exposes the native GUID without using its label as node identity',async()=>{
  const {page,node}=fixture(),snapshot=await page.observe();
