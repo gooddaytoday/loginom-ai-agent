@@ -16,6 +16,7 @@ print(json.dumps([{k:str(v) if hasattr(v,'__fspath__') else v for k,v in m.scena
   const expected=JSON.parse(readFileSync(spec.source+'/'+spec.expected_name,'utf8'));
   assert.deepEqual(expected.outputs.map(o=>o.output_port),[0,1]);
   assert.equal(expected.variable_inventory.links[0].kind,'control');
-  assert.equal(expected.variable_inventory.outputs[0].port,4);
+  assert.equal(expected.variable_inventory.outputs[0].port,0);
+  assert.equal(expected.variable_inventory.outputs[0].node.type,'variables.calculator');
  }
 });

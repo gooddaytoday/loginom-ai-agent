@@ -23,7 +23,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
  type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',inputMappingRecovery:true,openRecovery:true,parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
  validate:validateFilterParameters,
  validateInput:(p,resolved,native)=>p.groups===undefined?undefined:resolveFilterConditions(p,resolved.fields??native.target_fields),
- preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.groups!==undefined,resolve:resolveFilterConditions,label:'filter'}),
+ preflight:preflightFilterSource,
  beforeInput:prepareFilterInput,
  configurationObservation:{condition:'filter configuration page',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true},
  async configure(channel,p,{request}){
@@ -39,6 +39,24 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
   return {...changed,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
  },configureAllOutputs:configureFilterOutputs,readOutputs:readFilterOutputs,
 });}
+
+export async function preflightFilterSource(options,ctx,config){
+ const request=options.operation.parameters;
+ if(request.finish!=='close'&&(request.target.kind==='existing'||request.variable_inputs?.some(i=>i.kind==='control'))){
+  const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
+  need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'Complete filter control source graph required');
+  const sources=request.target.kind==='new'?request.variable_inputs.filter(i=>i.kind==='control').map(i=>i.source.node_id)
+   :graph.links.filter(l=>l.kind==='control'&&l.target===request.target.ref.node_id).map(l=>l.source);
+  for(const id of sources){
+   const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
+   if(nodes[0].type==='variables.user'){
+    const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values.');
+    error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+   }
+  }
+ }
+ return preflightTabularSource(options,ctx,config,{required:request.parameters.groups!==undefined,resolve:resolveFilterConditions,label:'filter'});
+}
 
 export async function prepareFilterInput(options,ctx,{channel}){
  const request=options.operation.nodeApply.request;

@@ -56,10 +56,10 @@ def expected(case):
                   {"limit": ("integer", 10 if case == "empty" else 100 if case == "mixed-none" else 15),
                    "codes": ("string", "A,B" if case == "empty" else "C")})
         result["variable_inventory"] = {
-            "outputs": [{"node": {"type": "variables.user"}, "port": 4,
+            "outputs": [{"node": {"type": "variables.calculator"}, "port": 0,
                          "variables": [{"name": name, "type": kind, "value": value}
                                        for name, (kind, value) in values.items()]}],
-            "links": [{"source": {"type": "variables.user"}, "output": 4,
+            "links": [{"source": {"type": "variables.calculator"}, "output": 0,
                        "target": {"type": "transform.filter_data"}, "input": 0, "kind": "control"}]}
     return result
 

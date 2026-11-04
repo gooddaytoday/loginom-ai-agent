@@ -324,6 +324,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name == 'variables-calculator':
+        src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
+                    variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
     if name == 'variables-user':
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
@@ -1322,8 +1327,8 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
-                src / spec.get('variable_initial_name', 'expected-user-initial.json'), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'snapshot')})
+                src / spec.get('variable_initial_name', spec.get('variable_initial', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') == 'variables-calculator' else 'snapshot')})
             return session, expected, None, None
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')

@@ -92,9 +92,9 @@
     "outputs": [
       {
         "node": {
-          "type": "variables.user"
+          "type": "variables.calculator"
         },
-        "port": 4,
+        "port": 0,
         "variables": [
           {
             "name": "wanted",
@@ -107,9 +107,9 @@
     "links": [
       {
         "source": {
-          "type": "variables.user"
+          "type": "variables.calculator"
         },
-        "output": 4,
+        "output": 0,
         "target": {
           "type": "transform.filter_data"
         },
