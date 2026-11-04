@@ -420,3 +420,8 @@ abs=1e-8 только для real, метки через label_any.
 информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
+
+`coarse-classes-train` и `coarse-classes-apply`: один дискретный Segment,
+бинарная Target, автоматические конечные классы. Приёмочный комплект —
+`preprocessing-coarseclasses/acceptance`; три CSV в порядке портов 0/1/2,
+Save/cold/cleanup. Apply заменяет источник того же импорта, сохраняя обучение.
