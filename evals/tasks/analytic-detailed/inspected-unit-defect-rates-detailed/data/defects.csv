@@ -1,0 +1,6 @@
+defect_id;unit_id;defect_code;severity
+D01;U01;A;1
+D02;U01;B;3
+D03;U01;B;3
+D04;U02;C;2
+D05;U04;A;1

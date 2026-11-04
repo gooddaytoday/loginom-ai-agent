@@ -1,0 +1,21 @@
+{
+  "task_id": "paired-change-dispersion-business",
+  "source_task": "paired-change-dispersion-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/paired-change-dispersion-detailed/provenance.json",
+  "dataset_sha256": {
+    "machines.csv": "e2ba8fee38451763431efb1cbe3869dae947ba9ef2c677714452c3390edfd63b"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "85bcb5acc050f602688d3ecaedfa3f237b8b6e9d1f6cc7e82498f115faf7f3e6"
+  },
+  "reference_sha256": "c26414b2cb28912cc76c6c7dae88822ebfe9a6a11ae5488d434bbecc73bcae08",
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

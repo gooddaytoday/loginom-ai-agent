@@ -1,0 +1,8 @@
+event_id;campaign_id;device_id
+E01;C01;D01
+E02;C01;D02
+E03;C01;D01
+E04;C01;D03
+E05;C01;DX
+E06;C02;DY
+E07;C02;DZ

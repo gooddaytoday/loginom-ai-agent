@@ -1,0 +1,142 @@
+{
+  "sources": {
+    "SPEC.md": "f019fd6368d88b6aec880633f31b6c2d04b37b61a169461b3e96871383e77bdc",
+    "acceptance.json": "b2ca0e82ee25105bde1ce558c5d6eb018958fbfd028f21c5e7a752c249c98bb6",
+    "data/defects.csv": "d50915244f8c45c74ee2c0c45eb731618bb897bb98271ce646d06fc0329fc312",
+    "data/inspections.csv": "3234de376046bba9ac97060689d8557eb1d1a60ddd31ce00cf1e83c5ba004350",
+    "oracle.csv": "1ba3ed87ddf8c720743696ea02a96e8bc94a28bf4eff85a28312c53c886f8090",
+    "oracle.py": "6b8469f70797979d0c466042fbc6114ced7c358738a6eacdbaaef3c9d3daad9b",
+    "provenance.json": "191e5aa869a93e5ffeb5d01fc768d6c8bc90e07804a32d2be233d1236f23af2c",
+    "reference.lgp": "9723c588f1f94c08a43a1093a5706a0f9eff0846eab596a8ade83306153be90d",
+    "task.json": "1472ab63a945566fa67b100b8ae037b7edc8179b2226e60136f45da1b23c8481"
+  },
+  "cases": [
+    {
+      "id": "remarks-instead-units",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"defect_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"defect_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Name=\"defect_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"defect_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "unit-defect-grain",
+        "full-inspection-base",
+        "supplier-line-rates",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        severity[row[\"unit_id\"]] = max(severity.get(row[\"unit_id\"], 0), int(row[\"severity\"]))",
+            "to": "        severity.setdefault(row[\"unit_id\"], []).append(int(row[\"severity\"]))",
+            "count": 1
+          },
+          {
+            "from": "        counts[0] += 1\n        counts[1] += severity.get(row[\"unit_id\"], 0) > 0\n        counts[2] += severity.get(row[\"unit_id\"], 0) == 3",
+            "to": "        for value in severity.get(row[\"unit_id\"], [0]):\n            counts[0] += 1\n            counts[1] += value > 0\n            counts[2] += value == 3",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "remarks-instead-units.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "dropping-clean-units",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "full-inspection-base",
+        "supplier-line-rates",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        counts = groups.setdefault((row[\"supplier_id\"], row[\"production_line\"]), [0, 0, 0])",
+            "to": "        if row[\"unit_id\"] not in severity:\n            continue\n        counts = groups.setdefault((row[\"supplier_id\"], row[\"production_line\"]), [0, 0, 0])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "dropping-clean-units.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "major-is-critical",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IFF(NVLF(max_severity, 0) = 3, 1, 0)",
+          "to": "IFF(NVLF(max_severity, 0) &gt;= 2, 1, 0)",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "unit-defect-grain",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        counts[2] += severity.get(row[\"unit_id\"], 0) == 3",
+            "to": "        counts[2] += severity.get(row[\"unit_id\"], 0) >= 2",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "major-is-critical.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "shares-as-percent",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "defective_units / inspected_units",
+          "to": "100 * defective_units / inspected_units",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "critical_units / inspected_units",
+          "to": "100 * critical_units / inspected_units",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "supplier-line-rates",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{defective / inspected:.15g}\"",
+            "to": "f\"{100 * defective / inspected:.15g}\"",
+            "count": 1
+          },
+          {
+            "from": "f\"{critical / inspected:.15g}\"",
+            "to": "f\"{100 * critical / inspected:.15g}\"",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "shares-as-percent.csv",
+      "expected_oracle_pass": false
+    }
+  ]
+}

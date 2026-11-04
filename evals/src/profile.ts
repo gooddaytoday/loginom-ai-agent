@@ -108,9 +108,10 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
   const input = { cmd, cwd: boundary?.cwd ?? command.cwd,
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
-    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, outDir: out, captureSecrets: command.cleanupSecrets, stdin, timeoutMs, signal }
   const result = await superviseProcess(input)
-  if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), processes: result.processCleanup })
+  if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), exitCode: result.exitCode,
+    timedOut: result.timedOut, interrupted: result.interrupted, sandboxError: Boolean(result.sandboxError), processes: result.processCleanup })
   // Diagnostic only: never substitutes for process cleanup or connection-check proof.
   if (out && args[0] === "loginom" && args[1] === "check") {
     const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as

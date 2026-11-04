@@ -1,0 +1,4 @@
+movement_id;sku;warehouse;direction;qty
+M01;A;W1;in;4
+M02;A;W1;out;3
+M03;A;W2;out;5

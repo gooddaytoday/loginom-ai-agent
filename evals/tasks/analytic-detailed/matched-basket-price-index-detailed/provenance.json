@@ -1,0 +1,132 @@
+{
+  "task_id": "matched-basket-price-index-detailed",
+  "dataset_sha256": {
+    "sales_lines.csv": "d2e42091ef1b3fb8d39d9d0ed691bad91176b0de932c469695e549f49970d6f9"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "38ef0c1a1b29834f71a577b2c2f068826f074322a10bf2c29d4fc8ae33aba63a"
+  },
+  "reference_sha256": "d8a85300711cd33aef2337e957d70165a9dc962d88537057e073582e02f0d995",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/sales_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T21:02:03+03:00",
+    "duration_s": 1060,
+    "tokens": {
+      "input": 121680,
+      "output": 7937,
+      "reasoning": 2701
+    },
+    "tool_calls": 51,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic13 sale lines frozen before separate manual2x7 and independent oracle under approved G06 P23 fixture plan; no answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real sales, or derived real-data snapshot. Grain sale line/SKU not PK; category constant perSKU; ASCII case-sensitive/noNULL. qty nonnegative integer,amount nonnegative2dec; eligible only qty>0 AND amount>0. Local Europe/Moscow ISO timestamps; half-open base[Jan1,Apr1),current[Apr1,Jul1)2026. Full base category registry/denominator; matched SKU intersection/fixed base quantities; CAT_B undefined index empty,not0/NULL; current-only CAT_C omitted."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent eligible raw aggregation into SKU/period Decimal qty/revenue dictionaries; intersection; current prices in fixed base quantities; full original base revenue denominator; complete separate manual2x7 before oracle/native. No intermediate rounding."
+  },
+  "authoring_budget": {
+    "maximum_attempts": 3,
+    "observed_used": 1,
+    "reset": false
+  },
+  "requested_service_tier": "STANDARD/default model preset",
+  "response_service_tier": "NOT_OBSERVED",
+  "speed_comparison": "NOT_MEASURED",
+  "counter_interpretation": {
+    "official_memory_tool_calls": 0,
+    "observed_readonly_knowledge_calls": 5,
+    "observed_bundled_file_reads": 3,
+    "writing_memory_or_knowledge_tools_observed": false,
+    "limitation": "official memory counter0 does not imply absence of reads"
+  },
+  "native_history": {
+    "save": {
+      "operation": "save-final-1",
+      "status": "SUCCEEDED",
+      "save_completed": true,
+      "workflow_preserved": true,
+      "cleanup_complete": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "collected_XML_verified_separately": true
+    },
+    "arrangement": {
+      "status": "attempted",
+      "reason": "result_unconfirmed",
+      "warning": true
+    }
+  },
+  "accepted_verification": {
+    "native_qa": "PRIVATE_ARCHIVE",
+    "native_review": "PRIVATE_ARCHIVE",
+    "native_review_result": "SPEC+QUALITY APPROVE;33lines/rootFULLREAD53e4fc; native only",
+    "cold_qa": "PRIVATE_ARCHIVE",
+    "cold_review": "PRIVATE_ARCHIVE",
+    "cold_review_result": "SPEC+QUALITY APPROVE;30lines/rootFULLREAD1dc3a9; cold only",
+    "cold_rerun": "single park/new inode full2x7 CSV; exact saved LGP/raw SHA+stat unchanged; one toolbar Execute all/all16grey→green; no Configure/Save; NoSave/Home/logout/ownTab[private]closed/final IABinventory empty; postidle/config unchanged",
+    "native_storage_archive_omitted": "private instance storage; not published",
+    "operational_storage_history_omitted": "private instance storage; not published",
+    "Save_limitation": "original reopened=false/persisted_content_verified=false/arrangementwarning retained; collected content and accepted cold verified separately"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "group_gate": "G06 after all5dispositions and whole-group prerequisites; P17 ONLY-B conditional, no new ONLY-B P23 requirement"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

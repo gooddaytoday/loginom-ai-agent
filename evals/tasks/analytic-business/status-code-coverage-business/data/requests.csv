@@ -1,0 +1,15 @@
+id;source;status
+R01;SRC_A;done
+R02;SRC_A;closed
+R03;SRC_A;Готово
+R04;SRC_A;Завершено
+R05;SRC_A;new
+R06;SRC_A;in_progress
+R07;SRC_A;Новая
+R08;SRC_A;В работе
+R09;SRC_A;"done "
+R10;SRC_A;Done
+R11;SRC_A;готово
+R12;SRC_B;?
+R13;SRC_B;""
+R14;SRC_B;"NULL"

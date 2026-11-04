@@ -1,0 +1,5 @@
+route;tariff_code;fixed_fee;price_per_kg
+R3;FREE;0;0
+R1;EXP;20;3
+R2;STD;7;1.5
+R1;STD;10;2

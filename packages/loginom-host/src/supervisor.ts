@@ -174,6 +174,7 @@ async function superviseProcess(
     string,
     { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
   >()
+  const startupFailure: { value?: ReturnType<typeof knowledgeStartupFailure> } = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
     child.once("error", () => resolve({ code: 1, signal: null }))
@@ -213,6 +214,7 @@ async function superviseProcess(
       ])
     }
     if ("error" in message) {
+      startupFailure.value ??= knowledgeStartupFailure("startupFailure" in message ? message.startupFailure : undefined)
       request.reject(
         hostError(message) !== "LOGINOM_HOST_REQUEST_FAILED"
           ? hostException(message)
@@ -262,6 +264,7 @@ async function superviseProcess(
           request_error: response.error,
           closed_ack: !!reply && typeof reply === "object" && "closed" in reply && reply.closed === true,
           exit_code: outcome.code, exit_signal: outcome.signal,
+          ...(startupFailure.value ? { startup_failure: startupFailure.value } : {}),
         }) + "\n", { mode: 0o600, flag: "wx" }).catch(() => undefined)
         if (
           !reply ||
@@ -306,4 +309,25 @@ async function superviseProcess(
   } finally {
     signal?.removeEventListener("abort", cancel)
   }
+}
+
+function knowledgeStartupFailure(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const codes = ["EAI_AGAIN", "ENOTFOUND", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH",
+    "ENETDOWN", "EPIPE", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "UND_ERR_SOCKET",
+    "ERR_TLS_CERT_ALTNAME_INVALID", "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "CERT_HAS_EXPIRED", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "ERR_TLS_HANDSHAKE_TIMEOUT", "ERR_SSL_WRONG_VERSION_NUMBER",
+    "ERR_SSL_TLSV1_ALERT_UNKNOWN_CA", "ABORT_ERR"]
+  if (Object.keys(record).some(key => !["stage", "error_class", "code", "cause_codes", "aborted", "timeout", "elapsed_ms"].includes(key))
+    || typeof record.stage !== "string" || !["connect_initialize", "catalog"].includes(record.stage)
+    || typeof record.error_class !== "string" || !["Error", "TypeError", "RangeError", "SyntaxError", "AbortError", "TimeoutError", "AggregateError", "McpError",
+      "SseError", "StreamableHTTPError", "Unknown"].includes(record.error_class)
+    || !(record.code === null || typeof record.code === "number" && Number.isSafeInteger(record.code) && record.code >= -32768 && record.code <= 599)
+    || !Array.isArray(record.cause_codes) || record.cause_codes.length > 16
+    || !record.cause_codes.every(code => typeof code === "string" && codes.includes(code))
+    || typeof record.aborted !== "boolean" || typeof record.timeout !== "boolean"
+    || typeof record.elapsed_ms !== "number" || !Number.isSafeInteger(record.elapsed_ms) || record.elapsed_ms < 0) return undefined
+  return { stage: record.stage, error_class: record.error_class, code: record.code, cause_codes: record.cause_codes,
+    aborted: record.aborted, timeout: record.timeout, elapsed_ms: record.elapsed_ms }
 }

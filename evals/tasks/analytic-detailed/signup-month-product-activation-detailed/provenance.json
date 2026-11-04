@@ -1,0 +1,85 @@
+{
+  "task_id": "signup-month-product-activation-detailed",
+  "dataset_sha256": {
+    "events.csv": "47409b521ce8dc8aba53e20ecd18c845fd9539924644e3c5917a76a2363a495f",
+    "users.csv": "9dab973a81957713638e5cf9609dec8136a216ad765779ffa4e8f85f9ffde36d"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "337c781bb33c33cea09752f779a7910e8cee12b237995db7925dd31ec937faec"
+  },
+  "reference_sha256": "3e5e8b70e348cb034fcf9cfe6443275175c81dc15a8a6ff3cec4123d7f858317",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/users.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/events.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T20:14:09+03:00",
+    "duration_s": 972,
+    "tokens": {
+      "input": 139689,
+      "output": 7241,
+      "reasoning": 892
+    },
+    "tool_calls": 48,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal.Decimal",
+      "builtin set"
+    ],
+    "algorithm": "Independent civil datetime parsing, complete-month eligibility, per-user sets of valid event types in [signup,next-month), full eligible registry iteration and monthly activated/users; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Seven users and eighteen raw action events, frozen before gold under the approved P18/G03 fixture plan. Event physical order is deliberately nonchronological; no derived flags or aggregates in runtime inputs.",
+    "snapshot_at": "2026-03-01T00:00:00",
+    "time_basis": "one naive civil calendar, fixed ISO seconds without offset/Z/fractions; no UTC attribution or timezone conversion",
+    "limitations": "Only create_project/invite_member/export, complete user registry and valid event foreign keys, no NULL inputs. Not real product telemetry."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,13 @@
+credit_id;invoice_id;amount;status
+N001;I001;20.25;posted
+N002;I001;30.00;posted
+N003;I001;200.00;void
+N004;I002;50.00;posted
+N005;I003;25.00;posted
+N006;I004;10.00;draft
+N007;I005;10.00;posted
+N008;I006;800.00;draft
+N009;I007;100.00;posted
+N010;I008;50.00;posted
+N011;I009;20.00;posted
+N012;I009;30.00;posted

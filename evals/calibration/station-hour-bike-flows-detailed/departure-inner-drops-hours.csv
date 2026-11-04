@@ -1,0 +1,5 @@
+station_id;year;month;day;hour;departures;arrivals;net_inflow
+412;2024;1;3;23;1;0;-1
+412;2024;1;4;4;1;0;-1
+516;2024;1;4;6;1;0;-1
+516;2024;1;4;22;2;0;-2

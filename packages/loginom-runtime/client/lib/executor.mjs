@@ -2540,10 +2540,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       // A sent abort or an expired timeout is not proof: only the page ledger is.
       const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
-      // Same proof as the node release: a completed last gesture with confirmed cleanup.
-      if (state?.state !== 'none' && (state?.state !== 'completed' || state.receipt?.cleanup_complete !== true))
-        return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable')
-          + (state?.state === 'completed' ? ' without confirmed cleanup' : '') };
+      // Completion stops the callback; UI cleanup is proved afresh after browser recovery.
+      if (state?.state !== 'none' && state?.state !== 'completed')
+        return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable') };
       leased = operation.id;
       return { stopped: true, proof: { receipt_id: operation.lastReceipt?.id ?? null, receipt_state: state.state,
         cleanup_complete: state.receipt?.cleanup_complete ?? null } };

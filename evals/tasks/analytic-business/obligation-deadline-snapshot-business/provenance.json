@@ -1,0 +1,48 @@
+{
+  "task_id": "obligation-deadline-snapshot-business",
+  "source_task": "obligation-deadline-snapshot-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/obligation-deadline-snapshot-detailed/provenance.json",
+  "dataset_sha256": {
+    "obligations.csv": "660621379042700bb7ada585a1daf5ce695701c2b5a6e63e67dda60c0366b5da"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "b78be299377017f68532378d38f6ad7a5979ba01b182088ad340d85c7bdf460d"
+  },
+  "reference_sha256": "10ae3c3cb1bdeb8d70aef4e2bfa20cb7695808e258b429f5c51e3d7f201042c9",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Eight original obligations frozen before independent manual3x8 and stdlib oracle; no answer columns or external real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK id; ASCII case-sensitive id/team; only completed_at nullable. Local Europe/Moscow timestamps; fixed snapshot2026-03-15 12:00:00. observed iff nonempty completion<=snapshot; four mutually exclusive classes; due-only denominator deadline<=snapshot; sole empty T_B/2026-04.violation_share; no money/minprecision share requirement."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent per-id datetime observation/classification and Decimal due-only division over full team/deadline-month registry. Complete separate manual3x8 after raw freeze before oracle/native. No intermediate rounding."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "group_gate": "G06 after all5dispositions and whole-group prerequisites; P17 ONLY-B conditional, no new ONLY-B P19 requirement"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

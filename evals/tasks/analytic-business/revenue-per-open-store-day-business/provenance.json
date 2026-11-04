@@ -1,0 +1,50 @@
+{
+  "task_id": "revenue-per-open-store-day-business",
+  "source_task": "revenue-per-open-store-day-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/revenue-per-open-store-day-detailed/provenance.json",
+  "dataset_sha256": {
+    "operating_calendar.csv": "b83b6631039d514fed85fa40002b0689f1f98ce8ee76ff93bc1f8c4dd82a415e",
+    "sales_lines.csv": "b535adb40672f0a3dc1ec265141e9535007a662a0b69d96cd530db498af3270c"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "36fbd06f1b336965a46542a4533e6ab2f376239cbec05e8e8a2ef3f32c8ffa1c"
+  },
+  "reference_sha256": "d24cedd5eb26aeef11735242af8a974bc1851955c7644bcffbe266010e2027f8",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Six complete operating-calendar rows and five sales events frozen before separate manual3x6 and stdlib Decimal oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK calendar(store_id,date), sale_id; all sales FK to calendar; nonempty ASCII/case-sensitive keys/day_type; published HOLIDAY/WORKDAY overrides weekday. Local Europe/Moscow ISO date/time without conversion. Positive amount in one synthetic monetary unit, no tax/fees. Full-calendar denominator and no-sales zero groups; descriptive normalization only."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent Decimal raw-sales ledger by local store/date over complete calendar registry, then group exposure count/revenue and revenue/days. Separate manual full18 after raw freeze before oracle/native; no intermediate rounding."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G06 after all5dispositions/whole-group prerequisites; P17 ONLY-B conditional; no new P24 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

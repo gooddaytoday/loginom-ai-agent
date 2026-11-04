@@ -1,0 +1,19 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "budgets.csv",
+      "orders.csv",
+      "expenses.csv"
+    ]
+  }
+}

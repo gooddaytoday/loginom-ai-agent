@@ -1,0 +1,8 @@
+line_id;order_id;category;qty;unit_price
+N01;O01;CAT_A;2;10.00
+N02;O01;CAT_A;1;10.00
+N03;O01;CAT_B;1;30.00
+N04;O02;CAT_A;1;1.00
+N05;O02;CAT_A;1;1.00
+N06;O02;CAT_C;1;1.00
+N07;O03;CAT_B;1;7.00

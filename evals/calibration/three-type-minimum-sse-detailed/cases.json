@@ -1,0 +1,101 @@
+{
+  "sources": {
+    "task.json": "1d2a3a32152d05613b6e47167f7c7e95fded2a101c3deb63bfe1250543598561",
+    "reference.lgp": "dd751c74def31679d7deec56e949d5ca718fecc55a0ff731f4ad327e73097462",
+    "SPEC.md": "924cb41f7ea0a93bd32431d99c75e19d54d7924134b4762cd71b0cb3b845285c",
+    "data/objects.csv": "acb0985d5d0a85d0ae41e61bf5281e87002eabf8853209dbda2906118e177a87",
+    "oracle.csv": "52fbcc7274389019a7f5065a1c03fe4f1c3759604f0dbe762228cc8a4e4f4757",
+    "oracle.py": "fcf51352b28c412821da3886abb6d94d7ccde472d8200db6fdd150ef7d284f27"
+  },
+  "cases": [
+    {
+      "id": "mean-distance",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(x - center_x) * (x - center_x) + (y - center_y) * (y - center_y)\"",
+          "to": "Expression=\"Sqrt((x - center_x) * (x - center_x) + (y - center_y) * (y - center_y))\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "mean-distance.csv",
+      "expected_failed": [
+        "group_profiles",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "from fractions import Fraction\n",
+            "to": "from fractions import Fraction\nfrom math import sqrt\n",
+            "count": 1
+          },
+          {
+            "from": "    mean_squared_distance = sum((px - x) ** 2 + (py - y) ** 2 for px, py in group) / len(group)",
+            "to": "    mean_squared_distance = sum(sqrt(float((px - x) ** 2 + (py - y) ** 2)) for px, py in group) / len(group)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "sum-squared-distance",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdAvg\" Order=\"3\"",
+          "to": "GroupFunctions=\"gdSum\" Order=\"3\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"squared_distance_Avg\"/>",
+          "to": "<Mapping Source=\"squared_distance_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sum-squared-distance.csv",
+      "expected_failed": [
+        "group_profiles",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    mean_squared_distance = sum((px - x) ** 2 + (py - y) ** 2 for px, py in group) / len(group)",
+            "to": "    mean_squared_distance = sum((px - x) ** 2 + (py - y) ** 2 for px, py in group)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"center_x\"/>",
+          "to": "<Item Name=\"center_x\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sort.csv",
+      "expected_failed": [
+        "scenario_and_export",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "center_x",
+          "descending": true
+        }
+      }
+    }
+  ]
+}

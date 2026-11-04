@@ -1,0 +1,137 @@
+{
+  "task_id": "measurement-redelivery-volume-detailed",
+  "dataset_sha256": {
+    "deliveries.csv": "86d4cb02135ca1a5be6324b8b7d82a6d59c4a8edf73d191a3d0900c03d73f4d6"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "5231535f9ed6a0d00d4a9237d19c02f3bd235204d88569c90fafd5bfb0f449c4"
+  },
+  "reference_sha256": "813f0848bd244a3464838d4451dfecb9783cb7ec1886d5c70b632a28ea5aded5",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/deliveries.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-11-01T06:13:53+03:00",
+    "duration_s": 366,
+    "tokens": {
+      "input": 81918,
+      "output": 3728,
+      "reasoning": 361
+    },
+    "tool_calls": 27,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Nine raw deliveries of five consistent measurements on three devices, frozen before independent manual3x5 and stdlib Counter oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Unique delivery_id; globally consistent measurement_id→device/quantity; nonempty ASCII/case-sensitive identifiers, positive integer quantity in pieces, no date/money. Same quantity does not identify a fact. Includes double/triple delivery, separate equal-quantity facts and singleton device; no conflict resolution or arrival ordering implied."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections.Counter",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw delivery count by device and measurement_id identity map retaining consistent device/quantity, then count facts and quantity once per fact; repeats=raw count−facts. Separate manual full15 after raw freeze before oracle/native."
+  },
+  "native_verification": {
+    "actual_review": "SPEC+QUALITY29 APPROVE/rootFULLREAD171cbd CLOSED",
+    "observed_nodes": 7,
+    "observed_links": 6,
+    "node_names_counts_layout_are_not_acceptance_gates": true,
+    "full_cells": 15,
+    "integer_count_quantity_texts": 12,
+    "empty_cells": 0,
+    "no_JS_or_static_gold": true,
+    "tool_errors": 0,
+    "skill_duplicate": "Same callID/input/output, enriched activation metadata; whole events/parts NOT byte-equal",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "content_verification": "Collected XML and full CSV independently checked; original Save flags preserved",
+    "ordinary_cleanup": "Own saved package Close/logout; original Runtime+Knowledge ACK and actual exit0/noSignal; two full scoped idle passes, no new CLI probe"
+  },
+  "cold_verification": {
+    "root_actual": "rooteda3d1+5cd238 verified; combined independent review pending",
+    "run_all_calls": 1,
+    "native_nodes_green": 7,
+    "service_node_green": 1,
+    "LGP_and_raw_SHA_stat_unchanged": true,
+    "new_export_bytes": 109,
+    "full15_by_named_columns": true,
+    "integer_texts": 12,
+    "empty_cells": 0,
+    "Save_calls": 0,
+    "Configure_calls": 0,
+    "NoSave": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "browser_tabs_after": [],
+    "UI_evidence": "cold-full.png covers initial six native nodes at left; cold-export.png covers remaining export and intermediate nodes after one horizontal scroll. No repeated execution/config/save.",
+    "observer_note": "After logout/signin proof write, own tab close and IAB[] already returned, optional JS variable cleanup referenced undefined p25pw. Confirmed UI/file effects preserved, no actions repeated."
+  },
+  "measurement": {
+    "requested_service_tier": "STANDARD",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G07 under canonical implementation plan; no new P26 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

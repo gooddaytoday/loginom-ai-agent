@@ -1,0 +1,8 @@
+quote_id;sku;supplier_id;active
+Q01;A01;S01;1
+Q02;A01;S01;1
+Q03;A02;S01;1
+Q04;A02;S02;1
+Q05;A03;S03;0
+Q06;B01;S04;1
+Q07;B02;S04;0

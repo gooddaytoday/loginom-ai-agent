@@ -1,0 +1,131 @@
+{
+  "sources": {
+    "SPEC.md": "8b1fae31de2f0e0298dc474a24370cf9b81cc440d27a4cd983ab39708693cc0b",
+    "acceptance.json": "42bdfd4626b326453510cc3e2f6e4adf50cda5b7a45efb4f6f36382916451dc1",
+    "data/operating_calendar.csv": "b83b6631039d514fed85fa40002b0689f1f98ce8ee76ff93bc1f8c4dd82a415e",
+    "data/sales_lines.csv": "b535adb40672f0a3dc1ec265141e9535007a662a0b69d96cd530db498af3270c",
+    "oracle.csv": "36fbd06f1b336965a46542a4533e6ab2f376239cbec05e8e8a2ef3f32c8ffa1c",
+    "oracle.py": "d4bc93fc1b27a61343e5ce768e8b48990408d513bf67c9b727720e1cf18f2f45",
+    "provenance.json": "9d7db4bb502ea20b6f96576015894176ee53efb35ec8b5024788e2b608c7f73d",
+    "reference.lgp": "d24cedd5eb26aeef11735242af8a974bc1851955c7644bcffbe266010e2027f8",
+    "task.json": "056636c69826ddbd7c8f85098cc290c2343f5da94c9f336144c792e6c1a669a3"
+  },
+  "cases": [
+    {
+      "id": "calendar-inner",
+      "kind": "filter",
+      "edits": [
+        {
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\" JoinType=\"jtJoin\">",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "calendar-store-day-exposure",
+        "published-calendar-groups",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "with (root / \"data/operating_calendar.csv\").open(newline=\"\", encoding=\"utf-8\") as source:\n    for row in csv.DictReader(source, delimiter=\";\"):\n",
+            "to": "with (root / \"data/operating_calendar.csv\").open(newline=\"\", encoding=\"utf-8\") as source:\n    for row in csv.DictReader(source, delimiter=\";\"):\n        if (row[\"store_id\"], row[\"date\"]) not in ledger:\n            continue\n",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "calendar-inner.csv"
+    },
+    {
+      "id": "daily-amount-count",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "from": "<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>",
+          "to": "<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdCount\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        },
+        {
+          "from": "<Mapping Source=\"amount_Sum\"/>",
+          "to": "<Mapping Source=\"amount_Count\"/>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "revenue-per-exposure",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "ledger[key] = ledger.get(key, Decimal(0)) + Decimal(row[\"amount\"])",
+            "to": "ledger[key] = ledger.get(key, Decimal(0)) + Decimal(1)",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "daily-amount-count.csv"
+    },
+    {
+      "id": "unnormalized-total",
+      "kind": "column",
+      "edits": [
+        {
+          "from": "Expression=\"revenue / open_store_days\"",
+          "to": "Expression=\"revenue\"",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "revenue-per-exposure",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "format(revenue / Decimal(days), \".6f\")",
+            "to": "format(revenue, \".6f\")",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "unnormalized-total.csv"
+    },
+    {
+      "id": "missing-sales-one",
+      "kind": "column",
+      "edits": [
+        {
+          "from": "Expression=\"NVLF(daily_revenue, 0)\"",
+          "to": "Expression=\"NVLF(daily_revenue, 1)\"",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "calendar-store-day-exposure",
+        "revenue-per-exposure",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "values[1] += ledger.get((row[\"store_id\"], row[\"date\"]), Decimal(0))",
+            "to": "values[1] += ledger.get((row[\"store_id\"], row[\"date\"]), Decimal(1))",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "missing-sales-one.csv"
+    }
+  ]
+}

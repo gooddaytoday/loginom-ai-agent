@@ -1,0 +1,5 @@
+credit_id;order_line_id;qty;amount;status
+K01;L01;1;12.00;posted
+K02;L01;1;14.00;posted
+K03;L02;1;7.00;posted
+K04;L01;3;37.50;draft

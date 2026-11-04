@@ -1,0 +1,66 @@
+{
+  "task_id": "three-type-minimum-sse-detailed",
+  "dataset_sha256": {
+    "objects.csv": "acb0985d5d0a85d0ae41e61bf5281e87002eabf8853209dbda2906118e177a87"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "52fbcc7274389019a7f5065a1c03fe4f1c3759604f0dbe762228cc8a4e4f4757"
+  },
+  "reference_sha256": "dd751c74def31679d7deec56e949d5ca718fecc55a0ff731f4ad327e73097462",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol-fast",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/objects.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T13:29:23+03:00",
+    "duration_s": 578,
+    "tokens": {
+      "input": 87941,
+      "output": 5585,
+      "reasoning": 2685
+    },
+    "tool_calls": 33,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "library": "stdlib fractions.Fraction",
+    "algorithm": "restricted-growth enumeration of 966 unlabelled partitions; independent pairwise SSE and separation bound"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

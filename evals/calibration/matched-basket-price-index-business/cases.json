@@ -1,0 +1,138 @@
+{
+  "sources": {
+    "SPEC.md": "64f30b7c113422e3b8d5f4a6d02e07b5f079edae1448c504a9aa54314aadb016",
+    "acceptance.json": "525ca1dcac85368f1d5ee130f3352240a9ae3e4dd8f3124ad19fe6f2314d87dd",
+    "data/sales_lines.csv": "d2e42091ef1b3fb8d39d9d0ed691bad91176b0de932c469695e549f49970d6f9",
+    "oracle.csv": "38ef0c1a1b29834f71a577b2c2f068826f074322a10bf2c29d4fc8ae33aba63a",
+    "oracle.py": "509d8163eb5a6e5c45caf8914e5a2531a9b7a295f884b40efa4019741421b059",
+    "provenance.json": "0f0dcbfb2e40d1f3f152bce63a02dfee5965b517d7dfa28c802d2736beff120a",
+    "reference.lgp": "d8a85300711cd33aef2337e957d70165a9dc962d88537057e073582e02f0d995",
+    "task.json": "3677e31a2ebf46a6b497ca4cadab29b8522419bd3e69e71fd6c0f17850bc8f0d"
+  },
+  "cases": [
+    {
+      "id": "quarter-upper-inclusive",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"0127bad7-2fb8-4d91-9891-b5af41b6187b\" Name=\"timestamp\" ConcatenationType=\"ctAnd\" DataType=\"dtDateTime\" RelationType=\"frtLess\"",
+          "to": "<Item Guid=\"0127bad7-2fb8-4d91-9891-b5af41b6187b\" Name=\"timestamp\" ConcatenationType=\"ctAnd\" DataType=\"dtDateTime\" RelationType=\"frtLessOrEqual\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "eligible-quarter-prices",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "quarter-upper-inclusive.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "timestamp < datetime(2026, 7, 1)",
+            "to": "timestamp <= datetime(2026, 7, 1)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "current-weights",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"base_qty * base_price\"",
+          "to": "Expression=\"current_qty * base_price\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"base_qty * current_price\"",
+          "to": "Expression=\"current_qty * current_price\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "matched-fixed-base-basket",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "current-weights.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "base_cost = sum((base[sku][1] for sku in matched), Decimal(0))",
+            "to": "base_cost = sum((current[sku][0] * base[sku][1] / base[sku][0] for sku in matched), Decimal(0))",
+            "count": 1
+          },
+          {
+            "from": "current_cost = sum((base[sku][0] * current[sku][1] / current[sku][0] for sku in matched), Decimal(0))",
+            "to": "current_cost = sum((current[sku][0] * current[sku][1] / current[sku][0] for sku in matched), Decimal(0))",
+            "count": 1
+          },
+          {
+            "from": "coverage = base_cost / base_revenue",
+            "to": "coverage = sum((base[sku][1] for sku in matched), Decimal(0)) / base_revenue",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "matched-denominator",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"NVLF(matched_revenue, 0) / base_revenue\"",
+          "to": "Expression=\"NVLF(matched_revenue / basket_base_cost, 0)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "base-category-coverage",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "matched-denominator.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "coverage = base_cost / base_revenue",
+            "to": "coverage = Decimal(1) if matched else base_cost / base_revenue",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "base-category-dropped",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "base-category-coverage",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "base-category-dropped.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for category in sorted({category for category, sku in periods[0]}):",
+            "to": "for category in sorted({category for category, sku in periods[0]} & {category for category, sku in periods[1]}):",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

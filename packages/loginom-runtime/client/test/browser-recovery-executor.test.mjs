@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createActionRuntime } from '../lib/executor.mjs';
-import { NodeReleaseBlocked } from '../lib/node-pending-release.mjs';
+import { NodeReleaseBlocked, releasePendingNode, verifyRecoveredPendingNode } from '../lib/node-pending-release.mjs';
+import { createBrowserRecovery } from '../lib/browser-recovery.mjs';
+import { createSerialGate } from '../lib/clipboard.mjs';
 import { buildNodeReadRequest, nodeReadHandler, alignReadSchema } from '../lib/node-read-contract.mjs';
 import { actions } from './support/executor-fixture.mjs';
 import { compactNodeResult } from '../lib/user-results.mjs';
+import { createExcelImportNodeSupport } from '../lib/imports-excel-node.mjs';
 import { createJavascriptCodeNodeSupport } from '../lib/javascript-code-node.mjs';
 import { createRedactor } from '../lib/redact.mjs';
 
@@ -25,7 +28,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
   nodeType = 'imports.text', stopPhase = 'finish' } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
-  const adapter = { observe: async () => structuredClone(graph), preflight: async () => {},
+  const adapter = { observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
     positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
     reconcile: async () => ({ verified: true, cleanup_complete: true }),
     mutate: async e => { calls.push(e.kind); if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Source',
@@ -45,9 +48,10 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     releasePending: async s => { calls.push('release:' + s.pending.phase); return state.release(s); },
     ...(releasePendingPhases ? { releasePendingPhases } : {}),
     ...(recoveryReleasePending ? { recoveryReleasePending } : {}) };
-  const mode = nodeType === 'programming.javascript' ? 'script' : 'delimited';
+  const mode = nodeType === 'programming.javascript' ? 'script' : nodeType === 'imports.excel' ? 'xlsx' : 'delimited';
   const handler = { revision: '1', modes: [mode], validate: () => {}, configure: async () => {
     const result = await ok('configure')();
+    if (stopPhase === 'configure' && state.receipt) state.receiptOptions('apply:configure', 'node.excel.configure.internal', 'signature');
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
@@ -55,16 +59,18 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
-      const receipt = { status: 'SUCCEEDED', action_key: 'node.finish', action_revision: '1', operation_id: 'apply:finish', phase: 'verified',
+      const receipt = { status: stopPhase === 'configure' ? 'AMBIGUOUS' : 'SUCCEEDED',
+        action_key: stopPhase === 'configure' ? 'node.excel.configure.internal' : 'node.finish', action_revision: '1',
+        operation_id: 'apply:' + stopPhase, phase: 'verified',
         effect_possible: true, output: {}, error: null, trace: [], cleanup_complete: state.receipt.cleanup };
       if ('operation_id' in state.receipt) receipt.operation_id = state.receipt.operation_id;
       if ('action_key' in state.receipt) receipt.action_key = state.receipt.action_key;
       return { status: 'SUCCEEDED', action_key: 'operation.receipt', action_revision: '1', operation_id: 'apply', phase: 'observed',
-        effect_possible: false, error: null, trace: [], output: { state: 'completed', receipt } };
+        effect_possible: false, error: null, trace: [], output: { state: state.receipt.state ?? 'completed', receipt } };
     },
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([[nodeType, handler]]),
     nodeApplyDriverFactory: options => {
-      state.receiptOptions = options.receiptOptions; state.operation = options.operation;
+      state.receiptOptions = options.receiptOptions; state.operation = options.operation; state.readReceipt = options.readReceipt;
       if (nodeType === 'programming.javascript') {
         const js = createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()})
           .nodeApplyDriverFactory(options);
@@ -84,6 +90,73 @@ async function stopAtFinish(f, id = 'apply', target) {
   assert.equal(job.outcome.output.pending_phase, 'finish');
   return job;
 }
+
+test('terminal Excel configure hands off without cleanup and finishes only after fresh native quiet proof', async () => {
+  let wizard = true, observations = 0;
+  const channel = { observe: async ({ready}) => {
+    observations++;
+    const value = {wizard: {status: wizard ? 'observed' : 'absent'},
+      prepared_node_context: {...node, verified: true, surface: wizard ? 'wizard' : 'graph', locked: false},
+      ui: {dialogs: [], masks: []}};
+    if (!ready(value)) throw Error('Node procedure readiness timeout');
+    return value;
+  }, perform: async () => assert.fail('Recovery verifier must not perform a gesture') };
+  const f = fixture({nodeType: 'imports.excel', stopPhase: 'configure',
+    release: () => releasePendingNode({operation: f.state.operation, channel, readReceipt: f.state.readReceipt}),
+    recoveryReleasePending: () => verifyRecoveredPendingNode({operation: f.state.operation, channel, readReceipt: f.state.readReceipt})});
+  f.state.receipt = {cleanup: false};
+  f.runtime.startNodeApply(f.request('apply'));
+  const job = await f.runtime.waitNodeApply('apply', {timeoutMs: 1000});
+  assert.equal(job.outcome.output.pending_phase, 'configure');
+  assert.equal(job.outcome.output.execution.status, 'not_requested');
+  const graphReads = f.calls.filter(c => c === 'graph').length;
+  assert.equal((await f.runtime.recover('apply', {strategy: 'abandon_operation', recoveryOperationId: 'release-1'})).error.code,
+    'NODE_RELEASE_REFUSED');
+  assert.equal(observations, 0);
+  assert.equal(f.calls.filter(c => c === 'graph').length, graphReads);
+  const recovery = createBrowserRecovery({enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ok: true}), record: async event => {f.events.push(event); return event;},
+    browser: {callTool: async () => {wizard = false; return {content: [{type: 'text', text: 'Cancelled own wizard'}]};}}});
+  const body = reply => JSON.parse(reply.content[0].text);
+  assert.equal(body(await recovery.call('dock_browser_recovery', {action: 'start', operation_id: 'apply'})).phase, 'browser');
+  assert.deepEqual(f.events.find(e => e.phase === 'browser_recovery_handoff').proof,
+    {receipt_id: 'apply:configure', receipt_state: 'completed', cleanup_complete: false});
+  const finish = () => recovery.call('dock_browser_recovery', {action: 'finish', operation_id: 'apply', actions_performed: ['Cancelled wizard']});
+  const unresolved = body(await finish());
+  assert.equal(unresolved.verification.status, 'unresolved');
+  assert.equal(unresolved.phase, 'browser');
+  assert.equal(f.calls.filter(c => c === 'graph').length, graphReads);
+  assert.equal(recovery.refusesDock('dock_node_apply'), true);
+  assert.throws(() => f.runtime.startNodeApply(f.request('other')), /Browser recovery holds/);
+  assert.equal((await recovery.call('browser_click', {element: 'Cancel', ref: 'cancel'})).isError, undefined);
+  const fresh = observations;
+  const verified = body(await finish());
+  assert.equal(verified.verification.status, 'continuable');
+  assert.equal(verified.phase, 'dock');
+  assert.equal(observations - fresh, 2);
+  assert.equal(f.calls.filter(c => c === 'graph').length - graphReads, 2);
+  assert.equal(f.state.receipt.cleanup, false);
+  const outcome = f.runtime.nodeApplyStatus('apply').outcome;
+  assert.equal(outcome.status, 'FAILED');
+  assert.equal(outcome.output.configuration.status, 'unknown');
+  assert.equal(outcome.output.execution.status, 'not_requested');
+  assert.equal(outcome.output.package_saved, false);
+  assert.deepEqual(f.events.find(e => e.phase === 'node_operation_released').receipt.proof.cleanup,
+    {wizard_closed: false, read_view_restored: false, views_returned: false});
+  const phases = f.events.map(e => e.phase);
+  assert.ok(phases.indexOf('browser_recovery_receipt') < phases.indexOf('operation_abandoned'));
+  assert.equal(f.calls.filter(c => c === 'configure').length, 1);
+  assert.equal(f.calls.includes('finish'), false);
+  assert.equal(f.runtime.hasUnsettledWork(), false);
+});
+
+test('Excel inherits the recovery-only release verifier without dispatching an uncertain browser call',async()=>{
+ const operation={transportUncertain:true,nodeApply:{node,pending:{phase:'configure'},
+  request:{document_id:'doc',workflow_ref:workflow}}};
+ const drivers=createExcelImportNodeSupport({}).nodeApplyDriverFactory({operation,now:()=>1,
+  execute:async()=>assert.fail('Unconfirmed transport cannot read or mutate the browser')});
+ await assert.rejects(drivers.recoveryReleasePending(operation.nodeApply),/last browser call has not confirmed completion/);
+});
 
 test('T1: a refused release points to browser recovery instead of asking the user', async () => {
   const f = fixture();
@@ -307,16 +380,15 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(settled.output.next_step.tool, 'dock_action_run');
 });
 
-test('handoff requires the same completed and cleaned-up last receipt as the node release', async () => {
+test('handoff proves callback completion independently from UI cleanup', async () => {
   for (const cleanup of [false, true]) {
     const f = fixture();
     f.state.receipt = { cleanup };
     await stopAtFinish(f);
     await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
     const handoff = await f.runtime.browserRecoveryHandoff('apply');
-    assert.equal(handoff.stopped, cleanup, JSON.stringify(handoff));
-    if (!cleanup) assert.match(handoff.reason, /without confirmed cleanup/);
-    if (cleanup) assert.equal(handoff.proof.cleanup_complete, true);
+    assert.equal(handoff.stopped, true, JSON.stringify(handoff));
+    assert.equal(handoff.proof.cleanup_complete, cleanup);
   }
 });
 
@@ -331,6 +403,24 @@ for (const identity of [{ operation_id: null }, { operation_id: 'foreign:step' }
     assert.throws(() => f.runtime.assertPreparationAllowed(), /pending|uncertain/);
   });
 }
+
+test('terminal Excel configure cannot hand off an unsettled, foreign or transport-uncertain receipt', async () => {
+  for (const fault of [{state: 'running'}, {state: 'unknown'}, {state: 'missing'}, {state: 'identity_mismatch'},
+    {operation_id: null}, {operation_id: 'foreign:configure'}, {action_key: 'foreign.action'}, {transportUncertain: true}]) {
+    const f = fixture({nodeType: 'imports.excel', stopPhase: 'configure'});
+    f.state.receipt = {cleanup: false, ...fault};
+    f.runtime.startNodeApply(f.request('apply'));
+    await f.runtime.waitNodeApply('apply', {timeoutMs: 1000});
+    await f.runtime.recover('apply', {strategy: 'abandon_operation', recoveryOperationId: 'release-1'});
+    f.state.operation.transportUncertain = fault.transportUncertain === true;
+    const reads = f.calls.filter(c => c === 'graph').length;
+    const result = await f.runtime.browserRecoveryHandoff('apply').catch(error => ({stopped: false, reason: error.message}));
+    assert.equal(result.stopped, false, JSON.stringify(fault));
+    await assert.rejects(f.runtime.verifyBrowserRecovery({operationId: 'apply', step: {}, attested: {}}), /lease/);
+    assert.equal(f.calls.filter(c => c === 'graph').length, reads);
+    assert.equal(f.runtime.hasUnsettledWork(), true);
+  }
+});
 
 test('an unknown recovery action outcome keeps Dock mutations blocked after stop', async () => {
   const f = fixture();

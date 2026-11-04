@@ -1,0 +1,48 @@
+{
+  "task_id": "matched-basket-price-index-business",
+  "source_task": "matched-basket-price-index-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/matched-basket-price-index-detailed/provenance.json",
+  "dataset_sha256": {
+    "sales_lines.csv": "d2e42091ef1b3fb8d39d9d0ed691bad91176b0de932c469695e549f49970d6f9"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "38ef0c1a1b29834f71a577b2c2f068826f074322a10bf2c29d4fc8ae33aba63a"
+  },
+  "reference_sha256": "d8a85300711cd33aef2337e957d70165a9dc962d88537057e073582e02f0d995",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic13 sale lines frozen before separate manual2x7 and independent oracle under approved G06 P23 fixture plan; no answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real sales, or derived real-data snapshot. Grain sale line/SKU not PK; category constant perSKU; ASCII case-sensitive/noNULL. qty nonnegative integer,amount nonnegative2dec; eligible only qty>0 AND amount>0. Local Europe/Moscow ISO timestamps; half-open base[Jan1,Apr1),current[Apr1,Jul1)2026. Full base category registry/denominator; matched SKU intersection/fixed base quantities; CAT_B undefined index empty,not0/NULL; current-only CAT_C omitted."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent eligible raw aggregation into SKU/period Decimal qty/revenue dictionaries; intersection; current prices in fixed base quantities; full original base revenue denominator; complete separate manual2x7 before oracle/native. No intermediate rounding."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "group_gate": "G06 after all5dispositions and whole-group prerequisites; P17 ONLY-B conditional, no new ONLY-B P23 requirement"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

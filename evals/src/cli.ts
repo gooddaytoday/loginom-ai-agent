@@ -131,6 +131,9 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     ...(config.slotsFile ? { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false" } : {}),
     ...(config.slotsFile && config.auth ? { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: config.auth.sharedDir } : {}),
   }
+  if (config.slotsFile && config.agent.cliMode === "binary" &&
+    Object.entries(isolated).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))
+    isolated.NODE_USE_ENV_PROXY = "1"
   if (config.agent.cliMode === "source")
     return {
       mode: "source" as const,

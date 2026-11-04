@@ -1,0 +1,40 @@
+{
+  "task_id": "cross-device-campaign-reach-business",
+  "source_task": "cross-device-campaign-reach-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/cross-device-campaign-reach-detailed/provenance.json",
+  "dataset_sha256": {
+    "campaigns.csv": "c084a2565f86456d85a48e9fc1d9f4d63cc9a3c2731f79b44dbe9d5c15310215",
+    "identities.csv": "c1b1056d7e0f868a031b4964f3c42c3d7aa2602c406a36ef576a6dcc60dd782e",
+    "impressions.csv": "15619f11a99c6d0e47cc69f3879640980b55b6d5399b873aafa6797509d2c011"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "297c281b6460800dd2fcfc0c70301dd9097978f808e8befe0a68885ce74e5cb4"
+  },
+  "reference_sha256": "15b6cde2f741e4e562f6a6374eb4217014043d24219d5f0aee5bd0c7e4f40584",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 3-campaign register, 3 device/person identities and 7 impression events, frozen before manual gold and independent oracle under approved P11 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real users or a derived real-user snapshot. Case-sensitive ASCII string keys; unique campaign_id/event_id in their registers and device_id in identities; all impression campaign foreign keys exist; identities device→person is single-valued, multiple devices per person allowed; nonempty input cells/no NULL. Unknown impression devices intentionally lack identities. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv"
+    ],
+    "algorithm": "Independent raw-CSV event and unknown-event counters plus per-campaign person sets over the full campaigns register; device→person lookup before distinct counting, no deduplication of events, unknown devices excluded from person sets; ASCII sorting and identified-event numerator/known-person denominator with empty frequency when no people. Full manual 3×5 independently checked before native; no Loginom outputs used."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

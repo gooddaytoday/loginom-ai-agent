@@ -1,0 +1,162 @@
+{
+  "task_id": "status-code-coverage-detailed",
+  "dataset_sha256": {
+    "requests.csv": "44fb4ba814864aadcb6c04c37039d3683292bc2aa78d0debe86593876103803d"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "5b5373afcdb7bfab762159075683db5bd233658abeb06b7b8bad8a84c8d21f64"
+  },
+  "reference_sha256": "263b36299dbaf26f4d6adebdc0c5f243d66e835990d49289f45676cdf535f4ea",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/requests.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-11-01T07:50:52+03:00",
+    "duration_s": 458,
+    "tokens": {
+      "input": 90507,
+      "output": 4358,
+      "reasoning": 982
+    },
+    "tool_calls": 36,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; no separate deep-link visit claimed",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "requests.csv",
+    "selection": "Exact14 requests frozen before independent manual/oracle/native; eight exact English/Russian aliases plus case/trailing-space/missing/literal-NULL boundaries",
+    "units": "One request; completion_pct in percent0–100; no dates/currency/weights",
+    "transformations": "UTF8 semicolon CSV only; whole? represents actual NULL, quoted empty and literal NULL remain separate; no trim/casefold"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only exact status dictionary, exhaustive four-category partition by source, recognized-only completion ratio; independent full manual precedes source/native"
+  },
+  "native_verification": {
+    "actual_review": "actual34 APPROVE c8463990/rootFULLREADcb8fbe ADOPT2a9f41",
+    "observed_nodes": 7,
+    "observed_links": 6,
+    "node_names_counts_layout_are_not_acceptance_gates": true,
+    "full_cells": 14,
+    "integer_counter_texts": 10,
+    "sole_empty_cell": [
+      "SRC_B",
+      "completion_pct"
+    ],
+    "classification": "R01–R04 completed;R05–R08 open;R09 trailing-space/R10 Done/R11 готово unmapped;R12 actual NULL/R13 empty missing;R14 literalNULL unmapped",
+    "import_observed_format": {
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "null_marker": "?",
+      "decimal_separator": ".",
+      "multiple_delimiters": false,
+      "date_format": "Не задано (dd/mm/yyyy)",
+      "date_separator": "Не задано (.)"
+    },
+    "no_JS_or_static_gold": true,
+    "tool_errors": 0,
+    "event_tool_count": 36,
+    "unique_tool_calls": 35,
+    "skill_duplicate": "One same callID/input/output with enriched activation metadata; not another dispatch or whole-event equality",
+    "DB_prompt_format": "9537B vs argv9530: exteriorquotes+five escaped quotes(+7), remainder exact after those transformations; validJSONfalse. Other74B attachment framing+282B exactraw text and282B raw file checked; no autocontext absence attestation.",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": {
+        "status": "attempted",
+        "reason": "result_unconfirmed",
+        "warning": true
+      }
+    },
+    "outcome_limit": "Original Save data not_checked/goal not_verified preserved; external numeric proof does not promote them",
+    "memory_context": "0 memory-writing counter; readonly Help/skills present; automatic-context absence NOT_ATTESTED",
+    "ordinary_cleanup": "Own saved-package Close/logout, original Runtime+Knowledge closed_ack/actualexit0/noSignal and session/document/account/path binding; subsequent two complete scoped idle passes/config/raw unchanged; no new CLI probe",
+    "auxiliary_native_collect_error": "8d685f usage exit1 before artifact collection: extra case arg; corrected invocation only, no model/oracle replay"
+  },
+  "cold_verification": {
+    "root_actual": "server-after7413da35/idle-after-cold a14a88e4 VERIFIED/rootFULLREADd81722; combined independent review pending",
+    "run_all_calls": 1,
+    "run_at": "2026-11-01T05:11:52.833Z",
+    "native_nodes_green": 7,
+    "service_nodes_green": 1,
+    "ports_observed_before_after": 23,
+    "server_LGP_raw_SHA_stat_unchanged": true,
+    "new_export_bytes": 100,
+    "new_export_mtime_UTC": "2026-11-01T05:11:53.185589117Z",
+    "full14_by_named_columns": true,
+    "integer_texts": 10,
+    "sole_empty_cell": [
+      "SRC_B",
+      "completion_pct"
+    ],
+    "Save_calls": 0,
+    "Configure_calls": 0,
+    "NoSave": true,
+    "logout": true,
+    "own_tab_closed": true,
+    "browser_tabs_after": [],
+    "UI_observer_notes": "Packages text locator timeout before menu effect; fresh AX showed closed menu, container click opened it. Single actual Open/RunAll/NoSave/logout, all7native+service grey to green/23ports active incl sorting no_automapping. No Configure/Save/repeated execution. Initial postaction AX asynchronous; following DOM and signin confirm closure."
+  },
+  "measurement": {
+    "requested_service_tier": "STANDARD",
+    "response_service_tier": "NOT_OBSERVED",
+    "speed_comparison": "NOT_MEASURED"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies; no new pair-only blind-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

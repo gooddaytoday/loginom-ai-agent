@@ -318,15 +318,16 @@ test('target preflight refusal before creation releases without inventing a targ
   assert.deepEqual(f.calls,[]);
 });
 
-test('completed last browser call without cleanup refuses release and handoff',async()=>{
+test('completed parent callback without cleanup admits handoff but retains strict early release',async()=>{
   const f=fixture();await stop(f);
   f.state.operation.lastReceipt={id:'original',operation_id:'original',action_key:'ui.act',signature:'signature'};
   f.state.receiptResult={state:'completed',receipt:{status:'SUCCEEDED',action_key:'ui.act',action_revision:'1',operation_id:'original',
     phase:'verified',effect_possible:true,output:{},error:null,trace:[],cleanup_complete:false}};
   assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');
-  const handoff=await f.runtime.browserRecoveryHandoff('apply');
-  assert.equal(handoff.stopped,false);
-  assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);
+  const basis=f.runtime.browserRecoveryBasis('apply'),handoff=await f.runtime.browserRecoveryHandoff('apply');
+  assert.equal(handoff.stopped,true);assert.equal(handoff.proof.cleanup_complete,false);
+  assert.equal((await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{}})).status,'unresolved');
+  assert.throws(()=>f.runtime.assertPreparationAllowed(),/Browser recovery holds the page/);
 });
 
 test('expired proof read cannot issue a second observation or release the gate',async()=>{

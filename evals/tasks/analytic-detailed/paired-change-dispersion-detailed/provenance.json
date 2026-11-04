@@ -1,0 +1,60 @@
+{
+  "task_id": "paired-change-dispersion-detailed",
+  "dataset_sha256": {
+    "machines.csv": "e2ba8fee38451763431efb1cbe3869dae947ba9ef2c677714452c3390edfd63b"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "85bcb5acc050f602688d3ecaedfa3f237b8b6e9d1f6cc7e82498f115faf7f3e6"
+  },
+  "reference_sha256": "c26414b2cb28912cc76c6c7dae88822ebfe9a6a11ae5488d434bbecc73bcae08",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-browser",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/machines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Авторская сборка эталона в уже подготовленном Authoring. Работай только с доставленным machines.csv и собственным новым пакетом этой попытки. Рано сохрани импорт checkpoint, затем сохраняй законченные значимые этапы и итоговый сценарий.\nИспользуй штатные узлы, без JS-подмены: изменение after-before для одной машины, native CrossTable avg/stddev/count с row_keys setting_group и columns=[], затем SE по числу пар собственной группы. Подтверждай реальный выборочный смысл stddev и фактические выходные имена/schema через Help/readback; не угадывай имена агрегатов или незаданные настройки. Эквивалентная native-композиция допустима по постановке.\nПри неизвестном результате не повторяй apply/Execute вслепую; только exact предлагаемый managed recovery и fresh native proof. Не объявляй исходную configuration/execution успешными после простого освобождения узла. Короткие осмысленные подписи узлов достаточны.\nИтог — новый полный CSV по контракту (;, qualifier двойная кавычка, decimal dot, заголовки и сортировка setting_group), final Save и честный отчёт. Эта подсказка не содержит oracle или эталонных чисел.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T10:25:00+03:00",
+    "duration_s": 540,
+    "tokens": {
+      "input": 112347,
+      "output": 5731,
+      "reasoning": 2606
+    },
+    "tool_calls": 42,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,50 @@
+{
+  "task_id": "measurement-unit-consistency-business",
+  "source_task": "measurement-unit-consistency-detailed",
+  "source_provenance": "../../analytic-detailed/measurement-unit-consistency-detailed/provenance.json",
+  "reference_origin": "Shared genuine detailed CLI A1 reference verified native and cold;no separate B authoring model/session/attempt claimed",
+  "dataset_sha256": {
+    "samples.csv": "3f8709fa9071a1fc2510f96a29f837813d9025e4e4531e56fa605e06d5ba6246"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "c8490460f072180573c52a24a312b13936e2c3e6ab1db27037221b8e6546172c"
+  },
+  "reference_sha256": "5f7192fff64b53b0c50921e170285a6d1988e5cf7eb9247cf8e79dc31ee67afe",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint,savedpackage and Unit_0/Info.xml Name=Unit1;no separate deep-link visit claimed",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "samples.csv",
+    "selection": "Exact6 frozen samples across MAT_A/MAT_B before independent manual/oracle/native;unequal valid lengths and exact mm/cm/m versus ft/CM",
+    "units": "length in exact unit;mass_kg kg;length_m metres;kg_per_m kg/m;positive lengths/masses",
+    "transformations": "UTF8 semicolon CSV;no trim/casefold/guessed unit;unknown rows excluded from BOTH valid sums"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only exact unit factors,valid/unknown counts,valid-only sums by material,ratio of sums;full handwritten manual before source/native"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies;no new pair-only gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

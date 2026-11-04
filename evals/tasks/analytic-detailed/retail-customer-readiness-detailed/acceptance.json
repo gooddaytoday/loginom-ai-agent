@@ -1,0 +1,19 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "uci-retail.csv",
+      "synthetic-boundary.csv",
+      "categories.csv"
+    ]
+  }
+}

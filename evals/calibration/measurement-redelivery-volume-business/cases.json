@@ -1,0 +1,131 @@
+{
+  "sources": {
+    "SPEC.md": "2e129edc6c8190b90097521a652a6c9ed009367568ac63d54f7d00832c919347",
+    "acceptance.json": "3d924c8fe6d0dbead107e050c3537fba4fcfcce59f06868a5ef4a32cff84e758",
+    "data/deliveries.csv": "86d4cb02135ca1a5be6324b8b7d82a6d59c4a8edf73d191a3d0900c03d73f4d6",
+    "oracle.csv": "5231535f9ed6a0d00d4a9237d19c02f3bd235204d88569c90fafd5bfb0f449c4",
+    "oracle.py": "97e22ca79e76353accc4a36bf25b379cafc06512f5aa96c6fbc9da6efe002fc1",
+    "provenance.json": "3b66e98df99637a40ba8fe1f6f32abefa64ffc833524ac59d0e0ff0e647b2137",
+    "reference.lgp": "813f0848bd244a3464838d4451dfecb9783cb7ec1886d5c70b632a28ea5aded5",
+    "task.json": "f6bfc02e46005a88bb0ebfab2b7cc4f0fd3563aae53076a66f24b30c9cd036c9"
+  },
+  "cases": [
+    {
+      "id": "collapsed-delivery-count",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdSum\" Order=\"0\"",
+          "to": "GroupFunctions=\"gdCount\" Order=\"0\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"delivery_count_Sum\"/>",
+          "to": "<Mapping Source=\"delivery_count_Count\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-delivery-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "[device, counts[device], facts, counts[device] - facts, quantity]",
+            "to": "[device, facts, facts, counts[device] - facts, quantity]",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "collapsed-delivery-count.csv"
+    },
+    {
+      "id": "copies-as-repeats",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"delivery_count - 1\"",
+          "to": "Expression=\"delivery_count\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-delivery-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "counts[device] - facts",
+            "to": "counts[device]",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "copies-as-repeats.csv"
+    },
+    {
+      "id": "quantity-count",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdSum\" Order=\"3\"",
+          "to": "GroupFunctions=\"gdCount\" Order=\"3\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"quantity_Sum\"/>",
+          "to": "<Mapping Source=\"quantity_Count\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "unique-measurement-quantity",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "values[1] += quantity",
+            "to": "values[1] += 1",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "quantity-count.csv"
+    },
+    {
+      "id": "reverse-device-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"device\"/>",
+          "to": "<Item Name=\"device\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-delivery-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "device",
+          "descending": true
+        }
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-device-order.csv"
+    }
+  ]
+}

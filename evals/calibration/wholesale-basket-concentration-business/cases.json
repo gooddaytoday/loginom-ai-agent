@@ -1,0 +1,92 @@
+{
+  "sources": {
+    "task.json": "f2cab6f49a5b0a960c5b2d5a68a109d3432f064e87fc4dd344cf82a99a1d2abb",
+    "reference.lgp": "79d8fc1969b118b68f97ac7e3d61d4d44d0dbd65cf6a12f7ce514c0dff609ba3",
+    "SPEC.md": "1257b952290ba9ec044dfa65ec880ec3e8d0a71e872da6cf30436d2d159e144f",
+    "data/wholesale-customers.csv": "39b0a96f182e58b598d3e25a2e201ce1aac3cdeadd47286366995bb7d4baf453",
+    "oracle.csv": "89dd6a389130eb4b03ef2e9d68b499088a8eb55b61338d9bdad6a2f56b2f5a9c",
+    "oracle.py": "cebdb87d18df9c01b241e8b299e3a84f04ab6c35edd676c7afdbdb5e82f8573b"
+  },
+  "cases": [
+    {
+      "id": "unsquared-hhi",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"fresh_share * fresh_share + milk_share * milk_share + grocery_share * grocery_share + frozen_share * frozen_share + detergents_share * detergents_share + delicassen_share * delicassen_share\"",
+          "to": "Expression=\"fresh_share + milk_share + grocery_share + frozen_share + detergents_share + delicassen_share\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "unsquared-hhi.csv",
+      "expected_failed": [
+        "concentration_metrics",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "hhi = Fraction(sum(value * value for value in values), total * total)",
+            "to": "hhi = Fraction(sum(values), total)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "effective-not-inverse",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"1 / hhi\"",
+          "to": "Expression=\"hhi\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "effective-not-inverse.csv",
+      "expected_failed": [
+        "concentration_metrics",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "metrics = [hhi, 1 / hhi, Fraction(max(values), total)]",
+            "to": "metrics = [hhi, hhi, Fraction(max(values), total)]",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-one-decimal",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(Str(Int(total_spend)), &quot;.00&quot;)\"",
+          "to": "Expression=\"Concat(Str(Int(total_spend)), &quot;.0&quot;)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-one-decimal.csv",
+      "expected_failed": [
+        "result-full"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f'{total}.00'",
+            "to": "f'{total}.0'",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

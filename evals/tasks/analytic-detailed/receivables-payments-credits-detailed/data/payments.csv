@@ -1,0 +1,12 @@
+payment_id;invoice_id;amount;status
+P001;I001;100.00;posted
+P002;I001;200.25;posted
+P003;I001;999.00;rejected
+P004;I003;650.00;posted
+P005;I004;100.25;posted
+P006;I005;30.00;posted
+P007;I005;100.00;draft
+P008;I007;100.00;cancelled
+P009;I008;450.00;posted
+P010;I009;100.00;posted
+P011;I009;50.00;posted

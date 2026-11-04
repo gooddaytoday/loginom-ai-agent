@@ -1,0 +1,21 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "users.csv",
+      "events.csv"
+    ]
+  },
+  "forbidden_literals": [
+    "TBGJavaScriptEngine"
+  ]
+}

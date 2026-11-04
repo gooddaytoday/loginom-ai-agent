@@ -1,0 +1,140 @@
+{
+  "task_id": "wholesale-basket-concentration-detailed",
+  "dataset_sha256": {
+    "wholesale-customers.csv": "39b0a96f182e58b598d3e25a2e201ce1aac3cdeadd47286366995bb7d4baf453"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "89dd6a389130eb4b03ef2e9d68b499088a8eb55b61338d9bdad6a2f56b2f5a9c"
+  },
+  "reference_sha256": "79d8fc1969b118b68f97ac7e3d61d4d44d0dbd65cf6a12f7ce514c0dff609ba3",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/wholesale-customers.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T22:06:45+03:00",
+    "duration_s": 543,
+    "tokens": {
+      "input": 132181,
+      "output": 4397,
+      "reasoning": 2874
+    },
+    "tool_calls": 29,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "Python standard library fractions.Fraction and decimal.Decimal",
+    "python_version": "3.12.3"
+  },
+  "source_dataset": {
+    "source": "UCI Wholesale Customers",
+    "source_url": "https://archive.ics.uci.edu/dataset/292/wholesale%2Bcustomers",
+    "doi": "10.24432/C5030X",
+    "creator": "Margarida Cardoso",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "download_url": "https://archive.ics.uci.edu/static/public/292/wholesale%2Bcustomers.zip",
+    "fetch_metadata_observed_at_utc": "2026-10-29T09:12:39.424921+00:00",
+    "raw_zip": "source-preflight/uci-wholesale-customers-original.zip",
+    "raw_zip_sha256": "647e6a61683ed23f48c7b04e1e2be78835eca8758b32267603fc42a1479dbfb8",
+    "csv_member": "Wholesale customers data.csv",
+    "raw_csv_sha256": "c3d018c643565b85cee733c4a2ac76dd76e080e857cb23f0ccfcc2e15a6c17ef",
+    "source_data_rows": 440,
+    "source_headers": [
+      "Channel",
+      "Region",
+      "Fresh",
+      "Milk",
+      "Grocery",
+      "Frozen",
+      "Detergents_Paper",
+      "Delicassen"
+    ],
+    "selector": "All 440 source data rows in unchanged original order; no filter, sort, deduplication or synthetic observations.",
+    "runtime_input": "data/wholesale-customers.csv",
+    "runtime_input_sha256": "39b0a96f182e58b598d3e25a2e201ce1aac3cdeadd47286366995bb7d4baf453",
+    "adaptations": [
+      "customer_id=C + three-digit one-based original data-row number; technical snapshot key, not original customer identity.",
+      "CSV serialization UTF-8, semicolon delimiter, header, double-quote qualifier, decimal dot, LF; original eight field values preserved."
+    ],
+    "excluded_from_expenses": [
+      "Channel",
+      "Region"
+    ],
+    "expense_fields": [
+      "Fresh",
+      "Milk",
+      "Grocery",
+      "Frozen",
+      "Detergents_Paper",
+      "Delicassen"
+    ],
+    "units": "Monetary units of the original dataset; currency and scaling not established in verified source evidence. No conversion.",
+    "input_quality": {
+      "unique_technical_ids": 440,
+      "all_expenses_nonnegative": true,
+      "all_row_totals_positive": true,
+      "zero_expense_cells": 0
+    },
+    "coverage_limit": "No zero-expense witness is present in this real snapshot; no synthetic zero rows were added.",
+    "frozen_at_utc": "2026-10-29T16:36:08.600621+00:00",
+    "pre_gold": true,
+    "oracle_contract": {
+      "output_columns": [
+        "customer_id",
+        "total_spend",
+        "hhi",
+        "effective_categories",
+        "max_category_share"
+      ],
+      "sort": "customer_id ascending string",
+      "oracle_tolerance": 1e-08,
+      "total_spend_format": "at least two decimal places",
+      "metric_export_precision": "sufficient for tolerance; no independent minimum digit count",
+      "oracle_serialization_metric_places": 10,
+      "intermediate_rounding": false
+    },
+    "evidence_paths_scope": "Private source-preflight evidence; raw_zip is provenance only, not a runtime input dependency."
+  },
+  "reference_verification": {
+    "cold_rerun": "browser UI, all seven nodes, no reconfiguration or Save",
+    "executor": "root; knows oracle, not blind",
+    "fresh_full_csv": true,
+    "server_package_unchanged": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

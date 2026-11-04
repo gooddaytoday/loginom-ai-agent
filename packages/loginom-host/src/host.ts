@@ -128,7 +128,8 @@ export async function createLoginomHost(options: {
             {
               node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
               entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-              stateDir: join(root, "validation", "knowledge", chat),
+              // Knowledge has no mutable cwd state; retain its private close evidence after validation cleanup.
+              stateDir: join(root, "knowledge", String(connection.generation)),
               generation: connection.generation,
               endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
               apiKey: connection.apiKey,
@@ -164,7 +165,6 @@ export async function createLoginomHost(options: {
               recursive: true,
               force: true,
             }),
-            rm(join(root, "validation", "knowledge", chat), { recursive: true, force: true }),
           ])
         }
       },

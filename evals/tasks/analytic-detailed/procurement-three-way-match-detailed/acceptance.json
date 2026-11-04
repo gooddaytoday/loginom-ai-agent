@@ -1,0 +1,22 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "po_lines.csv",
+      "receipts.csv",
+      "invoice_lines.csv"
+    ]
+  },
+  "forbidden_literals": [
+    "TBGJavaScriptEngine"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "sources": {
+    "SPEC.md": "1481e7e9c36d323549b0e96b41e4896f9e195a50a5d14d8bb9149ac8f2d4cfb5",
+    "acceptance.json": "a027b01557ff1601ca75db59a6ca556605257b99c2fd4cf3b28b7b9104e504b6",
+    "data/invoice_lines.csv": "049d7943a70cea12ff20d117a2ec2b0ef428268754d1df2b5b5fec8e20a23d8a",
+    "data/po_lines.csv": "639ef7ab85d88b7a63767e083dfb77430aebe442eae1849d1ffe4db2da6667ae",
+    "data/receipts.csv": "80644337e0a133ac0fd63602d5b0f8bedd86ce01e3591789c72c431789149bdc",
+    "oracle.csv": "6ae253626d03b4d2fc236252625d828f24bc1d7f78de515582e4c870110e6e9f",
+    "oracle.py": "cc1f53a615180587be40c18e78888f5b1dc0623890ab03e2b13131587ea22e65",
+    "provenance.json": "c30d7f7cfe8461887c62ddfebdcb43e8b916e58362111663e9f6263c9e956114",
+    "reference.lgp": "24048e42c95993f1e169a120a2ba33220e47503c996eb949aa61f0b84f6d3e71",
+    "task.json": "5d5549aea1047e9f4841b713f198e6d3cc4253f29c59db424edb86a2f11280cf"
+  },
+  "cases": [
+    {
+      "id": "excess-compared-with-ordered",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(NVLF(billed_qty, 0) &gt; NVLF(accepted_qty, 0), NVLF(billed_qty, 0) - NVLF(accepted_qty, 0), 0)\"",
+          "to": "Expression=\"IFF(NVLF(billed_qty, 0) &gt; NVLF(ordered_qty, 0), NVLF(billed_qty, 0) - NVLF(ordered_qty, 0), 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "excess-compared-with-ordered.csv",
+      "expected_failed": [
+        "accepted-quantity",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "int(max(billed[key] - accepted[key], 0))",
+            "to": "int(max(billed[key] - Decimal(orders[key][\"ordered_qty\"]), 0))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "price-problems-by-net-deviation",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Int(NVLF(price_problem_lines, 0))\"",
+          "to": "Expression=\"IFF(NVLF(price_deviation, 0) &lt;&gt; 0, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "price-problems-by-net-deviation.csv",
+      "expected_failed": [
+        "invoice-price-lines",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{deviations[key]:.2f}\", problems[key]",
+            "to": "f\"{deviations[key]:.2f}\", int(deviations[key] != 0)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "receipt-inner-drops-po",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"a5991c12-8391-494c-82a9-cfe6db78b26e\">\n\t\t\t\t\t\t\t\t<Left Name=\"po_line_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"po_line_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"a5991c12-8391-494c-82a9-cfe6db78b26e\">\n\t\t\t\t\t\t\t\t<Left Name=\"po_line_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"po_line_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "receipt-inner-drops-po.csv",
+      "expected_failed": [
+        "po-population",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "accepted = {key: Decimal(0) for key in orders}",
+            "to": "accepted = {key: Decimal(0) for key in orders}\nreceipt_keys = set()",
+            "count": 1
+          },
+          {
+            "from": "        accepted[row[\"po_line_id\"]] += Decimal(row[\"accepted_qty\"])",
+            "to": "        accepted[row[\"po_line_id\"]] += Decimal(row[\"accepted_qty\"])\n        receipt_keys.add(row[\"po_line_id\"])",
+            "count": 1
+          },
+          {
+            "from": "    for key in sorted(orders):",
+            "to": "    for key in sorted(receipt_keys):",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "one-decimal-money-text",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True), IF(Find(&quot;.&quot;, Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True)) = 0, &quot;.00&quot;, IF(Count(Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True)) - Find(&quot;.&quot;, Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True)) = 1, &quot;0&quot;, &quot;&quot;)))\"",
+          "to": "Expression=\"Concat(Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True), IF(Find(&quot;.&quot;, Replace(Str(price_deviation), &quot;,&quot;, &quot;.&quot;, True)) = 0, &quot;.0&quot;, &quot;&quot;))\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "one-decimal-money-text.csv",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{deviations[key]:.2f}\"",
+            "to": "f\"{deviations[key]:.1f}\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

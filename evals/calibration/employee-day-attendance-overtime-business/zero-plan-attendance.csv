@@ -1,0 +1,5 @@
+employee_id;month;planned_days;attended_days;absent_days;planned_minutes;worked_minutes;overtime_minutes
+E_A;2025-12;2;2;0;960;960;60
+E_A;2026-01;1;1;1;480;90;90
+E_B;2025-12;1;0;1;480;0;0
+E_B;2026-01;2;1;1;960;540;60

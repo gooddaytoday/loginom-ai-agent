@@ -56,12 +56,15 @@ test('multi-output preview requires exact graph port shapes, including persisted
  roots.set(second.FCell,f.el(nodeRoot.tid+';Output_Data-1'));assert.equal(f.read().verified,false);
 });
 test('inactive cached dataset roots cannot shadow the single visible preview schema',()=>{
- const f=fixture(),tid='MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm';
- const hidden=f.el(tid,f.root);hidden.checkVisibility=()=>false;
- f.el(tid+';normalHeaderCt',hidden);
- f.form.FFormCache.old={FView:{el:{dom:hidden}},FModelNode:{}};
- assert.equal(f.read().verified,true);
- hidden.checkVisibility=()=>true;assert.equal(f.read().verified,false);
+ const f=fixture(),baseline=f.read(),tid='MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm';
+ const hidden=Array.from({length:17},(_,i)=>{
+  const root=f.el(tid,f.root);root.checkVisibility=()=>false;
+  f.el(tid+';normalHeaderCt',root);
+  f.form.FFormCache['old'+i]={FView:{el:{dom:root}},FModelNode:{}};
+  return root;
+ });
+ const result=f.read();assert.equal(result.verified,true);assert.equal(JSON.stringify(result),JSON.stringify(baseline));
+ hidden[0].checkVisibility=()=>true;assert.equal(f.read().verified,false);
 });
 
 test('multi-output preview ignores cached foreign graphs but rejects duplicates in its bound graph',()=>{

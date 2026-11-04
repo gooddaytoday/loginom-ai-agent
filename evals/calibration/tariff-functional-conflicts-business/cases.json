@@ -1,0 +1,224 @@
+{
+  "sources": {
+    "task.json": "7393f313672bd7e4e7daf1e7a9dbc5673742190c0868fc845a87bb4e45b7f210",
+    "reference.lgp": "69238e26e857ea853461f046110a3f688bde31e18d7c7e34c54985195dba7885",
+    "SPEC.md": "ba3244a016f632cdf62cb5cd46f7fad0fa860e6f68f1f7d2f1c154a8dfc6892a",
+    "data/tariffs.csv": "83e2b00d8446b93a97101a07a31b0024bd1d0a43e4bdd520c8becf16cd38c498",
+    "oracle.csv": "29c9b15504e7288737e12d80a422e153113ce8fc10535b4d37888c23deefcf2e",
+    "oracle.py": "cb3bf4a9690d7582b41bc702e4375e09dac9e3514e7273ee630d690c09f98852"
+  },
+  "cases": [
+    {
+      "id": "supplier-only-key",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"service\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"service\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n",
+          "to": "",
+          "count": 2
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"service\"/>",
+          "to": "<Mapping Source=\"supplier\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "tariff-key",
+        "supplier-summary",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "keys[(row['supplier'], row['service'])]",
+            "to": "keys[(row['supplier'], '__all_services__')]",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "supplier-only-key.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "ignore-currency",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"currency\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"currency\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"2\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n",
+          "to": "",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"currency\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"currency\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n",
+          "to": "",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "content-variants",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": ".append((row['currency'], Decimal(row['price'])))",
+            "to": ".append((Decimal(row['price']),))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "ignore-currency.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "ignore-price",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"price\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utGroup\" InputColumnInfoName=\"price\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"3\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n",
+          "to": "",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"price\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" InputColumnInfoName=\"price\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n",
+          "to": "",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "content-variants",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": ".append((row['currency'], Decimal(row['price'])))",
+            "to": ".append((row['currency'],))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "ignore-price.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "metadata-content",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"source_tag\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"source_tag\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"source_tag\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"source_tag\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"4\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "content-variants",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": ".append((row['currency'], Decimal(row['price'])))",
+            "to": ".append((row['currency'], Decimal(row['price']), row['source_tag']))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "metadata-content.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "variant-rows",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"variant_rows_Sum\"/>",
+          "to": "<Mapping Source=\"variant_rows_Count\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "conflicting-source-rows",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "suppliers[supplier].append((len(set(contents)) > 1, len(contents)))",
+            "to": "suppliers[supplier].append((len(set(contents)) > 1, len(set(contents))))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "variant-rows.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "rows-as-keys",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"key_rows\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" InputColumnInfoName=\"key_rows\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"key_rows\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"key_rows\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"4\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"service_Count\"/>",
+          "to": "<Mapping Source=\"key_rows_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "tariff-key",
+        "supplier-summary",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "return [(supplier, len(groups), sum",
+            "to": "return [(supplier, sum(count for conflict, count in groups), sum",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "rows-as-keys.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"supplier\"/>",
+          "to": "<Item Name=\"supplier\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "supplier-summary",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "supplier",
+          "descending": true
+        }
+      },
+      "result_csv": "sort.csv",
+      "expected_oracle_pass": false
+    }
+  ]
+}

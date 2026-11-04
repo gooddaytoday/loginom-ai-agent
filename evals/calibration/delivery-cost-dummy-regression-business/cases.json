@@ -1,0 +1,138 @@
+{
+  "sources": {
+    "task.json": "0ef543a2ec60cdd15d8552a112163c04f3782c3260d69976eca04982e11fd083",
+    "reference.lgp": "a0dd2ae8d75b81ed1736b81059b27de8e3041ad048f1c8b611448293660e8764",
+    "SPEC.md": "507b70df38360825b813de5d32819e56cc06f5d7a2123228939250a032018689",
+    "data/shipments.csv": "d644374c70640199c9166a343dc8d85017eaab440a6e9c05ef16ca299e08bb50",
+    "oracle.csv": "a9ce9f5bd86bedc3688dc14db797c380c65cb941bc9b608bae969a7fba7c66fd",
+    "oracle.py": "1d49871ac810f4896dc637653e11dba7c4cd1f1a655501136e9b046415ca8ad4"
+  },
+  "cases": [
+    {
+      "id": "reverse-baseline",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(service_type = &quot;express&quot;, 1, 0)\"",
+          "to": "Expression=\"IFF(service_type = &quot;standard&quot;, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "reverse-baseline.csv",
+      "expected_failed": [
+        "service-contrast",
+        "coefficient-scale",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Fraction(row[\"service_type\"] == \"express\")",
+            "to": "Fraction(row[\"service_type\"] == \"standard\")",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "dummy-100",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(service_type = &quot;express&quot;, 1, 0)\"",
+          "to": "Expression=\"IFF(service_type = &quot;express&quot;, 100, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "dummy-100.csv",
+      "expected_failed": [
+        "service-contrast",
+        "coefficient-scale",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Fraction(row[\"service_type\"] == \"express\")",
+            "to": "100 * Fraction(row[\"service_type\"] == \"express\")",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "raw-means",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"units\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\" OriginType=\"iotCustom\" InputColumnInfoName=\"units\">\n\t\t\t\t\t\t\t\t\t\t\t<ColTunedNormParams>\n\t\t\t\t\t\t\t\t\t\t\t\t<NormSettings/>\n\t\t\t\t\t\t\t\t\t\t\t\t<ControlRange FactRangeMin=\"0\" FactRangeMax=\"0\" RangeMin=\"8\" RangeMax=\"15\"/>\n\t\t\t\t\t\t\t\t\t\t\t</ColTunedNormParams>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"distance\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\" OriginType=\"iotCustom\" InputColumnInfoName=\"distance\">\n\t\t\t\t\t\t\t\t\t\t\t<ColTunedNormParams>\n\t\t\t\t\t\t\t\t\t\t\t\t<NormSettings/>\n\t\t\t\t\t\t\t\t\t\t\t\t<ControlRange FactRangeMin=\"0\" FactRangeMax=\"0\" RangeMin=\"90\" RangeMax=\"150\"/>\n\t\t\t\t\t\t\t\t\t\t\t</ColTunedNormParams>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "",
+          "count": 1
+        }
+      ],
+      "result_csv": "raw-means.csv",
+      "expected_failed": [
+        "ols-model",
+        "service-contrast",
+        "coefficient-scale",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "design = [\n    [Fraction(1), Fraction(row[\"units\"]), Fraction(row[\"distance\"]), Fraction(row[\"service_type\"] == \"express\")]\n    for row in shipments\n]\nresponse = [Fraction(row[\"cost\"]) for row in shipments]\ngram = [[sum((row[a] * row[b] for row in design), Fraction(0)) for b in range(4)] for a in range(4)]\nrhs = [sum((row[column] * value for row, value in zip(design, response)), Fraction(0)) for column in range(4)]\ndenominator = determinant(gram)\nassert denominator != 0, \"P44 requires a full-rank four-term design\"\ncoefficients = [\n    determinant([[rhs[row] if column == term else gram[row][column] for column in range(4)] for row in range(4)]) / denominator\n    for term in range(4)\n]\n",
+            "to": "means = {\n    kind: sum((Fraction(row[\"cost\"]) for row in shipments if row[\"service_type\"] == kind), Fraction(0))\n    / sum(row[\"service_type\"] == kind for row in shipments)\n    for kind in (\"standard\", \"express\")\n}\ncoefficients = [means[\"standard\"], means[\"express\"] - means[\"standard\"]]\n",
+            "count": 1
+          },
+          {
+            "from": "zip([\"intercept\", \"units\", \"distance\", \"express\"],",
+            "to": "zip([\"intercept\", \"express\"],",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"term_order\"/>",
+          "to": "<Item Name=\"term_order\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sort.csv",
+      "expected_failed": [
+        "export-contract",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "term",
+          "order": [
+            "intercept",
+            "units",
+            "distance",
+            "express"
+          ],
+          "descending": true
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "sources": {
+    "SPEC.md": "99309d4e96ab6edfb6b391638e51ec66120d04905b95dc6499ee343e4f76cdf1",
+    "acceptance.json": "cdebc21576296ae58d4c8144d1a846022cf0109517fdc8be53673e63cefa3539",
+    "data/events.csv": "47409b521ce8dc8aba53e20ecd18c845fd9539924644e3c5917a76a2363a495f",
+    "data/users.csv": "9dab973a81957713638e5cf9609dec8136a216ad765779ffa4e8f85f9ffde36d",
+    "oracle.csv": "337c781bb33c33cea09752f779a7910e8cee12b237995db7925dd31ec937faec",
+    "oracle.py": "83c5a6d3db84ed15b6dc835ebce18768fe4cadd9319044746933b7497aa64502",
+    "provenance.json": "a62136e89b4eb70d59edad399ec695062536fbd039882bb1e161d2a1b0b5ebdd",
+    "reference.lgp": "3e5e8b70e348cb034fcf9cfe6443275175c81dc15a8a6ff3cec4123d7f858317",
+    "task.json": "7e1229ff326f3fd91e31d079647dddb2aa5870c1818ee51f9bbe29ad14d0ea9f"
+  },
+  "cases": [
+    {
+      "id": "inclusive-next-month-boundary",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(event_dt &gt;= signup_dt and event_dt &lt; next_month, 1, 0)\"",
+          "to": "Expression=\"IFF(event_dt &gt;= signup_dt and event_dt &lt;= next_month, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "inclusive-next-month-boundary.csv",
+      "expected_failed": [
+        "action-time-window",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        if signup <= datetime.fromisoformat(row[\"event_timestamp\"]) < following:",
+            "to": "        if signup <= datetime.fromisoformat(row[\"event_timestamp\"]) <= following:",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "repeated-create-counts-as-activation",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdMax\" Order=\"0\"",
+          "to": "GroupFunctions=\"gdSum\" Order=\"0\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"did_create_Max\"",
+          "to": "Source=\"did_create_Sum\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(created_project = 1 and invited_member = 1 and exported = 1, 1, 0)\"",
+          "to": "Expression=\"IFF(created_project + invited_member + exported &gt;= 3, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "repeated-create-counts-as-activation.csv",
+      "expected_failed": [
+        "distinct-user-activation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            users[row[\"user_id\"]] = (signup, following, set())",
+            "to": "            users[row[\"user_id\"]] = (signup, following, [])",
+            "count": 1
+          },
+          {
+            "from": "            actions.add(row[\"event_type\"])",
+            "to": "            actions.append(row[\"event_type\"])",
+            "count": 1
+          },
+          {
+            "from": "    values[1] += int(\"create_project\" in actions)",
+            "to": "    values[1] += actions.count(\"create_project\")",
+            "count": 1
+          },
+          {
+            "from": "    values[4] += int(required <= actions)",
+            "to": "    values[4] += int(actions.count(\"create_project\") + int(\"invite_member\" in actions) + int(\"export\" in actions) >= 3)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "inner-base-drops-no-event-user",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"48632400-25c9-4793-bcd6-ee2332e98268\">\n\t\t\t\t\t\t\t\t<Left Name=\"user_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"user_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"48632400-25c9-4793-bcd6-ee2332e98268\">\n\t\t\t\t\t\t\t\t<Left Name=\"user_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"user_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "inner-base-drops-no-event-user.csv",
+      "expected_failed": [
+        "completed-signup-months",
+        "distinct-user-activation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for signup, following, actions in users.values():",
+            "to": "for signup, following, actions in users.values():\n    if not actions:\n        continue",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "any-action-instead-of-all-three",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(created_project = 1 and invited_member = 1 and exported = 1, 1, 0)\"",
+          "to": "Expression=\"IFF(created_project = 1 or invited_member = 1 or exported = 1, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "any-action-instead-of-all-three.csv",
+      "expected_failed": [
+        "distinct-user-activation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    values[4] += int(required <= actions)",
+            "to": "    values[4] += int(bool(required & actions))",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
