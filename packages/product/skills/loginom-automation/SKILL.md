@@ -29,18 +29,7 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 ## Кластеризация
 
-Для k-means в разных единицах задай `normalization:"standardize"` (выборочное SD).
-У нового узла по умолчанию `none`; у существующего
-пропуск параметра сохраняет одинаковую поддерживаемую нормировку полей.
-Центры порта 1 — в исходных единицах, Distance порта 0 — в нормированных.
-Читай оба порта; фиксируй seed для повторяемости;
-номера кластеров — метки, а не ранги. Для масштабирования выбери
-`loginom_dock_node_apply`, `target.type:"datamining.clustering"`, `mode:"k_means"`:
-`normalization:"scale_minus_one_one"` для [-1;1], `"scale_zero_one"` для [0;1],
-`"absolute_scale"` для деления на максимальный модуль. Нормализация встроена в
-Кластеризацию; отдельный Калькулятор или JavaScript для неё не требуется.
-Выбранный метод применяется ко всем используемым полям; смешанные методы
-требуют явного выбора. Контроль и ручной диапазон не задаются.
+Масштабирование k-means → `loginom_dock_node_apply`, `datamining.clustering/k_means`; [параметры](references/node-settings.md).
 
 ## Только загрузка файла
 
