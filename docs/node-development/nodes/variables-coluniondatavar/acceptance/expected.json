@@ -1,0 +1,179 @@
+{
+  "status": "proposal_pending_criteria_and_W1",
+  "initial": {
+    "output_node_type": "variables.column_union",
+    "output_port": 0,
+    "port_kind": "variables",
+    "ordered": true,
+    "variables": [
+      {
+        "name": "a0",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 11
+      },
+      {
+        "name": "title",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Левый"
+      },
+      {
+        "name": "empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "name": "ratio",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.125,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "missing",
+        "label": "Нет значения",
+        "type": "integer",
+        "value": null
+      },
+      {
+        "name": "a1",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 29
+      },
+      {
+        "name": "a2",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 37
+      },
+      {
+        "name": "title_1",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Правый"
+      },
+      {
+        "name": "enabled_1",
+        "label": "Включено",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "ratio_1",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.1,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "zero",
+        "label": "Ноль",
+        "type": "integer",
+        "value": 0
+      }
+    ]
+  },
+  "updated": {
+    "output_node_type": "variables.column_union",
+    "output_port": 0,
+    "port_kind": "variables",
+    "ordered": true,
+    "variables": [
+      {
+        "name": "a0",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 11
+      },
+      {
+        "name": "title",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Левый"
+      },
+      {
+        "name": "empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "name": "ratio",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.125,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "missing",
+        "label": "Нет значения",
+        "type": "integer",
+        "value": null
+      },
+      {
+        "name": "a1",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 41
+      },
+      {
+        "name": "a2",
+        "label": "Параметр",
+        "type": "integer",
+        "value": 37
+      },
+      {
+        "name": "title_1",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Правый"
+      },
+      {
+        "name": "enabled_1",
+        "label": "Включено",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "ratio_1",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.1,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "zero",
+        "label": "Ноль",
+        "type": "integer",
+        "value": 0
+      }
+    ]
+  }
+}

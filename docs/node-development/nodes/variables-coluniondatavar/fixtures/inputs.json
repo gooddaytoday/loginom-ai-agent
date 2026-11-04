@@ -1,0 +1,19 @@
+{
+  "left": [
+    {"name":"a0","label":"Параметр","type":"integer","value":11},
+    {"name":"title","label":"Заголовок","type":"string","value":"Левый"},
+    {"name":"empty","label":"Пустая строка","type":"string","value":""},
+    {"name":"enabled","label":"Включено","type":"boolean","value":true},
+    {"name":"ratio","label":"Доля","type":"real","value":0.125},
+    {"name":"missing","label":"Нет значения","type":"integer","value":null}
+  ],
+  "right": [
+    {"name":"a0","label":"Параметр","type":"integer","value":29},
+    {"name":"a1","label":"Параметр","type":"integer","value":37},
+    {"name":"title","label":"Заголовок","type":"string","value":"Правый"},
+    {"name":"enabled","label":"Включено","type":"boolean","value":false},
+    {"name":"ratio","label":"Доля","type":"real","value":0.1},
+    {"name":"zero","label":"Ноль","type":"integer","value":0}
+  ],
+  "update": {"source":"right","name":"a0","value":41}
+}
