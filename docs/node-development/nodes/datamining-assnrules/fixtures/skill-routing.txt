@@ -1,0 +1,1 @@
+`datamining.assn_rules` — ассоциативные правила: перед настройкой читай `references/nodes/assn-rules.md`.

@@ -1,4 +1,5 @@
 import {createQualityNodeSupport} from './quality-node.mjs';
+import {createCoarseClassesNodeSupport} from './coarse-classes-node.mjs';
 import {createExcelExportNodeSupport} from './exports-excel-node.mjs';
 import {createTreeNodeSupport} from './tree-node.mjs';
 import {createBinningNodeSupport} from './binning-node.mjs';
@@ -49,6 +50,7 @@ export function createCandidateNodeSupport(config) {
  const excelExport=createExcelExportNodeSupport(config);
  const jsonTree=createTreeNodeSupport(config,{json:true}),treeTable=createTreeNodeSupport(config,{json:false});
  const autoCorrelation=createAutoCorrelationNodeSupport(config);
+ const coarseClasses=createCoarseClassesNodeSupport(config);
  const binning=createBinningNodeSupport(config);
  const smoothing=createSmoothingNodeSupport(config);
  const slidingWindow=createSlidingWindowNodeSupport(config);
@@ -59,7 +61,7 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...quality.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...quality.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
@@ -71,6 +73,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='research.quality')return quality.nodeApplyDriverFactory(options);
   if(type==='trees.from_json')return jsonTree.nodeApplyDriverFactory(options);
   if(type==='trees.to_table')return treeTable.nodeApplyDriverFactory(options);
+  if(type==='preprocessing.coarse_classes')return coarseClasses.nodeApplyDriverFactory(options);
   if(type==='preprocessing.binning')return binning.nodeApplyDriverFactory(options);
   if(type==='preprocessing.smoothing')return smoothing.nodeApplyDriverFactory(options);
   if(type==='preprocessing.sampling')return sampling.nodeApplyDriverFactory(options);

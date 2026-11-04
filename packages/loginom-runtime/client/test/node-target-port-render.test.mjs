@@ -264,3 +264,14 @@ test('caption rebinding remains refused for other node types',async()=>{
   await assert.rejects(f.read(),/Visible port identity/);
  }
 });
+
+test('Coarse Classes rebinds the same output 2 after its native caption replacement',async()=>{
+ const f=fixture({portIndex:2});f.node.FIconCls='bg-vendor-icon-coarseclasses';await f.read();
+ f.rename();await f.read();assert.deepEqual(Array.from((await f.binding()).native_bindings[0].outputs),[2]);
+});
+test('Coarse Classes caption rebinding retains GUID, parent, type and suffix guards',async()=>{
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.losePortTid(),f=>{f.port.FGuid='foreign';},f=>{f.port.data={};},f=>{f.port.parent={};},f=>{f.port.FCell={...f.port.FCell};},f=>{f.port.FCell.parent={};},f=>{f.port.FType=0;},f=>{f.port.FSubType=9;},f=>f.rename('Output_Data-0')]){
+  const f=fixture({portIndex:2});f.node.FIconCls='bg-vendor-icon-coarseclasses';await f.read();f.rename();change(f);
+  await assert.rejects(f.read(),/Visible port identity/);
+ }
+});

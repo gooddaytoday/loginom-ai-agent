@@ -138,7 +138,7 @@ export function matchesExpectedOutput(data,expected){
  const indices=columnIndices(data,expected);if(!indices)return false;
  const categories=expected.columns.flatMap((c,i)=>c.category_labels_any?[i]:[]);
  const matchesRow=(row,want)=>expected.columns.every((c,i)=>row[indices[i]]?.type===data.schema[indices[i]].type
-  &&(c.category_labels_any?categoryKey(row[indices[i]],c)!==undefined:matchesCell(row[indices[i]],c,want[c.name])));
+  &&(c.category_labels_any?categoryKey(row[indices[i]],c)!==undefined:matchesCell(row[indices[i]],c,want[c.name],expected.output_node_type==='preprocessing.coarse_classes'&&expected.output_port===1&&['LowerBound','UpperBound'].includes(c.name))));
  if(categories.length){
   const pairs=expected.ordered?expected.rows.map((want,i)=>matchesRow(data.sample[i],want)?i:-1)
    :matchIndices(expected.rows.map(want=>data.sample.flatMap((row,i)=>matchesRow(row,want)?[i]:[])),true);
@@ -166,8 +166,14 @@ export function matchesExpectedOutput(data,expected){
  };
  return expected.rows.every((_,i)=>assign(i,new Set()));
 }
-function matchesCell(cell,column,want){
+function matchesCell(cell,column,want,coarseBound=false){
+ // The new discrete coarse-class report has typed Variant NULL bounds. Its
+ // ordinary production reader proves exact NULL without native byte claims.
+ // Keep native provenance mandatory for every other Variant value/path.
+
  if(!cell||!allowsType(column,cell.type))return false;
+ if(coarseBound&&column.type==='variant'&&want===null&&cell.precision==='exact_null')
+  return cell.is_null===true&&cell.value===null&&cell.cell_type===undefined&&cell.native===undefined;
  const nativeRequired=column.type==='variant'||want&&typeof want==='object';
  if(nativeRequired&&cell.type!==column.type)return false;
  if(nativeRequired){

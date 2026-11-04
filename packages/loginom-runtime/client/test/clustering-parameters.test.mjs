@@ -21,3 +21,7 @@ test('identifiers, strings, unknown and discrete numeric fields cannot become fe
  for(const field of [{name:'X',type:'string',data_kind:'Дискретный'},{name:'X',type:'real',data_kind:'Дискретный'},{name:'Other',type:'real',data_kind:'Непрерывный'}])
   assert.throws(()=>resolveClusteringFeatures({features:[p.features[0]]},[field]),/continuous numeric/);
 });
+
+for(const normalization of ['scale_minus_one_one','scale_zero_one','absolute_scale'])test('native scaling enters the production validator: '+normalization,()=>{
+ validateClusteringParameters({...p,normalization},'k_means',request);
+});

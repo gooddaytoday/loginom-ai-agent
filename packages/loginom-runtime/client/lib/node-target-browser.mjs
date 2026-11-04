@@ -74,7 +74,7 @@ export async function readGraph(page, task) {
         // leaving an alternate SVG without data-tid. Rebind only the same
         // native data port with its exact previous suffix; other types retain
         // the previous caption restriction and exact cached-TID lookup.
-        const renamedBinning=type==='preprocessing.binning' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedBinning=['preprocessing.binning','preprocessing.coarse_classes'].includes(type) && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable;

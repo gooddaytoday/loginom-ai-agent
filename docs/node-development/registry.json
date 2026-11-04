@@ -4367,9 +4367,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-777: этап 0 подготовлен; утвердить предложенные порты 0/1, max_items=2, oracle и допуски, затем отдельно назначить этап 1. Порт 2 и общий бюджет SKILL.md — ограничения в discovery; runtime handler не реализован.",
       "plan": "nodes/datamining-assnrules/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.dataMining.Clope",
