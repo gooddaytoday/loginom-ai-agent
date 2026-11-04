@@ -12,25 +12,6 @@ export async function readCoarseClassesContext(page,binding,readNode=readPrepare
 export function readCoarseClassesBrowser(prefix){
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;CoarseClassesWizard-1';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
- const modelBase=prefix+';WizrdMCF;CoarseClassesWizard-2',modelRoots=exact(modelBase);
- if(modelRoots.length===1&&modelRoots[0].checkVisibility({checkVisibilityCSS:true})){
-  const grids=[...modelRoots[0].querySelectorAll('[data-tid$=";grdBinning"]')];
-  const grid=grids.length===1?globalThis.Ext?.getCmp?.(grids[0].id):null,store=grid?.getStore?.(),data=store?.getData?.(),rs=data?.items,source=data?.getSource?.()?.items;
-  if(grid?.el?.dom!==grids[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(rs)||rs.length>1000||store.getCount?.()!==rs.length||source&&(source.length!==rs.length||source.some(r=>!rs.includes(r))))return fail('coarse_classes_model_inventory');
-  const usedElements=[...modelRoots[0].querySelectorAll('[data-tid$=";grdUsedColumns"]')],usedGrid=usedElements.length===1?globalThis.Ext?.getCmp?.(usedElements[0].id):null,usedStore=usedGrid?.getStore?.(),used=usedStore?.getData?.()?.items;
-  if(usedGrid?.el?.dom!==usedElements[0]||usedStore?.$className!=='Ext.data.Store'||usedStore.isLoading?.()||usedStore.isBufferedStore||!Array.isArray(used)||usedStore.getCount?.()!==used.length||used.length>1)return fail('coarse_classes_model_field_inventory');
-  if(used.length===0&&rs.length===0)return {verified:true,state:'settings',classes:[],total_iv:null};
-  const field=used[0]?.data;
-  if(!field||typeof field.Name!=='string'||field.DataType!==5||field.DataKind!==2||field.ColumnPurpose!==1||field.IsLocked!==false||field.IsEdited!==false||!Number.isInteger(field.Count)||field.Count<=0||rs.length!==field.Count||!Number.isFinite(field.TotalIV))return fail('coarse_classes_model_field');
-  const classes=[];
-  for(const r of rs){
-   const d=r?.data;
-   if(!r?.isModel||!Number.isInteger(d?.Index)||d.Index<0||typeof d.Mark!=='string'||!Number.isFinite(d.WoE)||!Number.isFinite(d.IV))return fail('coarse_classes_model_record');
-   classes.push({number:d.Index,mark:d.Mark,woe:d.WoE,iv:d.IV});
-  }
-  if(new Set(classes.map(c=>c.number)).size!==classes.length)return fail('coarse_classes_model_class_identity');
-  return {verified:true,state:'materialized',classes,total_iv:field.TotalIV,input_field:field.Name};
- }
  const roots=exact(base),root=roots[0];
  if(roots.length!==1||!root.checkVisibility({checkVisibilityCSS:true}))return fail('coarse_classes_root');
  const cmp=t=>{const es=exact(t),c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);return c?.el?.dom===es[0]&&root.contains(es[0])?c:null;};

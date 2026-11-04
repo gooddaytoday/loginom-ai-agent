@@ -5,7 +5,6 @@ import {coarseClassesConfigurationReadback} from './coarse-classes-readback.mjs'
 import {configureCoarseClassesOutputs,readCoarseClassesOutputs} from './coarse-classes-output.mjs';
 import {coarseClassesParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
-import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('CoarseClasses: '+m);};
 export async function coarseClassesBeforeGraphExecute(options,ctx,c,channel){
@@ -15,10 +14,7 @@ export async function coarseClassesBeforeGraphExecute(options,ctx,c,channel){
  need(source.length===1&&source[0].input===0&&source[0].node,'one current input source required for Train');
  const training=await trainConfiguredNode(channel,ctx.node),after=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
  need(JSON.stringify(after.links.filter(e=>e.target===ctx.node.node_id))===JSON.stringify(graph.links.filter(e=>e.target===ctx.node.node_id)),'source changed during Train');
- await openPreparedWizard(channel);
- const learned=await configureCoarseClasses(channel,{}, {request:{mode:'apply'},preconfiguration:{target_fields:c.fields}});
- await closePreparedWizard(channel);
- return {training:{...training,source,model:{state:'materialized',classes:learned.configuration.classes,total_iv:learned.configuration.total_iv}}};
+ return {training:{...training,source}};
 }
 export function createCoarseClassesNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
