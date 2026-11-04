@@ -11,7 +11,16 @@ export async function configureLgdImportBrowser(page,t,readContext){
    need(c.verified&&c.surface==='wizard'&&!c.input_port&&!c.output_port,'owned node wizard changed');
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return c;};
   const wait=async(label,read)=>{while(Date.now()<t.deadline){await guard();const r=await read();if(r)return r;await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}throw Error('LGD import: '+label+' did not settle');};
-  const quiet=()=>wait('loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
+  const nativeError=async()=>{
+   await guard();
+   const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error('LGD import: '+((await error.getAttribute('data-qtip'))??'native file validation refused'));
+   // PreviewDataAsync reports checksum failures in the source preview status,
+   // independently of the wizard's Next/Verify error button.
+   const status=find(file.slice(0,-1)).locator('.bg-preview-panel-error [data-tid$=";cntErrorInfo"]:visible');
+   need(await status.count()<=1,'preview error status ambiguous');
+   if(await status.count()===1){const text=(await status.innerText()).trim();if(text)throw Error('LGD import: '+text);}
+  };
+  const quiet=()=>wait('loading',async()=>{await nativeError();return await page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count()===0;});
   const point=async l=>{await quiet();await guard();need(await l.count()===1,'control missing or ambiguous');return wait('control reachable',()=>l.evaluate(e=>{
    const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);
    return r.width>0&&r.height>0&&h&&(h===e||e.contains(h))&&!e.closest('.x-item-disabled,.x-btn-disabled')?{x,y}:null;
@@ -37,12 +46,11 @@ export async function configureLgdImportBrowser(page,t,readContext){
   need(observed.checksum===true&&observed.connection==='Локальное','checksum verify and local file storage required');
   need(t.source_path===undefined||observed.source_path===t.source_path,'source changed');
   need(/\.lgd$/i.test(observed.source_path),'standalone LGD required');
-  // Native Next reads/validates the header and checksum; never accept an empty
-  // preview as successful configuration of a corrupt source.
-  const nativeError=async()=>{
-   await guard();
-   const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error('LGD import: '+((await error.getAttribute('data-qtip'))??'native file validation refused'));
-  };
+  // Loginom fills these fields only after ReadHeaderAsync + PreviewDataAsync.
+  // Keep the source page visible until that preview succeeds or reports its
+  // own error; advancing early can hide a failed preview behind the next card.
+  observed=await wait('source preview',async()=>{const v=await native();return v.compression!==''&&v.written_checksum!==''&&v.bitness!==''?v:null;});
+  need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported native LGD format');
   const advance=async target=>{await nativeError();await click(find(root+';btnNext'));await wait(target,async()=>{
    await nativeError();
    return await find(root+';'+target).isVisible()&&await page.evaluate(target=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().el.dom.getAttribute('data-tid').endsWith(';'+target),target);

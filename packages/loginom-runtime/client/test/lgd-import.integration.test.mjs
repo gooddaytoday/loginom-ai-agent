@@ -4,7 +4,7 @@ import {chromium} from 'playwright-core';
 import {configureLgdImportBrowser} from '../lib/lgd-import-procedure.mjs';
 test('native LGD import retains properties, checks corruption and refuses a foreign owner',async t=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
- for(const fault of [null,'header_pending','corrupt','corrupt_early','owner']){
+ for(const fault of [null,'header_pending','corrupt','corrupt_early','corrupt_preview','owner']){
   const page=await browser.newPage();t.after(()=>page.close());
   await page.route('http://lgd.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('http://lgd.test/');
   await page.evaluate(fault=>{
@@ -21,6 +21,13 @@ test('native LGD import retains properties, checks corruption and refuses a fore
    for(const id of ['ColumnsMappingEngineOutputPortWizard','DoneWizard']){const e=document.createElement('div');e.dataset.tid=root.dataset.tid+';'+id;e.textContent=id;e.style.display='none';root.append(e);pages[id]=e;}
    const error=document.createElement('button');error.dataset.tid=root.dataset.tid+';btnError';error.dataset.qtip='Контрольная сумма блока не совпадает';error.style.display='none';root.append(error);
    if(fault==='corrupt_early')error.style.display='block';
+   if(fault==='header_pending')card.querySelector('[data-tid$=";edtFileName;ValueControl"] input').onchange=()=>setTimeout(()=>{card.querySelector('[data-tid$=";edtCompression"] input').value='LZ4';},100);
+   if(fault==='corrupt_preview'){
+    const preview=document.createElement('div');preview.className='bg-preview-panel-error';card.append(preview);
+    const status=document.createElement('div');status.dataset.tid=card.dataset.tid+';PreviewPanel;cntErrorInfo';preview.append(status);
+    const mask=document.createElement('div');mask.className='bg-mask-message';mask.textContent='Подготовка предпросмотра';mask.style.display='none';card.append(mask);
+    card.querySelector('[data-tid$=";edtFileName;ValueControl"] input').onchange=()=>{mask.style.display='block';setTimeout(()=>{status.textContent='Контрольная сумма блока не совпадает';mask.style.display='none';},100);};
+   }
    const next=document.createElement('button');next.dataset.tid=root.dataset.tid+';btnNext';next.textContent='Далее';root.append(next);globalThis.nexts=0;
    next.onclick=()=>{globalThis.nexts++;if(fault==='corrupt'){error.style.display='block';return;}card.querySelector('[data-tid$=";edtCompression"] input').value='LZ4';pages[stage].style.display='none';stage=stage==='ImportNativePreviewWizard'?'ColumnsMappingEngineOutputPortWizard':'DoneWizard';pages[stage].style.display='block';};
    globalThis.Ext={getCmp:id=>components.get(id)};
@@ -34,6 +41,7 @@ test('native LGD import retains properties, checks corruption and refuses a fore
   if(!fault||fault==='header_pending'){assert.equal(result.configuration.source.source_path,'/own/source.lgd');assert.equal(result.configuration.source.checksum,true);assert.equal(result.configuration.source.compression,'LZ4');}
   if(fault?.startsWith('corrupt')){assert.match(result.error,/Контрольная сумма/);assert.equal(result.configuration,undefined);}
   if(fault==='corrupt_early')assert.equal(await page.evaluate(()=>globalThis.nexts),0);
+  if(fault==='corrupt_preview')assert.equal(await page.evaluate(()=>globalThis.nexts),0);
   if(fault==='owner'){assert.equal(result.effect_possible,false);assert.equal(await page.locator('input[type=text]').first().inputValue(),'');}
  }
 });
