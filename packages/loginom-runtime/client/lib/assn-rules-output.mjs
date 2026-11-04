@@ -1,6 +1,8 @@
 export function assnRulesOutputColumns(configuration,port){
- const names=port===0?['ItemsetID','Width','Support','Item_0','Item_1']:['RuleID','Support','Confidence','Lift','Item_0_A','Item_0_C'];
- return names.map(name=>({name,type:['ItemsetID','Width','RuleID'].includes(name)?'integer':name.startsWith('Item_')?'string':'real'}));
+ const item=configuration.fields.find(f=>f.usage_type===configuration.roles.item)?.name;
+ if(!item)throw Error('Association rules: configured item field missing');
+ const names=port===0?['ItemsetID','Width','Support',item+'_0',item+'_1']:['RuleID','Support','Confidence','Lift',item+'_0_A',item+'_0_C'];
+ return names.map((name,index)=>({name,type:index>=(port===0?3:4)?'string':['ItemsetID','Width','RuleID'].includes(name)?'integer':'real'}));
 }
 export function alignAssnRulesOutput(columns,expected){
  if(columns.length!==expected.length||columns.some((c,i)=>c.name!==expected[i].name||c.type!==expected[i].type))throw Error('Association rules: output field order or types differ');
