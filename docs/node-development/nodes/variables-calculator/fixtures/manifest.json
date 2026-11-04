@@ -1,0 +1,12 @@
+{
+  "encoding": "UTF-8",
+  "files": [
+    "inputs.json",
+    "expressions.json"
+  ],
+  "input_port_required": false,
+  "expression_order": "as declared in expressions.json",
+  "null": "NULL formula -> typed JSON null; empty string remains empty string",
+  "integer_scope": "safe IEEE754 integers; larger Int64 not accepted by this proposal",
+  "delivery": "Only inputs/expressions/task to the model; oracle and expected stay outside model context."
+}
