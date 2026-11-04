@@ -93,7 +93,26 @@ async function configureSamplingMode(channel,p,{request,inputMapping,base,partit
  };
  let c=(await observe('sampling method settings')).node_sampling;
  if(p.seed!==undefined){
-  await fill(base+'RandSeedEdit;edtRandSeed;ValueControl',p.seed);
+  const key=base+'RandSeedEdit;edtRandSeed;ValueControl';
+  let state=await observe('sampling seed visibility');
+  const control=s=>{const fields=s.ui.elements.filter(at(key,'fill'));need(fields.length===1,'unique seed control required');return fields[0];};
+  const target=control(state);
+  if(target.interaction?.state==='point_not_observed'){
+   // At 1280x800 the stratified form puts seed under rgpBottom.
+   // Scroll through a visible control in the same owned pane before typing.
+   const scroll=target.scroll;
+   need(scroll&&scroll.top<scroll.max_top,'seed cannot be revealed in its pane');
+   await channel.perform({condition:'reveal sampling seed in its own pane',initialObservation:state,
+    ready:s=>s.wizard?.stage===state.wizard.stage&&s.node_sampling?.verified===true&&s.node_sampling.base===base&&s.node_sampling.method===c.method,
+    identity:s=>({node:s.prepared_node_context,scroll:control(s).scroll.ref}),
+    resolve:s=>{const field=control(s),anchor=s.ui.elements.find(e=>e.scroll?.ref===field.scroll?.ref&&e.enabled===true&&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll')
+     &&(e.tid?.startsWith(base)||e.identity?.anchor_tid?.startsWith(base)));
+     need(anchor,'visible sampling scroll anchor unavailable');return {verb:'scroll',ref:anchor.ref,delta_y:field.scroll.max_top-field.scroll.top};}});
+   state=await observe('sampling seed revealed');
+   const revealed=control(state);
+   need(revealed.scroll?.ref===scroll.ref&&revealed.scroll.top>scroll.top&&revealed.interaction?.state==='point_observed','seed pane did not reveal its control');
+  }
+  await fill(key,p.seed);
   c=(await observe('sampling seed readback')).node_sampling;
   need(c.seed===p.seed,'seed differs');
  }
