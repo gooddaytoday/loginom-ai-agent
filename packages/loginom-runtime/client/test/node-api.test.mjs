@@ -5,10 +5,10 @@ import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('model schema inventory pins merged v0.3.9 registrations and excludes private cold windows',()=>{
+test('model schema inventory pins v0.4.0 Coarse Classes registration and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,96845,'58487f0599757af2c5870182a31ba29110be3b9d5fcc3bc113344bd94ecebf18'],
-  [nodeApiTools.map(userNodeTool),17412,'db9e7a57212618301dec5ead7b2128e2fb3cc8b8b49147c803e7444746af14b6'],
+  [nodeApiTools,110607,'9206cd029f25dd0ac6cc4e15c6c72d7b3ba83a16188b312a06d0a4155b472066'],
+  [nodeApiTools.map(userNodeTool),17666,'86a120aa54fa26119d80a1f78541ea32ba7597e64cceecebd14033bc86b6a0c5'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

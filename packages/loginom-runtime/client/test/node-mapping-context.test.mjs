@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
 function fixture({grouped=false,input=false,socket=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
@@ -142,6 +143,36 @@ for(const [name,change] of Object.entries({wrong_total:f=>f.stores[1].getTotalCo
 test('input mapping retains usage and rejects a broken reverse connection',()=>{
  const f=fixture({input:true}),r=f.read();assert.equal(r.verified,true);assert.equal(r.mapping_wizard,'TuneDataSourceMappingWizard');assert.equal(r.target_fields[0].usage_type,3);
  f.target[0].data.ReverseBroken=true;assert.equal(f.read().verified,false);
+});
+
+test('retrain reads saved Transaction/Item roles on the owned association-rules input',async()=>{
+ const f=fixture({input:true});f.target[0].data.UsageType=8;f.target[1].data.UsageType=9;
+ const owner={verified:true,surface:'wizard',node_id:'association',input_port:{direction:'input',port:0,node_icon_class:'bg-vendor-icon-assnrules'}};
+ const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+ const read=()=>readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>owner);
+ const result=await read();assert.equal(result.verified,true);
+ assert.deepEqual(Array.from(result.target_fields,x=>x.usage_type),[8,9]);
+ f.target[0].data.UsageType=10;assert.equal((await read()).reason,'mapping_input_usage');
+ f.target[0].data.UsageType=8;f.target[0].data.ReverseBroken=true;
+ assert.equal((await read()).reason,'mapping_input_usage');
+});
+
+test('Transaction/Item remain refused for every other node type and unbound input owners',async()=>{
+ for(const icon of [...Object.values(NODE_TYPES).filter(t=>t.type!=='datamining.assn_rules').map(t=>t.icon_class),undefined,'bg-vendor-icon-unknown']) {
+  for(const role of [8,9]) {
+   const f=fixture({input:true});f.target[0].data.UsageType=role;
+   const owner={verified:true,surface:'wizard',input_port:{direction:'input',port:0,node_icon_class:icon}};
+   const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+   assert.equal((await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>owner)).reason,'mapping_input_usage',String(icon));
+  }
+ }
+ const f=fixture({input:true});f.target[0].data.UsageType=8;
+ assert.equal(f.read().reason,'mapping_input_usage');
+ for(const input_port of [undefined,{direction:'output',port:0,node_icon_class:'bg-vendor-icon-assnrules'},
+  {direction:'input',port:1,node_icon_class:'bg-vendor-icon-assnrules'}]) {
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  assert.equal((await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port}))).reason,'mapping_input_usage');
+ }
 });
 
 test('conditional calculator mapping keeps the same strict excluded-record proof',()=>{

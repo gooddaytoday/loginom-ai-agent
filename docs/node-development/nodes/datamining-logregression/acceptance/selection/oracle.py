@@ -16,8 +16,8 @@ FACTORS = ("X", "Noise")
 CRITERIA = ("deviance", "aic", "aicc", "bic", "hqic")
 
 
-def source():
-    with (ROOT / "fixtures/selection.csv").open(newline="", encoding="utf-8") as file:
+def source(path=None):
+    with (Path(path) if path else ROOT / "fixtures/selection.csv").open(newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         assert reader.fieldnames == ["RowID", "X", "Noise", "Target", "Note"]
         rows = [{"RowID": int(r["RowID"]), "X": float(r["X"]),
@@ -115,8 +115,8 @@ def select(rows, mode="stepwise", criterion="deviance", entry=0.05, removal=0.1)
     raise AssertionError("selection did not terminate")
 
 
-def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1):
-    rows = source()
+def expected(mode="stepwise", criterion="deviance", entry=0.05, removal=0.1, rows=None):
+    rows = source() if rows is None else rows
     model, _ = select(rows, mode, criterion, entry, removal)
     columns = [
         {"name": "PredictionEvent", "type": "boolean", "label_any": True},
@@ -190,9 +190,9 @@ if __name__ == "__main__":
         full = fit(source(), FACTORS)
         selected, _ = select(source())
         assert max(abs(a - b) for a, b in zip(full["probabilities"], selected["probabilities"])) > 0.01
-        assert select(source(), entry=1e-9, removal=0.2)[0]["factors"] == []
+        assert select(source(), entry=1e-7, removal=0.2)[0]["factors"] == []
         assert select(source(), entry=0.95, removal=0.99)[0]["factors"] == list(FACTORS)
-        for name, entry, removal in [("expected-strict.json", 1e-9, 0.2),
+        for name, entry, removal in [("expected-strict.json", 1e-7, 0.2),
                                      ("expected-permissive.json", 0.95, 0.99)]:
             assert json.loads((Path(__file__).parent / name).read_text()) == expected(entry=entry, removal=removal)
         print("PASS: 15 mode/criterion combinations, fixture copy, Enter distinction, threshold sensitivity")

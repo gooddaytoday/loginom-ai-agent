@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'imports.lgd' | 'exports.lgd' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): AssnRulesConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -317,6 +317,14 @@ export interface ClusteringConfigurationReadback {
     source: Array<{node: NodeRef; output: number; input: 0}>};
 }
 
+export interface AssnRulesConfigurationReadback {
+  kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; mode: 'fp_growth'; transaction_field: string; item_field: string;
+  min_support_pct: number; min_confidence_pct: number; max_items: 2;
+  min_lift: 0; singletons: true; consequence_limit: 1;
+  training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
+}
+
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply'; input_fields: string[]; target_field: string;
@@ -350,7 +358,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface LogRegressionConfigurationReadback {
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
- node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; input_fields:string[]; target_field:string;
+ node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
  normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;
@@ -384,3 +392,24 @@ export interface BinningConfigurationReadback {
  output_mappings: {port: number; fields: {index: number; name: string; label: string; type: string; data_kind: string; source_name: string}[]}[];
  package_persistence_verified: false;
 }
+
+export interface CoarseClassesConfigurationReadback {
+ kind: 'coarse_classes'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
+ mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic';
+ min_class_percent: number; max_classes: number; uniformity_percent: number;
+ roles: {name: string; role: 'unused' | 'input' | 'target'}[];
+ state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;
+ training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: Pick<CoarseClassesConfigurationReadback,'state'|'classes'|'total_iv'>};
+ output_mappings: BinningConfigurationReadback['output_mappings']; package_persistence_verified: false;
+}
+
+export interface FactorAnalysisConfigurationReadback {
+  kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];
+  factors: number; rotation: 'none'; training: ClusteringConfigurationReadback['training'];
+  output_mappings: Array<{port: number; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string}>}>;
+  package_persistence_verified: false;
+}
+
+export interface TreeConversionConfigurationReadback { kind: "table_to_tree" | "tree_to_json"; mode: "manual_structure" | "serialize"; scope: "observed_before_verified_finish"; values_are: "observed_ui_values"; node: NodeRef; receipt_ids: string[]; package_persistence_verified: false; input_port: 0; output_port: 0; nodes?: {path:string;name:string;label:string;type:"object"|"integer"|"real"|"string"|"boolean";is_array:boolean;source_field?:string}[]; exclude_root?: true; pretty?: false; keys?: "names"; multi_row?: false; datetime?: "iso8601" }

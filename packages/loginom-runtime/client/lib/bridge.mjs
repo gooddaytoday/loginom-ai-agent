@@ -411,14 +411,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             const first = !userBundleDelivered;
             const ready = session.metadata.workspaceReady === true;
             const types = first ? actionRuntime.describe().available_node_types : [];
-            const inventory = first ? actionRuntime.describe({
-              action_keys: ['package.save_checkpoint'], node_types: types.slice(0, 32),
-            }) : null;
-            // The new LGD registrations exceed a single public describe batch.
-            // Keep that request limit and assemble the private prepare inventory.
-            if (inventory && types.length > 32) for (let offset = 32; offset < types.length; offset += 32)
-              inventory.node_types.push(...actionRuntime.describe({ node_types: types.slice(offset, offset + 32) }).node_types);
-            const bundle = first ? compactKnowledgeBundle(inventory) : null;
+            const described = first ? actionRuntime.describe({action_keys:['package.save_checkpoint'],node_types:types.slice(0,32)}) : null;
+            if(first&&types.length>32)for(let offset=32;offset<types.length;offset+=32)
+              described.node_types.push(...actionRuntime.describe({node_types:types.slice(offset,offset+32)}).node_types);
+            const bundle = first ? compactKnowledgeBundle(described) : null;
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),
