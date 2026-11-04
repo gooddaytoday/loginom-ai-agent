@@ -11,10 +11,6 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 # Построение сценария Loginom
 
-| Запрос | Тип / режим | Инструкция |
-|---|---|---|
-| Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
-
 Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки: `loginom_file_admit` исходного пути → `dock_artifact_deliver` → `dock_artifact_delivery_status` до `ready`. Используй подтверждённый `destination`; не загружай этот полный файл ещё раз. После доставки работай с ним как с серверным источником по следующему циклу.
 
 Работай через управляемые инструменты текущей сессии. Активация этого skill
@@ -178,6 +174,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
 | Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |
 | Добавление строк таблиц | `transform.union_data` / append_all | [читать](references/nodes/transform.union_data.md) |
+| Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
