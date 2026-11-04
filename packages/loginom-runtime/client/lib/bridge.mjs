@@ -410,10 +410,16 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (userProfile && actionRuntime) {
             const first = !userBundleDelivered;
             const ready = session.metadata.workspaceReady === true;
-            const bundle = first ? compactKnowledgeBundle(actionRuntime.describe({
+            const inventory = first ? actionRuntime.describe().available_node_types : [];
+            const description = first ? actionRuntime.describe({
               action_keys: ['package.save_checkpoint'],
-              node_types: actionRuntime.describe().available_node_types,
-            })) : null;
+              node_types: inventory?.slice(0,32),
+            }) : null;
+            // Quality extends the installed inventory beyond one describe batch;
+            // keep each call inside the existing public 32-type limit.
+            const bundle = first ? compactKnowledgeBundle(inventory?.length>32
+              ? {...description,node_types:[...description.node_types,...actionRuntime.describe({node_types:inventory.slice(32)}).node_types]}
+              : description) : null;
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),

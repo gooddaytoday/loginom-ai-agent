@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`quality-default` and `quality-spikes` use the approved five-output fixtures in
+`nodes/research-quality/acceptance/`. Only task/data reach the model. The stock
+typed matcher checks full production receipts before and after the same Import
+and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
+reexecutes the saved node without configuration. Only Moda/variant uses the
+bounded native decoder; ordinary scalar reading and other node limits are unchanged.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty

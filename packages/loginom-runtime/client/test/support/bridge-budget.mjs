@@ -128,7 +128,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    .find(event=>event.tool_name==='dock_node_wait');
   assert.deepEqual(logged.result,worker);
   assert.equal((await call('dock_node_status',{operation_id:worker.operation_id})).isError,true);
-  const all=await call('dock_action_describe',{node_types:parse(inventory).available_node_types});
+  const all=await call('dock_action_describe',{node_types:parse(inventory).available_node_types.filter(type=>type!=='research.quality')});
   assert.equal(all.isError,true);assert.equal(parse(all).error.scope,'whole_response');assert.ok(size(all)<2000);
   const pair=await call('dock_action_describe',{node_types:['imports.text','programming.javascript']});
   assert.notEqual(pair.isError,true);assert.equal(parse(pair).node_types.length,2);assert.ok(size(pair)<=46000);

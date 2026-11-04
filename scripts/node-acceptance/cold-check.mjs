@@ -235,6 +235,7 @@ page = context.pages()[0]
     id: "cold-read-expected-"+outputIndex,
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
+    ...(target.type==='research.quality'?{parameters:{target:{type:target.type}}}:{}),
   }
   const coldReadCeiling={operation_id:operation.id,node:structuredClone(node),deadline_at:operation.deadline,total_ms:540_000};
   const processObservation=coldProcessObservation(execute,{node,operation,record});
@@ -329,11 +330,11 @@ page = context.pages()[0]
   }
 
   let data;
-  if(target.type==='trees.to_table'){
+  if(['trees.to_table','research.quality'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
-   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error('COLD_TREE_TABLE_INCOMPLETE');
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }
   if(args['exact-port-windows']){
