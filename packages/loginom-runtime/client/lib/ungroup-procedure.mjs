@@ -33,8 +33,8 @@ export async function configureUngroup(channel,p,{request}){
  if(s.node_ungroup.ungroup.rounding.format!==u.rounding.format)await choose('pedRoundFormat;ValueControl',{
   none:'Не_округлять',precision:'Округлять_до_заданной_точности',multiple:'Округлять_до_кратного_целому'}[u.rounding.format],c=>c.ungroup.rounding.format===u.rounding.format);
  if(u.rounding.format!=='none'&&s.node_ungroup.ungroup.rounding.value!==u.rounding.value){
-  const find=t=>{const es=t.ui.elements.filter(e=>e.wizard_field?.name==='ungroup_rounding'&&e.allowed_actions.includes('set_wizard_field'));need(es.length===1,'round parameter input unavailable');return es[0];};
-  await channel.perform({condition:'set ungroup rounding value',initialObservation:s,ready:stable,identity:t=>t.node_ungroup,resolve:t=>({verb:'set_wizard_field',ref:find(t).ref,text:String(u.rounding.value)})});
+  const find=t=>{const tid=t.wizard.root_tid+';UngroupDataWizard;pedRoundParam;ValueControl';const es=t.ui.elements.filter(e=>e.identity?.anchor_tid===tid&&e.allowed_actions.includes('fill'));need(es.length===1,'round parameter input unavailable');return es[0];};
+  await channel.perform({condition:'set ungroup rounding value',initialObservation:s,ready:stable,identity:t=>t.node_ungroup,resolve:t=>({verb:'fill',ref:find(t).ref,text:String(u.rounding.value)})});
   s=await channel.observe({condition:'rounding value editor',readUngroup:true,ready:stable});
   await channel.perform({condition:'commit ungroup rounding value',initialObservation:s,ready:stable,identity:t=>t.node_ungroup,resolve:t=>({verb:'press',ref:find(t).ref,key:'Tab'})});
   s=await channel.observe({condition:'rounding value committed',readUngroup:true,ready:t=>stable(t)&&t.node_ungroup.ungroup.rounding.value===u.rounding.value});changes.push('rounding.value');

@@ -2130,10 +2130,6 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && wizard.stage==='ungroup') {
       const base=wizard.root_tid+';UngroupDataWizard;';
-      const roundOwners=tids.get(base+'pedRoundParam;ValueControl')??[];
-      const roundInputs=roundOwners.length===1?[...roundOwners[0].querySelectorAll('input')].filter(visible):[];
-      if(roundInputs.length===1&&wizardForms[0].contains(roundOwners[0])&&enabled(roundInputs[0])&&!roundInputs[0].readOnly&&!sensitive(roundInputs[0]))
-        wizardFields.set(roundInputs[0],{name:'ungroup_rounding',scope:'ungroup',max_length_utf16:10,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(roundOwners[0])});
       for(const key of ['pedUngroupMethod;ValueControl','pedRoundFormat;ValueControl','pedBalanceMethod;ValueControl','grdUngroupColumns;tbl;celleditor;cbx','grdSupportColumns;tbl;celleditor;cbx']){
         const owners=tids.get(base+key)??[],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
         if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(inputs[0]))
