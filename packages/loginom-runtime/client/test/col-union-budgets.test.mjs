@@ -10,9 +10,9 @@ test('positional union fits the apply, type card, node reference and route budge
  assert.ok(Buffer.byteLength(JSON.stringify({name:t.name,description:t.description,inputSchema:t.inputSchema}))<=20000);
  const card=describeNodeTypes(['transform.col_union_data'],{},new Map(),createCandidateNodeSupport({}).nodeApplyHandlers)[0];
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
- const reference=await readFile(new URL('../../../product/skills/loginom-automation/references/nodes/transform-coluniondata.md',import.meta.url),'utf8');
+ const reference=await readFile(new URL('../../../product/skills/loginom-automation/references/nodes/transform.col_union_data.md',import.meta.url),'utf8');
  assert.ok(Buffer.byteLength(reference)<=6000);assert.doesNotMatch(reference,/\$(?:\d+|ARGUMENTS)/);
  const skill=await readFile(new URL('../../../product/skills/loginom-automation/SKILL.md',import.meta.url),'utf8');
- const route=skill.split('\n').find(line=>line.includes('references/nodes/transform-coluniondata.md'));
+ const route=skill.split('\n').find(line=>line.includes('references/nodes/transform.col_union_data.md'));
  assert.ok(route&&Buffer.byteLength(route)<=200);
 });

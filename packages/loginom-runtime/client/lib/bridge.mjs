@@ -411,7 +411,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const first = !userBundleDelivered;
             const ready = session.metadata.workspaceReady === true;
             const types=first?actionRuntime.describe().available_node_types:[];
-            const descriptions=first?Array.from({length:Math.ceil(types.length/32)},(_,index)=>actionRuntime.describe({
+            const descriptions=first?Array.from({length:Math.max(1,Math.ceil(types.length/32))},(_,index)=>actionRuntime.describe({
               action_keys:['package.save_checkpoint'],node_types:types.slice(index*32,index*32+32),
             })):[];
             const bundle=first?compactKnowledgeBundle({...descriptions[0],node_types:descriptions.flatMap(d=>d.node_types)}):null;
