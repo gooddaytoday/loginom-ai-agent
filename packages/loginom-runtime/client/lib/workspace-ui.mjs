@@ -4718,6 +4718,29 @@ function readRenderedInputMapping(observation) {
                 ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='input_mapping'
                   &&mask.input_mapping_owner_ref===fresh.wizard.root_ref));
+          // Reopening a saved LGD source renders the native controller before
+          // its breadcrumb owner and contained loading message settle. Observe
+          // this one opening until its exact owner is painted, using only the
+          // original deadline; never replay Settings or wait on foreign UI.
+          if(task.prepared_node_context&&['lgd_import','lgd_export'].includes(observed.wizard?.stage)) {
+            const root=observed.wizard.root_ref,stage=observed.wizard.stage;
+            const pendingLgd=fresh=>contextMatches(fresh)&&fresh.wizard?.status==='observed'
+              &&fresh.wizard.root_ref===root&&fresh.wizard.stage===stage
+              &&fresh.prepared_node_context?.verified===true&&fresh.prepared_node_context.surface==='wizard'
+              &&['document_id','workflow_id','node_id'].every(k=>current.prepared_node_context[k]===fresh.prepared_node_context[k])
+              &&(fresh.wizard.owner_context?.status!=='observed'||intendedWizard(fresh))
+              &&fresh.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+                &&(m.ref===root&&m.target_tid===current.workflow_ref.prefix+';WizrdMCF'
+                  ||m.wizard_loading_owner_ref===root));
+            if(pendingLgd(observed)&&(!intendedWizard(observed)||observed.ui.masks.length)) {
+              record('lgd_wizard_open_wait_started',{initial_observation:observed});
+              while(pendingLgd(observed)&&(!intendedWizard(observed)||observed.ui.masks.length)) {
+                timeout();await page.waitForTimeout(Math.min(200,timeout()));timeout();
+                observed=await readOpeningUi();timeout();
+              }
+              record('lgd_wizard_open_wait_finished',{owner_confirmed:intendedWizard(observed),mask_present:observed.ui.masks.length>0});
+            }
+          }
           // The opening click is already sent. Observe its own loading mask
           // within the original node deadline; never reissue the click.
           observed=await waitForMasks(observed,readOpeningUi,ownedLoading);
