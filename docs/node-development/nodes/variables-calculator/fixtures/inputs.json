@@ -1,0 +1,11 @@
+{
+  "limit": 100,
+  "updated_limit": 120,
+  "skip": 0,
+  "title": "Страница",
+  "enabled": true,
+  "ratio_numerator": 1,
+  "ratio_denominator": 8,
+  "empty": "",
+  "missing": null
+}
