@@ -43,13 +43,26 @@ test("the bundle bakes the feed parameter and defaults to disabled", async () =>
         define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
       })
       expect(bundle.success).toBe(true)
-      // macOS Bun resolves data: URLs as filesystem paths and can hit NameTooLong.
-      // Separate files also avoid sharing the module cache between feed values.
+      // macOS Bun's test loader can fail to resolve later files created in the
+      // same temporary directory. Evaluate each output with a fresh loader.
       const output = join(directory, `product-${index}.mjs`)
       await writeFile(output, await bundle.outputs[0].text())
-      const built = await import(pathToFileURL(output).href)
-      expect(built.Product.updateFeed).toBe(value || null)
-      expect(built.Product.changelogFeed).toBeNull()
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "--eval",
+          `import { Product } from ${JSON.stringify(pathToFileURL(output).href)};
+         console.log(JSON.stringify([Product.updateFeed, Product.changelogFeed]));`,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      )
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(JSON.parse(stdout)).toEqual([value || null, null])
     }
   } finally {
     await rm(directory, { recursive: true, force: true })
