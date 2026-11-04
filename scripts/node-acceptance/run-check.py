@@ -1250,7 +1250,8 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
-        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or execution_error or lgd_corrupt) or delivered else None
+        invalid = (port_failure(replies, folder / 'model.stdout')
+                   if not spec.get('variable_only') and (not (rejection or execution_error or lgd_corrupt) or delivered) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
