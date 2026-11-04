@@ -437,3 +437,11 @@ abs=1e-8 только для real, метки через label_any.
 информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
+
+`clustering-scale-minus-one-one`, `clustering-scale-zero-one`, `clustering-scale-absolute`:
+k-means с нативной нормировкой [-1;1], [0;1] и max-abs соответственно.
+Только task и scaling.csv передаются модели. Stdlib oracle вычисляет
+преобразования и Lloyd k-means независимо; номера кластеров свободны,
+назначения, оба порта, центры в исходных единицах, Distance в нормированных,
+порядок полей, типы, CSV/Save/cold и сохранённый NormType проверяются.
+Допуски real abs=1e-8/rel=1e-10. Каждый метод меняет raw-разбиение.
