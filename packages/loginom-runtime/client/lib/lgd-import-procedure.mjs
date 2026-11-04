@@ -37,14 +37,21 @@ export async function configureLgdImportBrowser(page,t,readContext){
   need(observed.checksum===true&&observed.connection==='Локальное','checksum verify and local file storage required');
   need(t.source_path===undefined||observed.source_path===t.source_path,'source changed');
   need(/\.lgd$/i.test(observed.source_path),'standalone LGD required');
-  need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported retained native LGD format');
   // Native Next reads/validates the header and checksum; never accept an empty
   // preview as successful configuration of a corrupt source.
-  const advance=async target=>{await click(find(root+';btnNext'));await wait(target,async()=>{
+  const nativeError=async()=>{
+   await guard();
    const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error('LGD import: '+((await error.getAttribute('data-qtip'))??'native file validation refused'));
+  };
+  const advance=async target=>{await nativeError();await click(find(root+';btnNext'));await wait(target,async()=>{
+   await nativeError();
    return await find(root+';'+target).isVisible()&&await page.evaluate(target=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().el.dom.getAttribute('data-tid').endsWith(';'+target),target);
   });};
   await advance('ColumnsMappingEngineOutputPortWizard');
+  const selectedSource=observed.source_path;
+  observed=await native();
+  need(observed.source_path===selectedSource&&observed.checksum===true&&observed.connection==='Локальное','source or checksum changed during native validation');
+  need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported retained native LGD format');
   await advance('DoneWizard');
   return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source:observed}};
  }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
