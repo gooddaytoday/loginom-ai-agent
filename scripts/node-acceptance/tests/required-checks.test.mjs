@@ -54,6 +54,7 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/node-procedure.mjs','s1'],
  ['packages/loginom-runtime/client/lib/node-port-output.mjs','n19'],
  ['packages/loginom-runtime/client/lib/crosstable-readback.mjs','n13'],
+ ['packages/loginom-runtime/client/lib/variables-calculator-context.mjs','variables-calculator'],
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
  ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
@@ -63,7 +64,9 @@ for(const [path,scenario] of [
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
  assert.ok(ids(text).includes('live-ui'));assert.match(text,/run-check.py start/);
- assert.ok(text.includes(scenario));assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
+ assert.ok(text.includes(scenario));
+ if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator --pair/);
+ assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });
 
