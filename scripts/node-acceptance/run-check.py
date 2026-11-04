@@ -89,6 +89,14 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['enrich-data-left', 'enrich-data-composite']:
+        src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
+        composite = name == 'enrich-data-composite'
+        return dict(source=src, prompt=src / ('composite/task.md' if composite else 'task.md'),
+                    data=src / ('composite/data' if composite else 'data'), base=None,
+                    expected_name='composite/expected.json' if composite else 'expected.json',
+                    input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
+                    ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
     if name == 'clustering-normalized':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,

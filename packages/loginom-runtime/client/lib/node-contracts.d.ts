@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
+  | 'transform.enrich_data' | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -37,7 +37,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -383,4 +383,16 @@ export interface BinningConfigurationReadback {
  training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: {state: 'materialized'; intervals: BinningConfigurationReadback['intervals']}};
  output_mappings: {port: number; fields: {index: number; name: string; label: string; type: string; data_kind: string; source_name: string}[]}[];
  package_persistence_verified: false;
+}
+
+export interface EnrichParameters {enrichment?: {tables:Array<{port:1|2;keys:Array<{main:string;lookup:string}>}>;
+  prefixes:{enabled:boolean;name:string;label:string}}}
+export interface EnrichConfigurationReadback {
+  kind:'enrich';scope:'observed_before_verified_finish';node:NodeRef;
+  receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
+  prefixes:{enabled:boolean;name:string;label:string};
+  tables:Array<{port:1|2;native_index:number;keys:Array<{main:string;lookup:string}>}>;
+  input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
+    autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
+  output_mapping:GroupingConfigurationReadback['output_mapping'];
 }

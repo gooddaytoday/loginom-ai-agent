@@ -11,6 +11,8 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 # Построение сценария Loginom
 
+Дополнение данных: `transform.enrich_data` / `left`, `parameters.enrichment`; [правила](references/nodes/enrich-data.md).
+
 Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки: `loginom_file_admit` исходного пути → `dock_artifact_deliver` → `dock_artifact_delivery_status` до `ready`. Используй подтверждённый `destination`; не загружай этот полный файл ещё раз. После доставки работай с ним как с серверным источником по следующему циклу.
 
 Работай через управляемые инструменты текущей сессии. Активация этого skill

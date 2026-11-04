@@ -128,7 +128,9 @@ test('installed import discovery supplies its complete parameter vocabulary on t
   const { describeNodeTypes } = await import('../lib/node-contracts.mjs');
   const { nodeApplyInputSchema } = await import('../lib/node-api.mjs');
   const support = createCandidateNodeSupport({ targetOrigin: 'http://example.test', targetBuild: '7.4.2' });
-  const cards = describeNodeTypes([...support.nodeApplyHandlers.keys()], { runtime: 'pin' }, new Map(), support.nodeApplyHandlers, '7.4.2');
+  const types = [...support.nodeApplyHandlers.keys()];
+  const cards = [types.slice(0,32),types.slice(32)].filter(batch=>batch.length).flatMap(batch=>
+    describeNodeTypes(batch, { runtime: 'pin' }, new Map(), support.nodeApplyHandlers, '7.4.2'));
   // The initial prepare bundle only lists installed types; the schema of a
   // selected type comes from dock_action_describe({node_types:[type]}).
   const knowledge = compactKnowledgeBundle({ session_manifest: { runtime: 'pin' }, actions: [], node_types: cards });
