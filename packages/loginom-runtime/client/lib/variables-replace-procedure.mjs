@@ -1,16 +1,17 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {readVariablesReplaceContext,readVariablesReplaceBrowser} from './variables-replace-context.mjs';
+export function variablesReplaceLocator(page,tid){return page.locator('[data-tid='+JSON.stringify(tid)+']:visible:not(tr.x-grid-row-summary *)');}
 export function makeVariablesReplaceConfigureCode(binding,options){
  validatePreparedNodeContext(binding);
- return `async page=>(${configureVariablesReplace.toString()})(page,${JSON.stringify({...options,binding})},${readPreparedNodeContext.toString()},${readVariablesReplaceContext.toString()},${readVariablesReplaceBrowser.toString()})`;
+ return `async page=>(${configureVariablesReplace.toString()})(page,${JSON.stringify({...options,binding})},${readPreparedNodeContext.toString()},${readVariablesReplaceContext.toString()},${readVariablesReplaceBrowser.toString()},${variablesReplaceLocator.toString()})`;
 }
 // Private UI procedure: cached native inventories, guarded rendered gestures,
 // original deadline, and no retries of dispatched or unknown effects.
-export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser){
+export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser,locate=variablesReplaceLocator){
  let effect=false,phase='inventory',lastAction='read';
  const need=(ok,message)=>{if(!ok)throw Error('Variables replacement '+message);};
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';ReplaceVariablesWizard';
- const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
+ const at=tid=>locate(page,tid);
  const remaining=()=>{const n=task.deadline-Date.now();need(n>0,'original deadline expired');return n;};
  let owner;
  const owned=async()=>{remaining();const c=await readNode(page,b);need(c.verified===true&&c.surface==='wizard'&&!c.input_port&&!c.output_port,'owned wizard required');need(!owner||same(owner,c),'owner changed');owner??=c;return c;};
@@ -31,7 +32,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
  const inspect=async(tid,{grid,row,dialog,input=false}={})=>{
   await owned();
   return page.evaluate(({tid,grid,row,dialog,input,root,base,origin,build})=>{
-   const need=(v,m)=>{if(!v)throw Error('Variables replacement '+m);},exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+   const need=(v,m)=>{if(!v)throw Error('Variables replacement '+m);},exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')].filter(e=>!e.closest('tr.x-grid-row-summary')),visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    need(location.origin===origin&&globalThis.bg?.app?.Version===build,'origin/build changed');
    const roots=exact(root);need(roots.length===1&&visible(roots[0]),'one wizard');
    const dialogs=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible);
