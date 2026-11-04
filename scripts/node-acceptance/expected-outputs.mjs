@@ -110,7 +110,10 @@ export function resolveExportInput(graph,{destination,destinations,type='exports
  need(['exports.text','exports.excel'].includes(type),error);
  let exports=graph.nodes.filter(n=>n.type===type);
  if(destination!==undefined){
-  need(Array.isArray(destinations)&&destinations.length===exports.length
+  need(Array.isArray(destinations),error);
+  // Destination observations include every export type in the package.
+  destinations=destinations.filter(d=>exports.some(n=>n.ref.node_id===d.node_id));
+  need(destinations.length===exports.length
    &&new Set(destinations.map(d=>d.node_id)).size===exports.length
    &&exports.every(n=>destinations.some(d=>d.node_id===n.ref.node_id&&typeof d.destination==='string')),error);
   exports=exports.filter(n=>destinations.some(d=>d.node_id===n.ref.node_id&&d.destination===destination));

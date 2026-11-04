@@ -216,6 +216,33 @@ test('exact destination selects renamed report while the earlier s1 export remai
  }
 });
 
+test('exact destination selects CSV or Excel among mixed export types',()=>{
+ for(const type of ['exports.text','exports.excel']){
+  const g=graph();g.nodes.find(n=>n.ref.node_id==='export').type=type;
+  g.nodes.push(node('input-lgd','exports.lgd',[]),node('result-lgd','exports.lgd',[]),
+   node('other-export',type==='exports.text'?'exports.excel':'exports.text',[]));
+  const destination='/own/report.csv',input_fields=[{name:'Code',source_name:'Code',type:'string'}];
+  const destinations=[{node_id:'input-lgd',destination:'/own/input.lgd'},
+   {node_id:'export',destination,input_fields},{node_id:'result-lgd',destination:'/own/result.lgd'},
+   {node_id:'other-export',destination}];
+  const binding=resolveExportInput(g,{type,destination,destinations});
+  assert.equal(binding.export_node_id,'export');assert.equal(binding.node.ref.node_id,'rename');
+  assert.equal(binding.output_port,1);assert.deepEqual(binding.input_fields,input_fields);
+  assert.equal(matchExpectedOutputs([actual('rename',1)],[output],{exportInput:binding}).length,1);
+  assert.throws(()=>resolveExportInput(g,{type,destination,destinations:[...destinations,destinations[1]]}),
+   /COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+ }
+});
+
+test('two CSV exports still refuse a single observed destination beside LGD',()=>{
+ const g=graph();g.nodes.push(node('second-export','exports.text',[]),node('lgd','exports.lgd',[]));
+ const destination='/own/report.csv';
+ for(const destinations of [
+  [{node_id:'export',destination},{node_id:'lgd',destination:'/own/report.lgd'}],
+  [{node_id:'export',destination},{node_id:'second-export',destination},{node_id:'lgd',destination:'/own/report.lgd'}],
+ ])assert.throws(()=>resolveExportInput(g,{destination,destinations}),/COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+});
+
 test('cold reveals only an unavailable owned body, preserving clipped-label selection guards',async()=>{
  const {observeExportDestinations}=await import('../static-source-proof.mjs');
  const {preparedGraphSelection}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
