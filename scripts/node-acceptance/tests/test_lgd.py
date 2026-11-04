@@ -6,6 +6,22 @@ from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
+    def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
+        reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
+                 'configuration': {'readback': {'kind': 'lgd_import'}},
+                 'execution': {'status': 'completed'}, 'output': {'ports': [{
+                     'port': 0, 'schema': [], 'sample': [], 'sample_complete': True,
+                     'row_count': 5, 'freshness_basis': 'completed_execution_port_source'}]}}
+        runner.check_lgd_import_result([(1, reply)], 5)
+        for kind, status, complete in [('text_import', 'SUCCEEDED', True),
+                                       ('lgd_import', 'AMBIGUOUS', True),
+                                       ('lgd_import', 'SUCCEEDED', False)]:
+            changed = json.loads(json.dumps(reply))
+            changed['configuration']['readback']['kind'] = kind
+            changed['status'] = status
+            changed['output']['ports'][0]['sample_complete'] = complete
+            with self.assertRaises(AssertionError): runner.check_lgd_import_result([(1, changed)], 5)
+
     def test_binary_source_is_a_user_path_without_provider_file_parts(self):
         class Captured(Exception): pass
         for name in ['lgd-import', 'lgd-properties', 'lgd-corrupt']:

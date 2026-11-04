@@ -621,6 +621,15 @@ def port_failure(replies, journal):
     return str(journal) + ':' + str(invalid[0] if invalid else 1) if not delivered or invalid else None
 
 
+def check_lgd_import_result(replies, row_count):
+    assert any(o.get('status') == 'SUCCEEDED'
+               and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import'
+               and o.get('execution', {}).get('status') == 'completed'
+               and any(p.get('port') == 0 and p.get('sample_complete') is True
+                       and p.get('row_count') == row_count and port_path(owner, p) is not None
+                       for owner, p in ports(o)) for _, o in replies), 'LGD_IMPORT_FULL_RESULT_MISSING'
+
+
 def check_tree(port, expected):
     tree = port.get('tree', {})
     assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
@@ -1143,6 +1152,8 @@ class Runner:
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
             return session, expected, None, None
+        if spec.get('lgd'):
+            check_lgd_import_result(replies, len(expected['outputs'][0]['rows']))
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None
