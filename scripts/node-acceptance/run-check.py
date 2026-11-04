@@ -328,6 +328,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
                     variable_only=True, oracle=REPO / 'scripts/node-acceptance/expected-outputs.mjs')
+    if name in ['calculator-vars', 'calculator-vars-update']:
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        update = name == 'calculator-vars-update'
+        return dict(source=src, prompt=src / ('task-variables-update.md' if update else 'task-variables.md'),
+                    data=src.parent / 'fixtures', input_files=['variables.csv'], base=None,
+                    expected_name='expected.json' if update else 'expected-initial.json', oracle=src / 'oracle-variables.py')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

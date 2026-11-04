@@ -25,6 +25,8 @@ RULES = (
     ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8')),
     ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1',)),
     ((C + 'variables-datatovar-*.mjs', 'docs/node-development/nodes/variables-datatovar/acceptance/**', 'scripts/node-acceptance/variables-datatovar.mjs'), ('live-ui',), ('variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty')),
+    ((C + 'calculator-*.mjs', 'docs/node-development/nodes/calculator/acceptance/**'),
+     ('live-ui',), ('calculator-vars', 'calculator-vars-update')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
     ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns',)),

@@ -80,6 +80,11 @@ python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
 ```
 
+`calculator-vars` and `calculator-vars-update` use the approved Calculator
+Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
+Only the task and `fixtures/variables.csv` reach the model. The update task
+changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2

@@ -21,6 +21,20 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_calculator_variables_use_approved_tasks_and_only_the_input_csv(self):
+        for name, expected_name, value in [('calculator-vars', 'expected-initial.json', 7),
+                                           ('calculator-vars-update', 'expected.json', 11)]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/calculator.lgp')
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], ['variables.csv'])
+            self.assertTrue(case['oracle'].is_file())
+            self.assertTrue((case['data'] / 'variables.csv').is_file())
+            self.assertIn('Var.Amount', case['prompt'].read_text())
+            self.assertEqual(expected['package_path'], '/own/calculator.lgp')
+            self.assertEqual(expected['outputs'][0]['rows'][0]['ScenarioAmount'], value)
+            self.assertIsNone(expected['outputs'][0]['rows'][3]['Shifted'])
+
     def test_typed_variant_csv_uses_existing_scalar_rules_and_null_collision_guard(self):
         expected = dict(columns=[dict(name='Value', type='variant')], rows=[dict(Value=v) for v in [
             dict(cell_type='integer', value=7), dict(cell_type='boolean', value=False),
