@@ -361,7 +361,8 @@ export function parseExpectedVariableInventory(expected){
  for(const o of v.outputs){
   need(o&&Object.keys(o).every(k=>['node','port','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
    &&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
-  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value'].includes(k))
+  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value',...(o.node.type==='variables.replace'?['tolerance']:[])].includes(k))
+   &&(x.tolerance===undefined||o.node.type==='variables.replace'&&x.type==='real'&&Object.keys(x.tolerance).sort().join(',')==='abs,rel'&&x.tolerance.abs===1e-12&&x.tolerance.rel===1e-12)
    &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string'].includes(x.type)
    &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'),'EXPECTED_VARIABLE_VALUE_INVALID');
   need(new Set(o.variables.map(x=>x.name)).size===o.variables.length,'EXPECTED_VARIABLE_DUPLICATE');
@@ -382,11 +383,11 @@ export function matchVariableInventoryOutput(output,want){
   &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
   &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
   &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');
- if(want.node.type==='variables.calculator')need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(['variables.calculator','variables.replace'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
  for(const x of want.variables){
   const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
   need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
-   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&Object.is(cell.value,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
+   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(want.node.type==='variables.replace'?Number.isFinite(cell.value)&&Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value)):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
  }
  return true;
 }

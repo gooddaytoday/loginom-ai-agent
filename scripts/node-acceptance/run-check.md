@@ -508,3 +508,5 @@ only limit to 120, freshly execute and Save. Typed variable output 0 and native
 configuration receipts establish both states, stable IDs/types and preservation
 of unrequested expressions. Stock W1 typed cold execution and cleanup apply.
 Only the user task reaches the model; expected values and oracle stay private.
+
+`variables-replace-exact`: точная замена переменных всех четырёх типов, исходный JSON через Калькулятор (переменные). Три полных typed-чтения по 10 переменных: initial, patch только Count, source refresh только Color без перенастройки замены. Проверяются порядок/метки/типизированный NULL, отсутствие каскада, сохранённые пары остальных переменных, Save/cold/cleanup.

@@ -1,3 +1,4 @@
+import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
 import {makeVariablesCalculatorContextCode} from './variables-calculator-context.mjs';
 import {makeVariablesCalculatorConfigureCode} from './variables-calculator-procedure.mjs';
 import {makeVariablePortMappingCode} from './variable-port-mapping.mjs';
@@ -354,6 +355,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureUserVariables(variables,finish) {return crossTableOwnedStep('user_values',{variables,finish},makeUserVariablesConfigureCode);},
     async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
+    async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},

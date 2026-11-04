@@ -307,6 +307,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'variables-replace-exact':
+        src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
+                    input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -1310,7 +1315,7 @@ class Runner:
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
                 src / spec.get('variable_initial', 'expected-user-initial.json'), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': 'execution' if spec.get('variable_audit') == 'variables-calculator' else 'snapshot'})
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace'] else 'snapshot'})
             return session, expected, None, None
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
