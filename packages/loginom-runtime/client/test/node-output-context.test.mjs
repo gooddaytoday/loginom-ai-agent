@@ -1,7 +1,8 @@
+import {decodePortCell,makeNodeVariableOutputCode} from '../lib/node-port-output.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readOutputContext,makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
+import {readVariableRecords,readOutputContext,makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
 const portGuid='11111111-1111-1111-1111-111111111111',viewGuid='22222222-2222-2222-2222-222222222222';
 function fixture(surface='graph') {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;TF-1',navigation_path:[]},node:{node_id:'node'}};
@@ -83,4 +84,34 @@ for(const inside of [false,true])test('graph output inventory '+(inside?'rejects
  f.d.FmxGraph.container.contains=e=>e===f.port||(inside&&e===copy);
  const r=await readOutputContext(f.page,f.binding,f.readNode);
  assert.equal(r.verified,!inside);if(inside)assert.equal(r.reason,'port_identity');else assert.equal(r.ports.length,1);
+});
+
+function variableStore(){
+ const values=[[1,false],[4,0],[5,''],[5,null]];
+ const items=values.map(([DataType,ValueVariant],Index)=>({isModel:true,data:{ID:Index,Index,Name:'v'+Index,DisplayName:'V'+Index,DataType,ValueVariant,DisplayValue:ValueVariant,ValueIsNull:ValueVariant===null,OriginType:1}}));
+ return {items,complete:true,loadCount:1,getTotalCount:()=>items.length,isLoading:()=>false,getCount:()=>items.length,getData:()=>({items})};
+}
+for(const mode of ['preview','values'])test('W1 complete native variable inventory distinguishes NULL, false, zero and empty string: '+mode,()=>{
+ const s=variableStore(),r=readVariableRecords(s,mode,decodePortCell);
+ assert.deepEqual(r.variables.map(v=>v.cell.value),[false,'0','',null]);assert.deepEqual(r.variables.map(v=>v.cell.is_null),[false,false,false,true]);
+ assert.deepEqual(r.completeness,{count:4,store_count:4,unique_ids:4,loaded:true});
+});
+for(const fault of ['loading','truncated','duplicate-id','duplicate-name','unsupported','unloaded','unsafe-integer','foreign-origin'])test('W1 refuses unproved variable inventory: '+fault,()=>{
+ const s=variableStore();
+ if(fault==='loading')s.isLoading=()=>true;if(fault==='truncated')s.getCount=()=>5;
+ if(fault==='duplicate-id')s.items[1].data.ID=0;if(fault==='duplicate-name')s.items[1].data.Name='v0';
+ if(fault==='unsupported')s.items[0].data.DataType=6;if(fault==='unloaded')s.items[1].data.ValueVariant=undefined;
+ if(fault==='unsafe-integer')s.items[1].data.ValueVariant=Number.MAX_SAFE_INTEGER+1;if(fault==='foreign-origin')s.items[0].data.OriginType=0;
+ assert.throws(()=>readVariableRecords(s,fault==='foreign-origin'?'values':'preview',decodePortCell));
+});
+test('W1 executable variable reader refuses a fabricated execution before any browser call',()=>{
+ assert.throws(()=>makeNodeVariableOutputCode({document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]},node:{document_id:'doc',workflow_id:'wf',node_id:'n'}},{port:0,execution:{execution_id:'fake'}}));
+});
+
+test('W1 observed DataToVar real output uses the existing finite binary64 decoder, without admitting real writes',()=>{
+ const s=variableStore();s.items[1].data.DataType=3;s.items[1].data.ValueVariant=3.5;
+ assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.value,3.5);
+ assert.throws(()=>readVariableRecords(s,'values',decodePortCell));
+ s.items[1].data.ValueVariant=Infinity;assert.throws(()=>readVariableRecords(s,'preview',decodePortCell));
+ for(const patch of [{complete:false},{loadCount:0},{getTotalCount:()=>8}])assert.throws(()=>readVariableRecords({...variableStore(),...patch},'preview',decodePortCell));
 });

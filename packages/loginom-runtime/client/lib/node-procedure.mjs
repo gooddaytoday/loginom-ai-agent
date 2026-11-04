@@ -15,7 +15,7 @@ import {NODE_TYPES} from './node-contracts.mjs';
 import {revealPreparedGraphNode,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph} from './node-placement.mjs';
 import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
-import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
+import {makeCrossTableVariablesCode,makeCrossTableBindingsCode,makeUserVariablesSnapshotCode} from './crosstable-variables.mjs';
 import {makeNodeProcessControlCode} from './node-process-control.mjs';
 import {makeReplacementContextCode} from './replacement-context.mjs';
 import {makeSmoothingContextCode} from './smoothing-context.mjs';
@@ -43,7 +43,7 @@ import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './no
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
 import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
-import {makeNodePortOutputCode} from './node-port-output.mjs';
+import {makeNodeVariableOutputCode,makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
@@ -221,7 +221,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const crossTableOwnedStep=async(verb,payload,makeCode)=>{
     checkBudget();
     if(!preparedNodeContext)throw Error('Prepared CrossTable owner required');
-    const step=nextStep(),id=operation.id+':n'+step,actionKey='node.crosstable.'+verb+'.internal',action={verb,...payload};
+    const step=nextStep(),id=operation.id+':n'+step,actionKey=(verb.startsWith('variable_')||verb==='user_snapshot'?'node.variables.':'node.crosstable.')+verb+'.internal',action={verb,...payload};
     const signature=digest([id,action,preparedNodeContext]);snapshot=null;evidenceSnapshot=null;
     const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,signature});
     if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('CrossTable step was not durably prepared');
@@ -345,6 +345,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }}
       return {verified:true,port_guid:port.port_guid,execution_started:false};
     },
+    async readVariablePort({port,execution}) {return crossTableOwnedStep('variable_output',{port,execution},makeNodeVariableOutputCode);},
+    async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async revealGraphNode({target='drawing'}={}) {

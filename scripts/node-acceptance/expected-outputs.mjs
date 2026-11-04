@@ -30,7 +30,7 @@ export function parseExpectedOutputs(expected){
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
  const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
- need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
+ need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&parseExpectedVariableInventory(expected)?.outputs.length>0),'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
@@ -344,4 +344,52 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&p
  const aligned=alignFactorSigns(actual,outputs,expected.factor_signs);
  matchExpectedOutputs(actual,aligned);
  writeFileSync(process.argv[5],JSON.stringify({...expected,outputs:aligned}));
+}
+
+// Optional variable evidence is independent of the legacy table matcher.
+export function parseExpectedVariableInventory(expected){
+ if(expected.variable_inventory===undefined)return null;
+ const v=expected.variable_inventory;
+ need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&v.outputs.length>0&&v.outputs.length<=16
+  &&(v.links===undefined||Array.isArray(v.links)&&v.links.length<=100),'EXPECTED_VARIABLE_INVENTORY_INVALID');
+ const selector=s=>s&&Object.keys(s).every(k=>['type','label'].includes(k))&&typeof s.type==='string'&&s.type.length>0
+  &&(s.label===undefined||typeof s.label==='string'&&s.label.length>0);
+ const ordinal=p=>Number.isInteger(p)&&p>=0&&p<100;
+ for(const o of v.outputs){
+  need(o&&Object.keys(o).every(k=>['node','port','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
+   &&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
+  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value'].includes(k))
+   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string'].includes(x.type)
+   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'),'EXPECTED_VARIABLE_VALUE_INVALID');
+  need(new Set(o.variables.map(x=>x.name)).size===o.variables.length,'EXPECTED_VARIABLE_DUPLICATE');
+ }
+ for(const l of v.links??[])need(l&&Object.keys(l).every(k=>['source','output','target','input','kind'].includes(k))&&selector(l.source)&&selector(l.target)
+  &&ordinal(l.output)&&ordinal(l.input)&&['variables','control'].includes(l.kind)&&(l.kind!=='control'||l.input===0),'EXPECTED_VARIABLE_LINK_INVALID');
+ return v;
+}
+export function selectVariableInventoryNode(graph,selector){
+ const nodes=graph.nodes.filter(n=>n.type===selector.type&&(selector.label===undefined||n.label===selector.label));
+ need(nodes.length===1,'COLD_VARIABLE_NODE_AMBIGUOUS');return nodes[0];
+}
+export function matchVariableInventoryOutput(output,want){
+ const snapshot=want.node.type==='variables.user',c=output?.completeness;
+ need(output?.kind==='variables'&&output.port===want.port&&output.complete===true&&output.fresh===true&&typeof output.read_id==='string'&&output.read_id.length>0
+  &&output.source===(snapshot?'snapshot':'execution')&&output.native_source===(snapshot?'VariablesEditValuesWizard':'VariablesForm')
+  &&(snapshot?output.execution_id===null:typeof output.execution_id==='string'&&output.execution_id.length>0)
+  &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
+  &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
+  &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');
+ for(const x of want.variables){
+  const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
+  need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
+   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&Object.is(cell.value,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
+ }
+ return true;
+}
+export function matchVariableInventoryLinks(graph,inventory){
+ return (inventory.links??[]).map(want=>{
+  const source=selectVariableInventoryNode(graph,want.source),target=selectVariableInventoryNode(graph,want.target);
+  const matches=(graph.variable_links??[]).filter(l=>l.source===source.ref.node_id&&l.target===target.ref.node_id&&l.output===want.output&&l.input===want.input&&l.kind===want.kind);
+  need(matches.length===1&&typeof matches[0].source_port_guid==='string'&&typeof matches[0].target_port_guid==='string','COLD_VARIABLE_LINK_MISMATCH');return matches[0];
+ });
 }

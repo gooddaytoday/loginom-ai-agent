@@ -24,7 +24,7 @@ export interface PortMapping {
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
-  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
+  read: {ports: number[]; variable_ports?: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
@@ -212,9 +212,15 @@ export interface NativeNodeOutputPort extends NodeOutputPortBase {
   cell_precision: {cells: 'exact_native'; temporal: 'native_serial_only'}; limitations: string[];
 }
 export type NodeOutputPort = LegacyNodeOutputPort | NativeNodeOutputPort | TreeNodeOutputPort;
+export interface NodeVariableOutput {
+ port:number; kind:'variables'; port_guid:string; fresh:true; read_id:string; execution_id:string|null;
+ source:'execution'|'snapshot'; native_source:'VariablesForm'|'VariablesEditValuesWizard'; complete:true; count:number;
+ variables:Array<{id:string|number;index:number;name:string;label:string;type:'integer'|'real'|'boolean'|'string';cell:TableCell}>;
+ completeness:{count:number;store_count:number;unique_ids:number;loaded:true};
+}
 export interface NodeOutput {
   status: 'not_refreshed' | 'partial' | 'complete'; evidence_ref: string | null;
-  execution_id?: string; ports?: NodeOutputPort[]; no_output_requested?: boolean;
+  execution_id?: string | null; ports?: NodeOutputPort[]; variable_ports?: NodeVariableOutput[]; no_output_requested?: boolean;
   verified?: boolean; cleanup_complete?: boolean; effect_possible?: boolean;
   /** Native format, read-setting and ownership evidence remains available. */
   [evidence: string]: unknown;

@@ -31,7 +31,8 @@ export async function readPreparedNodeContext(page, binding) {
     const seen=new Set();
     for(let i=0;n && i<32 && !seen.has(n);i++,n=n.ParentNode) {
       seen.add(n);
-      if(app.ModelNodeTreeNode && n instanceof app.ModelNodeTreeNode) nodeTree=n;
+      if(app.ModelNodeTreeNode && n instanceof app.ModelNodeTreeNode
+        ||app.ModelServiceNodeTreeNode && n instanceof app.ModelServiceNodeTreeNode) nodeTree=n;
       if(app.WorkFlowTreeNode && n instanceof app.WorkFlowTreeNode) workflowNode=n;
       if(app.PackageTreeNode && n instanceof app.PackageTreeNode) {packageNode=n;break;}
     }
@@ -83,7 +84,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||o.workflow!==workflowNode||o.packageNode!==packageNode||o.node.FGuid!==o.node_id
           ||o.node.data!==o.nodeData||o.port.data!==o.portData||o.port.FGuid!==o.portGuid||o.node.data!==nodeTree.FModelNode
           ||o.port.data!==portTree.FModelNodePort||o.port.parent!==o.node||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
-          ||portTree.FIndex!==o.nativeIndex||!o.enginePort||(input?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
+          ||portTree.FIndex!==o.nativeIndex||!o.enginePort||(input||o.kind==='variables'?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
         outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
         // Breadcrumb overflow may hide the node itself. Retain context only

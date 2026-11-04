@@ -68,7 +68,7 @@ export function validateNodeApplyRequest(request, handlers) {
       }
     }
   }
-  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
+  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[]),...(Object.hasOwn(request.read??{},'variable_ports')?['variable_ports']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
   if(request.read.coverage==='full')requireValue(request.finish==='execute'&&JSON.stringify(request.read.ports)==='[0]'
     &&(['transform.collapse_columns','transform.cross_table'].includes(request.target.type)
@@ -80,6 +80,9 @@ export function validateNodeApplyRequest(request, handlers) {
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
     && Number.isInteger(request.read.sample_rows) && request.read.sample_rows>=0 && request.read.sample_rows<=100
     && typeof request.read.require_exact_numbers==='boolean', 'Invalid output read request');
+  if(request.read.variable_ports!==undefined)requireValue(Array.isArray(request.read.variable_ports)&&request.read.variable_ports.length<=16
+    &&new Set(request.read.variable_ports).size===request.read.variable_ports.length&&request.read.variable_ports.every(p=>Number.isInteger(p)&&p>=0&&p<100)
+    &&(request.finish==='execute'||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
   requireValue(request.finish==='execute' || request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
@@ -370,6 +373,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
+          &&(!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
           &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
@@ -460,10 +464,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
       if(terminal)return terminal;
       // Output reading has its own work (formats, paging, restoration). The
       // configuration limit does not cap it; the total operation deadline still does.
-      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||request.read.variable_ports?.length>0||handler.fileOutput===true,verify:value=>requireValue(
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length
+        && (request.read.variable_ports===undefined||request.read.variable_ports.length===0&&!value.variable_ports?.length||Array.isArray(value.variable_ports)&&value.variable_ports.length===request.read.variable_ports.length
+          &&value.variable_ports.every((p,i)=>p.port===request.read.variable_ports[i]&&p.kind==='variables'&&p.source==='execution'&&p.native_source==='VariablesForm'
+            &&p.execution_id===state.execution.execution_id&&p.fresh===true&&p.complete===true&&typeof p.read_id==='string'&&p.read_id.length>0
+            &&p.count===p.variables?.length&&p.count===p.completeness?.count&&p.count===p.completeness.store_count&&p.count===p.completeness.unique_ids))
         && value.ports.every((p,i)=>p.port===request.read.ports[i] && p.fresh===true)
         &&(request.read.coverage!=='full'||request.target.type!=='programming.javascript'
           ||value.status==='complete'&&value.ports.every(p=>p.sample_complete===true&&p.sample_rows===p.row_count)),

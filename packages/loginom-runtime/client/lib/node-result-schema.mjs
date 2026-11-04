@@ -42,7 +42,8 @@ export const nodeOutputPortSchema=port;
 export const nodeTreeOutputPortSchema=treePort;
 const fileArtifact=object({artifact_id:str,destination:str,bytes:integer,sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},execution_id:str,verification_id:str,
  freshness_basis:values('explicit_replace_and_completed_native_execution','native_absence_check_and_completed_execution')});
-const output=object({status:values('not_refreshed','partial','complete'),evidence_ref:nullable(str),execution_id:str,ports:array({anyOf:[port,treePort]}),file_artifacts:{...array(fileArtifact),maxItems:1},
+export const nodeVariableOutputSchema=object({port:integer,kind:values('variables'),port_guid:str,fresh:{const:true},source:values('execution','snapshot'),native_source:values('VariablesForm','VariablesEditValuesWizard'),read_id:str,execution_id:nullable(str),complete:{const:true},count:{type:'integer',minimum:0,maximum:128},variables:{...array(object({id:{type:['integer','string']},index:integer,name:str,label:str,type:values('integer','real','boolean','string'),cell})),maxItems:128},completeness:object({count:integer,store_count:integer,unique_ids:integer,loaded:{const:true}})},undefined,true);
+const output=object({status:values('not_refreshed','partial','complete'),evidence_ref:nullable(str),execution_id:nullable(str),variable_ports:array(nodeVariableOutputSchema),ports:array({anyOf:[port,treePort]}),file_artifacts:{...array(fileArtifact),maxItems:1},
  verified:bool,cleanup_complete:bool,effect_possible:bool,no_output_requested:bool,
  javascript_source:object({source_operation_id:str,source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},
   source_utf8_bytes:{type:'integer',minimum:0,maximum:32768},source_lf_lines:{type:'integer',minimum:1,maximum:1024},

@@ -84,12 +84,16 @@ export function buildNodeReadRequest(args,source){
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
  const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
- const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
+ const retained=request.target.type==='transform.cross_table'||previews.length===0&&node.output?.variable_ports?.length?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
  // JS binds to the owned full mapping even when an earlier preview exists.
  const schemas=javascript?retained:[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
- need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
+ const observedVariables=node.output?.variable_ports??[];
+ const variablePorts=args.read?.variable_ports??observedVariables.map(p=>p.port);
+ need(variablePorts.every(port=>observedVariables.some(p=>p.port===port&&p.source==='execution'&&p.complete===true&&p.execution_id===node.execution.execution_id)),
+  'Invalid parameters.read.variable_ports: choose complete variable outputs of the executed source');
+ need(schemas?.length>0||variablePorts.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output or variable output');
  const ports=args.read?.ports??schemas.map(p=>p.port);
- need(ports.length>0&&ports.every(p=>schemas.some(s=>s.port===p)),
+ need((ports.length>0||variablePorts.length>0)&&ports.every(p=>schemas.some(s=>s.port===p)),
   'Invalid parameters.read.ports: choose ports present in the completed source result');
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
@@ -98,7 +102,7 @@ export function buildNodeReadRequest(args,source){
   mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:'execute',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 // A browser recovery receipt carries only runtime-proven release facts and the
@@ -129,7 +133,7 @@ export function nodeReadHandler(handler){
    const observed=parameters?.observed_schema===true;
    need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
-    &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&parameters.schemas.length>0,
+    &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&(parameters.schemas.length>0||request.read.variable_ports?.length>0),
     'Verified local output schemas required');
    if(parameters.cross_table_policy)need(request.target.type==='transform.cross_table'
     &&parameters.cross_table_policy.kind==='crosstable_sliding'

@@ -49,6 +49,19 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
       &&same(keep(before,[]),keep(after,[]))?{}:null;
   }
   if(!same(after.foreign_links,before.foreign_links))return null;
+  if(kind==='reveal_control'){
+    let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
+    const control=current.variable_inputs?.filter(v=>v.kind==='control');
+    if(control?.length!==1||control[0].port!==0||typeof control[0].port_guid!=='string'
+      ||original.variable_inputs?.some(v=>v.kind==='control')
+      ||!same(current.variable_inputs.filter(v=>v.kind!=='control'),original.variable_inputs??[])
+      ||!same(current.variable_outputs??[],original.variable_outputs??[])
+      ||!same(current.other_ports,[...(original.other_ports??[]),'Input_ControlVar'].sort()))return null;
+    const restored={...current};for(const key of ['variable_inputs','variable_outputs','other_ports']){
+      if(Object.hasOwn(original,key))restored[key]=original[key];else delete restored[key];
+    }
+    return same(domainNode(restored),domainNode(original))&&same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
+  }
   if(['rename','move','add_input'].includes(kind)){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const field=kind==='rename'?'label':kind==='move'?'position':'inputs';
@@ -189,7 +202,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       const proof=verifyNodeTargetEffect(state.pending,graph,adapter.positionMatches);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery });
-      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
+      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
     }
@@ -216,9 +229,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       for(const input of request.variable_inputs??[]){
         const source=node(graph,input.source.node_id),outputs=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===input.output);
         if(outputs?.length!==1)throw Error('Source variable output does not exist');
-        if(request.target.kind!=='existing')throw Error('Variable links require observed target ports before mutation');
+        if(request.target.kind==='new')continue;
         const target=node(graph,request.target.ref.node_id),ports=target.variable_inputs?.filter(p=>p.kind===input.kind&&p.port===input.input);
-        if(ports?.length!==1)throw Error('Target variable input does not exist or is hidden');
+        if(ports?.length!==1&&input.kind!=='control')throw Error('Target variable input does not exist');
         const occupied=(graph.variable_links??[]).filter(e=>e.target===target.ref.node_id&&e.kind===input.kind&&e.input===input.input);
         if(occupied.length>1||occupied.some(e=>e.source!==source.ref.node_id||e.output!==input.output))throw Error('Requested variable input is occupied by an unowned link');
       }
@@ -262,7 +275,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
         const proof=verifyNodeTargetEffect({kind:'create',parameters:request.target,before},after,adapter.positionMatches);
         if(!proof)return false;
-        state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;return true;
+        state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;return true;
       });
       graph = after;
     }
@@ -317,6 +330,23 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         && unchangedExcept(before, after, [], [edgeKey(edge)]));
     }
     const variableDesired=(request.variable_inputs??[]).map(i=>({source:i.source.node_id,output:i.output,target:state.targetId,input:i.input,kind:i.kind}));
+    if(variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
+      if(variableDesired.some(d=>edgeKey(d)===edgeKey(edge))||!(graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
+      graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
+    }
+    if(variableDesired.some(e=>e.kind==='control')&&!node(graph,state.targetId).variable_inputs?.some(p=>p.kind==='control'&&p.port===0)){
+      graph=await change('reveal_control',{ref:node(graph,state.targetId).ref},(before,after)=>!!verifyNodeTargetEffect({kind:'reveal_control',parameters:{ref:node(before,state.targetId).ref},before},after,adapter.positionMatches));
+    }
+    for(const edge of variableDesired){
+      const ports=node(graph,state.targetId).variable_inputs?.filter(p=>p.kind===edge.kind&&p.port===edge.input);
+      if(ports?.length!==1)throw Error('Target variable input does not exist after creation or reveal');
+      const occupied=(graph.variable_links??[]).filter(e=>e.target===edge.target&&e.kind===edge.kind&&e.input===edge.input&&edgeKey(e)!==edgeKey(edge));
+      for(const old of occupied){
+        if(!(state.auto_created_variable_links??[]).some(e=>edgeKey(e)===edgeKey(old)))throw Error('Requested variable input is occupied by an unowned link');
+        graph=await change('remove_link',{edge:old},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge:old},before},after,adapter.positionMatches));
+      }
+    }
+
     for(const edge of variableDesired){
       if((graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
       graph=await change('connect',{edge},(before,after)=>(after.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge))
@@ -352,7 +382,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
     }else{
     const proof=verifyNodeTargetEffect(effect,graph,adapter.positionMatches);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
-    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
+    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery});
     state.pending=null;state.last_graph=structuredClone(graph);
     }

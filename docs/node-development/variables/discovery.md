@@ -382,3 +382,34 @@ discovery за модельный PASS. Бюджет W1 больше прежн�
 независимый `oracle.py`, `expected-initial.json`, `expected.json` созданы
 до первого выполнения REST в этом исследовании. Подробности запуска и границ
 проверки — [acceptance/README.md](acceptance/README.md). Новый источник не нужен.
+
+
+## Аддитивный контракт W1 после native-проверки 04.11.2026
+
+`variable_inputs` допускает новый target: source проверяется до создания,
+целевой native порт — после. `kind:"control", input:0` показывает скрытый
+управляющий порт штатной командой. Конфликтующую автоматическую связь можно
+снять только при наличии receipt её создания в этой операции.
+
+`read.variable_ports:[0]` задаёт отдельное пространство ordinals.
+`output.variable_ports[]` содержит `port`, `port_guid`, `kind:"variables"`,
+`read_id`, `execution_id`, `source`, `native_source`, `fresh`, `complete`, `count`,
+`variables:[{id,index,name,label,type,cell}]` и
+`completeness:{count,store_count,unique_ids,loaded}`. Integer cell хранит точную
+десятичную строку. NULL, false, 0 и пустая строка различаются.
+
+У исполняемого источника `source:"execution"`, `native_source:"VariablesForm"`;
+reader проверяет новый завершённый process, native owner и полный UI store.
+DataToVar native Sum выдаёт finite real: reader использует существующий binary64
+decoder; это не разрешает запись real через builtin values handler.
+Builtin `variables.user` использует `source:"snapshot"`,
+`native_source:"VariablesEditValuesWizard"`, `execution_id:null`: только root
+user output 4, независимое открытие и Cancel. Снимок требует чистый пакет и
+повторно проверяет modified=false; он не выполняет Save или Execute.
+
+Cold принимает optional `variable_inventory:{outputs,links}`. Output:
+`{node:{type,label?},port,variables:[{name,label?,type,value}]}`. Link:
+`{source:{type,label?},output,target:{type,label?},input,kind}`. При наличии
+этого inventory разрешён variable-only `outputs:[]`; прежний табличный matcher
+не меняется. Builtin читается снимком до executable источников, остальные —
+после нового Execute. Native связи сверяются до и после чтения.

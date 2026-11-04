@@ -1,5 +1,69 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {openPreparedOutputPort} from './node-port-open.mjs';
+import {readVariableRecords} from './node-output-context.mjs';
+import {decodePortCell} from './node-port-output.mjs';
+
+export function makeUserVariablesSnapshotCode(binding,options){
+ validatePreparedNodeContext(binding);
+ return `async page=>(${readUserVariablesSnapshot.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${openPreparedOutputPort.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+}
+
+// A builtin snapshot opens only its user port and cancels the untouched wizard.
+// Package modification reads use the same native API as package persistence.
+export async function readUserVariablesSnapshot(page,task,readNode,openPort,readRecords,decode){
+ const b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF';let effect=false,opened=false,inventory,portGuid;
+ const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('User variables snapshot deadline');return n;};
+ const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
+ const inspect=mode=>page.evaluate(async({task,mode,recordsCode,decoderCode})=>{
+  const b=task.binding,p=globalThis.__loginomDockPreparationV1,a=bg.app,card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
+  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+  const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1
+   ||!(r.nodeTargetWorkflowNode.ParentNode instanceof a.ModelUnitItemTreeNode))throw Error('Root user snapshot owner changed');
+  const tabs=exact(b.workflow_ref.tab_tid);if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active'))throw Error('User snapshot tab changed');
+  if(mode==='dirty'){
+   if(!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r.nodeTargetWorkflowNode||r.packageNode.HasRunningNodes()!==false)throw Error('Quiet user snapshot graph required');
+   const ns=m.FDiagram.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id);
+   if(ns.length!==1||ns[0].FIconCls!=='bg-vendor-icon-modelvariables')throw Error('Builtin user source required');
+   const connection=a.Application.FInstance.FMainForm.FMapTree.FServerConnection,session=connection.Session,pack=r.packageNode.Package;
+   const modified=await session.IsPackageModified(pack);
+   if(a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()!==card||card.Controller.FController!==m
+    ||connection.Session!==session||r.packageNode.Package!==pack||typeof modified!=='boolean')throw Error('User snapshot package changed during modification read');
+   return modified;
+  }
+  const recs=[...(p.outputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.operation_id===task.operation_id+':port'
+   &&o.kind==='variables'&&o.node_id===b.node.node_id&&o.workflow===r.nodeTargetWorkflowNode&&o.wizard===m&&o.enginePort===m.FModelSocket);
+  const o=recs[0],tree=card.Controller.Node.data.node,roots=exact(b.workflow_ref.prefix+';WizrdMCF'),gridTid=b.workflow_ref.prefix+';WizrdMCF;VariablesEditValuesWizard;grdTargetColumns',es=exact(gridTid),grid=es.length===1&&Ext.getCmp(es[0].id);
+  if(recs.length!==1||!(tree instanceof a.WizardTreeNode)||tree.ParentNode!==o.portTree||o.portTree.ParentNode.ParentNode!==o.nodeTree
+   ||o.nodeTree.FModelNode!==o.nodeData||o.portTree.FModelNodePort!==o.portData||o.portGuid!==o.port.FGuid||o.port.parent!==o.node
+   ||roots.length!==1||m.FView?.el.dom!==roots[0]||!visible(roots[0])||!grid||grid.el.dom!==es[0]||!roots[0].contains(es[0]))throw Error('Owned user value wizard required');
+  if(mode==='inventory')return {port_guid:o.portGuid,...eval('('+recordsCode+')')(grid.getStore(),'values',eval('('+decoderCode+')'))};
+  throw Error('Unknown user snapshot inspection');
+ },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString()});
+ try{
+  const before=await readNode(page,b);if(!before.verified||before.surface!=='graph'||before.locked)throw Error('User snapshot graph unavailable');
+  if(await inspect('dirty'))return {status:'NOT_APPLIED',verified:false,effect_possible:false,cleanup_complete:true,error:'User snapshot requires a clean package: save this owned package, then use a NEW dock_node_read operation_id'};
+  const result=await openPort(page,{...task,direction:'output',kind:'variables',port:4,operation_id:task.operation_id+':port'},readNode);
+  effect=result.effect_possible===true;opened=result.status==='SUCCEEDED';if(!opened)throw Error(result.error??'User snapshot opening unconfirmed');
+  await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t)+']'),g=e&&Ext.getCmp(e.id);return typeof g?.getStore==='function'&&g.getStore().isLoading()===false;},root+';VariablesEditValuesWizard;grdTargetColumns',{timeout:remaining()});
+  inventory=await inspect('inventory');portGuid=inventory.port_guid;
+  await at(root+';btnClose').click({timeout:remaining()});
+  await page.waitForFunction(t=>!document.querySelector('[data-tid='+JSON.stringify(t)+']')?.checkVisibility({checkVisibilityCSS:true})
+   ||[...document.querySelectorAll('[role="dialog"],.x-message-box')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),root,{timeout:remaining()});
+  if(await at(root).count()){
+   const yes=await page.evaluate(()=>{const visible=e=>e.checkVisibility({checkVisibilityCSS:true}),ds=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible),es=[...document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')].filter(visible);
+    if(ds.length!==1||ds[0].innerText.replace(/\s+/g,' ').trim()!=='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'||es.length!==1||!ds[0].contains(es[0]))throw Error('Owned untouched wizard cancellation confirmation required');return true;});
+   if(yes)await at('msgbox;tlb;yes').click({timeout:remaining()});
+  }
+  await page.waitForFunction(t=>{const a=bg.app,m=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;return m instanceof a.ModelForm
+   &&!document.querySelector('[data-tid='+JSON.stringify(t)+']')?.checkVisibility({checkVisibilityCSS:true})
+   &&![...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(e=>e.checkVisibility({checkVisibilityCSS:true}));},root,{timeout:remaining()});
+  opened=false;const after=await readNode(page,b);if(!after.verified||after.surface!=='graph')throw Error('User snapshot graph return unconfirmed');
+  if(await inspect('dirty'))return {status:'NOT_APPLIED',verified:false,effect_possible:true,cleanup_complete:true,node_context:after,error:'USER_SNAPSHOT_MARKED_PACKAGE_MODIFIED: untouched VariablesEditValuesWizard changed the clean package'};
+  return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,output:{...inventory,port:4,kind:'variables',port_guid:portGuid,
+   read_id:task.operation_id,execution_id:null,source:'snapshot',native_source:'VariablesEditValuesWizard',fresh:true,package_modified:false}};
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect&&!opened,error:String(error.message).slice(0,500)};}
+}
 
 export function makeCrossTableVariablesCode(binding,options){
  validatePreparedNodeContext(binding);

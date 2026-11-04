@@ -40,6 +40,8 @@ import {createCalculatorNodeSupport} from './calculator-node.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
 import {NODE_READ_MODE,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
+import {createNodeProcedure} from './node-procedure.mjs';
+import {withBrowserReceipt} from './executor.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 // The journal canonicalizes JSON text and redacts URL credentials. Prepare
@@ -133,8 +135,22 @@ export function createCandidateNodeSupport(config) {
    const value=await drivers.verifySource(...args);
    return checked.length?{...value,switched_sources:checked}:value;
   },readOutput:async(...args)=>{
-   const value=await drivers.readOutput(...args);
-   return readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
+   let value=await drivers.readOutput(...args);
+   const [read,ctx]=args;
+   if(read.variable_ports?.length){
+    options.operation.deadline=ctx.deadline;
+    const execution=options.operation.nodeApply?.phases.findLast(p=>p.phase==='execute')?.value;
+    if(execution?.verified!==true||execution.owner_verified!==true||execution.status!=='completed'||execution.execution_id!==ctx.execution.execution_id)throw Error('Variable output requires the accepted completed execution receipt');
+    const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,maxSteps:512,
+     targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,
+     preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
+     wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+    const variable_ports=[];
+    for(const port of read.variable_ports){const result=await channel.readVariablePort({port,execution});variable_ports.push(result.output);}
+    value={...value,variable_ports,no_output_requested:false};
+   }
+
+   return read.variable_ports?.length||readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
     ||value.ports?.some(port=>port.freshness_basis==='completed_execution_port_source')?nodeOutputForJournal(value,redactor):value;
   }};
  }};

@@ -293,3 +293,12 @@ test('JavaScript declared readback and original verified phase identities remain
  s.outcome.output.phases.find(phase=>phase.phase==='node_finish').status='pending';
  assert.throws(()=>buildNodeReadRequest(args,s));
 });
+
+test('W1 variable-only reread retains its typed selection and still requests a real Execute',()=>{
+ const s=source();s.outcome.output.execution.execution_id='old';s.outcome.output.output={ports:[],variable_ports:[{port:0,source:'execution',complete:true,execution_id:'old'}]};
+ const r=buildNodeReadRequest({...args,read:{ports:[],variable_ports:[0]}},s);validateNodeApplyRequest(r,handlers);
+ assert.equal(r.finish,'execute');assert.deepEqual(r.read.variable_ports,[0]);assert.deepEqual(r.parameters.schemas,[]);
+ for(const mutate of [s=>s.outcome.output.output.variable_ports[0].execution_id='stale',s=>s.outcome.output.output.variable_ports[0].source='snapshot',s=>s.outcome.output.output.variable_ports[0].complete=false]){
+  const invalid=structuredClone(s);mutate(invalid);assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[],variable_ports:[0]}},invalid));
+ }
+});
