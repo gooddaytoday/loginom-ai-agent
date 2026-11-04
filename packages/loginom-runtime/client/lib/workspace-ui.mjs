@@ -4580,10 +4580,17 @@ function readRenderedInputMapping(observation) {
                   &&fresh.ui.dialogs[0].title==='Информация'
                   &&typeof qualityLabel==='string'&&qualityLabel.length>0
                   &&fresh.ui.dialogs[0].text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.';
+                const variablesUnionInformation=task.action.verb==='begin_wizard'&&task.prepared_node_context
+                  &&qualityOpening?.signature?.native_graph?.icon==='bg-vendor-icon-unionvariables'
+                  &&fresh.prepared_node_context?.verified===true&&fresh.wizard?.stage==='variables_column_union'
+                  &&['document_id','workflow_id','node_id'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context?.[k])
+                  &&fresh.ui.dialogs.length===1&&fresh.ui.dialogs[0].identity?.anchor_tid==='toast'
+                  &&fresh.ui.dialogs[0].title==='Информация'&&typeof qualityLabel==='string'&&qualityLabel.length>0
+                  &&fresh.ui.dialogs[0].text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.';
                 // A bound Execute can leave a native toast beyond 50 reads.
                 // Observe the same completed gesture within its remaining node
                 // budget; all owner checks and graph settlement still apply.
-                if((qualityInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
+                if((qualityInformation||variablesUnionInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
                   && (transientToastReads<50 || qualityInformation&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;

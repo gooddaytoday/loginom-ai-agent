@@ -1,4 +1,15 @@
 const need=(ok,message)=>{if(!ok)throw Error('Variables column union: '+message);};
+// A native default caption changes after each variable link. Give only a new
+// union without a caller caption an explicit name before either connection.
+// Reuse the original baseline on resume so the requested identity stays fixed.
+export function variablesColumnUnionTargetRequest(request,graph){
+ if(request.target?.type!=='variables.column_union'||request.target.kind!=='new'||request.target.label!==undefined)return request;
+ need(graph?.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref?.workflow_id===request.workflow_ref.workflow_id
+  &&Array.isArray(graph.nodes)&&graph.nodes.length<=200,'complete owned graph required for the union caption');
+ const labels=new Set(graph.nodes.map(n=>n.label)),base='Соединение переменных';
+ const label=Array.from({length:201},(_,i)=>base+(i?' '+(i+1):'')).find(name=>!labels.has(name));
+ need(label,'no unique union caption available');return {...request,target:{...request.target,label}};
+}
 export const variablesColumnUnionParametersSchema={type:'object',additionalProperties:false,properties:{column_union:{type:'object',additionalProperties:false,properties:{mapping:{type:'string',enum:['automatic'],description:'Preserve all variables and native generated names in input order. Custom mappings and conversions are unsupported.'}},required:['mapping']}},description:'Two initial variable inputs only. Empty parameters preserve native automatic mapping.'};
 export function validateVariablesColumnUnionParameters(p,mode,r){
  need(mode==='append_variables','use append_variables mode');
