@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "description": "New import requires source and checksum. Existing {} preserves saved source/settings.",
+  "properties": {
+    "source": {
+      "type": "object",
+      "description": "Completed admitted LGD attachment; reuse existing artifact delivery contract.",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Artifact ID returned by completed delivery."
+        },
+        "upload_operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Operation ID of that same completed delivery."
+        }
+      },
+      "required": [
+        "artifact_id",
+        "upload_operation_id"
+      ],
+      "additionalProperties": false
+    },
+    "lgd_import": {
+      "type": "object",
+      "description": "LGD read settings; unsupported modes refuse before mutation.",
+      "properties": {
+        "checksum": {
+          "type": "string",
+          "enum": [
+            "verify"
+          ],
+          "description": "Always verify stored checksums; never retry damaged LGD with checks disabled."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

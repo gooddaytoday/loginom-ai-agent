@@ -1,0 +1,374 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.quality"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.quality",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Class",
+          "label": "Class",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Value": 1,
+          "Class": "A",
+          "Note": "ёж"
+        },
+        {
+          "RowID": 2,
+          "Value": 1,
+          "Class": "A",
+          "Note": "ёж"
+        },
+        {
+          "RowID": 3,
+          "Value": 2,
+          "Class": "B",
+          "Note": "alpha"
+        },
+        {
+          "RowID": 4,
+          "Value": null,
+          "Class": "B",
+          "Note": "beta"
+        },
+        {
+          "RowID": 5,
+          "Value": 3,
+          "Class": "A",
+          "Note": "gamma"
+        },
+        {
+          "RowID": 6,
+          "Value": 4,
+          "Class": "B",
+          "Note": "delta"
+        },
+        {
+          "RowID": 7,
+          "Value": 100,
+          "Class": "",
+          "Note": "omega"
+        },
+        {
+          "RowID": 8,
+          "Value": 0,
+          "Class": null,
+          "Note": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Class",
+          "label": "Class",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Class",
+          "label": "Class",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 3,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Class",
+          "label": "Class",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Value": 1,
+          "Class": "A",
+          "Note": "ёж"
+        },
+        {
+          "RowID": 2,
+          "Value": 1,
+          "Class": "A",
+          "Note": "ёж"
+        },
+        {
+          "RowID": 3,
+          "Value": 2,
+          "Class": "B",
+          "Note": "alpha"
+        },
+        {
+          "RowID": 4,
+          "Value": null,
+          "Class": "B",
+          "Note": "beta"
+        },
+        {
+          "RowID": 5,
+          "Value": 3,
+          "Class": "A",
+          "Note": "gamma"
+        },
+        {
+          "RowID": 6,
+          "Value": 4,
+          "Class": "B",
+          "Note": "delta"
+        },
+        {
+          "RowID": 7,
+          "Value": 100,
+          "Class": "",
+          "Note": "omega"
+        },
+        {
+          "RowID": 8,
+          "Value": 0,
+          "Class": null,
+          "Note": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 4,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Col0",
+          "label": "N",
+          "type": "integer"
+        },
+        {
+          "name": "Col1",
+          "label": "DisplayName",
+          "type": "string"
+        },
+        {
+          "name": "Col2",
+          "label": "DataType",
+          "type": "string"
+        },
+        {
+          "name": "Col3",
+          "label": "DataKind",
+          "type": "string"
+        },
+        {
+          "name": "Col4",
+          "label": "Null",
+          "type": "integer"
+        },
+        {
+          "name": "Col5",
+          "label": "Out",
+          "type": "integer"
+        },
+        {
+          "name": "Col6",
+          "label": "Extr",
+          "type": "integer"
+        },
+        {
+          "name": "Col7",
+          "label": "Avg",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Col8",
+          "label": "Moda",
+          "type": "variant"
+        },
+        {
+          "name": "Col9",
+          "label": "Median",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Col0": 1,
+          "Col1": "RowID",
+          "Col2": "Целый",
+          "Col3": "Непрерывный",
+          "Col4": 0,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 4.5,
+          "Col8": {
+            "cell_type": "real",
+            "value": 1.875
+          },
+          "Col9": 5.0
+        },
+        {
+          "Col0": 2,
+          "Col1": "Value",
+          "Col2": "Целый",
+          "Col3": "Непрерывный",
+          "Col4": 1,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 15.857142857142858,
+          "Col8": {
+            "cell_type": "real",
+            "value": 12.5
+          },
+          "Col9": 2.0
+        },
+        {
+          "Col0": 3,
+          "Col1": "Class",
+          "Col2": "Строковый",
+          "Col3": "Дискретный",
+          "Col4": 1,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": null,
+          "Col8": {
+            "cell_type": "string",
+            "value": "B"
+          },
+          "Col9": null
+        },
+        {
+          "Col0": 4,
+          "Col1": "Note",
+          "Col2": "Строковый",
+          "Col3": "Дискретный",
+          "Col4": 1,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": null,
+          "Col8": {
+            "cell_type": "string",
+            "value": "ёж"
+          },
+          "Col9": null
+        }
+      ]
+    }
+  ]
+}

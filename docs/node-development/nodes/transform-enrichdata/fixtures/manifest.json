@@ -1,0 +1,138 @@
+{
+  "status": "stage_1_proposal_pending_approval",
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "header": true,
+  "null_marker": "?",
+  "text_qualifier": "\"",
+  "empty_string": "quoted empty string is distinct from ?",
+  "files": [
+    {
+      "file": "main.csv",
+      "bytes": 116,
+      "sha256": "459a3b41240d2c9249fe20417e6a9aa414a0b4fad32ecc26a42f0ddc8bb495e5",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Key",
+          "type": "integer"
+        },
+        {
+          "name": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Note",
+          "type": "string"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "main.csv"
+    },
+    {
+      "file": "ref-b.csv",
+      "bytes": 60,
+      "sha256": "ee9f5e82f9b95ceab3228cbf3f729fa345943e42e486387713170a35b36eb20b",
+      "columns": [
+        {
+          "name": "Key",
+          "type": "integer"
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Rate",
+          "type": "real"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "ref-b.csv"
+    },
+    {
+      "file": "ref-b-duplicates.csv",
+      "bytes": 92,
+      "sha256": "bcf8a6c8ab33eeadc2b97a24c51787142b76c156c79e67650ae280534f75f556",
+      "columns": [
+        {
+          "name": "Key",
+          "type": "integer"
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Rate",
+          "type": "real"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "ref-b-duplicates.csv"
+    },
+    {
+      "file": "ref-c.csv",
+      "bytes": 49,
+      "sha256": "7c2691336caf1dadf4ad4be74bf3d2be9819522c208502eecdfdae2dacc48e76",
+      "columns": [
+        {
+          "name": "Key",
+          "type": "integer"
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "ref-c.csv"
+    },
+    {
+      "file": "composite-main.csv",
+      "bytes": 59,
+      "sha256": "ff80bc844d0b1bccb4cfb82361dd6537a82a88d48c7392817d9ae65b15d8637e",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Code",
+          "type": "integer"
+        },
+        {
+          "name": "Zone",
+          "type": "string"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "composite-main.csv"
+    },
+    {
+      "file": "composite-ref.csv",
+      "bytes": 88,
+      "sha256": "6ef38568c0cde8276130627eb273d5b77272e11b2c38b293c4a0f32ac4533f6f",
+      "columns": [
+        {
+          "name": "Code",
+          "type": "integer"
+        },
+        {
+          "name": "Zone",
+          "type": "string"
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        }
+      ],
+      "ordered": true,
+      "source_identity": "composite-ref.csv"
+    }
+  ]
+}

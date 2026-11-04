@@ -1,0 +1,23 @@
+{
+  "type": "transform.enrich_data",
+  "title": "Дополнение данных",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-enrichdata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 2,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": true,
+  "modes": [
+    "left"
+  ],
+  "semantics": "Left-enrich main input 0 with one or two independent lookup inputs 1/2. Equal NULL keys match; duplicate lookup keys expand all Cartesian matches. Retain every main row; unmatched lookup values are NULL, distinct from empty text. parameters.enrichment supplies complete per-input key pairs and global literal name/label prefixes. Exclude lookup key columns, preserve scalar types, append non-key fields in input order; native name collisions may add suffixes. Execute current inputs without training; read output 0. Existing omission preserves supported settings only when sources stay unchanged. Other joins, third lookup, conversions and variable bindings are unsupported. For explicit output field order use output mapping port 0 with autosync=false and a complete fields layout; autosync can reorder keys after reopen.",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/transformation/enrich-data.md"
+  }
+}

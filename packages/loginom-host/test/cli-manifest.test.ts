@@ -25,6 +25,8 @@ test("CLI artifact verification rejects an accurately inventoried payload withou
   }
 })
 
+// Copies/builds real Product skills and repeatedly rebuilds/verifies manifests.
+// Per-node references add filesystem work; CI exceeded the default 5s.
 test("CLI artifact verification rejects required skill files omitted from freshly rebuilt manifests", async () => {
   const root = await mkdtemp(join(tmpdir(), "cli-product-skill-closure-"))
   const resources = join(root, "resources/loginom")
@@ -55,7 +57,7 @@ test("CLI artifact verification rejects required skill files omitted from freshl
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-})
+}, 15_000)
 
 test("CLI manifest verifies complete payload and rejects mutation, extras and escaped links", async () => {
   const root = await mkdtemp(join(tmpdir(), "cli-manifest-"))
