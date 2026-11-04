@@ -1,6 +1,6 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import { verify } from "node:crypto"
+import { verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
 import semver from "semver"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
@@ -8,10 +8,6 @@ declare const LOGINOM_AI_AGENT_UPDATE_FEED: string
 
 // Only release builds can enable this; a runtime environment variable cannot redirect the feed.
 const updateFeed = typeof LOGINOM_AI_AGENT_UPDATE_FEED === "string" ? LOGINOM_AI_AGENT_UPDATE_FEED : ""
-const publicKeys = [
-  "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAekkV+yIMJpDlzXoJAWpT9ifgHKbKe5PJdtGC8FjmJ2c=\n-----END PUBLIC KEY-----",
-  "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAuVor7DX+ReBZ+tg8gXaygsXqxF+WKA9dijYEIDNHTtc=\n-----END PUBLIC KEY-----",
-]
 const day = 24 * 60 * 60 * 1000
 
 // Runs alongside the command. The profile owner cancels and settles it before releasing its guard.
@@ -31,6 +27,7 @@ export async function notifyUpdate(input: {
   now?: number
   timeout?: number
   write?: (text: string) => void
+  request?: (url: URL, init: RequestInit) => Promise<Response>
 }) {
   const env = input.env ?? process.env
   const feed = input.feed ?? updateFeed
@@ -69,8 +66,7 @@ export async function notifyUpdate(input: {
     const channel = policy.channel ?? config.channel ?? "stable"
     if (channel !== "stable" && channel !== "unstable") return
     const base = new URL(`${feed.replace(/\/+$/, "")}/${channel}/`)
-    if (!["https:", "http:"].includes(base.protocol) || base.username || base.password || base.search || base.hash)
-      return
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) return
 
     const marker = path.join(input.data, "update-notifier.json")
     const previous = await readSettings(marker, signal).catch(() => ({ checkedAt: undefined }))
@@ -83,13 +79,10 @@ export async function notifyUpdate(input: {
     signal.throwIfAborted()
     // Bun fetch uses the same HTTP(S)_PROXY / NO_PROXY environment as the rest of the CLI.
     const [bytes, signature] = await Promise.all([
-      readFeed(new URL("cli.json", base), signal, 64 * 1024),
-      readFeed(new URL("cli.json.sig", base), signal, 1024),
+      readFeed(new URL("cli.json", base), signal, 64 * 1024, input.request),
+      readFeed(new URL("cli.json.sig", base), signal, 1024, input.request),
     ])
-    const encoded = signature.toString("utf8").trim()
-    if (!/^[A-Za-z0-9+/]{86}==$/.test(encoded)) return
-    if (!(input.publicKeys ?? publicKeys).some((key) => verify(null, bytes, key, Buffer.from(encoded, "base64"))))
-      return
+    if (!verifyUpdateSignature(bytes, signature.toString("utf8"), input.publicKeys)) return
 
     const manifest: unknown = JSON.parse(bytes.toString("utf8"))
     if (!record(manifest) || !releaseVersion(manifest.version) || !releaseVersion(manifest.minSupportedVersion)) return
@@ -105,7 +98,7 @@ export async function notifyUpdate(input: {
     )
       return
     const url = new URL(download.url, base)
-    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return
+    if (url.protocol !== "https:" || url.username || url.password) return
     signal.throwIfAborted()
     const warning = semver.lt(current, manifest.minSupportedVersion)
       ? "ВНИМАНИЕ: Эта версия больше не поддерживается сервером — обновитесь. "
@@ -137,8 +130,13 @@ async function readSettings(file: string, signal: AbortSignal) {
   return value
 }
 
-async function readFeed(url: URL, signal: AbortSignal, limit: number) {
-  const response = await fetch(url, { signal, redirect: "error", headers: { "Cache-Control": "no-cache" } })
+async function readFeed(
+  url: URL,
+  signal: AbortSignal,
+  limit: number,
+  request: (url: URL, init: RequestInit) => Promise<Response> = fetch,
+) {
+  const response = await request(url, { signal, redirect: "error", headers: { "Cache-Control": "no-cache" } })
   if (!response.ok || !response.body) throw new Error("Update feed unavailable")
   const chunks: Uint8Array[] = []
   let size = 0

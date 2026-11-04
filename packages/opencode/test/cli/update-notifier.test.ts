@@ -42,13 +42,15 @@ async function fixture(
     data: path.join(tmp.path, "data"),
     config: path.join(tmp.path, "config"),
     policyFile: path.join(tmp.path, "policy.json"),
-    feed: `${server.url}feed/`,
+    feed: `${server.url}feed/`.replace(/^http:/, "https:"),
     current: "0.3.9",
     platform: "linux" as NodeJS.Platform,
     arch: "x64",
     env: {},
     isTTY: true,
     publicKeys,
+    // Test HTTPS URL validation independently of TLS trust using a local HTTP fixture transport.
+    request: (url: URL, init: RequestInit) => fetch(url.href.replace(/^https:/, "http:"), init),
     write: (text: string) => {
       output.push(text)
     },
@@ -67,6 +69,28 @@ async function fixture(
 }
 
 describe("signed CLI update notifier", () => {
+  test("rejects HTTP feed before requests or timestamp writes", async () => {
+    await using f = await fixture()
+    await notifyUpdate({ ...f.input, feed: f.input.feed.replace(/^https:/, "http:") })
+    expect(f.requests).toEqual([])
+    expect(f.output).toEqual([])
+    expect(await fs.readdir(f.input.data)).toEqual([])
+  })
+
+  test("rejects HTTP download even with a valid signature", async () => {
+    await using f = await fixture({
+      value: {
+        ...manifest,
+        downloads: {
+          "linux-x64": { url: "http://downloads.example.invalid/cli.tar.gz", sha256: "ab".repeat(32) },
+        },
+      },
+    })
+    await notifyUpdate(f.input)
+    expect(f.requests).toHaveLength(2)
+    expect(f.output).toEqual([])
+  })
+
   test("new release produces exactly one line with the platform download", async () => {
     await using f = await fixture()
     await notifyUpdate(f.input)
@@ -129,26 +153,21 @@ describe("signed CLI update notifier", () => {
 
   test("build-time feed and version are used without runtime overrides", async () => {
     await using f = await fixture()
-    const options = {
-      entrypoints: [path.resolve(import.meta.dir, "../../src/cli/update-notifier.ts")],
-      target: "bun",
-      outdir: path.join(f.input.config, "compiled"),
-      define: {
-        LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(f.input.feed),
-        LOGINOM_AI_AGENT_VERSION: JSON.stringify("0.3.9"),
-      },
-    }
     const { feed, current, ...input } = f.input
-    // Building in its own process also exercises the build's constant substitution boundary.
+    // Apply the same defines through runtime transpilation; no build artifacts are produced.
     const child = Bun.spawn(
       [
         process.execPath,
+        "--define",
+        `LOGINOM_AI_AGENT_UPDATE_FEED=${JSON.stringify(feed)}`,
+        "--define",
+        `LOGINOM_AI_AGENT_VERSION=${JSON.stringify("0.3.9")}`,
         "--eval",
         `
-      const build = await Bun.build(${JSON.stringify(options)});
-      if (!build.success) throw new AggregateError(build.logs);
-      const compiled = await import(build.outputs[0].path);
-      await compiled.notifyUpdate(${JSON.stringify(input)});
+      import { notifyUpdate } from ${JSON.stringify(path.resolve(import.meta.dir, "../../src/cli/update-notifier.ts"))};
+      await notifyUpdate({ ...${JSON.stringify(input)},
+        request: (url, init) => fetch(url.href.replace(/^https:/, 'http:'), init),
+      });
     `,
       ],
       { stdout: "pipe", stderr: "pipe" },
@@ -164,7 +183,7 @@ describe("signed CLI update notifier", () => {
     expect(f.requests).toHaveLength(2)
   })
 
-  test("fetch respects proxy environment without querying the feed host directly", async () => {
+  test("fixture transport respects proxy environment without querying the feed host directly", async () => {
     await using f = await fixture()
     const child = Bun.spawn(
       [
@@ -172,16 +191,18 @@ describe("signed CLI update notifier", () => {
         "--eval",
         `
       import { notifyUpdate } from ${JSON.stringify(path.resolve(import.meta.dir, "../../src/cli/update-notifier.ts"))};
-      await notifyUpdate(${JSON.stringify({ ...f.input, feed: "http://updates.example.invalid/feed/" })});
+      await notifyUpdate({ ...${JSON.stringify({ ...f.input, feed: "https://updates.example.invalid/feed/" })},
+        request: (url, init) => fetch(url.href.replace(/^https:/, 'http:'), init),
+      });
     `,
       ],
       {
         env: {
           ...process.env,
-          HTTP_PROXY: new URL(f.input.feed).origin,
-          http_proxy: new URL(f.input.feed).origin,
-          HTTPS_PROXY: new URL(f.input.feed).origin,
-          https_proxy: new URL(f.input.feed).origin,
+          HTTP_PROXY: new URL(f.input.feed).origin.replace(/^https:/, "http:"),
+          http_proxy: new URL(f.input.feed).origin.replace(/^https:/, "http:"),
+          HTTPS_PROXY: new URL(f.input.feed).origin.replace(/^https:/, "http:"),
+          https_proxy: new URL(f.input.feed).origin.replace(/^https:/, "http:"),
           NO_PROXY: "",
           no_proxy: "",
         },
@@ -197,7 +218,7 @@ describe("signed CLI update notifier", () => {
     expect(code).toBe(0)
     expect(stdout).toBe("")
     expect(stderr).toBe(
-      "Доступна версия 0.4.0 — скачать: http://updates.example.invalid/feed/stable/0.4.0/cli-linux.tar.gz\n",
+      "Доступна версия 0.4.0 — скачать: https://updates.example.invalid/feed/stable/0.4.0/cli-linux.tar.gz\n",
     )
     expect(f.requests).toHaveLength(2)
   })
@@ -313,7 +334,7 @@ describe("signed CLI update notifier", () => {
     })
     try {
       const start = Date.now()
-      await notifyUpdate({ ...f.input, feed: server.url.toString(), timeout: 100 })
+      await notifyUpdate({ ...f.input, feed: server.url.toString().replace(/^http:/, "https:"), timeout: 100 })
       expect(Date.now() - start).toBeLessThan(1500)
       expect(f.output).toEqual([])
     } finally {
@@ -350,7 +371,7 @@ describe("signed CLI update notifier", () => {
     try {
       const pending = notifyUpdate({
         ...f.input,
-        feed: server.url.toString(),
+        feed: server.url.toString().replace(/^http:/, "https:"),
         signal: controller.signal,
         timeout: 5000,
       })
