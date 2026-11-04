@@ -27,6 +27,7 @@ function setup(options: {
   image?: boolean
   fail?: boolean
   catalog?: ReturnType<typeof catalogOf>
+  result?: { content: { type: "text"; text: string }[]; _meta?: Record<string, unknown> }
 }) {
   const requested: string[] = []
   const status: { failure?: string } = {}
@@ -41,6 +42,9 @@ function setup(options: {
         if (options.fail) throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
         return { tools: options.catalog ?? catalog }
       },
+      async call() {
+        return options.result
+      },
     },
     loginomStatus: status,
     model: {
@@ -52,6 +56,10 @@ function setup(options: {
     task,
     profile: options.profile,
     plugin: { trigger: () => Effect.void },
+    run: { promise: Effect.runPromise },
+    truncate: { output: (content: string) => Effect.succeed({ content, truncated: false }) },
+    context: () => ({ sessionID, messageID: taskMessageID, callID: "export", ask: () => Effect.void }),
+    processor: { message: { id: taskMessageID } },
   } as unknown as ContributeInput
   return { tools, status, requested, run: () => Effect.runPromise(toolContributor.contribute(input)) }
 }
@@ -60,6 +68,37 @@ const schemaOf = (tool: AITool) =>
   (tool.inputSchema as { jsonSchema: { properties: object; required?: string[] } }).jsonSchema
 
 describe("toolContributor", () => {
+  test("host outputFiles are private metadata while model-facing output stays byte-identical", async () => {
+    const text =
+      ' {"state":"settled","status":"SUCCEEDED","output":{"file_artifacts":[{"artifact_id":"csv-1","destination":"/server/result.csv"}]}}\n'
+    const content = [{ type: "text" as const, text }]
+    const files = [{ artifact_id: "csv-1", path: "/runtime/result.csv", name: "result.csv" }]
+    const execute = async (outputFiles?: typeof files) => {
+      const run = setup({
+        profile: "loginom-automation",
+        catalog: catalogOf(["dock_node_wait"]),
+        result: { content, ...(outputFiles ? { _meta: { outputFiles } } : {}) },
+      })
+      await run.run()
+      const tool = run.tools.loginom_dock_node_wait
+      return (await tool.execute!(
+        {},
+        { toolCallId: "export", abortSignal: new AbortController().signal, messages: [] },
+      )) as {
+        output: string
+        content: typeof content
+        metadata: Record<string, unknown>
+      }
+    }
+    const base = await execute()
+    const result = await execute(files)
+    expect(base.metadata.outputFiles).toBeUndefined()
+    expect(result.metadata.outputFiles).toEqual(files)
+    expect(result.output).toBe(text)
+    expect(result.output).toBe(base.output)
+    expect(JSON.stringify(result.content)).toBe(JSON.stringify(base.content))
+    expect(result.output).not.toContain("/runtime/")
+  })
   test("automation receives the whole catalog under the loginom_ prefix without the host token", async () => {
     const run = setup({ profile: "loginom-automation" })
     await run.run()

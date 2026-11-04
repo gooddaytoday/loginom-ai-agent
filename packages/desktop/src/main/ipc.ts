@@ -238,7 +238,7 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string, options?: { checkOnly?: boolean }) => {
     const exists = await stat(path).then(
-      () => true,
+      (info) => options?.checkOnly ? info.isFile() : true,
       () => false,
     )
     if (!exists) return false

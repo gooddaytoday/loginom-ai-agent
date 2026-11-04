@@ -5,10 +5,20 @@ test("export cards use only host-confirmed local files, never model text or serv
   const file = { artifact_id: "export-1", path: "/private/download/result.csv", name: "result.csv" }
   const result = { status: "completed", metadata: { outputFiles: [file] } }
   expect(completedOutputFiles(result)).toEqual([file])
-  for (const status of ["running", "pending", "error"])
-    expect(completedOutputFiles({ ...result, status })).toEqual([])
-  expect(completedOutputFiles({ status: "completed", output: '{"destination":"/server/result.csv","path":"/invented.csv"}' })).toEqual([])
-  for (const path of ["result.csv", "https://host/result.csv", "file:///result.csv", "/a/../result.csv", "/a/result\n.csv"])
+  for (const status of ["running", "pending", "error"]) expect(completedOutputFiles({ ...result, status })).toEqual([])
+  expect(
+    completedOutputFiles({
+      status: "completed",
+      output: '{"destination":"/server/result.csv","path":"/invented.csv"}',
+    }),
+  ).toEqual([])
+  for (const path of [
+    "result.csv",
+    "https://host/result.csv",
+    "file:///result.csv",
+    "/a/../result.csv",
+    "/a/result\n.csv",
+  ])
     expect(completedOutputFiles({ ...result, metadata: { outputFiles: [{ ...file, path }] } })).toEqual([])
   expect(completedOutputFiles({ ...result, metadata: { outputFiles: [file, file] } })).toEqual([file])
 })
