@@ -479,3 +479,8 @@ cold обоих портов с независимым Apriori oracle, точн�
 через autosync=false, CSV/Save/cold/cleanup; строки — мультимножество.
 Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
 модели передаются только соответствующее задание и перечисленные CSV.
+
+`ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
+по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
+Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
+CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.

@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'research.quality' | 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'research.quality' | 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'transform.ungroup_data' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.enrich_data' | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -430,4 +430,12 @@ export interface EnrichConfigurationReadback {
   input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
     autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
   output_mapping:GroupingConfigurationReadback['output_mapping'];
+}
+
+export interface UngroupParameters {
+ ungroup?: {keys:Array<{total:string;support:string}>;value_field:string;item_field:string;share_field:string;
+  rounding:{format:'none'}|{format:'precision'|'multiple';value:number};balance:'none'|'last'|'proportional'|'equal'};
+}
+export interface UngroupConfigurationReadback extends Omit<JoinConfigurationReadback,'kind'|'mode'|'keys'|'case_sensitive'|'include_joined_keys'> {
+ kind:'ungroup';mode:'shares';ungroup:NonNullable<UngroupParameters['ungroup']>;
 }

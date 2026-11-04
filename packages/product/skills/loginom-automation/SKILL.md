@@ -175,6 +175,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтрация строк | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
+| Доли итогов | `transform.ungroup_data` / shares | [читать](references/nodes/transform.ungroup_data.md) |
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
 | Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
