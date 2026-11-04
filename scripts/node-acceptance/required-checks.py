@@ -25,6 +25,7 @@ RULES = (
     ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8')),
     ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1',)),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
+    ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none')),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
