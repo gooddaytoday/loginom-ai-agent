@@ -1,0 +1,91 @@
+{
+  "status": "proposal_not_native_export",
+  "order": "parent_before_child; sibling order is list order",
+  "nodes": [
+    {
+      "path": "",
+      "name": "Root",
+      "type": "object",
+      "is_array": false,
+      "label": "Root"
+    },
+    {
+      "path": "/items",
+      "name": "items",
+      "type": "object",
+      "is_array": true,
+      "label": "items"
+    },
+    {
+      "path": "/items/RowID",
+      "name": "RowID",
+      "type": "integer",
+      "is_array": false,
+      "source_field": "RowID",
+      "label": "RowID"
+    },
+    {
+      "path": "/items/OrderID",
+      "name": "OrderID",
+      "type": "integer",
+      "is_array": false,
+      "source_field": "OrderID",
+      "label": "OrderID"
+    },
+    {
+      "path": "/items/ExternalID",
+      "name": "ExternalID",
+      "type": "integer",
+      "is_array": false,
+      "source_field": "ExternalID",
+      "label": "ExternalID"
+    },
+    {
+      "path": "/items/details",
+      "name": "details",
+      "type": "object",
+      "is_array": false,
+      "label": "details"
+    },
+    {
+      "path": "/items/details/SKU",
+      "name": "SKU",
+      "type": "string",
+      "is_array": false,
+      "source_field": "SKU",
+      "label": "SKU"
+    },
+    {
+      "path": "/items/details/Qty",
+      "name": "Qty",
+      "type": "integer",
+      "is_array": false,
+      "source_field": "Qty",
+      "label": "Qty"
+    },
+    {
+      "path": "/items/details/Price",
+      "name": "Price",
+      "type": "real",
+      "is_array": false,
+      "source_field": "Price",
+      "label": "Price"
+    },
+    {
+      "path": "/items/details/Active",
+      "name": "Active",
+      "type": "boolean",
+      "is_array": false,
+      "source_field": "Active",
+      "label": "Active"
+    },
+    {
+      "path": "/items/details/Note",
+      "name": "Note",
+      "type": "string",
+      "is_array": false,
+      "source_field": "Note",
+      "label": "Note"
+    }
+  ]
+}

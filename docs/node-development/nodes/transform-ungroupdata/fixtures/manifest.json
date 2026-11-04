@@ -1,0 +1,234 @@
+{
+  "encoding": "UTF-8",
+  "bom": false,
+  "line_ending": "LF",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "text_qualifier": "\"",
+  "header": true,
+  "null_marker": "?",
+  "empty_string": "quoted empty string; distinct from ?",
+  "source_identity": "Deliver original bytes from this fixture file to the assigned account. Do not reuse another package or replace contents during a run.",
+  "files": [
+    {
+      "file": "balance-shares.csv",
+      "bytes": 46,
+      "sha256": "e8cbe00b1f99ac37d3d8ce34610e215d47404016a85133dd6cf3fe41ca81c31f",
+      "row_count": 3,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "balance-totals.csv",
+      "bytes": 17,
+      "sha256": "ac127b8b623ab043e190da34520eda516c4804ed6e2f8a374afdc7cb18c95015",
+      "row_count": 1,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "edge-shares.csv",
+      "bytes": 55,
+      "sha256": "781b6bd54cb937c34c779a483eda47149373c163c3cd159c739affbb5aec273c",
+      "row_count": 5,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "edge-totals.csv",
+      "bytes": 32,
+      "sha256": "ca7511cea14c6d95fef8a63ddfe54948ca22bd6b290cac0256a5a60fd2230467",
+      "row_count": 4,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "duplicate-group refusal probe"
+    },
+    {
+      "file": "empty-totals.csv",
+      "bytes": 12,
+      "sha256": "593862560d95148c7798bd202c2f4b3fa1a82124357757127408ab0153a054b0",
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "null-totals.csv",
+      "bytes": 27,
+      "sha256": "2f73d7ebf65417d2d5c549860d853ab4e2655a3681a99a40c3f47a12bb87fc6c",
+      "row_count": 3,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "round-shares.csv",
+      "bytes": 43,
+      "sha256": "7c8f665bf9ecb2d178754d50eb6ba1076599376a914032f4cd1d36bf9f708d79",
+      "row_count": 3,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "round-totals.csv",
+      "bytes": 17,
+      "sha256": "8268549cf26393db03a15f1362159d0540d788c9f62ae7b0b8acdfcdda67f24a",
+      "row_count": 1,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "shares.csv",
+      "bytes": 137,
+      "sha256": "fd96870eb47dd3b9d409d8881239df97577bc33b000749be7f202a921cb2945f",
+      "row_count": 15,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    },
+    {
+      "file": "totals.csv",
+      "bytes": 61,
+      "sha256": "ff1f636c493f0f572a53a2c29250b7329d8104c956db188ebd1f5cafc3274c20",
+      "row_count": 9,
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "data_kind": "Непрерывный"
+        }
+      ],
+      "ordered": true,
+      "purpose": "independent input"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "proposal": "LAB-770 approved criteria; stage 1 separately assigned; no run PASS",
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "trees.from_json",
+      "label": "DocumentTree"
+    },
+    {
+      "type": "trees.to_json",
+      "label": "DocumentJSON"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "trees.to_json",
+      "output_node_label": "DocumentJSON",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "JSON",
+          "name_any": true,
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "JSON": "{\"id\":9007199254740993,\"active\":false,\"items\":[{\"sku\":\"A\",\"qty\":2,\"price\":1.25,\"note\":null},{\"sku\":\"B\",\"qty\":0,\"price\":0.5,\"note\":\"\"},{\"sku\":\"C\",\"qty\":3,\"price\":2.0,\"note\":\"x\"},{\"sku\":\"D\",\"qty\":1,\"price\":0.5,\"note\":null}]}"
+        }
+      ]
+    }
+  ],
+  "proposed_json_comparison": {
+    "output_port": 0,
+    "ordered": true,
+    "document_count": 1,
+    "mode": "decoded_json_values",
+    "tolerance": {
+      "abs": 0,
+      "rel": 0
+    },
+    "object_key_order": "ignore; tree schema order exact",
+    "array_order": "exact",
+    "duplicate_keys": "reject",
+    "int64": "exact; no binary64 conversion",
+    "null_is_distinct_from": [
+      "empty string",
+      "zero",
+      "false"
+    ],
+    "note": "Existing cold checker compares strings; rows.JSON is a semantic witness, not a required escape spelling. Requires approved scoped adapter before runs."
+  },
+  "proposed_tree_output": {
+    "output_node_type": "trees.from_json",
+    "output_node_label": "DocumentTree",
+    "output_port": 0,
+    "port_kind": "tree",
+    "ordered": true,
+    "tolerance": {
+      "abs": 0,
+      "rel": 0
+    },
+    "schema_field_order": [
+      "id",
+      "active",
+      "items"
+    ],
+    "item_field_order": [
+      "sku",
+      "qty",
+      "price",
+      "note"
+    ],
+    "schema_types": {
+      "/id": "integer",
+      "/active": "boolean",
+      "/items": "object_array",
+      "/items/sku": "string",
+      "/items/qty": "integer",
+      "/items/price": "real",
+      "/items/note": "string"
+    },
+    "document": {
+      "path": "",
+      "type": "object",
+      "children": [
+        {
+          "path": "/id",
+          "type": "integer",
+          "value": "9007199254740993"
+        },
+        {
+          "path": "/active",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "path": "/items",
+          "type": "array",
+          "children": [
+            {
+              "path": "/items/0",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/0/sku",
+                  "type": "string",
+                  "value": "A"
+                },
+                {
+                  "path": "/items/0/qty",
+                  "type": "integer",
+                  "value": "2"
+                },
+                {
+                  "path": "/items/0/price",
+                  "type": "real",
+                  "value": "1.25"
+                },
+                {
+                  "path": "/items/0/note",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            },
+            {
+              "path": "/items/1",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/1/sku",
+                  "type": "string",
+                  "value": "B"
+                },
+                {
+                  "path": "/items/1/qty",
+                  "type": "integer",
+                  "value": "0"
+                },
+                {
+                  "path": "/items/1/price",
+                  "type": "real",
+                  "value": "0.5"
+                },
+                {
+                  "path": "/items/1/note",
+                  "type": "string",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "path": "/items/2",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/2/sku",
+                  "type": "string",
+                  "value": "C"
+                },
+                {
+                  "path": "/items/2/qty",
+                  "type": "integer",
+                  "value": "3"
+                },
+                {
+                  "path": "/items/2/price",
+                  "type": "real",
+                  "value": "2.0"
+                },
+                {
+                  "path": "/items/2/note",
+                  "type": "string",
+                  "value": "x"
+                }
+              ]
+            },
+            {
+              "path": "/items/3",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/3/sku",
+                  "type": "string",
+                  "value": "D"
+                },
+                {
+                  "path": "/items/3/qty",
+                  "type": "integer",
+                  "value": "1"
+                },
+                {
+                  "path": "/items/3/price",
+                  "type": "real",
+                  "value": "0.5"
+                },
+                {
+                  "path": "/items/3/note",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "instance_count": 24,
+    "note": "Proposal. Verify actual schema and complete instances independently of the JSON output.",
+    "schema_node_count": 8,
+    "labels": "label_any; technical names and types exact"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.enrich_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.enrich_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Zone",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RefName",
+          "type": "string",
+          "label": "LookupName"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": 1,
+          "Zone": "A",
+          "RefName": "north"
+        },
+        {
+          "RowID": 2,
+          "Code": 1,
+          "Zone": "B",
+          "RefName": "south"
+        },
+        {
+          "RowID": 3,
+          "Code": 2,
+          "Zone": "A",
+          "RefName": "east"
+        },
+        {
+          "RowID": 4,
+          "Code": 3,
+          "Zone": "A",
+          "RefName": null
+        },
+        {
+          "RowID": 5,
+          "Code": null,
+          "Zone": "A",
+          "RefName": "null-code"
+        },
+        {
+          "RowID": 6,
+          "Code": 1,
+          "Zone": null,
+          "RefName": "null-zone"
+        },
+        {
+          "RowID": 7,
+          "Code": 1,
+          "Zone": "",
+          "RefName": "empty-zone"
+        }
+      ]
+    }
+  ]
+}

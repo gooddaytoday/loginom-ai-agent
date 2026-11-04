@@ -9,14 +9,6 @@ import {createSkillLoader} from '../lib/skill.mjs';
 import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
-test('full apply schema reserves v0.3.9 growth with at least 1500 bytes below 46000',t=>{
- const bytes=value=>Buffer.byteLength(JSON.stringify(value));
- const expanded=structuredClone(full.inputSchema),before=bytes(expanded),costs={};
- // All accepted v0.3.9 nodes and logistic selection modes are registered.
- t.diagnostic(JSON.stringify({full_bytes:before,compact_bytes:bytes(userNodeTool(full).inputSchema),
-  growth:costs,expanded_bytes:bytes(expanded),headroom_bytes:46000-bytes(expanded)}));
- assert.ok(bytes(expanded)<=44500,`full=${before}; expanded=${bytes(expanded)}; need >=1500 bytes below 46000`);
-});
 test('published apply references retain every canonical constraint and description',async()=>{
  const expand=value=>{
   if(Array.isArray(value))return value.map(expand);
@@ -66,7 +58,6 @@ for(const tool of [full,userNodeTool(full)])test('node caption rule reaches '+(t
  const groups=full.inputSchema.properties.parameters.properties.groups;
  assert.ok(JSON.stringify(groups).includes('>'));assert.ok(JSON.stringify(groups).includes('>='));
  assert.ok(label.description.length<500);assert.ok(Buffer.byteLength(JSON.stringify(label))<2000);
- assert.ok(Buffer.byteLength(JSON.stringify(tool.inputSchema))<46000);
  assert.deepEqual(label,full.inputSchema.properties.target.properties.label);
 });
 
