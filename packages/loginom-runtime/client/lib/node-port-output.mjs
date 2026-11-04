@@ -1,5 +1,80 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
-import {readOutputContext} from './node-output-context.mjs';
+import {readOutputContext,readVariableRecords} from './node-output-context.mjs';
+
+export function makeNodeVariableOutputCode(binding,options){
+ validatePreparedNodeContext(binding);
+ if(!Number.isInteger(options?.port)||options.port<0||options.port>99||!Number.isSafeInteger(options.deadline)
+  ||typeof options.operation_id!=='string'||options.execution?.verified!==true||options.execution.owner_verified!==true
+  ||options.execution.status!=='completed'||['execution_id','process_id','process_record_id'].some(k=>typeof options.execution[k]!=='string'))throw Error('Variable read requires a completed owned execution');
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+}
+
+// Executable variable sources use the native VariablesForm after a real Execute.
+// No server/data-source proxy is invoked and no wizard is opened on this path.
+export async function readNodeVariableOutput(page,task,readNode,readOutputs,readRecords,decode){
+ const b=task.binding,root=b.workflow_ref.prefix+';ModelForm;PreviewWindow';let effect=false,opened=false,output,error;
+ const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable output deadline');return n;};
+ const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
+ const inspect=mode=>page.evaluate(({task,mode,recordsCode,decoderCode})=>{
+  const b=task.binding,a=bg.app,p=globalThis.__loginomDockPreparationV1,exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+  const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1)throw Error('Variable output document/workflow changed');
+  const tabs=exact(b.workflow_ref.tab_tid),card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
+  if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active')||!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r.nodeTargetWorkflowNode)throw Error('Variable output graph owner changed');
+  const d=m.FDiagram,g=d.FmxGraph,ns=d.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id),n=ns[0];
+  if(ns.length!==1||n.FIconCls==='bg-vendor-icon-modelvariables'||n.FStatus!==1||n.FRunning)throw Error('Active executable variable node required');
+  const ports=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===task.port_guid),port=ports[0];
+  if(ports.length!==1||port.parent!==n||port.FCell.parent!==n.FCell||port.FType!==1||port.FSubType!==3||port.FStatus!==1||!port.data)throw Error('Active variable output owner changed');
+  const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(t=>exact(t+';ProgressForm;trpProgress;treepanel;tree'));
+  if(trees.length!==1)throw Error('Variable execution tree required');
+  const store=Ext.getCmp(trees[0].id)?.getStore(),nativeRoot=store?.getRoot(),prefix=b.document_id+':',id=task.execution.execution_id;
+  if(store?.isLoading()!==false||nativeRoot?.data.loaded!==true||!id.startsWith(prefix))throw Error('Variable execution store unavailable');
+  const parts=id.slice(prefix.length).split(':'),records=[],parents=new Map(),seen=new Set();
+  if(parts.length!==2||String(nativeRoot.internalId)!==parts[0]||!/^[1-9][0-9]*$/.test(parts[1]))throw Error('Variable execution root changed');
+  const walk=parent=>{if(!Array.isArray(parent.childNodes))throw Error('Variable process children');for(const record of parent.childNodes){if(seen.has(record)||records.length>=2000||record.data.loading)throw Error('Variable process bound');seen.add(record);records.push(record);parents.set(record,parent);walk(record);}};walk(nativeRoot);
+  const groups=records.filter(v=>String(v.data.id)===parts[1]),own=records.filter(v=>v.data.ModelNode===n.data),matches=own.filter(v=>String(v.data.id)===task.execution.process_id&&String(v.internalId)===task.execution.process_record_id);
+  if(groups.length!==1||parents.get(groups[0])!==nativeRoot||groups[0].data.Status!==3||groups[0].data.ErrorDetails!==''||groups[0].data.loaded!==true
+   ||matches.length!==1||matches[0].data.Status!==3||matches[0].data.ErrorDetails!==''||!String(matches[0].data.id).startsWith(parts[1]+'.')
+   ||own.some(v=>BigInt(String(v.data.id).split('.')[0])>BigInt(parts[1])))throw Error('Variable execution is stale or incomplete');
+  let ancestor=parents.get(matches[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);if(ancestor!==groups[0])throw Error('Variable execution process owner differs');
+  const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Variable read target covered');return {x,y};};
+  const root=b.workflow_ref.prefix+';ModelForm;PreviewWindow',pf=m.FPreviewManager?.FPreviewForm,windows=exact(root).filter(visible);
+  if(mode==='port'){
+   if(windows.length||exact('mn').some(visible))throw Error('A previous preview or menu is open');
+   const es=exact(task.port_tid).filter(e=>g.container.contains(e));if(es.length!==1)throw Error('Unique variable port drawing required');
+   const box=es[0].getBoundingClientRect(),gb=g.container.getBoundingClientRect();if(g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)!==port.FCell)throw Error('Variable output native hit changed');return point(es[0]);
+  }
+  if(mode==='menu'){
+   const menus=exact('mn').filter(visible),es=exact('mn;mniShowDataPreview').filter(visible);
+   if(menus.length!==1||m.FPortContextMenu?.el.dom!==menus[0]||Ext.getCmp(menus[0].id)!==m.FPortContextMenu||m.FCurrentPortMenu!==port
+    ||es.length!==1||!menus[0].contains(es[0])||es[0].closest('.x-item-disabled,.x-menu-item-disabled'))throw Error('Owned variable preview command required');return point(es[0]);
+  }
+  if(windows.length!==1||m.FPreviewManager.FPreviewWindow.FView.el.dom!==windows[0]||pf?.FCurrentPreviewNode!==n||pf.FCurrentPreviewPort!==port)throw Error('Variable preview native owner changed');
+  if(mode==='close'){
+   const es=exact(root+';p.h;close').filter(visible);if(es.length!==1||!windows[0].contains(es[0]))throw Error('Owned variable preview Close required');return point(es[0]);
+  }
+  const forms=exact(root+';PreviewForm;VariablesForm').filter(visible),es=exact(root+';PreviewForm;VariablesForm;grdValuePreview'),grid=es.length===1&&Ext.getCmp(es[0].id),form=forms.length===1&&Ext.getCmp(forms[0].id)?.Controller;
+  if(forms.length!==1||!windows[0].contains(forms[0])||form?.constructor?.name!=='VariablesForm'||form.FView.el.dom!==forms[0]||form.FModelNode!==n.data
+   ||Object.values(pf.FFormCache).filter(v=>v===form).length!==1||!grid||grid.el.dom!==es[0]||!forms[0].contains(es[0])||grid.getStore()!==form.FVariablesStore)throw Error('Bound native VariablesForm required');
+  return eval('('+recordsCode+')')(grid.getStore(),'preview',eval('('+decoderCode+')'));
+ },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString()});
+ try{
+  const before=await readNode(page,b);if(!before.verified||before.surface!=='graph')throw Error('Variable output graph unavailable');
+  const inventory=await readOutputs(page,b,readNode),ports=inventory.variable_ports?.filter(p=>p.index===task.port);
+  if(!inventory.verified||ports?.length!==1||!ports[0].active)throw Error('Requested active variable output absent');
+  task={...task,port_guid:ports[0].port_guid,port_tid:ports[0].tid};
+  const point=await inspect('port');effect=true;await page.mouse.click(point.x,point.y,{button:'right'});
+  await at('mn;mniShowDataPreview').waitFor({state:'visible',timeout:remaining()});const command=await inspect('menu');await page.mouse.click(command.x,command.y);opened=true;
+  await page.waitForFunction(t=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],grid=es.length===1&&Ext.getCmp(es[0].id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false&&grid.getStore().complete===true&&grid.getStore().loadCount>=1;},root+';PreviewForm;VariablesForm;grdValuePreview',{timeout:remaining()});
+  output={...await inspect('inventory'),port:task.port,kind:'variables',port_guid:task.port_guid,read_id:task.operation_id,
+   execution_id:task.execution.execution_id,source:'execution',native_source:'VariablesForm',fresh:true,freshness_basis:'completed_execution_variables_preview'};
+ }catch(cause){error=String(cause.message).slice(0,500);}
+ let clean=!effect;
+ if(effect)try{if(opened){const point=await inspect('close');await page.mouse.click(point.x,point.y);await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});}
+  else await page.keyboard.press('Escape');const after=await readNode(page,b);clean=after.verified===true&&after.surface==='graph';}catch{clean=false;}
+ const nodeContext=clean?await readNode(page,b):null;
+ return {status:output&&!error&&clean?'SUCCEEDED':effect?'AMBIGUOUS':'NOT_APPLIED',verified:!!output&&!error&&clean,effect_possible:effect,cleanup_complete:clean,node_context:nodeContext,...(output&&!error&&clean?{output}:{}),...(error?{error}:{})};
+}
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
