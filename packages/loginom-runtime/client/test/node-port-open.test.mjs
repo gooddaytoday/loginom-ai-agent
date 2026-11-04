@@ -116,6 +116,54 @@ function groupingBusy(f){
  f.flags.graphMasks=[panel];return panel;
 }
 
+function userBusy(f){
+ const panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-modelvariables';
+ f.task.kind='variables';f.task.port=4;f.task.operation_id='values:readback:port';
+ f.portDom.tid=f.portDom.tid.replace('Output_Data-0','Output_Var-4');
+ f.portDom.getAttribute=key=>key==='data-tid'?f.portDom.tid:null;
+ Object.assign(f.port,{FPortIndex:4,FType:1,FSubType:3});f.portTree.FIndex=4;
+ f.wizard.FModelSocket=f.wizard.FModelEnginePort;
+ const prepared=[...f.prep.receipts.values()][0];
+ prepared.nodeTargetPortIdentities=new Map([[f.port,{graph:f.graph.FDiagram.FmxGraph,node:f.node,cell:f.port.FCell,guid:f.port.FGuid,data:f.port.data,tid:f.portDom.tid}]]);
+ f.page.evaluate(()=>{
+  const a=bg.app;a.ModelUnitItemTreeNode=class ModelUnitItemTreeNode{};a.ModelServiceNodeTreeNode=a.ModelNodeTreeNode;
+  [...__loginomDockPreparationV1.receipts.values()][0].nodeTargetWorkflowNode.ParentNode=new a.ModelUnitItemTreeNode();
+ },null);
+ return panel;
+}
+
+test('user independent readback after Done waits for its own ModelForm mask before opening output four',async()=>{
+ const f=fixture();userBusy(f);let waits=0;
+ f.page.waitForTimeout=async()=>{
+  if(!f.flags.graphMasks.length)return;
+  waits++;assert.deepEqual(f.gestures,[]);f.flags.graphMasks=[];
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(waits,1);assert.equal(f.gestures.length,2);
+ assert.ok(result.trace.some(x=>x.event==='output_port_graph_busy'&&x.mode==='begin'));
+});
+
+for(const fault of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','non-root','locked','persistent','changed-owner'])test('user readback mask refuses '+fault,async()=>{
+ const f=fixture(),panel=userBusy(f);
+ if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
+ if(fault==='non-root')[...f.prep.receipts.values()][0].nodeTargetWorkflowNode.ParentNode={};
+ if(fault==='locked')f.node.FLocked=true;
+ let waits=0;f.page.waitForTimeout=async()=>{
+  waits++;
+  if(fault==='persistent')f.task.deadline=Date.now()-1;
+  if(fault==='changed-owner')f.graph.FView.el.dom={};
+ };
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED',result.error);
+ assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);assert.deepEqual(f.gestures,[]);
+ assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
+});
+
 for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
  const f=fixture('input');let waits=0;
  const busy=()=>{groupingBusy(f);f.node.FIconCls='bg-vendor-icon-'+icon;};

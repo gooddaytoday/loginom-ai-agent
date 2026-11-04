@@ -5,10 +5,10 @@ import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('model schema inventory pins v0.4.0 Quality and Coarse Classes registrations and excludes private cold windows',()=>{
+test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,123043,'1a3b12c046701262c2d1b13ba7b152a81c5027a5831f2a855c5d2c5b48e66d8c'],
-  [nodeApiTools.map(userNodeTool),18264,'053dab4a539c2c1b0497d64e428c269b25e04f98e494652a9097e52252b2d393'],
+  [nodeApiTools,126519,'844a02ac8249bfee96899eec10bd45ceccd4f44c77a0d35b2b8cfcf0a63b662b'],
+  [nodeApiTools.map(userNodeTool),19550,'28479351fd3291300a10d6d78ab218f7f05747f6cfc85143bfb660b072950fb8'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -31,6 +31,17 @@ const fixture=()=>{
   runtime[name]=(...args)=>{calls.push({name,args});return {operation_id:'op',state:'running'};};
  return {runtime,calls};
 };
+test('W1 variable_inputs is optional and dispatched independently from table inputs',async()=>{
+ const f=fixture(),request={operation_id:'w1',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'wf',navigation_path:[{tid:'crumb',label:'Scenario'}]},
+  target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'wf',node_id:'target'}},inputs:[],mode:'request',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:5,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',request);
+ const link={source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:4,input:0,kind:'variables'};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[link]});
+ assert.deepEqual(f.calls[1].args[0].variable_inputs,[link]);
+ await assert.rejects(dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[{...link,kind:'data'}]}));
+ assert.equal(f.calls.length,2);
+});
 
 test('public apply mode reaches only the existing LinRegression handler',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
@@ -198,4 +209,11 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
  const incomplete=structuredClone(cross);delete incomplete.parameters.facts;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',incomplete),/typed facts required/);
  assert.equal(calls.length,3);
+});
+
+test('W1 variable reread selection is additive and distinct from table ports',async()=>{
+ let received;const runtime={tools:nodeApiTools,startNodeRead:args=>{received=args;return {status:'pending'};}};
+ const args={operation_id:'fresh',source_operation_id:'executed',read:{ports:[],variable_ports:[0]}};
+ await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(received,args);
+ await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_read',{...args,read:{...args.read,variable_ports:[100]}}));
 });

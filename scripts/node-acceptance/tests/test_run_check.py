@@ -40,6 +40,17 @@ class RunCheckTests(unittest.TestCase):
                 runner.check_csv(path, expected, null_marker=None,
                                  export_events=self.export_events(marker=''), destination='/test/all.csv')
 
+    def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
+        case = runner.scenario('variables-user')
+        expected = runner.expected_for(case, '/own/variables-user.lgp')
+        self.assertTrue(case['variable_only'])
+        self.assertEqual(expected['outputs'], [])
+        self.assertEqual(expected['variable_inventory']['outputs'][0]['port'], 4)
+        self.assertEqual([v['name'] for v in expected['variable_inventory']['outputs'][0]['variables']],
+                         ['limit', 'skip', 'sentinel', 'enabled', 'empty', 'missing', 'zero'])
+        self.assertTrue(case['oracle'].is_file())
+        self.assertNotIn('expected-user', case['prompt'].read_text())
+
     def test_assnrules_fixture_ports_and_model_boundary(self):
         for name, counts in [('assnrules-basic', [4, 2]), ('assnrules-length', [6, 6])]:
             case = runner.scenario(name)
@@ -50,6 +61,39 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue(case['prompt'].is_file())
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
+
+    def test_variable_only_model_requires_its_oracle_without_inventing_a_table_failure(self):
+        for oracle_fails in [False, True]:
+            with self.subTest(oracle_fails=oracle_fails), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+                for path in [folder, profile, workspace]: path.mkdir()
+                runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True, 'unsaved_changes_discarded': False})
+                runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+                event = {'type': 'tool_use', 'sessionID': 'own-session', 'part': {'tool': 'loginom_dock_action_run', 'state': {
+                    'status': 'completed', 'output': json.dumps({'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}}
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                calls = []
+                def phase(name, command, *args, **kwargs):
+                    calls.append(name)
+                    if name == 'model': (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                    elif name == 'variable-oracle':
+                        self.assertTrue((folder / 'variable-events.json').is_file())
+                        self.assertIn('variables-user', list(map(str, command)))
+                        if oracle_fails: raise RuntimeError('typed inventory rejected')
+                    else: self.fail('Unexpected phase ' + name)
+                with patch.object(instance, 'phase', side_effect=phase):
+                    if oracle_fails:
+                        with self.assertRaisesRegex(RuntimeError, 'typed inventory rejected'):
+                            instance.model('variables-user', folder, profile, workspace, '/test/result.lgp', {'package_directory': '/test'}, root / 'build')
+                    else:
+                        result = instance.model('variables-user', folder, profile, workspace, '/test/result.lgp', {'package_directory': '/test'}, root / 'build')
+                        self.assertEqual(result[-2:], (None, None))
+                        self.assertEqual(instance.current['port-read'], 'PASS')
+                        self.assertEqual(instance.current['read-path'], 'snapshot')
+                self.assertEqual(calls, ['model', 'variable-oracle'])
+                self.assertNotIn('failure_class', instance.current)
 
     def test_missing_zero_fixtures_and_independent_oracle(self):
         for name, kind in [('missing-zero', 'core'), ('missing-zero-threshold', 'threshold'),

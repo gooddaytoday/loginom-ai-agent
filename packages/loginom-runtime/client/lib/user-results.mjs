@@ -64,6 +64,11 @@ export function compactNodeRequestFailure(outcome,request={}) {
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile']) : {};
+  if(data?.variable_ports){
+    output.variable_ports=data.variable_ports.map(port=>({...pick(port,['port','kind','port_guid','fresh','source','native_source','read_id','execution_id','complete','count','completeness','package_modified']),
+      variables:port.variables.map(variable=>({...pick(variable,['id','index','name','label','type']),
+        cell:pick(variable.cell,['type','value','decimal','representation','precision','is_null'])}))}));
+  }
   if (data?.ports) output.ports = data.ports.map(port => {
     if(port.port_kind==='tree')return pick(port,['port','port_guid','port_kind','fresh','execution_id','freshness_basis','tree','sample_complete']);
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'freshness_basis', 'read_limit', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations','full_import_verification']);
@@ -106,7 +111,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   };
   // JS readback carries the complete observed mappings and schema. Refuse an
   // oversized final reply instead of converting these facts into a summary.
-  if(node?.configuration?.readback?.kind!=='javascript'&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply,
+  if(!['javascript','user_variables'].includes(node?.configuration?.readback?.kind)&&!node?.configuration?.variable_mappings?.length&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply,
     {wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;

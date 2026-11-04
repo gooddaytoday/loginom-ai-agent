@@ -1,6 +1,31 @@
 import {readTreeConversionBrowser} from './tree-conversion-context.mjs';
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
+// Only a fully loaded, bounded native Ext store is a complete variable set.
+// Value/$self RPC proxies are deliberately never inspected or invoked.
+export function readVariableRecords(store,mode,decode){
+ const need=(ok,message)=>{if(!ok)throw Error('Variable inventory: '+message);};
+ const items=store?.getData?.()?.items,count=store?.getCount?.();
+ need(['preview','values'].includes(mode)&&store.isLoading()===false&&Array.isArray(items)
+  &&Number.isSafeInteger(count)&&count>=0&&count<=128&&items.length===count,'count/store/loading');
+ if(mode==='preview')need(store.complete===true&&store.loadCount>=1&&store.getTotalCount()===count,'preview total/load completeness');
+ const variables=items.map((record,index)=>{
+  const d=record?.data,type={1:'boolean',4:'integer',5:'string',...(mode==='preview'?{3:'real'}:{})}[d?.DataType];
+  need(record?.isModel===true&&d.Index===index&&(Number.isSafeInteger(d.ID)&&d.ID>=0||typeof d.ID==='string'&&d.ID.length>0&&d.ID.length<=128)
+   &&typeof d.Name==='string'&&d.Name.length>0&&d.Name.length<=128&&typeof d.DisplayName==='string'&&d.DisplayName.length<=1024&&type,'record metadata/type');
+  if(mode==='values')need(typeof d.ValueIsNull==='boolean'&&d.OriginType===1,'local value/null metadata');
+  const raw=mode==='values'?(d.ValueIsNull?null:d.DisplayValue):d.ValueVariant;
+  // Undefined is absence of a loaded value, never an explicit NULL.
+  need(raw!==undefined,'value not loaded');
+  const decoded=decode(raw,type);need(decoded.limitations.length===0,'scalar precision');
+  return {id:d.ID,index,name:d.Name,label:d.DisplayName,type,cell:decoded.cell};
+ });
+ const unique=new Set(variables.map(v=>JSON.stringify(v.id))).size;
+ need(unique===count&&new Set(variables.map(v=>v.name)).size===count,'duplicate IDs/names');
+ need(new TextEncoder().encode(JSON.stringify(variables)).length<=1048576,'byte bound');
+ return {variables,count,complete:true,completeness:{count,store_count:items.length,unique_ids:unique,loaded:true}};
+}
+
 export function makeTreeWizardContextCode(binding){
  validatePreparedNodeContext(binding);
  return `async page=>{const readNode=${readPreparedNodeContext.toString()},b=${JSON.stringify(binding)};const before=await readNode(page,b);if(!before.verified||before.surface!=='wizard'||before.input_port||before.output_port)return {verified:false,reason:'tree_wizard_owner'};const newer=await page.evaluate(${readTreeConversionBrowser.toString()},b.workflow_ref.prefix);const value=newer.applicable?newer:await page.evaluate(${readTreeWizardBrowser.toString()},b.workflow_ref.prefix);const after=await readNode(page,b);return JSON.stringify(before)===JSON.stringify(after)?{...value,node_context:after}:{verified:false,reason:'tree_wizard_changed'};}`;
@@ -73,11 +98,17 @@ export async function readOutputContext(page,binding,readNode=readPreparedNodeCo
       const d=model?.FDiagram,nodes=d?.FNodes?.FCollection;
       const node=Array.isArray(nodes)?nodes.filter(n=>n.FGuid===b.node.node_id):[];
       if(node.length!==1 || !Array.isArray(node[0].FPorts) || node[0].FPorts.length>16)return fail('graph_node');
-      const ports=[];
+      const ports=[],variablePorts=[];
       for(const list of node[0].FPorts) {
         if(!Array.isArray(list.FCollection)||list.FCollection.length>100)return fail('port_bound');
         for(const p of list.FCollection) {
           const el=d.FmxGraph.view.getState(p.FCell)?.shape?.node,tid=el?.getAttribute('data-tid');
+          const variable=tid?.startsWith(context.tid+';')&&/^Output_Var-(\d+)$/.exec(tid.slice(context.tid.length+1));
+          if(variable){
+            if(!guid(p.FGuid)||p.parent!==node[0]||p.FCell.parent!==node[0].FCell||p.FType!==1||p.FSubType!==3
+              ||!d.FmxGraph.container.contains(el)||[...exact(tid)].filter(e=>d.FmxGraph.container.contains(e)).length!==1)return fail('variable_port_identity');
+            variablePorts.push({native_index:Number(variable[1]),port_guid:p.FGuid,tid,active:p.FStatus===1,kind:'variables'});continue;
+          }
           const match=tid?.startsWith(context.tid+';')&&/^Output_Data(Tree)?-(\d+)$/.exec(tid.slice(context.tid.length+1));
           if(!match)continue;
           const tree=!!match[1],index=match[2];
@@ -94,8 +125,10 @@ export async function readOutputContext(page,binding,readNode=readPreparedNodeCo
       }
       if(new Set(ports.map(p=>p.native_index)).size!==ports.length || new Set(ports.map(p=>p.port_guid)).size!==ports.length)return fail('duplicate_ports');
       ports.sort((a,b)=>a.native_index-b.native_index);
+      variablePorts.sort((a,b)=>a.native_index-b.native_index);variablePorts.forEach((p,index)=>p.index=index);
+      if(new Set(variablePorts.map(p=>p.native_index)).size!==variablePorts.length||new Set(variablePorts.map(p=>p.port_guid)).size!==variablePorts.length)return fail('duplicate_variable_ports');
       const selected=d.FmxGraph.getSelectionCells();
-      return {verified:true,surface:'graph',node_selected:selected.length===1 && selected[0]===node[0].FCell,
+      return {verified:true,surface:'graph',...(variablePorts.length?{variable_ports:variablePorts}:{}),node_selected:selected.length===1 && selected[0]===node[0].FCell,
         ports:ports.map((p,index)=>({...p,index})),execution_freshness_verified:false};
     }
     if(context.surface!=='views')return fail('unsupported_surface');

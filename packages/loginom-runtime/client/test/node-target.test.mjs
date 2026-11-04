@@ -6,6 +6,25 @@ const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{tid:'path',label:'Scenario'}] };
 const source = { ref: ref('source'), type: 'imports.text', label: 'Source', position: {x:8,y:8}, inputs: [], outputs: [0] };
 const request = () => ({ document_id:'doc', workflow_ref:workflow, target:{kind:'new',type:'transform.union_data',label:'Target',position:{x:160,y:160}}, inputs:[{source:ref('source'),output:0,input:0},{source:ref('source'),output:0,input:1},{source:ref('source'),output:0,input:2}] });
+test('W1 builtin is existing-only before any browser work',()=>{
+ assert.throws(()=>validateNodeTargetRequest({...request(),target:{kind:'new',type:'variables.user'},inputs:[]}),/existing/);
+});
+for(const kind of ['variables','control'])test('W1 '+kind+' links retain table ordinal zero and preserve omitted variable links',async()=>{
+ const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:4,port_guid:'same'}];
+ f.graph.nodes.push({ref:ref('target'),type:'transform.union_data',label:'Target',inputs:[0,1],outputs:[0],variable_inputs:[{kind:'variables',port:0,port_guid:'v'},{kind:'control',port:0,port_guid:'c'}]});
+ const mutate=f.adapter.mutate;f.adapter.mutate=async effect=>{
+  if(effect.parameters.edge?.kind){f.calls.push('variable_connect');(f.graph.variable_links??=[]).push({...effect.parameters.edge,source_port_guid:'same',target_port_guid:kind==='variables'?'v':'c'});return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};}
+  return mutate(effect);
+ };
+ const r={...request(),target:{kind:'existing',type:'transform.union_data',ref:ref('target')},inputs:[{source:ref('source'),output:0,input:0}],variable_inputs:[{source:ref('source'),output:4,input:0,kind}]};
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);assert.deepEqual(f.calls,['connect','variable_connect']);
+ assert.equal(f.graph.links[0].input,0);assert.equal(result.variable_links[0].kind,kind);
+ const next=await prepareNodeTarget({request:{...r,inputs:[],variable_inputs:[]},operation:{id:'next',deadline:Date.now()+10000},adapter:f.adapter,record:async e=>e});
+ assert.equal(next.status,'SUCCEEDED',next.error);assert.equal(f.graph.variable_links.length,1);
+});
+for(const change of [r=>{r.variable_inputs[0].source.workflow_id='foreign';},r=>{r.variable_inputs.push({...r.variable_inputs[0]});},r=>{r.variable_inputs[0].kind='table';},r=>{r.variable_inputs[0].kind='control';r.variable_inputs[0].input=1;}])test('W1 rejects invalid variable inputs before observation',()=>{
+ const r={...request(),variable_inputs:[{source:ref('source'),output:4,input:0,kind:'variables'}]};change(r);assert.throws(()=>validateNodeTargetRequest(r));
+});
 function fixture() {
  let graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[structuredClone(source)],links:[]};
  const calls=[],events=[],operation={id:'op',deadline:Date.now()+10000};
@@ -22,6 +41,34 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+for(const kind of ['variables','control'])for(const automatic of [false,true])test('W1 creates a target with '+kind+' input and owned automatic link='+automatic,async()=>{
+ const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:4,port_guid:'source-var'}];
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  const edge=effect.parameters.edge;
+  if(effect.kind==='reveal_control'){
+   f.calls.push(effect.kind);f.graph.nodes[1].variable_inputs=[{kind:'control',port:0,port_guid:'target-control',native_index:0}];f.graph.nodes[1].other_ports=['Input_ControlVar'];
+  }else if(effect.kind==='remove_link'&&edge.kind){f.calls.push('variable_remove');f.graph.variable_links=f.graph.variable_links.filter(e=>e.output!==edge.output);}
+  else if(effect.kind==='connect'&&edge.kind){f.calls.push('variable_connect');(f.graph.variable_links??=[]).push({...edge,source_port_guid:'source-var',target_port_guid:'target-'+kind});}
+  else {
+   const result=await mutate(effect);
+   if(effect.kind==='create'){
+    if(kind==='variables')f.graph.nodes[1].variable_inputs=[{kind,port:0,port_guid:'target-variables',native_index:0}];
+    if(automatic&&kind==='variables')f.graph.variable_links=[{source:'source',output:0,target:'target',input:0,kind,source_port_guid:'auto-source',target_port_guid:'target-variables'}];
+   }
+   return result;
+  }
+  return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
+ };
+ const r={...request(),target:{kind:'new',type:'transform.union_data',position:{x:160,y:160}},inputs:[],variable_inputs:[{source:ref('source'),output:4,input:0,kind}]};
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,['create',...(kind==='control'?['reveal_control']:automatic?['variable_remove']:[]),'variable_connect']);
+ assert.equal(result.variable_links[0].output,4);assert.equal(result.variable_links[0].kind,kind);
+});
+test('W1 rejects an absent source variable port before creating a target',async()=>{
+ const f=fixture(),r={...request(),variable_inputs:[{source:ref('source'),output:4,input:0,kind:'variables'}]};
+ const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/Source variable/);assert.deepEqual(f.calls,[]);
+});
 // Reduced from rest-countries:graph:0, 2026-10-24T11:02:34.527Z:
 // native dropped (520,580) at (520,584) and connected a nearby REST reference.
 function restServiceCase() {
