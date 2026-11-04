@@ -189,7 +189,18 @@ function matchesCell(cell,column,want,coarseBound=false){
  if(nativeRequired){
   if(cell.cell_type!==type)return false;
   if(want.bytes_le!==undefined&&cell.native.bytes_le!==want.bytes_le)return false;
-  if(type==='datetime'&&(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate'||cell.native.semantic_scope!=='native_serial_only'))return false;
+  if(type==='datetime'){
+   if(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate')return false;
+   if(cell.native.semantic_scope==='browser_civil_time'){
+    if(cell.native.civil_time_verified!==true||cell.native.epoch_verified!==true||cell.representation!=='local_datetime'
+     ||typeof cell.timezone!=='string'||!cell.timezone||cell.timezone.length>128
+     ||typeof cell.value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(cell.value)
+     ||!Number.isFinite(Number(cell.decimal))||typeof cell.decimal!=='string'
+     ||!(/^[a-f0-9]{16}$/.test(cell.native.bytes_le)))return false;
+    const serial=new DataView(Uint8Array.from(cell.native.bytes_le.match(/../g),s=>parseInt(s,16)).buffer).getFloat64(0,true);
+    if(!Number.isFinite(serial)||String(serial)!==cell.decimal)return false;
+   }else if(cell.native.semantic_scope!=='native_serial_only')return false;
+  }
   if(!Object.hasOwn(want,'value'))return typeof want.bytes_le==='string';
   want=want.value;
  }

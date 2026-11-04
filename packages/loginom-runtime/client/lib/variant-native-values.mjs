@@ -2,18 +2,20 @@
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 const need=(x,m)=>{if(!x)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const hex=bytes=>bytes.map(n=>n.toString(16).padStart(2,'0')).join('');
-const tags=new Map([[1,'null'],[5,'real'],[7,'datetime'],[8,'string'],[11,'boolean'],[20,'integer']]);
 export const temporalProfile='loginom-7.4.2-native-oadate';
 
-export function adaptCell(cell,column,{dateProfile}={}) {
+// Also serialized by the generic port reader; keep dependencies explicit.
+export function adaptCell(cell,column,{dateProfile,civilTime}={},decode=decodeVariantFrame) {
+ const need=(x,m)=>{if(!x)throw Error(m);};
+ const hex=bytes=>bytes.map(n=>n.toString(16).padStart(2,'0')).join('');
+ const tags=new Map([[1,'null'],[5,'real'],[7,'datetime'],[8,'string'],[11,'boolean'],[20,'integer']]);
  need(tags.has(cell.tag),'unsupported native tag; no inferred subtype');
  need(Array.isArray(cell.payload)&&cell.payload.length>=10&&cell.payload.length<=65524,'logical payload');
  need(Number.isInteger(cell.frame_size)&&cell.frame_size===Math.max(60,12+cell.payload.length),'frame length');
  // Saved evidence omits transport padding. Reconstruct only ignored padding;
  // the decoder validates the exact logical length again below.
  const frame=[...cell.payload,...Array(cell.frame_size-12-cell.payload.length).fill(0)];
- const d=decodeVariantFrame(frame,cell.frame_size);
+ const d=decode(frame,cell.frame_size);
  need(d.tag===cell.tag&&d.consumed_bytes===cell.payload.length,'tag/logical length mismatch');
  const cellType=tags.get(d.tag);
  need(column.type==='variant'||cellType==='null'||column.type===cellType,'schema/native subtype mismatch');
@@ -24,7 +26,13 @@ export function adaptCell(cell,column,{dateProfile}={}) {
  if(cellType==='integer')return {...result,value:d.decimal,decimal:d.decimal,representation:'decimal_integer',native:{...native,bits:64}};
  if(cellType==='real')return {...result,value:d.representation,decimal:d.representation,representation:'binary64_decimal',native:{...native,bits:64,bytes_le:d.bytes_le}};
  if(cellType==='datetime'){
-  need(dateProfile===temporalProfile,'unknown temporal semantics');
+  need(dateProfile==='loginom-7.4.2-native-oadate','unknown temporal semantics');
+  if(civilTime){
+   need(typeof civilTime.timezone==='string'&&civilTime.timezone.length>0&&civilTime.timezone.length<=128
+    &&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(civilTime.value),'invalid civil datetime proof');
+   return {...result,value:civilTime.value,decimal:d.representation,representation:'local_datetime',timezone:civilTime.timezone,
+    native:{...native,bits:64,bytes_le:d.bytes_le,temporal_profile:dateProfile,semantic_scope:'browser_civil_time',civil_time_verified:true,epoch_verified:true}};
+  }
   return {...result,value:d.bytes_le,decimal:d.representation,representation:'native_oadate_binary64_le',timezone:'unspecified',native:{...native,bits:64,bytes_le:d.bytes_le,temporal_profile:dateProfile,semantic_scope:'native_serial_only',civil_time_verified:false,epoch_verified:false}};
  }
  return {...result,value:d.value,representation:cellType==='string'?'native_string':'native_boolean'};

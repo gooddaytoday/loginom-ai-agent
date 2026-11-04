@@ -1,5 +1,11 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {readOutputContext} from './node-output-context.mjs';
+import {createNativeVariantReader} from './variant-native-read.mjs';
+import {decodeVariantFrame} from './variant-native-decode.mjs';
+import {adaptCell} from './variant-native-values.mjs';
+import {collectNativeRuntime} from './collapse-native-runtime.mjs';
+import {nativeRuntimePins} from './collapse-native-runtime-pins.mjs';
+const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins};
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
@@ -132,7 +138,8 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>k!=='typedVariants').sort().join(','))
+  ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
   ||!Number.isInteger(request.sampleRows)||request.sampleRows<0||request.sampleRows>100
   ||Object.hasOwn(request,'rowOffset')&&(!Number.isSafeInteger(request.rowOffset)||request.rowOffset<0)
@@ -142,23 +149,23 @@ export function makeNodePortOutputCode(binding,request,options,quality=null) {
   ||!options||Object.keys(options).sort().join(',')!=='build,deadline,origin'
   ||typeof options.origin!=='string'||typeof options.build!=='string'||!Number.isSafeInteger(options.deadline))throw Error('Exact bounded completed port read required');
  if(quality&&(request.port!==4||typeof quality.binding_id!=='string'||typeof quality.read!=='function'||typeof quality.decode!=='function'))throw Error('Private Quality Moda capability required');
- return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()},${quality?JSON.stringify({binding_id:quality.binding_id,read:quality.read.toString(),decode:quality.decode.toString()}):'null'})`;
+ return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()},${quality?JSON.stringify({binding_id:quality.binding_id,read:quality.read.toString(),decode:quality.decode.toString()}):'null'},${JSON.stringify(variantCapability)})`;
 }
 
 // One dispatch retains native identity and owns only the proxies acquired here.
-export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource,quality=null) {
+export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource,quality=null,variant=variantCapability) {
  const before=await readNode(page,binding);
  if(before.verified!==true||before.surface!=='graph')return {verified:false,cleanup_complete:false,reason:'node_context'};
  const inventory=await readOutputs(page,binding,readNode);
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
- const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality})=>{
+ const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
   const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
-  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,readDiagnostic,reason='read_failed',released=true,qualityNativeUncertain=false;
+  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,readDiagnostic,nativeReader,reason='read_failed',released=true,qualityNativeUncertain=false;
   const items=[];
   const snapshot=()=>{
    const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
@@ -243,12 +250,22 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     schema.push({index,name,label,type});
    }
    const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount-offset,q.sampleRows,Math.floor(10000/total));
+   // Private opt-in: existing ordinary reads, including Variant NULL and the
+   // full Collapse/CrossTable path, keep their previous envelopes and calls.
+   const exactVariants=q.typedVariants===true&&requested>0&&schema.some(c=>c.type==='variant');
+   const nativeDecode=exactVariants?eval('('+variant.decode+')'):null,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},nativeDecode,eval('('+variant.collect+')'),variant.pins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount-offset,q.sampleRows);
    for(let row=offset;row<offset+requested;row++){
-    const rawValues=[];
+    const rawValues=[],nativeCells=[];
     for(let column=0;column<total;column++){
+     if(exactVariants&&schema[column].type==='variant'){
+      const cell=await nativeReader.read(row,column);
+      nativeCells[column]=adaptNative(cell,schema[column],{dateProfile:'loginom-7.4.2-native-oadate',civilTime:cell.civilTime},nativeDecode);
+      rawValues.push(null);continue;
+     }
      live();stable();const raw=quality&&column===8?null:await dataSource.AsVariant(row,column);live();stable();
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
      rawValues.push(raw);
@@ -260,7 +277,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      need(typeof full==='string','string_value');return full;
     }));
     need(fullValues.every(item=>item.status==='fulfilled'),'cell_read_failed');
-    const decoded=fullValues.map((item,column)=>quality&&column===8?{cell:moda[row],limitations:[]}:decode(item.value,schema[column].type)),cells=decoded.map(item=>item.cell);
+    const decoded=fullValues.map((item,column)=>nativeCells[column]?{cell:nativeCells[column],limitations:[]}:quality&&column===8?{cell:moda[row],limitations:[]}:decode(item.value,schema[column].type)),cells=decoded.map(item=>item.cell);
     const rowValues=cells.map(c=>c.value??c.display_text??null);
     if(new TextEncoder().encode(JSON.stringify([...values,rowValues])).length>512*1024){limited=true;break;}
     need(!q.requireExactNumbers||decoded.every(item=>item.limitations.length===0),'unverified_precision');
@@ -277,16 +294,19 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
+  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
   }finally{
-   for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
+   // A timed-out fixed321 request still owns its buffers. Retain its source
+   // handles until the owning browser is closed; never claim native cancel.
+   if(!nativeReader?.unsettled)for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
   }
   let context=false;try{context=!!baseline&&same(baseline,snapshot());}catch{}
+  if(nativeReader?.unsettled)return {verified:false,cleanup_complete:false,reason:'variant_native_pending'};
   if(qualityNativeUncertain)return {verified:false,cleanup_complete:false,reason:'quality_native_pending'};
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason,...(readDiagnostic?{read_diagnostic:readDiagnostic}:{})};
   return {verified:true,cleanup_complete:true,output:result};
- },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality});
+ },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality,variant});
  const after=await readNode(page,binding);
  if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
  return result.verified?{...result,node_context:after}:result;
