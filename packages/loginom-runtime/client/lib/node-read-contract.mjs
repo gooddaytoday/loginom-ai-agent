@@ -14,6 +14,7 @@ export function isUnchangedTransformExecution(request){
   &&p&&typeof p==='object'&&!Array.isArray(p)
   &&(type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
    ||type==='transform.enrich_data'&&request.mode==='left'&&Object.keys(p).length===0
+   ||type==='transform.col_union_data'&&request.mode==='positional'&&Object.keys(p).length===0
    ||type==='transform.join_data'&&['inner','left','right','full','difference'].includes(request.mode)&&Object.keys(p).length===0
    ||type==='transform.reform_columns'&&request.mode==='scalar'&&Object.keys(p).join(',')==='changes'
     &&Array.isArray(p.changes)&&p.changes.length===0);
