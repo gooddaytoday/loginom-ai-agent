@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -36,15 +36,21 @@ test("identity cannot be changed after startup and has no update fallback", () =
 test("the bundle bakes the feed parameter and defaults to disabled", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-feed-bundle-"))
   try {
-    for (const [index, value] of [null, "", "https://example.test/updates/"].entries()) {
+    const cases = [null, "", "https://example.test/updates/"].map((value, index) => ({
+      value,
+      file: join(root, `${index}.mjs`),
+    }))
+    // Populate the whole directory before Bun's resolver sees the first import.
+    for (const { value, file } of cases) {
       const bundle = await Bun.build({
         entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
         target: "bun",
         define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
       })
       expect(bundle.success).toBe(true)
-      const file = join(root, `${index}.mjs`)
-      await Bun.write(file, bundle.outputs[0])
+      await writeFile(file, await bundle.outputs[0].text())
+    }
+    for (const { value, file } of cases) {
       const built = await import(pathToFileURL(file).href)
       expect(built.Product.updateFeed).toBe(value || null)
     }
