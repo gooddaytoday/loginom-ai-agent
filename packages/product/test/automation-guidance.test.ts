@@ -3,8 +3,9 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
-test("sampling advertises random and explicitly refuses deferred modes", () => {
-  expect(skill).toContain('mode:"random"')
+test("sampling advertises random and explicitly refuses deferred modes", async () => {
+  const sampling = await Bun.file(new URL("../skills/loginom-automation/references/nodes/preprocessing.sampling.md", import.meta.url)).text()
+  expect(sampling).toContain('mode:"random"')
   expect(skill).toContain('«Этот режим пока не поддерживается»')
   expect(skill).toContain('Не подменяй эти режимы другим алгоритмом')
   expect(skill).not.toContain('mode:"stratified"')
@@ -16,8 +17,8 @@ test("automation preserves technical output names explicitly requested by the us
   expect(skill).toMatch(/выходное техническое имя[\s\S]*?ровно[\s\S]*?без приставок[\s\S]*?Returned[\s\S]*?переводов[\s\S]*?суффиксов/)
 })
 
-test("exports preserve NULL separately from empty strings with an explicit announced marker", () => {
-  const exports = skill.split("## Экспорт\n")[1]?.split("\n## ")[0] ?? ""
+test("exports preserve NULL separately from empty strings with an explicit announced marker", async () => {
+  const exports = await Bun.file(new URL("../skills/loginom-automation/references/nodes/exports.text.md", import.meta.url)).text()
   expect(exports).toContain("NULL и пустые строки")
   expect(exports).toContain("пользователь не задал маркер выгрузки")
   expect(exports).toContain("`exports.text`")
@@ -43,9 +44,9 @@ test("single chain calculation permits source activation only after a safe prefl
 })
 
 test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
-  const trees = skill.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/node-settings.md", import.meta.url)).text()
-  const details = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/trees.from_json.md", import.meta.url)).text()
+  const trees = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+  const details = settings
 
   expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
   expect(trees).toContain("по просьбе о дереве")
