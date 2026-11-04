@@ -3,13 +3,17 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
-test("sampling advertises random and explicitly refuses deferred modes", async () => {
-  const sampling = await Bun.file(new URL("../skills/loginom-automation/references/nodes/preprocessing.sampling.md", import.meta.url)).text()
-  expect(sampling).toContain('mode:"random"')
-  expect(skill).toContain('«Этот режим пока не поддерживается»')
-  expect(skill).toContain('Не подменяй эти режимы другим алгоритмом')
-  expect(skill).not.toContain('mode:"stratified"')
-  expect(skill).not.toContain('mode:"biased"')
+test("sampling selects native modes through node-specific guidance", async () => {
+  for (const type of ["preprocessing.sampling", "preprocessing.data_partition"]) {
+    const settings = await Bun.file(new URL(`../skills/loginom-automation/references/nodes/${type}.md`, import.meta.url)).text()
+    expect(skill).toContain(`[читать](references/nodes/${type}.md)`)
+    expect(settings).toContain('mode:"biased"')
+    expect(settings).toContain('strata_fields:[{kind:"input_field",name:"Class"}]')
+    expect(settings).toContain('bias_factors:[{value:"A",factor:0.4},{value:"B",factor:1}]')
+    expect(settings).toContain('используй существующий узел и `finish:"execute"`')
+    expect(settings).toContain('Равномерный случайный метод: «Этот режим пока не поддерживается»')
+    expect(skill + settings).not.toMatch(/\$(?:[1-9]\d*|ARGUMENTS)/)
+  }
 })
 
 test("automation preserves technical output names explicitly requested by the user", () => {

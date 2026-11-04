@@ -1,4 +1,16 @@
 const need=(v,m)=>{if(!v)throw Error('Sequential output: '+m);};
+export function validateSamplingOutputMapping(c,m,port){
+ need(m?.verified===true&&m.inventory_complete===true&&m.node_context?.output_port?.port===port,'output owner differs');
+ if(m.source_identity_verified===true)return;
+ // With autosync off, Loginom's unexecuted output exposes its complete literal
+ // definition without a source store. Bind it to the already verified input
+ // inventory and this exact port; do not claim a native source-link proof.
+ need(['stratified','biased'].includes(c.mode)&&m.autosync===false&&Array.isArray(m.source_fields)&&m.source_fields.length===0
+  &&Array.isArray(m.target_fields)&&m.target_fields.every(f=>!f.source&&!f.excluded&&f.inherited===false),'frozen output definition required');
+ const expected=samplingOutputColumns(c,port);
+ need(m.target_fields.length===expected.length&&new Set(m.target_fields.map(f=>f.name)).size===expected.length
+  &&expected.every(f=>m.target_fields.some(t=>['name','label','type','data_kind'].every(k=>t[k]===f[k]))),'frozen fields differ from verified input');
+}
 export function samplingOutputColumns(c,port){
  const partition=c.kind==='data_partition';
  need(Number.isInteger(port)&&port>=0&&port<(partition?3:1),'unknown port');

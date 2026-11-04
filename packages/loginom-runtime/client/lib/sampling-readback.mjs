@@ -1,3 +1,4 @@
+import {validateSamplingOutputMapping} from './sampling-output.mjs';
 const need=(v,m)=>{if(!v)throw Error('Sequential readback: '+m);};
 export function samplingConfigurationReadback({node,phases,operation_id}){
  const owner=c=>c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c[k]===node[k]);
@@ -9,11 +10,12 @@ export function samplingConfigurationReadback({node,phases,operation_id}){
  need(mapped.value.ports.length===(c.kind==='data_partition'?3:1),'complete output schemas required');
  for(const [index,p] of mapped.value.ports.entries()){
   const m=p.native_mapping;
-  need(p.port===index&&m?.verified&&m.inventory_complete&&m.source_identity_verified&&owner(m.node_context)&&m.node_context.output_port?.port===index
+  need(p.port===index&&m?.verified&&m.inventory_complete&&owner(m.node_context)&&m.node_context.output_port?.port===index
    &&p.finish?.verified&&p.finish.cleanup_complete&&p.finish.settings_applied&&owner(p.finish.node_context),'output mapping owner or finish differs');
+  validateSamplingOutputMapping(c,m,index);
   const fields=m.target_fields.filter(f=>!f.excluded).map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
   need(JSON.stringify(fields)===JSON.stringify(p.schema),'retained output schema differs');
  }
- return {kind:c.kind,scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'sequential',counts:c.counts,groups:c.groups,...(c.mode&&c.mode!=='sequential'?{seed:c.seed,test_priority:c.test_priority??false}:{}),
+ return {kind:c.kind,scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'sequential',counts:c.counts,groups:c.groups,...(c.mode&&c.mode!=='sequential'?{seed:c.seed,strata_fields:c.strata?.rows.filter(r=>r.values.UsageFlag).map(r=>r.values.Name)??[],bias_field:c.bias_fields?.rows.find(r=>r.selected)?.values.Name??null,bias_factors:c.bias?.rows.map(r=>({value:r.values.Value,factor:r.values.Factor}))??[],test_priority:c.test_priority??false}:{}),
   output_mappings:mapped.value.ports.map(p=>({port:p.port,fields:p.schema.map((f,index)=>({...f,index,source_name:f.name}))})),package_persistence_verified:false};
 }

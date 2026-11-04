@@ -4,9 +4,10 @@ import {pathToFileURL} from 'node:url';
 
 const need=(v,m)=>{if(!v)throw Error('SAMPLING_'+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const orderedFields=(a,b)=>same(a.map(({name,type})=>({name,type})),b.map(({name,type})=>({name,type})));
 const sameFields=(a,b)=>Array.isArray(a)&&a.length===b.length&&new Set(a.map(c=>c.name)).size===a.length&&b.every(c=>a.some(f=>f.name===c.name&&f.type===c.type));
 export function makeSamplingExpected(proposal,mode,package_path){
- need(mode==='random','MODE_UNSUPPORTED');
+ need(['random','stratified','biased'].includes(mode),'MODE_UNSUPPORTED');
  need(['preprocessing.sampling','preprocessing.data_partition'].includes(proposal?.node_type),'TYPE_UNSUPPORTED');
  const partition=proposal.node_type==='preprocessing.data_partition',source=proposal.source?.rows;
  need(Array.isArray(source)&&source.length>0&&source.length<=100&&proposal.source.row_count===source.length,'SOURCE_INCOMPLETE');
@@ -14,11 +15,11 @@ export function makeSamplingExpected(proposal,mode,package_path){
  const columns=[{name:'RowID',type:'integer',label_any:true},{name:'Class',type:'string',label_any:true},{name:'Value',type:'integer',label_any:true}];
  need(same(proposal.columns,columns),'SOURCE_SCHEMA');
  need(Number.isInteger(proposal.seed)&&proposal.seed>=0,'SEED_INVALID');
- const sizes=proposal.requested_sizes,keys=partition?['train','test']:['sample'];
+ const sizes=mode==='biased'&&!partition?{sample:14}:proposal.requested_sizes,keys=partition?['train','test']:['sample'];
  need(sizes&&same(Object.keys(sizes),keys)&&keys.every(k=>Number.isInteger(sizes[k])&&sizes[k]>=0)&&keys.reduce((n,k)=>n+sizes[k],0)<=source.length,'SIZES_INVALID');
  const ports=partition?[0,1,2]:[0];
  return {package_path,nodes:[{type:'imports.text'},{type:proposal.node_type},{type:'exports.text'}],
-  sampling_modes:{version:1,mode,node_type:proposal.node_type,seed:proposal.seed,source,requested_sizes:sizes},
+  sampling_modes:{version:1,mode,node_type:proposal.node_type,seed:proposal.seed,source,requested_sizes:sizes,...(mode==='biased'?{bias_field:'Class',bias_factors:[{value:'A',factor:0.4},{value:'B',factor:1}]}:{})},
   // Empty rows are a read plan, never an exact-row oracle. This envelope is
   // consumed only by the explicit sampling adapter, not the stock matcher.
   outputs:ports.map(port=>({output_node_type:proposal.node_type,output_port:port,ordered:true,column_order:'exact',
@@ -64,10 +65,12 @@ export async function observeSamplingColdMapping({load,channel,node,port,expecte
   const s=await channel.observe({condition:'sampling cold unchanged output definition',readMappings:true,
    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   const m=s.node_mapping,n=m.node_context;
-  need(m.source_identity_verified===true&&['document_id','workflow_id','node_id'].every(k=>n?.[k]===node[k])
+  const frozen=expected.sampling_modes.mode!=='random'&&m.autosync===false&&Array.isArray(m.source_fields)&&m.source_fields.length===0
+   &&m.target_fields.every(f=>f.source===null&&f.inherited===false&&!f.excluded);
+  need((m.source_identity_verified===true||frozen)&&['document_id','workflow_id','node_id'].every(k=>n?.[k]===node[k])
    &&n.output_port?.direction==='output'&&n.output_port.port===port,'MAPPING_OWNER');
   const columns=m.target_fields.map(({name,type})=>({name,type}));
-  need(m.target_fields.every(f=>!f.excluded)&&sameFields(columns,want.columns),'NATIVE_FIELDS');
+  need(m.target_fields.every(f=>!f.excluded)&&sameFields(columns,want.columns)&&(expected.sampling_modes.mode==='random'||orderedFields(columns,want.columns)),'NATIVE_FIELDS');
   proof={verified:true,node:{...node},port,columns};
  }finally{
   const closed=await closePreparedWizard(channel);
@@ -79,7 +82,7 @@ function coldMappingData(expected,record){
  const proof=record.sampling_mapping,want=expected.outputs.find(o=>o.output_port===record.output_port),data=record.data;
  need(want&&proof?.verified===true&&proof.cleanup_complete===true&&proof.settings_applied===false
   &&proof.port===record.output_port&&['document_id','workflow_id','node_id'].every(k=>typeof record.node?.[k]==='string'&&proof.node?.[k]===record.node[k])
-  &&sameFields(proof.columns,want.columns),'COLD_MAPPING_PROOF');
+  &&sameFields(proof.columns,want.columns)&&(expected.sampling_modes.mode==='random'||orderedFields(proof.columns,want.columns)),'COLD_MAPPING_PROOF');
  // A Table visualizer can keep a presentation order independent of the saved
  // output definition. Bind field names/types to that independent definition.
  need(Array.isArray(data?.schema)&&data.schema.length===proof.columns.length
@@ -111,7 +114,20 @@ function checkRound(expected,records){
   need(new Set(rows.map(r=>r.RowID)).size===rows.length,'DUPLICATE_ROW_ID');
   result.push({port:want.output_port,rows});
  }
- // Owner decision 1: repeatability and exact typed source membership only.
+ const rows=p=>result.find(r=>r.port===p).rows;
+ const partition=c.node_type==='preprocessing.data_partition';
+ const subsets=partition?[['train',rows(1)],['test',rows(2)]]:[['sample',rows(0)]];
+ for(const [key,subset] of subsets){
+  if(c.mode==='stratified')need(subset.length===c.requested_sizes[key],'ROW_COUNT');
+  if(c.mode==='stratified')for(const cls of new Set(c.source.map(r=>r.Class))){
+   const quota=c.requested_sizes[key]*c.source.filter(r=>r.Class===cls).length/c.source.length;
+   need(Number.isInteger(quota)&&subset.filter(r=>r.Class===cls).length===quota,'CLASS_QUOTA');
+  }
+ }
+ if(partition&&c.mode==='stratified'){
+  need(!rows(1).some(r=>rows(2).some(s=>s.RowID===r.RowID)),'TRAIN_TEST_OVERLAP');
+  need(same(rows(0),[...rows(1).map(r=>({IsTestSet:false,...r})),...rows(2).map(r=>({IsTestSet:true,...r}))]),'COMBINED_RELATION');
+ }
  return result;
 }
 function checkExecutions(expected,actual){
@@ -142,6 +158,8 @@ export function checkSamplingMain(expected,replies,csvs){
  need(configs.length>0&&new Set(configs.map(r=>r.node.node_id)).size===1,'CONFIGURATION_MISSING');
  const node=configs[0].node.node_id;
  for(const {readback:r} of configs){
+  if(c.mode==='stratified')need(same(r.strata_fields,['Class']),'STRATA_CHANGED');
+  if(c.mode==='biased')need(r.bias_field===c.bias_field&&same(r.bias_factors,c.bias_factors),'BIAS_CHANGED');
   need(r.mode===c.mode&&r.seed===c.seed&&same(r.counts,Object.values(c.requested_sizes))&&r.test_priority===false,'CONFIGURATION_CHANGED');
  }
  for(const reply of receipts(replies))if(reply.node.node_id===node){
@@ -168,7 +186,7 @@ export function checkSamplingCold(expected,actual,baseline){
  need(baseline?.version===1&&same(baseline.contract,expected.sampling_modes)&&baseline.node_id===result.node_id,'COLD_BASELINE_IDENTITY');
  need(same(baseline.ports,result.ports),'COLD_MAIN_MISMATCH');
  const first=normalized.filter(a=>a.execution.execution_id===result.execution_ids[0]);
- return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:false,native_definition_verified:true,
+ return {evidence:{mode:expected.sampling_modes.mode,seed:expected.sampling_modes.seed,repeat_execution_ids:result.execution_ids,membership:true,values_and_types:true,relations:expected.sampling_modes.mode==='stratified',native_definition_verified:true,
    output_definitions:first.map(a=>({port:a.output_port,columns:a.sampling_mapping.columns,settings_applied:false}))},
   correspondence:expected.outputs.map((want,index)=>{const a=first.find(a=>a.output_port===want.output_port);return {expected_index:index,node:a.node,output_port:a.output_port,execution:a.execution};})};
 }

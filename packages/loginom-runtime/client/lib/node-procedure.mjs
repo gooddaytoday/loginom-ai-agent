@@ -130,6 +130,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.wizard.factor_editor.selected_field?.status==='rendered_selected'
     &&dialog.ref===state.wizard.factor_editor.dialog_ref
     &&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  const allowedSamplingFactorEditor=(dialog,state)=>{
+    const n=state.node_sampling,field=n?.bias_fields?.rows?.filter(r=>r.selected),category=n?.bias?.rows?.filter(r=>r.selected);
+    return ['sampling','data_partition'].includes(state.wizard?.stage)&&n?.kind===state.wizard.stage
+      &&n.verified===true&&n.inventory_complete===true&&n.method==='Отбор со смещением'
+      &&n.node_context?.verified===true&&n.bias_fields?.verified===true&&n.bias?.verified===true
+      &&field?.length===1&&typeof field[0].values.Name==='string'&&category?.length===1
+      &&typeof category[0].values.Value==='string'&&Number.isFinite(category[0].values.Factor)
+      &&category[0].values.Factor>=0&&category[0].values.Factor<=1
+      &&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  };
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
     &&dialog.identity?.anchor_tid===state.node_preview_schema.root_tid
     &&state.node_preview_schema.node_id===preparedNodeContext?.node.node_id;
@@ -177,7 +187,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
   const allowedTreeConversionEditor=(dialog,state)=>{const c=state.node_tree,portal=c?.editor??c?.delete_confirmation;return state.wizard?.stage==='table_tree'&&c?.verified===true&&portal&&c.selected.length===1&&c.selected[0]===portal.selected_record_id&&(portal.root_tid==='msgbox'?state.ui.elements.some(e=>e.tid==='msgbox;tlb;yes'&&e.signature?.dialog_ref===dialog.ref):dialog.identity?.anchor_tid===portal.root_tid);};
-  const allowedNodeEditor=(dialog,state)=>allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -553,6 +563,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const crossTableEditors=readCrossTable&&wizard?.stage==='crosstable'?(roots.output.ui?.elements??[]).filter(e=>
           ['ColumnEditDialog','FactorEditDialog'].some(name=>e.tid===wizard.root_tid+';'+name)):[];
         if(crossTableEditors.length>1)throw Error('CrossTable editor is ambiguous');
+        const samplingFactorEditors=readSampling&&['sampling','data_partition'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';FactorEditDialog'):[];
+        if(samplingFactorEditors.length>1)throw Error('Sampling factor editor is ambiguous');
         const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
@@ -563,7 +575,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const normPortal=readClustering&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
         const treeEditor=readTrees&&wizard?.stage==='table_tree'?(roots.output.ui?.elements??[]).find(e=>e.tid==='EditDataTreeNodeDefForm')?.ref:undefined;
         const treeQuestion=readTrees&&wizard?.stage==='table_tree'&&roots.output.ui?.dialogs?.length===1?roots.output.ui.dialogs[0].ref:undefined;
-        const root = (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const root = (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
@@ -672,6 +684,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readTrees&&result.output.wizard?.stage==='table_tree'){
           result.output.node_tree=await read(makeTreeWizardContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_tree.node_context&&JSON.stringify(canonical(result.output.node_tree.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Tree conversion native owner changed during observation');
+        }
+        if(readSampling&&['sampling','data_partition'].includes(result.output.wizard?.stage)
+          &&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid===result.output.wizard.root_tid+';FactorEditDialog')){
+          result.output.node_sampling=await read(makeSamplingContextCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=result.output.node_sampling;
+          if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
+            throw Error('Sampling factor native owner changed during observation');
         }
         try {
           assertContext(result.output, true, tableDialog, false, wizardConfirmation);
