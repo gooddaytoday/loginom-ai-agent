@@ -5,8 +5,8 @@ const chain = skill.split("## Один расчёт цепочки\n")[1].split(
 
 test("sampling selects native modes through explicit tool parameters", async () => {
   const settings = await Bun.file(new URL("../skills/loginom-automation/references/node-settings.md", import.meta.url)).text()
-  expect(skill).toContain('mode:"stratified"')
-  expect(skill).toContain('mode:"biased"')
+  expect(skill).toContain('`stratified/biased`')
+  expect(settings).toContain('mode:"biased"')
   expect(settings).toContain('strata_fields:[{kind:"input_field",name:"Class"}]')
   expect(settings).toContain('bias_factors:[{value:"A",factor:0.4},{value:"B",factor:1}]')
   expect(settings).toContain('используй существующий узел и `finish:"execute"`')
