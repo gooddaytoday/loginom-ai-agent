@@ -1,0 +1,140 @@
+{
+  "trees.from_table": {
+    "component_id": "component.trees.DataToTree",
+    "mode": "manual_structure",
+    "semantics": "Convert each input row into one ordered object in one explicitly defined tree array. Build Root, the array, scalar fields and at most one nested object from exact technical input names. Equal keys do not imply grouping. Output 0 is a typed tree; preserve schema order, exact Int64, Boolean, real, NULL and empty strings. This row rule is a proposal pending native confirmation. Read the complete source first. No XSD, variables, dates, Variant, sibling arrays or aggregation.",
+    "parameter_schema": {
+      "type": "object",
+      "description": "New nodes require the complete ordered structure. Existing parameters:{} preserves settings; explicit nodes replaces the whole structure after validation. Proposal pending approval.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "description": "Complete parent-before-child schema in sibling order. Exactly Root, one object array, and at most one nested object; max 64 nodes.",
+          "minItems": 3,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "JSON Pointer schema path; root is empty; array indices are omitted.",
+                "maxLength": 512
+              },
+              "name": {
+                "type": "string",
+                "description": "Unique technical name within its parent; must match the last decoded path segment, except Root.",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "label": {
+                "type": "string",
+                "description": "Display label; first slice requires the same text as name.",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "type": {
+                "type": "string",
+                "description": "Declared native scalar type or object for containers; must match the bound source field.",
+                "enum": [
+                  "object",
+                  "string",
+                  "integer",
+                  "real",
+                  "boolean"
+                ]
+              },
+              "is_array": {
+                "type": "boolean",
+                "description": "True only for the single repeated object branch; root and scalar leaves are false."
+              },
+              "source_field": {
+                "type": "string",
+                "description": "Required only for scalar leaves: exact technical input field name. Omit for containers.",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "path",
+              "name",
+              "label",
+              "type",
+              "is_array"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "additionalProperties": false
+    },
+    "readback": {
+      "mode": "manual_structure",
+      "output_port": 0,
+      "input_port": 0,
+      "nodes": "ordered path/name/label/type/is_array/source_field list",
+      "execution": "completed only after fresh tree read; done means configured only"
+    }
+  },
+  "trees.to_json": {
+    "component_id": "component.trees.TreeToJSON",
+    "mode": "serialize",
+    "semantics": "Serialize one completely read typed object tree as one JSON string on table output 0. Exclude the technical Root wrapper and use technical field names. Preserve array order, scalar values, exact Int64, Boolean, NULL and empty strings. JSON null cannot restore a missing scalar already materialized as NULL upstream. Compact JSON; escaping may vary without changing decoded values. No root arrays, multiple rows, dates, Variant, labels-as-keys, formatting or variables in this slice.",
+    "parameter_schema": {
+      "type": "object",
+      "description": "All settings required for a new node. Existing parameters:{} preserves the supported settings; an explicit patch preserves omitted settings.",
+      "properties": {
+        "exclude_root": {
+          "type": "boolean",
+          "description": "Remove the native Root wrapper. Only true is supported in this slice.",
+          "const": true
+        },
+        "pretty": {
+          "type": "boolean",
+          "description": "Emit compact JSON. Pretty printing is deferred.",
+          "const": false
+        },
+        "keys": {
+          "type": "string",
+          "description": "Use technical node names. Labels and collisions are deferred.",
+          "enum": [
+            "names"
+          ]
+        },
+        "multi_row": {
+          "type": "boolean",
+          "description": "Return one JSON document per input tree. Root-array splitting is deferred.",
+          "const": false
+        },
+        "datetime": {
+          "type": "string",
+          "description": "Keep native ISO8601 setting; datetime fields themselves are rejected before mutation.",
+          "enum": [
+            "iso8601"
+          ]
+        }
+      },
+      "required": [
+        "exclude_root",
+        "pretty",
+        "keys",
+        "multi_row",
+        "datetime"
+      ],
+      "additionalProperties": false
+    },
+    "readback": {
+      "mode": "serialize",
+      "output_port": 0,
+      "input_port": 0,
+      "exclude_root": true,
+      "pretty": false,
+      "keys": "names",
+      "multi_row": false,
+      "datetime": "iso8601",
+      "execution": "completed only after reading the full JSON string"
+    }
+  }
+}

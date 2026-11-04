@@ -4367,9 +4367,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "LAB-777: этап 0 подготовлен; утвердить предложенные порты 0/1, max_items=2, oracle и допуски, затем отдельно назначить этап 1. Порт 2 и общий бюджет SKILL.md — ограничения в discovery; runtime handler не реализован.",
       "plan": "nodes/datamining-assnrules/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.dataMining.Clope",
@@ -6392,7 +6392,7 @@
       "handler": null,
       "card": "nodes/preprocessing-coarseclasses/README.md",
       "initial_scope": "Один бинарный пример: роли полей, разбиение признака, WoE/IV и применение сохранённых классов.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "native_discovery_acceptance_proposal_pending_approval",
       "limitations": [
         "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
       ],
@@ -6438,9 +6438,9 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Этап 0 LAB-775: native discovery и приёмочный комплект готовы. Утвердить критерии train/apply перед назначением этапа 1; runtime и модельная приёмка отсутствуют.",
       "plan": "nodes/preprocessing-coarseclasses/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.preprocessing.DataPartition",
