@@ -7,15 +7,26 @@ export function makeVariablesReplaceConfigureCode(binding,options){
 // Private UI procedure: cached native inventories, guarded rendered gestures,
 // original deadline, and no retries of dispatched or unknown effects.
 export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser){
- let effect=false,phase='inventory';
+ let effect=false,phase='inventory',lastAction='read';
  const need=(ok,message)=>{if(!ok)throw Error('Variables replacement '+message);};
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';ReplaceVariablesWizard';
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
  const remaining=()=>{const n=task.deadline-Date.now();need(n>0,'original deadline expired');return n;};
  let owner;
  const owned=async()=>{remaining();const c=await readNode(page,b);need(c.verified===true&&c.surface==='wizard'&&!c.input_port&&!c.output_port,'owned wizard required');need(!owner||same(owner,c),'owner changed');owner??=c;return c;};
- const inventory=async()=>{
-  await owned();const r=await readContext(page,b,readNode,readBrowser);need(r.verified===true&&r.inventory_complete===true,'complete inventory required: '+r.reason);return r;
+ const inventory=async(ready=()=>true)=>{
+  const ceiling=Math.min(task.deadline,Date.now()+15000);let previous;
+  for(;;){
+   await owned();const r=await readContext(page,b,readNode,readBrowser);
+   need(same(r.node_context,owner),'inventory owner changed');
+   if(r.verified===true&&r.inventory_complete===true&&ready(r)){
+    const key=JSON.stringify(r);if(key===previous)return r;previous=key;
+   }else{
+    need(r.verified===true||['variables_replace_mask','variables_replace_input_inventory','variables_replace_table_inventory'].includes(r.reason),'complete inventory required: '+r.reason);previous=undefined;
+   }
+   need(Date.now()<ceiling,'complete inventory did not settle: '+(r.reason??'selected variable'));
+   await page.waitForTimeout(Math.min(100,remaining()));
+  }
  };
  const inspect=async(tid,{grid,row,dialog,input=false}={})=>{
   await owned();
@@ -42,8 +53,8 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target');return {x,y};
   },{tid,grid,row,dialog,input,root,base,origin:task.origin,build:task.build});
  };
- const click=async(tid,options={},double=false)=>{await at(tid).scrollIntoViewIfNeeded({timeout:remaining()});const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
- const fill=async(tid,text,options={})=>{await inspect(tid,{...options,input:true});const input=at(tid).locator('input:visible,textarea:visible');need(await input.count()===1,'unique input');effect=true;await input.fill(text,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
+ const click=async(tid,options={},double=false)=>{lastAction=tid;await at(tid).scrollIntoViewIfNeeded({timeout:remaining()});const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
+ const fill=async(tid,text,options={})=>{lastAction=tid;await inspect(tid,{...options,input:true});const input=at(tid).locator('input:visible,textarea:visible');need(await input.count()===1,'unique input');effect=true;await input.fill(text,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
  const normalize=r=>({variable:{kind:'input_variable',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(p=>({from:p.from.value,to:p.to.value})),other:r.other.mode,
   ...(r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:['integer','real'].includes(r.input_fields.find(f=>f.name===r.selected).type)?{precision:r.precision}:{})});
  try{
@@ -51,7 +62,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
   const select=async name=>{
    const s=await inventory(),f=s.input_fields.find(f=>f.name===name);need(f,'missing variable '+name);
    if(s.selected!==name)await click(base+';colInputData_'+name,{grid:base+';grdDataList',row:f.record_id});
-   const r=await inventory();need(r.selected===name,'selection did not settle');return r;
+   return inventory(r=>r.selected===name);
   };
   const requested=task.parameters.rules??[];
   for(const r of requested)need(fields.some(f=>f.name===r.variable.name&&f.type===r.type),'unknown variable or changed input type: '+r.variable.name);
@@ -100,11 +111,16 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
   phase='mapping';await click(root+';btnNext');
   const mapping=root+';DerivedVariablesMappingEngineOutputPortWizard';await at(mapping).waitFor({state:'visible',timeout:Math.min(15000,remaining())});
   const readMapping=async()=>{
-   await owned();return page.evaluate(mapping=>{
+   const ceiling=Math.min(task.deadline,Date.now()+15000);
+   for(;;){
+   await owned();const rows=await page.evaluate(({mapping,count})=>{
     const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(mapping+';grdTargetColumns')+']')],g=es.length===1&&Ext.getCmp(es[0].id),s=g?.getStore?.(),rs=s?.getData?.()?.items;
-    if(g?.el?.dom!==es[0]||s?.isLoading?.()||!Array.isArray(rs)||s.getCount()!==rs.length||rs.length>128)throw Error('Complete output variable mapping required');
+    if(g?.el?.dom!==es[0]||s?.isLoading?.()||!Array.isArray(rs)||s.getCount()!==rs.length||rs.length!==count||rs.length>128)return null;
     return rs.map((r,index)=>({record_id:String(r.internalId),index,name:r.data.Name,label:r.data.DisplayName,type:({1:'boolean',3:'real',4:'integer',5:'string'})[r.data.DataType]}));
-   },mapping);
+   },{mapping,count:fields.length});
+   if(rows)return rows;
+   need(Date.now()<ceiling,'complete output mapping did not settle');await page.waitForTimeout(Math.min(100,remaining()));
+   }
   };
   let mapped=await readMapping();need(same(mapped.map(({name,type})=>({name,type})),fields.map(({name,type})=>({name,type}))),'output names/types/order changed');
   for(const field of fields){
@@ -120,5 +136,5 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
   await click(root+';btnNext');await at(root+';DoneWizard').waitFor({state:'visible',timeout:remaining()});
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:await owned(),configuration,
    syntax_validation:{status:'accepted_by_loginom_next',node_context:owner}};
- }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,node_context:owner,error:'['+phase+'] '+error.message};}
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,node_context:owner,error:'['+phase+' / '+lastAction+'] '+error.message};}
 }

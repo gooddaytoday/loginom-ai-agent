@@ -23,7 +23,7 @@ export function auditVariablesReplaceHistory(events,initial,updated,final){
  const requests=events.flatMap((e,index)=>e.phase==='node_apply_prepared'?[{index,...e.request}]:[]);
  const changed=requests.filter(r=>r.index>a.index&&r.index<b.index&&r.target?.type==='variables.replace'&&r.mode==='exact');
  need(changed.length===1&&changed[0].target.kind==='existing'&&changed[0].parameters.rules.length===1&&changed[0].parameters.rules[0].variable.name==='Count','PATCH_ONLY_COUNT');
- need(!requests.some(r=>r.index>b.index&&r.index<=c.index&&r.target?.type==='variables.replace'&&Object.keys(r.parameters).length),'SOURCE_REFRESH_RECONFIGURED');
+ need(!requests.some(r=>r.index>b.index&&r.index<=c.index&&r.target?.type==='variables.replace'&&r.mode!=='read_existing_output'&&Object.keys(r.parameters).length),'SOURCE_REFRESH_RECONFIGURED');
  need(requests.some(r=>r.index>b.index&&r.index<c.index&&r.target?.type==='variables.calculator'&&r.target.kind==='existing'
   &&r.parameters.expressions?.length===1&&r.parameters.expressions[0].target.name==='Color'&&r.parameters.expressions[0].formula==='"blue"'),'SOURCE_PATCH');
  return {status:'PASS',node:a.result.node,executions:found.map(s=>s.output.execution_id)};

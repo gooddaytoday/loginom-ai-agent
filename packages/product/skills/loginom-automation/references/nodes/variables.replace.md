@@ -31,3 +31,7 @@ Regex, нечувствительность к регистру, ненулев�
 Инструмент: `dock_node_apply`, target.type=`variables.replace`, mode=`exact`, inputs=[], variable_inputs=[{source:<ref>,output:0,input:0,kind:"variables"}], read={ports:[],variable_ports:[0]}, finish="execute". Сначала `dock_action_describe({node_types:["variables.replace"]})`.
 
 parameters.rules: [{variable:{kind:"input_variable",name:"Count"},type:"integer",pairs:[{from:2,to:5}],other:"keep",precision:0}]. При patch того же ref передавай только изменяемые rules; для Execute после смены источника передавай parameters={} без variable_inputs. Значения и real/метки исходного JSON создай в variables.calculator/expression через name,label,type,formula; NULL — формула NULL, строки — строковые литералы. Для замены выбирай variables.replace/exact; Калькулятор служит только источником.
+
+Если создание источника отменило только черновик и оставило Калькулятор с единственным пустым Expr1, не добавляй все переменные к Expr1. После подтверждённого release настрой прежний узел: первое выражение target:{kind:"existing",name:"Expr1"} переименуй в первое имя fixture с его label/type/formula, остальные создай через target:{kind:"new"}. Перед подключением проверь полный состав источника: ровно переменные JSON в его порядке, без лишнего Expr1.
+
+На новом источнике сразу укажи простую устойчивую target.label (например «Исходные переменные»), чтобы автоматическая подпись Калькулятора после изменения выражений не меняла имя источника при подключении. Адресуй узлы по выданному ref/GUID.

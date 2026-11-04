@@ -145,6 +145,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | --- | --- | --- |
 | User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
 | Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
+| Замена переменных | `variables.replace` / exact | [читать](references/nodes/variables.replace.md) |
 | Качество таблицы | `research.quality` / `profile` | [Пять выходов](references/nodes/research.quality.md), `parameters:{}`. |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
 | Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
@@ -347,5 +348,3 @@ BufferedStore и число групп не заменяют его. Затем 
 Если пользователь далее просит документацию, активируй `package-docs` после
 завершения текущей операции. Для документации требуется локальный .lgp:
 автоматического скачивания сохранённого серверного пакета в этом workflow нет.
-
-- `variables.replace`: точная замена переменных — [узел](references/nodes/variables.replace.md).

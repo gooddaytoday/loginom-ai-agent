@@ -24,10 +24,19 @@ test('source refresh uses unchanged graph execution without reopening configurat
 });
 test('serialized variable writer refuses expired budgets and unknown names before a UI gesture',async()=>{
  const context={verified:true,surface:'wizard',...ref},task={binding:{workflow_ref:{prefix:'MF;TF'}},deadline:Date.now()+10000,parameters:request().parameters};
- const page={locator:()=>assert.fail('No gesture or locator before resolving names')};
- const readNode=async()=>context,readContext=async()=>({verified:true,inventory_complete:true,input_fields:[{name:'Other',label:'Other',type:'integer',mode:'none'}]});
+ const page={locator:()=>assert.fail('No gesture or locator before resolving names'),waitForTimeout:async()=>{}};
+ const readNode=async()=>context,readContext=async()=>({verified:true,inventory_complete:true,node_context:context,input_fields:[{name:'Other',label:'Other',type:'integer',mode:'none'}]});
  const unknown=await configureVariablesReplace(page,task,readNode,readContext);
  assert.equal(unknown.status,'NOT_APPLIED');assert.equal(unknown.effect_possible,false);assert.match(unknown.error,/unknown variable/);
  const expired=await configureVariablesReplace(page,{...task,deadline:0},readNode,readContext);
  assert.equal(expired.status,'NOT_APPLIED');assert.match(expired.error,/deadline/);
+});
+test('owned transient native mask settles before resolving names, without replaying a gesture',async()=>{
+ let calls=0,waits=0;
+ const context={verified:true,surface:'wizard',...ref},task={binding:{workflow_ref:{prefix:'MF;TF'}},deadline:Date.now()+5000,parameters:request().parameters};
+ const page={locator:()=>assert.fail('No gesture before names resolve'),waitForTimeout:async()=>{waits++;}};
+ const read=async()=>++calls===1?{verified:false,reason:'variables_replace_mask',node_context:context}
+  :{verified:true,inventory_complete:true,node_context:context,input_fields:[{name:'Other',label:'Other',type:'integer',mode:'none'}]};
+ const result=await configureVariablesReplace(page,task,async()=>context,read);
+ assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/unknown variable/);assert.ok(waits>0);assert.ok(calls>=3);
 });
