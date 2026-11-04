@@ -1,13 +1,17 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {readVariablesReplaceContext,readVariablesReplaceBrowser} from './variables-replace-context.mjs';
 export function variablesReplaceLocator(page,tid){return page.locator('[data-tid='+JSON.stringify(tid)+']:visible:not(tr.x-grid-row-summary *)');}
+export async function revealVariablesReplaceControl(page,tid,locate=variablesReplaceLocator,timeout=15000){
+ const inView=await locate(page,tid).evaluate(e=>{const b=e.getBoundingClientRect();return e.isConnected&&b.width>0&&b.height>0&&b.left>=0&&b.top>=0&&b.right<=innerWidth&&b.bottom<=innerHeight;},undefined,{timeout});
+ if(!inView)await locate(page,tid).scrollIntoViewIfNeeded({timeout});
+}
 export function makeVariablesReplaceConfigureCode(binding,options){
  validatePreparedNodeContext(binding);
- return `async page=>(${configureVariablesReplace.toString()})(page,${JSON.stringify({...options,binding})},${readPreparedNodeContext.toString()},${readVariablesReplaceContext.toString()},${readVariablesReplaceBrowser.toString()},${variablesReplaceLocator.toString()})`;
+ return `async page=>(${configureVariablesReplace.toString()})(page,${JSON.stringify({...options,binding})},${readPreparedNodeContext.toString()},${readVariablesReplaceContext.toString()},${readVariablesReplaceBrowser.toString()},${variablesReplaceLocator.toString()},${revealVariablesReplaceControl.toString()})`;
 }
 // Private UI procedure: cached native inventories, guarded rendered gestures,
 // original deadline, and no retries of dispatched or unknown effects.
-export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser,locate=variablesReplaceLocator){
+export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser,locate=variablesReplaceLocator,reveal=revealVariablesReplaceControl){
  let effect=false,phase='inventory',lastAction='read';
  const need=(ok,message)=>{if(!ok)throw Error('Variables replacement '+message);};
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';ReplaceVariablesWizard';
@@ -54,7 +58,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target');return {x,y};
   },{tid,grid,row,dialog,input,root,base,origin:task.origin,build:task.build});
  };
- const click=async(tid,options={},double=false)=>{lastAction=tid;await at(tid).scrollIntoViewIfNeeded({timeout:remaining()});const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
+ const click=async(tid,options={},double=false)=>{lastAction=tid;await owned();await reveal(page,tid,locate,remaining());const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
  const fill=async(tid,text,options={})=>{lastAction=tid;await inspect(tid,{...options,input:true});const input=at(tid).locator('input:visible,textarea:visible');need(await input.count()===1,'unique input');effect=true;await input.fill(text,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
  const normalize=r=>({variable:{kind:'input_variable',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(p=>({from:p.from.value,to:p.to.value})),other:r.other.mode,
   ...(r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:['integer','real'].includes(r.input_fields.find(f=>f.name===r.selected).type)?{precision:r.precision}:{})});
@@ -111,15 +115,17 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
   if(task.finish==='close')return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:owner,configuration};
   phase='mapping';await click(root+';btnNext');
   const mapping=root+';DerivedVariablesMappingEngineOutputPortWizard';await at(mapping).waitFor({state:'visible',timeout:Math.min(15000,remaining())});
-  const readMapping=async()=>{
-   const ceiling=Math.min(task.deadline,Date.now()+15000);
+  const readMapping=async(ready=()=>true)=>{
+   const ceiling=Math.min(task.deadline,Date.now()+15000);let previous;
    for(;;){
    await owned();const rows=await page.evaluate(({mapping,count})=>{
+    const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+    if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message,[role="dialog"],.x-window,.bg-dialog')].some(visible))return null;
     const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(mapping+';grdTargetColumns')+']')],g=es.length===1&&Ext.getCmp(es[0].id),s=g?.getStore?.(),rs=s?.getData?.()?.items;
     if(g?.el?.dom!==es[0]||s?.isLoading?.()||!Array.isArray(rs)||s.getCount()!==rs.length||rs.length!==count||rs.length>128)return null;
     return rs.map((r,index)=>({record_id:String(r.internalId),index,name:r.data.Name,label:r.data.DisplayName,type:({1:'boolean',3:'real',4:'integer',5:'string'})[r.data.DataType]}));
    },{mapping,count:fields.length});
-   if(rows)return rows;
+   if(rows&&ready(rows)){const key=JSON.stringify(rows);if(key===previous)return rows;previous=key;}else previous=undefined;
    need(Date.now()<ceiling,'complete output mapping did not settle');await page.waitForTimeout(Math.min(100,remaining()));
    }
   };
@@ -129,7 +135,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    await click(mapping+';colDisplayName_'+field.name,{grid:mapping+';grdTargetColumns',row:current.record_id},true);
    await at('EditVariableForm').waitFor({state:'visible',timeout:remaining()});
    await fill('EditVariableForm;edtDisplayName',field.label,{dialog:'EditVariableForm'});
-   await click('EditVariableForm;btnApply',{dialog:'EditVariableForm'});mapped=await readMapping();
+   await click('EditVariableForm;btnApply',{dialog:'EditVariableForm'});mapped=await readMapping(rows=>rows.find(m=>m.name===field.name)?.label===field.label);
    need(mapped.find(m=>m.name===field.name)?.label===field.label,'output label readback differs');
   }
   need(same(mapped.map(({name,label,type})=>({name,label,type})),configuration.input_fields),'output mapping differs');
