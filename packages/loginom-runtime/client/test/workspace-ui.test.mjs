@@ -2089,6 +2089,41 @@ test('owned Calculator cursor visibility blinking does not stale an unrelated ch
   assert.deepEqual(page.events,['click']);
 });
 
+test('LAB-862 variables calculator Next tolerates only cursor visibility and settles its owned Done page',async()=>{
+ for(const fault of [null,'geometry-aba','individual','unowned','content','foreign','wrapper','changing-done']) {
+  const page=new Page(),c=wizardStepFixture(page),editor=calculatorDocument(page,'NULL');
+  c.button.box={x:800,y:700,width:50,height:20};
+  c.marker.attrs['data-tid']=c.base+';CalcVariablesWizard;btnAddExpr';
+  editor.editor.attrs['data-tid']=c.base+';CalcVariablesWizard;cmpExpression';
+  const cursor=page.add('div',null,'',{x:0,y:0,width:0,height:0},fault==='unowned'?page.document.body:editor.wrapper);
+  cursor.attrs.class=fault==='individual'?'CodeMirror-cursor':'CodeMirror-cursors';cursor.attrs.style='';
+  if(fault==='wrapper')editor.wrapper.CodeMirror.getWrapperElement=()=>editor.editor;
+  const snapshot=await page.observe(),next=snapshot.ui.elements.find(e=>e.wizard_step);
+  assert.equal(snapshot.wizard.stage,'variables_calculator');
+  // LAB-862 r1:63/65, 68/70, 73/75: only cursor_style advances by one.
+  page.mutationObserver.pending.push({type:fault==='content'?'childList':'attributes',attributeName:'style',target:cursor,oldValue:'visibility: hidden;'});
+  if(fault==='geometry-aba')page.mutationObserver.pending.push({type:'attributes',attributeName:'style',target:cursor,oldValue:'left: 100px;'});
+  if(fault==='foreign')page.mutationObserver.pending.push({type:'attributes',attributeName:'title',target:c.form});
+  const click=page.mouse.click;let waits=0;
+  page.mouse.click=async(...args)=>{await click(...args);c.marker.remove();editor.editor.remove();
+   page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);
+   page.mutationObserver.callback([{type:'childList',target:c.form}]);};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;
+   if(waits<=2||fault==='changing-done')page.mutationObserver.callback([{type:'attributes',attributeName:'style',target:c.form}]);};
+  const result=await page.act({verb:'wizard_step',ref:next.ref,expected_stage:'done'},snapshot);
+  if(fault&&fault!=='changing-done') {
+   assert.equal(result.status,'NOT_APPLIED',fault);assert.equal(result.error.code,'UI_EPOCH_CHANGED',fault);
+   assert.deepEqual(page.events,[]);continue;
+  }
+  if(fault!=='changing-done')assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault==='changing-done'){assert.equal(result.error.code,'WIZARD_STEP_NOT_SETTLED');continue;}
+  assert.equal(result.output.wizard.stage,'done');assert.equal(waits,5);
+  assert.equal(result.output.scan.mutation_counts.ignored_cursor_blink,1);
+  assert.ok(result.trace.some(e=>e.event==='wizard_step_settled'&&e.quiet_samples===3));
+ }
+});
+
 test('cursor exemption rejects geometry ABA, individual cursor styles and unowned containers',async()=>{
   for(const mode of ['geometry-aba','individual','unowned','content']) {
     const page=new Page(),c=calculatorDocument(page);
