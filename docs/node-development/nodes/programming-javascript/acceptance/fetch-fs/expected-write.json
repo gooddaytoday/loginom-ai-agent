@@ -1,0 +1,46 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "FileName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ByteCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Hex",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "FileName": "report.txt",
+          "ByteCount": 21,
+          "Hex": "d09fd180d0b8d0b2d0b5d1822c20d081d0b60a3432"
+        },
+        {
+          "FileName": "report.bin",
+          "ByteCount": 5,
+          "Hex": "00017f80ff"
+        }
+      ]
+    }
+  ]
+}

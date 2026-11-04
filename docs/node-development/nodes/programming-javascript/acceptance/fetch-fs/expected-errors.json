@@ -1,0 +1,61 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Case",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Outcome",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Case": "ok",
+          "Status": 200,
+          "Outcome": "ok"
+        },
+        {
+          "Case": "missing",
+          "Status": 404,
+          "Outcome": "http_error"
+        },
+        {
+          "Case": "server",
+          "Status": 500,
+          "Outcome": "http_error"
+        },
+        {
+          "Case": "malformed",
+          "Status": 200,
+          "Outcome": "invalid_json"
+        },
+        {
+          "Case": "slow",
+          "Status": null,
+          "Outcome": "aborted"
+        }
+      ]
+    }
+  ]
+}
