@@ -1,4 +1,4 @@
-import {resolveClusteringFeatures} from './clustering-parameters.mjs';
+import {resolveClusteringFeatures,clusteringNormalizations} from './clustering-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
 const need=(v,m)=>{if(!v)throw Error('Clustering: '+m);};
@@ -57,10 +57,10 @@ export async function configureClustering(channel,p,{request,inputMapping}){
  let state=await norm('complete clustering normalizers');const baseline=state.node_clustering;
  const features=roles.configuration.fields.filter(f=>f.usage_type===3);
  need(same(baseline.fields.map(f=>f.name),features.map(f=>f.name)),'normalizer fields differ from the selected numeric features');
- const wantedNorm=p.normalization===undefined&&request.target.kind==='existing'?baseline.fields[0]?.norm_type:p.normalization==='standardize'?5:0;
- need([0,5].includes(wantedNorm)&&(p.normalization!==undefined||request.target.kind==='new'||baseline.fields.every(f=>f.norm_type===wantedNorm)),
-  'existing mixed or unsupported normalization requires an explicit none/standardize choice');
- const normLabel=wantedNorm===5?'Стандартизация':'Нет';
+ const wantedNorm=p.normalization===undefined&&request.target.kind==='existing'?baseline.fields[0]?.norm_type:clusteringNormalizations[p.normalization??'none'].type;
+ need(Object.values(clusteringNormalizations).some(n=>n.type===wantedNorm)&&(p.normalization!==undefined||request.target.kind==='new'||baseline.fields.every(f=>f.norm_type===wantedNorm)),
+  'existing mixed or unsupported normalization requires an explicit supported normalization choice');
+ const normLabel=Object.values(clusteringNormalizations).find(n=>n.type===wantedNorm).label;
  for(const field of baseline.fields){
   state=await norm('normalizer before change');if(state.node_clustering.fields.find(f=>f.record_id===field.record_id)?.norm_type===wantedNorm)continue;
   const base=state.wizard.root_tid+';NormTuneWizard;',key=field.name.replace(/\s/g,'_').replace(/,/g,'');

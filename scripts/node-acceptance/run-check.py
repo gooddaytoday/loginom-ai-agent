@@ -89,6 +89,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
+        kind = name.removeprefix('clustering-scale-')
+        return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
+                    input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
     if name == 'clustering-normalized':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
