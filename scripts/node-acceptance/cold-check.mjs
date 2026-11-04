@@ -396,6 +396,8 @@ page = context.pages()[0]
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   }
+  // LGD sources materialize their output definitions on the first cold Execute.
+  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected,outputProperties:true});
   // REST-dependent schemas are restored by cold execution. Inspect the saved
   // export input only after its source has executed and its output was read.
   if(exportInput){
