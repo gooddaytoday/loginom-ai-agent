@@ -47,6 +47,7 @@ RULES = (
     (('docs/node-development/nodes/programming-javascript/acceptance/js-declared-empty/**',),
      ('live-ui',), ('js-declared-empty',)),
     ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
+    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),

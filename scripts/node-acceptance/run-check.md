@@ -420,3 +420,8 @@ abs=1e-8 только для real, метки через label_any.
 информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
+
+`ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
+по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
+Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
+CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.
