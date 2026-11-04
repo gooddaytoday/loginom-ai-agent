@@ -40,6 +40,23 @@ class RunCheckTests(unittest.TestCase):
                 runner.check_csv(path, expected, null_marker=None,
                                  export_events=self.export_events(marker=''), destination='/test/all.csv')
 
+    def test_datatovar_catalog_keeps_oracle_private_and_requests_ordered_variable_output(self):
+        for name, files in [('variables-datatovar', ['values.csv', 'replace.csv']),
+                            ('variables-datatovar-null', ['null.csv']), ('variables-datatovar-empty', ['values.csv'])]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/datatovar.lgp')
+            self.assertTrue(case['variable_only'])
+            self.assertEqual(case['variable_audit'], 'variables-datatovar')
+            self.assertEqual(case['input_files'], files)
+            self.assertEqual(expected['outputs'], [])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertTrue(output['ordered'])
+            self.assertEqual(output['node']['type'], 'variables.from_table')
+            self.assertEqual([v['name'] for v in output['variables']], ['X_Sum', 'X_Count', 'X_Min', 'X_Max', 'X_Avg'])
+            self.assertTrue(case['oracle'].is_file())
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
