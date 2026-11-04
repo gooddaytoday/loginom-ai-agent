@@ -1,3 +1,4 @@
+import {createUserVariablesNodeSupport} from './crosstable-variables.mjs';
 import {createQualityNodeSupport} from './quality-node.mjs';
 import {createLgdImportNodeSupport} from './lgd-import-node.mjs';
 import {createLgdExportNodeSupport} from './lgd-export-node.mjs';
@@ -40,6 +41,8 @@ import {createCalculatorNodeSupport} from './calculator-node.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
 import {NODE_READ_MODE,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
+import {createNodeProcedure} from './node-procedure.mjs';
+import {withBrowserReceipt} from './executor.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 // The journal canonicalizes JSON text and redacts URL credentials. Prepare
@@ -53,6 +56,7 @@ export function nodeOutputForJournal(value,redactor){
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
+ const userVariables=createUserVariablesNodeSupport(config);
  const lgdImport=createLgdImportNodeSupport(config),lgdExport=createLgdExportNodeSupport(config);
  const factorAnalysis=createFactorAnalysisNodeSupport(config);
  const tableTree=createTreeConversionNodeSupport(config,{table:true}),treeJson=createTreeConversionNodeSupport(config,{table:false});
@@ -74,11 +78,12 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...quality.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
   const drivers=(()=>{
+  if(type==='variables.user')return userVariables.nodeApplyDriverFactory(options);
   if(readOnly||['integration.rest_request','transform.join_data'].includes(type)){
    return readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
@@ -128,13 +133,36 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,verifySource:async(...args)=>{
+  return {...drivers,mapPorts:async(mappings,ctx)=>{
+   const requested=mappings.filter(m=>m.kind!==undefined);if(!requested.length)return drivers.mapPorts(mappings,ctx);
+   options.operation.deadline=ctx.deadline;
+   const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,maxSteps:512,
+    targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
+    wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+   const variable_mappings=[];for(const mapping of requested){const value=await channel.mapVariablePort(mapping);variable_mappings.push({...value.mapping,node:ctx.node,source_identity_verified:true,independent_readback:value.independent_readback});}
+   const result=await drivers.mapPorts(mappings.filter(m=>m.kind===undefined),ctx);
+   return {...result,effect_possible:true,variable_mappings};
+  },verifySource:async(...args)=>{
    const checked=await verifyDeferredTextImportSources(options.operation.parameters,options.nodeHistory?.(),options.resolveStorageSource);
    const value=await drivers.verifySource(...args);
    return checked.length?{...value,switched_sources:checked}:value;
   },readOutput:async(...args)=>{
-   const value=await drivers.readOutput(...args);
-   return readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
+   let value=await drivers.readOutput(...args);
+   const [read,ctx]=args;
+   if(type!=='variables.user'&&read.variable_ports?.length){
+    options.operation.deadline=ctx.deadline;
+    const execution=options.operation.nodeApply?.phases.findLast(p=>p.phase==='execute')?.value;
+    if(execution?.verified!==true||execution.owner_verified!==true||execution.status!=='completed'||execution.execution_id!==ctx.execution.execution_id)throw Error('Variable output requires the accepted completed execution receipt');
+    const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,maxSteps:512,
+     targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,
+     preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
+     wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+    const variable_ports=[];
+    for(const port of read.variable_ports){const result=await channel.readVariablePort({port,execution});variable_ports.push(result.output);}
+    value={...value,variable_ports,no_output_requested:false};
+   }
+
+   return read.variable_ports?.length||readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
     ||value.ports?.some(port=>port.freshness_basis==='completed_execution_port_source')?nodeOutputForJournal(value,redactor):value;
   }};
  }};

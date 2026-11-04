@@ -87,7 +87,9 @@ export async function readGraph(page, task) {
           && element && containers[0].contains(element) && (!ptid || ptid===tid+';Output_Add')
           && (p.FCell.edges==null || Array.isArray(p.FCell.edges) && p.FCell.edges.length===0)
           && (n.FPorts??[]).flatMap(group=>group.FCollection??[]).filter(port=>port.FType===1&&port.FSubType===10).length===1)continue;
-        if(!ptid && element && containers[0].contains(element) && visible(element)
+        const variableRedraw=previous&&[3,4].includes(p.FSubType)&&(ptid!==previous.tid||[...exact(ptid)].filter(e=>containers[0].contains(e)).length!==1);
+        let nativeRebound=false;
+        if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
             && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort)
@@ -99,13 +101,13 @@ export async function readGraph(page, task) {
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
-            if([...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
+            if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
               portBox.y-box.y+containers[0].scrollTop+portBox.height/2)===p.FCell;
           });
           if(rendered.length===1){
-            renderedPort=rendered[0];ptid=renderedPort.getAttribute('data-tid');
+            renderedPort=rendered[0];ptid=renderedPort.getAttribute('data-tid');nativeRebound=!!variableRedraw;
           }
         }
         if (p.FCell?.visible===true && (!ptid || !containers[0].contains(element))) fail('Visible port identity is not rendered: '+JSON.stringify({
@@ -115,7 +117,7 @@ export async function readGraph(page, task) {
         if (!ptid || !containers[0].contains(element)) continue; // Hidden service ports are outside tabular phase.
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
-          && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
+          && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1))portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
         const variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
         if([3,4].includes(p.FSubType)&&!variable&&!control)fail('Variable port native identity changed');
@@ -123,7 +125,7 @@ export async function readGraph(page, task) {
           const direction=control?'Input':variable[1],kind=control?'control':'variables',nativeIndex=control?0:Number(variable[2]);
           if(!p.FGuid||!p.data||p.parent!==n||p.FCell.parent!==n.FCell
             ||p.FType!==(direction==='Input'?0:1)||p.FSubType!==(control?4:3)
-            ||[...exact(ptid)].filter(e=>containers[0].contains(e)).length!==1)fail('Variable port native identity changed');
+            ||!nativeRebound&&[...exact(ptid)].filter(e=>containers[0].contains(e)).length!==1)fail('Variable port native identity changed');
           const descriptor={kind,port:0,port_guid:p.FGuid,native_index:nativeIndex};
           (direction==='Input'?variableInputs:variableOutputs).push(descriptor);
           variableByTid.set(ptid,{node:n.FGuid,direction,kind,port:p,descriptor});
@@ -227,7 +229,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const before=await read(page,task);
     if(JSON.stringify(before)!==JSON.stringify(task.effect.before) || !before.interaction_ready)throw new Error('Graph changed before gesture');
     const p=task.effect.parameters,kind=task.effect.kind;
-    if(kind==='rename'||kind==='move'){
+    if(kind==='rename'||kind==='move'||kind==='reveal_control'){
       const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
       if(!node||node.locked)throw Error('Exact unlocked target node required');
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -314,6 +316,37 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const source=find(tid),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
+    }else if(kind==='reveal_control'){
+      const inspect=mode=>page.evaluate(({task,mode})=>{
+        const b=task.request,a=bg.app,prep=globalThis.__loginomDockPreparationV1,card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
+        const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+        const r=[...prep.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id),d=m.FDiagram,g=d?.FmxGraph;
+        if(!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r?.nodeTargetWorkflowNode||g?.container!==exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram')[0])throw Error('Control reveal graph owner changed');
+        const ns=d.FNodes.FCollection.filter(n=>n.FGuid===task.effect.parameters.ref.node_id),n=ns[0];
+        if(ns.length!==1||n.FLocked)throw Error('Control reveal node unavailable');
+        const ports=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FType===0&&p.FSubType===4);
+        if(ports.length!==1||!ports[0].FGuid||!ports[0].data||ports[0].parent!==n||ports[0].FCell.parent!==n.FCell||ports[0].FCell.visible===true)throw Error('Unique hidden native control port required');
+        const point=e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Control reveal target covered');return {x,y};};
+        if(mode==='menu'){
+          const roots=exact('mn').filter(visible),es=exact('mn;mniShowControlVariablesPort').filter(visible),selected=g.getSelectionCells();
+          if(roots.length!==1||m.FNodeContextMenu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==m.FNodeContextMenu
+            ||selected.length!==1||selected[0]!==n.FCell&&selected[0]!==n.FLabel.FCell||es.length!==1||!roots[0].contains(es[0])
+            ||es[0].textContent!=='Показать порт управляющих переменных'||es[0].closest('.x-item-disabled,.x-menu-item-disabled'))throw Error('Owned Show Control Port command required');
+          return point(es[0]);
+        }
+        const dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
+        if(!dom||!g.container.contains(dom)||!visible(dom))throw Error('Control reveal body unavailable');
+        for(const dx of [.5,.1,.9,.25,.75])for(const dy of [.5,.1,.9,.25,.75]){
+          const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y),cell=g.getCellAt(x-gb.x+g.container.scrollLeft,y-gb.y+g.container.scrollTop);
+          if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&hit&&(hit===dom||dom.contains(hit))&&hit.closest('[data-tid]')===dom&&cell===n.FCell)return {x,y};
+        }
+        throw Error('Native control reveal body hit unavailable');
+      },{task,mode});
+      const tid=await targetTid(p.ref),label=find(tid+';Label;Label');await point(label);effectPossible=true;await label.click({timeout:remaining()});
+      if(!sameGraph(gestureBefore,await read(page,task)))throw Error('Graph changed before control reveal');
+      const body=await inspect('body');await ensureContext();await page.mouse.click(body.x,body.y,{button:'right'});transient=true;
+      await find('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});
+      const command=await inspect('menu');await ensureContext();await page.mouse.click(command.x,command.y);transient=false;
     }else if(kind==='add_input'){
       const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add);effectPossible=true;await add.click({timeout:remaining()});
       const choice=await wait('additional_table_input_or_type_menu',async()=>{
@@ -331,6 +364,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(JSON.stringify(boundGraph)!==JSON.stringify(before))throw Error('Graph changed before owned link binding');
       const resolve=(id,direction,index)=>{
         const matches=bindings.filter(b=>b.node_id===id);
+        if(p.edge.kind){
+          const kind=direction==='outputs'?'variables':p.edge.kind,ports=matches.length===1?matches[0][direction==='outputs'?'variable_outputs':'variable_inputs']?.filter(p=>p.kind===kind&&p.port===index):[];
+          if(ports?.length!==1)throw Error('Exact owned variable port disappeared');
+          return {label:matches[0].label,index:ports[0].native_index,kind:kind==='control'?'control_var':'var'};
+        }
         if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
         const kind=matches[0][direction==='inputs'?'input_kinds':'output_kinds']?.[index]??'data';
         if(!['data','tree'].includes(kind))throw Error('Unknown owned port kind');
@@ -340,8 +378,8 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const serviceEdges=service?(before.rest_connection_links??[]).filter(e=>JSON.stringify(e)===JSON.stringify(p.edge)):[];
       if(service&&(serviceEdges.length!==1||!before.foreign_links.includes(serviceEdges[0].tid)))throw Error('Exact owned REST service edge disappeared');
       const source=service?null:resolve(p.edge.source,'outputs',p.edge.output),target=service?null:resolve(p.edge.target,'inputs',p.edge.input);
-      if(!service&&source.kind!==target.kind)throw Error('Incompatible owned link port kinds');
-      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_'+(source.kind==='tree'?'DataTree-':'Data-')+source.index+'|'+target.label+'|Input_'+(target.kind==='tree'?'DataTree-':'Data-')+target.index;
+      if(!service&&source.kind!==target.kind&&!(source.kind==='var'&&target.kind==='control_var'))throw Error('Incompatible owned link port kinds');
+      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_'+(source.kind==='var'?'Var-':source.kind==='tree'?'DataTree-':'Data-')+source.index+'|'+target.label+'|Input_'+(target.kind==='control_var'?'ControlVar':(target.kind==='var'?'Var-':target.kind==='tree'?'DataTree-':'Data-')+target.index);
       const nativeLinks=()=>page.evaluate(()=>{
         const links=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FLinks.FCollection;
         if(!Array.isArray(links)||links.length>400)throw Error('Bounded native link identities unavailable');
