@@ -61,6 +61,30 @@ class RunCheckTests(unittest.TestCase):
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
+    def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
+        case = runner.scenario('variables-columns')
+        self.assertEqual(case['source'].name, 'acceptance')
+        self.assertEqual(case['source'].parent.name, 'variables-vartodata')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertIsNone(case['base'])
+        self.assertEqual(case['input_files'], [])
+        expected = runner.expected_for(case, '/test/variables-columns.lgp')
+        self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
+        output = expected['outputs'][0]
+        self.assertTrue(output['ordered'])
+        self.assertEqual(output['column_order'], 'exact')
+        self.assertEqual(output['output_port'], 0)
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['A', 'B', 'Text', 'Moment', 'Missing', 'Rate', 'Empty', 'Zero'])
+        self.assertIs(output['rows'][0]['B'], False)
+        self.assertIsNone(output['rows'][0]['Missing'])
+        self.assertEqual(output['rows'][0]['Empty'], '')
+        self.assertEqual(output['rows'][0]['Zero'], 0)
+        self.assertEqual(output['rows'][0]['Moment'], '2026-01-02T03:04:05.006')
+        self.assertEqual(output['columns'][5]['tolerance'], dict(abs=0, rel=0))
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'],
+                       check=True, capture_output=True)
+
     def test_text_export_cp1251_catalog_and_same_node_switch(self):
         case = runner.scenario('text-export-cp1251')
         self.assertEqual(case['text_export_encodings'], ['cp1251', 'utf-8'])
