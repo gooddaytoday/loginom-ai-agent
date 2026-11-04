@@ -480,7 +480,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
           throw Error('Original wizard receipt context changed');
       };
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, sampleStarted = observationNow();
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -816,6 +816,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // Train/Execute can fail immediately and leave an error portal outside
         // this read's root. A fresh group requires strict native child proof.
         // Validation before a process exists may only report and stop.
+        const ownToastMasks=state=>state.ui.masks.length>0&&state.ui.masks.every(m=>
+          ['busy','modal_background'].includes(m.kind)&&!m.dialog_ref&&m.graph_loading_owner_ref
+          &&m.target_tid===preparedNodeContext?.workflow_ref.prefix+';ModelForm');
+        if(settlingErrorToast&&(ws.ui.dialogs.length!==1||ws.ui.dialogs[0].ref!==settlingErrorToast.ref))
+          throw Error('Owned execution error toast settlement context changed');
         const toastGate={launch_bound:!!launchEvidence,dialog_unique:result.output.ui.dialogs.length===1,
           toast_identity:result.output.ui.dialogs[0]?.identity?.anchor_tid==='toast',
           node_surface:result.output.prepared_node_context?.surface==='graph',node_unlocked:result.output.prepared_node_context?.locked===false,
@@ -824,7 +829,44 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,stage:'error_toast_gate',
             reason:'Owned execution error toast gate refused',checks:toastGate,failed_conditions:Object.keys(toastGate).filter(k=>!toastGate[k]),
             launch:structuredClone(launchEvidence??null),outcome:structuredClone(result)});
-        if(Object.values(toastGate).every(Boolean)) {
+        if(Object.entries(toastGate).every(([key,ok])=>ok||key==='masks_absent'&&ownToastMasks(result.output))) {
+          if(ownToastMasks(result.output)) {
+            // Native history deliberately refuses while the graph is masked.
+            // Only bind a read-only wait here; prove history after it clears.
+            const portal=result.output.ui.dialogs[0],detail=await readUi({mode:'observe',operation_id:id,...boundOptions,
+              root_ref:portal.ref,node_error_toast_observation:true,download_toast_observation:true,
+              expected_origin:targetOrigin,expected_build:targetBuild});
+            if(detail.status!=='SUCCEEDED')throw Error('Owned execution error toast could not be observed under graph mask');
+            assertContext(detail.output,true);
+            const state=detail.output,dialog=state.ui.dialogs[0];
+            if(state.ui.masks.length) {
+              const checks={toast_error_kind:dialog?.error_toast?.kind==='error',dialog_unique:state.ui.dialogs.length===1,
+                toast_identity:dialog?.identity?.anchor_tid==='toast',dialog_ref:dialog?.ref===portal.ref,
+                browser_document:state.dom_epoch.document===launchEvidence.browser_document,
+                after_launch:now()>=launchEvidence.started_at,launch_wait_active:now()<operation.deadline,
+                toast_absent_before_launch:launchEvidence.toast_absent===true,
+                exclusive_operation:operation.exclusiveNodeExecution?.()===true,
+                node_surface:state.prepared_node_context.surface==='graph',node_unlocked:state.prepared_node_context.locked===false,
+                wizard_absent:state.wizard?.status==='absent',masks_owned:ownToastMasks(state),
+                masks_unchanged:state.ui.masks.every(m=>result.output.ui.masks.some(old=>m.ref===old.ref
+                  &&m.graph_loading_owner_ref===old.graph_loading_owner_ref)),
+                same_wait:!settlingErrorToast||dialog?.ref===settlingErrorToast.ref
+                  &&JSON.stringify(dialog?.error_toast)===JSON.stringify(settlingErrorToast.error_toast)
+                  &&state.ui.masks.every(m=>settlingErrorToast.masks.some(old=>m.ref===old.ref
+                    &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))};
+              if(Object.values(checks).some(ok=>!ok)) {
+                await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
+                  reason:'Owned execution error toast mask ownership refused',checks,
+                  failed_conditions:Object.keys(checks).filter(k=>!checks[k]),outcome:structuredClone(detail)});
+                throw Error('Owned execution error toast mask ownership refused');
+              }
+              settlingErrorToast??={...structuredClone(dialog),masks:structuredClone(state.ui.masks)};
+              await entry('node_execution_error_toast_mask_wait',{step,sample,internal_operation_id:id,condition,checks,
+                launch:structuredClone(launchEvidence),outcome:structuredClone(detail)});
+              satisfied=false;confirmations=0;previousIdentity=undefined;
+              continue;
+            }
+          }
           const portal=result.output.ui.dialogs[0],native=await read(makeNodeProcessContextCode(preparedNodeContext,{errorToast:true}),{timeout:readTimeout()});
           const detail=await readUi({mode:'observe',operation_id:id,...boundOptions,root_ref:portal.ref,
             node_error_toast_observation:true,download_toast_observation:true,expected_origin:targetOrigin,expected_build:targetBuild});
@@ -867,6 +909,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               toast_absent_before_launch:launchEvidence.toast_absent===true,
               launch_wait_active:now()<operation.deadline,
               exclusive_operation:operation.exclusiveNodeExecution?.()===true};
+            if(settlingErrorToast&&(dialog?.ref!==settlingErrorToast.ref
+              ||JSON.stringify(toast)!==JSON.stringify(settlingErrorToast.error_toast)
+              ||state.ui.masks.some(m=>!settlingErrorToast.masks.some(old=>m.ref===old.ref
+                &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))))
+              throw Error('Owned execution error toast settlement context changed');
             if(Object.values(reportChecks).every(Boolean)) {
               const failure={code:'NODE_EXECUTION_FAILED',message:('Loginom сообщил после запуска: '+toast.message).slice(0,1000),
                 native:{source:'loginom_post_launch_error_toast',attribution:'own_action_wait',message:toast.message,
@@ -875,6 +922,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
                 launch:structuredClone(launchEvidence),checks:reportChecks,failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');
               reportedErrorToast=structuredClone(dialog);launchEvidence=undefined;snapshot=null;evidenceSnapshot=null;
+              if(releaseWizard){satisfied=false;confirmations=0;previousIdentity=undefined;continue;}
               throw Object.assign(Error(failure.message),{nodeExecutionFailure:failure});
             }
             if(Object.values(checks).some(ok=>!ok))await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,
