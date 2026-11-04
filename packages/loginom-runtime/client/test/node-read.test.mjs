@@ -293,3 +293,25 @@ test('JavaScript declared readback and original verified phase identities remain
  s.outcome.output.phases.find(phase=>phase.phase==='node_finish').status='pending';
  assert.throws(()=>buildNodeReadRequest(args,s));
 });
+
+test('W1 variable-only reread retains its typed selection and still requests a real Execute',()=>{
+ const s=source();s.outcome.output.execution.execution_id='old';s.outcome.output.output={ports:[],variable_ports:[{port:0,source:'execution',complete:true,execution_id:'old'}]};
+ const r=buildNodeReadRequest({...args,read:{ports:[],variable_ports:[0]}},s);validateNodeApplyRequest(r,handlers);
+ assert.equal(r.finish,'execute');assert.deepEqual(r.read.variable_ports,[0]);assert.deepEqual(r.parameters.schemas,[]);
+ for(const mutate of [s=>s.outcome.output.output.variable_ports[0].execution_id='stale',s=>s.outcome.output.output.variable_ports[0].source='snapshot',s=>s.outcome.output.output.variable_ports[0].complete=false]){
+  const invalid=structuredClone(s);mutate(invalid);assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[],variable_ports:[0]}},invalid));
+ }
+});
+
+test('W1 builtin snapshot follows only confirmed same-document Save continuations without rewriting its source',()=>{
+ const s=source();s.parameters.target.type='variables.user';s.outcome.output.execution={status:'not_requested',execution_id:null};s.outcome.output.output={ports:[]};
+ const original=structuredClone(s),old=s.parameters.workflow_ref,next={...old,navigation_path:[{tid:'saved',label:'Saved'}]};
+ const save={action:{action_key:'package.save_checkpoint'},outcome:{action_key:'package.save_checkpoint',status:'SUCCEEDED',cleanup_complete:true,
+  output:{save_completed:true,workflow_preserved:true,reopened:false,workflow_continuations:[{document_id:'doc',previous_workflow_ref:old,workflow_ref:next}]}}};
+ const r=buildNodeReadRequest({operation_id:'snapshot',source_operation_id:'values'},s,{saves:[save]});
+ assert.equal(r.finish,'done');assert.deepEqual(r.read.variable_ports,[4]);assert.deepEqual(r.workflow_ref,next);assert.deepEqual(s,original);
+ for(const change of [v=>v.outcome.status='FAILED',v=>v.outcome.output.reopened=true,v=>v.outcome.output.workflow_continuations[0].document_id='foreign',v=>v.outcome.output.workflow_continuations[0].workflow_ref.prefix='MF;TF-2']){
+  const invalid=structuredClone(save);change(invalid);assert.deepEqual(buildNodeReadRequest({operation_id:'snapshot',source_operation_id:'values'},s,{saves:[invalid]}).workflow_ref,old);
+ }
+ assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[0]}},s));
+});

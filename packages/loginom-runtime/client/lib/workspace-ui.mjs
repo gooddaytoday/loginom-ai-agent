@@ -780,7 +780,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const ownedGraph=element=>!!graphPrefix && graphContainer.contains(element) && (getTid(element)??'').startsWith(graphPrefix);
     // Native type, not an editable graph label, owns the extra script deny.
     // Build once per observation; unconfirmed controls never inherit permission.
-    const nativeGraphControls=new Map(),nativeGraphLinks=new Set();
+    const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map();
     const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
       ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
     if(graphQueryable&&graphPrefix){
@@ -839,6 +839,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             const element=value(value(getState.call(view,portCell),'shape'),'node'),portTid=getTid(element);
             if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
             const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
+            const suffix=portTid.slice(tid.length+1),variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
+            if(unique(element)&&portData&&(variable&&subtype===3&&type===(variable[1]==='Input'?0:1)||control&&subtype===4&&type===0)){
+              const inventory=nativeVariablePorts.get(guid)??{variable_inputs:[],variable_outputs:[]};
+              inventory[type===0?'variable_inputs':'variable_outputs'].push({kind:control?'control':'variables',native_index:control?0:Number(variable[2]),port_guid:portGuid});
+              nativeVariablePorts.set(guid,inventory);
+            }
           }
         }
         // Links are out of this node-control policy only when their native
@@ -3520,13 +3526,23 @@ function readRenderedInputMapping(observation) {
         allowed_actions: ungroupField ? (allowed&&interaction.state==='point_observed'?['click','double_click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : smoothingCell ? (allowed && interaction.state==='point_observed' ? ['click',...(scroll?['scroll']:[])] : []) : elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : enrichField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','right_click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
-    const nodes = labels.slice(0, 200).map(label => {
+    // VariablesNode has no visible Label cell and cannot be selected like a
+    // component. Issue its native identity without adding graph action rights.
+    const builtinLabels=graphElements.filter(e=>nativeGraphControl(e)?.icon==='bg-vendor-icon-modelvariables'&&nativeGraphControl(e).node_id)
+      .map(e=>getTid(e).slice(graphPrefix.length));
+    const observedNodeLabels=[...new Set([...labels,...builtinLabels])].sort();
+    const nodes = observedNodeLabels.slice(0, 200).map(label => {
       const nodeTid = graphPrefix + label, matches=graphElements.filter(e=>getTid(e)===nodeTid),node=matches.length===1?matches[0]:null;
       // A saved node's GUID comes only from the existing native/DOM binding,
       // never from its editable label or an arbitrary DOM attribute.
       const native=node&&nativeGraphControl(node);
+      const variablePorts=native?.node_id&&nativeVariablePorts.get(native.node_id);
+      if(variablePorts)for(const ports of Object.values(variablePorts))for(const kind of ['variables','control'])
+        ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
+        ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
+        ...(variablePorts??{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });
@@ -3984,7 +4000,7 @@ function readRenderedInputMapping(observation) {
         ...(definitionPrefix?{scope:omittedRegions.has('table_data_cells')?'node_output_controls':'node_definition_controls',omitted_regions:[...omittedRegions]}:{}) },
       nodes, links: links.slice(0, 500), workarea: workarea ? boxOf(workarea) : null,
       ui: { elements, dialogs: dialogs.slice(0, 12), messages: messages.slice(0, 30), masks: masks.slice(0, 12), table_cells: tableCells,
-        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || labels.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
+        truncated: { elements: !!selectedRoot || controls.length > 240, nodes: !!selectedRoot || observedNodeLabels.length > 200, links: !!selectedRoot || links.length > 500, ports: !!selectedRoot || nodes.some(node => node.ports.length === 100), dialogs: dialogs.length > 12, messages: !!selectedRoot || messages.length > 30, masks: masks.length > 12, table_cells: definitionOnly || !!selectedRoot || cells.length > 120 } } };
     } catch (error) {
       // Playwright serializes thrown Errors without arbitrary properties such
       // as our code. Return a small data envelope across the realm boundary;

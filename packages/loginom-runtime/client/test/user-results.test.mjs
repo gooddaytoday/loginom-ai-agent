@@ -4,6 +4,20 @@ import { compactNodeResult, compactActionResult, compactKnowledgeBundle, userRes
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 const validate = new AjvJsonSchemaValidator().getValidator(userResultSchema);
 
+test('compact variable snapshots retain complete exact values and source identity without UI traces',()=>{
+ const port={port:4,kind:'variables',port_guid:'user-port',fresh:true,source:'snapshot',native_source:'VariablesEditValuesWizard',read_id:'snapshot-1',execution_id:null,
+  complete:true,count:4,package_modified:false,completeness:{loaded:true,count:4,store_count:4,unique_ids:4},internal:'UI trace',
+  variables:[['integer',null],['integer','0'],['boolean',false],['string','']].map(([type,value],id)=>({id,index:id,name:'v'+id,label:'v'+id,type,
+   cell:{type,is_null:value===null,value,precision:'exact'},internal:'UI trace'}))};
+ const raw={operation_id:'snapshot',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{execution:{status:'not_requested',execution_id:null},output:{ports:[],variable_ports:[port]}}}};
+ const before=structuredClone(raw),result=compactNodeResult(raw);
+ assert.equal(validate(result).valid,true);assert.equal(result.output.variable_ports[0].count,4);
+ assert.deepEqual(result.output.variable_ports[0].variables.map(v=>v.cell.value),[null,'0',false,'']);
+ assert.equal(result.output.variable_ports[0].source,'snapshot');assert.equal(result.output.variable_ports[0].execution_id,null);
+ assert.equal(result.output.variable_ports[0].read_id,'snapshot-1');assert.ok(!JSON.stringify(result).includes('UI trace'));
+ assert.deepEqual(raw,before);
+});
+
 test('zero interpretation warning counts only explicit numeric zeros in returned cells',()=>{
  const sample=[[{type:'integer',value:'0',is_null:false},{type:'real',value:0,is_null:false},
   {type:'string',value:'0',is_null:false},{type:'real',value:0,is_null:true},
