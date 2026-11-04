@@ -617,7 +617,7 @@ function TitlebarV2Right(props: { state: TitlebarV2RightState }) {
   )
 }
 
-function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
+export function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
   return (
     <div class="group relative mr-3 h-5 w-5 shrink-0 rounded-full bg-v2-background-bg-deep transition-[width] duration-150 ease-out hover:z-30 hover:w-[68px] focus-within:z-30 focus-within:w-[68px] motion-reduce:transition-none">
       <button
@@ -627,6 +627,7 @@ function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
         disabled={props.state.installing}
         aria-busy={props.state.installing}
         aria-label={props.state.ariaLabel}
+        title={props.state.title}
       >
         <span class="shrink-0 ml-[8px] mr-px text-[11px] text-v2-text-text-accent [font-weight:530] opacity-0 translate-x-2 motion-safe:transition-all duration-150 ease-out group-hover:opacity-100 group-hover:translate-x-0 group-focus-within:opacity-100 group-focus-within:translate-x-0 motion-reduce:translate-x-0">
           {props.state.label}

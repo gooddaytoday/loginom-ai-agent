@@ -91,8 +91,6 @@ export const SettingsGeneral: Component = () => {
   const params = useParams()
   const settings = useSettings()
 
-  const updater = useUpdaterAction()
-
   const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
   const dir = createMemo(() => decode64(params.dir))
   const accepting = createMemo(() => {
@@ -674,69 +672,6 @@ export const SettingsGeneral: Component = () => {
     </div>
   )
 
-  const UpdatesSection = () => (
-    <div class="flex flex-col gap-1">
-      <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.general.section.updates")}</h3>
-
-      <SettingsList>
-        <SettingsRow
-          title={language.t("settings.general.row.releaseNotes.title")}
-          description={language.t("settings.general.row.releaseNotes.description")}
-        >
-          <div data-action="settings-release-notes">
-            <Switch
-              checked={settings.general.releaseNotes()}
-              onChange={(checked) => settings.general.setReleaseNotes(checked)}
-            />
-          </div>
-        </SettingsRow>
-
-        <Show when={updater.state()?.settings}>
-          <SettingsRow
-            title={language.t("settings.updates.channel")}
-            description={updater.state()?.settings?.managed ? language.t("settings.updates.managed") : undefined}
-          >
-            <select
-              data-tid="update-channel"
-              class="rounded px-2 py-1 bg-background-base text-text-base"
-              aria-label={language.t("settings.updates.channel")}
-              disabled={updater.state()?.settings?.channelLocked}
-              value={updater.state()?.settings?.channel ?? "stable"}
-              onChange={(event) => void updater.setChannel(event.currentTarget.value as "stable" | "unstable")}
-            >
-              <option value="stable">{language.t("settings.updates.stable")}</option>
-              <option value="unstable">{language.t("settings.updates.unstable")}</option>
-            </select>
-          </SettingsRow>
-          <Show when={updater.state()?.settings?.enabled === false}>
-            <p data-tid="update-disabled">{language.t("settings.updates.disabled")}</p>
-          </Show>
-        </Show>
-        <Show when={updater.state()?.unsupported}>
-          <p role="alert" data-tid="update-unsupported">
-            {language.t("settings.updates.unsupported")}
-          </p>
-        </Show>
-        <Show when={updater.state()?.status === "ready"}>
-          <p data-tid="update-on-close">{language.t("settings.updates.onClose")}</p>
-        </Show>
-        <Show when={updater.state()?.status === "error"}>
-          <p role="alert" data-tid="update-error">
-            {language.t("settings.updates.verificationFailed")}
-          </p>
-        </Show>
-        <SettingsRow
-          title={language.t("settings.updates.row.check.title")}
-          description={language.t("settings.updates.row.check.description")}
-        >
-          <Button size="small" variant="secondary" disabled={!updater.action().run} onClick={updater.run}>
-            {language.t(updater.action().label)}
-          </Button>
-        </SettingsRow>
-      </SettingsList>
-    </div>
-  )
-
   const DisplaySection = () => (
     <Show when={desktop()}>
       <div class="flex flex-col gap-1">
@@ -801,7 +736,7 @@ export const SettingsGeneral: Component = () => {
 
         <SoundsSection />
 
-        <UpdatesSection />
+        <SettingsUpdates />
 
         <DisplaySection />
 
@@ -859,6 +794,91 @@ const SettingsRow: Component<SettingsRowProps> = (props) => {
         <span class="text-12-regular text-text-weak">{props.description}</span>
       </div>
       <div class="flex w-full justify-end sm:w-auto sm:shrink-0">{props.children}</div>
+    </div>
+  )
+}
+
+export const SettingsUpdates: Component = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+  const updater = useUpdaterAction()
+  const availableUpdate = () => {
+    const state = updater.state()
+    return state?.status === "available" ? state : undefined
+  }
+
+  return (
+    <div class="flex flex-col gap-1">
+      <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.general.section.updates")}</h3>
+
+      <SettingsList>
+        <SettingsRow
+          title={language.t("settings.general.row.releaseNotes.title")}
+          description={language.t("settings.general.row.releaseNotes.description")}
+        >
+          <div data-action="settings-release-notes">
+            <Switch
+              checked={settings.general.releaseNotes()}
+              onChange={(checked) => settings.general.setReleaseNotes(checked)}
+            />
+          </div>
+        </SettingsRow>
+
+        <Show when={updater.state()?.settings}>
+          <SettingsRow
+            title={language.t("settings.updates.channel")}
+            description={updater.state()?.settings?.managed ? language.t("settings.updates.managed") : undefined}
+          >
+            <select
+              data-tid="update-channel"
+              class="rounded px-2 py-1 bg-background-base text-text-base"
+              aria-label={language.t("settings.updates.channel")}
+              disabled={updater.state()?.settings?.channelLocked}
+              value={updater.state()?.settings?.channel ?? "stable"}
+              onChange={(event) => void updater.setChannel(event.currentTarget.value as "stable" | "unstable")}
+            >
+              <option value="stable">{language.t("settings.updates.stable")}</option>
+              <option value="unstable">{language.t("settings.updates.unstable")}</option>
+            </select>
+          </SettingsRow>
+          <Show when={updater.state()?.settings?.enabled === false}>
+            <p data-tid="update-disabled">{language.t("settings.updates.disabled")}</p>
+          </Show>
+        </Show>
+        <Show when={updater.state()?.unsupported}>
+          <p role="alert" data-tid="update-unsupported">
+            {language.t("settings.updates.unsupported")}
+          </p>
+        </Show>
+        <Show when={availableUpdate()}>
+          {(update) => (
+            <div role="status" data-tid="update-available" class="py-3">
+              <p>{language.t("settings.updates.available", { version: update().version })}</p>
+              <Show when={update().notes}>
+                <p data-tid="update-notes" class="whitespace-pre-wrap break-words max-h-32 overflow-auto">
+                  {update().notes}
+                </p>
+              </Show>
+            </div>
+          )}
+        </Show>
+        <Show when={updater.state()?.status === "ready"}>
+          <p data-tid="update-on-close">{language.t("settings.updates.onClose")}</p>
+        </Show>
+        <Show when={updater.state()?.status === "error"}>
+          <p role="alert" data-tid="update-error">
+            {language.t("settings.updates.verificationFailed")}
+          </p>
+        </Show>
+        <SettingsRow
+          title={language.t("settings.updates.row.check.title")}
+          description={language.t("settings.updates.row.check.description")}
+        >
+          <Button size="small" variant="secondary" disabled={!updater.action().run} onClick={updater.run}>
+            {language.t(updater.action().label)}
+          </Button>
+        </SettingsRow>
+      </SettingsList>
     </div>
   )
 }
