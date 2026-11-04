@@ -72,6 +72,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { Npm } from "@opencode-ai/core/npm"
+import { NpmTest } from "../fake/npm"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -225,6 +227,8 @@ const promptRoot = LayerNode.group([
 
 function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking" }) {
   const replacements = [
+    // The local hook fixtures do not import npm packages.
+    [Npm.node, NpmTest.noop],
     [SessionSummary.node, summary],
     [LSP.node, lsp],
     [MCP.node, makeMcp(input?.mcpInstructions)],
@@ -239,6 +243,7 @@ function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; proces
 function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking"; resources?: string }) {
   const root = LayerNode.group([promptRoot, testLLMServerNode])
   const replacements = [
+    [Npm.node, NpmTest.noop],
     [SessionSummary.node, summary],
     [LSP.node, lsp],
     [MCP.node, makeMcp(input?.mcpInstructions)],
