@@ -1,0 +1,144 @@
+{
+  "format_version": 1,
+  "variant": "loginom-ai-agent",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "size": 14732,
+      "sha256": "1571da690c883d4be0f5c4ce43c2fbb943386190d3e54879a5e0d2b8c2bce016"
+    },
+    {
+      "path": "references/assessment.md",
+      "size": 18215,
+      "sha256": "c6a09c3922c3ae2f3642e5964795a9621bd04a4a52d31eac797efda25b5e3430"
+    },
+    {
+      "path": "references/product-runtime.md",
+      "size": 5035,
+      "sha256": "a53e17664eb608703c262ca755fbea1cbe2871877ae84eccb2305cc784e0a128"
+    },
+    {
+      "path": "references/rubric.md",
+      "size": 38645,
+      "sha256": "cc01c1149de6d6d93d7055d0b23f51b9caea9230636f018ee6cd41483bad741f"
+    },
+    {
+      "path": "resources/vendor-types.json",
+      "size": 6964,
+      "sha256": "ea8e0889f8bd3bae88e84f2bf91fa365bee11451afb465e9edb0d8e256101d41"
+    },
+    {
+      "path": "scripts/package_linter.py",
+      "size": 54609,
+      "sha256": "438aaecb56fc9aa77e99a7d0e7510e1fd66e943ac16c7db23421eae6281b0980"
+    },
+    {
+      "path": "scripts/scoring.py",
+      "size": 13940,
+      "sha256": "a0238155d0be2ac8af2b7d4c6aec4eb4ce14359917ac6e0ceabe85cd881ce7c4"
+    }
+  ],
+  "provenance": {
+    "source_git": {
+      "head": "78bb5cbcffd5063fd6d74ce585f02627a59ee6cd",
+      "dirty": true
+    },
+    "source_inputs": [
+      {
+        "path": "export_package_linter_product.py",
+        "size": 1459,
+        "sha256": "0c950eb36b864a3ba4045c6ad2feb70d022252aa6c846bfa5a38ca5720f1947f"
+      },
+      {
+        "path": "integrations/loginom-ai-agent/package-linter/adapter.py",
+        "size": 7453,
+        "sha256": "2e8a5eec154c3874aff371630f3fef80b2c4d96a91cd7be4e599fb85eca1ff01"
+      },
+      {
+        "path": "product-runtime.md",
+        "size": 5035,
+        "sha256": "a53e17664eb608703c262ca755fbea1cbe2871877ae84eccb2305cc784e0a128"
+      },
+      {
+        "path": "profile.json",
+        "size": 1092,
+        "sha256": "6220c11f88bcbb8d100156e24b563554f56dd0f6486583002f7ca373cde7cb2a"
+      },
+      {
+        "path": "skill/SKILL.md",
+        "size": 13292,
+        "sha256": "6ed1c32e91ec6a33793b6b4a81f88d59c00f82a527380d52f9280327bd5364d1"
+      },
+      {
+        "path": "skill/agents/openai.yaml",
+        "size": 363,
+        "sha256": "196e932d5c397a23e130d436b956a674e531d4cd6c3085d54aecd36ac12ec653"
+      },
+      {
+        "path": "skill/references/assessment.md",
+        "size": 18215,
+        "sha256": "c6a09c3922c3ae2f3642e5964795a9621bd04a4a52d31eac797efda25b5e3430"
+      },
+      {
+        "path": "skill/references/rubric.md",
+        "size": 38645,
+        "sha256": "cc01c1149de6d6d93d7055d0b23f51b9caea9230636f018ee6cd41483bad741f"
+      },
+      {
+        "path": "skill/resources/vendor-types.json",
+        "size": 6964,
+        "sha256": "ea8e0889f8bd3bae88e84f2bf91fa365bee11451afb465e9edb0d8e256101d41"
+      },
+      {
+        "path": "skill/scripts/package_linter.py",
+        "size": 54609,
+        "sha256": "438aaecb56fc9aa77e99a7d0e7510e1fd66e943ac16c7db23421eae6281b0980"
+      },
+      {
+        "path": "skill/scripts/scoring.py",
+        "size": 13940,
+        "sha256": "a0238155d0be2ac8af2b7d4c6aec4eb4ce14359917ac6e0ceabe85cd881ce7c4"
+      },
+      {
+        "path": "tools/skill_packaging/__init__.py",
+        "size": 70,
+        "sha256": "fb0637258d65436d28590cb586f1aea7b6e025881fb24bbca785f9338b23132b"
+      },
+      {
+        "path": "tools/skill_packaging/product.py",
+        "size": 6002,
+        "sha256": "80da58ffcbc8b39eb089165d66037f91381d4eef66e36657336642c4b75bb6d1"
+      },
+      {
+        "path": "tools/skill_packaging/runtime.py",
+        "size": 2945,
+        "sha256": "e9eae0a75ca5d7f6ea2ed8c125555a3ccd45d481865b8e8333840c6fcdb56fde"
+      }
+    ],
+    "source_inputs_sha256": "dfb7c92d64a686b7e1d1f3e03fdc6d154cad17e0c3025eeed22a54d2c134630b",
+    "target_evidence": {
+      "repository": "loginom-ai-agent",
+      "commit": "2910b8782c1ad8c016c6fc478369ddd179457e3e",
+      "status": "read-only-source-contract; actual installed activation unverified",
+      "paths": [
+        "packages/opencode/src/session/tools.ts",
+        "packages/opencode/src/tool/registry.ts",
+        "packages/opencode/src/tool/skill.ts",
+        "packages/opencode/src/product/turn-lifecycle.ts",
+        "packages/opencode/test/skill/bundled-skills.test.ts",
+        "packages/product/src/skills.ts",
+        "packages/opencode/src/tool/shell/id.ts",
+        "packages/product/skills/package-docs/SKILL.md",
+        "packages/product/skills/loginom-automation/SKILL.md"
+      ]
+    },
+    "clean_head_equivalence_claimed": false
+  },
+  "transforms": [
+    "complete canonical SKILL body and agents default_prompt",
+    "Product runtime overlay"
+  ],
+  "manifest_self_hash": "excluded to avoid recursive hashing",
+  "installed_harness_verified": false,
+  "transfer_destination": "packages/product/skills/package-linter"
+}
