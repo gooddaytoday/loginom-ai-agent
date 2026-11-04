@@ -34,6 +34,9 @@ test("bakes the source commit and ignores only the config loader's temporary fil
     const clean = load()
     expect(clean["import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA"]).toBe(JSON.stringify(git("rev-parse", "HEAD")))
     expect(clean["import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY"]).toBe("false")
+    expect(clean["LOGINOM_AI_AGENT_UPDATE_FEED"]).toBe(
+      JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
+    )
     await writeFile(join(root, "uncommitted.ts"), "// real build input\n")
     expect(load()["import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY"]).toBe("true")
   } finally {

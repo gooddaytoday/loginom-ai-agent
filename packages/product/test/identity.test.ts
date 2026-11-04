@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test"
 import { Product, productChannel, productName, productSlug } from "../src/index"
 import release from "../loginom-release.json"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 test("bundled MCP and first-run Loginom defaults use the public service addresses", () => {
   expect(Product.knowledgeEndpoint).toBe("https://mcp.loginom.ai/mcp")
@@ -29,18 +33,25 @@ test("identity cannot be changed after startup and has no update fallback", () =
   expect(Product.wordmark).toBe("Loginom AI")
 })
 
-test("Desktop may bake an update feed, while an empty build stays disabled", async () => {
-  for (const feed of ["", "https://releases.example.test/agent/"]) {
-    const build = await Bun.build({
-      entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
-      target: "bun",
-      define: { __LOGINOM_AI_AGENT_UPDATE_FEED__: JSON.stringify(feed) },
-    })
-    expect(build.success).toBe(true)
-    const module = await import(
-      "data:text/javascript;base64," + Buffer.from(await build.outputs[0].text()).toString("base64")
-    )
-    expect(module.Product.updateFeed).toBe(feed || null)
-    expect(module.Product.changelogFeed).toBeNull()
+test("the bundle bakes the feed parameter and defaults to disabled", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-update-feed-"))
+  try {
+    for (const [index, value] of [null, "", "https://example.test/updates/"].entries()) {
+      const bundle = await Bun.build({
+        entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
+        target: "bun",
+        define: { LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(value) },
+      })
+      expect(bundle.success).toBe(true)
+      // macOS Bun resolves data: URLs as filesystem paths and can hit NameTooLong.
+      // Separate files also avoid sharing the module cache between feed values.
+      const output = join(directory, `product-${index}.mjs`)
+      await writeFile(output, await bundle.outputs[0].text())
+      const built = await import(pathToFileURL(output).href)
+      expect(built.Product.updateFeed).toBe(value || null)
+      expect(built.Product.changelogFeed).toBeNull()
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
   }
 })

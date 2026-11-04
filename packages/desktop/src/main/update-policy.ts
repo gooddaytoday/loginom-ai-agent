@@ -1,5 +1,5 @@
 import { Product } from "@loginom-ai-agent/product"
-import { verify } from "node:crypto"
+import { UPDATE_PUBLIC_KEYS, verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
 import { parseUpdateInfo } from "electron-updater/out/providers/Provider"
 import type { UpdateInfo } from "electron-updater"
 import type { AppUpdater } from "electron-updater/out/AppUpdater"
@@ -7,11 +7,6 @@ import type { ProxyConfig } from "electron"
 
 export type UpdateChannel = "stable" | "unstable"
 export type UpdateAdminPolicy = { updates?: "on" | "off"; channel?: UpdateChannel; feedUrl?: string }
-
-export const updatePublicKeys = [
-  "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAekkV+yIMJpDlzXoJAWpT9ifgHKbKe5PJdtGC8FjmJ2c=\n-----END PUBLIC KEY-----",
-  "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAuVor7DX+ReBZ+tg8gXaygsXqxF+WKA9dijYEIDNHTtc=\n-----END PUBLIC KEY-----",
-] as const
 
 export function updateSettings(feed: string | null, preference: unknown, policy: UpdateAdminPolicy = {}) {
   const channel = policy.channel ?? (preference === "unstable" ? "unstable" : "stable")
@@ -114,13 +109,9 @@ export function verifyUpdateManifest(
   raw: Buffer,
   signature: string,
   feed: string,
-  keys: readonly string[] = updatePublicKeys,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
 ): SignedUpdateInfo {
-  const encoded = signature.trim()
-  if (
-    !/^[A-Za-z0-9+/]{86}==$/.test(encoded) ||
-    !keys.some((key) => verify(null, raw, key, Buffer.from(encoded, "base64")))
-  )
+  if (!verifyUpdateSignature(raw, signature, keys))
     throw Error("LOGINOM_UPDATE_SIGNATURE_INVALID")
   const info = parseUpdateInfo(raw.toString("utf8"), "latest.yml", new URL(feed)) as SignedUpdateInfo
   compareUpdateVersions(info.version, info.minSupportedVersion)

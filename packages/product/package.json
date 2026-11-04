@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./cli-profile": "./src/cli-profile.ts",
-    "./skills": "./src/skills.ts"
+    "./skills": "./src/skills.ts",
+    "./update-signature": "./src/update-signature.ts"
   },
   "scripts": {
     "test": "bun test",

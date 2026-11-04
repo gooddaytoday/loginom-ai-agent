@@ -54,8 +54,8 @@ const sentry =
 export default defineConfig({
   main: {
     define: {
+      LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
-      __LOGINOM_AI_AGENT_UPDATE_FEED__: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || ""),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY": JSON.stringify(source.dirty),
       // Release builds bake browser recovery; packaged mode is still required at runtime.

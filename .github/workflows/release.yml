@@ -46,6 +46,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_AI_AGENT_UPDATE_FEED }}
 
 jobs:
   cut:
@@ -355,7 +356,7 @@ jobs:
       - name: Collect Windows artifacts
         run: |
           $upload = New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/windows-upload"
-          Copy-Item -Path "$env:RUNNER_TEMP/windows/desktop/*-win-x64.exe", "$env:RUNNER_TEMP/windows/desktop/*-source.tar.gz", "$env:RUNNER_TEMP/windows/desktop/windows-release-manifest.json*", "$env:RUNNER_TEMP/windows/desktop/static-nsis.json", "$env:RUNNER_TEMP/windows/loginom-ai-agent-cli-*.zip*" -Destination $upload.FullName
+          Copy-Item -Path "$env:RUNNER_TEMP/windows/desktop/*-win-x64.exe", "$env:RUNNER_TEMP/windows/desktop/*.blockmap", "$env:RUNNER_TEMP/windows/desktop/latest*.yml", "$env:RUNNER_TEMP/windows/desktop/*-source.tar.gz", "$env:RUNNER_TEMP/windows/desktop/windows-release-manifest.json*", "$env:RUNNER_TEMP/windows/desktop/static-nsis.json", "$env:RUNNER_TEMP/windows/loginom-ai-agent-cli-*.zip*" -Destination $upload.FullName
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -411,6 +412,8 @@ jobs:
         with:
           name: loginom-macos
           path: |
+            ${{ runner.temp }}/macos/latest*.yml
+            ${{ runner.temp }}/macos/*.blockmap
             ${{ runner.temp }}/macos/*.dmg
             ${{ runner.temp }}/macos/*.zip
             ${{ runner.temp }}/macos/*.tar.gz

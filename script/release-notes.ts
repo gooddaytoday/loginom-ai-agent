@@ -68,13 +68,21 @@ const macos: [file: string, status: string][] = withoutMacos
   : [
       ["loginom-ai-agent-mac-arm64.dmg", `${await staticStatus("static-dmg.json")}; offline smoke PASS; ad-hoc signed`],
       ["loginom-ai-agent-mac-arm64.zip", `${await staticStatus("static-zip.json")}; offline smoke PASS; ad-hoc signed`],
-      [`loginom-ai-agent-cli-${version}-darwin-arm64.tar.gz`, "archive verification and offline smoke PASS; ad-hoc signed"],
+      [
+        `loginom-ai-agent-cli-${version}-darwin-arm64.tar.gz`,
+        "archive verification and offline smoke PASS; ad-hoc signed",
+      ],
       [`loginom-ai-agent-${version}-macos-source.tar.gz`, "macOS corresponding source"],
       ["macos-release-manifest.json", "macOS release manifest (ad-hoc signed app; not notarized)"],
+      ["latest-mac.yml", "macOS update metadata"],
+      ["loginom-ai-agent-mac-arm64.zip.blockmap", "macOS differential update blockmap"],
     ]
 const expected: [file: string, status: string][] = [
   ["loginom-ai-agent-linux-amd64.deb", `${await staticStatus("static-deb.json")} + ${matrixStatus}`],
-  ["loginom-ai-agent-linux-x86_64.AppImage", `${await staticStatus("static-appimage.json")}; Docker matrix covers the DEB only`],
+  [
+    "loginom-ai-agent-linux-x86_64.AppImage",
+    `${await staticStatus("static-appimage.json")}; Docker matrix covers the DEB only`,
+  ],
   [
     `loginom-ai-agent-cli-${version}-linux-x64.tar.gz`,
     "static verify PASS (cli-manifest); Docker matrix covers the DEB only",
@@ -83,6 +91,10 @@ const expected: [file: string, status: string][] = [
   [`loginom-ai-agent-cli-${version}-win32-x64.zip`, "archive manifest verification PASS; unsigned"],
   [`loginom-ai-agent-${version}-source.tar.gz`, "source archive (git archive HEAD)"],
   [`loginom-ai-agent-${version}-windows-source.tar.gz`, "Windows corresponding source"],
+  ["latest.yml", "Windows update metadata"],
+  ["latest-linux.yml", "Linux update metadata"],
+  ["loginom-ai-agent-win-x64.exe.blockmap", "Windows differential update blockmap"],
+  ["loginom-ai-agent-linux-x86_64.AppImage.blockmap", "Linux differential update blockmap (also embedded in AppImage)"],
   ["release-manifest.json", "Linux release manifest (unsigned)"],
   ["windows-release-manifest.json", "Windows release manifest (unsigned)"],
   ...macos,
@@ -112,7 +124,7 @@ const notes = [
   "- Pre-release: Linux/Windows unsigned; macOS own code ad-hoc signed, without Developer ID or notarization. OS security warnings are expected.",
   "- CI is credential-free and does not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
-  "- Public automatic update feed remains disabled; install updates manually.",
+  "- Automatic updates require LOGINOM_AI_AGENT_UPDATE_FEED at build time and a separately signed, published channel feed; an empty build parameter disables updates.",
   "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",
   "",
   "## Assets",

@@ -9,18 +9,6 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { pathToFileURL } from "node:url"
 
-test("configured feed produces stable generic metadata without an upstream fallback", async () => {
-  const previous = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
-  try {
-    process.env.LOGINOM_AI_AGENT_UPDATE_FEED = "https://releases.example.test/agent"
-    const config = (await import("./electron-builder.config.ts?feed=example")).default
-    expect(config.publish).toEqual({ provider: "generic", url: "https://releases.example.test/agent/stable/" })
-  } finally {
-    if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
-    else process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previous
-  }
-})
-
 for (const channel of ["dev", "beta", "prod"] as const) {
   test(`isolates the ${channel} package and cannot publish upstream`, async () => {
     const previous = process.env.LOGINOM_AI_AGENT_CHANNEL
@@ -35,14 +23,7 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     expect(config.linux?.executableName).toBe(productSlug(channel))
     expect(config.deb?.packageName).toBe(productSlug(channel))
     expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(Product.channels[channel])
-    expect(config.publish).toEqual(
-      process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim()
-        ? {
-            provider: "generic",
-            url: new URL("stable/", process.env.LOGINOM_AI_AGENT_UPDATE_FEED.trim().replace(/\/?$/, "/")).href,
-          }
-        : null,
-    )
+    expect(config.publish).toEqual({ provider: "generic", url: "https://updates.invalid/", channel: "latest" })
     expect(config.protocols).toEqual({ name: Product.name, schemes: [Product.scheme] })
     expect(JSON.stringify(config)).not.toContain("opencode")
     expect(config.extraResources).not.toContainEqual(expect.objectContaining({ filter: ["opencode-cli*"] }))
@@ -79,26 +60,77 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
 })
 
-test.skipIf(process.platform !== "linux")("Linux afterPack restores the current pinned Chromium sandbox mode", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-afterpack-"))
-  try {
-    const sandbox = join(root, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`)
-    await mkdir(dirname(sandbox), { recursive: true })
-    await writeFile(sandbox, "fixture", { mode: 0o700 })
-    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-    if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node executable")
-    // electron-builder executes this hook in Node. Bun 1.3.14's fs.chmod drops
-    // setuid bits, so running the hook in the Bun test process is not faithful.
-    const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "electron-builder.config.ts")], target: "node" })
-    if (!bundle.success) throw Error("Could not bundle packaging hook")
-    const module = join(root, "hook.mjs")
-    await writeFile(module, await bundle.outputs[0].text())
-    await promisify(execFile)(node, ["--input-type=module", "-e",
-      `import config from ${JSON.stringify(pathToFileURL(module).href)};
+test.skipIf(process.platform !== "linux")(
+  "Linux afterPack restores the current pinned Chromium sandbox mode",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "loginom-afterpack-"))
+    try {
+      const sandbox = join(
+        root,
+        `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
+      )
+      await mkdir(dirname(sandbox), { recursive: true })
+      await writeFile(sandbox, "fixture", { mode: 0o700 })
+      const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+      if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node executable")
+      // electron-builder executes this hook in Node. Bun 1.3.14's fs.chmod drops
+      // setuid bits, so running the hook in the Bun test process is not faithful.
+      const bundle = await Bun.build({
+        entrypoints: [join(import.meta.dir, "electron-builder.config.ts")],
+        target: "node",
+      })
+      if (!bundle.success) throw Error("Could not bundle packaging hook")
+      const module = join(root, "hook.mjs")
+      await writeFile(module, await bundle.outputs[0].text())
+      await promisify(execFile)(node, [
+        "--input-type=module",
+        "-e",
+        `import config from ${JSON.stringify(pathToFileURL(module).href)};
        if (process.versions.node !== ${JSON.stringify(release.nodeVersion)}) throw Error('Unexpected Node version');
        await config.afterPack({appOutDir:${JSON.stringify(root)},electronPlatformName:'linux'});`,
-    ])
-    expect((await stat(sandbox)).mode & 0o7777).toBe(0o4755)
+      ])
+      expect((await stat(sandbox)).mode & 0o7777).toBe(0o4755)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+)
+
+test("packaging uses the explicitly supplied feed without uploading", () => {
+  const result = Bun.spawnSync(
+    [
+      process.execPath,
+      "--eval",
+      `
+    import config from './electron-builder.config.ts';
+    console.log(JSON.stringify(config.publish));
+  `,
+    ],
+    { cwd: import.meta.dir, env: { ...process.env, LOGINOM_AI_AGENT_UPDATE_FEED: "https://example.test/feed/" } },
+  )
+  expect(result.exitCode).toBe(0)
+  expect(JSON.parse(result.stdout.toString())).toEqual({
+    provider: "generic",
+    url: "https://example.test/feed/",
+    channel: "latest",
+  })
+})
+
+test("AppImage post-build hook emits an external blockmap without changing the binary", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-blockmap-"))
+  try {
+    const file = join(root, "fixture.AppImage")
+    const bytes = Buffer.from("AppImage embedded blockmap fixture ".repeat(10000))
+    await writeFile(file, bytes)
+    const config = (await import("./electron-builder.config")).default
+    if (typeof config.afterAllArtifactBuild !== "function") throw Error("Missing artifact hook")
+    const artifacts = await config.afterAllArtifactBuild({ artifactPaths: [file, join(root, "fixture.deb")] } as never)
+    expect(artifacts).toEqual([`${file}.blockmap`])
+    expect(await Bun.file(file).bytes()).toEqual(bytes)
+    const { gunzipSync } = await import("node:zlib")
+    const map = JSON.parse(gunzipSync(await Bun.file(`${file}.blockmap`).bytes()).toString())
+    expect(map.version).toBe("2")
+    expect(map.files[0].sizes.reduce((sum: number, size: number) => sum + size, 0)).toBe(bytes.length)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
