@@ -45,3 +45,15 @@ test('invalid native records expose bounded scalar shape for diagnosing a refuse
  assert.equal(r.record_shape.data.Nested,'[object]');assert.equal(r.record_shape.data.Name,'RowID');
  assert.equal(Object.hasOwn(r.record_shape.data,'GroupFunctions'),false);
 });
+
+test('observed native summary record is excluded from field identity, order and selection',()=>{
+ const f=fixture(),summary={isModel:true,internalId:'summary',data:{$id:1,DataType:0,GroupFunctions:0,Order:0,Separator:'',UniqueOnly:false,Sort:false,SortDirection:0,Wrapper:'',DisplayName:'',Disposition:3,Index:0}};
+ f.records.unshift(summary);f.members[1].unshift(summary);f.selection[1]=[summary];
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.input_fields.length,3);
+ assert.equal(r.fields.length,1);assert.equal(r.fields[0].name,'X');assert.equal(r.fields[0].order,0);
+ assert.equal(r.selections.selected.length,0);
+ f.records.shift();f.records.push(summary);assert.equal(f.read().fields[0].order,0);
+ summary.data.GroupFunctions=1;assert.equal(f.read().verified,false);
+ summary.data.GroupFunctions=0;const duplicate={...summary,internalId:'summary2'};f.records.push(duplicate);f.members[1].push(duplicate);
+ assert.equal(f.read().verified,false);
+});

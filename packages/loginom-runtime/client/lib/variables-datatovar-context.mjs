@@ -33,8 +33,15 @@ export function readDataToVarBrowser(prefix){
  if(partitions.some(rs=>!Array.isArray(rs)||rs.some(r=>!records.includes(r))||new Set(rs).size!==rs.length)
   ||partitions[0].length+partitions[1].length!==records.length||partitions[0].some(r=>partitions[1].includes(r)))return fail('datatovar_partition');
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},fields=[],ids=new Set(),names=new Set();
+ let summary=null;
  for(const r of records){
   const d=r?.data,id=String(r?.internalId??'');
+  // Native summary row observed in a2-diag:372. It belongs to the store and
+  // partition proof, but is not an input field or a selected-field ordinal.
+  if(r?.isModel&&id&&!ids.has(id)&&d?.Name===undefined&&d.DataType===0&&d.DisplayName===''&&d.Disposition===3
+   &&d.Order===0&&d.Index===0&&d.GroupFunctions===0&&d.Separator===''&&d.Wrapper===''&&d.UniqueOnly===false&&d.Sort===false&&d.SortDirection===0){
+   if(summary)return fail('datatovar_duplicate_summary');summary=r;ids.add(id);continue;
+  }
   if(!r?.isModel||!id||ids.has(id)||typeof d?.Name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(d.Name)||names.has(d.Name.toLowerCase())
    ||typeof d.DisplayName!=='string'||d.DisplayName.length>256||!types[d.DataType]||!Number.isSafeInteger(d.GroupFunctions)||d.GroupFunctions<0||d.GroupFunctions>16383){
    // A refused read must retain enough bounded native shape to distinguish a
@@ -53,11 +60,13 @@ export function readDataToVarBrowser(prefix){
   const order=partitions[1].indexOf(r);
   fields.push({record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],role:order<0?'available':'selected',order,functions:d.GroupFunctions,settings});
  }
+ const selectedFields=partitions[1].filter(r=>r!==summary);
+ for(const field of fields)field.order=selectedFields.findIndex(r=>String(r.internalId)===field.record_id);
  const selections={};
  for(const [i,role]of ['available','selected'].entries()){
   const selected=components[i].getSelectionModel?.().getSelection?.();
   if(!Array.isArray(selected)||new Set(selected).size!==selected.length||selected.some(r=>!records.includes(r)))return fail('datatovar_selection');
-  selections[role]=selected.filter(r=>partitions[i].includes(r)).map(r=>String(r.internalId));
+  selections[role]=selected.filter(r=>r!==summary&&partitions[i].includes(r)).map(r=>String(r.internalId));
  }
  return {verified:true,inventory_complete:true,state_source:'cached_datatovar_source_store',input_fields:fields,
   fields:fields.filter(f=>f.role==='selected').sort((a,b)=>a.order-b.order),selections,settings_applied:false};
