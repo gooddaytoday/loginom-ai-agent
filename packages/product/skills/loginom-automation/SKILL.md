@@ -148,6 +148,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
+| Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
+| Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 | Первые/последние/случайные N | `preprocessing.sampling` / sequential, random | [читать](references/nodes/preprocessing.sampling.md) |
 | Train/test по порядку/случайно | `preprocessing.data_partition` / sequential, random | [читать](references/nodes/preprocessing.data_partition.md) |
 | Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |

@@ -82,3 +82,7 @@
 ## Конечные классы
 
 [preprocessing.coarse_classes](nodes/preprocessing.coarse_classes.md)
+
+## Таблица в дерево и дерево в JSON
+
+[trees.from_table](nodes/trees.from_table.md) · [trees.to_json](nodes/trees.to_json.md)

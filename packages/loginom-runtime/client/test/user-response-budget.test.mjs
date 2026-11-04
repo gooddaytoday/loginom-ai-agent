@@ -62,7 +62,7 @@ function catalog(types) {
    selectorCatalogDigest:'b'.repeat(64),e2eCommit:'c'.repeat(40),actionManifestDigest:'d'.repeat(64),
    catalogLifecycleStatus:'candidate',acceptanceVerified:false,acceptanceDigest:null,
    compatibilityProfile:{profile_id:'source-fixture-linux',loginom_build:'7.4.2',platform:'linux',browser:'chromium'}};
- return userActionInventory({actions:[],node_types:describeNodeTypes(types??[...handlers.keys()],
+ return userActionInventory({actions:[],node_types:describeNodeTypes(types??[...[...handlers.keys()].filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript'],
    {...pins,skillRevision:'e'.repeat(64),loginomProfile:pins.compatibilityProfile},new Map(),handlers,'7.4.2'),session_manifest:pins});
 }
 
