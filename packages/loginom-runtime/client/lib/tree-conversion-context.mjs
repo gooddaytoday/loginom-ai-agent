@@ -14,22 +14,26 @@ export function readTreeConversionBrowser(prefix){
    exclude_root:bool('pedRootExcluded'),pretty:bool('pedPrettifyJSON'),keys:bool('pedDisplayNameAsKey')?'labels':'names',multi_row:bool('pedMultiRowOutput'),datetime:bool('pedDateTimeIsISO8601')?'iso8601':'unsupported'};
   const tree=cmp(base+'trpDataTree'),store=tree.getStore(),nativeRoot=store.getRoot(),fields=cmp(base+'grdFields').getStore();
   need(!store.isLoading()&&!fields.isLoading()&&nativeRoot.childNodes.length===1,'tree_conversion_store');
+  const sourceRecords=fields.getRange();
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},nodes=[],records=new Set();
   const pointer=v=>v.replaceAll('~','~0').replaceAll('/','~1');
   const walk=(r,parent,path,depth)=>{
    need(depth<=16&&nodes.length<64&&!records.has(r)&&r.isModel&&Array.isArray(r.childNodes),'tree_conversion_structure');records.add(r);
    const d=r.data;need(typeof d.Name==='string'&&typeof d.IsArray==='boolean'&&typeof d.IsContainer==='boolean','tree_conversion_node');
+   const linked=d.LinkedRecord;
+   if(!d.IsContainer)need(linked==null?d.SourceName===''&&d.SourceIndex===-1:sourceRecords.includes(linked)
+    &&typeof linked.data.Name==='string'&&Number.isInteger(linked.data.Value)&&linked.data.DataType===d.DataType,'tree_conversion_source_binding');
    const next=parent===null?'':path+'/'+pointer(d.Name),index=nodes.length;
    const row=[...tree.el.dom.querySelectorAll('[data-recordid]')].filter(e=>e.getAttribute('data-recordid')===String(r.internalId));
    const tids=row.flatMap(e=>[...e.querySelectorAll('[data-tid]')].map(e=>e.getAttribute('data-tid')));
    const texts=tids.filter(t=>t.endsWith(';TreeText'));
    nodes.push({path:next,name:d.Name,label:d.DisplayName,type:d.IsContainer?'object':types[d.DataType]??'unsupported',is_array:d.IsArray,
-    ...(!d.IsContainer?{source_field:d.SourceName}:{}),index,parent,record_id:String(r.internalId),
+    ...(!d.IsContainer?{source_field:linked?.data.Name??''}:{}),index,parent,record_id:String(r.internalId),
     ...(texts.length===1?{tid:texts[0]}:{}),delete_tid:tids.find(t=>t.includes(';colDelete_'))??null});
    for(const child of r.childNodes){need(child.parentNode===r,'tree_conversion_parent');if(!child.data.Node)continue;walk(child,index,next,depth+1);}
   };
   walk(nativeRoot.childNodes[0],null,'',0);
-  const source_fields=fields.getRange().map(r=>{const d=r.data;need(typeof d.Name==='string'&&Number.isInteger(d.Value),'tree_conversion_field');return {name:d.Name,type:types[d.DataType]??'unsupported',tid:base+'colFields_'+d.Value};});
+  const source_fields=sourceRecords.map(r=>{const d=r.data;need(typeof d.Name==='string'&&Number.isInteger(d.Value),'tree_conversion_field');return {name:d.Name,type:types[d.DataType]??'unsupported',tid:base+'colFields_'+d.Value};});
   const selected=tree.getSelection().map(r=>String(r.internalId)),forms=exact('EditDataTreeNodeDefForm').filter(visible);
   need(forms.length<=1,'tree_conversion_editor_count');let editor=null;
   if(forms.length){

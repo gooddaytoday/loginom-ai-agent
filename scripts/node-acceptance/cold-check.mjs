@@ -265,10 +265,6 @@ page = context.pages()[0]
   })
   const channel={...procedure,observe:options=>processObservation.observe(procedure,options),get lastPreparedStep(){return procedure.lastPreparedStep;},
     get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record,readReceipt})};
-  if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
-   const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
-   await record({phase:'cold_tree_saved_settings',node,...settings});
-  }
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
   if(nativeConfiguration){
@@ -289,6 +285,10 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
+   const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
+   await record({phase:'cold_tree_saved_settings',node,...settings});
+  }
   let javascriptAdmission;
   if(target.type==='programming.javascript'){
    const {createJavascriptSourceAdmission}=await load('client/lib/javascript-source-admission.mjs');
