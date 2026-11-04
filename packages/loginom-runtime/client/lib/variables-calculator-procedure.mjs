@@ -24,11 +24,15 @@ export async function configureVariablesCalculator(page,task,readNode=readPrepar
   requireValue(!owner||same(owner,context),'calculator owner changed');owner??=context;return context;
  };
  const inventory=async()=>{
+  for(;;){
   await owned();const value=await readContext(page,b,readNode,readBrowser);
+  if(value.verified!==true&&value.reason==='variables_calculator_mask'&&same(value.node_context,owner)){await page.waitForTimeout(Math.min(100,remaining()));continue;}
   requireValue(value.verified===true&&value.inventory_complete===true&&same(value.node_context,owner),'complete same-owner calculator inventory required');return value;
+  }
  };
  const inspect=async(mode,extra={})=>{
-  await owned();return page.evaluate(({root,base,editor,origin,build,mode,extra})=>{
+  for(;;){
+  await owned();const value=await page.evaluate(({root,base,editor,origin,build,mode,extra})=>{
    const need=(ok,message)=>{if(!ok)throw Error('Variables calculator '+message);};
    const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
    const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
@@ -38,8 +42,13 @@ export async function configureVariablesCalculator(page,task,readNode=readPrepar
    const dialogs=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible),editors=exact(editor);
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
    const ownedEditor=editors.length===1&&visible(editors[0])&&dialogs.length===1&&dialogs[0]===editors[0];
-   need(masks.length===0||ownedEditor&&masks.every(m=>m.classList.contains('x-mask')&&!m.classList.contains('x-mask-msg')&&!m.classList.contains('bg-mask-message')
-    &&(roots[0].contains(m)||exact(root).some(w=>w.contains(m)))&&!m.contains(editors[0])&&!editors[0].contains(m)),'unmasked wizard');
+   // Match workspace-ui's modal_background ownership rule. Loginom can
+   // attach the own editor's backdrop outside the wizard and use bg-mask-message.
+   const modalBackground=ownedEditor&&masks.every(m=>!m.contains(editors[0])&&!editors[0].contains(m));
+   if(masks.length&&!modalBackground){
+    need(dialogs.length===0||ownedEditor,'unmasked wizard '+JSON.stringify({mode,masks:masks.map(m=>({tid:m.getAttribute('data-tid'),classes:String(m.className)})),dialogs:dialogs.map(d=>d.getAttribute('data-tid'))}));
+    return {pending_mask:true};
+   }
    const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
     need(visible(e)&&box.width>0&&box.height>0&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'rendered hit');return {x,y};};
    if(mode==='button'||mode==='row'||mode==='formula'||mode==='focus') {
@@ -70,6 +79,9 @@ export async function configureVariablesCalculator(page,task,readNode=readPrepar
    if(mode==='apply'){const c=cmp(editor+';btnApply');need(editors[0].contains(c.el.dom)&&!c.disabled,'owned Apply');return point(c.el.dom);}
    need(false,'unsupported inspection');
   },{root,base,editor,origin:task.origin,build:task.build,mode,extra});
+  if(value?.pending_mask!==true)return value;
+  await page.waitForTimeout(Math.min(100,remaining()));
+  }
  };
  const click=async(mode,extra)=>{const point=await inspect(mode,extra);effect=true;await page.mouse.click(point.x,point.y);};
  try {
