@@ -578,7 +578,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
     if infer_marker:
         null_marker = export_null_marker(export_events, destination)
-        assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
+        assert not any(row[col['name']] is not None and str(row[col['name']].get('value') if col['type'] == 'variant' and isinstance(row[col['name']], dict) else row[col['name']]) == null_marker
                        for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
     elif null_marker is None:
         null_marker = ''
@@ -615,7 +615,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
-        if scenario_name in ['quality-default', 'quality-spikes'] and col['type'] == 'variant':
+        if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())
         if col['type'] in ['integer', 'real']:

@@ -21,6 +21,25 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_typed_variant_csv_uses_existing_scalar_rules_and_null_collision_guard(self):
+        expected = dict(columns=[dict(name='Value', type='variant')], rows=[dict(Value=v) for v in [
+            dict(cell_type='integer', value=7), dict(cell_type='boolean', value=False),
+            dict(cell_type='string', value='Привет'), dict(cell_type='datetime', value='2026-01-02T03:04:05.006'),
+            None, dict(cell_type='real', value=1.25), dict(cell_type='string', value=''), dict(cell_type='integer', value=0)]])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'rows.csv'
+            path.write_text('Value\n7\nfalse\nПривет\n2026-01-02T03:04:05.006\n?\n1.25\n""\n0\n')
+            runner.check_csv(path, expected, null_marker='?', scenario_name='variables-rows')
+            for source, replacement in [('05.006', '05.000'), ('false', '0'), ('1.25', '1.2')]:
+                original = path.read_text()
+                path.write_text(original.replace(source, replacement))
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, expected, null_marker='?', scenario_name='variables-rows')
+                path.write_text(original)
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                runner.check_csv(path, expected, null_marker=None,
+                                 export_events=self.export_events(marker=''), destination='/test/all.csv')
+
     def test_assnrules_fixture_ports_and_model_boundary(self):
         for name, counts in [('assnrules-basic', [4, 2]), ('assnrules-length', [6, 6])]:
             case = runner.scenario(name)

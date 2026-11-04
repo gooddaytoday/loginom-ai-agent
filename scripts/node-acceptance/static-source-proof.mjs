@@ -145,7 +145,7 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
   catch(error){if(!String(error.message).startsWith('Workspace changed between observation pages;')||attempt===2)throw error;}
  };
  const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
- const directory=()=>ready(async()=>{const s=await roots(),bar=s.ui.elements.find(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');return bar?detail(s,bar):null;},s=>s.file_storage?.status==='observed');
+ const directory=expected=>ready(async()=>{const s=await roots(),bar=s.ui.elements.find(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');return bar?detail(s,bar):null;},s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
  const row=async(name,parent)=>{
   let last;const observed=async options=>{const s=await read(options.root_ref?{rootRef:options.root_ref,observationId:last?.observation_id}:{scope:'roots',...(options.storage_name?{storageName:options.storage_name}:{})});need(s.dom_epoch.document===parent.dom_epoch.document&&JSON.stringify(s.workflow_ref)===JSON.stringify(parent.workflow_ref),'storage owner changed');last=s;return s;};
   return findNativeStorageRow({name,roots:()=>observed({discover_roots:true}),read:observed,ready,act,guard:()=>{}});
@@ -155,8 +155,8 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
  s=await directory();
  const own='/'+account;
  if(s.file_storage.directory!==own){
-  if(s.file_storage.directory!=='/'){await act(s,one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'&&e.allowed_actions.includes('click')),'storage root'));s=await directory();need(s.file_storage.directory==='/','storage root changed');}
-  const r=await row(account,s);await act(r,one(r.ui.elements.filter(e=>e.label===account&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'own source folder'),'double_click');s=await directory();
+  if(s.file_storage.directory!=='/'){await act(s,one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'&&e.allowed_actions.includes('click')),'storage root'));s=await directory('/');need(s.file_storage.directory==='/','storage root changed');}
+  const r=await row(account,s);await act(r,one(r.ui.elements.filter(e=>e.label===account&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'own source folder'),'double_click');s=await directory(own);
  }
  need(s.file_storage.directory===own,'own storage required');
  const proofs=new Map();

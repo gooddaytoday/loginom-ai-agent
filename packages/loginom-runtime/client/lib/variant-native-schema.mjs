@@ -15,6 +15,10 @@ export const nativeCellSchema={anyOf:[
  scalar('datetime',7,'native_oadate_binary64_le',bytes,{encoding:fixed('oadate-binary64-le'),bits:fixed(64),bytes_le:bytes,
   temporal_profile:fixed('loginom-7.4.2-native-oadate'),semantic_scope:fixed('native_serial_only'),civil_time_verified:fixed(false),epoch_verified:fixed(false)},
  {decimal:str,timezone:fixed('unspecified')}),
+ scalar('datetime',7,'local_datetime',{type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}$'},
+  {encoding:fixed('oadate-binary64-le'),bits:fixed(64),bytes_le:bytes,temporal_profile:fixed('loginom-7.4.2-native-oadate'),
+   semantic_scope:fixed('browser_civil_time'),civil_time_verified:fixed(true),epoch_verified:fixed(true)},
+  {decimal:str,timezone:{type:'string',minLength:1,maxLength:128}}),
 ]};
 export const nativePortProperties={
  exact_table:obj({rows:{type:'array',maxItems:50,items:{type:'array',minItems:1,maxItems:8,items:nativeCellSchema}},complete:fixed(true)}),
