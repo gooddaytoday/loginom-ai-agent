@@ -1,0 +1,178 @@
+{
+  "transactions": {
+    "transaction_count": 4,
+    "itemsets": [
+      {
+        "items": [
+          "A"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "B"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "C"
+        ],
+        "count": 2,
+        "support_pct": 50.0
+      },
+      {
+        "items": [
+          "A",
+          "B"
+        ],
+        "count": 2,
+        "support_pct": 50.0
+      }
+    ],
+    "rules": [
+      {
+        "antecedent": [
+          "A"
+        ],
+        "consequent": [
+          "B"
+        ],
+        "support_pct": 50.0,
+        "confidence_pct": 66.66666666666667,
+        "lift": 0.8888888888888888
+      },
+      {
+        "antecedent": [
+          "B"
+        ],
+        "consequent": [
+          "A"
+        ],
+        "support_pct": 50.0,
+        "confidence_pct": 66.66666666666667,
+        "lift": 0.8888888888888888
+      }
+    ]
+  },
+  "length": {
+    "transaction_count": 4,
+    "itemsets": [
+      {
+        "items": [
+          "A"
+        ],
+        "count": 4,
+        "support_pct": 100.0
+      },
+      {
+        "items": [
+          "B"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "C"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "A",
+          "B"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "A",
+          "C"
+        ],
+        "count": 3,
+        "support_pct": 75.0
+      },
+      {
+        "items": [
+          "B",
+          "C"
+        ],
+        "count": 2,
+        "support_pct": 50.0
+      }
+    ],
+    "rules": [
+      {
+        "antecedent": [
+          "A"
+        ],
+        "consequent": [
+          "B"
+        ],
+        "support_pct": 75.0,
+        "confidence_pct": 75.0,
+        "lift": 1.0
+      },
+      {
+        "antecedent": [
+          "A"
+        ],
+        "consequent": [
+          "C"
+        ],
+        "support_pct": 75.0,
+        "confidence_pct": 75.0,
+        "lift": 1.0
+      },
+      {
+        "antecedent": [
+          "B"
+        ],
+        "consequent": [
+          "A"
+        ],
+        "support_pct": 75.0,
+        "confidence_pct": 100.0,
+        "lift": 1.0
+      },
+      {
+        "antecedent": [
+          "B"
+        ],
+        "consequent": [
+          "C"
+        ],
+        "support_pct": 50.0,
+        "confidence_pct": 66.66666666666667,
+        "lift": 0.8888888888888888
+      },
+      {
+        "antecedent": [
+          "C"
+        ],
+        "consequent": [
+          "A"
+        ],
+        "support_pct": 75.0,
+        "confidence_pct": 100.0,
+        "lift": 1.0
+      },
+      {
+        "antecedent": [
+          "C"
+        ],
+        "consequent": [
+          "B"
+        ],
+        "support_pct": 50.0,
+        "confidence_pct": 66.66666666666667,
+        "lift": 0.8888888888888888
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "status": "approved_scope_pending_live_confirmation",
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "header": true,
+  "null_marker": "?",
+  "empty_string": "quoted empty CSV cell",
+  "main_fields": [
+    {"name": "RowID", "type": "integer"},
+    {"name": "Code", "type": "string"},
+    {"name": "Amount", "type": "real"},
+    {"name": "Flag", "type": "boolean"},
+    {"name": "Day", "type": "datetime"}
+  ],
+  "attached_fields": [
+    {"name": "BRowID", "type": "integer"},
+    {"name": "Code", "type": "string"},
+    {"name": "Rate", "type": "real"}
+  ],
+  "files": {
+    "main.csv": {"role": "main", "rows": 3},
+    "attached.csv": {"role": "attached", "rows": 2},
+    "attached-long.csv": {"role": "attached", "rows": 4},
+    "empty-main.csv": {"role": "main", "rows": 0},
+    "empty-attached.csv": {"role": "attached", "rows": 0}
+  },
+  "datetime": "local civil ISO datetime, no timezone conversion; whole seconds",
+  "precision": "All fixture integers are safe and real values exactly representable in binary64. Copying requires abs=rel=0."
+}

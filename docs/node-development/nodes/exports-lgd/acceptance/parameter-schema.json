@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "description": "New export requires all lgd_export fields; existing {} preserves settings.",
+  "properties": {
+    "lgd_export": {
+      "type": "object",
+      "description": "One new LGD file in native default compression mode.",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Absolute new .lgd path in own selected export directory."
+        },
+        "compression": {
+          "type": "string",
+          "enum": [
+            "lz4"
+          ],
+          "description": "Native observed LZ4; no LZO or uncompressed mode."
+        },
+        "checksum": {
+          "type": "string",
+          "enum": [
+            "compressed"
+          ],
+          "description": "Observed native checksum of compressed data."
+        },
+        "overwrite": {
+          "type": "string",
+          "enum": [
+            "reject"
+          ],
+          "description": "Reject an existing destination; no replace or append."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

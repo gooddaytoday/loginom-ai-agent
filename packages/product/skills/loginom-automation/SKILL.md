@@ -11,8 +11,6 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 # Построение сценария Loginom
 
-Дополнение данных: `transform.enrich_data` / `left`, `parameters.enrichment`; [правила](references/nodes/enrich-data.md).
-
 Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки: `loginom_file_admit` исходного пути → `dock_artifact_deliver` → `dock_artifact_delivery_status` до `ready`. Используй подтверждённый `destination`; не загружай этот полный файл ещё раз. После доставки работай с ним как с серверным источником по следующему циклу.
 
 Работай через управляемые инструменты текущей сессии. Активация этого skill
@@ -28,16 +26,6 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 `package_path`. Пакеты `.lgp` не регистрируются через `loginom_file_admit`.
 Если upload подтверждён, а open не удался, следуй выданному `next_step` с
 серверным путём и исходным `operation_id`; новый local-path вызов загружает новую копию.
-
-## Кластеризация
-
-Для k-means по признакам в разных единицах либо по просьбе пользователя задай
-`normalization:"standardize"` в параметрах Кластеризации: штатная стандартизация
-использует выборочное SD. По умолчанию нового узла — `none`; у существующего
-пропуск параметра сохраняет одинаковую поддерживаемую нормировку полей.
-Центры порта 1 возвращаются в исходных единицах, Distance порта 0 — в масштабе
-нормализованных признаков. Читай оба порта. Seed фиксируй для повторяемости;
-номера кластеров — метки, а не ранги. Другие нормализаторы не поддерживаются.
 
 ## Только загрузка файла
 
@@ -117,8 +105,6 @@ patch по схеме его типа. Дождись подтверждённо
 Последний вычисляющий узел (например, Группировку) выполни один раз через
 `loginom_dock_node_apply` с `finish:"execute"` и чтением его результата:
 `read:{ports:[0],sample_rows:100,require_exact_numbers:true}` для одного выхода.
-GET по полному URL без query-параметров допустим: `query_parameters:[]`, `inputs:[]`,
-`finish:"execute"`; входная таблица и URL-кодировщик не нужны.
 Для нескольких выходов используй порты по контракту узла. Для небольшой итоговой
 таблицы запрашивай не меньше её числа строк и проверь `sample_complete:true`.
 Значения для ответа, включая суммы и количества исходных записей, бери из этого
@@ -133,32 +119,6 @@ Execute вычисляющих узлов ради чтения, ответа и
 Округление значений и дополнительные узлы для него добавляй только по явной
 просьбе пользователя; формат отображения числа сам по себе этого не требует.
 
-## Экспорт
-
-Для текстового экспорта по умолчанию используй UTF-8. Только по явной просьбе
-пользователя укажи `encoding:"Windows-1251"` (как в Текстовом импорте).
-В Loginom 7.4.2 BOM для CP1251 игнорируется; выбирай `bom:false`.
-Символы вне CP1251 заменяются байтом `0x1A` (SUB): наблюдалось для `漢` и emoji.
-Предупреди пользователя об этой потере; не обещай сохранность произвольного Unicode.
-
-Для книги Excel выбирай `dock_node_apply` с `target.type:"exports.excel"`,
-`mode:"xlsx"`, одним входом 0 и `parameters.excel_export`:
-`destination` — новый `.xlsx` в выбранном каталоге экспорта, `sheet_name` —
-явное имя единственного листа, `header:"none"|"names"|"labels"`, `overwrite:"reject"`.
-У нового узла нужны все четыре параметра. `finish:"execute"`,
-`read:{ports:[],sample_rows:0,require_exact_numbers:false}` возвращают
-`output.file_artifacts`: доставь этот XLSX пользователю. Сохраняй типы и порядок
-исходной таблицы без округления и преобразования текста в формулы.
-Существующий файл отклоняется; выбирай новый путь. Для существующего узла
-пропущенные настройки сохраняются. `done` сохраняет настройки без файла,
-`close` отменяет черновик; пакет сохраняй отдельно. Для самой выгрузки в Excel
-используй этот узел; вычисляющие узлы нужны только для запрошенных вычислений.
-
-Если в выгружаемых данных есть NULL и пустые строки, а пользователь не задал маркер выгрузки,
-для `exports.text` явно передай в параметре `null_marker` непустой маркер,
-не совпадающий с не-NULL значениями. По умолчанию выбери тот же непустой маркер, что при импорте,
-если он был задан; иначе `NULL`. Назови выбранный маркер пользователю.
-
 ## Выбор узлов
 
 По умолчанию решай задачу стандартными узлами из текущего каталога, включая
@@ -166,24 +126,56 @@ Execute вычисляющих узлов ради чтения, ответа и
 требуемый шаг доступными стандартными узлами и режимами.
 
 Для операций ниже используй указанные штатные узлы и режимы, без замены
-Калькулятором или JavaScript. **Перед настройкой прочитай соответствующий раздел
-[настроек узлов](references/node-settings.md)**: там обязательные параметры,
-порты, patch, порядок результатов и ограничения; затем запроси `parameter_schema`.
+Калькулятором или JavaScript. **Перед настройкой прочитай файл нужного узла из
+таблицы**: там обязательные параметры, порты, patch, порядок результатов и
+ограничения; затем запроси `parameter_schema`.
+Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
+для словаря соответствий с другим типом результата — Замену.
+Для ответа REST → таблица используй Калькулятор → Свёртка → Кросс-таблица;
+деревья выбирай по просьбе о дереве или для ровных записей без вложенных контейнеров.
+На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
+Не подменяй эти режимы другим алгоритмом.
 
-| Задача | Тип и режим | Граница поддержки |
+Пути `references/nodes/…` в таблице заданы относительно `Base directory for this skill`
+из вывода SkillTool. Присоединяй к этому каталогу путь ссылки буквально: не сокращай
+и не набирай вручную. Список ресурсов SkillTool содержит только выборку (≤10 файлов);
+путь нужного узла бери из таблицы, даже если его нет в этой выборке.
+
+| Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
-| Пирсон числовых полей | `research.corr_analysis`, `pearson` | Непустой источник, ≥2 совместных наблюдений на пару; другие коэффициенты недоступны. |
-| Тип значений замены | `transform.replace_columns`, `exact` | Для словаря соответствий с другим типом результата выбирай Замену; для вычисляемой формулы или разбора произвольного текста — Калькулятор. См. `references/node-settings.md`. |
-| Regex-замена | `transform.replace_columns`, `regex` | Первое совпадение заменяет всю ячейку константой; без подстановок групп. Смешанные exact/regex таблицы и неподдержанные конструкции — отказ. |
-| Выбросы SD/IQR | `preprocessing.elim_outlier`, `detect` | Непрерывные числовые поля, keep/keep, обучение на текущем входе. Другие политики, quality и apply недоступны. |
-| Лаги предыдущих/следующих строк | `transform.sliding_window`, `lag` | Время задаёт входной порядок; явная политика неполных краёв. |
-| Слияние двух таблиц по ключам | `transform.join_data`, `right`/`full`/`difference` | Все правые / обе стороны / левые без пары. Типы ключей совпадают. |
-| Первые/последние N строк | `preprocessing.sampling`, `sequential` | `position:first/last`, размеры в строках. |
-| Последовательное разбиение | `preprocessing.data_partition`, `sequential` | Размеры train/test и порядок выделения; без обучения. |
-| Случайная выборка/разбиение | Те же sampling/data_partition, `mode:"random"` | Явные размеры и seed; повтор на том же источнике/seed. Stratified, biased и равномерный случайный метод: «Этот режим пока не поддерживается». Не подменяй эти режимы другим алгоритмом. |
-| Бинарная строковая цель, вероятность и отбор факторов | `datamining.log_regression`, `enter/forward/backward/stepwise` | Пользовательские критерии и пороги включения/исключения не поддерживаются; сообщи ограничение без подмены стандартным отбором. |
-| LinReg на новых данных | Обученный LinReg, `apply` | Сохранённые input_fields/target_field; enter обучает/переобучает. |
-| Календарные признаки datetime | `transform.date_time`, `calendar` | Год/квартал/месяц/день/час, границы периодов, ISO-год/неделя/понедельник. `iso_week_end` недоступен из-за ошибки Loginom: сообщи ограничение без подстановки вычисления. |
+| Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
+| Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
+| JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
+| Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
+| Первые/последние/случайные N | `preprocessing.sampling` / sequential, random | [читать](references/nodes/preprocessing.sampling.md) |
+| Train/test по порядку/случайно | `preprocessing.data_partition` / sequential, random | [читать](references/nodes/preprocessing.data_partition.md) |
+| Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |
+| Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise | [читать](references/nodes/datamining.log_regression.md) |
+| Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
+| Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
+| REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
+| Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply | [читать](references/nodes/datamining.lin_regression.md) |
+| Кластеризация k-means | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
+| Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
+| Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
+| Заполнение NULL | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
+| Экспорт XLSX | `exports.excel` / xlsx | [читать](references/nodes/exports.excel.md) |
+| Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |
+| Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |
+| Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |
+| Вычисляемые формулы | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
+| Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
+| Фильтрация строк | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
+| Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
+| Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
+| Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
+| Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
+| Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
+| Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
+| Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |
+| Добавление строк таблиц | `transform.union_data` / append_all | [читать](references/nodes/transform.union_data.md) |
+| Дополнение данных | `transform.enrich_data` / left | [читать](references/nodes/transform.enrich_data.md) |
+| Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
@@ -214,25 +206,11 @@ Execute вычисляющих узлов ради чтения, ответа и
 JS-узлы не удаляй автоматически; их наличие не разрешает переносить в них
 другие стандартно решаемые шаги.
 
-Путь ресурса копируй из списка буквально: не сокращай и не набирай вручную.
+Путь ресурса копируй из ссылки или списка буквально: не сокращай и не набирай вручную.
 Перед созданием первого узла прочитай [порядок работы](references/workflow.md).
 Для незнакомого обработчика сначала запроси его `parameter_schema` через
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
-
-## Группировка
-
-Меняя `measures` existing Группировки, задай полный `group_by` и связь входа 0 в `inputs`.
-
-## Кросс-таблица
-
-При смене ролей укажи полный набор ключей, колонок, фактов, режим и явный вход 0.
-Настройки проверяй по `configuration.readback` завершённой операции.
-После `finish:"done"` или осмотра мастера снова выполни и прочитай Кросс-таблицу
-перед подключением следующего узла, включая экспорт: её выход деактивируется.
-Для повтора используй `loginom_dock_node_read` с `source_operation_id` последней
-успешной настройки с `finish:"execute"`. Если Execute ещё не было, выполни тот же
-существующий узел с `parameters:{}` и `finish:"execute"`.
 
 ## Браузер и владение операцией
 
@@ -286,37 +264,9 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 `settings.source.source_path`. Произвольный путь или придуманные artifact/upload IDs
 не доказывают происхождение. Структура и preview мастера имеют `coverage=preview`:
 это не SHA, не точный полный N и не проверка редких значений.
-Для серверного текста сначала вызови `dock_node_apply` для `imports.text` с
-`parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
-`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`. Это открывает
-мастер и возвращает `output.server_profile`, затем закрывает черновик без Execute.
-Если кодировка известна, укажи её в `settings.source.encoding` (например, `CP1251`). Если кириллица preview искажена при UTF-8, снова найди исходный путь через `dock_storage_source` и повтори preview с `CP1251`; не считай искажённый текст данными файла.
-Preview — до 25 отображённых строк, с явной неполнотой и ограничением ответа;
-полный N и редкие типы не доказаны. После скачивания и создания выборки переиспользуй
-этот узел по возвращённому ref: пустая конфигурация после Close требует полных
-настроек импорта выборки из локального профиля.
 
-Для серверного цикла «скачать источник в cache → выборка → полный файл» снова
-найди исходный путь через `loginom_dock_storage_source`, затем вызови
-`loginom_dock_storage_download_start` с возвращённым `server_source_ref` и новым
-`operation_id`. Дождись завершения через status/wait с тем же `operation_id`.
-Только успешный download разрешает профиль, точный `loginom_file_scan` и
-`loginom_file_sample` по возвращённому локальному `output.path`.
-Зарегистрируй и доставь только выборку; полный файл уже есть на сервере.
-Построй сценарий на выборке и сохрани checkpoint. Для `source_switch` передай
-`profile_id` скачанной копии и исходный серверный источник `kind:"storage"`.
-Перед переключением снова открой его каталог через `loginom_dock_storage_source`.
-Runtime заново сверяет native size/mtime и связь точного scan с копией в cache.
-При `LOGINOM_FILE_CHANGED` останови полный расчёт: найди исходник заново и повтори
-скачивание и точную сверку в новой операции. Старый cache не подтверждает подменённый файл.
-Проверка источника может оставить навигацию в Files. Перед Save вернись через
-`loginom_dock_prepare` с `intent:"existing_workflow"` и последним `workflow_ref`
-этого runtime, включив `document_id`; после Save бери ссылку из
-`workflow_continuations`. Затем Save с новым `operation_id`. Такой возврат
-восстанавливает навигацию, но не разрешает полный расчёт по старому cache.
-Не подменяй точную сверку числом видимых строк или preview, не экспортируй и
-не загружай полный серверный исходник повторно. После завершения вызови
-`loginom_dock_storage_download_cleanup` с operation_id скачивания.
+Для серверного цикла «скачать источник в cache → выборка → полный файл»
+сначала прочитай и выполни [порядок скачивания и сверки](references/workflow.md#серверный-источник-и-cache).
 
 Для цикла «выборка → полный файл» сначала нужен полный локальный
 источник (либо проверенная серверная копия в cache) и успешный `loginom_file_scan` без ошибок типов.
@@ -353,25 +303,6 @@ BufferedStore и число групп не заменяют его. Затем 
 Успешный `exports.text` уже возвращает скачанные, проверенные `file_artifacts`.
 Не скачивай этот итог повторно через server source cache; сохрани пакет и сообщи результат.
 
-Для XLSX профиль показывает листы и видимость, declared и наблюдённую размерность,
-систему дат, формулы и cached values. Выбери нужный `sheet_name`; declared dimension
-не доказывает число записей. `loginom_file_sample` создаёт XLSX с теми же типами и
-форматами, его доставляй как XLSX и настраивай Excel-импорт по `settings.excel`
-профиля; `source` (artifact/upload IDs) и `excel.source_path` заполни из доставки.
-Не преобразуй книгу в CSV. Формулы в выборке — cached values, без пересчёта;
-отсутствующий cache требует уточнения исходника. `settings_complete=false`
-запрещает объявлять настройки готовыми: Excel-узел поддерживает 1–12 колонок,
-1–10 строк заголовка и импорт пустых строк. Более широкую книгу профилировать можно.
-Указанный пользователем лист передавай точным именем в `excel.sheet_name`;
-без выбора листа сохраняется прежнее поведение — первый лист книги.
-
-Если просьба меняет настройки существующего Импорта, сначала проверь наличие
-подтверждённого исходного CSV. Без него запроси файл до выполнения или чтения
-неизменённого Импорта: такое чтение добавляет таблицу визуализатора в пакет даже при
-последующем отказе изменения настроек. Если запрос изменения уже отклонён с
-`NOT_APPLIED`, `effect_possible=false`, не выполняй baseline и не сохраняй пакет
-ради cleanup; сообщи отказ и попроси исходный CSV.
-
 В продолжении после открытия пакета сохранение не доказывает активность выхода.
 Перед новым `transform.calculator`, `transform.filter_data` или `transform.sorting` подтверди нужный
 выход того же существующего табличного источника. Используй `loginom_dock_node_read`
@@ -384,20 +315,6 @@ BufferedStore и число групп не заменяют его. Затем 
 узел ещё не создан: после выполнения источника повтори запрос с новым operation_id,
 не пересоздавая источник и не освобождая несуществующий целевой узел. Это не разрешает
 повтор неизвестного запуска или автоматический запуск REST/JS/экспорта вне просьбы.
-
-Калькулятор проверяет формулы через «Предпросмотр» до завершения настройки.
-При `WIZARD_CALCULATOR_VALIDATION_FAILED` используй текст Loginom и имена
-вычисляемых полей из отказа: исправь формулу и выполни `next_step` с новым
-operation_id на том же узле. После подтверждённой отмены черновика не вызывай
-`node_wait` и не жди отключения узла; сохрани существующие связи.
-
-## JSON в дерево и дерево в таблицу
-
-Для ответа REST → таблица используй Калькулятор → Свёртка → Кросс-таблица; при отказе деревьев вернись к этому пути. `trees.from_json` / `auto_structure` → `trees.to_table` / `selected_nodes` выбирай по просьбе о дереве или для ровных записей без вложенных контейнеров. Сначала прочитай [параметры и ограничения](references/node-settings.md#json-в-дерево-и-дерево-в-таблицу).
-
-## Квантование числового поля
-
-Для интервалов числового поля выбирай `preprocessing.binning`, без Калькулятора и JavaScript; перед настройкой прочитай [детали internal/apply, параметров и обоих выходов](references/node-settings.md#квантование-числового-поля). Сохранение узла не сохраняет пакет — в конце используй `package.save_checkpoint`.
 
 ## Справка и происхождение
 
@@ -432,10 +349,3 @@ operation_id на том же узле. После подтверждённой 
 Если пользователь далее просит документацию, активируй `package-docs` после
 завершения текущей операции. Для документации требуется локальный .lgp:
 автоматического скачивания сохранённого серверного пакета в этом workflow нет.
-
-## Автокорреляция и сглаживание
-
-Для зависимости ряда от предыдущих значений выбирай `research.auto_correlation` / `time_domain`; перед настройкой прочитай [детали параметров, NULL и выходов](references/node-settings.md#автокорреляция). Не заменяй узел корреляцией сдвинутых полей, Калькулятором или JavaScript.
-
-Для тренда Ходрика–Прескотта выбирай `preprocessing.smoothing` / `hodrick_prescott`; перед настройкой прочитай [детали параметров, NULL и выходов](references/node-settings.md#сглаживание-ходрикапрескотта). Не заменяй узел Калькулятором или JavaScript.
-После замены файла выполняй прежний узел, не пересоздавай его.

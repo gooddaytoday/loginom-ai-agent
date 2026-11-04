@@ -43,7 +43,7 @@ test('enrich model contract stays within apply, type card and node-reference bud
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
  const apply=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
  assert.ok(Buffer.byteLength(JSON.stringify(apply.inputSchema))<=20000);
- const reference=readFileSync(new URL('../../../product/skills/loginom-automation/references/nodes/enrich-data.md',import.meta.url),'utf8');
+ const reference=readFileSync(new URL('../../../product/skills/loginom-automation/references/nodes/transform.enrich_data.md',import.meta.url),'utf8');
  assert.ok(Buffer.byteLength(reference)<=6000);
  assert.doesNotMatch(reference,/\$(?:[1-9][0-9]*|ARGUMENTS)\b/);
 });
