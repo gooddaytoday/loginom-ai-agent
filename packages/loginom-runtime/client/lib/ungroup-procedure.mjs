@@ -34,9 +34,15 @@ export async function configureUngroup(channel,p,{request}){
   none:'Не_округлять',precision:'Округлять_до_заданной_точности',multiple:'Округлять_до_кратного_целому'}[u.rounding.format],c=>c.ungroup.rounding.format===u.rounding.format);
  if(u.rounding.format!=='none'&&s.node_ungroup.ungroup.rounding.value!==u.rounding.value){
   const find=t=>{const tid=t.wizard.root_tid+';UngroupDataWizard;pedRoundParam;ValueControl';const es=t.ui.elements.filter(e=>e.identity?.anchor_tid===tid&&e.allowed_actions.includes('fill'));need(es.length===1,'round parameter input unavailable');return es[0];};
+  const binding=s.prepared_node_context,root=s.wizard.root_tid,editor=find(s).identity,text=String(u.rounding.value);
+  need(binding?.verified,'rounding editor owner unavailable');
+  const draftReady=t=>t.wizard?.stage==='ungroup'&&t.wizard.root_tid===root&&same(t.prepared_node_context,binding)
+   &&t.ui.elements.filter(e=>same(e.identity,editor)&&e.value===text&&e.allowed_actions.includes('fill')&&e.allowed_actions.includes('press')).length===1;
   await channel.perform({condition:'set ungroup rounding value',initialObservation:s,ready:stable,identity:t=>t.node_ungroup,resolve:t=>({verb:'fill',ref:find(t).ref,text:String(u.rounding.value)})});
-  s=await channel.observe({condition:'rounding value editor',readUngroup:true,ready:stable});
-  await channel.perform({condition:'commit ungroup rounding value',initialObservation:s,ready:stable,identity:t=>t.node_ungroup,resolve:t=>({verb:'press',ref:find(t).ref,key:'Tab'})});
+  // The cached property proof is intentionally invalid between typing and blur.
+  // Commit only the same observed editor; recheck every native setting afterward.
+  s=await channel.observe({condition:'rounding value editor',readUngroup:false,ready:draftReady});
+  await channel.perform({condition:'commit ungroup rounding value',initialObservation:s,ready:draftReady,identity:t=>t.prepared_node_context,resolve:t=>({verb:'press',ref:find(t).ref,key:'Tab'})});
   s=await channel.observe({condition:'rounding value committed',readUngroup:true,ready:t=>stable(t)&&t.node_ungroup.ungroup.rounding.value===u.rounding.value});changes.push('rounding.value');
  }
  if(s.node_ungroup.ungroup.balance!==u.balance)await choose('pedBalanceMethod;ValueControl',{
