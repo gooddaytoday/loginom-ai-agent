@@ -29,9 +29,16 @@ export function readFactorAnalysisBrowser(prefix) {
    if(sw.length>1)return {verified:false,reason:'factor_analysis_switch'};
    switches[key]=sw.length===1&&globalThis.Ext?.getCmp?.(sw[0].id)?.pressed===true;
   }
+  const radioValue=key=>{
+   const value=values[key];
+   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==1)return;
+   const selected=Object.values(value)[0];return ['0','1','2'].includes(selected)?Number(selected):undefined;
+  };
+  const criterion=radioValue('pedSignificanceCriterion'),rotation=radioValue('pedRotationType');
+  if(criterion===undefined||rotation===undefined)return {verified:false,reason:'factor_analysis_radio_value'};
   const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(parameterBase+'cntOutFactorsMax;cnt;chb')+']')],cap=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);
   if(cap?.el?.dom!==es[0]||typeof cap.getValue?.()!=='boolean'||!Number.isSafeInteger(values.pedNFactors))return {verified:false,reason:'factor_analysis_cap'};
-  return {verified:true,kind:'parameters',criterion:values.pedSignificanceCriterion,factors:values.pedNFactors,rotation:values.pedRotationType,output_cap:cap.getValue(),values,switches};
+  return {verified:true,kind:'parameters',criterion,factors:values.pedNFactors,rotation,output_cap:cap.getValue(),values,switches};
  }
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;TuneDataSourceInputPortWizard;';
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];

@@ -39,7 +39,7 @@ test('PCA controls are read from owned visible DOM and cached native values',asy
  const base='MF;TF;WizrdMCF;FactorAnalysisWizard;',elements=[],components={};
  const add=(tid,value)=>{const element={id:'c'+elements.length,tid,checkVisibility:()=>true};elements.push(element);components[element.id]={el:{dom:element},getValue:()=>value};return element;};
  add(base.slice(0,-1));
- for(const [name,value] of Object.entries({pedSignificanceCriterion:2,pedEigenValuesThreshold:1,pedCumDispersion:90,pedNFactors:2,pedRotationType:0,pedNOutFactorsMax:1}))add(base+name+';ValueControl',value);
+ for(const [name,value] of Object.entries({pedSignificanceCriterion:{'enumRadioPropEdit-2609enumGroup':'2'},pedEigenValuesThreshold:1,pedCumDispersion:90,pedNFactors:2,pedRotationType:{'enumRadioPropEdit-2639enumGroup':'0'},pedNOutFactorsMax:1}))add(base+name+';ValueControl',value);
  const cap=add(base+'cntOutFactorsMax;cnt;chb',false);
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
  const read=()=>runInNewContext('('+readFactorAnalysisBrowser.toString()+')("MF;TF")',context);
@@ -104,4 +104,27 @@ test('PCA readback requires distinct completed training and execution receipts',
  for(const change of [p=>p.at(-1).value.training.execution_id='execute',p=>p.at(-1).value.training.status='not_requested',p=>p[1].value.configuration.rotation='varimax',p=>p[1].value.configuration.node_context={...node,node_id:'foreign'}]){
   const bad=structuredClone(phases);change(bad);assert.throws(()=>factorAnalysisConfigurationReadback({node,phases:bad,operation_id}));
  }
+});
+
+test('observed PCA radio DisplayEl controls select fixed count and no rotation',async()=>{
+ const {configureFactorAnalysis}=await import('../lib/factor-analysis-procedure.mjs');
+ const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'pca'};
+ const nativeFields=fields.map((f,index)=>({...f,index,field_id:String(index),record_id:'r'+index}));
+ const source_fields=nativeFields.map((f,i)=>({...f,record_id:'s'+i}));
+ const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...owner,input_port:{port:0}},source_fields,target_fields:nativeFields.map((f,i)=>({...f,source:source_fields[i]}))};
+ let stage='input_mapping',criterion=0,rotation=1,output_cap=true;const actions=[];
+ const control=key=>({tid:'wizard;FactorAnalysisWizard;'+key,ref:key,allowed_actions:['set_checked']});
+ const state=()=>({prepared_node_context:owner,wizard:{stage,root_tid:'wizard'},ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},
+  ...['pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl','pedRotationType;ValueControl;radiofield;DisplayEl','cntOutFactorsMax;cnt;chb;InputEl'].map(control)]},
+  node_factor_analysis:stage==='input_mapping'?{verified:true,inventory_complete:true,node_context:owner,fields:nativeFields}
+   :{verified:true,kind:'parameters',criterion,rotation,factors:2,output_cap,values:{pedEigenValuesThreshold:1,pedCumDispersion:90,pedNOutFactorsMax:1},switches:{}}});
+ const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform(task){const s=state();assert.equal(task.ready(s),true);const a=task.resolve(s);actions.push(a);
+  if(a.verb==='wizard_step')stage=a.expected_stage;
+  else if(a.ref.startsWith('pedSignificanceCriterion'))criterion=2;
+  else if(a.ref.startsWith('pedRotationType'))rotation=0;
+  else if(a.ref.startsWith('cntOutFactorsMax'))output_cap=false;
+  return {verified:true};}};
+ const r=await configureFactorAnalysis(channel,parameters,{inputMapping,request:{target:{kind:'new'}}});
+ assert.equal(r.configuration.rotation,'none');assert.equal(r.configuration.factors,2);assert.equal(r.configuration.output_cap,false);
+ assert.deepEqual(actions.filter(a=>a.verb==='set_checked').map(a=>a.ref),['pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl','pedRotationType;ValueControl;radiofield;DisplayEl','cntOutFactorsMax;cnt;chb;InputEl']);
 });

@@ -65,7 +65,7 @@ export async function configureFactorAnalysis(channel,p,{inputMapping}){
  // no rotation option 0. Existing omission only preserves supported settings.
  need(a.factors!==undefined||old.criterion===2,'existing automatic criterion unsupported; provide factors');
  need(a.rotation!==undefined||old.rotation===0,'existing rotation unsupported; provide rotation none');
- for(const [name,value,key] of [['criterion',2,'pedSignificanceCriterion;ValueControl;radiofield-2'],['rotation',0,'pedRotationType;ValueControl;radiofield']]){
+ for(const [name,value,key] of [['criterion',2,'pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl'],['rotation',0,'pedRotationType;ValueControl;radiofield;DisplayEl']]){
   state=await observe('PCA '+name+' before edit');if(state.node_factor_analysis[name]===value)continue;
   await act(state,key,{verb:'set_checked',checked:true});state=await observe('PCA '+name+' readback');need(state.node_factor_analysis[name]===value,'PCA '+name+' differs');
  }
@@ -74,7 +74,7 @@ export async function configureFactorAnalysis(channel,p,{inputMapping}){
   await act(state,'pedNFactors;ValueControl',{verb:'fill',text:String(factors)});state=await observe('PCA factors before commit');
   await act(state,'pedNFactors;ValueControl',{verb:'press',key:'Tab'});
  }
- state=await observe('PCA output cap');if(state.node_factor_analysis.output_cap)await act(state,'cntOutFactorsMax;cnt;chb;DisplayEl',{verb:'set_checked',checked:false});
+ state=await observe('PCA output cap');if(state.node_factor_analysis.output_cap)await act(state,'cntOutFactorsMax;cnt;chb;InputEl',{verb:'set_checked',checked:false});
  const after=(await observe('complete fixed PCA readback')).node_factor_analysis;
  need(after.criterion===2&&after.rotation===0&&after.factors===factors&&after.output_cap===false,'PCA settings differ');
  need(['pedEigenValuesThreshold','pedCumDispersion','pedNOutFactorsMax'].every(k=>same(after.values[k],old.values[k])),'unrequested PCA settings changed');
