@@ -1,0 +1,14 @@
+{
+  "requests.json": {
+    "bytes": 432,
+    "sha256": "ece2a789231036254da2a1ba4953c7bec335df85b6de424a8a3de2304b77421c"
+  },
+  "utf8.txt": {
+    "bytes": 21,
+    "sha256": "227bf7cb3b9fbc393235c82fbe0f1a782b4ec4902985c3353c42e63b5f24c9c9"
+  },
+  "bytes.bin": {
+    "bytes": 5,
+    "sha256": "0150a92bb1212cd00516b65fde0704614760000963874fcbb11eaa734ee87809"
+  }
+}
