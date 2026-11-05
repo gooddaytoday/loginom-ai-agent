@@ -1,0 +1,49 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource,saveVariablesColumnUnionSource} from '../variables-column-union.mjs';
+const load=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-'+name+'-run.json',import.meta.url)));
+const initial=load('initial'),updated=load('updated');
+test('source Save targets only the completed owned upload and requires a completed native save',async()=>{
+ const calls=[],path='/worker/new-copy.lgp',proof={status:'SUCCEEDED',destination:path,upload_completion_verified:true,cleanup_complete:true};
+ const runtime={run:async(...args)=>{calls.push(args);return {status:'SUCCEEDED',output:{save_completed:true}};}};
+ await saveVariablesColumnUnionSource(runtime,path,proof);
+ assert.deepEqual(calls[0],['package.save_checkpoint',{path,conflict_policy:'replace'},{operationId:'source-save'}]);
+ for(const patch of [{destination:'/worker/foreign.lgp'},{upload_completion_verified:false},{status:'AMBIGUOUS'},{cleanup_complete:false}]){
+  calls.length=0;await assert.rejects(()=>saveVariablesColumnUnionSource(runtime,path,{...proof,...patch}));assert.equal(calls.length,0);
+ }
+ runtime.run=async()=>({status:'FAILED',output:{save_completed:false}});
+ await assert.rejects(()=>saveVariablesColumnUnionSource(runtime,path,proof),/SOURCE_SAVE/);
+});
+test('fixture delivery resumes only an explicit settled checkpoint before upload and never restarts delivery',async()=>{
+ const request={operation_id:'source'},calls=[];
+ const checkpoint={outcome:{status:'NOT_APPLIED',effect_possible:false,upload_submitted_or_unknown:false,inspection_required:false,cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume'}}};
+ const runtime={deliverPackageArtifact:async r=>{calls.push(r);return checkpoint;},resumeArtifactDelivery:async r=>{calls.push(r);return {outcome:{status:'SUCCEEDED'}};}};
+ assert.equal((await deliverVariablesColumnUnionSource(runtime,request)).outcome.status,'SUCCEEDED');
+ assert.equal(calls.length,2);assert.equal(calls[1].operation_id,'source');assert.ok(calls[1].resume_id);
+ for(const patch of [{inspection_required:true},{cleanup_complete:false},{upload_submitted_or_unknown:true}]){
+  calls.length=0;runtime.deliverPackageArtifact=async()=>({...checkpoint,outcome:{...checkpoint.outcome,...patch}});
+  assert.equal((await deliverVariablesColumnUnionSource(runtime,request)).outcome.status,'NOT_APPLIED');assert.equal(calls.length,0);
+ }
+});
+function history(){
+ const node={document_id:'doc',workflow_id:'wf',node_id:'u'},inputs=[0,1].map(input=>({kind:'variables',input,output:0,source:{...node,node_id:'s'+input}}));
+ const checkpoint=(id,expected)=>({phase:'node_checkpoint',result:{status:'SUCCEEDED',cleanup_complete:true,node,execution:{status:'completed',execution_id:id},
+  configuration:{readback:{kind:'variables_column_union',mapping:'automatic',input_count:2,inputs,mapping_fields:[{input:0,source_name:'a0',output_name:'a0'}]}},
+  output:{variable_ports:[{kind:'variables',port:0,read_id:id,execution_id:id,source:'execution',native_source:'VariablesForm',complete:true,fresh:true,count:12,
+   completeness:{loaded:true,count:12,store_count:12,unique_ids:12},variables:expected.variable_inventory.outputs[0].variables.map((v,index)=>({id:index,index,name:v.name,label:v.label,type:v.type,
+    cell:{type:v.type,is_null:v.value===null,value:v.type==='integer'&&v.value!==null?String(v.value):v.value,...(v.type==='integer'&&v.value!==null?{precision:'exact_integer'}:v.type==='real'?{precision:'17_significant_digits'}:{})}}))}]}}});
+ return [checkpoint('first',initial),{phase:'node_checkpoint',result:{status:'SUCCEEDED',cleanup_complete:true,node:inputs[1].source,execution:{status:'completed'},configuration:{readback:{kind:'variables_calculator',expressions:[{name:'a0',formula:'41'}]}}}},checkpoint('second',updated)];
+}
+test('union audit requires both complete ordered outputs, source patch, unchanged identities and input links',()=>{
+ assert.equal(auditVariablesColumnUnionHistory(history(),initial,updated).status,'PASS');
+ for(const corrupt of [e=>e.shift(),e=>e.splice(1,1),e=>e[2].result.node={node_id:'foreign'},e=>e[2].result.output.variable_ports[0].variables.reverse(),
+  e=>e[2].result.output.variable_ports[0].variables[6].cell.value='29',e=>e[2].result.output.variable_ports[0].variables[0].id=99,
+  e=>e[2].result.configuration.readback={...e[2].result.configuration.readback,inputs:[]},e=>e[2].result.execution.execution_id='first']){
+  const events=history();corrupt(events);assert.throws(()=>auditVariablesColumnUnionHistory(events,initial,updated));
+ }
+ const events=history();events[2].result.output.variable_ports[0].variables[10].cell.value+=5e-13;
+ assert.equal(auditVariablesColumnUnionHistory(events,initial,updated).status,'PASS');
+ events[2].result.output.variable_ports[0].variables[10].cell.value+=1e-7;
+ assert.throws(()=>auditVariablesColumnUnionHistory(events,initial,updated));
+});

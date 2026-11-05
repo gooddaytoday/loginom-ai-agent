@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
+import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
 
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
@@ -90,6 +91,11 @@ function nativeRestServiceEdge(graph,edge){
 // Effects are committed one at a time. A possible effect never retries a gesture.
 export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now, beforeTarget }) {
   validateNodeTargetRequest(request);
+  if(request.target.type==='variables.column_union'&&request.target.kind==='new'&&request.target.label===undefined){
+    signal?.throwIfAborted();
+    request=variablesColumnUnionTargetRequest(request,operation.targetPhase?.baseline??await adapter.observe(request,operation.deadline,signal));
+    validateNodeTargetRequest(request);
+  }
   const signature = digest(request);
   const state = operation.targetPhase ??= { signature, receipts: [], baseline: null, targetId: null, effect_possible: false };
   if (state.signature !== signature) throw new Error('Operation ID reused with a different node target');

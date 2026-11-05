@@ -311,6 +311,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'variables-column-union':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',
+                    source_package=src.parent / 'fixtures/source.lgp', variable_only=True, variable_audit='variables-column-union', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-column-union.mjs')
     if name in ['variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty']:
         src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
         variant = name.removeprefix('variables-datatovar').lstrip('-')
@@ -1361,7 +1366,7 @@ class Runner:
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
                 src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') == 'variables-calculator' else 'snapshot')})
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-column-union'] else 'snapshot')})
             return session, expected, None, None
         if refusal:
             self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
@@ -1484,6 +1489,9 @@ class Runner:
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    if spec.get('source_package'):
+                        write(folder / 'source-config.json', dict(login=login, package=r['package']))
+                        self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):

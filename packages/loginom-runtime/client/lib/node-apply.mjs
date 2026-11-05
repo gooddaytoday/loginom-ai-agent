@@ -34,6 +34,7 @@ export function validateNodeApplyRequest(request, handlers) {
   requireValue(handler.modes.includes(request.mode), 'Unsupported node configuration mode');
   requireValue(['done','execute','close'].includes(request.finish), 'Choose Done, Execute or Close explicitly');
   requireValue(Array.isArray(request.mappings) && request.mappings.length <= 16, 'Bounded port mappings required');
+  if(request.target.type==='variables.column_union')requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
