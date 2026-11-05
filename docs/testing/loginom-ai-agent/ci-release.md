@@ -127,23 +127,23 @@ Repository variables (адреса — параметры сборки, runtime 
 
 `vars.LOGINOM_UPDATES_FEEDS_OFF=true` — единственный явный способ собрать тег с выключенными фидами. Без него непроверенный тег, отсутствующие или некорректные GitHub endpoints завершают `verify` ошибкой; тихой успешной сборки тега без фида нет. Endpoints проверяются после удаления пробелов по краям: только HTTPS, без credentials, query и fragment; это относится и к заданному `LOGINOM_AI_AGENT_UPDATE_FEED`. Непроверенные branch/candidate сборки остаются с отключённым фидом. Окончательное разрешение вычисляет шаг `release-config` после проверки версии; все три native build job берут его output. Если разрешён GitHub, а `LOGINOM_AI_AGENT_UPDATE_FEED` не задан, адрес S3 выводится из встроенных endpoint/bucket. `--publish never` сохраняется; `updates.invalid` нужен только для генерации metadata.
 
-Задачи `release` (подпись YAML) и `mirror-updates` (запись S3) используют **Environment `release`**. Владелец настраивает для него обязательного ревьюера и хранит ключ подписи и ключ записи S3 только в секретах окружения. Если окружения ещё нет, GitHub создаст его при первом запуске; обязательного ревьюера нужно настроить до выдачи ключа подписи. Ключ чтения остаётся на уровне репозитория для каждой сборки Desktop.
+Задачи `release` (подпись YAML) и `mirror-updates` (запись S3) используют созданное владельцем **Environment `release`**. Владелец хранит ключ подписи и ключ записи S3 только в секретах окружения; обязательного ревьюера нужно настроить до выдачи ключа подписи. Ключ чтения остаётся на уровне репозитория для каждой сборки Desktop.
 
-| Secret                                | Где хранить                  | Назначение                                                                              |
-| ------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `LOGINOM_UPDATES_SIGNING_KEY`         | Только Environment `release` | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
-| `LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY` | Только Environment `release` | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
-| `LOGINOM_UPDATES_S3_WRITE_SECRET_KEY` | Только Environment `release` | Секрет ключа записи, только шаг mirror                                                  |
-| `LOGINOM_UPDATES_S3_READ_ACCESS_KEY`  | Repository secrets           | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |
-| `LOGINOM_UPDATES_S3_READ_SECRET_KEY`  | Repository secrets           | Secret Key чтения; ресурсы Desktop и проверка зеркала                                   |
+| Secret                               | Где хранить                  | Назначение                                                                              |
+| ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `LOGINOM_UPDATES_SIGNING_KEY`        | Только Environment `release` | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
+| `LOGINOM_UPDATES_S3_ACCESS_KEY`      | Только Environment `release` | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
+| `LOGINOM_UPDATES_S3_SECRET_KEY`      | Только Environment `release` | Секрет ключа записи, только шаг mirror                                                  |
+| `LOGINOM_UPDATES_S3_READ_ACCESS_KEY` | Repository secrets           | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |
+| `LOGINOM_UPDATES_S3_READ_SECRET_KEY` | Repository secrets           | Secret Key чтения; ресурсы Desktop и проверка зеркала                                   |
 
-Новые имена WRITE намеренно не совпадают с прежними repository-секретами. Все три критичных секрета должны существовать **только в Environment `release`**; при отсутствии любого из них шаг подписи/записи завершается с сообщением, называющим недостающий секрет. Одноимённые repository-копии не создавать; прежние repository write-секреты больше не читаются кодом и должны быть удалены владельцем.
+Ключи записи сохраняют прежние имена `LOGINOM_UPDATES_S3_ACCESS_KEY` и `LOGINOM_UPDATES_S3_SECRET_KEY`: владелец уже перенёс их в Environment `release` и удалил repository-копии. Ключ подписи `LOGINOM_UPDATES_SIGNING_KEY` также размещается **только в Environment `release`**. Эти секреты используются только в задачах с `environment: release`; при отсутствии любого из них шаг подписи/записи завершается с сообщением, называющим недостающий секрет. Одноимённые repository-копии не создавать.
 
 До помещения ключей владелец настраивает в GitHub:
 
 1. Tag ruleset для `v*`: ограничить создание доверенными release-акторами, запретить обновление и удаление тега; право `cut` дать только доверенному release App/владельцу.
 2. Environment `release` → Deployment branches and tags → **Selected branches and tags**, правило типа **tag** с шаблоном `v*`; branch deployment rules не добавлять.
-3. Required reviewers окружения: обязательный доверенный ревьюер, Prevent self-review; перед одобрением сверять SHA, источник workflow и разрешённый version-only diff. Приватный Ed25519 ключ и WRITE-пара размещаются только после настройки защиты.
+3. Required reviewers окружения: обязательный доверенный ревьюер, Prevent self-review; перед одобрением сверять SHA, источник workflow и разрешённый version-only diff. Приватный Ed25519 ключ и ключи записи размещаются только после настройки защиты.
 
 Документация: [tag rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets), [deployment policies и reviewers](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 

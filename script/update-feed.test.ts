@@ -45,24 +45,24 @@ type Workflow = {
 const workflow = () =>
   Bun.YAML.parse(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8")) as Workflow
 
-test("review 4: only release-environment WRITE secrets are accepted and missing keys fail clearly", async () => {
+test("review 4: original S3 secret names require release environment and missing keys fail clearly", async () => {
   const jobs = workflow().jobs
   expect(jobs.release.environment).toBe("release")
   expect(jobs["mirror-updates"].environment).toBe("release")
   const signStep = jobs.release.steps.find((step) => step.env?.LOGINOM_UPDATES_SIGNING_KEY)!
-  const writeStep = jobs["mirror-updates"].steps.find((step) => step.env?.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY)!
-  expect(writeStep?.env?.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY).toBe("${{ secrets.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY }}")
+  const writeStep = jobs["mirror-updates"].steps.find((step) => step.env?.LOGINOM_UPDATES_S3_ACCESS_KEY)!
+  expect(writeStep?.env?.LOGINOM_UPDATES_S3_SECRET_KEY).toBe("${{ secrets.LOGINOM_UPDATES_S3_SECRET_KEY }}")
   for (const [step, missing] of [
     [signStep, "LOGINOM_UPDATES_SIGNING_KEY"],
-    [writeStep, "LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY"],
-    [writeStep, "LOGINOM_UPDATES_S3_WRITE_SECRET_KEY"],
+    [writeStep, "LOGINOM_UPDATES_S3_ACCESS_KEY"],
+    [writeStep, "LOGINOM_UPDATES_S3_SECRET_KEY"],
   ] as const) {
     const env = {
       PATH: process.env.PATH!,
-      LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY: "",
-      LOGINOM_UPDATES_S3_WRITE_SECRET_KEY: "",
+      LOGINOM_UPDATES_S3_ACCESS_KEY: "",
+      LOGINOM_UPDATES_S3_SECRET_KEY: "",
     }
-    if (missing === "LOGINOM_UPDATES_S3_WRITE_SECRET_KEY") env.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY = "test-only"
+    if (missing === "LOGINOM_UPDATES_S3_SECRET_KEY") env.LOGINOM_UPDATES_S3_ACCESS_KEY = "test-only"
     const child = Bun.spawn(["bash", "-c", step.run!], { env, stdout: "pipe", stderr: "pipe" })
     const [code, out, err] = await Promise.all([
       child.exited,

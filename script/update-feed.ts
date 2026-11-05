@@ -597,8 +597,8 @@ export async function s3Store(
           endpoint: process.env.LOGINOM_UPDATES_S3_ENDPOINT,
           bucket: process.env.LOGINOM_UPDATES_S3_BUCKET,
           region: process.env.LOGINOM_UPDATES_S3_REGION,
-          access_key: process.env.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY,
-          secret_key: process.env.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY,
+          access_key: process.env.LOGINOM_UPDATES_S3_ACCESS_KEY,
+          secret_key: process.env.LOGINOM_UPDATES_S3_SECRET_KEY,
         }
   ) as {
     endpoint: string
@@ -607,8 +607,8 @@ export async function s3Store(
     access_key: string
     secret_key: string
   }
-  if (!config.access_key) throw Error("Missing required secret: LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY")
-  if (!config.secret_key) throw Error("Missing required secret: LOGINOM_UPDATES_S3_WRITE_SECRET_KEY")
+  if (!config.access_key) throw Error("Missing required secret: LOGINOM_UPDATES_S3_ACCESS_KEY")
+  if (!config.secret_key) throw Error("Missing required secret: LOGINOM_UPDATES_S3_SECRET_KEY")
   if (!config.endpoint || !config.bucket) throw Error("Missing S3 endpoint or bucket")
   const base = new URL(feedBase)
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash)
