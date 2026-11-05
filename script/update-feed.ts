@@ -32,9 +32,14 @@ type Desktop = {
 type Cli = { version: string; minSupportedVersion: string; downloads: Record<string, { url: string; sha256: string }> }
 export type Store = {
   get(name: string): Promise<Uint8Array>
-  put(name: string, bytes: Uint8Array | Blob, cache: string): Promise<void>
+  put(
+    name: string,
+    bytes: Uint8Array | Blob,
+    cache: string,
+    condition?: { ifMatch?: string; ifNoneMatch?: string },
+  ): Promise<void>
   head(name: string): Promise<{ size: number; cache: string; etag?: string } | undefined>
-  copy(from: string, to: string, cache?: string, condition?: { ifMatch?: string; ifNoneMatch?: string }): Promise<void>
+  copy(from: string, to: string, cache?: string): Promise<void>
   sha256?(name: string): Promise<string>
 }
 
@@ -302,17 +307,27 @@ export async function mirrorRelease(
     const path = `releases/${version}/${name}`
     if (!(await store.head(path))) await store.put(path, Bun.file(join(dir, name)), immutable)
   }
-  // Both channels point to the same immutable tree. Promotion is a server-side
-  // copy from that tree; it never downloads/re-signs/re-writes the release.
+  // cloud.ru applies CopyObject conditions to the source, not the destination.
+  // Read and verify the small signed documents, then conditionally PUT pointers.
+  const documents = new Map<string, Uint8Array>()
+  for (const name of names) {
+    const bytes = await store.get(`releases/${version}/${name}`)
+    const signature = await store.get(`releases/${version}/${name}.sig`)
+    for (const [file, data] of [
+      [name, bytes],
+      [name + ".sig", signature],
+    ] as const) {
+      if (new Bun.CryptoHasher("sha256").update(data).digest("hex") !== sums.get(file))
+        throw Error(`Immutable release differs: ${file}`)
+      documents.set(file, data)
+    }
+    if (!verifyUpdateSignature(bytes, decoder.decode(signature), keys)) throw Error(`Invalid source signature: ${name}`)
+    if ((Bun.YAML.parse(decoder.decode(bytes)) as Desktop).version !== version)
+      throw Error(`Invalid source version: ${name}`)
+  }
   const conditions = await checkPointers()
-  for (const name of names)
-    for (const suffix of ["", ".sig"])
-      await store.copy(
-        `releases/${version}/${name}${suffix}`,
-        `${target}/${name}${suffix}`,
-        "no-cache",
-        conditions.get(`${target}/${name}${suffix}`),
-      )
+  for (const [name, bytes] of documents)
+    await store.put(`${target}/${name}`, bytes, "no-cache", conditions.get(`${target}/${name}`))
   return names
 }
 
@@ -656,44 +671,45 @@ export async function s3Store(
         throw Error("S3 HEAD failed")
       }
     },
-    async put(name, bytes, cache) {
-      await client.send(
-        new PutObjectCommand({
-          Bucket: config.bucket,
-          Key: key(name),
-          Body: bytes,
-          ContentLength: bytes instanceof Blob ? bytes.size : bytes.byteLength,
-          CacheControl: cache,
-          ContentType: name.endsWith(".yml")
-            ? "application/yaml"
-            : name.endsWith(".json")
-              ? "application/json"
-              : "application/octet-stream",
-        }),
-      )
-    },
-    async copy(from, to, cache, condition) {
+    async put(name, bytes, cache, condition) {
       try {
         await client.send(
-          new CopyObjectCommand({
+          new PutObjectCommand({
             Bucket: config.bucket,
-            Key: key(to),
-            CopySource: `${config.bucket}/${key(from).split("/").map(encodeURIComponent).join("/")}`,
-            MetadataDirective: cache ? "REPLACE" : "COPY",
+            Key: key(name),
+            Body: bytes,
+            ContentLength: bytes instanceof Blob ? bytes.size : bytes.byteLength,
+            CacheControl: cache,
             ...(condition ? { IfMatch: condition.ifMatch, IfNoneMatch: condition.ifNoneMatch } : {}),
-            ...(cache
-              ? {
-                  CacheControl: cache,
-                  ContentType: to.endsWith(".yml") ? "application/yaml" : "application/octet-stream",
-                }
-              : {}),
+            ContentType: name.endsWith(".yml")
+              ? "application/yaml"
+              : name.endsWith(".json")
+                ? "application/json"
+                : "application/octet-stream",
           }),
         )
       } catch (error) {
         const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
-        if (status === 409 || status === 412) throw Error("S3 channel pointer changed; rerun publication")
+        if (condition && (status === 409 || status === 412))
+          throw Error("S3 channel pointer changed; rerun publication")
         throw error
       }
+    },
+    async copy(from, to, cache) {
+      await client.send(
+        new CopyObjectCommand({
+          Bucket: config.bucket,
+          Key: key(to),
+          CopySource: `${config.bucket}/${key(from).split("/").map(encodeURIComponent).join("/")}`,
+          MetadataDirective: cache ? "REPLACE" : "COPY",
+          ...(cache
+            ? {
+                CacheControl: cache,
+                ContentType: to.endsWith(".yml") ? "application/yaml" : "application/octet-stream",
+              }
+            : {}),
+        }),
+      )
     },
   }
 }

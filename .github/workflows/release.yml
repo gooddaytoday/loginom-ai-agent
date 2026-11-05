@@ -628,7 +628,7 @@ jobs:
           gh release download "$TAG" --dir "$RUNNER_TEMP/assets"
           bun install --frozen-lockfile --ignore-scripts
 
-      - name: Mirror identical signed release and promote channel by server-side copy
+      - name: Mirror identical signed release and promote channel with conditional PUT
         env:
           LOGINOM_UPDATES_S3_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_ACCESS_KEY }}
           LOGINOM_UPDATES_S3_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_SECRET_KEY }}

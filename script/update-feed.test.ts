@@ -225,7 +225,7 @@ test("review 6: channel promotion refuses a lower signed version unless rollback
   }
 })
 
-test("promotion rechecks an advanced pointer after uploads and can resume an interrupted identical copy", async () => {
+test("promotion rechecks an advanced pointer after uploads and can resume an interrupted identical PUT", async () => {
   const dir = await signedFixture()
   const m = memory()
   try {
@@ -242,21 +242,20 @@ test("promotion rechecks an advanced pointer after uploads and can resume an int
       })
     }
     await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("rollback")
-    expect(m.events.some((event) => event.startsWith("copy stable/"))).toBe(false)
+    expect(m.events.some((event) => event.startsWith("put stable/"))).toBe(false)
     m.store.put = put
     m.files.delete("stable/latest.yml")
     m.files.delete("stable/latest.yml.sig")
-    const copy = m.store.copy
     let interrupted = false
-    m.store.copy = async (...args) => {
-      await copy(...args)
-      if (!interrupted) {
+    m.store.put = async (...args) => {
+      await put(...args)
+      if (args[0].startsWith("stable/") && !interrupted) {
         interrupted = true
         throw Error("interrupted")
       }
     }
     await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("interrupted")
-    m.store.copy = copy
+    m.store.put = put
     await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
     for (const name of ["latest.yml", "latest-linux.yml", "latest-mac.yml"]) {
       const raw = Buffer.from(m.files.get("stable/" + name)!.bytes)
@@ -269,16 +268,16 @@ test("promotion rechecks an advanced pointer after uploads and can resume an int
 })
 
 for (const changed of ["stable/latest.yml", "stable/latest.yml.sig"])
-  test(`promotion preserves a concurrent newer pointer when ${changed} changes immediately before copy`, async () => {
+  test(`promotion preserves a concurrent newer pointer when ${changed} changes immediately before PUT`, async () => {
     const dir = await signedFixture()
     const m = memory()
     try {
       await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
       await releaseSums(dir)
       await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
-      const copy = m.store.copy
-      m.store.copy = async (...args) => {
-        if (args[1] === changed) {
+      const put = m.store.put
+      m.store.put = async (...args) => {
+        if (args[0] === changed) {
           const newer = Buffer.from("version: 0.5.0\n")
           m.files.set("stable/latest.yml", { bytes: newer, cache: "no-cache" })
           m.files.set("stable/latest.yml.sig", {
@@ -286,7 +285,7 @@ for (const changed of ["stable/latest.yml", "stable/latest.yml.sig"])
             cache: "no-cache",
           })
         }
-        await copy(...args)
+        await put(...args)
       }
       await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("precondition")
       expect(Buffer.from(m.files.get("stable/latest.yml")!.bytes).toString()).toContain("0.5.0")
@@ -361,7 +360,11 @@ function memory() {
       if (!file) throw Error(`Missing ${name}`)
       return file.bytes
     },
-    async put(name, bytes, cache) {
+    async put(name, bytes, cache, condition) {
+      const current = files.get(name)
+      const etag = current ? '"' + createHash("sha256").update(current.bytes).digest("hex") + '"' : undefined
+      if ((condition?.ifMatch && condition.ifMatch !== etag) || (condition?.ifNoneMatch === "*" && current))
+        throw Error("S3 precondition failed")
       events.push(`put ${name}`)
       files.set(name, { bytes: bytes instanceof Blob ? new Uint8Array(await bytes.arrayBuffer()) : bytes, cache })
     },
@@ -374,11 +377,7 @@ function memory() {
         etag: '"' + createHash("sha256").update(file.bytes).digest("hex") + '"',
       }
     },
-    async copy(from, to, cache, condition) {
-      const current = files.get(to)
-      const etag = current ? '"' + createHash("sha256").update(current.bytes).digest("hex") + '"' : undefined
-      if ((condition?.ifMatch && condition.ifMatch !== etag) || (condition?.ifNoneMatch === "*" && current))
-        throw Error("S3 precondition failed")
+    async copy(from, to, cache) {
       events.push(`copy ${to}`)
       const file = files.get(from)
       if (!file) throw Error(`Missing ${from}`)
@@ -555,7 +554,7 @@ async function signedFixture() {
   return dir
 }
 
-test("dual release signs GitHub bytes, mirrors immutable assets and server-copies both channel pointers", async () => {
+test("dual release signs GitHub bytes, mirrors immutable assets and conditionally PUTs both channel pointers", async () => {
   const dir = await signedFixture()
   const m = memory()
   try {
@@ -564,13 +563,15 @@ test("dual release signs GitHub bytes, mirrors immutable assets and server-copie
     await verifySignedRelease(dir, "0.4.0", [publicKey])
     await mirrorRelease(m.store, dir, "0.4.0", "unstable", [publicKey])
     const puts = m.events.filter((event) => event.startsWith("put "))
-    expect(puts.every((event) => event.startsWith("put releases/0.4.0/"))).toBe(true)
+    expect(puts.filter((event) => !event.startsWith("put releases/0.4.0/"))).toHaveLength(6)
+    expect(m.events.some((event) => event.startsWith("copy "))).toBe(false)
     expect(m.files.get("unstable/latest.yml")!.bytes).toEqual(await Bun.file(join(dir, "latest.yml")).bytes())
     expect(m.files.get("unstable/latest.yml")!.cache).toBe("no-cache")
     expect(m.files.get("releases/0.4.0/latest.yml")!.cache).toContain("immutable")
     const previous = m.events.length
     await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
-    expect(m.events.slice(previous).every((event) => event.startsWith("copy stable/"))).toBe(true)
+    expect(m.events.slice(previous)).toHaveLength(6)
+    expect(m.events.slice(previous).every((event) => event.startsWith("put stable/"))).toBe(true)
     expect(m.files.get("stable/latest.yml")!.bytes).toEqual(m.files.get("unstable/latest.yml")!.bytes)
 
     let privateRead = false
@@ -651,10 +652,33 @@ test("dual mirror rejects an invalid signature before any S3 write, even with va
   }
 })
 
-test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache metadata", async () => {
+for (const changed of ["latest.yml", "latest.yml.sig"])
+  test(`promotion rejects altered source ${changed} before writing any channel pointer`, async () => {
+    const dir = await signedFixture()
+    const m = memory()
+    try {
+      await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+      await releaseSums(dir)
+      const get = m.store.get
+      m.store.get = async (name) => (name === `releases/0.4.0/${changed}` ? Buffer.from("tampered source") : get(name))
+      await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow(
+        "Immutable release differs",
+      )
+      expect(m.events.every((event) => event.startsWith("put releases/0.4.0/"))).toBe(true)
+      expect([...m.files.keys()].some((name) => name.startsWith("stable/"))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+test("cloud.ru source-conditional CopyObject cannot block channel promotion via destination-conditional PutObject", async () => {
   const dir = await mkdtemp(join(tmpdir(), "update-local-s3-"))
+  const release = await signedFixture()
   const objects = new Map<string, { bytes: Buffer; cache: string }>()
   const scopes: string[] = []
+  const reads: string[] = []
+  const writes: { path: string; copy: boolean; match?: string; none?: string }[] = []
+  const etag = (bytes: Uint8Array) => '"' + createHash("sha256").update(bytes).digest("hex") + '"'
   const server = createServer(async (req, res) => {
     scopes.push(req.headers.authorization ?? "")
     if (!req.headers.host?.startsWith("updates-test.")) {
@@ -662,18 +686,27 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
       return
     }
     const path = req.url!.split("?")[0]
+    if (req.method === "GET") reads.push(path)
     const source = req.headers["x-amz-copy-source"]
-    if (req.method === "PUT" && typeof source === "string") {
-      if (req.headers["if-match"] === "wrong") {
+    if (req.method === "PUT") {
+      const from =
+        typeof source === "string" ? "/" + decodeURIComponent(source).replace(/^\/?updates-test\//, "") : undefined
+      // cloud.ru applies CopyObject conditions to its source, but PutObject
+      // conditions to its destination, including an absent destination.
+      const current = objects.get(from ?? path)
+      const match = req.headers["if-match"] as string | undefined
+      const none = req.headers["if-none-match"] as string | undefined
+      writes.push({ path, copy: from !== undefined, match, none })
+      if ((match !== undefined && match !== (current && etag(current.bytes))) || (none === "*" && current)) {
         res.writeHead(412).end("<Error><Code>PreconditionFailed</Code></Error>")
         return
       }
-      const data = objects.get("/" + decodeURIComponent(source).replace(/^\/?updates-test\//, ""))!
-      objects.set(path, { bytes: data.bytes, cache: String(req.headers["cache-control"] ?? data.cache) })
-      res.end('<CopyObjectResult><ETag>"test"</ETag></CopyObjectResult>')
-      return
-    }
-    if (req.method === "PUT") {
+      if (from) {
+        if (!current) return void res.writeHead(404).end()
+        objects.set(path, { bytes: current.bytes, cache: String(req.headers["cache-control"] ?? current.cache) })
+        res.end(`<CopyObjectResult><ETag>${etag(current.bytes)}</ETag></CopyObjectResult>`)
+        return
+      }
       const chunks: Buffer[] = []
       for await (const chunk of req) chunks.push(chunk)
       objects.set(path, { bytes: Buffer.concat(chunks), cache: String(req.headers["cache-control"]) })
@@ -687,6 +720,7 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     }
     res.setHeader("Cache-Control", data.cache)
     res.setHeader("Content-Length", data.bytes.length)
+    res.setHeader("ETag", etag(data.bytes))
     res.end(req.method === "HEAD" ? undefined : data.bytes)
   })
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
@@ -723,18 +757,63 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     })
     expect(await store.head("missing")).toBeUndefined()
     await store.put("releases/0.4.0/latest.yml", new Blob(["signed bytes"]), "public, max-age=31536000, immutable")
-    await store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache")
-    await expect(
-      store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache", { ifMatch: "wrong" }),
-    ).rejects.toThrow("pointer changed")
-    expect(Buffer.from(await store.get("stable/latest.yml")).toString()).toBe("signed bytes")
-    expect(await store.sha256?.("stable/latest.yml")).toBe(createHash("sha256").update("signed bytes").digest("hex"))
-    expect(await store.head("stable/latest.yml")).toEqual({ size: 12, cache: "no-cache" })
+    await store.copy("releases/0.4.0/latest.yml", "probe/latest.yml", "no-cache")
+    expect(Buffer.from(await store.get("probe/latest.yml")).toString()).toBe("signed bytes")
+    expect(await store.sha256?.("probe/latest.yml")).toBe(createHash("sha256").update("signed bytes").digest("hex"))
+    expect(await store.head("probe/latest.yml")).toEqual({
+      size: 12,
+      cache: "no-cache",
+      etag: etag(Buffer.from("signed bytes")),
+    })
+    objects.delete("/releases/0.4.0/latest.yml")
+
+    await signRelease(release, "0.4.0", "0.3.9", key, [publicKey])
+    await releaseSums(release)
+    await mirrorRelease(store, release, "0.4.0", "unstable", [publicKey])
+    const uploaded = writes.filter((write) => write.path.startsWith("/releases/"))
+    await mirrorRelease(store, release, "0.4.0", "unstable", [publicKey])
+    for (const name of ["latest.yml", "latest-linux.yml", "latest-mac.yml"]) {
+      const older = Buffer.from((await Bun.file(join(release, name)).text()).replaceAll("0.4.0", "0.3.9"))
+      objects.set(`/stable/${name}`, { bytes: older, cache: "no-cache" })
+      objects.set(`/stable/${name}.sig`, {
+        bytes: Buffer.from(sign(null, older, pair.privateKey).toString("base64")),
+        cache: "no-cache",
+      })
+    }
+    await mirrorRelease(store, release, "0.4.0", "stable", [publicKey])
+    expect(writes.filter((write) => write.path.startsWith("/releases/"))).toEqual(uploaded)
+    for (const target of ["unstable", "stable"])
+      for (const name of ["latest.yml", "latest-linux.yml", "latest-mac.yml"]) {
+        const raw = Buffer.from(await store.get(`${target}/${name}`))
+        const signature = Buffer.from(await store.get(`${target}/${name}.sig`)).toString()
+        expect(raw).toEqual(Buffer.from(await Bun.file(join(release, name)).bytes()))
+        expect(
+          verifyUpdateManifest(raw, signature, `https://updates-test.s3.local.test/${target}/`, [publicKey]).version,
+        ).toBe("0.4.0")
+        expect((await store.head(`${target}/${name}`))?.cache).toBe("no-cache")
+        expect(reads).toContain(`/releases/0.4.0/${name}`)
+        expect(reads).toContain(`/releases/0.4.0/${name}.sig`)
+      }
+    const pointers = writes.filter((write) => /^\/(?:un)?stable\//.test(write.path))
+    expect(pointers).toHaveLength(18)
+    expect(pointers.every((write) => !write.copy && (write.none === "*" || write.match !== undefined))).toBe(true)
+    expect(pointers.slice(0, 6).every((write) => write.none === "*")).toBe(true)
+    expect(pointers.slice(6).every((write) => write.match !== undefined)).toBe(true)
+    await expect(store.put("probe/new", Buffer.from("new"), "no-cache", { ifNoneMatch: "*" })).resolves.toBeUndefined()
+    await expect(store.put("probe/new", Buffer.from("bad"), "no-cache", { ifNoneMatch: "*" })).rejects.toThrow(
+      "pointer changed",
+    )
+    await expect(store.put("probe/new", Buffer.from("bad"), "no-cache", { ifMatch: "wrong" })).rejects.toThrow(
+      "pointer changed",
+    )
+    await store.put("probe/new", Buffer.from("newer"), "no-cache", { ifMatch: etag(Buffer.from("new")) })
+    expect(Buffer.from(await store.get("probe/new")).toString()).toBe("newer")
     expect(scopes.every((value) => value.includes("/ru-central-1/s3/aws4_request"))).toBe(true)
   } finally {
     server.closeAllConnections()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     await rm(dir, { recursive: true, force: true })
+    await rm(release, { recursive: true, force: true })
   }
 })
 
