@@ -24,7 +24,7 @@ test('W1 mapping kind has an independent ordinal namespace and table handlers re
 // Execute the serialized production reader against native UI records. The old
 // journals identify the two failures but contain no intermediate inventories;
 // delayed updates below are explicit timing hypotheses, not recorded snapshots.
-function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstable=false}={}){
+function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstable=false,graphDelay=0}={}){
  const clock=fixtureClock(),document=new Document(),components=new Map(),clicks=[];
  document.querySelector=selector=>document.querySelectorAll(selector)[0]??null;
  const root=workflow.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';
@@ -40,19 +40,26 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const grid=components.get(gridEl.id);grid.getStore=()=>store;
  const auto=add(form+';btnAutoSyncThroughColumns',panel),button=components.get(auto.id);button.pressed=true;
  const done=add(root+';btnDone',wizard),close=add(root+';btnClose',wizard);
- const mask=cover?add('mask',cover==='foreign'?document.body:panel,'x-mask'):null;
- if(mask)mask.box=auto.box;
+ const header=cover==='disabled-header'?add(form+';colTargetDelete',panel):null;
+ if(header)Object.assign(components.get(header.id),{$className:'Ext.grid.column.Action',disabled:true});
+ const mask=cover?add('mask',cover==='foreign'?document.body:header??panel,'x-mask'):null;
+ if(mask)mask.box=header?.box??auto.box;
+ const graphEl=add(workflow.prefix+';ModelForm'),diagram=add(workflow.prefix+';ModelForm;cmpDiagram',graphEl);
+ graphEl.style.display='none';
  const nodeData={},portData={},node={FGuid:'node',data:nodeData},port={FSubType:3,data:portData};
  const nodeTree={FModelNode:nodeData},portTree={FModelNodePort:portData},owner={FView:{el:{dom:wizard}},FModelSocket:{}};
  const receipt={phase:'verified',operation_id:'map:port',workflow:'wf-native',node_id:'node',portIndex:0,wizard:owner,enginePort:owner.FModelSocket,port,node,nodeData,portData,nodeTree,portTree,nativeIndex:1,portGuid:'port'};
+ const graphModel={FView:{el:{dom:graphEl}},FDiagram:{FmxGraph:{container:diagram},FNodes:{FCollection:[node]}}};
+ receipt.graph=graphModel;port.parent=node;
  const preparation={document,id:'doc',receipts:new Map([['node',{phase:'verified',workflowId:'wf',nodeTargetWorkflowNode:'wf-native'}]]),inputPortOpenReceipts:new Map([['port',receipt]])};
  const card={Controller:{FController:owner,Node:{data:{node:{ParentNode:portTree}}}}};
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}};
  const context=vm.createContext({document,Date:clock.Date,location:{origin:'https://loginom.test'},Ext:{getCmp:id=>components.get(id)},__loginomDockPreparationV1:preparation,
   bg:{app}});
- let pending=null;
+ let pending=null,closed=null;
  const advance=ms=>{clock.advance(ms);if(mask&&cover==='owned'&&clock.Date.now()>=delay)mask.style.display='none';if(pending&&clock.Date.now()>=pending){button.pressed=false;if(drift)record.data.DisplayValue=8;pending=null;}
   if(unstable&&clock.Date.now()>=delay)button.pressed=clock.Date.now()<delay+240&&Math.floor(clock.Date.now()/80)%2===1;
+  if(closed!==null&&graphDelay)graphEl.attrs.class=clock.Date.now()>=closed+40&&clock.Date.now()<closed+graphDelay?'bg-mask-message':'';
  };
  if(readback)pending=delay;
  const page={evaluate:async(fn,arg)=>{context.arg=arg;return vm.runInContext('('+fn.toString()+')(arg)',context);},
@@ -61,13 +68,13 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
   locator:()=>({count:async()=>0}),mouse:{click:async(x,y)=>{
    const e=document.elementFromPoint(x,y);clicks.push(e?.getAttribute('data-tid'));
    if(e===auto)pending=clock.Date.now()+delay;
-   if(e===done||e===close)wizard.style.display='none';
+   if(e===done||e===close){wizard.style.display='none';graphEl.style.display='';card.Controller.FController=graphModel;closed=clock.Date.now();}
   }}};
  const task={binding:{document_id:'doc',workflow_ref:workflow,node:ref},mapping:{direction:'input',kind:'variables',port:0,autosync:false},origin:'https://loginom.test',build:'7.4.2',operation_id:'map',deadline:10000,read_only:readback};
  const graph=async()=>({verified:true,surface:'graph',locked:false});
  const open=async()=>({status:'SUCCEEDED',effect_possible:true});
  const run=async()=>{context.page=page;context.task=task;context.read=graph;context.open=open;return vm.runInContext('('+configureVariablePortMapping.toString()+')(page,task,read,open)',context);};
- return {run,clicks,task,clock};
+ return {run,clicks,task,clock,closed:()=>closed};
 }
 
 test('mapping waits for delayed autosync application without clicking twice',async()=>{
@@ -101,6 +108,16 @@ test('a permanent mismatch or owned mask stops within the local settling bound',
   assert.ok(!f.clicks.some(t=>t.endsWith(';btnDone')));
   assert.ok(f.clicks.filter(t=>t.endsWith(';btnAutoSyncThroughColumns')).length<=1);
  }
+});
+test('the native disabled delete header mask is not a loading or foreign overlay',async()=>{
+ const f=mappingFixture({cover:'disabled-header'}),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);
+});
+test('a graph mask appearing after Done must settle before independent readback',async()=>{
+ const f=mappingFixture({graphDelay:400}),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.ok(f.clock.Date.now()>=f.closed()+560);
+ assert.equal(f.clicks.filter(t=>t.endsWith(';btnDone')).length,1);
 });
 test('mapping writer stops before opening a port on a foreign or locked graph',async()=>{
  const binding={document_id:'doc',workflow_ref:workflow,node:ref},mapping={direction:'input',port:0,kind:'variables'};
