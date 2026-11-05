@@ -232,7 +232,9 @@ export async function loadSignedUpdate(input: {
       const signature = await read(transport(new URL(input.file + ".sig", feed).href))
       const signed = verifyUpdateManifest(raw, signature.toString("utf8"), feed, input.keys)
       if (release && release.tag_name !== "v" + signed.version) throw Error("LOGINOM_UPDATE_RELEASE_MISMATCH")
-      if (compareUpdateVersions(signed.version, input.currentVersion) < 0) throw Error("LOGINOM_UPDATE_VERSION_OLDER")
+      // An older signed feed (an S3 mirror behind GitHub, or an installed
+      // pre-release) means no update, as on GitHub; downgrades stay disabled.
+      if (compareUpdateVersions(signed.version, input.currentVersion) < 0) return undefined
       return {
         source: source.kind,
         feed,

@@ -561,12 +561,52 @@ test("both sources fail within bounded time with an explicit error", async () =>
   }
 })
 
-test("an older signed S3 release is an error and cannot enable a downgrade", async () => {
+test("an older signed S3 release means no update and cannot enable a downgrade", async () => {
   const f = await fixture({ status: 503, version: "0.4.0" })
   try {
+    expect(
+      await loadSignedUpdate({
+        sources: f.sources,
+        read: f.read,
+        file: "latest-linux.yml",
+        currentVersion: "0.4.1",
+        keys,
+      }),
+    ).toBeUndefined()
+    expect(f.calls.filter((url) => url.startsWith("/s3"))).toEqual([
+      "/s3/stable/latest-linux.yml",
+      "/s3/stable/latest-linux.yml.sig",
+    ])
+  } finally {
+    await f.close()
+  }
+})
+
+test("an older S3 release cannot replace a GitHub download that already failed", async () => {
+  const f = await fixture({ artifactStatus: 503 })
+  try {
+    const selected = await loadSignedUpdate({
+      sources: f.sources,
+      read: f.read,
+      file: "latest-linux.yml",
+      currentVersion: "0.4.1",
+      keys,
+    })
+    const updater = new Updater()
+    configureSignedUpdate(updater, selected)
+    await updater.checkForUpdates()
     await expect(
-      loadSignedUpdate({ sources: f.sources, read: f.read, file: "latest-linux.yml", currentVersion: "0.4.1", keys }),
-    ).rejects.toThrow("LOGINOM_UPDATE_VERSION_OLDER")
+      downloadSignedUpdate(updater, selected, () =>
+        loadSignedUpdate({
+          sources: f.sources.slice(1),
+          read: f.read,
+          file: "latest-linux.yml",
+          currentVersion: "0.4.3",
+          keys,
+        }),
+      ),
+    ).rejects.toThrow("LOGINOM_UPDATE_MANIFEST_MISMATCH")
+    expect(updater.urls).toEqual([f.base + `/download/v0.4.2/${filename}`])
   } finally {
     await f.close()
   }
