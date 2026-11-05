@@ -24,7 +24,8 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
  const inspect=mode=>page.evaluate(({task,mode,recordsCode,decoderCode})=>{
   const b=task.binding,a=bg.app,p=globalThis.__loginomDockPreparationV1,exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
-  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1)throw Error('Variable output document/workflow changed');
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode))throw Error('Variable output document/workflow changed');
   const tabs=exact(b.workflow_ref.tab_tid),card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
   if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active')||!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r.nodeTargetWorkflowNode)throw Error('Variable output graph owner changed');
   const d=m.FDiagram,g=d.FmxGraph,ns=d.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id),n=ns[0];

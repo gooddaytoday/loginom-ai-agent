@@ -3688,6 +3688,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
           const originalSource=operation.nodeApplyDrivers.verifySource;
           operation.nodeApplyDrivers={...operation.nodeApplyDrivers,
+            ...(request.target.type==='variables.user'&&typeof operation.nodeTargetAdapter.needsWorkflowActivation==='function'?{
+              needsWorkflowActivation:ctx=>operation.nodeTargetAdapter.needsWorkflowActivation(
+                {document_id:request.document_id,workflow_ref:request.workflow_ref},ctx)}:{}),
             verifySource:async(...args)=>{
               try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
               // Admission observations are valid for this initial source phase

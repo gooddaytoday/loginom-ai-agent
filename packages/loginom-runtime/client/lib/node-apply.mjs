@@ -410,6 +410,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
       return null;
   };
   try {
+    // Builtin variables prove their source by reading the prepared graph. An
+    // upload may have selected Files; activate only its still-owned inactive tab
+    // in the existing workflow phase before that read, never inside readGraph.
+    if(!state.phases.length&&drivers.activateWorkflow&&drivers.needsWorkflowActivation
+      &&await drivers.needsWorkflowActivation(context()))
+      await phase('workflow',ctx=>drivers.activateWorkflow({...ctx,waitForActive:true}));
     // File verification does not infer identity from the displayed path. The
     // driver checks an already completed upload/inspect/verify receipt chain.
     await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});

@@ -17,7 +17,7 @@ test('production builtin driver satisfies the executor lifecycle interface witho
 });
 test('user values refuses unsafe types and unsupported operations before any UI driver',()=>{
  assert.doesNotThrow(()=>validateNodeApplyRequest(request(),support.nodeApplyHandlers));
- for(const v of [{name:'x',type:'integer',value:9007199254740992},{name:'x',type:'integer',value:1.5},{name:'x',type:'real',value:1},
+ for(const v of [{name:'x',type:'integer',value:9007199254740992},{name:'x',type:'integer',value:1.5},{name:'x',type:'real',value:Infinity},
   {name:'x',type:'boolean',value:0},{name:'x',type:'string',value:false},{name:'x',type:'string'},{name:'x',type:'string',value:'',extra:true}]){
   const r=request();r.parameters.variables=[v];assert.throws(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));
  }
@@ -28,6 +28,17 @@ test('user values refuses unsafe types and unsupported operations before any UI 
  for(const [type,value] of [['integer',null],['integer',0],['integer',-7],['integer',Number.MAX_SAFE_INTEGER],['boolean',false],['string','']])
   assert.doesNotThrow(()=>validateUserVariablesParameters({variables:[{name:'x',type,value}]}));
  assert.throws(()=>makeUserVariablesSnapshotCode(binding,{variables:[]}));
+});
+test('real and civil whole-second dates validate before UI; invalid or lossy input refuses',()=>{
+ for(const [type,value] of [['real',0.15],['real',0.12345678901234566],['real',-0],['real',null],['datetime',null],
+  ['datetime','2026-10-31T23:59:59'],['datetime','2024-02-29T00:00:00.000']]){
+  const r=request();r.parameters.variables=[{name:'x',type,value}];assert.doesNotThrow(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));
+ }
+ for(const value of ['', '2026-10-31','2026-10-31T23:59:59.123','2026-10-31T23:59:59Z','2026-10-31T23:59:59+03:00',
+  '2026-02-29T00:00:00','2026-04-31T00:00:00','2026-01-01T24:00:00','2026-01-01T00:60:00',0])
+  assert.throws(()=>validateUserVariablesParameters({variables:[{name:'date',type:'datetime',value}]}));
+ for(const value of ['', '0,15','0.15',NaN,Infinity,-Infinity,false])
+  assert.throws(()=>validateUserVariablesParameters({variables:[{name:'threshold',type:'real',value}]}));
 });
 test('builtin lifecycle never executes; snapshot bypasses values configuration',async()=>{
  for(const mode of ['done','close','snapshot']){
@@ -58,5 +69,19 @@ test('read-only builtin snapshot cancels without editing and refuses package dir
   if(dirty==='before'){assert.equal(result.status,'NOT_APPLIED');assert.deepEqual(calls,[]);}
   else {assert.ok(calls.some(s=>s.includes(';btnClose')));assert.ok(!calls.some(s=>s.includes(';btnDone')||s.includes('btnApply')));
    assert.equal(result.status,dirty==='after'?'NOT_APPLIED':'SUCCEEDED');if(!dirty)assert.equal(result.output.execution_id,null);}
+ }
+});
+test('equal real/date patches retain millisecond neighbours; mixed type changes refuse before edits',async()=>{
+ const variables=[{id:1,index:0,name:'threshold',label:'Порог',type:'real',cell:{type:'real',is_null:false,value:0.15}},
+  {id:2,index:1,name:'report_date',label:'Дата',type:'datetime',cell:{type:'datetime',is_null:false,value:'2026-10-31T00:00:00.000'}},
+  {id:3,index:2,name:'saved_clock',label:'Часы',type:'datetime',cell:{type:'datetime',is_null:false,value:'2026-11-05T05:47:52.160'}}];
+ for(const changedType of [false,true]){
+  const calls=[],page={locator:s=>({count:async()=>0,click:async()=>calls.push(s)}),waitForFunction:async()=>{},
+   evaluate:async(_fn,{mode})=>{assert.ok(['dirty','inventory'].includes(mode),'No editor inspection for no-op or mismatched patch');return mode==='dirty'?false:{port_guid:'port',variables:structuredClone(variables)};}};
+  const result=await readUserVariablesSnapshot(page,{binding,deadline:Date.now()+5000,operation_id:'patch',finish:'done',variables:[
+   {name:'threshold',type:'real',value:changedType?0.2:0.15},{name:'report_date',type:changedType?'string':'datetime',value:'2026-10-31T00:00:00'}]},
+   async()=>({verified:true,surface:'graph',locked:false}),async()=>({status:'SUCCEEDED',effect_possible:true}),()=>{},()=>{});
+  if(changedType){assert.match(result.error,/type differs/);assert.equal(calls.length,0);}
+  else {assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.changed,[]);assert.deepEqual(result.variables,variables);assert.equal(calls.length,1);}
  }
 });

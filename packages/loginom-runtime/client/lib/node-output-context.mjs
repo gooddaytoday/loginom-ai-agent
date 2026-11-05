@@ -10,7 +10,7 @@ export function readVariableRecords(store,mode,decode){
   &&Number.isSafeInteger(count)&&count>=0&&count<=128&&items.length===count,'count/store/loading');
  if(mode==='preview')need(store.complete===true&&store.loadCount>=1&&store.getTotalCount()===count,'preview total/load completeness');
  const variables=items.map((record,index)=>{
-  const d=record?.data,type={1:'boolean',4:'integer',5:'string',...(mode==='preview'?{3:'real'}:{})}[d?.DataType];
+  const d=record?.data,type={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string'}[d?.DataType];
   need(record?.isModel===true&&d.Index===index&&(Number.isSafeInteger(d.ID)&&d.ID>=0||typeof d.ID==='string'&&d.ID.length>0&&d.ID.length<=128)
    &&typeof d.Name==='string'&&d.Name.length>0&&d.Name.length<=128&&typeof d.DisplayName==='string'&&d.DisplayName.length<=1024&&type,'record metadata/type');
   if(mode==='values')need(typeof d.ValueIsNull==='boolean'&&d.OriginType===1,'local value/null metadata');

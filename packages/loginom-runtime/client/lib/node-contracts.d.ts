@@ -223,7 +223,7 @@ export type NodeOutputPort = LegacyNodeOutputPort | NativeNodeOutputPort | TreeN
 export interface NodeVariableOutput {
  port:number; kind:'variables'; port_guid:string; fresh:true; read_id:string; execution_id:string|null;
  source:'execution'|'snapshot'; native_source:'VariablesForm'|'VariablesEditValuesWizard'; complete:true; count:number;
- variables:Array<{id:string|number;index:number;name:string;label:string;type:'integer'|'real'|'boolean'|'string';cell:TableCell}>;
+ variables:Array<{id:string|number;index:number;name:string;label:string;type:'integer'|'real'|'boolean'|'string'|'datetime';cell:TableCell}>;
  completeness:{count:number;store_count:number;unique_ids:number;loaded:true};
 }
 export interface NodeOutput {
