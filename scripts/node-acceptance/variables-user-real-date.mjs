@@ -58,8 +58,11 @@ export function auditUserRealDate(events,initial,final){
   const r=e.request,noOp=Object.keys(r.parameters).length===0||r.target.type==='transform.calculator'&&Object.keys(r.parameters).join(',')==='expressions'&&Array.isArray(r.parameters.expressions)&&r.parameters.expressions.length===0;
   // Output reads retain source/schema parameters but never configure the node.
   // Require this operation's later successful proof, not just its claimed mode.
-  const preserves=r.mode==='read_existing_output'?typeof e.operation_id==='string'&&r.target.ref&&checkpoints.some(c=>c.index>index
-   &&c.result.operation_id===e.operation_id&&c.result.configuration?.status==='not_requested'&&isDeepStrictEqual(c.result.node,r.target.ref)):noOp;
+  const preserves=r.mode==='read_existing_output'?typeof e.operation_id==='string'&&r.target.ref&&(checkpoints.some(c=>c.index>index
+   &&c.result.operation_id===e.operation_id&&c.result.configuration?.status==='not_requested'&&isDeepStrictEqual(c.result.node,r.target.ref))
+   ||events.some((done,i)=>i>index&&done.phase==='completed'
+    &&done.action_key==='node.apply'&&done.operation_id===e.operation_id&&isDeepStrictEqual(done.parameters,r)
+    &&done.outcome?.status==='NOT_APPLIED'&&done.outcome.effect_possible===false&&done.outcome.cleanup_complete===true)):noOp;
   need(r.target.kind==='existing'&&preserves&&!r.inputs.length&&!r.mappings.length&&!(r.variable_inputs?.length),'CONSUMER_RECONFIGURED');
  }
  return {status:'PASS',initial_evidence_id:first.result.output?.variable_ports?.[0]?.read_id??first.result.configuration.readback.receipt_ids[0],final_read_id:reread.result.output.variable_ports[0].read_id};

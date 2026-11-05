@@ -344,8 +344,10 @@ def scenario(name, case_root=None, *, cases=None):
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
     if name == 'variables-user-real-date':
         src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
+        # mas3 R2: 1803s minus 26s upload recovery still exceeds 1500s.
+        # setup 180 + model 2400 + cold 1800 = 4380s, within the 85-minute batch.
         return dict(source=src, prompt=src / 'task-real-datetime.md', data=src.parent / 'fixtures', input_files=['transactions.csv'], base=None,
-                    expected_name='expected-updated-run.json', variables_real_date=True, export_count=2)
+                    expected_name='expected-updated-run.json', variables_real_date=True, export_count=2, model_timeout=2400)
     if name == 'variables-user':
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',

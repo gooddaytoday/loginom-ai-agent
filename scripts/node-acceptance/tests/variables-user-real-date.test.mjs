@@ -14,6 +14,7 @@ p=Path('scripts/node-acceptance/run-check.py'); s=importlib.util.spec_from_file_
 c=m.scenario('variables-user-real-date'); e=m.expected_for(c,'/own/test.lgp')
 assert c['variables_real_date'] and c['input_files']==['transactions.csv']
 assert c['prompt'].name=='task-real-datetime.md' and c['export_count']==2
+assert c['model_timeout']==2400 and 180+c['model_timeout']+1800 < 85*60
 assert (c['source']/'oracle.py').is_file() and len(e['outputs'])==2
 assert e['package_path']=='/own/test.lgp'
 assert [len(o['rows']) for o in e['outputs']]==[3,3]
@@ -95,6 +96,25 @@ test('consumer read exemption requires its own successful later checkpoint and u
   p=>p.request.inputs.push({source:'other'}),p=>p.request.mappings.push({port:0}),
   (_p,_c,e)=>e.pop(),(_p,_c,e)=>e.splice(e.length-2,0,e.pop())]){
   const events=history(),{prepared,checkpoint}=appendConsumerRead(events,'day-final',6);corrupt(prepared,checkpoint,events);
+  assert.throws(()=>auditUserRealDate(events,initial,final),/USER_REAL_DATE_CONSUMER_RECONFIGURED/);
+ }
+});
+function refusedConsumerRead(events){
+ const {prepared}=appendConsumerRead(events,'day-final',6);events.pop();
+ const completed={phase:'completed',action_key:'node.apply',operation_id:prepared.operation_id,parameters:structuredClone(prepared.request),
+  outcome:{status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}};
+ events.push(completed);return {prepared,completed};
+}
+test('a confirmed mas3 consumer read refusal before mutation does not reconfigure its consumer',()=>{
+ const events=history();refusedConsumerRead(events);
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+});
+test('unconfirmed reads, possible effects and real configuration retain the consumer refusal',()=>{
+ for(const corrupt of [(_p,c)=>c.outcome.status='AMBIGUOUS',(_p,c)=>c.outcome.effect_possible=true,
+  (_p,c)=>c.outcome.cleanup_complete=false,(_p,c)=>c.operation_id='other',(_p,c)=>c.parameters.target.ref.node_id='other',
+  (_p,_c,e)=>e.pop(),(_p,_c,e)=>e.splice(e.length-2,0,e.pop()),
+  (p,c)=>{p.request.mode='configure';c.parameters.mode='configure';}]){
+  const events=history(),{prepared,completed}=refusedConsumerRead(events);corrupt(prepared,completed,events);
   assert.throws(()=>auditUserRealDate(events,initial,final),/USER_REAL_DATE_CONSUMER_RECONFIGURED/);
  }
 });
