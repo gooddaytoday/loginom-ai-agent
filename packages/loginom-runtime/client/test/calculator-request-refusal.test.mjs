@@ -62,10 +62,10 @@ test('native preview console refusal closes the owned modal before restoring the
  assert.equal(f.calls[0],'preview_close');
 });
 
-test('preview parse-error dialog requires its confirmed OK before draft rollback',async()=>{
+test('journal C parse-error dialog requires its confirmed OK before draft rollback',async()=>{
  const f=syntaxFixture(),v=f.error.receipt.output.wizard.calculator_validation;
- v.source='loginom_calculator_preview_error_dialog';v.field_name='E';
- v.message='Ошибка разбора выражения "E". Неправильное выражение: "X+"';
+ v.source='loginom_calculator_preview_error_dialog';v.field_name='id';
+ v.message='Loginom 7.4.2 Настройка прервана 1. Ошибка разбора выражения "id" 1.1. Некорректный символ';
  f.error.receipt.error.message=v.message;f.error.receipt.trace[0].message=v.message;
  f.error.receipt.trace.push({event:'wizard_calculator_preview_error_dismissed',root_ref:'wizard',message:v.message});
  const read=f.channel.observe;f.channel.observe=async()=>{const s=await read();s.wizard.calculator_preview={status:'absent'};s.ui={dialogs:[]};return s;};

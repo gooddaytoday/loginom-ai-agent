@@ -537,9 +537,10 @@ page = context.pages()[0]
         diagnosticReadOnly: readOnly,
         // Cancellation has no complete persisted-change inventory proving
         // Table-only changes. Never turn package ownership into discard proof.
+        // Failed checks also preserve their dirty state for diagnosis.
         // Clean packages close normally; dirty/unknown ones retain BLOCKED.
-        diagnosticDiscard: !readOnly && !state.cancelled,
-        diagnosticWaitForIdle: !readOnly && !state.cancelled,
+        diagnosticDiscard: !readOnly && !state.cancelled && !state.failure,
+        diagnosticWaitForIdle: !readOnly && !state.cancelled && !state.failure,
       }),
     )
       .then(async (result) => {
