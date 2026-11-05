@@ -1,6 +1,7 @@
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const object=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(k=>keys.includes(k));
 const name=value=>typeof value==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(value);
+export const isFilterVariable=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const scalarTypes=['integer','real','string','datetime','boolean'];
 const comparable=(value,type)=>type==='datetime'&&value.length===19?value+'.000':value;
 // Loginom Help filtering-criteria.md, verified against the node wizard (7.4.2).
@@ -47,6 +48,13 @@ export function validateFilterConditions(p){
    need(c.type==='string'&&(op.arity??1)!==0?typeof c.case_sensitive==='boolean':c.case_sensitive===undefined,'Explicit case_sensitive is required only for string value predicates');
    const arity=op.arity??1,keys=arity===0?[]:arity===2?['lower','upper']:arity==='list'?['values']:['value'];
    need(['value','lower','upper','values'].every(k=>keys.includes(k)?Object.hasOwn(c,k):!Object.hasOwn(c,k)),'Filter operator operands differ');
+   const variable=keys.find(k=>isFilterVariable(c[k]));
+   if(variable){
+    need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)||variable==='values'&&arity==='list')
+     &&c.field.kind==='input_field'&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
+    need(object(c[variable],['kind','name'])&&c[variable].kind==='variable'&&name(c[variable].name),'Exact mapped filter variable name required');
+    continue;
+   }
    if(arity==='list'){
     need(Array.isArray(c.values)&&c.values.length>0&&c.values.length<=128,'A bounded nonempty filter list is required');
     c.values.forEach((v,i)=>validateValue(v,`values[${i}]`));
@@ -57,13 +65,23 @@ export function validateFilterConditions(p){
  }
  need(count<=128,'Filter supports at most 128 condition/OR rows');return p;
 }
-export function resolveFilterConditions(p,fields){
+export function resolveFilterConditions(p,fields,variables){
  validateFilterConditions(p);
  need(Array.isArray(fields)&&fields.length<=1000&&fields.every(f=>name(f.name))&&new Set(fields.map(f=>f.name)).size===fields.length,'Complete unique filter input schema required');
  return p.groups.map(group=>group.map(c=>{
   if(c.field.kind==='row_number')return {...c};
   const found=fields.filter(f=>f.name===c.field.name);need(found.length===1,'Unknown filter input field: '+c.field.name);
   need(found[0].type===c.type,'Filter scalar type differs from input: '+c.field.name);
+  const operand=c.value??c.values;
+  if(isFilterVariable(operand)&&variables!==undefined){
+   const matches=variables.filter(v=>v.name===operand.name);need(matches.length===1,'Missing or ambiguous mapped filter variable: '+operand.name);
+   const v=matches[0];need(v.type===(c.values?'string':c.type)&&v.is_null===false,'Filter variable type or NULL differs: '+operand.name);
+   if(c.values){
+    need(typeof v.value==='string'&&v.value.length<=32768,'Bounded string list variable required');
+    const list=v.value.split(',');need(list.length>0&&list.length<=128&&list.every(x=>x.length>0&&!/[\"\r\n]/.test(x)),'Simple nonempty comma-separated variable list required');
+    if(c.type==='integer')need(list.every(x=>/^-?\d+$/.test(x)&&Number.isSafeInteger(Number(x))),'Integer variable list required');
+   }else validateFilterValue(v.value,c.type);
+  }
   return {...c,field:{...c.field}};
  }));
 }
@@ -84,5 +102,5 @@ export function filterGroupsFromNative(native){
   for(const key of arity===0?[]:arity===2?['lower','upper']:arity==='list'?['values']:['value'])condition[key]=structuredClone(row[key]);
   groups.at(-1).push(condition);
  }
- return resolveFilterConditions({groups},native.input_fields);
+ return resolveFilterConditions({groups},native.input_fields,native.control_variables);
 }

@@ -8116,3 +8116,29 @@ test('D2 Join long native ancestry keeps typed Close for both input roles',async
   assert.deepEqual(page.events,[]);
  }
 });
+
+test('filter variable picker binds cached metadata without reading the RPC variable object',async()=>{
+ const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF;FilterDataWizard;FilterDataPanel';
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:20,y:50,width:900,height:700});
+ const grid=page.add('div',base,'',{x:30,y:100,width:850,height:600},wizard);grid.id='filter-grid';
+ page.add('div',base+';tbl','',{x:30,y:100,width:850,height:600},grid);
+ const editor=page.add('div',base+';tbl;celleditor','',{x:100,y:120,width:500,height:200},grid);
+ const switchButton=page.add('button',base+';VariantPropEdit;SwitchButton','',{x:100,y:120,width:30,height:20},editor);
+ const combo=page.add('div',base+';VariantPropEdit;VariableControl','',{x:140,y:120,width:200,height:20},editor);combo.id='variable-combo';
+ const picker=page.add('div',base+';VariantPropEdit;VariableControl;boundlist','',{x:140,y:160,width:200,height:80});
+ const option=page.add('div',base+';VariantPropEdit;VariableControl;boundlist;limit','limit ( 15 )',{x:140,y:160,width:200,height:20},picker);option.attrs['data-recordid']='v1';
+ const variable={Index:2,DisplayName:'limit',DataType:4};
+ const record={isModel:true,internalId:'r1',data:{Name:'Amount',RelationType:3}},rows=[record],store={$className:'Ext.data.Store',getData:()=>({items:rows})};
+ const rpc=new Proxy({},{get(){throw Error('RPC getter must never be read');}});
+ const choice={internalId:'v1',data:{Value:rpc,DisplayText:'limit ( 15 )',Metadata:variable},getFields:()=>[{},{},{getName:()=> 'Metadata'}],get:k=>choice.data[k]};
+ const nativeCombo={$className:'Ext.form.field.ComboBox',el:{dom:combo},getStore:()=>({getData:()=>({items:[choice]})})};nativeCombo.picker={pickerField:nativeCombo,el:{dom:picker}};
+ const native={el:{dom:grid},getStore:()=>store,getView:()=>({getNode:()=>null}),Controller:{FFilterItemsStore:store,FVariablesData:{FVariables:[variable]}}};
+ native.editingPlugin={editing:true,context:{record,grid:native,field:'CompareValue'},activeEditor:{el:{dom:editor}}};
+ page.context.Ext={getCmp:id=>id===grid.id?native:id===combo.id?nativeCombo:null};
+ const observed=await page.observe();assert.equal(observed.wizard.stage,'row_filter');
+ const observedOption=observed.ui.elements.find(e=>e.tid===option.attrs['data-tid']);
+ assert.equal(observedOption?.filter_cell?.part,'variable_option');assert.equal(observedOption.filter_cell.variable_name,'limit');
+ assert.ok(observedOption.allowed_actions.includes('click'));
+ assert.ok(observed.ui.elements.find(e=>e.tid===switchButton.attrs['data-tid']).allowed_actions.includes('click'));
+});

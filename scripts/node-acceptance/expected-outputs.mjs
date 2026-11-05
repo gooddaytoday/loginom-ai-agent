@@ -386,6 +386,8 @@ export function parseExpectedVariableInventory(expected){
    &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'),'EXPECTED_VARIABLE_VALUE_INVALID');
   for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
    &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
+  for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
+   &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
   need(new Set(o.variables.map(x=>x.name)).size===o.variables.length,'EXPECTED_VARIABLE_DUPLICATE');
  }
  for(const l of v.links??[])need(l&&Object.keys(l).every(k=>['source','output','target','input','kind'].includes(k))&&selector(l.source)&&selector(l.target)

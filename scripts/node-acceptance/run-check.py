@@ -89,6 +89,15 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none']:
+        variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty', 'row-filter-none': 'none'}[name]
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-variable-' + variant + '.md'),
+                    data=node / 'fixtures', base=None,
+                    input_files=['variables-empty.csv' if variant == 'empty' else 'variables.csv'],
+                    export_count=2 if variant == 'empty' else 4,
+                    expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
+                    filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'
@@ -1104,6 +1113,7 @@ class Runner:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
@@ -1442,7 +1452,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            delimiter = check_csv(actual, expected['outputs'][index], header,
+            csv_expected = (read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
+                            else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
+            delimiter = check_csv(actual, csv_expected, header,
                                   column_order='any' if isinstance(case, Path) else None,
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
