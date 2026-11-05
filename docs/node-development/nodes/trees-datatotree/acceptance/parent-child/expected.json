@@ -1,0 +1,97 @@
+{
+  "status": "proposal_pending_owner_and_native_mode",
+  "native_result": "not_checked",
+  "cases": {
+    "org": {
+      "outcome": "success",
+      "document": {
+        "roots": [
+          {
+            "id": "001",
+            "parent_id": null,
+            "name": "Компания",
+            "children": [
+              {
+                "id": "002",
+                "parent_id": "001",
+                "name": "ИТ",
+                "children": [
+                  {
+                    "id": "003",
+                    "parent_id": "002",
+                    "name": "Группа данных",
+                    "children": [
+                      {
+                        "id": "004",
+                        "parent_id": "003",
+                        "name": "Аналитик",
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "id": "005",
+                    "parent_id": "002",
+                    "name": "Поддержка",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "source_rows": 5
+    },
+    "multiple-roots": {
+      "outcome": "success",
+      "document": {
+        "roots": [
+          {
+            "id": "B",
+            "parent_id": null,
+            "name": "Филиал",
+            "children": [
+              {
+                "id": "B1",
+                "parent_id": "B",
+                "name": "Команда филиала",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "A",
+            "parent_id": null,
+            "name": "Штаб",
+            "children": [
+              {
+                "id": "A2",
+                "parent_id": "A",
+                "name": "Второй отдел",
+                "children": []
+              },
+              {
+                "id": "A1",
+                "parent_id": "A",
+                "name": "Первый отдел",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "source_rows": 5
+    },
+    "cycle": {
+      "outcome": "reject",
+      "reason": "cycle",
+      "partial_output_allowed": false
+    },
+    "orphan": {
+      "outcome": "reject",
+      "reason": "orphan",
+      "partial_output_allowed": false
+    }
+  }
+}
