@@ -49,26 +49,39 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
  const {createArtifactStore}=await load('client/lib/artifacts.mjs');
  const {createExecutionJournal}=await load('client/lib/execution-journal.mjs');
  const {createStorageBinding}=await load('client/lib/storage-policy.mjs');
- const {context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/browser',candidate:config.login,keepOpen:true,headless:true});
- const page=context.pages()[0],sessionId=randomUUID(),record=createExecutionJournal({directory:output,metadata:{sessionId},knownSecrets:[config.login.password]});
+ let {context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/browser',candidate:config.login,keepOpen:true,headless:true});
+ let page=context.pages()[0];
+ const sessionId=randomUUID(),record=createExecutionJournal({directory:output,metadata:{sessionId},knownSecrets:[config.login.password]});
  const execute=code=>new Function('page',`return (${code})(page)`)(page);
  const compatibility={loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
  try{
-  const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-identity',identityOnly:true}));
-  if(identity.status!=='BOUND')throw Error('VARIABLES_SOURCE_IDENTITY');
+  const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-workspace',intent:'new_draft'}));
+  if(identity.status!=='READY')throw Error('VARIABLES_SOURCE_WORKSPACE');
   const directory=config.package.substring(0,config.package.lastIndexOf('/'));
-  const binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
+  let binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
   const actions=JSON.parse(await readFile(root+'/runtime/executor/catalog/actions.json','utf8')).actions;
   actions.find(action=>action.action_key==='package.save_checkpoint').effect.allowed_roots=[directory];
   const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
   const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId});
-  const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},
-   execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding});
+  const runtimeOptions={pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},
+   execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding};
+  let runtime=createActionRuntime(runtimeOptions);
   const bytes=await readFile(fixture),artifact=await artifactStore.admit({sourcePath:fixture,name:config.package.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:'reject'}});
   const delivered=await deliverVariablesColumnUnionSource(runtime,{operation_id:'source-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
   if(delivered.outcome?.status!=='SUCCEEDED')throw Error('VARIABLES_SOURCE_UPLOAD:'+JSON.stringify(delivered));
+  // Leave only the uploaded source package for the existing single-package
+  // Save/cleanup proof. The bootstrap draft has no authored edits to discard.
+  const bootstrapCleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
+  await record({phase:'variables_column_union_bootstrap_cleanup',cleanup:bootstrapCleanup});
+  await writeFile(output+'/bootstrap-cleanup.json',JSON.stringify(bootstrapCleanup));
+  if(bootstrapCleanup.package_closed!==true||bootstrapCleanup.logged_out!==true)throw Error('VARIABLES_SOURCE_BOOTSTRAP_CLEANUP');
+  await context.close();
+  ({context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/source-browser',candidate:config.login,keepOpen:true,headless:true}));
+  page=context.pages()[0];
   const prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-open',intent:'open_package',packagePath:config.package}));
   if(prepared.status!=='READY')throw Error('VARIABLES_SOURCE_OPEN');
+  binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:prepared.document_id,account:prepared.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
+  runtime=createActionRuntime(runtimeOptions);
   const saved=await saveVariablesColumnUnionSource(runtime,config.package,delivered.outcome);
   await writeFile(output+'/source-save.json',JSON.stringify(saved));
   const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:prepared.document_id,account:config.login.username,packagePath:config.package,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid}));

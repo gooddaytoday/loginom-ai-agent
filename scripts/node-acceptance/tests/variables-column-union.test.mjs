@@ -1,9 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource,saveVariablesColumnUnionSource} from '../variables-column-union.mjs';
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {auditVariablesColumnUnionHistory,deliverVariablesColumnUnionSource,saveVariablesColumnUnionSource,prepareVariablesColumnUnionSource} from '../variables-column-union.mjs';
 const load=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-'+name+'-run.json',import.meta.url)));
 const initial=load('initial'),updated=load('updated');
+test('fixture preparation establishes a real workspace before delivery and refuses a failed preparation without uploading',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'union-source-workspace-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const modules={
+  'src/resources.mjs':`export const verifyResources=async()=>({browserPath:'pinned'});`,
+  'src/connection-check.mjs':`export const state={events:[],fail:false,closed:false,ready:false,packages:0};export async function loginBrowser(){const page={prepare:o=>{state.events.push(o.intent??'identity');if(o.identityOnly)return {status:'BOUND',document_id:'doc',loginom_account:'worker'};if(state.fail)return {status:'NOT_READY'};state.packages++;if(o.intent==='new_draft')state.ready=true;return {status:'READY',document_id:'doc',loginom_account:'worker',workflow_ref:{tab_tid:'own'}};},cleanup:()=>{state.events.push('cleanup');if(state.packages!==1)return {package_closed:false,logged_out:false};state.packages--;return {package_closed:true,logged_out:true};}};return {context:{pages:()=>[page],close:async()=>{state.closed=true;}}};}`,
+  'client/lib/workspace.mjs':`export const makeWorkspacePrepareCode=o=>'async page=>page.prepare('+JSON.stringify(o)+')';`,
+  'client/lib/package-cleanup.mjs':`export const makePackageCleanupCode=()=> 'async page=>page.cleanup()';`,
+  'client/lib/executor.mjs':`import {state} from '../../src/connection-check.mjs';export const createActionRuntime=()=>({deliverPackageArtifact:async()=>{state.events.push('delivery');if(!state.ready)throw Error('Prepared workspace required before fixture delivery');return {outcome:{status:'SUCCEEDED',destination:'/worker/source.lgp',upload_completion_verified:true,cleanup_complete:true}};},run:async()=>({status:'SUCCEEDED',output:{save_completed:true}})});`,
+  'client/lib/artifacts.mjs':`export const createArtifactStore=async()=>({admit:async()=>({artifact_id:'input',upload:{grant_id:'grant'}})});`,
+  'client/lib/execution-journal.mjs':`export const createExecutionJournal=()=>async e=>e;`,
+  'client/lib/storage-policy.mjs':`export const createStorageBinding=()=>({});`,
+  'executor/catalog/actions.json':JSON.stringify({actions:[{action_key:'package.save_checkpoint',effect:{}}]}),
+  'executor/catalog/selectors.json':JSON.stringify({selectors:[]}),
+ };
+ for(const [path,text] of Object.entries(modules)){const p=join(root,'runtime',path);await mkdir(join(p,'..'),{recursive:true});await writeFile(p,text);}
+ const config=join(root,'config.json'),fixture=join(root,'source.lgp');await writeFile(config,JSON.stringify({login:{url:'https://loginom.test/app/',username:'worker',password:''},package:'/worker/source.lgp'}));await writeFile(fixture,'input');
+ const {state}=await import(pathToFileURL(join(root,'runtime/src/connection-check.mjs')));
+ await prepareVariablesColumnUnionSource(root,config,fixture,join(root,'success'));
+ assert.deepEqual(state.events,['new_draft','delivery','cleanup','open_package','cleanup']);assert.equal(state.closed,true);
+ state.events=[];state.ready=false;state.fail=true;state.closed=false;
+ await assert.rejects(()=>prepareVariablesColumnUnionSource(root,config,fixture,join(root,'refused')),/SOURCE_WORKSPACE/);
+ assert.deepEqual(state.events,['new_draft']);assert.equal(state.closed,true);
+});
 test('source Save targets only the completed owned upload and requires a completed native save',async()=>{
  const calls=[],path='/worker/new-copy.lgp',proof={status:'SUCCEEDED',destination:path,upload_completion_verified:true,cleanup_complete:true};
  const runtime={run:async(...args)=>{calls.push(args);return {status:'SUCCEEDED',output:{save_completed:true}};}};
