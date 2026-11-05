@@ -49,6 +49,7 @@ def load(source):
     roots = {}
     variable_roots = {}
     metadata_roots = {}
+    index = None
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
             entries = archive.infolist()
@@ -72,8 +73,9 @@ def load(source):
                 parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
                 root = etree.fromstring(data, parser)
                 require(not root.getroottree().docinfo.doctype and not any(isinstance(e, etree._Entity) for e in root.iter()), 'DTD/entities are forbidden')
-                if parts[-1].casefold() == 'unit.xml':
-                    require(root.tag == 'Unit', 'Unit.xml must contain native Unit XML')
+                if name.casefold() == 'packageindex.xml':
+                    index = root
+                elif parts[-1].casefold() == 'unit.xml':
                     roots[name] = root
                 elif parts[-1].casefold() == 'variables.xml':
                     variable_roots[name] = root
@@ -81,7 +83,21 @@ def load(source):
                     metadata_roots[name] = root
     except (zipfile.BadZipFile, etree.XMLSyntaxError, RuntimeError, OSError, NotImplementedError) as exc:
         raise ValueError('Cannot safely read package: ' + str(exc)) from exc
+    if index is not None:
+        bases = [item.get('BasePath', '').replace('\\', '/').strip('/')
+                 for item in index.findall('Units/Item')]
+        indexed = [base + '/Unit.xml' for base in bases if base]
+        if indexed:
+            by_name = {name.casefold(): name for name in roots}
+            selected = {}
+            for member in indexed:
+                name = by_name.get(member.casefold())
+                require(name is not None, 'Missing indexed Unit.xml: ' + member)
+                selected[name] = roots[name]
+            roots = selected
     require(roots, 'No own Unit.xml modules found')
+    for root in roots.values():
+        require(root.tag == 'Unit', 'Unit.xml must contain native Unit XML')
     return source, payload, dict(sorted(roots.items())), dict(sorted(variable_roots.items())), metadata_roots
 
 

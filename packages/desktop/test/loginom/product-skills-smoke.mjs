@@ -24,7 +24,10 @@ const application = damage ? join(root, "application", basename(executable)) : e
 await writeFile(join(evidence, "roots.json"), JSON.stringify({ root, home, workspace, profile }, null, 2))
 await mkdir(home, { mode: 0o700 })
 await mkdir(workspace, { mode: 0o700 })
-const reservedNames = ["package-docs", "loginom-automation", "package_docs"]
+// Keep the installed acceptance matrix aligned with packages/product/src/skills.ts.
+const productSkillNames = ["loginom-automation", "package-docs", "package-linter"]
+const reservedNames = [...productSkillNames, "package_docs"]
+const expectedProductSkillNames = damage ? [] : [...productSkillNames].sort()
 if (collisions) {
   for (const name of reservedNames) {
     const directory = join(workspace, ".agents/skills", name)
@@ -133,7 +136,7 @@ try {
   const bundled = skills.filter((skill) => skill.source === "bundled")
   if (
     JSON.stringify(bundled.map((skill) => skill.name).sort()) !==
-    JSON.stringify(damage ? [] : ["loginom-automation", "package-docs"])
+    JSON.stringify(expectedProductSkillNames)
   )
     throw Error(damage ? "DAMAGED_BUNDLE_ACCEPTED" : "PRODUCT_SKILLS_REQUIRED")
   if (bundled.some((skill) => !/^[a-f0-9]{64}$/.test(skill.digest))) throw Error("BUNDLED_PROVENANCE_REQUIRED")
@@ -205,8 +208,11 @@ try {
     await writeFile(join(evidence, "commands.json"), JSON.stringify(commands, null, 2))
     if (JSON.stringify(commands).includes("UNTRUSTED")) throw Error("RESERVED_COMMAND_REPLACED")
     if (commands.some((command) => command.name === "package_docs")) throw Error("OBSOLETE_COMMAND_REGISTERED")
-    const productCommands = commands.filter((command) => ["loginom-automation", "package-docs"].includes(command.name))
-    if (productCommands.length !== (damage ? 0 : 2) || productCommands.some((command) => command.source !== "skill"))
+    const productCommands = commands.filter((command) => productSkillNames.includes(command.name))
+    if (
+      JSON.stringify(productCommands.map((command) => command.name).sort()) !== JSON.stringify(expectedProductSkillNames) ||
+      productCommands.some((command) => command.source !== "skill")
+    )
       throw Error("PRODUCT_COMMAND_SOURCE_INVALID")
     for (const name of reservedNames) {
       await diagnostic(`Ignored external command '${name}' from config:`)
