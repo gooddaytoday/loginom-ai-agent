@@ -22,7 +22,7 @@ test('configuration readback retains mode and complete native output metadata in
  assert.equal(JSON.stringify(r).includes('Привет'),false);assert.equal(r.receipt_ids.length,5);
 });
 test('a requested orientation, draft or partial receipt cannot stand in for observed committed settings',()=>{
- for(const change of [f=>f.values.configure.configuration.mode='rows',f=>f.values.configure.configuration.verified=false,
+ for(const change of [f=>f.values.configure.configuration.mode='unsupported',f=>f.values.configure.configuration.verified=false,
   f=>f.values.configure.configuration.inventory_complete=false,f=>f.values.configure.validation.status='requested',
   f=>f.values.node_finish.settings_applied=false,f=>f.values.output_mapping.finish.settings_applied=false,
   f=>f.values.finish.mode='close',f=>f.phases[0].status='pending',f=>f.phases.push(f.phases[0]),
@@ -45,8 +45,17 @@ test('the real committed readback fits its public result schema without claiming
  const result={operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,execution:{status:'not_requested',execution_id:null},
   output:{status:'not_refreshed',evidence_ref:null},package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback:f.run()}};
  assert.equal(validate(result).valid,true);
- for(const change of [r=>r.configuration.readback.mode='rows',r=>r.configuration.readback.package_persistence_verified=true,
+ for(const change of [r=>r.configuration.readback.mode='unsupported',r=>r.configuration.readback.package_persistence_verified=true,
   r=>r.configuration.readback.receipt_ids.pop(),r=>delete r.configuration.readback.output_mapping.fields[0].source_name]){
   const invalid=structuredClone(result);change(invalid);assert.equal(validate(invalid).valid,false);
  }
+});
+
+test('committed rows readback retains the native Variant schema and fits the result contract',()=>{
+ const f=fixture();f.values.configure.configuration.mode='rows';
+ f.mapping.source_fields=[['Name','Имя','string'],['DisplayName','Метка','string'],['Value','Значение','variant']].map(([name,label,type],index)=>({name,label,type,index,record_id:'s'+index,data_kind:'discrete'}));
+ f.mapping.target_fields=f.mapping.source_fields.map((s,index)=>({...s,record_id:'t'+index,source:s,excluded:false}));
+ const result={operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null},package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback:f.run()}};
+ assert.equal(result.configuration.readback.mode,'rows');
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,true);
 });

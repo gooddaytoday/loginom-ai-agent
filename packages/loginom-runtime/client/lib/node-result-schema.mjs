@@ -271,7 +271,7 @@ const lgdExportConfigurationReadback=object({kind:values('lgd_export'),scope:val
 const tableTreeConfigurationReadback=object({kind:values('table_to_tree'),mode:values('manual_structure'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,input_port:{const:0},output_port:{const:0},receipt_ids:array(str),package_persistence_verified:{const:false},nodes:tableToTreeParametersSchema.properties.nodes});
 const treeJsonConfigurationReadback=object({kind:values('tree_to_json'),mode:values('serialize'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,input_port:{const:0},output_port:{const:0},receipt_ids:array(str),package_persistence_verified:{const:false},exclude_root:{const:true},pretty:{const:false},keys:values('names'),multi_row:{const:false},datetime:values('iso8601')});
 const variablesToTableConfigurationReadback=object({kind:values('variables_to_table'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
- receipt_ids:{...array(str),minItems:5,maxItems:5},mode:values('columns'),
+ receipt_ids:{...array(str),minItems:5,maxItems:5},mode:values('columns','rows'),
  variable_input:object({kind:values('variables'),source:ref,output:integer,input:{const:0},source_port_guid:str,target_port_guid:str}),
  output_mapping:object({port:{const:0},autosync:bool,fields:{...boundedFields(object({...readbackMappingField.properties,excluded:bool})),minItems:1,maxItems:128}}),
  package_persistence_verified:{const:false}});
