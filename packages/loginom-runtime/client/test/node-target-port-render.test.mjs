@@ -47,7 +47,7 @@ function fixture({portIndex=0}={}){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class;nodeTid='MF;TF-1;Graph;'+(factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {page,request,variable:()=>{portTid=portTid.replace('_Data-','_Var-');port.FSubType=3;},mislabeledShape:()=>{alternatePortDom.getAttribute=()=>nodeTid+';Output_Var-3';duplicateShape=true;},tree:()=>{portTid=portTid.replace('_Data-','_DataTree-');},rename:(suffix='Output_Data-'+portIndex,keys='R_Segment')=>{const factor=node.FIconCls===NODE_TYPES['research.factor_analysis'].icon_class,regression=node.FIconCls==='bg-vendor-icon-linregression',cross=node.FIconCls===NODE_TYPES['transform.cross_table'].icon_class;nodeTid='MF;TF-1;Graph;'+(factor?'Фактор._анализ:_X_Y_Z':cross?'cols:_Category;__rows:_'+keys+';__cells:_Amount':regression?'Линрегрессия:_Y_X1_X2_X3':'Квантование:_X');node.FLabel.FRawValue=factor?'Фактор. анализ: X Y Z':cross?'cols: Category; rows: '+keys.replaceAll('_',' ')+'; cells: Amount':regression?'Линрегрессия: Y X1 X2 X3':'Квантование: X';portTid=nodeTid+';'+suffix;duplicateShape=true;},hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('W1 inventories variable ports by native kind without shifting table ordinals',async()=>{
  const f=fixture({portIndex:2}),link=f.restLink();
@@ -124,6 +124,44 @@ test('W1 variable redraw rebinds a mislabeled shape only to its retained native 
  for(const change of [f=>f.wrongHit(),f=>{f.port.data={};},f=>{f.port.parent={};},f=>{f.port.FCell.parent={};}]){
   const invalid=fixture({portIndex:4});invalid.variable();await invalid.read();invalid.mislabeledShape();change(invalid);await assert.rejects(invalid.read());
  }
+});
+
+// LAB-852-I: own Done changes the caption before the port SVG is rebound.
+for(const icon of ['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'])test('owned variable source caption redraw rebinds only the fresh native port: '+icon,async()=>{
+ const f=fixture();f.variable();f.node.FIconCls=icon;await f.read();
+ f.rename('Output_Var-0');
+ const after=f.labelDom.getAttribute().replace(';Label;Label','');
+ f.page[Symbol.for('loginom-dock.operation-receipts.v1')]=new Map([['own-done',{state:'completed',outcome:{
+  status:'SUCCEEDED',action_key:'ui.act',cleanup_complete:true,
+  output:{prepared_node_context:{verified:true,document_id:'doc',workflow_id:'wf',node_id:'n',surface:'graph',tid:after}},
+  trace:[{event:'wizard_finish_graph_verified',previous_owner:{tid:'crumb>Calc'},node:{part:'body',node_label:after.split(';Graph;')[1]}}]
+ }}]]);
+ f.losePortTid();let paints=0;
+ f.paintWith(()=>{paints++;f.rename('Output_Var-0');});
+ const graph=await f.read();
+ assert.ok(paints>0);assert.equal(graph.complete,true);
+ assert.equal(graph.nodes[0].variable_outputs[0].native_index,0);
+ const bound=await f.binding();assert.equal(bound.native_bindings[0].label,after.split(';Graph;')[1]);
+});
+for(const invalid of ['missing','running','ambiguous','foreign-node','foreign-document','foreign-workflow','wrong-before','wrong-after','foreign-cell','foreign-data','foreign-guid','wrong-hit','duplicate'])test('variable caption redraw refuses '+invalid+' ownership',async()=>{
+ const f=fixture();f.variable();f.node.FIconCls='bg-vendor-icon-datatovariables';await f.read();f.rename('Output_Var-0');
+ const after=f.labelDom.getAttribute().replace(';Label;Label','');
+ const outcome={status:'SUCCEEDED',action_key:'ui.act',cleanup_complete:true,
+  output:{prepared_node_context:{verified:true,document_id:'doc',workflow_id:'wf',node_id:'n',surface:'graph',tid:after}},
+  trace:[{event:'wizard_finish_graph_verified',previous_owner:{tid:'crumb>Calc'},node:{part:'body',node_label:after.split(';Graph;')[1]}}]};
+ const entry={state:'completed',outcome};
+ if(invalid==='running')entry.state='running';
+ if(invalid==='ambiguous')outcome.status='AMBIGUOUS';
+ for(const [name,key] of [['foreign-node','node_id'],['foreign-document','document_id'],['foreign-workflow','workflow_id']])if(invalid===name)outcome.output.prepared_node_context[key]='foreign';
+ if(invalid==='wrong-before')outcome.trace[0].previous_owner.tid='crumb>Other';
+ if(invalid==='wrong-after')outcome.output.prepared_node_context.tid='MF;TF-1;Graph;Other';
+ if(invalid==='foreign-cell')f.port.FCell={...f.port.FCell};
+ if(invalid==='foreign-data')f.port.data={};
+ if(invalid==='foreign-guid')f.port.FGuid='foreign';
+ if(invalid==='wrong-hit')f.wrongHit();
+ if(invalid==='duplicate')f.duplicatePort();
+ f.page[Symbol.for('loginom-dock.operation-receipts.v1')]=new Map(invalid==='missing'?[]:[['own-done',entry]]);
+ await assert.rejects(f.binding(),/Visible port identity/);
 });
 
 test('first observation binds an alternate port shape only through its rendered native cell',async()=>{

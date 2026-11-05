@@ -9,7 +9,12 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlace
 // proxy or call Loginom server methods. GUID + prepared document/workflow is the
 // identity; labels and native port indexes are rebound on every observation.
 export async function readGraph(page, task) {
-  return page.evaluate(({ request, types, origin, build, read_bindings=false }) => {
+  // Reuse completed browser receipts, not captions alone, to recognize a
+  // source renamed by our own wizard completion in this prepared workflow.
+  const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
+    .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
+    .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -79,6 +84,14 @@ export async function readGraph(page, task) {
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
+          &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
+          &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
+            &&context.document_id===request.document_id&&context.workflow_id===request.workflow_ref.workflow_id
+            &&context.node_id===n.FGuid&&context.tid===tid
+            &&trace?.some(e=>['wizard_finish_graph_verified','wizard_execute_graph_verified'].includes(e.event)
+              &&e.previous_owner?.tid===request.workflow_ref.navigation_path.at(-1)?.tid+'>'+previous.nodeTid.slice((request.workflow_ref.prefix+';Graph;').length)
+              &&e.node?.part==='body'&&e.node.node_label===tid.slice((request.workflow_ref.prefix+';Graph;').length)));
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.
@@ -92,15 +105,18 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
+            if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
+              ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
@@ -190,7 +206,7 @@ export async function readGraph(page, task) {
     rest_connection_links.sort((a,b)=>a.tid.localeCompare(b.tid));
     return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(variable_links.length?{variable_links}:{}),...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
-  },task);
+  },{...task,finishes});
 }
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
