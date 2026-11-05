@@ -53,11 +53,17 @@ export function wizardDeactivationDialogOwner(state,binding) {
  // captured by that settled gesture, with the same native pending node/path.
  if(binding?.kind==='deactivation'&&binding.release_opening){
   const b=binding.release_opening;
+  const navigation=state.workflow_navigation,expected=b.navigation;
+  // A native-bound source caption may overflow in the refusal receipt and
+  // become observable during cleanup. Only that exact pending crumb can vary.
+  const pendingNavigation=b.native_pending_overflow===true&&[navigation,expected].every(v=>v?.status==='observed'&&Array.isArray(v.path)&&Array.isArray(v.current_path)
+    &&(same(v.current_path,v.path)||same(v.current_path,[...v.path,b.node.pending_wizard_node])))
+   &&same({...navigation,current_path:null},{...expected,current_path:null});
   return n?.verified===true&&n.surface==='graph'&&n.locked===false&&same(n,b.node)
    &&state.wizard?.status==='absent'&&same(state.workflow_ref,b.workflow_ref)
    &&state.dom_epoch?.document===b.document&&state.origin===b.origin&&state.loginom_build===b.build
    &&state.active_tab_ref===b.active_tab_ref&&same(state.package_identity,b.package_identity)
-   &&same(state.workflow_navigation,b.navigation)&&ui?.dialogs?.length===1
+   &&(same(navigation,expected)||pendingNavigation)&&ui?.dialogs?.length===1
    &&same({...ui.dialogs[0],title:b.dialog.title,text:b.dialog.text},b.dialog)&&Array.isArray(ui.masks)
    &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===n.tid.split(';Graph;')[0]&&m.dialog_ref===null);
  }

@@ -6,6 +6,13 @@ import {stoppedImportOpen} from './support/stopped-import-open.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+for(const fault of [null,'foreign-node','foreign-dialog','other-question','busy','changed-path','foreign-control','unknown-receipt','foreign-receipt','unsettled','other-gesture','lost-reply'])
+test('variables calculator release cancels only its receipted deactivation before the overflow breadcrumb is visible: '+fault,async()=>{
+ const operation={id:'vars-update',deadline:10000,action:{action_key:'node.apply',revision:'1'},nodeApply:{node,pending:{phase:'open'},request:{document_id:'doc',workflow_ref:workflow,target:{type:'variables.calculator'}}}};
+ const f=stoppedImportOpen(operation,fault,{workflowOnly:true});
+ if(fault){await assert.rejects(f.run());assert.equal(f.gestures.length,fault==='lost-reply'?1:0);}
+ else{const proof=await f.run();assert.equal(proof.cleanup_complete,true);assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-cancel'}]);assert.equal(proof.node_context.surface,'graph');}
+});
 function fixture(kind,fault,nodeWizard=false){
  let mode=kind,lastAction;const gestures=[],events=[];
  const operation={id:'apply',action:{action_key:'node.apply',revision:'1'},deadline:10000,lastReceipt:{id:'apply:opening'},

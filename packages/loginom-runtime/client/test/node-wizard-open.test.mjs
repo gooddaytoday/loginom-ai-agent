@@ -2,6 +2,48 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {wizardOpenBinding,boundWizardDeactivationConfirmation,openPreparedWizard} from '../lib/node-wizard-open.mjs';
 import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
+import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
+import vm from 'node:vm';
+import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixture.mjs';
+
+for(const fault of [null,'node','document','workflow','native','component','label','hidden','question','button','duplicate'])
+test('variables calculator hidden native pending breadcrumb uses the existing deactivation confirmation: '+fault,async()=>{
+ const f=scriptGraphFixture('Params','bg-vendor-icon-calcvariables'),{page,body}=f;f.node.FGuid='node';
+ const base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');const path=[];let chain='',mode='graph',dialog,mask,crumb;
+ for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']){
+  chain+=(chain?'>':'')+label;const tid=base+'cnrNaviMode;b.s_'+chain;path.push({tid,label});const e=page.add('a',tid,label,undefined,panel);
+  if(label==='Сценарий')page.add('span',null,'',undefined,e).attrs.class='maptree-icon-workflow';
+ }
+ const pending={tid:path.at(-1).tid+'>Params',label:'Params'};
+ class ModelNodeTreeNode{};page.app.ModelNodeTreeNode=ModelNodeTreeNode;const native=new ModelNodeTreeNode();native.FGuid=fault==='native'?'foreign':'node';
+ page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{FController:f.model,Node:{data:{node:native}}}});
+ const reader=async()=>({verified:true,document_id:fault==='document'&&mode!=='graph'?'other':'doc',workflow_id:fault==='workflow'&&mode!=='graph'?'other':'flow',node_id:fault==='node'&&mode!=='graph'?'other':'node',
+  surface:mode==='wizard'?'wizard':'graph',tid:base+(mode==='wizard'?'WizrdMCF':'Graph;Params'),locked:false,...(mode==='question'?{pending_wizard_node:pending}:{})});
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{document_id:'doc',node:{node_id:'node'},workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',navigation_path:path}},...options},reader));
+ const initial=await page.observe(),settings=initial.ui.elements.find(e=>e.wizard_open),binding=wizardOpenBinding(initial),click=page.mouse.click;
+ page.mouse.click=async(...args)=>{await click(...args);
+  if(mode==='graph'){
+   mode='question';crumb=page.add('a',pending.tid,fault==='label'?'Other':'Params',undefined,panel);crumb.style.display='none';crumb.id='pending-source';if(fault==='hidden')crumb.attrs.hidden='';page.add('span',null,'',undefined,crumb).attrs.class='bg-vendor-icon-calcvariables';
+   page.context.Ext={getCmp:id=>id===crumb.id&&fault!=='component'?{el:{dom:crumb},_node:{data:{node:native}}}:null};
+   mask=page.add('div','MF;TF-1','Загрузка');mask.attrs.class='bg-mask-message';
+   dialog=page.add('div',null,'',{x:400,y:200,width:500,height:260});dialog.attrs.class='x-window x-message-box';page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('span',null,fault==='question'?'Удалить пакет?':'Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел?',undefined,dialog);
+   let x=420;for(const [id,label] of Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'})){page.add('a','msgbox;tlb;'+id,fault==='button'&&id==='yes'?'Продолжить':label,{x,y:350,width:110,height:30},dialog);x+=125;}
+   if(fault==='duplicate')page.add('a','msgbox;tlb;yes','Да',{x:420,y:390,width:80,height:30},dialog);
+  }else{
+   assert.equal(mode,'question');mode='wizard';dialog.remove();mask.remove();body.parentElement.remove();
+   const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;CalcVariablesWizard;btnAddExpr','',undefined,wizard);
+   const settings=page.add('a',pending.tid+'>Настройка','Настройка',undefined,panel);page.add('span',null,'',undefined,settings).attrs.class='maptree-icon-wizard';
+  }
+ };
+ const opened=await page.execute({mode:'act',operation_id:'begin',action:{verb:'begin_wizard',ref:settings.ref},snapshot:initial});
+ assert.equal(opened.status,fault?'AMBIGUOUS':'SUCCEEDED',String(fault)+JSON.stringify({error:opened.error,pending:opened.output.wizard_pending_owner,navigation:opened.output.workflow_navigation}));assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(!fault){
+  const s=opened.output,yes=s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');assert.ok(yes.wizard_deactivation_confirmation);assert.ok(yes.allowed_actions.includes('confirm_wizard_deactivation'));s.node_wizard_confirmation=binding;
+  const confirmed=await page.execute({mode:'act',operation_id:'confirm',action:{verb:'confirm_wizard_deactivation',ref:yes.ref},snapshot:s});
+  assert.equal(confirmed.status,'SUCCEEDED',JSON.stringify(confirmed.error));assert.equal(confirmed.output.wizard.stage,'variables_calculator');assert.equal(page.events.filter(e=>e==='click').length,2);
+ }
+});
 const fixture=()=>{
  const node={verified:true,surface:'graph',document_id:'doc',workflow_id:'flow',node_id:'node',tid:'MF;TF-1;Graph;Import'};
  const path=[{tid:'flow',label:'Scenario'}];
@@ -22,6 +64,18 @@ test('deactivation requires the exact prepared graph, workflow, question and thr
   s=>s.ui.masks.push({kind:'busy',ref:'question'})]) {
   const bad=structuredClone(state);change(bad);assert.equal(boundWizardDeactivationConfirmation(bad,binding),false);
  }
+});
+
+test('receipted variables calculator cleanup tolerates only its exact pending overflow crumb becoming observable',()=>{
+ const {state}=fixture();Object.assign(state,{origin:'https://app.loginom.ai/',active_tab_ref:'tab',workflow_ref:{prefix:'MF;TF-1'},dom_epoch:{document:'browser'}});
+ const n=state.prepared_node_context;n.locked=false;n.pending_wizard_node={tid:'flow>Import',label:'Import'};
+ const path=[{tid:'flow',label:'Scenario'}];state.workflow_navigation={status:'observed',path,current_path:path};
+ const binding={kind:'deactivation',release_opening:{node:structuredClone(n),workflow_ref:state.workflow_ref,document:'browser',origin:state.origin,build:state.loginom_build,active_tab_ref:'tab',navigation:structuredClone(state.workflow_navigation),dialog:structuredClone(state.ui.dialogs[0]),native_pending_overflow:true}};
+ state.workflow_navigation.current_path=[...path,n.pending_wizard_node];assert.equal(boundWizardDeactivationConfirmation(state,binding),true);
+ for(const change of [s=>s.workflow_navigation.current_path.at(-1).label='Other',s=>s.workflow_navigation.current_path.push({tid:'other'}),s=>s.workflow_navigation.path=undefined,s=>s.dom_epoch.document='other',s=>s.prepared_node_context.node_id='other',s=>s.ui.elements[0].signature.dialog_ref='other']){
+  const bad=structuredClone(state);change(bad);assert.equal(boundWizardDeactivationConfirmation(bad,binding),false);
+ }
+ const imports=structuredClone(binding);delete imports.release_opening.native_pending_overflow;assert.equal(boundWizardDeactivationConfirmation(state,imports),false);
 });
 test('question discovery cannot replace button verification',()=>{
  const {state,binding}=fixture();state.ui.elements=[];
