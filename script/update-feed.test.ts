@@ -3,7 +3,19 @@ import { generateKeyPairSync } from "node:crypto"
 import { mkdtemp, rm, chmod } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Feed, type Store, checkRelease, validateVersion } from "./update-feed"
+import {
+  Feed,
+  type Store,
+  checkRelease,
+  validateVersion,
+  signRelease,
+  mirrorRelease,
+  verifySignedRelease,
+  verifyPublicRelease,
+  s3Store,
+} from "./update-feed"
+import { createServer } from "node:http"
+import { rename, readdir } from "node:fs/promises"
 
 const pair = generateKeyPairSync("ed25519")
 const key = pair.privateKey.export({ format: "pem", type: "pkcs8" }).toString()
@@ -27,11 +39,11 @@ function memory() {
       if (!file) return undefined
       return { size: file.bytes.length, cache: file.cache }
     },
-    async copy(from, to) {
+    async copy(from, to, cache) {
       events.push(`copy ${to}`)
       const file = files.get(from)
       if (!file) throw Error(`Missing ${from}`)
-      files.set(to, file)
+      files.set(to, { ...file, cache: cache ?? file.cache })
     },
   }
   return { files, events, store }
@@ -169,6 +181,157 @@ test("status fails on tampered signature or missing binary; stage refuses an unt
     m.files.delete("unstable/0.4.0/desktop.exe")
     await expect(feed.status("unstable")).rejects.toThrow("Missing")
   } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+async function releaseSums(dir: string) {
+  const files = (await readdir(dir)).filter((name) => name !== "SHA256SUMS.txt")
+  await Bun.write(
+    join(dir, "SHA256SUMS.txt"),
+    (
+      await Promise.all(
+        files.map(
+          async (name) =>
+            new Bun.CryptoHasher("sha256").update(await Bun.file(join(dir, name)).bytes()).digest("hex") +
+            "  " +
+            name +
+            "\n",
+        ),
+      )
+    ).join(""),
+  )
+}
+
+async function signedFixture() {
+  const dir = await fixture()
+  for (const name of await readdir(dir))
+    if (name.startsWith("desktop")) await rename(join(dir, name), join(dir, "loginom-ai-agent-" + name))
+  for (const name of ["latest.yml", "latest-linux.yml", "latest-mac.yml"])
+    await Bun.write(
+      join(dir, name),
+      (await Bun.file(join(dir, name)).text()).replaceAll("desktop.", "loginom-ai-agent-desktop."),
+    )
+  await releaseSums(dir)
+  return dir
+}
+
+test("dual release signs GitHub bytes, mirrors immutable assets and server-copies both channel pointers", async () => {
+  const dir = await signedFixture()
+  const m = memory()
+  try {
+    await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+    await releaseSums(dir)
+    await verifySignedRelease(dir, "0.4.0", [publicKey])
+    await mirrorRelease(m.store, dir, "0.4.0", "unstable", [publicKey])
+    const puts = m.events.filter((event) => event.startsWith("put "))
+    expect(puts.every((event) => event.startsWith("put releases/0.4.0/"))).toBe(true)
+    expect(m.files.get("unstable/latest.yml")!.bytes).toEqual(await Bun.file(join(dir, "latest.yml")).bytes())
+    expect(m.files.get("unstable/latest.yml")!.cache).toBe("no-cache")
+    expect(m.files.get("releases/0.4.0/latest.yml")!.cache).toContain("immutable")
+    const previous = m.events.length
+    await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
+    expect(m.events.slice(previous).every((event) => event.startsWith("copy stable/"))).toBe(true)
+    expect(m.files.get("stable/latest.yml")!.bytes).toEqual(m.files.get("unstable/latest.yml")!.bytes)
+
+    const server = createServer(async (req, res) => {
+      const path = req.url!.slice(1)
+      const bytes = path.startsWith("github/")
+        ? await Bun.file(join(dir, path.slice(7))).bytes()
+        : m.files.get(path)?.bytes
+      if (!bytes) {
+        res.writeHead(404).end()
+        return
+      }
+      res.end(bytes)
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/`
+    try {
+      await verifyPublicRelease(dir, "0.4.0", base + "github/", base, "stable", [publicKey])
+      m.files.set("stable/latest.yml.sig", { bytes: Buffer.from("tampered"), cache: "no-cache" })
+      await expect(verifyPublicRelease(dir, "0.4.0", base + "github/", base, "stable", [publicKey])).rejects.toThrow(
+        "verification failed",
+      )
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+    m.files.set("releases/0.4.0/loginom-ai-agent-desktop.exe", { bytes: Buffer.from("tampered"), cache: "immutable" })
+    await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow(
+      "Immutable release differs",
+    )
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("dual mirror rejects an invalid signature before any S3 write, even with valid SHA256SUMS", async () => {
+  const dir = await signedFixture()
+  const m = memory()
+  try {
+    await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+    await Bun.write(join(dir, "latest.yml.sig"), "invalid")
+    await releaseSums(dir)
+    await expect(mirrorRelease(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("Invalid signature")
+    expect(m.events).toHaveLength(0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache metadata", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "update-local-s3-"))
+  const objects = new Map<string, { bytes: Buffer; cache: string }>()
+  const scopes: string[] = []
+  const server = createServer(async (req, res) => {
+    scopes.push(req.headers.authorization ?? "")
+    const path = req.url!.split("?")[0]
+    const source = req.headers["x-amz-copy-source"]
+    if (req.method === "PUT" && typeof source === "string") {
+      const data = objects.get("/" + decodeURIComponent(source).replace(/^\//, ""))!
+      objects.set(path, { bytes: data.bytes, cache: String(req.headers["cache-control"] ?? data.cache) })
+      res.end('<CopyObjectResult><ETag>"test"</ETag></CopyObjectResult>')
+      return
+    }
+    if (req.method === "PUT") {
+      const chunks: Buffer[] = []
+      for await (const chunk of req) chunks.push(chunk)
+      objects.set(path, { bytes: Buffer.concat(chunks), cache: String(req.headers["cache-control"]) })
+      res.end()
+      return
+    }
+    const data = objects.get(path)
+    if (!data) {
+      res.writeHead(404).end()
+      return
+    }
+    res.setHeader("Cache-Control", data.cache)
+    res.setHeader("Content-Length", data.bytes.length)
+    res.end(req.method === "HEAD" ? undefined : data.bytes)
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  try {
+    const config = join(dir, "s3.json")
+    await Bun.write(
+      config,
+      JSON.stringify({
+        endpoint: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+        bucket: "updates-test",
+        access_key: "test-tenant:test-key",
+        secret_key: "test-secret",
+      }),
+    )
+    const store = await s3Store(config, "https://updates-test.example.test/")
+    expect(await store.head("missing")).toBeUndefined()
+    await store.put("releases/0.4.0/latest.yml", new Blob(["signed bytes"]), "public, max-age=31536000, immutable")
+    await store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache")
+    expect(Buffer.from(await store.get("stable/latest.yml")).toString()).toBe("signed bytes")
+    expect(await store.head("stable/latest.yml")).toEqual({ size: 12, cache: "no-cache" })
+    expect(scopes.every((value) => value.includes("/ru-central-1/s3/aws4_request"))).toBe(true)
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
     await rm(dir, { recursive: true, force: true })
   }
 })

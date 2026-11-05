@@ -27,7 +27,8 @@ export type Store = {
   get(name: string): Promise<Uint8Array>
   put(name: string, bytes: Uint8Array | Blob, cache: string): Promise<void>
   head(name: string): Promise<{ size: number; cache: string } | undefined>
-  copy(from: string, to: string): Promise<void>
+  copy(from: string, to: string, cache?: string): Promise<void>
+  sha256?(name: string): Promise<string>
 }
 
 export function validateVersion(version: string) {
@@ -78,6 +79,165 @@ export async function checkRelease(dir: string) {
       throw Error(`SHA256 mismatch: ${name}`)
   }
   return sums
+}
+
+// Release CI signs before uploading to the GitHub draft. The mirror never has a
+// signing key and must preserve every byte, including channel metadata.
+export async function signRelease(
+  dir: string,
+  version: string,
+  min: string,
+  key: string,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+) {
+  minimum(version, min)
+  await checkRelease(dir)
+  const documents = new Map<string, Uint8Array>()
+  for (const name of metadataNames.filter((name) => name !== "cli.json")) {
+    if (!(await Bun.file(join(dir, name)).exists())) {
+      if (name === "latest-mac.yml" && process.env.LOGINOM_RELEASE_SKIP_MACOS === "true") continue
+      throw Error(`Missing metadata: ${name}`)
+    }
+    const data = Bun.YAML.parse(await Bun.file(join(dir, name)).text()) as Desktop
+    if (data.version !== version || !Array.isArray(data.files) || !data.files.length || "packages" in data)
+      throw Error(`Invalid metadata: ${name}`)
+    for (const file of data.files) {
+      asset(file.url)
+      if (
+        !file.url.startsWith("loginom-ai-agent-") ||
+        file.sha512 !== (await digest(join(dir, file.url), "sha512", "base64")) ||
+        file.size !== (await stat(join(dir, file.url))).size
+      )
+        throw Error(`Metadata hash/size mismatch: ${name}`)
+    }
+    if (!data.files.some((file) => file.url === data.path && file.sha512 === data.sha512))
+      throw Error(`Invalid legacy path/hash: ${name}`)
+    documents.set(
+      name,
+      new TextEncoder().encode(
+        Bun.YAML.stringify({
+          ...data,
+          minSupportedVersion: min,
+          stagingPercentage: 100,
+          path: `releases/${version}/${asset(data.path)}`,
+          files: data.files.map((file) => ({ ...file, url: `releases/${version}/${asset(file.url)}` })),
+        }),
+      ),
+    )
+  }
+  const signatures = new Map([...documents].map(([name, bytes]) => [name, signed(bytes, key, keys)]))
+  for (const [name, bytes] of documents) {
+    await Bun.write(join(dir, name), bytes)
+    await Bun.write(join(dir, name + ".sig"), signatures.get(name)!)
+  }
+}
+
+export async function verifySignedRelease(dir: string, version: string, keys: readonly string[] = UPDATE_PUBLIC_KEYS) {
+  validateVersion(version)
+  const sums = await checkRelease(dir)
+  const names = [...sums.keys()].filter((name) => /^latest(?:-linux|-mac)?\.yml$/.test(name))
+  if (!names.includes("latest.yml") || !names.includes("latest-linux.yml"))
+    throw Error("Incomplete signed desktop metadata")
+  for (const name of names) {
+    const bytes = await Bun.file(join(dir, name)).bytes()
+    if (!verifyUpdateSignature(bytes, await Bun.file(join(dir, name + ".sig")).text(), keys))
+      throw Error(`Invalid signature: ${name}`)
+    const data = Bun.YAML.parse(decoder.decode(bytes)) as Desktop
+    if (data.version !== version || !Array.isArray(data.files) || !data.files.length || "packages" in data)
+      throw Error(`Invalid metadata: ${name}`)
+    minimum(version, data.minSupportedVersion)
+    percent(data.stagingPercentage)
+    if (!data.files.some((file) => file.url === data.path && file.sha512 === data.sha512))
+      throw Error(`Invalid legacy path/hash: ${name}`)
+    for (const file of data.files) {
+      const prefix = `releases/${version}/`
+      if (!file.url.startsWith(prefix)) throw Error("Expected releases/version path")
+      const target = asset(file.url.slice(prefix.length))
+      if (
+        !target.startsWith("loginom-ai-agent-") ||
+        !sums.has(target) ||
+        file.sha512 !== (await digest(join(dir, target), "sha512", "base64")) ||
+        file.size !== (await stat(join(dir, target))).size
+      )
+        throw Error(`Metadata hash/size mismatch: ${name}`)
+    }
+  }
+  return { sums, names }
+}
+
+export async function mirrorRelease(
+  store: Store,
+  dir: string,
+  version: string,
+  target: string,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+) {
+  channel(target)
+  const { sums, names } = await verifySignedRelease(dir, version, keys)
+  // Verify the whole input set before the first write. Existing objects may only
+  // be reused byte-for-byte, making a partial upload safely retryable.
+  const immutableNames = [...sums.keys(), "SHA256SUMS.txt"]
+  for (const name of immutableNames) {
+    const path = `releases/${version}/${name}`
+    if (await store.head(path)) {
+      const existing = store.sha256
+        ? await store.sha256(path)
+        : new Bun.CryptoHasher("sha256").update(await store.get(path)).digest("hex")
+      if (existing !== (sums.get(name) ?? (await digest(join(dir, name), "sha256", "hex"))))
+        throw Error(`Immutable release differs: ${name}`)
+    }
+  }
+  for (const name of immutableNames) {
+    const path = `releases/${version}/${name}`
+    if (!(await store.head(path))) await store.put(path, Bun.file(join(dir, name)), immutable)
+  }
+  // Both channels point to the same immutable tree. Promotion is a server-side
+  // copy from that tree; it never downloads/re-signs/re-writes the release.
+  for (const name of names)
+    for (const suffix of ["", ".sig"])
+      await store.copy(`releases/${version}/${name}${suffix}`, `${target}/${name}${suffix}`, "no-cache")
+  return names
+}
+
+export async function verifyPublicRelease(
+  dir: string,
+  version: string,
+  github: string,
+  s3: string,
+  target: string,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+) {
+  channel(target)
+  const { names } = await verifySignedRelease(dir, version, keys)
+  const read = async (url: string) => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: { "Cache-Control": "no-cache" } })
+    if (!response.ok) throw Error(`Public verification HTTP ${response.status}`)
+    return new Uint8Array(await response.arrayBuffer())
+  }
+  const hash = async (url: string) => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15 * 60_000) })
+    if (!response.ok || !response.body) throw Error(`Public artifact HTTP ${response.status}`)
+    const digest = new Bun.CryptoHasher("sha512")
+    for await (const bytes of response.body) digest.update(bytes)
+    return digest.digest("base64")
+  }
+  for (const name of names) {
+    for (const source of ["github", "s3"]) {
+      const base = source === "github" ? github : new URL(target + "/", s3).href
+      const bytes = await read(new URL(name, base).href)
+      const signature = decoder.decode(await read(new URL(name + ".sig", base).href))
+      if (
+        !verifyUpdateSignature(bytes, signature, keys) ||
+        !Buffer.from(bytes).equals(Buffer.from(await Bun.file(join(dir, name)).bytes()))
+      )
+        throw Error(`Public metadata verification failed: ${source}/${name}`)
+      const info = Bun.YAML.parse(decoder.decode(bytes)) as Desktop
+      for (const file of info.files) {
+        const url = source === "github" ? new URL(asset(file.url.split("/").at(-1)!), github) : new URL(file.url, s3)
+        if ((await hash(url.href)) !== file.sha512) throw Error(`Public SHA512 mismatch: ${source}/${name}`)
+      }
+    }
+  }
 }
 function minimum(version: string, min: string) {
   validateVersion(version)
@@ -285,13 +445,26 @@ export class Feed {
   }
 }
 
-export async function s3Store(configFile: string, feedBase: string): Promise<Store> {
-  const config = (await Bun.file(configFile).json()) as {
+export async function s3Store(configFile: string | undefined, feedBase: string): Promise<Store> {
+  const config = (
+    configFile
+      ? await Bun.file(configFile).json()
+      : {
+          endpoint: process.env.LOGINOM_UPDATES_S3_ENDPOINT,
+          bucket: process.env.LOGINOM_UPDATES_S3_BUCKET,
+          region: process.env.LOGINOM_UPDATES_S3_REGION,
+          access_key: process.env.LOGINOM_UPDATES_S3_ACCESS_KEY,
+          secret_key: process.env.LOGINOM_UPDATES_S3_SECRET_KEY,
+        }
+  ) as {
     endpoint: string
     bucket: string
+    region?: string
     access_key: string
     secret_key: string
   }
+  if (!config.endpoint || !config.bucket || !config.access_key || !config.secret_key)
+    throw Error("Missing S3 configuration")
   const base = new URL(feedBase)
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash)
     throw Error("Feed base must be a clean HTTPS URL")
@@ -303,7 +476,7 @@ export async function s3Store(configFile: string, feedBase: string): Promise<Sto
   const key = (name: string) => [prefix, name].filter(Boolean).join("/")
   const client = new S3Client({
     endpoint: config.endpoint,
-    region: "ru-1",
+    region: config.region || "ru-central-1",
     requestHandler: new FetchHttpHandler({
       requestInit: (request) => ({ signal: AbortSignal.timeout(request.method === "PUT" ? 15 * 60_000 : 15_000) }),
     }),
@@ -314,6 +487,13 @@ export async function s3Store(configFile: string, feedBase: string): Promise<Sto
     responseChecksumValidation: "WHEN_REQUIRED",
   })
   return {
+    async sha256(name) {
+      const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key(name) }))
+      if (!result.Body) throw Error("Empty S3 body")
+      const hash = new Bun.CryptoHasher("sha256")
+      for await (const bytes of result.Body.transformToWebStream()) hash.update(bytes)
+      return hash.digest("hex")
+    },
     async get(name) {
       const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key(name) }))
       if (!result.Body) throw Error("Empty S3 body")
@@ -344,13 +524,19 @@ export async function s3Store(configFile: string, feedBase: string): Promise<Sto
         }),
       )
     },
-    async copy(from, to) {
+    async copy(from, to, cache) {
       await client.send(
         new CopyObjectCommand({
           Bucket: config.bucket,
           Key: key(to),
           CopySource: `${config.bucket}/${key(from).split("/").map(encodeURIComponent).join("/")}`,
-          MetadataDirective: "COPY",
+          MetadataDirective: cache ? "REPLACE" : "COPY",
+          ...(cache
+            ? {
+                CacheControl: cache,
+                ContentType: to.endsWith(".yml") ? "application/yaml" : "application/octet-stream",
+              }
+            : {}),
         }),
       )
     },
@@ -375,16 +561,41 @@ async function main() {
       config: { type: "string" },
       "public-key": { type: "string", multiple: true },
       assets: { type: "string" },
+      "github-base": { type: "string" },
       help: { type: "boolean" },
     },
   })
   if (values.help) {
     console.log(
-      "update-feed.ts publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
+      "update-feed.ts sign-release --assets <directory> --version X.Y.Z [--min-supported X.Y.Z] [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nmirror-release --assets <directory> --version X.Y.Z --channel stable|unstable\nverify-public --assets <directory> --version X.Y.Z --channel stable|unstable --github-base HTTPS_URL\nLegacy: publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
     )
     return
   }
   const command = positionals[0]
+  if (["sign-release", "mirror-release", "verify-public"].includes(command)) {
+    if (positionals.length !== 1 || !values.assets || !values.version) throw Error("Required --assets and --version")
+    const keys = values["public-key"]
+      ? await Promise.all(values["public-key"].map((file) => Bun.file(resolve(file)).text()))
+      : UPDATE_PUBLIC_KEYS
+    if (command === "sign-release") {
+      const key = values.key ? await Bun.file(resolve(values.key)).text() : process.env.LOGINOM_UPDATES_SIGNING_KEY
+      if (!key) throw Error("Missing release signing key")
+      await signRelease(resolve(values.assets), values.version, values["min-supported"] ?? values.version, key, keys)
+      return
+    }
+    const base = values["feed-base"] ?? process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    if (!base) throw Error("Missing feed base")
+    const target = channel(values.channel ?? "")
+    if (command === "verify-public") {
+      if (!values["github-base"]) throw Error("Missing --github-base")
+      await verifyPublicRelease(resolve(values.assets), values.version, values["github-base"], base, target, keys)
+      console.log("Public signatures and SHA512: PASS")
+      return
+    }
+    await mirrorRelease(await s3Store(values.config, base), resolve(values.assets), values.version, target, keys)
+    console.log("Release mirror: PASS")
+    return
+  }
   if (positionals.length !== 1 || !["publish", "promote", "stage", "status"].includes(command))
     throw Error("Expected publish, promote, stage or status; see --help")
   const base = values["feed-base"] ?? process.env.LOGINOM_AI_AGENT_UPDATE_FEED

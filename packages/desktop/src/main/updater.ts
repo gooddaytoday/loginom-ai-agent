@@ -6,15 +6,17 @@ import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import {
   updateProxyOptions,
-  configureUpdateFeed,
+  configureSignedUpdate,
+  downloadSignedUpdate,
+  loadSignedUpdate,
+  readUpdateBytes,
   compareUpdateVersions,
   matchUpdateManifest,
   parseUpdateAdminPolicy,
   updateMode,
   updatePolicyPath,
-  updateSettings,
-  verifyUpdateManifest,
-  type SignedUpdateInfo,
+  updateSources,
+  type SelectedUpdate,
   type UpdateAdminPolicy,
   type UpdateChannel,
 } from "./update-policy"
@@ -51,11 +53,11 @@ export function setupAutoUpdater(input: {
   }
   let settings = (() => {
     try {
-      return updateSettings(Product.updateFeed, store.get("channel"), policy)
+      return updateSources(Product.updateFeed, Product.updateGithub, store.get("channel"), policy)
     } catch {
       policyError = true
       logger.error("updater feed configuration rejected")
-      return updateSettings(null, store.get("channel"), { updates: "off" })
+      return updateSources(null, null, store.get("channel"), { updates: "off" })
     }
   })()
   const mode = updateMode(process.platform, process.env.APPIMAGE)
@@ -81,9 +83,25 @@ export function setupAutoUpdater(input: {
   }
   autoUpdater.signals.login(login)
   autoUpdater.on("error", (error) => logger.error("updater backend error", error.message))
-  const applyFeed = () => configureUpdateFeed(autoUpdater, settings.feed)
-  applyFeed()
-  let approved: { info: UpdateInfo; signed: SignedUpdateInfo } | undefined
+  const readManifest = (url: string, timeout?: number) =>
+    readUpdateBytes(
+      url,
+      (url) => {
+        const request = net.request({ url, session: autoUpdater.netSession, redirect: "manual" })
+        let redirects = 0
+        request.on("redirect", (_status, _method, location) => {
+          if (++redirects > 5 || new URL(location).protocol !== "https:") {
+            request.emit("error", Error("LOGINOM_UPDATE_REDIRECT_INVALID"))
+            return
+          }
+          request.followRedirect()
+        })
+        request.on("login", login)
+        return request
+      },
+      timeout,
+    )
+  let approved: { info: UpdateInfo; selected: SelectedUpdate } | undefined
   let verifiedUnsupported: boolean | undefined
   // 6.8.9 AppUpdater.js:413 stores result; :418 returns result.info;
   // :436/:462 pass that same object to doDownloadUpdate. Check identity as well
@@ -106,8 +124,7 @@ export function setupAutoUpdater(input: {
     backend: {
       async checkForUpdates() {
         approved = undefined
-        const feed = settings.feed
-        if (!feed) throw Error("LOGINOM_UPDATE_FEED_UNAVAILABLE")
+        if (!settings.sources.length) throw Error("LOGINOM_UPDATE_FEED_UNAVAILABLE")
         const environment = await input.proxy()
         const proxy = updateProxyOptions(environment, input.systemProxyEnabled())
         proxyCredentials = proxy.credentials
@@ -120,55 +137,14 @@ export function setupAutoUpdater(input: {
             : process.platform === "linux"
               ? "latest-linux.yml"
               : "latest.yml"
-        const read = (name: string) =>
-          new Promise<Buffer>((resolve, reject) => {
-            const request = net.request({
-              url: new URL(name, feed).href,
-              session: autoUpdater.netSession,
-              redirect: "error",
-            })
-            const timer = setTimeout(() => {
-              reject(Error("LOGINOM_UPDATE_FEED_TIMEOUT"))
-              request.abort()
-            }, 30_000)
-            request.setHeader("Cache-Control", "no-cache")
-            request.on("login", login)
-            request.on("error", (error) => {
-              clearTimeout(timer)
-              reject(error)
-            })
-            request.on("response", (response) => {
-              if (response.statusCode !== 200) {
-                clearTimeout(timer)
-                reject(Error("LOGINOM_UPDATE_FEED_UNAVAILABLE"))
-                request.abort()
-                return
-              }
-              const chunks: Buffer[] = []
-              let size = 0
-              response.on("data", (chunk: Buffer) => {
-                size += chunk.length
-                if (size > 2 * 1024 * 1024) {
-                  clearTimeout(timer)
-                  reject(Error("LOGINOM_UPDATE_MANIFEST_TOO_LARGE"))
-                  request.abort()
-                  return
-                }
-                chunks.push(chunk)
-              })
-              response.on("error", (error) => {
-                clearTimeout(timer)
-                reject(error)
-              })
-              response.on("end", () => {
-                clearTimeout(timer)
-                resolve(Buffer.concat(chunks))
-              })
-            })
-            request.end()
-          })
-        const [raw, signature] = await Promise.all([read(file), read(file + ".sig")])
-        const signed = verifyUpdateManifest(raw, signature.toString("utf8"), feed)
+        const selected = await loadSignedUpdate({
+          sources: settings.sources,
+          file,
+          currentVersion: app.getVersion(),
+          read: readManifest,
+        })
+        const signed = selected.signed
+        configureSignedUpdate(autoUpdater, selected)
         const unsupported = compareUpdateVersions(app.getVersion(), signed.minSupportedVersion) < 0
         verifiedUnsupported = unsupported
         const notes =
@@ -187,7 +163,7 @@ export function setupAutoUpdater(input: {
             updateInfo: signed,
             unsupported,
             notes,
-            url: new URL(file.url, feed).href,
+            url: selected.url(file.url),
           }
         }
         const result = await autoUpdater.checkForUpdates()
@@ -195,16 +171,28 @@ export function setupAutoUpdater(input: {
         matchUpdateManifest(signed, result.updateInfo)
         if (result.isUpdateAvailable) {
           if (target() !== result.updateInfo) throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
-          approved = { info: result.updateInfo, signed }
+          approved = { info: result.updateInfo, selected }
         }
         return { ...result, unsupported }
       },
       downloadUpdate: () => {
-        if (!approved || target() !== approved.info || !settings.enabled || approved.signed.stagingPercentage === 0)
+        if (
+          !approved ||
+          target() !== approved.info ||
+          !settings.enabled ||
+          approved.selected.signed.stagingPercentage === 0
+        )
           throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
-        matchUpdateManifest(approved.signed, approved.info)
-        autoUpdater.allowDowngrade = false
-        return autoUpdater.downloadUpdate()
+        matchUpdateManifest(approved.selected.signed, approved.info)
+        const selected = approved.selected
+        return downloadSignedUpdate(autoUpdater, selected, () =>
+          loadSignedUpdate({
+            sources: settings.sources.filter((source) => source.kind === "generic"),
+            file: process.platform === "linux" ? "latest-linux.yml" : "latest.yml",
+            currentVersion: selected.signed.version,
+            read: readManifest,
+          }),
+        )
       },
       quitAndInstall: () => {
         // quitAndInstall closes all windows before emitting before-quit, so
@@ -239,9 +227,8 @@ export function setupAutoUpdater(input: {
       if (settings.channelLocked) throw Error("LOGINOM_UPDATE_POLICY_MANAGED")
       await controller.configure(() => {
         store.set("channel", channel)
-        settings = updateSettings(Product.updateFeed, channel, policy)
+        settings = updateSources(Product.updateFeed, Product.updateGithub, channel, policy)
         approved = undefined
-        applyFeed()
       })
       return controller.check()
     },
