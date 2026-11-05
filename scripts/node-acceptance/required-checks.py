@@ -30,7 +30,7 @@ RULES = (
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none')),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
-    ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns',)),
+    ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns', 'variables-rows')),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
     ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),

@@ -1,4 +1,4 @@
-import {validateVariablesToTableFields} from './variables-vartodata-parameters.mjs';
+import {validateVariablesToTableOutputFields} from './variables-vartodata-parameters.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('Variables-to-table output: '+message);};
 export async function configureVariablesToTableOutput(channel,configuration,parameters,mapping={}){
@@ -9,7 +9,7 @@ export async function configureVariablesToTableOutput(channel,configuration,para
   &&['document_id','workflow_id','node_id'].every(k=>s.node_mapping.node_context[k]===node[k]);
  let state=await channel.observe({condition:'owned variables-to-table derived output',readMappings:true,ready});
  const baseline=state.node_mapping;
- validateVariablesToTableFields(baseline.source_fields);
+ validateVariablesToTableOutputFields(baseline.source_fields,configuration.mode);
  need(baseline.target_fields.length===baseline.source_fields.length,'complete derived output required');
  const linked=new Set();
  for(const f of baseline.target_fields){

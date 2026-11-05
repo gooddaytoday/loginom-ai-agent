@@ -1,9 +1,9 @@
 const need=(value,message)=>{if(!value)throw Error('Переменные в таблицу: '+message);};
 export const variablesToTableParametersSchema={type:'object',properties:{},required:[],additionalProperties:false,
- description:'Use parameters:{} and mode:"columns". One explicitly connected nonempty variable set becomes one typed row on table output 0. Names, labels, types and source order are preserved; NULL, empty string, false and zero are distinct. Values belong to the upstream variable source. Rows mode is unsupported. Done commits, Execute computes, Close discards; save separately.'};
+ description:'Use parameters:{} and mode columns or rows. Columns produces one typed row preserving variable names, labels, types and order. Rows produces Name string, DisplayName string, Value variant, one row per variable in source order; each Value retains its native subtype and civil datetime milliseconds. NULL, empty string, false and zero are distinct. Values belong to the upstream variable source. Done commits, Execute computes, Close discards; save separately.'};
 
 export function validateVariablesToTableParameters(parameters,mode,request){
- need(mode==='columns','Этот режим пока не поддерживается');
+ need(['columns','rows'].includes(mode),'Этот режим пока не поддерживается');
  need(parameters&&typeof parameters==='object'&&!Array.isArray(parameters)&&Object.keys(parameters).length===0,'требуется parameters:{}; значения и формулы задаются в источнике переменных');
  need(Array.isArray(request.inputs)&&request.inputs.length===0,'используй variable_inputs; табличный вход не поддерживается');
  need(Array.isArray(request.variable_inputs)&&request.variable_inputs.length===1,'нужен один явный источник variable_inputs');
@@ -18,4 +18,11 @@ export function validateVariablesToTableFields(fields){
  need(new Set(fields.map(f=>f?.name?.toLowerCase())).size===fields.length&&fields.every(f=>f&&typeof f.name==='string'&&f.name.length>0&&f.name.length<=128
   &&typeof f.label==='string'&&['integer','real','boolean','string','datetime'].includes(f.type)),
  'имена, метки и scalar-типы переменных должны быть полными и уникальными; Variant пока не поддерживается');
+}
+
+export function validateVariablesToTableOutputFields(fields,mode='columns'){
+ if(mode==='columns')return validateVariablesToTableFields(fields);
+ need(mode==='rows'&&Array.isArray(fields)&&fields.length===3
+  &&fields.every((f,i)=>f.name===['Name','DisplayName','Value'][i]&&f.type===['string','string','variant'][i]&&typeof f.label==='string'),
+  'режим rows требует исходные поля Name string, DisplayName string, Value variant в этом порядке');
 }

@@ -12,7 +12,7 @@ test('columns accepts empty settings and the eight stage-0 scalar fields without
  assert.equal(fields[1].value,false);assert.equal(fields[4].value,null);assert.equal(fields[6].value,'');assert.equal(fields[7].value,0);
 });
 test('unsupported mode and settings refuse before a driver can mutate',()=>{
- assert.throws(()=>validateVariablesToTableParameters({},'rows',request()),/Этот режим пока не поддерживается/);
+ assert.throws(()=>validateVariablesToTableParameters({},'unknown',request()),/Этот режим пока не поддерживается/);
  for(const p of [null,[],{variables:fields},{layout:'columns'},{to_rows:false},{expressions:[]},{local_variables:[]}])
   assert.throws(()=>validateVariablesToTableParameters(p,'columns',request()));
 });
@@ -31,4 +31,8 @@ test('typed variable source admission refuses foreign workflows, tables, control
   r=>r.variable_inputs[0].output=-1,r=>r.variable_inputs[0].source.document_id='foreign',r=>r.variable_inputs[0].source.workflow_id='foreign']){
   const r=request();change(r);assert.throws(()=>validateVariablesToTableParameters({},'columns',r));
  }
+});
+
+test('rows accepts the same explicit scalar variable source and empty parameters',()=>{
+ assert.doesNotThrow(()=>validateVariablesToTableParameters({},'rows',request()));
 });
