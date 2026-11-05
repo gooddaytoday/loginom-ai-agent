@@ -142,11 +142,11 @@ export async function restRequestCapability(page,t,readContext){
      }));
     },{advanced});};
     await quiet();await readDefaults();
-    for(const [key,value] of [['pedTimeout',30],['pedFailedRequestRepeat',2]]){
-     const tid=advanced+';'+key+';ValueControl';await quiet();await guard();await point(tid);
-     const input=find(tid).locator('input');effect=true;await input.fill(String(value),{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
-    }
-    const observed=await wait('REST timeout defaults readback',async()=>{const r=await readDefaults();return r.pedTimeout===30&&r.pedFailedRequestRepeat===2?r:null;});
+    // A body stall after HTTP 200 reaches the native overall timeout without
+    // another timeout interval; leave retry settings at their native value.
+    const tid=advanced+';pedTimeout;ValueControl';await quiet();await guard();await point(tid);
+    const input=find(tid).locator('input');effect=true;await input.fill('30',{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+    const observed=await wait('REST timeout defaults readback',async()=>{const r=await readDefaults();return r.pedTimeout===30?r:null;});
     // Private configure evidence; the public parameter/readback contracts stay fixed.
     configuration.request_defaults={timeout_seconds:observed.pedTimeout,retries:observed.pedFailedRequestRepeat};
    }

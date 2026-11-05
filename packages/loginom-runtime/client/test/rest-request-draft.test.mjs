@@ -142,6 +142,6 @@ for(const duplicate of ['column','parameter'])test('REST refuses duplicate '+dup
 for(const new_node of [true,false])test('REST timeout defaults apply only to new nodes: '+new_node,async()=>{
  const f=fixture(null,false,null,{empty:true,new_node,timeout:new_node?-1:75,retries:new_node?0:4});
  const result=await f.run();assert.equal(result.verified,true,result.error);
- assert.deepEqual(f.values,new_node?{pedTimeout:30,pedFailedRequestRepeat:2}:{pedTimeout:75,pedFailedRequestRepeat:4});
- assert.deepEqual(f.writes,new_node?[["pedTimeout",30],["pedFailedRequestRepeat",2]]:[]);
+ assert.deepEqual(f.values,new_node?{pedTimeout:30,pedFailedRequestRepeat:0}:{pedTimeout:75,pedFailedRequestRepeat:4});
+ assert.deepEqual(f.writes,new_node?[["pedTimeout",30]]:[]);
 });
