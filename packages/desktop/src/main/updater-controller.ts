@@ -1,5 +1,6 @@
 import type { UpdaterState, UpdateSettings } from "@opencode-ai/app/updater"
 import { compareUpdateVersions } from "./update-policy"
+import { redactUpdateMessage } from "@loginom-ai-agent/product/update-signature"
 
 export type { UpdaterState } from "@opencode-ai/app/updater"
 
@@ -93,7 +94,7 @@ export function createUpdaterController(input: {
         // request or download fails. Never clear it on a network/signature error.
         const verified = input.supportStatus?.()
         if (verified !== undefined) unsupported = verified
-        const message = error instanceof Error ? error.message : String(error)
+        const message = redactUpdateMessage(error instanceof Error ? error.message : String(error))
         input.log?.("updater check rejected", { message })
         return transition({ status: "error", message })
       })

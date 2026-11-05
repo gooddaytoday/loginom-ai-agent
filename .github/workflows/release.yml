@@ -6,6 +6,8 @@ on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published, released]
   workflow_dispatch:
     inputs:
       mode:
@@ -40,13 +42,16 @@ on:
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_AI_AGENT_UPDATE_FEED }}
+  LOGINOM_UPDATES_S3_ENDPOINT: ${{ vars.LOGINOM_UPDATES_S3_ENDPOINT }}
+  LOGINOM_UPDATES_S3_REGION: ${{ vars.LOGINOM_UPDATES_S3_REGION }}
+  LOGINOM_UPDATES_S3_BUCKET: ${{ vars.LOGINOM_UPDATES_S3_BUCKET }}
 
 jobs:
   cut:
@@ -127,9 +132,12 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       channel: ${{ steps.release.outputs.channel }}
       prerelease: ${{ steps.release.outputs.prerelease }}
+      feeds: ${{ steps.feeds.outputs.enabled }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
 
       # Every build stages this key into its resources; without it the app cannot use the knowledge service.
       - name: Require the built-in knowledge key
@@ -140,6 +148,17 @@ jobs:
             echo "::error::Repository secret LOGINOM_MCP_API_KEY is required: release builds embed the knowledge service key"
             exit 1
           fi
+
+      - name: Require built-in S3 read key and virtual-host configuration
+        env:
+          S3_READ_ACCESS: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+          S3_READ_SECRET: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$S3_READ_ACCESS" && test -n "$S3_READ_SECRET"
+          test -n "$LOGINOM_UPDATES_S3_ENDPOINT" && test -n "$LOGINOM_UPDATES_S3_REGION" && test -n "$LOGINOM_UPDATES_S3_BUCKET"
+          echo "::add-mask::$S3_READ_ACCESS"
+          echo "::add-mask::$S3_READ_SECRET"
 
       - name: Resolve version and channel
         id: release
@@ -182,6 +201,21 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Building version \`$version\` on channel \`$channel\` (prerelease: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Setup Bun for feed authorization
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+
+      - name: Authorize update feeds
+        id: feeds
+        env:
+          LOGINOM_UPDATES_VERIFIED_SHA: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA }}
+          LOGINOM_UPDATES_FEEDS_OFF: ${{ vars.LOGINOM_UPDATES_FEEDS_OFF }}
+          LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_AI_AGENT_UPDATE_FEED }}
+          LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API }}
+          LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD }}
+        run: bun script/update-feed.ts release-config
+
   tests:
     name: tests
     needs: verify
@@ -210,9 +244,14 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -297,9 +336,14 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
@@ -374,9 +418,14 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
@@ -462,6 +511,7 @@ jobs:
 
   release:
     name: release
+    environment: release
     # Every platform must pass before a complete draft release can be created.
     needs: [verify, tests, typecheck, build, linux-matrix, windows, macos]
     if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && (needs.macos.result == 'success' || (vars.LOGINOM_RELEASE_SKIP_MACOS == 'true' && needs.macos.result == 'skipped'))
@@ -499,6 +549,24 @@ jobs:
           find "$RUNNER_TEMP/assets" -name '*.log' -delete
           LOGINOM_RELEASE_SKIP_MACOS="${{ vars.LOGINOM_RELEASE_SKIP_MACOS }}" bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
 
+      - name: Install release tooling
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Sign Desktop metadata and regenerate checksums
+        env:
+          LOGINOM_UPDATES_SIGNING_KEY: ${{ secrets.LOGINOM_UPDATES_SIGNING_KEY }}
+          LOGINOM_RELEASE_SKIP_MACOS: ${{ vars.LOGINOM_RELEASE_SKIP_MACOS }}
+          MIN_SUPPORTED: ${{ vars.LOGINOM_UPDATES_MIN_SUPPORTED_VERSION }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LOGINOM_UPDATES_SIGNING_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_SIGNING_KEY"; exit 1; fi
+          bun script/update-feed.ts sign-release --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --min-supported "${MIN_SUPPORTED:-${TAG#v}}"
+
+      - name: Regenerate release checksums and notes
+        env:
+          LOGINOM_RELEASE_SKIP_MACOS: ${{ vars.LOGINOM_RELEASE_SKIP_MACOS }}
+        run: bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
+
       - name: Create draft release
         run: |
           set -euo pipefail
@@ -513,3 +581,73 @@ jobs:
             echo
             cat "$RUNNER_TEMP/notes.md"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  mirror-updates:
+    name: mirror published update to cloud.ru
+    environment: release
+    # Publication (and later prerelease -> stable conversion) remains an owner action.
+    if: github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: update-${{ github.event.release.tag_name }}
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_AI_AGENT_UPDATE_FEED }}
+      LOGINOM_UPDATES_S3_ENDPOINT: ${{ vars.LOGINOM_UPDATES_S3_ENDPOINT }}
+      LOGINOM_UPDATES_S3_BUCKET: ${{ vars.LOGINOM_UPDATES_S3_BUCKET }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Require successful release checks on the exact tag SHA
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          gh run list --workflow release.yml --event push --commit "$sha" --status success --limit 100 --json headSha,headBranch,conclusion > "$RUNNER_TEMP/release-runs.json"
+          jq -e --arg sha "$sha" --arg tag "$TAG" 'any(.[]; .headSha == $sha and .headBranch == $tag and .conclusion == "success")' "$RUNNER_TEMP/release-runs.json"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+
+      - name: Download published release assets
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/assets"
+          gh release download "$TAG" --dir "$RUNNER_TEMP/assets"
+          bun install --frozen-lockfile --ignore-scripts
+
+      - name: Mirror identical signed release and promote channel with conditional PUT
+        env:
+          LOGINOM_UPDATES_S3_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_ACCESS_KEY }}
+          LOGINOM_UPDATES_S3_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_SECRET_KEY }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LOGINOM_UPDATES_S3_ACCESS_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_S3_ACCESS_KEY"; exit 1; fi
+          if [ -z "${LOGINOM_UPDATES_S3_SECRET_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_S3_SECRET_KEY"; exit 1; fi
+          channel=stable
+          if [ "$PRERELEASE" = true ]; then channel=unstable; fi
+          bun script/update-feed.ts mirror-release --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --channel "$channel"
+          echo "UPDATE_CHANNEL=$channel" >> "$GITHUB_ENV"
+
+      - name: Verify GitHub and authenticated S3 signatures and artifact SHA512
+        env:
+          GITHUB_DOWNLOAD_BASE: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD }}
+          LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+          LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$GITHUB_DOWNLOAD_BASE"
+          bun script/update-feed.ts verify-public --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --channel "$UPDATE_CHANNEL" --github-base "${GITHUB_DOWNLOAD_BASE%/}/$TAG/"

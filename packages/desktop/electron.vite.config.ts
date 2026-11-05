@@ -54,6 +54,12 @@ const sentry =
 export default defineConfig({
   main: {
     define: {
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API?.trim() || null,
+      ),
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD?.trim() || null,
+      ),
       LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),

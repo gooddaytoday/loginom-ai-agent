@@ -76,6 +76,7 @@ const config: Configuration = {
   extraResources: [
     { from: "resources/loginom", to: "loginom" },
     { from: "resources/icons", to: "icons" },
+    { from: "resources", to: ".", filter: ["updates-s3.json"] },
   ],
   protocols: { name: Product.name, schemes: [Product.scheme] },
   mac: {
