@@ -1,5 +1,7 @@
 # Текстовый импорт: подплан для Multica
 
+Подготовка v0.4.1: [несколько файлов и маска — исследование и предложение приёмки](multi-file.md).
+
 Статус: `reverification_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
 Component ID: `component.imports.Text`, slug `text-import`. Runtime type и режимы: `imports.text` / `delimited` — закреплены.
 База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
