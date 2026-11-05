@@ -1183,7 +1183,7 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'variable-events.json', evidence)
             self.phase('user-real-date-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-user-real-date.mjs',
-                src / 'expected-initial-run.json', src / 'expected-updated-run.json', folder / 'variable-events.json'], folder, timeout=60)
+                src / 'expected-initial-run.json', folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
         if spec.get('upload_only'):
             calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
                      if event.get('type') == 'tool_use']

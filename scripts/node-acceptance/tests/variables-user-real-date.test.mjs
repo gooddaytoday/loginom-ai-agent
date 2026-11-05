@@ -34,7 +34,7 @@ function history(){
  const cell=(c,value)=>({type:c.type,is_null:value===null,value:value!==null&&c.type==='integer'?String(value):value,...(c.type==='datetime'&&value!==null?{representation:'local_datetime',timezone:'unspecified'}:{}),precision:value===null?'exact_null':c.type==='real'?'17_significant_digits':c.type==='integer'?'exact_integer':c.type==='datetime'?'millisecond':'source_text'});
  const snapshot=(id,want)=>({phase:'node_checkpoint',result:{operation_id:id,status:'SUCCEEDED',cleanup_complete:true,node,output:{variable_ports:[{kind:'variables',port:4,complete:true,fresh:true,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,execution_id:null,read_id:id,count:8,completeness:{loaded:true,count:8,store_count:8,unique_ids:8},variables:want.variable_inventory.outputs[0].variables.map((v,index)=>({...v,id:index,index,label:v.name,cell:cell(v,v.value)}))}]}}});
  const tables=(want,suffix)=>want.outputs.map((o,i)=>({phase:'node_checkpoint',result:{status:'SUCCEEDED',cleanup_complete:true,node:{...node,node_id:'filter'+i},execution:{status:'completed',execution_id:suffix+i},output:{ports:[{port:0,fresh:true,execution_id:suffix+i,row_count:o.rows.length,sample_complete:true,precision:{numbers_verified:true},schema:o.columns.map(c=>({...c,label:c.name})),sample:o.rows.map(r=>o.columns.map(c=>cell(c,r[c.name])))}]}}}));
- return [snapshot('first',initial),...tables(initial,'first'),{phase:'node_apply_prepared',operation_id:'patch',request:{target:{kind:'existing',type:'variables.user',ref:node},finish:'done',parameters:{variables:final.variable_inventory.outputs[0].variables.slice(0,2)}}},
+ return [snapshot('first',initial),...tables(initial,'first'),{phase:'node_apply_prepared',operation_id:'patch',request:{target:{kind:'existing',type:'variables.user',ref:node},mode:'values',finish:'done',parameters:{variables:final.variable_inventory.outputs[0].variables.slice(0,2)}}},
   {phase:'node_checkpoint',result:{operation_id:'patch',status:'SUCCEEDED',cleanup_complete:true,configuration:{readback:{values_are:'independent_owned_user_variables'}}}},snapshot('last',final),...tables(final,'last')];
 }
 test('both business phases use stock typed matching and retain the same variables and consumers',()=>{
@@ -50,5 +50,26 @@ test('observed Calculator expressions empty reexecution preserves consumers, whi
  assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
  for(const parameters of [{expressions:[{}]},{expressions:[],order:['changed']},{expressions:[],extra:true}]){
   const bad=structuredClone(events);bad.at(-1).request.parameters=parameters;assert.throws(()=>auditUserRealDate(bad,initial,final));
+ }
+});
+test('independent creation readback proves initial values without requiring a redundant public snapshot',()=>{
+ const events=history(),first=events[0].result,variables=first.output.variable_ports[0].variables;
+ first.output={ports:[]};first.configuration={readback:{kind:'user_variables',mode:'values',scope:'observed_after_verified_finish',values_are:'independent_owned_user_variables',variables,receipt_ids:['first:configure']}};
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+ for(const corrupt of [r=>r.values_are='draft',r=>r.variables[1].cell.value='2026-10-30T00:00:00.000',r=>r.variables[1].cell.precision='unverified',r=>r.variables[1].id=0]){
+  const bad=structuredClone(events);corrupt(bad[0].result.configuration.readback);assert.throws(()=>auditUserRealDate(bad,initial,final));
+ }
+});
+test('read-only builtin requests between initial readback and the patch are not value patches',()=>{
+ const events=history();events.splice(1,0,{phase:'node_apply_prepared',request:{target:{type:'variables.user'},mode:'read',finish:'done',parameters:{source_operation_id:'first'}}});
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+});
+test('a verified reopen of the same saved package permits a new workflow ID while retaining native identities',()=>{
+ const events=history();events.splice(5,0,{phase:'completed',action_key:'package.save_as',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{reopened:true,package_ref:{path:final.package_path}}}});
+ events[6].result.node={...events[6].result.node,workflow_id:'wf-reopened'};
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+ for(const corrupt of [e=>e.splice(5,1),e=>e[5].outcome.output.package_ref.path='/other.lgp',e=>e[5].outcome.output.reopened=false,
+  e=>e[6].result.node.document_id='foreign',e=>e[6].result.node.node_id='foreign']){
+  const bad=structuredClone(events);corrupt(bad);assert.throws(()=>auditUserRealDate(bad,initial,final));
  }
 });
