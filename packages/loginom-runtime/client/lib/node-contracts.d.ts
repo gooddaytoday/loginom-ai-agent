@@ -123,7 +123,7 @@ export interface GroupingConfigurationReadback {
 }
 export interface VariablesToTableConfigurationReadback {
   kind: 'variables_to_table'; scope: 'observed_before_verified_finish'; node: NodeRef;
-  receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false; mode: 'columns';
+  receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false; mode: 'columns' | 'rows';
   variable_input: {kind:'variables'; source:NodeRef; output:number; input:0; source_port_guid:string; target_port_guid:string};
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string; excluded: boolean}>};
