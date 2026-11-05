@@ -76,7 +76,7 @@
     "links": [
       {
         "source": {
-          "type": "bg-vendor-icon-calcvariables"
+          "type": "variables.calculator"
         },
         "output": 0,
         "target": {

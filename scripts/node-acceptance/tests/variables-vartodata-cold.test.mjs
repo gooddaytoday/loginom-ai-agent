@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {NODE_TYPES} from '../../../packages/loginom-runtime/client/lib/node-contracts.mjs';
 import {parseExpectedOutputs,parseExpectedVariableInventory,matchVariableInventoryLinks} from '../expected-outputs.mjs';
 const fixture=()=>{
  const expected=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-vartodata/acceptance/expected.json',import.meta.url),'utf8'));
@@ -16,10 +17,10 @@ test('VarToData keeps its full typed table oracle while auditing only its actual
   const bad=fixture();change(bad);assert.throws(()=>{parseExpectedVariableInventory(bad);parseExpectedOutputs(bad);});
  }
 });
-const graph=()=>({nodes:[{ref:{node_id:'source'},type:'bg-vendor-icon-calcvariables'},{ref:{node_id:'target'},type:'variables.to_table'}],variable_links:[{source:'source',output:0,target:'target',input:0,kind:'variables',source_port_guid:'source-guid',target_port_guid:'target-guid'}]});
+const graph=()=>({nodes:[{ref:{node_id:'source'},type:NODE_TYPES['variables.calculator'].type},{ref:{node_id:'target'},type:'variables.to_table'}],variable_links:[{source:'source',output:0,target:'target',input:0,kind:'variables',source_port_guid:'source-guid',target_port_guid:'target-guid'}]});
 test('link-only VarToData inventory still requires exact typed native endpoints and GUID evidence',()=>{
  const want=parseExpectedVariableInventory(fixture());assert.equal(matchVariableInventoryLinks(graph(),want).length,1);
- for(const change of [g=>g.variable_links=[],g=>g.variable_links[0].kind='control',g=>g.variable_links[0].input=1,g=>delete g.variable_links[0].source_port_guid,g=>g.nodes.push({...g.nodes[1]})]){
+ for(const change of [g=>g.nodes[0].type=NODE_TYPES['variables.calculator'].icon_class,g=>g.variable_links=[],g=>g.variable_links[0].kind='control',g=>g.variable_links[0].input=1,g=>delete g.variable_links[0].source_port_guid,g=>g.nodes.push({...g.nodes[1]})]){
   const bad=graph();change(bad);assert.throws(()=>matchVariableInventoryLinks(bad,want));
  }
 });
