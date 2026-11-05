@@ -23,6 +23,21 @@ export function calculatorVariableMappingRefusal(operation,receipt){
   &&/(?:^|Error: )(?:Foreign variable mapping mask|Unique connected variable source required:|Complete connected field layout required;|Requested variable names collide)/.test(receipt.error.message??'');
 }
 
+// Only a completed single opening click may settle into this node's own
+// union wizard for cancellation. It never permits configure/Done/Execute.
+export function unionWizardOpeningRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt,n=receipt?.output?.prepared_node_context,w=receipt?.output?.wizard;
+ const gestures=receipt?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+ return !operation.transportUncertain&&state?.request?.target?.type==='variables.column_union'&&state.pending?.phase==='open'
+  &&ref?.action_key==='ui.act'&&typeof ref.operation_id==='string'&&ref.id===ref.operation_id&&ref.id.startsWith(operation.id+':n')
+  &&receipt?.operation_id===ref.id&&receipt.action_key==='ui.act'&&receipt.status==='AMBIGUOUS'
+  &&receipt.effect_possible===true&&receipt.cleanup_complete===true&&sameNode(n,state.node)
+  &&(n.surface==='graph'&&w?.status==='absent'||n.surface==='wizard'&&w?.status==='observed'&&w.stage==='variables_column_union')
+  &&['WIZARD_CONTEXT_CHANGED','WIZARD_OPEN_NOT_CONFIRMED','UI_DEADLINE_EXCEEDED'].includes(receipt.error?.code)
+  &&gestures.length===1&&gestures[0].verb==='begin_wizard'
+  &&receipt.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='begin_wizard').length===1;
+}
+
 export class NodeReleaseBlocked extends Error {
  constructor(message,userAction) {super(message);this.userAction=userAction;}
 }
@@ -72,6 +87,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
   const n=r.output?.prepared_node_context,w=r.output?.wizard;
+  if(unionWizardOpeningRefusal(operation,r))settleWizard={node:n,graph_only:true,union_opening:true,
+   opening_label:n.pending_wizard_node?.label,deadline};
   if(state.pending.phase==='open'&&state.request.target?.type==='imports.text'
    &&r.action_key==='ui.act'&&operation.lastReceipt.action_key==='ui.act'
    &&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id

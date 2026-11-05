@@ -42,6 +42,19 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const fault of [null,'type','transport','receipt','gesture','journal'])test('Union opening refusal automatically uses guarded release and durable ACK: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.column_union';p.mode='append_variables';
+ f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['append_variables']});
+ f.drivers.openWizard=async()=>{
+  f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'ui.act'};if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Node procedure step did not confirm completion'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'ui.act',phase:'observing',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+   output:{prepared_node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph'},wizard:{status:'absent'}},
+   trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:fault==='gesture'?'execute_wizard':'begin_wizard'}],error:{code:'WIZARD_CONTEXT_CHANGED'}}});
+ };
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-union-opening');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const result=await f.run(p);assert.equal(result.status,fault?'AMBIGUOUS':'FAILED');assert.equal(result.cleanup_complete,!fault);assert.equal(result.pending_phase,fault?'open':null);
+ assert.equal(result.error.code,'NODE_APPLY_STOPPED');assert.equal(f.calls.includes('cancel-owned-union-opening'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
 for(const fault of [null,'other-node','transport','receipt','journal'])test('Calculator variable mapping refusal cleanup is scoped and durably acknowledged: '+fault,async()=>{
  const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='other-node'?'imports.text':'transform.calculator';p.mode='expression';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expression']});
  f.drivers.mapPorts=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'node.variables.variable_mapping.internal'};

@@ -4595,11 +4595,41 @@ function readRenderedInputMapping(observation) {
             if(!postActionRoot)fail('WIZARD_OPEN_NOT_CONFIRMED','No current region was available after opening settings');
             try {
               const fresh=await readUi();
+              const qualityOpening=current.ui.elements.find(e=>e.ref===task.action.ref);
+              const qualityLabel=current.ui.elements.find(e=>e.graph_node?.part==='label'
+                &&e.tid===current.prepared_node_context?.tid+';Label;Label')?.label;
+              const unionOpening=task.action.verb==='begin_wizard'&&task.prepared_node_context
+                &&qualityOpening?.signature?.native_graph?.icon==='bg-vendor-icon-unionvariables';
+              // LAB-876 U1:506/U2:507: this native information toast precedes
+              // WizrdMCF. Wait on the same GUID/pending breadcrumb, not stage
+              // alone; no new gesture or extra opening budget is authorized.
+              if(unionOpening&&fresh.wizard?.status==='observed'&&fresh.wizard.stage!=='variables_column_union')
+                fail('WIZARD_CONTEXT_CHANGED','The native variables union opened another wizard stage');
+              const unionPending=fresh.wizard?.status==='absent'&&fresh.prepared_node_context?.surface==='graph'
+                &&fresh.wizard_pending_owner?.status==='observed'
+                &&fresh.prepared_node_context.pending_wizard_node?.tid===fresh.wizard_pending_owner.node?.tid
+                &&fresh.prepared_node_context.pending_wizard_node?.label===qualityLabel
+                &&fresh.wizard_pending_owner.node?.tid===qualityOpening?.wizard_open?.workflow_path?.at(-1)?.tid+'>'+qualityOpening?.wizard_open?.node?.node_label;
+              const unionWizard=fresh.wizard?.status==='observed'&&fresh.wizard.stage==='variables_column_union'
+                &&fresh.prepared_node_context?.surface==='wizard'&&fresh.prepared_node_context.tid===current.workflow_ref.prefix+';WizrdMCF';
+              const variablesUnionOpening=unionOpening
+                &&fresh.prepared_node_context?.verified===true&&(unionPending||unionWizard)
+                &&['document_id','workflow_id','node_id'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context?.[k])
+                &&typeof qualityLabel==='string'&&qualityLabel.length>0&&lifecycleContextMatches(fresh,true)
+                &&fresh.ui.dialogs.every(d=>d.identity?.anchor_tid==='toast'&&d.title==='Информация'
+                  &&d.text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.')
+                &&fresh.ui.dialogs.length<=1&&fresh.ui.masks.every(m=>!m.dialog_ref
+                  &&(unionPending&&['busy','modal_background'].includes(m.kind)
+                    &&(m.target_tid===current.workflow_ref.prefix||m.target_tid===current.workflow_ref.prefix+';ModelForm'&&m.graph_loading_owner_ref)
+                    ||unionWizard&&['busy','modal_background'].includes(m.kind)
+                      &&(m.ref===fresh.wizard.root_ref&&m.target_tid===fresh.wizard.root_tid||m.wizard_loading_owner_ref===fresh.wizard.root_ref)));
+              if(variablesUnionOpening&&(unionPending||fresh.ui.dialogs.length||fresh.ui.masks.length)
+                &&(transientToastReads<50||task.opening_timeout_ms)){
+                transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads,reason:'owned_union_opening',wizard_pending:unionPending});
+                await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;
+              }
               if(!lifecycleContextMatches(fresh)){
                 if(await deleteLostLinks(fresh))continue;
-                const qualityOpening=current.ui.elements.find(e=>e.ref===task.action.ref);
-                const qualityLabel=current.ui.elements.find(e=>e.graph_node?.part==='label'
-                  &&e.tid===current.prepared_node_context?.tid+';Label;Label')?.label;
                 const qualityInformation=task.action.verb==='begin_wizard'&&task.prepared_node_context
                   &&qualityOpening?.signature?.native_graph?.icon==='bg-vendor-icon-quality'
                   &&fresh.prepared_node_context?.verified===true
@@ -4608,18 +4638,11 @@ function readRenderedInputMapping(observation) {
                   &&fresh.ui.dialogs[0].title==='Информация'
                   &&typeof qualityLabel==='string'&&qualityLabel.length>0
                   &&fresh.ui.dialogs[0].text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.';
-                const variablesUnionInformation=task.action.verb==='begin_wizard'&&task.prepared_node_context
-                  &&qualityOpening?.signature?.native_graph?.icon==='bg-vendor-icon-unionvariables'
-                  &&fresh.prepared_node_context?.verified===true&&fresh.wizard?.stage==='variables_column_union'
-                  &&['document_id','workflow_id','node_id'].every(k=>fresh.prepared_node_context[k]===current.prepared_node_context?.[k])
-                  &&fresh.ui.dialogs.length===1&&fresh.ui.dialogs[0].identity?.anchor_tid==='toast'
-                  &&fresh.ui.dialogs[0].title==='Информация'&&typeof qualityLabel==='string'&&qualityLabel.length>0
-                  &&fresh.ui.dialogs[0].text==='Информация Мастера настройки для "'+qualityLabel+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.';
                 // A bound Execute can leave a native toast beyond 50 reads.
                 // Observe the same completed gesture within its remaining node
                 // budget; all owner checks and graph settlement still apply.
-                if((qualityInformation||variablesUnionInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
-                  && (transientToastReads<50 || (qualityInformation||variablesUnionInformation)&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
+                if((qualityInformation||['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb)) && lifecycleContextMatches(fresh,true)
+                  && (transientToastReads<50 || qualityInformation&&task.opening_timeout_ms || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;
                 }

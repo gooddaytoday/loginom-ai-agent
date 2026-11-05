@@ -1,5 +1,5 @@
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
-import {calculatorVariableMappingRefusal} from './node-pending-release.mjs';
+import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
@@ -526,7 +526,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
-    if(calculatorVariableMappingRefusal(operation,error.receipt)){
+    if(calculatorVariableMappingRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
         failure:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}});}
       catch { /* Foreign owners/masks and unknown cleanup retain the original phase. */ }

@@ -455,6 +455,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
       if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
         ||!settleWizard.root_ref&&settleWizard.graph_only!==true||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
+      if(settleWizard?.union_opening&&(operation.nodeApply?.request?.target?.type!=='variables.column_union'
+        ||operation.nodeApply.pending?.phase!=='open'))throw Error('Union opening release requires its stopped phase');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
@@ -496,6 +498,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const assertSettlement = state => {
         if(!settleWizard)return;
         const n=state.prepared_node_context,w=state.wizard;
+        if(settleWizard.union_opening){
+          // A stopped begin_wizard may paint its owned wizard after the
+          // refusal. Bind that one root once, retaining all native ID checks.
+          const prefix=preparedNodeContext.workflow_ref.prefix;
+          if(state.ui?.dialogs?.some(d=>d.identity?.anchor_tid!=='toast'||d.title!=='Информация'||!settleWizard.opening_label
+            ||d.text!=='Информация Мастера настройки для "'+settleWizard.opening_label+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.')
+            ||state.ui?.dialogs?.length>1||state.ui?.masks?.some(m=>!['busy','modal_background'].includes(m.kind)||m.dialog_ref
+              ||!(n?.surface==='graph'&&(m.target_tid===prefix||m.target_tid===prefix+';ModelForm'&&m.graph_loading_owner_ref)
+                ||n?.surface==='wizard'&&(m.ref===w?.root_ref&&m.target_tid===prefix+';WizrdMCF'||m.wizard_loading_owner_ref===w?.root_ref))))
+            throw Error('Union opening release has a foreign blocker');
+          if(n?.surface==='wizard'){
+            if(w?.status!=='observed'||w.stage!=='variables_column_union'||w.root_tid!==prefix+';WizrdMCF'
+              ||settleWizard.root_ref&&settleWizard.root_ref!==w.root_ref)throw Error('Union opening release wizard changed');
+            settleWizard.root_ref=w.root_ref;settleWizard.graph_only=false;
+          }
+        }
         if(n?.verified!==true||!['document_id','workflow_id','node_id','input_port','output_port'].every(k=>
           JSON.stringify(n[k])===JSON.stringify(settleWizard.node[k]))
           ||!(n.surface==='graph'&&w?.status==='absent'

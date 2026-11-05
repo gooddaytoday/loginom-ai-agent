@@ -39,6 +39,37 @@ const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_comple
  nodeTargetAdapter:{observe:async()=>graph()},receipt});
 const release=(operation,channel,restoreRead)=>releasePendingNode({operation,channel,restoreRead,readReceipt:async()=>operation.receipt});
 
+for(const fault of [null,'loading','foreign','stage','transport','receipt','gesture','graph','foreign-toast','foreign-mask'])test('stopped union opening settles only its own newly appeared wizard before cancellation: '+fault,async()=>{
+ const operation=stopped();let clock=1,closed=false,lastAction;const gestures=[];
+ operation.id='apply';operation.action={action_key:'node.apply',revision:'1'};operation.deadline=10000;
+ operation.nodeApply.pending={phase:'open'};operation.nodeApply.request.target={type:'variables.column_union'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};operation.transportUncertain=fault==='transport';
+ const graphContext={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Union',locked:false};
+ operation.receipt={state:'completed',receipt:{operation_id:fault==='receipt'?'other':'apply:n7',action_key:'ui.act',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+  output:{prepared_node_context:{...graphContext,pending_wizard_node:{label:'Union'}},wizard:{status:'absent'}},error:{code:'WIZARD_CONTEXT_CHANGED'},
+  trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:fault==='gesture'?'execute_wizard':'begin_wizard'}]}};
+ const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',authenticated:true,workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},navigation_context:{status:'observed',path:workflow.navigation_path},
+  prepared_node_context:closed?graphContext:{...node,verified:true,node_id:fault==='foreign'?'other':node.node_id,surface:'wizard',tid:'MF;TF-1;WizrdMCF'},
+  wizard:closed?{status:'absent'}:{status:'observed',root_ref:'ui-w',root_tid:'MF;TF-1;WizrdMCF',stage:fault==='stage'?'calculator':'variables_column_union',owner_context:{status:'observed',node:{tid:'owner'}}},
+  ui:{elements:closed?[]:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[],truncated:{elements:false,dialogs:false,masks:false}}});
+ let graphReads=0;operation.nodeTargetAdapter.observe=async()=>{const graph=graphOf();graph.nodes[0].type='variables.column_union';if(fault==='graph'&&++graphReads>1)graph.links.push({source:'foreign'});return graph;};
+ const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms;},
+  record:async e=>{if(e.phase==='node_step_prepared')lastAction=e.action;return structuredClone(e);},wrapMutation:(code,ref)=>({code,ref}),execute:async code=>{
+   if(typeof code==='string'){
+    const s=state();
+    if(!closed&&fault==='loading'&&clock<400){s.prepared_node_context=graphContext;s.wizard={status:'absent'};s.ui.dialogs=[{identity:{anchor_tid:'toast'},title:'Информация',text:'Информация Мастера настройки для "Union" не существует. Будут отображены страницы настройки полей и/ или описания узла.'}];s.ui.masks=[{kind:'modal_background',target_tid:workflow.prefix,dialog_ref:null}];}
+    else if(!closed&&fault==='loading'&&clock<1000)s.ui.masks=[{kind:'busy',ref:'ui-w',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}];
+    if(fault==='foreign-toast')s.ui.dialogs=[{identity:{anchor_tid:'toast'},title:'Информация',text:'Other node'}];
+    if(fault==='foreign-mask')s.ui.masks=[{kind:'busy',ref:'other',target_tid:'Other'}];
+    return {status:'SUCCEEDED',output:s};
+   }
+   gestures.push(lastAction);assert.deepEqual(lastAction,{verb:'click',ref:'ui-close'});closed=true;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.ref.id,cleanup_complete:true,output:state(),effect_possible:true};
+  }});
+ if(fault&&fault!=='loading'){await assert.rejects(release(operation,channel));if(fault!=='graph')assert.deepEqual(gestures,[]);}
+ else {const proof=await release(operation,channel);assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(gestures,[{verb:'click',ref:'ui-close'}]);}
+});
+
 for(const fault of [null,'pending','transport','identity','action','phase','type','foreign','unknown','port-owner','mask'])test('Calculator variable mapping refusal cleanup retains exact receipt/native ownership: '+fault,async()=>{
  const s=surface({wizard:true,variableMapping:true,foreign:fault==='foreign'}),operation=stopped();
  operation.nodeApply.pending.phase=fault==='phase'?'configure':'input_mapping';operation.nodeApply.request.target={type:fault==='type'?'transform.filter_data':'transform.calculator'};
