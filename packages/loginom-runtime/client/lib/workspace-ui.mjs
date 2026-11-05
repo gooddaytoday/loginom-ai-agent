@@ -917,6 +917,15 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ||getComputedStyle(icons[0]).opacity==='0'||icons[0].hasAttribute('hidden')||sensitive(icons[0]))return false;
       const app=globalThis.bg?.app,component=globalThis.Ext?.getCmp?.(element.id);
       let node=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
+      // The deactivation question keeps the workflow controller active. The
+      // native reader has already bound the pending node and Settings tree
+      // components to this graph GUID; verify that exact component still
+      // belongs to the active workflow before retaining its overflow caption.
+      const pending=component?._node?.data?.node;
+      if(wizard.status==='absent'&&icons[0].classList.contains('bg-vendor-icon-calcvariables')
+        &&preparedPendingWizardNode?.tid===getTid(element)&&preparedPendingWizardNode.label===element.textContent.trim()
+        &&app?.ModelNodeTreeNode&&pending instanceof app.ModelNodeTreeNode&&pending.FGuid===preparedNodeId
+        &&component?.el?.dom===element&&node&&pending.ParentNode===node)return true;
       for(let i=0;node&&i<4;i++,node=node.ParentNode) {
         if(app.ModelNodeTreeNode&&node instanceof app.ModelNodeTreeNode)
           return node.FGuid===preparedNodeId&&component?.el?.dom===element&&component?._node?.data?.node===node;

@@ -6,7 +6,7 @@ import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
 import vm from 'node:vm';
 import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixture.mjs';
 
-for(const fault of [null,'node','document','workflow','native','component','label','hidden','question','button','duplicate'])
+for(const fault of [null,'node','document','workflow','native','component','label','hidden','question','button','duplicate','parent'])
 test('variables calculator hidden native pending breadcrumb uses the existing deactivation confirmation: '+fault,async()=>{
  const f=scriptGraphFixture('Params','bg-vendor-icon-calcvariables'),{page,body}=f;f.node.FGuid='node';
  const base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');const path=[];let chain='',mode='graph',dialog,mask,crumb;
@@ -16,7 +16,8 @@ test('variables calculator hidden native pending breadcrumb uses the existing de
  }
  const pending={tid:path.at(-1).tid+'>Params',label:'Params'};
  class ModelNodeTreeNode{};page.app.ModelNodeTreeNode=ModelNodeTreeNode;const native=new ModelNodeTreeNode();native.FGuid=fault==='native'?'foreign':'node';
- page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{FController:f.model,Node:{data:{node:native}}}});
+ const workflow={};native.ParentNode=fault==='parent'?{}:workflow;
+ page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{FController:f.model,Node:{data:{node:mode==='wizard'?native:workflow}}}});
  const reader=async()=>({verified:true,document_id:fault==='document'&&mode!=='graph'?'other':'doc',workflow_id:fault==='workflow'&&mode!=='graph'?'other':'flow',node_id:fault==='node'&&mode!=='graph'?'other':'node',
   surface:mode==='wizard'?'wizard':'graph',tid:base+(mode==='wizard'?'WizrdMCF':'Graph;Params'),locked:false,...(mode==='question'?{pending_wizard_node:pending}:{})});
  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{document_id:'doc',node:{node_id:'node'},workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',navigation_path:path}},...options},reader));
