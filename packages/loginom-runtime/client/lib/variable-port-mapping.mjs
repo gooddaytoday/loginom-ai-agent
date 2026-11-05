@@ -14,8 +14,8 @@ export function makeVariablePortMappingCode(binding,options){
  return `async page=>{
   const run=${configureVariablePortMapping.toString()},read=${readPreparedNodeContext.toString()},open=${openPreparedOutputPort.toString()},task=${JSON.stringify({binding,...options})};
   const configured=await run(page,task,read,open);if(configured.status!=='SUCCEEDED')return configured;
-  const observed=await run(page,{...task,operation_id:task.operation_id+':readback',read_only:true},read,open);
-  if(observed.status!=='SUCCEEDED'||JSON.stringify(observed.mapping)!==JSON.stringify(configured.mapping))return {...observed,status:'AMBIGUOUS',verified:false,effect_possible:true,error:'Independent variable mapping readback differs'};
+  const observed=await run(page,{...task,operation_id:task.operation_id+':readback',read_only:true,expected_mapping:configured.mapping},read,open);
+  if(observed.status!=='SUCCEEDED'||JSON.stringify(observed.mapping)!==JSON.stringify(configured.mapping))return {...observed,status:'AMBIGUOUS',verified:false,effect_possible:true,error:('Independent variable mapping readback differs'+(observed.error?': '+observed.error:'')).slice(0,500)};
   return {...configured,node_context:observed.node_context,independent_readback:true};
  }`;
 }
@@ -33,12 +33,37 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
   const r=rs[0],o=[...(p?.inputPortOpenReceipts?.values()??[])].find(o=>o.phase==='verified'&&o.operation_id===task.operation_id+':port');
   const roots=exact(b.workflow_ref.prefix+';WizrdMCF'),form=b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard';
   const es=exact(form+';grdTargetColumns'),grid=es.length===1&&Ext.getCmp(es[0].id),store=grid?.getStore?.(),rows=store?.getData?.()?.items;
+  if(mode==='graph'){
+   const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
+   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
+    ||o.workflow!==r.nodeTargetWorkflowNode||o.graph!==m||o.node.FGuid!==b.node.node_id||o.node.data!==o.nodeData
+    ||o.port.data!==o.portData||o.port.parent!==o.node||roots.length!==1||m.FView?.el.dom!==roots[0]
+    ||diagrams.length!==1||m.FDiagram?.FmxGraph?.container!==diagrams[0]||!roots[0].contains(diagrams[0]))throw Error('Owned variable mapping graph required');
+   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
+   if(masks.some(e=>e!==roots[0]||!e.classList.contains('bg-mask-message')||e.classList.contains('x-mask')||e.classList.contains('x-mask-msg')||e.getAttribute('role')==='dialog')
+    ||[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].some(visible))throw Error('Foreign variable mapping graph overlay');
+   return {pending:masks.length>0};
+  }
   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
    ||o.workflow!==r.nodeTargetWorkflowNode||o.node_id!==b.node.node_id||o.portIndex!==task.mapping.port||o.wizard!==m||o.enginePort!==m.FModelSocket
    ||o.port.FSubType!==(task.mapping.kind==='control'?4:3)||o.node.FGuid!==b.node.node_id||o.nodeData!==o.node.data||o.portData!==o.port.data
    ||card.Controller.Node.data.node.ParentNode!==o.portTree||o.portTree.FModelNodePort!==o.portData||o.nodeTree.FModelNode!==o.nodeData
    ||roots.length!==1||m.FView?.el.dom!==roots[0]||!grid||grid.el.dom!==es[0]||!roots[0].contains(es[0])
-   ||store.isLoading()||!Array.isArray(rows)||rows.length>128||store.getCount()!==rows.length)throw Error('Owned complete variable mapping required');
+   ||!Array.isArray(rows)||rows.length>128||store.getCount()!==rows.length)throw Error('Owned complete variable mapping required');
+  if(mode!=='dialog'){
+   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible).filter(e=>{
+    const parent=e.parentElement,tid=form+';colTargetDelete',header=parent&&Ext.getCmp(parent.id);
+    // The port opener also permits this native disabled action-column mask.
+    return !(e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+     &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()&&parent?.getAttribute('data-tid')===tid&&exact(tid).length===1
+     &&roots[0].contains(parent)&&header?.el.dom===parent&&header.$className==='Ext.grid.column.Action'&&header.disabled===true);
+   });
+   // Wait only for masks contained by this receipt's native wizard. Global
+   // modal/reconnect masks and unrelated controls are never retryable.
+   if(masks.some(e=>![roots[0],es[0],...exact(form)].includes(e.parentElement)
+     ||e.getAttribute('role')==='dialog'))throw Error('Foreign variable mapping mask');
+   if(masks.length||store.isLoading())return {pending:true};
+  }
   const fields=rows.map((row,index)=>{
    const d=row.data,s=d.ConnectedRecord?.data;
    if(!row.isModel||!Number.isSafeInteger(d.ID)||d.Index!==index||typeof d.Name!=='string'||typeof d.DisplayName!=='string'
@@ -56,7 +81,11 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
   if(mode==='inventory')return {kind:task.mapping.kind,direction:'input',port:task.mapping.port,native_index:o.nativeIndex,port_guid:o.portGuid,
    count:fields.length,store_count:store.getCount(),unique_ids:new Set(fields.map(f=>f.id)).size,autosync:button.pressed,fields};
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
-   if(!visible(e)||box.width<=0||box.height<=0||!(hit===e||e.contains(hit)))throw Error('Variable mapping control covered');return {x,y};};
+   if(!visible(e)||box.width<=0||box.height<=0) return {pending:true};
+   if(!(hit===e||e.contains(hit))){
+    if([roots[0],es[0],...exact(form)].includes(hit))return {pending:true};
+    throw Error('Variable mapping control covered');
+   }return {x,y};};
   if(mode==='row'){
    const row=rows.find(row=>row.data.ID===extra.id),el=row&&grid.getView().getNode(row);
    if(!el||grid.getView().getRecord(el)!==row)throw Error('Owned variable mapping row required');return point(el);
@@ -72,15 +101,30 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
    ||field('cbxDataType')?.getValue()!==extra.type||field('cbxNullValue')?.getValue()!==extra.is_null)throw Error('Owned variable metadata editor required');
   return true;
  },{task,mode,extra});
- const settle=async()=>{await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t+';grdTargetColumns')+']'),g=e&&Ext.getCmp(e.id);
-  return g?.getStore?.().isLoading()===false&&!document.querySelector('[data-tid='+JSON.stringify(t)+']')?.classList.contains('bg-mask-message');},form,{timeout:remaining()});};
- const click=async tid=>{const point=await inspect('button',{tid});await page.mouse.click(point.x,point.y);};
+ const settle=async(expected)=>{
+  const end=Date.now()+Math.min(5000,remaining());let previous=null,matches=0;
+  while(true){
+   const current=await inspect('inventory'),snapshot=JSON.stringify(current);
+   matches=!current.pending&&(!expected||expected(current))?(snapshot===previous?matches+1:1):0;
+   if(matches>=3)return current;
+   if(Date.now()>=end)throw Error('Variable mapping stable applied state unconfirmed');
+   previous=current.pending?null:snapshot;await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
+ };
+ const point=async(mode,extra)=>{
+  const end=Date.now()+Math.min(5000,remaining());
+  while(true){const result=await inspect(mode,extra);if(!result.pending)return result;
+   if(Date.now()>=end)throw Error('Variable mapping control readiness unconfirmed');
+   await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
+ };
+ const click=async tid=>{const p=await point('button',{tid});await page.mouse.click(p.x,p.y);};
  try{
   let graph=await readNode(page,b);while(graph.surface_pending||graph.verified&&graph.locked){await page.waitForTimeout(Math.min(80,remaining()));graph=await readNode(page,b);}
   if(!graph.verified||graph.surface!=='graph'||graph.locked)throw Error('Owned variable mapping graph required');
   const opened=await openPort(page,{...task,direction:'input',kind:mapping.kind,port:mapping.port,operation_id:task.operation_id+':port'},readNode);
   effect=opened.effect_possible===true;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
-  await settle();const before=await inspect('inventory');let current=before;
+  const before=await settle(task.expected_mapping?value=>JSON.stringify(value)===JSON.stringify(task.expected_mapping):null);let current=before;
   if(!task.read_only){
    const requested=mapping.fields??mapping.changes??[],all=mapping.fields!==undefined;
    const selected=requested.map(f=>{const xs=before.fields.filter(row=>row.source?.name===f.source.name);if(xs.length!==1)throw Error('Unique connected variable source required: '+f.source.name);return {...xs[0],name:f.name??xs[0].name,label:f.label??xs[0].label};});
@@ -89,25 +133,26 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
    if(new Set(expected.map(row=>row.name)).size!==expected.length)throw Error('Requested variable names collide');
    for(const want of selected){
     const old=current.fields.find(f=>f.id===want.id);if(old.name===want.name&&old.label===want.label)continue;
-    const point=await inspect('row',{id:want.id});await page.mouse.click(point.x,point.y);await click(form+';btnEditMappingColumn');
+    const p=await point('row',{id:want.id});await page.mouse.click(p.x,p.y);await click(form+';btnEditMappingColumn');
     await at('EditTuneVariableForm').waitFor({state:'visible',timeout:remaining()});
     for(const [key,value] of [['edtName',want.name],['edtDisplayName',want.label]]){
      await inspect('dialog',{type:want.type,is_null:want.is_null});const input=at('EditTuneVariableForm;'+key).locator('input:visible');
      if(await input.count()!==1)throw Error('Unique variable metadata input required');await input.fill(value,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
     }
     await inspect('dialog',{type:want.type,is_null:want.is_null});await at('EditTuneVariableForm;btnApply').click({timeout:remaining()});
-    await page.locator('[data-tid="EditTuneVariableForm"]').waitFor({state:'hidden',timeout:remaining()});await settle();current=await inspect('inventory');
+    await page.locator('[data-tid="EditTuneVariableForm"]').waitFor({state:'hidden',timeout:remaining()});
+    current=await settle(value=>value.fields.some(row=>row.id===want.id&&row.name===want.name&&row.label===want.label));
    }
    if(all)for(let destination=0;destination<selected.length;destination++){
     while(current.fields.findIndex(f=>f.id===selected[destination].id)>destination){
-     const point=await inspect('row',{id:selected[destination].id});await page.mouse.click(point.x,point.y);await click(form+';btnMoveMappingColumnUp');
-     await settle();const next=await inspect('inventory');if(next.fields.findIndex(f=>f.id===selected[destination].id)!==current.fields.findIndex(f=>f.id===selected[destination].id)-1)throw Error('Variable reorder not confirmed');current=next;
+     const p=await point('row',{id:selected[destination].id});await page.mouse.click(p.x,p.y);await click(form+';btnMoveMappingColumnUp');
+     current=await settle(value=>value.fields.findIndex(f=>f.id===selected[destination].id)===current.fields.findIndex(f=>f.id===selected[destination].id)-1);
     }
    }
-   if(mapping.autosync!==undefined&&current.autosync!==mapping.autosync){await click(form+';btnAutoSyncThroughColumns');await settle();current=await inspect('inventory');}
+   if(mapping.autosync!==undefined&&current.autosync!==mapping.autosync){await click(form+';btnAutoSyncThroughColumns');current=await settle(value=>value.autosync===mapping.autosync);}
    const ordered=all?selected:expected;
    const wanted={...before,autosync:mapping.autosync??before.autosync,fields:ordered.map((row,index)=>({...row,index,origin_type:row.name!==before.fields.find(f=>f.id===row.id).name||row.label!==before.fields.find(f=>f.id===row.id).label?1:row.origin_type}))};
-   if(JSON.stringify(wanted)!==JSON.stringify(current))throw Error('Variable mapping changed unrequested source/default/type/value state');
+   current=await settle(value=>JSON.stringify(wanted)===JSON.stringify(value));
   }
   await click(root+(task.read_only?';btnClose':';btnDone'));
   await page.waitForFunction(root=>!document.querySelector('[data-tid='+JSON.stringify(root)+']')?.checkVisibility({checkVisibilityCSS:true})
@@ -117,8 +162,18 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
   }
   await page.waitForFunction(root=>!document.querySelector('[data-tid='+JSON.stringify(root)+']')?.checkVisibility({checkVisibilityCSS:true})
    &&![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),root,{timeout:remaining()});
-  graph=await readNode(page,b);while(graph.surface_pending||graph.verified&&graph.locked){await page.waitForTimeout(Math.min(80,remaining()));graph=await readNode(page,b);}
-  if(!graph.verified||graph.surface!=='graph')throw Error('Variable mapping graph return unconfirmed');
+  const end=Date.now()+Math.min(5000,remaining());let previous=null,matches=0;
+  while(true){
+   graph=await readNode(page,b);
+   if(!graph.surface_pending&&!(graph.verified&&graph.locked)){
+    if(!graph.verified||graph.surface!=='graph')throw Error('Variable mapping graph return unconfirmed');
+    const ready=await inspect('graph'),snapshot=JSON.stringify(graph);
+    matches=ready.pending?0:snapshot===previous?matches+1:1;previous=ready.pending?null:snapshot;
+    if(matches>=3)break;
+   }else {matches=0;previous=null;}
+   if(Date.now()>=end)throw Error('Variable mapping graph settlement unconfirmed');
+   await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:graph,mapping:current,source_identity_verified:true};
  }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:String(error.message).slice(0,500)};}
 }
