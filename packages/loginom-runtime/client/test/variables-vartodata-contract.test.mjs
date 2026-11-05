@@ -12,7 +12,7 @@ test('VarToData has a distinct variable input and one typed table output; column
  const card=NODE_TYPES['variables.to_table'];assert.ok(card);assert.equal(card.palette_group,'Переменные');
  assert.equal(card.tabular_inputs,0);assert.equal(card.variable_inputs,1);assert.equal(card.tabular_outputs,1);
  assert.deepEqual(card.input_kinds,['variables']);assert.deepEqual(card.output_kinds,['table']);assert.deepEqual(card.modes,['columns','rows']);
- assert.ok(nodeApplyInputSchema.properties.target.properties.type.enum.includes(card.type));assert.ok(nodeApplyInputSchema.properties.mode.enum.includes('columns'));
+ assert.ok(nodeApplyInputSchema.properties.target.properties.type.enum.includes(card.type));assert.ok(nodeApplyInputSchema.properties.mode.enum.includes('columns'));assert.ok(nodeApplyInputSchema.properties.mode.enum.includes('rows'));
 });
 test('closed registered columns request reaches the real handler admission before browser work',()=>{
  const support=createVariablesToTableNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});

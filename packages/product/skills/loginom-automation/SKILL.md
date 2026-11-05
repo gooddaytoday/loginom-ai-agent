@@ -143,7 +143,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
-| Переменные в столбцы | `variables.to_table` / columns | [читать](references/nodes/variables.to_table.md) |
+| Переменные в таблицу | `variables.to_table` / columns, rows | [читать](references/nodes/variables.to_table.md) |
 | User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
 | Соединить переменные | `variables.column_union` / append_variables | [читать](references/nodes/variables.column_union.md) |
 | Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
