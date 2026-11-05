@@ -1,0 +1,16 @@
+{
+  "initial": [
+    {"name":"threshold","type":"real","value":0.15},
+    {"name":"report_date","type":"datetime","value":"2026-10-31T00:00:00.000"},
+    {"name":"missing_threshold","type":"real","value":null},
+    {"name":"missing_date","type":"datetime","value":null},
+    {"name":"sentinel","type":"string","value":"keep"},
+    {"name":"empty_text","type":"string","value":""},
+    {"name":"zero","type":"integer","value":0},
+    {"name":"disabled","type":"boolean","value":false}
+  ],
+  "patch": [
+    {"name":"threshold","type":"real","value":0.2},
+    {"name":"report_date","type":"datetime","value":"2026-11-01T00:00:00.000"}
+  ]
+}
