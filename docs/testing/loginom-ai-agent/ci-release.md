@@ -101,7 +101,7 @@ Native CI и offline smoke не заменяют установленную GUI-
 
 Desktop проверяет GitHub Releases, затем запасной S3 cloud.ru. Stable выбирает обычный опубликованный GitHub release (`releases/latest`), unstable — первый опубликованный pre-release в выдаче API (до 10 страниц по 100). Флаг pre-release относится к GitHub Release; версия метаданных остаётся `X.Y.Z`, тег — `vX.Y.Z`. Semver-теги с суффиксом пока ограничены существующим beta/Docker gate.
 
-Используется generic provider через поддерживаемый electron-updater custom-provider hook: проверенный снимок метаданных передаётся GenericProvider без повторного чтения unsigned YAML. GitHub хранит ассеты плоско, S3 — по версии; provider меняет только разрешение URL. Подпись Ed25519 над точными байтами YAML и SHA-512 бинарников одинаковы для обоих источников. Доверие остаётся в `UPDATE_PUBLIC_KEYS`; ключ из фида не принимается. Дифференциальная загрузка отключена, `allowDowngrade=false` устанавливается при каждой конфигурации и загрузке.
+Используется `provider: "custom"` через поддерживаемый electron-updater `updateProvider` hook: проверенный снимок метаданных передаётся GenericProvider без повторного чтения unsigned YAML. GitHub хранит ассеты плоско, закрытый S3 — по версии. Для S3 provider формирует presigned SigV4 GET отдельно для channel metadata, `.sig` и каждого артефакта; артефакт подписывается при разрешении URL перед загрузкой, срок ссылки — 1 час. Используются только virtual-hosted URL `updates-loginom.s3.cloud.ru`, region `ru-central-1` и read-only ключ. Подпись запроса реализована Node crypto по [AWS SigV4 query authentication](https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sigv4-query-string-auth.html), сверена с опубликованным test vector и независимой проверкой canonical request на локальном сервере. Секретная часть ключа не входит в URL; query с credential/signature удаляется из updater logs и сообщений ошибок. Все запросы выполняются текущей Electron session, поэтому proxy сохраняется. Подпись Ed25519 над точными байтами YAML и SHA-512 бинарников одинаковы для обоих источников. Доверие остаётся в `UPDATE_PUBLIC_KEYS`; ключ из фида не принимается. Дифференциальная загрузка отключена, `allowDowngrade=false` устанавливается при каждой конфигурации и загрузке.
 
 Fallback разрешён только для DNS/соединения/тайм-аута, HTTP 5xx, 403 и 429. HTTP 404/401, ошибка сертификата, подписи, YAML, путей или версии — явная ошибка без S3. На один источник отводится 30 секунд на API, metadata и signature вместе; при недоступности обоих возвращается `LOGINOM_UPDATE_SOURCES_UNAVAILABLE`. Версия ниже установленной отклоняется с `LOGINOM_UPDATE_VERSION_OLDER`. Если отказал сам GitHub download, перед повтором на S3 проверяются подпись и полное совпадение подписанного target. Повреждённый SHA-512 не разрешает fallback.
 
@@ -117,28 +117,33 @@ Repository variables (адреса — параметры сборки, runtime 
 | `LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD` | `https://github.com/gooddaytoday/loginom-ai-agent/releases/download/`  |
 | `LOGINOM_AI_AGENT_UPDATE_FEED`            | `https://updates-loginom.s3.cloud.ru/`                                 |
 | `LOGINOM_UPDATES_S3_ENDPOINT`             | `https://s3.cloud.ru`                                                  |
+| `LOGINOM_UPDATES_S3_REGION`               | `ru-central-1`                                                         |
 | `LOGINOM_UPDATES_S3_BUCKET`               | `updates-loginom`                                                      |
 | `LOGINOM_UPDATES_MIN_SUPPORTED_VERSION`   | Минимальная поддерживаемая `X.Y.Z`; если пусто, версия выпуска         |
 | `LOGINOM_UPDATES_VERIFIED_SHA`            | Полный SHA финальной головы после приёмки подписи                      |
 
-При несовпадении `LOGINOM_UPDATES_VERIFIED_SHA` с SHA сборки все три встроенных адреса остаются пустыми: такая сборка не включает публичное автообновление. Пустые параметры также отключают обновления. Не выставляйте этот SHA до проверки подписи на финальной голове. electron-builder генерирует latest\*.yml/blockmap через generic target даже при отключённом фиде; `--publish never` сохраняется. `updates.invalid` используется только для генерации metadata, upstream feed отсутствует.
+При несовпадении `LOGINOM_UPDATES_VERIFIED_SHA` с SHA сборки все три встроенных адреса остаются пустыми: такая сборка не включает автообновление. Пустые параметры также отключают обновления. Если GitHub-параметры включены, а `LOGINOM_AI_AGENT_UPDATE_FEED` не задан, адрес S3 выводится из встроенных endpoint и bucket; отдельный публичный адрес не нужен. Не выставляйте этот SHA до проверки подписи на финальной голове. electron-builder генерирует latest\*.yml/blockmap через generic target даже при отключённом фиде; `--publish never` сохраняется. `updates.invalid` используется только для генерации metadata, upstream feed отсутствует.
 
-Создать GitHub Environment **release** с required reviewers и ограничением защищённых release-тегов. Все credentials — только Environment secrets:
+По уточнению владельца используются **repository secrets**, Environment `release` пока не требуется:
 
-| Secret                          | Назначение                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `LOGINOM_UPDATES_SIGNING_KEY`   | Ed25519 PKCS8 PEM, соответствующий одному из закреплённых `UPDATE_PUBLIC_KEYS`; только шаг подписи draft |
-| `LOGINOM_UPDATES_S3_ACCESS_KEY` | Ключ записи cloud.ru в формате `<tenant_id>:<key_id>`, только шаг mirror                                 |
-| `LOGINOM_UPDATES_S3_SECRET_KEY` | Секрет ключа cloud.ru, только шаг mirror                                                                 |
+| Secret                               | Назначение                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `LOGINOM_UPDATES_SIGNING_KEY`        | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
+| `LOGINOM_UPDATES_S3_ACCESS_KEY`      | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
+| `LOGINOM_UPDATES_S3_SECRET_KEY`      | Секрет ключа записи, только шаг mirror                                                  |
+| `LOGINOM_UPDATES_S3_READ_ACCESS_KEY` | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |
+| `LOGINOM_UPDATES_S3_READ_SECRET_KEY` | Secret Key чтения; ресурсы Desktop и проверка зеркала                                   |
 
-Ключей в исходниках, артефактах или выводе команд нет. Mirror не получает signing key. Выдать только необходимые права чтения/HEAD/PUT/CopyObject в этом бакете, без DeleteObject. Чтение Desktop и проверка после публикации — анонимные HTTPS; настроить публичное чтение и Range для артефактов. Регион SDK — `ru-central-1` ([настройка cloud.ru](https://cloud.ru/docs/s3e/ug/topics/tools__aws-cli)); иной регион можно задать `LOGINOM_UPDATES_S3_REGION` или полем `region` явного S3 config. Timeweb больше не используется.
+`bundle-loginom.ts` сохраняет endpoint/region/bucket и **только ключ чтения** в `resources/updates-s3.json`; electron-builder переносит его в корень resources приложения. Ресурс исключён из git и исходного архива. Ключ записи и Ed25519 private key в приложение не попадают. При сборке без read credentials предыдущий ресурс удаляется; неполная пара — ошибка. Main process читает ресурс, runtime environment не заменяет его. `policy.json feedUrl` сохраняет прежний generic override без доступа к встроенному S3 ключу.
+
+Рабочих ключей нет в git или выводе команд; ключ чтения намеренно присутствует в устанавливаемом Desktop, как MCP key. Бакет остаётся **закрытым**: анонимный GET возвращает 403. Публичный доступ не требуется. SDK загрузки тоже использует virtual-hosted адресацию (`forcePathStyle=false`); path-style для этого бакета непригоден. Регион и формат ключа соответствуют [настройке cloud.ru](https://cloud.ru/docs/s3e/ug/topics/tools__aws-cli). У ключа чтения нет права записи; mirror не меняет bucket policy и не удаляет объекты. Secrets маскируются, `set -x` отсутствует. Timeweb не используется.
 
 ### Порядок CI и публикации
 
-1. Tag-run выполняет все существующие platform/static/unit/typecheck/Docker gates. Job `release` в Environment `release` сначала проверяет provenance и SHA256SUMS. `sign-release` проверяет SHA-512/size, добавляет minimum/staging=100 и пути `releases/<version>/<filename>`, подписывает exact bytes. Проверка ключа выполняется до изменения файлов. SHA256SUMS и release notes пересоздаются после подписи. Подписанные YAML и `.sig` входят в GitHub draft вместе с исходными бинарниками и отчётами.
+1. Tag-run выполняет все существующие platform/static/unit/typecheck/Docker gates. Job `release` сначала проверяет provenance и SHA256SUMS. `sign-release` проверяет SHA-512/size, добавляет minimum/staging=100 и пути `releases/<version>/<filename>`, подписывает exact bytes. Проверка ключа выполняется до изменения файлов. SHA256SUMS и release notes пересоздаются после подписи. Подписанные YAML и `.sig` входят в GitHub draft вместе с исходными бинарниками и отчётами.
 2. Владелец проверяет draft и публикует его с нужным флагом pre-release. CI не публикует draft автоматически. События [published/released](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release) запускают отдельный `mirror-updates`; это покрывает публикацию и перевод pre-release в обычный release.
 3. Mirror работает только на tag ref. До обращения к S3 он требует успешный `release.yml` push-run на том же полном SHA и том же теге. Проверяет скачанный комплект, SHA256SUMS, подписи всех Desktop YAML и SHA-512/size каждого desktop asset. Загружает те же байты в immutable `releases/<version>/…`, затем серверно копирует YAML/`.sig` в канал, соответствующий текущему флагу release. Повтор разрешён только при побайтовом совпадении существующих immutable объектов; несовпадение — ошибка. Удалений нет. Операции каналов сериализованы concurrency group.
-4. `verify-public` заново скачивает metadata, подписи и desktop binaries по публичным GitHub и S3 URL. Проверяет подпись, равенство YAML опубликованному комплекту и SHA-512. Ошибка делает job красным; не включать фид и не считать выпуск принятым до разбора.
+4. `verify-public` заново скачивает metadata, подписи и desktop binaries: GitHub — публично, S3 — через presigned SigV4 GET ключом чтения (отдельным от writer). Название команды сохранено для совместимости; анонимного доступа к S3 она не требует. Проверяет подпись, равенство YAML опубликованному комплекту и SHA-512. Ошибка делает job красным; не включать фид и не считать выпуск принятым до разбора.
 
 Раскладка cloud.ru:
 
@@ -154,7 +159,7 @@ stable/latest*.yml + .sig           # обычный release
 
 В подписанном YAML `path` и `files[].url` — `releases/<version>/<filename>`. На S3 разрешение идёт от корня бакета, на GitHub — имя файла в ассетах выбранного тега. Каталог версии имеет `Cache-Control: public, max-age=31536000, immutable`; указатели канала — `no-cache`. При переводе в stable бинарники остаются на месте, metadata копируются на сервере из immutable выпуска без переподписи. YAML и `.sig` копируются последовательно: временно несовпадающая пара отклоняется клиентом.
 
-Команды для повторной проверки опубликованного комплекта (без записи):
+Команды для повторной проверки опубликованного комплекта (без записи, после задания перечисленных S3 vars и read secrets в окружении; значения не выводить):
 
 ```sh
 gh release download v0.4.0 --dir ./release-assets
@@ -173,4 +178,4 @@ bun script/update-feed.ts verify-public --assets ./release-assets --version 0.4.
 (cd script && nice -n 19 bun test ./update-feed.test.ts)
 ```
 
-Тестовый HTTP-сервер исполняет оба транспорта без внешних credentials; test-only Ed25519 key передаётся только тестовым вызовам. Проверяются fallback при timeout/5xx/429/403, отказ fallback при плохой подписи/metadata/старой версии, недоступность обоих источников, pin артефакта, download failover, policy override, byte-identical mirror и server-side promotion. Локальные тесты не доказывают доступ к реальному cloud.ru и установленный AppImage/NSIS upgrade: после выдачи отдельного тестового ключа нужна приёмка на изолированном префиксе и финальном SHA, затем проверка установленного приложения.
+Тестовый HTTP-сервер исполняет оба транспорта без внешних credentials; test-only Ed25519 key передаётся только тестовым вызовам. Проверяются fallback при timeout/5xx/429/403, отказ fallback при плохой подписи/metadata/старой версии, недоступность обоих источников, pin артефакта, download failover, policy override, byte-identical mirror и server-side promotion. Закрытый локальный S3 проверяет SigV4 canonical request/host/region/expiry, отклоняет anonymous/tampered/wrong-key GET и принимает подписанные metadata/артефакт после отказа GitHub. Дополнительно проверяются AWS test vector, virtual-hosted SDK, read-only build resource и очистка stale credentials. Локальные тесты не доказывают доступ к реальному cloud.ru и установленный AppImage/NSIS upgrade: после выдачи отдельного тестового ключа нужна приёмка на изолированном префиксе и финальном SHA, затем проверка установленного приложения.

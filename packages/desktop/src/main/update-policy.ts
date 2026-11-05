@@ -1,5 +1,10 @@
 import { Product } from "@loginom-ai-agent/product"
-import { UPDATE_PUBLIC_KEYS, verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
+import {
+  UPDATE_PUBLIC_KEYS,
+  verifyUpdateSignature,
+  presignUpdateGet,
+  type UpdateS3Config,
+} from "@loginom-ai-agent/product/update-signature"
 import { parseUpdateInfo } from "electron-updater/out/providers/Provider.js"
 import { resolveFiles } from "electron-updater/out/providers/Provider.js"
 import { GenericProvider } from "electron-updater/out/providers/GenericProvider.js"
@@ -61,14 +66,17 @@ export function configureUpdateFeed(updater: Pick<AppUpdater, "setFeedURL" | "al
 export type UpdateSource =
   | { kind: "github"; api: string; download: string; channel: UpdateChannel }
   | { kind: "generic"; feed: string }
+  | { kind: "s3"; feed: string; config: UpdateS3Config | null }
 
 export function updateSources(
   feed: string | null,
   github: { api: string; download: string } | null,
   preference: unknown,
   policy: UpdateAdminPolicy = {},
+  s3?: UpdateS3Config | null,
 ) {
-  const settings = updateSettings(feed, preference, policy)
+  const builtIn = feed || (github && s3 ? new URL(presignUpdateGet(s3, "probe")).origin + "/" : null)
+  const settings = updateSettings(builtIn, preference, policy)
   const clean = (value: string) => {
     const url = new URL(value.endsWith("/") ? value : value + "/")
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash)
@@ -86,7 +94,13 @@ export function updateSources(
           },
         ]
       : []),
-    ...(settings.feed ? [{ kind: "generic" as const, feed: settings.feed }] : []),
+    ...(settings.feed
+      ? [
+          policy.feedUrl !== undefined || s3 === undefined
+            ? { kind: "generic" as const, feed: settings.feed }
+            : { kind: "s3" as const, feed: settings.feed, config: s3 },
+        ]
+      : []),
   ]
   return { ...settings, enabled: policy.updates !== "off" && sources.length > 0, sources }
 }
@@ -192,10 +206,18 @@ export async function loadSignedUpdate(input: {
       const feed = release
         ? new URL(encodeURIComponent(release.tag_name) + "/", source.kind === "github" ? source.download : "").href
         : (source as { feed: string }).feed
+      const transport = (url: string) => {
+        if (source.kind !== "s3") return url
+        if (!source.config) throw Error("LOGINOM_UPDATE_S3_CONFIG_UNAVAILABLE")
+        const original = new URL(url)
+        const signed = presignUpdateGet(source.config, original.pathname.slice(1))
+        if (new URL(signed).origin !== original.origin) throw Error("LOGINOM_UPDATE_S3_TARGET_INVALID")
+        return signed
+      }
       // Sequential reads ensure an invalid primary signature is never hidden by
       // a racing transport error. Every request has a total wall-clock deadline.
-      const raw = await read(new URL(input.file, feed).href)
-      const signature = await read(new URL(input.file + ".sig", feed).href)
+      const raw = await read(transport(new URL(input.file, feed).href))
+      const signature = await read(transport(new URL(input.file + ".sig", feed).href))
       const signed = verifyUpdateManifest(raw, signature.toString("utf8"), feed, input.keys)
       if (release && release.tag_name !== "v" + signed.version) throw Error("LOGINOM_UPDATE_RELEASE_MISMATCH")
       if (compareUpdateVersions(signed.version, input.currentVersion) < 0) throw Error("LOGINOM_UPDATE_VERSION_OLDER")
@@ -206,7 +228,7 @@ export async function loadSignedUpdate(input: {
         url: (file) =>
           source.kind === "github"
             ? new URL(file.slice(file.lastIndexOf("/") + 1), feed).href
-            : new URL(file.startsWith("releases/") ? "../" + file : file, feed).href,
+            : transport(new URL(file.startsWith("releases/") ? "../" + file : file, feed).href),
       }
     } catch (error) {
       if (!(error instanceof UpdateTransportError)) throw error

@@ -1,5 +1,11 @@
 import { app, dialog, net } from "electron"
 import { readFileSync } from "node:fs"
+import { join, resolve } from "node:path"
+import {
+  parseUpdateS3Config,
+  redactUpdateMessage,
+  type UpdateS3Config,
+} from "@loginom-ai-agent/product/update-signature"
 import type { UpdateInfo } from "electron-updater"
 import { Product } from "@loginom-ai-agent/product"
 import pkg from "electron-updater"
@@ -51,9 +57,27 @@ export function setupAutoUpdater(input: {
       logger.error("updater administrator policy rejected")
     }
   }
+  let s3: UpdateS3Config | null = null
+  if (!policy.feedUrl) {
+    try {
+      s3 = parseUpdateS3Config(
+        JSON.parse(
+          readFileSync(
+            app.isPackaged
+              ? join(process.resourcesPath, "updates-s3.json")
+              : resolve(import.meta.dirname, "../../resources/updates-s3.json"),
+            "utf8",
+          ),
+        ),
+      )
+    } catch {
+      // No credentials or parsing exceptions may reach logs. GitHub remains usable.
+      logger.log("updater S3 read credentials unavailable")
+    }
+  }
   let settings = (() => {
     try {
-      return updateSources(Product.updateFeed, Product.updateGithub, store.get("channel"), policy)
+      return updateSources(Product.updateFeed, Product.updateGithub, store.get("channel"), policy, s3)
     } catch {
       policyError = true
       logger.error("updater feed configuration rejected")
@@ -61,7 +85,14 @@ export function setupAutoUpdater(input: {
     }
   })()
   const mode = updateMode(process.platform, process.env.APPIMAGE)
-  autoUpdater.logger = logger
+  const safe = (values: unknown[]) =>
+    values.map((value) => redactUpdateMessage(value instanceof Error ? (value.stack ?? value.message) : String(value)))
+  autoUpdater.logger = {
+    info: (...values) => logger.info(...safe(values)),
+    warn: (...values) => logger.warn(...safe(values)),
+    error: (...values) => logger.error(...safe(values)),
+    debug: (...values) => logger.debug(...safe(values)),
+  }
   autoUpdater.allowPrerelease = false
   autoUpdater.allowDowngrade = false
   autoUpdater.autoDownload = false
@@ -82,7 +113,7 @@ export function setupAutoUpdater(input: {
     callback("", "")
   }
   autoUpdater.signals.login(login)
-  autoUpdater.on("error", (error) => logger.error("updater backend error", error.message))
+  autoUpdater.on("error", (error) => logger.error("updater backend error", redactUpdateMessage(error.message)))
   const readManifest = (url: string, timeout?: number) =>
     readUpdateBytes(
       url,
@@ -187,7 +218,7 @@ export function setupAutoUpdater(input: {
         const selected = approved.selected
         return downloadSignedUpdate(autoUpdater, selected, () =>
           loadSignedUpdate({
-            sources: settings.sources.filter((source) => source.kind === "generic"),
+            sources: settings.sources.filter((source) => source.kind !== "github"),
             file: process.platform === "linux" ? "latest-linux.yml" : "latest.yml",
             currentVersion: selected.signed.version,
             read: readManifest,
@@ -227,7 +258,7 @@ export function setupAutoUpdater(input: {
       if (settings.channelLocked) throw Error("LOGINOM_UPDATE_POLICY_MANAGED")
       await controller.configure(() => {
         store.set("channel", channel)
-        settings = updateSources(Product.updateFeed, Product.updateGithub, channel, policy)
+        settings = updateSources(Product.updateFeed, Product.updateGithub, channel, policy, s3)
         approved = undefined
       })
       return controller.check()

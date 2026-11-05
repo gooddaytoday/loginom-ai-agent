@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { createServer, request } from "node:http"
-import { createHash, generateKeyPairSync, sign } from "node:crypto"
+import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto"
 import { AppUpdater, type DownloadUpdateOptions } from "electron-updater/out/AppUpdater"
 const {
   loadSignedUpdate,
@@ -10,6 +10,7 @@ const {
   updateSources,
   isUpdateTransportError,
 } = await import("./update-policy")
+import { presignUpdateGet } from "@loginom-ai-agent/product/update-signature"
 
 const key = generateKeyPairSync("ed25519")
 const keys = [key.publicKey.export({ type: "spki", format: "pem" }).toString()]
@@ -20,6 +21,153 @@ const metadata = (version = "0.4.2") =>
   Buffer.from(
     `version: ${version}\nminSupportedVersion: 0.4.0\nstagingPercentage: 100\npath: releases/${version}/${filename}\nsha512: ${sha512}\nfiles:\n  - url: releases/${version}/${filename}\n    sha512: ${sha512}\n    size: ${payload.length}\n`,
   )
+
+test("private S3 rejects anonymous and modified GETs, then verifies SigV4 metadata and payload after GitHub failure", async () => {
+  const calls: string[] = []
+  const secret = "local-only-secret"
+  let corruptSignature = false
+  const server = createServer((req, res) => {
+    if (req.url!.startsWith("/github")) {
+      res.writeHead(503).end()
+      return
+    }
+    const url = new URL(req.url!, "https://" + req.headers.host)
+    if (!url.hostname.startsWith("updates-test.")) {
+      res.writeHead(404).end("NoSuchBucket")
+      return
+    }
+    const signature = url.searchParams.get("X-Amz-Signature")
+    if (!signature) {
+      res.writeHead(403).end("AccessDenied")
+      return
+    }
+    const date = url.searchParams.get("X-Amz-Date") ?? ""
+    const timestamp = Date.parse(date.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z"))
+    const expires = Number(url.searchParams.get("X-Amz-Expires"))
+    if (
+      req.method !== "GET" ||
+      !Number.isFinite(timestamp) ||
+      timestamp > Date.now() + 300_000 ||
+      timestamp + expires * 1000 < Date.now() ||
+      url.searchParams.get("X-Amz-SignedHeaders") !== "host" ||
+      url.searchParams.get("X-Amz-Algorithm") !== "AWS4-HMAC-SHA256"
+    ) {
+      res.writeHead(403).end("AccessDenied")
+      return
+    }
+    url.searchParams.delete("X-Amz-Signature")
+    const encode = (value: string) =>
+      encodeURIComponent(value).replace(/[!'()*]/g, (ch) => "%" + ch.charCodeAt(0).toString(16).toUpperCase())
+    const query = [...url.searchParams]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([a, b]) => encode(a) + "=" + encode(b))
+      .join("&")
+    const credential = url.searchParams.get("X-Amz-Credential")!.split("/")
+    const canonical = `${req.method}\n${url.pathname}\n${query}\nhost:${req.headers.host}\n\nhost\nUNSIGNED-PAYLOAD`
+    let signing = Buffer.from("AWS4" + secret)
+    for (const part of credential.slice(1)) signing = createHmac("sha256", signing).update(part).digest()
+    const expected = createHmac("sha256", signing)
+      .update(
+        "AWS4-HMAC-SHA256\n" +
+          url.searchParams.get("X-Amz-Date") +
+          "\n" +
+          credential.slice(1).join("/") +
+          "\n" +
+          createHash("sha256").update(canonical).digest("hex"),
+      )
+      .digest("hex")
+    if (expected !== signature || credential[0] !== "tenant:read-key" || credential[2] !== "ru-central-1") {
+      res.writeHead(403).end("SignatureDoesNotMatch")
+      return
+    }
+    calls.push(url.pathname)
+    if (url.pathname.endsWith(".sig")) {
+      res.end(corruptSignature ? "invalid" : sign(null, metadata(), key.privateKey).toString("base64"))
+      return
+    }
+    if (url.pathname.endsWith(".yml")) {
+      res.end(metadata())
+      return
+    }
+    if (url.pathname.endsWith(filename)) {
+      res.end(payload)
+      return
+    }
+    res.writeHead(404).end()
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const port = (server.address() as { port: number }).port
+  const config = {
+    endpoint: `https://s3.local.test:${port}`,
+    region: "ru-central-1",
+    bucket: "updates-test",
+    accessKeyId: "tenant:read-key",
+    secretAccessKey: secret,
+  }
+  const feed = `https://updates-test.s3.local.test:${port}/stable/`
+  const read = (value: string) =>
+    readUpdateBytes(
+      value,
+      (value) => {
+        const url = new URL(value)
+        return request({ hostname: "127.0.0.1", port, path: url.pathname + url.search, headers: { Host: url.host } })
+      },
+      200,
+    )
+  try {
+    await expect(read(feed + "latest-linux.yml")).rejects.toThrow("HTTP_403")
+    const tampered = presignUpdateGet(config, "stable/latest-linux.yml").replace("latest-linux.yml", "other.yml")
+    await expect(read(tampered)).rejects.toThrow("HTTP_403")
+    const settings = updateSources(
+      null,
+      { api: `https://github.local.test:${port}/github/`, download: `https://github.local.test:${port}/download/` },
+      "stable",
+      {},
+      config,
+    )
+    const selected = await loadSignedUpdate({
+      sources: settings.sources,
+      read,
+      file: "latest-linux.yml",
+      currentVersion: "0.4.1",
+      keys,
+    })
+    expect(selected.source).toBe("s3")
+    const updater = new Updater()
+    configureSignedUpdate(updater, selected)
+    expect((await updater.checkForUpdates())?.isUpdateAvailable).toBe(true)
+    updater.read = read
+    await updater.downloadUpdate()
+    expect(calls).toEqual(["/stable/latest-linux.yml", "/stable/latest-linux.yml.sig", `/releases/0.4.2/${filename}`])
+    expect(updater.allowDowngrade).toBe(false)
+    corruptSignature = true
+    await expect(
+      loadSignedUpdate({
+        sources: settings.sources.filter((source) => source.kind === "s3"),
+        read,
+        file: "latest-linux.yml",
+        currentVersion: "0.4.1",
+        keys,
+      }),
+    ).rejects.toThrow("SIGNATURE_INVALID")
+    const managed = updateSources(
+      feed.replace(/stable\/$/, ""),
+      null,
+      "stable",
+      { feedUrl: "https://admin.example.test/" },
+      config,
+    )
+    expect(managed.sources).toEqual([{ kind: "generic", feed: "https://admin.example.test/stable/" }])
+    await expect(
+      read(presignUpdateGet(config, "stable/latest-linux.yml", { now: new Date("2000-01-01") })),
+    ).rejects.toThrow("HTTP_403")
+    const wrong = presignUpdateGet({ ...config, secretAccessKey: "wrong" }, "stable/latest-linux.yml")
+    await expect(read(wrong)).rejects.toThrow("HTTP_403")
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
 
 async function fixture(
   options: {
@@ -95,6 +243,7 @@ async function fixture(
 }
 
 class Updater extends AppUpdater {
+  read = (url: string) => readUpdateBytes(url, (url) => request(url), 200)
   urls: string[] = []
   constructor() {
     super(null, {
@@ -118,7 +267,7 @@ class Updater extends AppUpdater {
     const files = options.updateInfoAndProvider.provider.resolveFiles(options.updateInfoAndProvider.info)
     for (const file of files) {
       this.urls.push(file.url.href)
-      const bytes = await readUpdateBytes(file.url.href, (url) => request(url), 200)
+      const bytes = await this.read(file.url.href)
       expect(createHash("sha512").update(bytes).digest("base64")).toBe(file.info.sha512)
     }
     return ["fixture"]

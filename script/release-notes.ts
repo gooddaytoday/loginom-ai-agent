@@ -124,7 +124,7 @@ const notes = [
   "- Pre-release: Linux/Windows unsigned; macOS own code ad-hoc signed, without Developer ID or notarization. OS security warnings are expected.",
   "- CI builds use no Loginom account or LLM credentials and do not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
-  "- Desktop updates use signed GitHub Release metadata with a cloud.ru S3 transport fallback. Build-time endpoints remain disabled until signature acceptance on the exact source SHA; publication and mirror checks are required.",
+  "- Desktop updates use signed GitHub Release metadata with a private cloud.ru S3 fallback using read-only SigV4 GET. Build-time endpoints remain disabled until signature acceptance on the exact source SHA; publication and mirror checks are required.",
   "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",
   "",
   "## Assets",

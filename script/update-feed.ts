@@ -5,9 +5,23 @@ import { homedir, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { createReadStream } from "node:fs"
-import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3"
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  HeadObjectCommand,
+  CopyObjectCommand,
+  type S3ClientConfig,
+} from "@aws-sdk/client-s3"
 import { FetchHttpHandler } from "@smithy/fetch-http-handler"
-import { UPDATE_PUBLIC_KEYS, verifyUpdateSignature } from "../packages/product/src/update-signature"
+import {
+  UPDATE_PUBLIC_KEYS,
+  verifyUpdateSignature,
+  parseUpdateS3Config,
+  presignUpdateGet,
+  redactUpdateMessage,
+  type UpdateS3Config,
+} from "../packages/product/src/update-signature"
 
 const metadataNames = ["latest.yml", "latest-mac.yml", "latest-linux.yml", "cli.json"] as const
 const immutable = "public, max-age=31536000, immutable"
@@ -206,16 +220,24 @@ export async function verifyPublicRelease(
   s3: string,
   target: string,
   keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+  options: { s3?: UpdateS3Config; fetch?: typeof fetch } = {},
 ) {
   channel(target)
   const { names } = await verifySignedRelease(dir, version, keys)
   const read = async (url: string) => {
-    const response = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: { "Cache-Control": "no-cache" } })
+    const response = await (options.fetch ?? fetch)(url, {
+      signal: AbortSignal.timeout(30_000),
+      headers: { "Cache-Control": "no-cache" },
+      redirect: url.includes("X-Amz-Signature=") ? "error" : "follow",
+    })
     if (!response.ok) throw Error(`Public verification HTTP ${response.status}`)
     return new Uint8Array(await response.arrayBuffer())
   }
   const hash = async (url: string) => {
-    const response = await fetch(url, { signal: AbortSignal.timeout(15 * 60_000) })
+    const response = await (options.fetch ?? fetch)(url, {
+      signal: AbortSignal.timeout(15 * 60_000),
+      redirect: url.includes("X-Amz-Signature=") ? "error" : "follow",
+    })
     if (!response.ok || !response.body) throw Error(`Public artifact HTTP ${response.status}`)
     const digest = new Bun.CryptoHasher("sha512")
     for await (const bytes of response.body) digest.update(bytes)
@@ -223,9 +245,15 @@ export async function verifyPublicRelease(
   }
   for (const name of names) {
     for (const source of ["github", "s3"]) {
+      const transport = (url: URL) => {
+        if (source !== "s3" || !options.s3) return url.href
+        const signed = presignUpdateGet(options.s3, url.pathname.slice(1))
+        if (new URL(signed).origin !== url.origin) throw Error("S3 verification host mismatch")
+        return signed
+      }
       const base = source === "github" ? github : new URL(target + "/", s3).href
-      const bytes = await read(new URL(name, base).href)
-      const signature = decoder.decode(await read(new URL(name + ".sig", base).href))
+      const bytes = await read(transport(new URL(name, base)))
+      const signature = decoder.decode(await read(transport(new URL(name + ".sig", base))))
       if (
         !verifyUpdateSignature(bytes, signature, keys) ||
         !Buffer.from(bytes).equals(Buffer.from(await Bun.file(join(dir, name)).bytes()))
@@ -234,7 +262,7 @@ export async function verifyPublicRelease(
       const info = Bun.YAML.parse(decoder.decode(bytes)) as Desktop
       for (const file of info.files) {
         const url = source === "github" ? new URL(asset(file.url.split("/").at(-1)!), github) : new URL(file.url, s3)
-        if ((await hash(url.href)) !== file.sha512) throw Error(`Public SHA512 mismatch: ${source}/${name}`)
+        if ((await hash(transport(url))) !== file.sha512) throw Error(`Public SHA512 mismatch: ${source}/${name}`)
       }
     }
   }
@@ -445,7 +473,11 @@ export class Feed {
   }
 }
 
-export async function s3Store(configFile: string | undefined, feedBase: string): Promise<Store> {
+export async function s3Store(
+  configFile: string | undefined,
+  feedBase: string,
+  transport?: S3ClientConfig["requestHandler"],
+): Promise<Store> {
   const config = (
     configFile
       ? await Bun.file(configFile).json()
@@ -477,11 +509,13 @@ export async function s3Store(configFile: string | undefined, feedBase: string):
   const client = new S3Client({
     endpoint: config.endpoint,
     region: config.region || "ru-central-1",
-    requestHandler: new FetchHttpHandler({
-      requestInit: (request) => ({ signal: AbortSignal.timeout(request.method === "PUT" ? 15 * 60_000 : 15_000) }),
-    }),
+    requestHandler:
+      transport ??
+      new FetchHttpHandler({
+        requestInit: (request) => ({ signal: AbortSignal.timeout(request.method === "PUT" ? 15 * 60_000 : 15_000) }),
+      }),
     maxAttempts: 2,
-    forcePathStyle: true,
+    forcePathStyle: false,
     credentials: { accessKeyId: config.access_key, secretAccessKey: config.secret_key },
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
@@ -583,13 +617,30 @@ async function main() {
       await signRelease(resolve(values.assets), values.version, values["min-supported"] ?? values.version, key, keys)
       return
     }
-    const base = values["feed-base"] ?? process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    const readConfig =
+      command === "verify-public"
+        ? parseUpdateS3Config({
+            endpoint: process.env.LOGINOM_UPDATES_S3_ENDPOINT,
+            region: process.env.LOGINOM_UPDATES_S3_REGION,
+            bucket: process.env.LOGINOM_UPDATES_S3_BUCKET,
+            accessKeyId: process.env.LOGINOM_UPDATES_S3_READ_ACCESS_KEY,
+            secretAccessKey: process.env.LOGINOM_UPDATES_S3_READ_SECRET_KEY,
+          })
+        : undefined
+    const configuredBase = values["feed-base"] ?? process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    if (!configuredBase && (!process.env.LOGINOM_UPDATES_S3_ENDPOINT || !process.env.LOGINOM_UPDATES_S3_BUCKET))
+      throw Error("Missing S3 configuration")
+    const storageBase = new URL(configuredBase || process.env.LOGINOM_UPDATES_S3_ENDPOINT!)
+    if (!configuredBase) storageBase.hostname = process.env.LOGINOM_UPDATES_S3_BUCKET + "." + storageBase.hostname
+    const base = storageBase.href
     if (!base) throw Error("Missing feed base")
     const target = channel(values.channel ?? "")
     if (command === "verify-public") {
       if (!values["github-base"]) throw Error("Missing --github-base")
-      await verifyPublicRelease(resolve(values.assets), values.version, values["github-base"], base, target, keys)
-      console.log("Public signatures and SHA512: PASS")
+      await verifyPublicRelease(resolve(values.assets), values.version, values["github-base"], base, target, keys, {
+        s3: readConfig,
+      })
+      console.log("Published signatures and SHA512: PASS")
       return
     }
     await mirrorRelease(await s3Store(values.config, base), resolve(values.assets), values.version, target, keys)
@@ -649,12 +700,14 @@ if (import.meta.main) {
   } catch (error) {
     // Never dump SDK/crypto exceptions: they may contain credentials or key material.
     console.error(
-      error instanceof Error && error.message.startsWith("S3 ")
-        ? error.message
-        : "Update feed command failed: " +
-            (error instanceof Error && !/key|secret|credential|PEM|DECODER|ASN1|SSL/i.test(error.message)
-              ? error.message
-              : "check inputs, signing key and S3 credentials"),
+      redactUpdateMessage(
+        error instanceof Error && error.message.startsWith("S3 ")
+          ? error.message
+          : "Update feed command failed: " +
+              (error instanceof Error && !/key|secret|credential|PEM|DECODER|ASN1|SSL/i.test(error.message)
+                ? error.message
+                : "check inputs, signing key and S3 credentials"),
+      ),
     )
     process.exitCode = 1
   }

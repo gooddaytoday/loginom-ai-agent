@@ -48,6 +48,9 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  LOGINOM_UPDATES_S3_ENDPOINT: ${{ vars.LOGINOM_UPDATES_S3_ENDPOINT }}
+  LOGINOM_UPDATES_S3_REGION: ${{ vars.LOGINOM_UPDATES_S3_REGION }}
+  LOGINOM_UPDATES_S3_BUCKET: ${{ vars.LOGINOM_UPDATES_S3_BUCKET }}
   # The owner enables feeds only after signature acceptance on this exact source SHA.
   LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA == github.sha && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
   LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA == github.sha && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
@@ -146,6 +149,17 @@ jobs:
             exit 1
           fi
 
+      - name: Require built-in S3 read key and virtual-host configuration
+        env:
+          S3_READ_ACCESS: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+          S3_READ_SECRET: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$S3_READ_ACCESS" && test -n "$S3_READ_SECRET"
+          test -n "$LOGINOM_UPDATES_S3_ENDPOINT" && test -n "$LOGINOM_UPDATES_S3_REGION" && test -n "$LOGINOM_UPDATES_S3_BUCKET"
+          echo "::add-mask::$S3_READ_ACCESS"
+          echo "::add-mask::$S3_READ_SECRET"
+
       - name: Resolve version and channel
         id: release
         env:
@@ -218,6 +232,8 @@ jobs:
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -305,6 +321,8 @@ jobs:
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
@@ -382,6 +400,8 @@ jobs:
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+      LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
@@ -472,7 +492,6 @@ jobs:
     if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && (needs.macos.result == 'success' || (vars.LOGINOM_RELEASE_SKIP_MACOS == 'true' && needs.macos.result == 'skipped'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    environment: release
     permissions:
       contents: write
     env:
@@ -539,7 +558,6 @@ jobs:
     if: github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    environment: release
     concurrency:
       group: update-channels
       cancel-in-progress: false
@@ -590,9 +608,11 @@ jobs:
           bun script/update-feed.ts mirror-release --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --channel "$channel"
           echo "UPDATE_CHANNEL=$channel" >> "$GITHUB_ENV"
 
-      - name: Verify public GitHub and S3 signatures and artifact SHA512
+      - name: Verify GitHub and authenticated S3 signatures and artifact SHA512
         env:
           GITHUB_DOWNLOAD_BASE: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD }}
+          LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
+          LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
         run: |
           set -euo pipefail
           test -n "$GITHUB_DOWNLOAD_BASE"

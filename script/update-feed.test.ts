@@ -234,8 +234,14 @@ test("dual release signs GitHub bytes, mirrors immutable assets and server-copie
     expect(m.events.slice(previous).every((event) => event.startsWith("copy stable/"))).toBe(true)
     expect(m.files.get("stable/latest.yml")!.bytes).toEqual(m.files.get("unstable/latest.yml")!.bytes)
 
+    let privateRead = false
     const server = createServer(async (req, res) => {
-      const path = req.url!.slice(1)
+      const url = new URL(req.url!, "http://" + req.headers.host)
+      const path = url.pathname.slice(1)
+      if (privateRead && !path.startsWith("github/") && !url.searchParams.has("X-Amz-Signature")) {
+        res.writeHead(403).end("AccessDenied")
+        return
+      }
       const bytes = path.startsWith("github/")
         ? await Bun.file(join(dir, path.slice(7))).bytes()
         : m.files.get(path)?.bytes
@@ -249,6 +255,31 @@ test("dual release signs GitHub bytes, mirrors immutable assets and server-copie
     const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/`
     try {
       await verifyPublicRelease(dir, "0.4.0", base + "github/", base, "stable", [publicKey])
+      privateRead = true
+      const send: typeof fetch = async (input, init) => {
+        const url = new URL(String(input))
+        if (url.hostname !== "updates-test.s3.local.test") return fetch(input, init)
+        const headers = new Headers(init?.headers)
+        headers.set("Host", url.host)
+        return fetch(new URL(url.pathname + url.search, base), { ...init, headers })
+      }
+      const s3 = {
+        endpoint: "https://s3.local.test",
+        region: "ru-central-1",
+        bucket: "updates-test",
+        accessKeyId: "tenant:read-key",
+        secretAccessKey: "test-only-secret",
+      }
+      await verifyPublicRelease(
+        dir,
+        "0.4.0",
+        base + "github/",
+        "https://updates-test.s3.local.test/",
+        "stable",
+        [publicKey],
+        { s3, fetch: send },
+      )
+      privateRead = false
       m.files.set("stable/latest.yml.sig", { bytes: Buffer.from("tampered"), cache: "no-cache" })
       await expect(verifyPublicRelease(dir, "0.4.0", base + "github/", base, "stable", [publicKey])).rejects.toThrow(
         "verification failed",
@@ -286,10 +317,14 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
   const scopes: string[] = []
   const server = createServer(async (req, res) => {
     scopes.push(req.headers.authorization ?? "")
+    if (!req.headers.host?.startsWith("updates-test.")) {
+      res.writeHead(404).end("NoSuchBucket")
+      return
+    }
     const path = req.url!.split("?")[0]
     const source = req.headers["x-amz-copy-source"]
     if (req.method === "PUT" && typeof source === "string") {
-      const data = objects.get("/" + decodeURIComponent(source).replace(/^\//, ""))!
+      const data = objects.get("/" + decodeURIComponent(source).replace(/^\/?updates-test\//, ""))!
       objects.set(path, { bytes: data.bytes, cache: String(req.headers["cache-control"] ?? data.cache) })
       res.end('<CopyObjectResult><ETag>"test"</ETag></CopyObjectResult>')
       return
@@ -316,13 +351,32 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     await Bun.write(
       config,
       JSON.stringify({
-        endpoint: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+        endpoint: "https://s3.local.test/",
         bucket: "updates-test",
         access_key: "test-tenant:test-key",
         secret_key: "test-secret",
       }),
     )
-    const store = await s3Store(config, "https://updates-test.example.test/")
+    const store = await s3Store(config, "https://updates-test.s3.local.test/", {
+      async handle(input) {
+        const query = new URLSearchParams()
+        for (const [key, value] of Object.entries(input.query ?? {})) {
+          for (const item of Array.isArray(value) ? value : [value])
+            if (item !== undefined && item !== null) query.append(key, String(item))
+        }
+        const response = await fetch(
+          `http://127.0.0.1:${(server.address() as { port: number }).port}${input.path}?${query}`,
+          {
+            method: input.method,
+            headers: input.headers,
+            body: input.body,
+          },
+        )
+        return {
+          response: { statusCode: response.status, headers: Object.fromEntries(response.headers), body: response.body },
+        }
+      },
+    })
     expect(await store.head("missing")).toBeUndefined()
     await store.put("releases/0.4.0/latest.yml", new Blob(["signed bytes"]), "public, max-age=31536000, immutable")
     await store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache")
