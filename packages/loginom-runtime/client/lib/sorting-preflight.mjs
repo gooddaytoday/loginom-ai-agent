@@ -91,7 +91,7 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  try{
   if(admission){need(preview.node_preview_schema.inventory_complete===true&&preview.node_preview_schema.node_id===input.source.node_id
    &&preview.node_preview_schema.port===0,'Managed JavaScript preview schema is incomplete');alignReadSchema(fields,admission.schema);}
-  const mapping=request.mappings.find(m=>m.direction==='input'&&(inputPort===undefined||m.port===inputPort));
+  const mapping=request.mappings.find(m=>m.direction==='input'&&m.kind===undefined&&m.port===(inputPort??input.input));
   if(mapping?.fields){need(mapping.fields.length===fields.length,'Input mapping must account for every upstream field');const seen=new Set();fields=mapping.fields.map(f=>{const source=fields.find(c=>c.name===f.source?.name);need(source&&!seen.has(source.name)&&f.excluded!==true,'Invalid '+label+' input mapping');seen.add(source.name);return {...source,name:f.name??source.name,label:f.label??source.label};});}
   resolve(request.parameters,fields);
  }catch(e){error=e;}
