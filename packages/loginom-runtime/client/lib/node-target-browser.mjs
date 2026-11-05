@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
-import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
+import {activatePreparedWorkflow,needsPreparedWorkflowActivation} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
@@ -705,6 +705,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
   const workflowOptions=(value,ctx)=>({receipt_namespace:'node-workflow:'+value.document_id,receipt_id:ctx.receipt_id,
     operation_id:ctx.receipt_id,receipt_signature:createHash('sha256').update(JSON.stringify(value)).digest('hex')});
   return {
+    async needsWorkflowActivation(value,ctx){
+      ctx.signal?.throwIfAborted();
+      return call(`async page=>(${needsPreparedWorkflowActivation.toString()})(page,${JSON.stringify({request:value,origin,build})})`,ctx.deadline);
+    },
     async readWorkflowReceipt(value,ctx){
       return call(withBrowserReceipt('null',{...workflowOptions(value,ctx),receipt_read:true}),ctx.deadline);
     },
@@ -715,7 +719,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     async activateWorkflow(value,ctx){
       request=value;ctx.signal?.throwIfAborted();
       const options=workflowOptions(value,ctx);
-      const code=withBrowserReceipt(`(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task({deadline:ctx.deadline}))})`,options);
+      const code=withBrowserReceipt(`(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task({deadline:ctx.deadline,...(ctx.waitForActive===true?{waitForActive:true}:{})}))})`,options);
       try{return await call(code,ctx.deadline);}
       catch(error){
         // Reconcile a lost transport reply by reading the original receipt only.
