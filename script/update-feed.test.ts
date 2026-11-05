@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { generateKeyPairSync } from "node:crypto"
+import { createHash, generateKeyPairSync } from "node:crypto"
 import { mkdtemp, rm, chmod } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -13,13 +13,68 @@ import {
   verifySignedRelease,
   verifyPublicRelease,
   s3Store,
+  createS3RequestHandler,
 } from "./update-feed"
+import type { FetchHttpHandler } from "@smithy/fetch-http-handler"
 import { createServer } from "node:http"
 import { rename, readdir } from "node:fs/promises"
 
 const pair = generateKeyPairSync("ed25519")
 const key = pair.privateKey.export({ format: "pem", type: "pkcs8" }).toString()
 const publicKey = pair.publicKey.export({ format: "pem", type: "spki" }).toString()
+
+test("S3 artifact GET and PUT survive a 16-second response while metadata and HEAD retain short deadlines", async () => {
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+  const server = createServer((req, res) => {
+    if (req.method === "GET") {
+      res.writeHead(200)
+      res.flushHeaders()
+      res.write("first")
+    }
+    const timer = setTimeout(() => res.end(req.method === "GET" ? "last" : "firstlast"), 16_000)
+    timers.add(timer)
+    res.on("close", () => {
+      clearTimeout(timer)
+      timers.delete(timer)
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const handler = createS3RequestHandler()
+  const read = async (method: string, path: string) => {
+    const input: Parameters<FetchHttpHandler["handle"]>[0] = {
+      protocol: "http:",
+      hostname: "127.0.0.1",
+      port: (server.address() as { port: number }).port,
+      method,
+      path,
+      headers: {},
+      query: {},
+      body: method === "PUT" ? "payload" : undefined,
+      clone() {
+        return { ...this, clone: this.clone }
+      },
+    }
+    const { response } = await handler.handle(input)
+    return new Response(response.body).text()
+  }
+  try {
+    const outcomes = await Promise.allSettled([
+      read("GET", "/releases/0.4.0/loginom-ai-agent-win-x64.exe"),
+      read("PUT", "/releases/0.4.0/loginom-ai-agent-win-x64.exe"),
+      read("GET", "/stable/latest.yml"),
+      read("GET", "/releases/0.4.0/release-manifest.json"),
+      read("HEAD", "/releases/0.4.0/loginom-ai-agent-win-x64.exe"),
+    ])
+    expect(outcomes[0]).toEqual({ status: "fulfilled", value: "firstlast" })
+    expect(outcomes[1]).toEqual({ status: "fulfilled", value: "firstlast" })
+    for (const outcome of outcomes.slice(2)) expect(outcome.status).toBe("rejected")
+  } finally {
+    timers.forEach(clearTimeout)
+    handler.destroy()
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+}, 25_000)
 
 function memory() {
   const files = new Map<string, { bytes: Uint8Array; cache: string }>()
@@ -256,7 +311,7 @@ test("dual release signs GitHub bytes, mirrors immutable assets and server-copie
     try {
       await verifyPublicRelease(dir, "0.4.0", base + "github/", base, "stable", [publicKey])
       privateRead = true
-      const send: typeof fetch = async (input, init) => {
+      const send = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
         const url = new URL(String(input))
         if (url.hostname !== "updates-test.s3.local.test") return fetch(input, init)
         const headers = new Headers(init?.headers)
@@ -358,7 +413,7 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
       }),
     )
     const store = await s3Store(config, "https://updates-test.s3.local.test/", {
-      async handle(input) {
+      async handle(input: Parameters<FetchHttpHandler["handle"]>[0]) {
         const query = new URLSearchParams()
         for (const [key, value] of Object.entries(input.query ?? {})) {
           for (const item of Array.isArray(value) ? value : [value])
@@ -381,6 +436,7 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     await store.put("releases/0.4.0/latest.yml", new Blob(["signed bytes"]), "public, max-age=31536000, immutable")
     await store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache")
     expect(Buffer.from(await store.get("stable/latest.yml")).toString()).toBe("signed bytes")
+    expect(await store.sha256?.("stable/latest.yml")).toBe(createHash("sha256").update("signed bytes").digest("hex"))
     expect(await store.head("stable/latest.yml")).toEqual({ size: 12, cache: "no-cache" })
     expect(scopes.every((value) => value.includes("/ru-central-1/s3/aws4_request"))).toBe(true)
   } finally {

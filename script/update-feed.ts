@@ -70,6 +70,24 @@ async function digest(file: string, algorithm: "sha256" | "sha512", encoding: "h
   for await (const bytes of createReadStream(file)) hash.update(bytes)
   return hash.digest(encoding)
 }
+
+async function streamDigest(
+  stream: ReadableStream<Uint8Array>,
+  algorithm: "sha256" | "sha512",
+  encoding: "hex" | "base64",
+) {
+  const reader = stream.getReader()
+  const hash = new Bun.CryptoHasher(algorithm)
+  try {
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) return hash.digest(encoding)
+      hash.update(chunk.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
 function checksums(text: string) {
   const entries = text
     .trim()
@@ -220,7 +238,7 @@ export async function verifyPublicRelease(
   s3: string,
   target: string,
   keys: readonly string[] = UPDATE_PUBLIC_KEYS,
-  options: { s3?: UpdateS3Config; fetch?: typeof fetch } = {},
+  options: { s3?: UpdateS3Config; fetch?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> } = {},
 ) {
   channel(target)
   const { names } = await verifySignedRelease(dir, version, keys)
@@ -239,9 +257,7 @@ export async function verifyPublicRelease(
       redirect: url.includes("X-Amz-Signature=") ? "error" : "follow",
     })
     if (!response.ok || !response.body) throw Error(`Public artifact HTTP ${response.status}`)
-    const digest = new Bun.CryptoHasher("sha512")
-    for await (const bytes of response.body) digest.update(bytes)
-    return digest.digest("base64")
+    return streamDigest(response.body, "sha512", "base64")
   }
   for (const name of names) {
     for (const source of ["github", "s3"]) {
@@ -473,6 +489,16 @@ export class Feed {
   }
 }
 
+export function createS3RequestHandler() {
+  return new FetchHttpHandler({
+    requestInit: (request) => {
+      // A GET deadline also covers consuming its body during immutable hash checks.
+      const artifact = request.method === "GET" && !/\.(?:ya?ml|json|sig|txt|pem)$/i.test(request.path)
+      return { signal: AbortSignal.timeout(request.method === "PUT" || artifact ? 15 * 60_000 : 15_000) }
+    },
+  })
+}
+
 export async function s3Store(
   configFile: string | undefined,
   feedBase: string,
@@ -509,11 +535,7 @@ export async function s3Store(
   const client = new S3Client({
     endpoint: config.endpoint,
     region: config.region || "ru-central-1",
-    requestHandler:
-      transport ??
-      new FetchHttpHandler({
-        requestInit: (request) => ({ signal: AbortSignal.timeout(request.method === "PUT" ? 15 * 60_000 : 15_000) }),
-      }),
+    requestHandler: transport ?? createS3RequestHandler(),
     maxAttempts: 2,
     forcePathStyle: false,
     credentials: { accessKeyId: config.access_key, secretAccessKey: config.secret_key },
@@ -524,9 +546,7 @@ export async function s3Store(
     async sha256(name) {
       const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key(name) }))
       if (!result.Body) throw Error("Empty S3 body")
-      const hash = new Bun.CryptoHasher("sha256")
-      for await (const bytes of result.Body.transformToWebStream()) hash.update(bytes)
-      return hash.digest("hex")
+      return streamDigest(result.Body.transformToWebStream(), "sha256", "hex")
     },
     async get(name) {
       const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key(name) }))
