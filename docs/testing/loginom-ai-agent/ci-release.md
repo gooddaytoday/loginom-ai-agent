@@ -124,15 +124,17 @@ Repository variables (адреса — параметры сборки, runtime 
 
 При несовпадении `LOGINOM_UPDATES_VERIFIED_SHA` с SHA сборки все три встроенных адреса остаются пустыми: такая сборка не включает автообновление. Пустые параметры также отключают обновления. Если GitHub-параметры включены, а `LOGINOM_AI_AGENT_UPDATE_FEED` не задан, адрес S3 выводится из встроенных endpoint и bucket; отдельный публичный адрес не нужен. Не выставляйте этот SHA до проверки подписи на финальной голове. electron-builder генерирует latest\*.yml/blockmap через generic target даже при отключённом фиде; `--publish never` сохраняется. `updates.invalid` используется только для генерации metadata, upstream feed отсутствует.
 
-По уточнению владельца используются **repository secrets**, Environment `release` пока не требуется:
+Задачи `release` (подпись YAML) и `mirror-updates` (запись S3) используют **Environment `release`**. Владелец настраивает для него обязательного ревьюера и хранит ключ подписи и ключ записи S3 только в секретах окружения. Если окружения ещё нет, GitHub создаст его при первом запуске; обязательного ревьюера нужно настроить до выдачи ключа подписи. Ключ чтения остаётся на уровне репозитория для каждой сборки Desktop.
 
-| Secret                               | Назначение                                                                              |
-| ------------------------------------ | --------------------------------------------------------------------------------------- |
-| `LOGINOM_UPDATES_SIGNING_KEY`        | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
-| `LOGINOM_UPDATES_S3_ACCESS_KEY`      | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
-| `LOGINOM_UPDATES_S3_SECRET_KEY`      | Секрет ключа записи, только шаг mirror                                                  |
-| `LOGINOM_UPDATES_S3_READ_ACCESS_KEY` | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |
-| `LOGINOM_UPDATES_S3_READ_SECRET_KEY` | Secret Key чтения; ресурсы Desktop и проверка зеркала                                   |
+| Secret                               | Где хранить                  | Назначение                                                                              |
+| ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `LOGINOM_UPDATES_SIGNING_KEY`        | Только Environment `release` | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
+| `LOGINOM_UPDATES_S3_ACCESS_KEY`      | Только Environment `release` | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
+| `LOGINOM_UPDATES_S3_SECRET_KEY`      | Только Environment `release` | Секрет ключа записи, только шаг mirror                                                  |
+| `LOGINOM_UPDATES_S3_READ_ACCESS_KEY` | Repository secrets           | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |
+| `LOGINOM_UPDATES_S3_READ_SECRET_KEY` | Repository secrets           | Secret Key чтения; ресурсы Desktop и проверка зеркала                                   |
+
+Environment secrets перекрывают одноимённые repository secrets. До переноса существующего ключа записи задачи продолжат использовать его repository-значение; после переноса удалите repository-копии ключа записи. Ключ подписи на уровне репозитория не размещать.
 
 `bundle-loginom.ts` сохраняет endpoint/region/bucket и **только ключ чтения** в `resources/updates-s3.json`; electron-builder переносит его в корень resources приложения. Ресурс исключён из git и исходного архива. Ключ записи и Ed25519 private key в приложение не попадают. При сборке без read credentials предыдущий ресурс удаляется; неполная пара — ошибка. Main process читает ресурс, runtime environment не заменяет его. `policy.json feedUrl` сохраняет прежний generic override без доступа к встроенному S3 ключу.
 

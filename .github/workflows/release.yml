@@ -487,6 +487,7 @@ jobs:
 
   release:
     name: release
+    environment: release
     # Every platform must pass before a complete draft release can be created.
     needs: [verify, tests, typecheck, build, linux-matrix, windows, macos]
     if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && (needs.macos.result == 'success' || (vars.LOGINOM_RELEASE_SKIP_MACOS == 'true' && needs.macos.result == 'skipped'))
@@ -554,6 +555,7 @@ jobs:
 
   mirror-updates:
     name: mirror published update to cloud.ru
+    environment: release
     # Publication (and later prerelease -> stable conversion) remains an owner action.
     if: github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.event.release.tag_name, 'v') && !github.event.release.draft
     runs-on: ubuntu-24.04
