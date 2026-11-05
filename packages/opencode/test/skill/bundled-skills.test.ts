@@ -10,7 +10,7 @@ import { Command } from "../../src/command"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
-import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { obsoleteSkillNames, productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { ConfigMarkdown } from "../../src/config/markdown"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { Session } from "../../src/session/session"
@@ -329,7 +329,7 @@ it.live("an ordinary project skill retains its source provenance", () =>
   ),
 )
 
-for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+for (const name of [...reservedSkillNames, ...obsoleteSkillNames]) {
   it.live(`a configured command cannot claim the reserved name ${name}`, () =>
     provideTmpdirInstance((directory) =>
       Effect.gen(function* () {
@@ -347,7 +347,7 @@ for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
         yield* Effect.addFinalizer(() => off)
         const commands = yield* Command.Service
         const command = yield* commands.get(name)
-        if (name === "package_docs") expect(command).toBeUndefined()
+        if (obsoleteSkillNames.some((obsolete) => obsolete === name)) expect(command).toBeUndefined()
         else {
           expect(command?.source).toBe("skill")
           expect(yield* Effect.promise(() => Promise.resolve(command?.template))).not.toContain("UNTRUSTED")
@@ -383,7 +383,7 @@ it.live("real MCP prompts keep their namespace and do not replace bundled comman
       })
       expect((yield* mcp.status()).external?.status).toBe("connected")
       const commands = yield* Command.Service
-      for (const name of ["package-docs", "loginom-automation", "package_docs", "sample"]) {
+      for (const name of [...reservedSkillNames, ...obsoleteSkillNames, "sample"]) {
         const external = yield* commands.get(`external:${name}`)
         expect(external?.source).toBe("mcp")
         expect(yield* Effect.promise(() => Promise.resolve(external?.template))).toBe(`EXTERNAL MCP ${name}`)
