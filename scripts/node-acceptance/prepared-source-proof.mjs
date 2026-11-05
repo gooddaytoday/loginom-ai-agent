@@ -4,9 +4,11 @@ export function verifyPreparedSourceGraph(graph,prepared,account,fixture,inactiv
  need(graph.complete===true&&graph.document_id===prepared.document_id
   &&graph.workflow_ref?.workflow_id===prepared.workflow_ref.workflow_id
   &&graph.foreign_links?.length===0&&graph.links?.length===1,'complete source graph required');
- const system=graph.nodes.filter(n=>n.type==='bg-vendor-icon-modelvariables');
+ const system=graph.nodes.filter(n=>['bg-vendor-icon-modelvariables','variables.user'].includes(n.type));
  need(system.length<=1&&graph.nodes.length===2+system.length
   &&inactiveSystemNodes.length===system.length&&system.every(n=>inactiveSystemNodes.some(p=>p.node_id===n.ref.node_id&&p.status===0&&p.running===false)
+   &&Array.isArray(n.inputs)&&n.inputs.length===0&&Array.isArray(n.outputs)&&n.outputs.length===0
+   &&!graph.links.some(l=>l.source===n.ref.node_id||l.target===n.ref.node_id)
    &&n.ref.document_id===prepared.document_id&&n.ref.workflow_id===prepared.workflow_ref.workflow_id),'only verified inactive system node allowed');
  const input=graph.nodes.filter(n=>n.type==='imports.text'),collapse=graph.nodes.filter(n=>n.type==='transform.collapse_columns');
  need(input.length===1&&collapse.length===1&&input[0].label==='VariantInput'&&collapse[0].label==='VariantSource','source identities differ');
