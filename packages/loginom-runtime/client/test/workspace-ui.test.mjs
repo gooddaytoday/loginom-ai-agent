@@ -2089,6 +2089,41 @@ test('owned Calculator cursor visibility blinking does not stale an unrelated ch
   assert.deepEqual(page.events,['click']);
 });
 
+test('LAB-862 variables calculator Next tolerates only cursor visibility and settles its owned Done page',async()=>{
+ for(const fault of [null,'geometry-aba','individual','unowned','content','foreign','wrapper','changing-done']) {
+  const page=new Page(),c=wizardStepFixture(page),editor=calculatorDocument(page,'NULL');
+  c.button.box={x:800,y:700,width:50,height:20};
+  c.marker.attrs['data-tid']=c.base+';CalcVariablesWizard;btnAddExpr';
+  editor.editor.attrs['data-tid']=c.base+';CalcVariablesWizard;cmpExpression';
+  const cursor=page.add('div',null,'',{x:0,y:0,width:0,height:0},fault==='unowned'?page.document.body:editor.wrapper);
+  cursor.attrs.class=fault==='individual'?'CodeMirror-cursor':'CodeMirror-cursors';cursor.attrs.style='';
+  if(fault==='wrapper')editor.wrapper.CodeMirror.getWrapperElement=()=>editor.editor;
+  const snapshot=await page.observe(),next=snapshot.ui.elements.find(e=>e.wizard_step);
+  assert.equal(snapshot.wizard.stage,'variables_calculator');
+  // LAB-862 r1:63/65, 68/70, 73/75: only cursor_style advances by one.
+  page.mutationObserver.pending.push({type:fault==='content'?'childList':'attributes',attributeName:'style',target:cursor,oldValue:'visibility: hidden;'});
+  if(fault==='geometry-aba')page.mutationObserver.pending.push({type:'attributes',attributeName:'style',target:cursor,oldValue:'left: 100px;'});
+  if(fault==='foreign')page.mutationObserver.pending.push({type:'attributes',attributeName:'title',target:c.form});
+  const click=page.mouse.click;let waits=0;
+  page.mouse.click=async(...args)=>{await click(...args);c.marker.remove();editor.editor.remove();
+   page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);
+   page.mutationObserver.callback([{type:'childList',target:c.form}]);};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;
+   if(waits<=2||fault==='changing-done')page.mutationObserver.callback([{type:'attributes',attributeName:'style',target:c.form}]);};
+  const result=await page.act({verb:'wizard_step',ref:next.ref,expected_stage:'done'},snapshot);
+  if(fault&&fault!=='changing-done') {
+   assert.equal(result.status,'NOT_APPLIED',fault);assert.equal(result.error.code,'UI_EPOCH_CHANGED',fault);
+   assert.deepEqual(page.events,[]);continue;
+  }
+  if(fault!=='changing-done')assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault==='changing-done'){assert.equal(result.error.code,'WIZARD_STEP_NOT_SETTLED');continue;}
+  assert.equal(result.output.wizard.stage,'done');assert.equal(waits,5);
+  assert.equal(result.output.scan.mutation_counts.ignored_cursor_blink,1);
+  assert.ok(result.trace.some(e=>e.event==='wizard_step_settled'&&e.quiet_samples===3));
+ }
+});
+
 test('cursor exemption rejects geometry ABA, individual cursor styles and unowned containers',async()=>{
   for(const mode of ['geometry-aba','individual','unowned','content']) {
     const page=new Page(),c=calculatorDocument(page);
@@ -8080,4 +8115,30 @@ test('D2 Join long native ancestry keeps typed Close for both input roles',async
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,fault==='none',port+':'+fault);
   assert.deepEqual(page.events,[]);
  }
+});
+
+test('filter variable picker binds cached metadata without reading the RPC variable object',async()=>{
+ const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF;FilterDataWizard;FilterDataPanel';
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:20,y:50,width:900,height:700});
+ const grid=page.add('div',base,'',{x:30,y:100,width:850,height:600},wizard);grid.id='filter-grid';
+ page.add('div',base+';tbl','',{x:30,y:100,width:850,height:600},grid);
+ const editor=page.add('div',base+';tbl;celleditor','',{x:100,y:120,width:500,height:200},grid);
+ const switchButton=page.add('button',base+';VariantPropEdit;SwitchButton','',{x:100,y:120,width:30,height:20},editor);
+ const combo=page.add('div',base+';VariantPropEdit;VariableControl','',{x:140,y:120,width:200,height:20},editor);combo.id='variable-combo';
+ const picker=page.add('div',base+';VariantPropEdit;VariableControl;boundlist','',{x:140,y:160,width:200,height:80});
+ const option=page.add('div',base+';VariantPropEdit;VariableControl;boundlist;limit','limit ( 15 )',{x:140,y:160,width:200,height:20},picker);option.attrs['data-recordid']='v1';
+ const variable={Index:2,DisplayName:'limit',DataType:4};
+ const record={isModel:true,internalId:'r1',data:{Name:'Amount',RelationType:3}},rows=[record],store={$className:'Ext.data.Store',getData:()=>({items:rows})};
+ const rpc=new Proxy({},{get(){throw Error('RPC getter must never be read');}});
+ const choice={internalId:'v1',data:{Value:rpc,DisplayText:'limit ( 15 )',Metadata:variable},getFields:()=>[{},{},{getName:()=> 'Metadata'}],get:k=>choice.data[k]};
+ const nativeCombo={$className:'Ext.form.field.ComboBox',el:{dom:combo},getStore:()=>({getData:()=>({items:[choice]})})};nativeCombo.picker={pickerField:nativeCombo,el:{dom:picker}};
+ const native={el:{dom:grid},getStore:()=>store,getView:()=>({getNode:()=>null}),Controller:{FFilterItemsStore:store,FVariablesData:{FVariables:[variable]}}};
+ native.editingPlugin={editing:true,context:{record,grid:native,field:'CompareValue'},activeEditor:{el:{dom:editor}}};
+ page.context.Ext={getCmp:id=>id===grid.id?native:id===combo.id?nativeCombo:null};
+ const observed=await page.observe();assert.equal(observed.wizard.stage,'row_filter');
+ const observedOption=observed.ui.elements.find(e=>e.tid===option.attrs['data-tid']);
+ assert.equal(observedOption?.filter_cell?.part,'variable_option');assert.equal(observedOption.filter_cell.variable_name,'limit');
+ assert.ok(observedOption.allowed_actions.includes('click'));
+ assert.ok(observed.ui.elements.find(e=>e.tid===switchButton.attrs['data-tid']).allowed_actions.includes('click'));
 });

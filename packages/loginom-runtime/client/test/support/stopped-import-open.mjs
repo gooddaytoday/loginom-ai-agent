@@ -3,7 +3,7 @@ import {releasePendingNode} from '../../lib/node-pending-release.mjs';
 
 // LAB-666: main-execution-events.jsonl:562-570, including the node-only
 // breadcrumb and absent wizard_pending_owner of the deactivation question.
-export function stoppedImportOpen(operation,fault) {
+export function stoppedImportOpen(operation,fault,{workflowOnly=false}={}) {
  const node=operation.nodeApply.node,workflow=operation.nodeApply.request.workflow_ref;
  const path=workflow.navigation_path,tid=workflow.prefix+';Graph;Source';
  let open=true,lastAction;const gestures=[],events=[];
@@ -12,7 +12,7 @@ export function stoppedImportOpen(operation,fault) {
   dom_epoch:{document:'browser',revision:open?1:2},scan:{complete:true},
   prepared_node_context:{...node,verified:true,surface:'graph',tid,locked:false,
    ...(open?{pending_wizard_node:{tid:path.at(-1).tid+'>Source',label:'Source'}}:{})},
-  workflow_navigation:{status:'observed',path,current_path:[...path,...(open?[{tid:path.at(-1).tid+'>Source',label:'Source'}]:[])]},
+  workflow_navigation:{status:'observed',path,current_path:[...path.map(c=>({...c})),...(open&&!workflowOnly?[{tid:path.at(-1).tid+'>Source',label:'Source'}]:[])]},
   wizard:{status:'absent'},wizard_pending_owner:{status:'unobserved'},
   ui:{truncated:{elements:false,dialogs:false,masks:false},
    dialogs:open?[{ref:'ui-question',title:'Loginom 7.4.2',text:'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет'}]:[],
@@ -26,7 +26,7 @@ export function stoppedImportOpen(operation,fault) {
  operation.nodeTargetAdapter={observe:async()=>{
   if(open)throw Error('Graph is blocked');
   return {complete:true,document_id:node.document_id,workflow_ref:workflow,
-   nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+   nodes:[{ref:node,type:operation.nodeApply.request.target.type,label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
  }};
  const current=()=>{
   const s=state();

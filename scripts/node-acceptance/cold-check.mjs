@@ -4,7 +4,7 @@ import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mj
 import {execFileSync} from 'node:child_process'
 import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
+import {parseExpectedVariableInventory,selectVariableInventoryNode,matchVariableInventoryOutput,matchVariableInventoryLinks,parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -72,6 +72,7 @@ if(excelExpected){
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
 }
 const expected = excelExpected??rawExpected
+const variableInventory=parseExpectedVariableInventory(expected);
 const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(expected)
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
 if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
@@ -213,6 +214,31 @@ page = context.pages()[0]
     if(!source.source)throw Error('COLD_SOURCE_PROVENANCE_MISSING');
    }
   }
+  if(expected.variable_inventory){
+   const links=matchVariableInventoryLinks(graph,variableInventory),outputs=[];
+   // Inspect the clean builtin before any executable source can dirty native state.
+   for(const want of [...variableInventory.outputs].sort((a,b)=>Number(b.node.type==='variables.user')-Number(a.node.type==='variables.user'))){
+    const target=selectVariableInventoryNode(graph,want.node),node=target.ref;
+    const operation={id:'cold-variable-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_variables',revision:'1'},deadline:Date.now()+540000};
+    const channel=createNodeProcedure({operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+    let result,execution=null;
+    if(target.type==='variables.user')result=await channel.readUserVariables();
+    else{
+     const driver=createNodeExecutionProcedure(channel,node,{allowDeactivate:true});
+     execution=await runColdExecution({driver,channel,node,operation,record,readReceipt:async r=>(await execute(withBrowserReceipt('null',{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.operation_id,receipt_read:true}))).output});
+     if(execution.status!=='completed'||execution.verified!==true||execution.owner_verified!==true)throw Error('COLD_VARIABLE_EXECUTION_UNCONFIRMED');
+     result=await channel.readVariablePort({port:want.port,execution});
+    }
+    matchVariableInventoryOutput(result.output,want);
+    outputs.push({node,type:target.type,label:target.label,execution,output:result.output});
+    await record({phase:'cold_variable_output',node,output:result.output,execution,settings_applied:false});
+   }
+   graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   const after=matchVariableInventoryLinks(graph,variableInventory);
+   if(JSON.stringify(links)!==JSON.stringify(after))throw Error('COLD_VARIABLE_LINK_CHANGED');
+   state.variableInventory={outputs,links};
+  }
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
@@ -223,7 +249,8 @@ page = context.pages()[0]
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+  const reads=expectedOutputs.length===0&&state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){
     const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
@@ -439,6 +466,15 @@ page = context.pages()[0]
   const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
+  if(variableInventory?.outputs.length===0){
+   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-for-variable-links'});
+   if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_VARIABLE_LINK_RETURN_UNCONFIRMED');
+   const graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   const links=matchVariableInventoryLinks(graph,variableInventory);
+   if(JSON.stringify(links)!==JSON.stringify(state.variableInventory.links))throw Error('COLD_VARIABLE_LINK_CHANGED_AFTER_TABLE');
+   await record({phase:'cold_variable_links_after_table',links,settings_applied:false});
+  }
+
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
   if (state.cancelled) throw Error("COLD_CANCELLED")
@@ -472,6 +508,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
     ...(state.treeOutputs?{tree_outputs:state.treeOutputs}:{}),
     ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {

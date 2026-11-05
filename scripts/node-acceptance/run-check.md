@@ -80,6 +80,11 @@ python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
 ```
 
+`calculator-vars` and `calculator-vars-update` use the approved Calculator
+Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
+Only the task and `fixtures/variables.csv` reach the model. The update task
+changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
@@ -518,3 +523,17 @@ cold обоих портов с независимым Apriori oracle, точн�
 по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
 Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
 CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.
+
+`variables-calculator` uses the approved eight ordered scalar expressions from
+`nodes/variables-calculator/acceptance/task.md`: create with limit 100, patch
+only limit to 120, freshly execute and Save. Typed variable output 0 and native
+configuration receipts establish both states, stable IDs/types and preservation
+of unrequested expressions. Stock W1 typed cold execution and cleanup apply.
+Only the user task reaches the model; expected values and oracle stay private.
+
+`variables-column-union` использует исходный `source.lgp` только с двумя
+Калькуляторами переменных. Штатный private package delivery загружает отдельную
+копию в каталог назначенной пары до модели; oracle/expected не передаются.
+Модель получает исходный task.md и inputs.json. Аудит проверяет два свежих
+полных упорядоченных native вывода, patch правого a0, неизменные связи и mapping.
+Cold W1 проверяет сохранённый граф, типы, значения и порядок, затем cleanup.

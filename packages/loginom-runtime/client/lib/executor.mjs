@@ -8,6 +8,7 @@ import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
+import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
@@ -761,11 +762,13 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     const bind=(expected,direction,port)=>{
       const nodes=diagram.FNodes.FCollection.filter(n=>n.FGuid===expected.id);
       if(nodes.length!==1)throw Error('Link validation node changed');
-      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':(port.kind==='connection'?'Connection-':port.kind==='tree'?'DataTree-':'Data-')+port.index);
+      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='control_var'?'ControlVar':port.kind==='add'?'Add':(port.kind==='var'?'Var-':port.kind==='connection'?'Connection-':port.kind==='tree'?'DataTree-':'Data-')+port.index);
       const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.parent===node&&p.FCell?.parent===node.FCell
         &&(graph.view.getState(p.FCell)?.shape?.node?.getAttribute('data-tid')===tid||receipt.nodeTargetPortIdentities?.get(p)?.tid===tid));
       const elements=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       if(ports.length!==1||elements.length!==1)throw Error('Link validation port changed');
+      if(['var','control_var'].includes(port.kind)&&(!ports[0].FGuid||!ports[0].data||ports[0].FType!==(direction==='Input'?0:1)
+        ||ports[0].FSubType!==(port.kind==='var'?3:4)))throw Error('Link validation variable native kind changed');
       return {port:ports[0],element:elements[0]};
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
@@ -782,7 +785,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
   },{context,parameters});
 }
 
-function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation) {
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -887,8 +890,12 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const prefixes=[...new Set(graph.map(e=>/^(MF;TF(?:-\d+)?;Graph;)/.exec(e.getAttribute('data-tid'))[1]))];
       if(prefixes.length>1)throw new Error('Multiple native graph namespaces in the active container');
       const native=prefixes[0]??null,tids=graph.map(e=>e.getAttribute('data-tid'));
-      const labels=[...new Set(tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
-        .filter(t=>t && t!=='Переменные_сценария'))].sort();
+      const linkedVariables=tids.some(t=>t.startsWith(native+'Переменные_сценария|Output_Var-'));
+      const labels=[...new Set([
+        ...tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
+          .filter(t=>t && t!=='Переменные_сценария'),
+        ...(linkedVariables && tids.includes(native+'Переменные_сценария')?['Переменные_сценария']:[])
+      ])].sort();
       const actionable=tids.filter(t=>{charge();const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body)
         || labels.some(label=>body===label || body===label+';Label;Label' || body===label+';Setting'
           || body.startsWith(label+';') && /;(?:Input|Output)_[^;]+$/.test(body));});
@@ -1203,6 +1210,30 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const prefix = await ensureReady();
     const { source_node: sourceNode, target_node: targetNode, target_port: targetPort } = task.parameters;
     checkNodeRef(sourceNode); checkNodeRef(targetNode);
+    const bound=task.node_target_context;
+    if(effectPossible&&readNodeTargetGraph&&bound?.request?.target?.kind==='new'
+      &&bound.request.target.type==='variables.to_table'&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
+      const baseline=bound.graph_baseline,source=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[0].id),target=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[1].id);
+      const outputs=source[0]?.variable_outputs?.filter(p=>p.kind==='variables'&&p.native_index===task.parameters.source_port.index);
+      const inputs=target[0]?.variable_inputs?.filter(p=>p.kind==='variables'&&p.native_index===targetPort.index);
+      if(source.length===1&&target.length===1&&outputs?.length===1&&inputs?.length===1){
+        const edge={source:source[0].ref.node_id,output:outputs[0].port,target:target[0].ref.node_id,input:inputs[0].port,kind:'variables'};
+        const native=await readNodeTargetGraph(page,{...bound.graph_probe,read_bindings:true});
+        if(normalizeVariablesToTableLinkGraph(baseline,native,edge)!==native){
+          const bindings=native.native_bindings?.filter(n=>n.node_id===edge.target),original=bound.nodes[1].tid;
+          if(bindings?.length!==1)throw Error('VarToData caption binding disappeared');
+          const label=bindings[0].label,graphPrefix=await graphPrefixFor(prefix);
+          const exact=graphPrefix+sourceNode.node_label+'|Output_Var-'+task.parameters.source_port.index+'|'+label+'|Input_Var-'+targetPort.index;
+          const links=await graphLinks(prefix),actualPorts=await ports(prefix,label),oldPrefix=graphPrefix+original+';',newPrefix=graphPrefix+label+';';
+          if(!before.ports.every(p=>p.startsWith(oldPrefix))||links.filter(l=>l===exact).length!==1
+            ||!same(links.filter(l=>l!==exact),before.links)
+            ||!same(sorted(actualPorts),sorted(before.ports.map(p=>newPrefix+p.slice(oldPrefix.length)))))throw Error('VarToData caption DOM differs from its native graph');
+          bound.nodes=bound.nodes.map(n=>{const b=native.native_bindings.filter(b=>b.node_id===n.id),v=native.nodes.filter(v=>v.ref.node_id===n.id);if(b.length!==1||v.length!==1)throw Error('VarToData link endpoint disappeared');return {id:n.id,tid:b[0].label,dom_epoch:v[0].dom_epoch};});
+          phase='verified';record('variables_to_table_link_caption_verified',{node_id:edge.target,before:target[0].label,after:native.nodes.find(n=>n.ref.node_id===edge.target).label});
+          return result('SUCCEEDED',{link_ref:{kind:'link',tid:exact},variable_target_label_transition:{node_id:edge.target},reconciled:false});
+        }
+      }
+    }
     const currentLinks = await graphLinks(prefix);
     const currentPorts = await ports(prefix, targetNode.node_label);
     const addedLinks = currentLinks.filter(value => !before.links.includes(value));
@@ -1755,7 +1786,7 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
   const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
     ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector) } : {}) };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()})`;
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }
@@ -2948,7 +2979,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
-        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id)));
+        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]}));
       }
       if(!sourceReads.has(args.operation_id)
         &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))

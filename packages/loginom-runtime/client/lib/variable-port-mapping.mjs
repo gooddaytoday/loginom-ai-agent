@@ -1,0 +1,189 @@
+import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
+import {openPreparedOutputPort} from './node-port-open.mjs';
+
+export function validateVariablePortMapping(mapping){
+ const need=(v,m)=>{if(!v)throw Error('Variable mapping: '+m);};
+ need(mapping&&['variables','control'].includes(mapping.kind)&&mapping.direction==='input'&&Number.isInteger(mapping.port)&&mapping.port>=0&&mapping.port<100
+  &&(mapping.kind!=='control'||mapping.port===0),'observed input variable/control port required');
+ need(!(mapping.fields&&mapping.changes),'fields and changes are exclusive');
+ const fields=mapping.fields??mapping.changes??[];
+ need(fields.length<=128&&fields.every(f=>f.source?.kind==='configured_field'&&typeof f.source.name==='string'&&f.excluded!==true),'configured source names only; exclusion is unsupported');
+}
+export function makeVariablePortMappingCode(binding,options){
+ validatePreparedNodeContext(binding);validateVariablePortMapping(options.mapping);
+ return `async page=>{
+  const run=${configureVariablePortMapping.toString()},read=${readPreparedNodeContext.toString()},open=${openPreparedOutputPort.toString()},task=${JSON.stringify({binding,...options})};
+  const configured=await run(page,task,read,open);if(configured.status!=='SUCCEEDED')return configured;
+  const observed=await run(page,{...task,operation_id:task.operation_id+':readback',read_only:true,expected_mapping:configured.mapping},read,open);
+  if(observed.status!=='SUCCEEDED'||JSON.stringify(observed.mapping)!==JSON.stringify(configured.mapping))return {...observed,status:'AMBIGUOUS',verified:false,effect_possible:true,error:('Independent variable mapping readback differs'+(observed.error?': '+observed.error:'')).slice(0,500)};
+  return {...configured,node_context:observed.node_context,independent_readback:true};
+ }`;
+}
+
+// Fixed native UI procedure. Only the owned input wizard is edited; cached
+// ConnectedRecord identity is retained across every metadata/order gesture.
+export async function configureVariablePortMapping(page,task,readNode,openPort){
+ const b=task.binding,mapping=task.mapping,root=b.workflow_ref.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';let effect=false;
+ const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable mapping deadline');return n;};
+ const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
+ const inspect=(mode,extra={})=>page.evaluate(({task,mode,extra})=>{
+  const b=task.binding,p=globalThis.__loginomDockPreparationV1,a=globalThis.bg?.app,card=a?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card?.Controller?.FController;
+  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+  const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode);
+  const r=rs[0],o=[...(p?.inputPortOpenReceipts?.values()??[])].find(o=>o.phase==='verified'&&o.operation_id===task.operation_id+':port');
+  const roots=exact(b.workflow_ref.prefix+';WizrdMCF'),form=b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard';
+  const es=exact(form+';grdTargetColumns'),grid=es.length===1&&Ext.getCmp(es[0].id),store=grid?.getStore?.(),rows=store?.getData?.()?.items;
+  if(mode==='graph'){
+   const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
+   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
+    ||o.workflow!==r.nodeTargetWorkflowNode||o.graph!==m||o.node.FGuid!==b.node.node_id||o.node.data!==o.nodeData
+    ||o.port.data!==o.portData||o.port.parent!==o.node||roots.length!==1||m.FView?.el.dom!==roots[0]
+    ||diagrams.length!==1||m.FDiagram?.FmxGraph?.container!==diagrams[0]||!roots[0].contains(diagrams[0]))throw Error('Owned variable mapping graph required');
+   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
+   if(masks.some(e=>e!==roots[0]||!e.classList.contains('bg-mask-message')||e.classList.contains('x-mask')||e.classList.contains('x-mask-msg')||e.getAttribute('role')==='dialog')
+    ||[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].some(visible))throw Error('Foreign variable mapping graph overlay');
+   return {pending:masks.length>0};
+  }
+  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
+   ||o.workflow!==r.nodeTargetWorkflowNode||o.node_id!==b.node.node_id||o.portIndex!==task.mapping.port||o.wizard!==m||o.enginePort!==m.FModelSocket
+   ||o.port.FSubType!==(task.mapping.kind==='control'?4:3)||o.node.FGuid!==b.node.node_id||o.nodeData!==o.node.data||o.portData!==o.port.data
+   ||card.Controller.Node.data.node.ParentNode!==o.portTree||o.portTree.FModelNodePort!==o.portData||o.nodeTree.FModelNode!==o.nodeData
+   ||roots.length!==1||m.FView?.el.dom!==roots[0]||!grid||grid.el.dom!==es[0]||!roots[0].contains(es[0])
+   ||!Array.isArray(rows)||rows.length>128||store.getCount()!==rows.length)throw Error('Owned complete variable mapping required');
+  if(mode!=='dialog'){
+   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible).filter(e=>{
+    const parent=e.parentElement,tid=form+';colTargetDelete',header=parent&&Ext.getCmp(parent.id);
+    // The port opener also permits this native disabled action-column mask.
+    return !(e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+     &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()&&parent?.getAttribute('data-tid')===tid&&exact(tid).length===1
+     &&roots[0].contains(parent)&&header?.el.dom===parent&&header.$className==='Ext.grid.column.Action'&&header.disabled===true);
+   });
+   // Wait only for masks contained by this receipt's native wizard. Global
+   // modal/reconnect masks and unrelated controls are never retryable.
+   const foreignMask=masks.find(e=>!(o.node.FIconCls==='bg-vendor-icon-calcdata'&&e===roots[0]
+      &&e.classList.contains('bg-mask-message')&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
+      ||[roots[0],es[0],...exact(form)].includes(e.parentElement))
+     ||e.getAttribute('role')==='dialog');
+   if(foreignMask){
+    const window=globalThis.Ext?.WindowManager?.getActive?.();
+    const detail=o.node.FIconCls==='bg-vendor-icon-calcdata'?': '+JSON.stringify({root_tid:roots[0].getAttribute('data-tid'),
+     mask_tid:foreignMask.getAttribute('data-tid'),mask_class:foreignMask.getAttribute('class')?.slice(0,64),
+     parent_tid:foreignMask.parentElement?.getAttribute('data-tid')??null,
+     window_tid:window?.el?.dom?.getAttribute('data-tid')??null,window_class:window?.$className??null}):'';
+    throw Error('Foreign variable mapping mask'+detail);
+   }
+   if(masks.length||store.isLoading())return {pending:true};
+  }
+  const fields=rows.map((row,index)=>{
+   const d=row.data,s=d.ConnectedRecord?.data;
+   if(!row.isModel||!Number.isSafeInteger(d.ID)||d.Index!==index||typeof d.Name!=='string'||typeof d.DisplayName!=='string'
+     ||![1,4,5].includes(d.DataType)||![0,1].includes(d.OriginType)||typeof d.ValueIsNull!=='boolean'
+     ||d.DisplayValue!==null&&!['string','number','boolean'].includes(typeof d.DisplayValue)
+     ||s&&(!Number.isSafeInteger(s.ID)||typeof s.Name!=='string'||typeof s.DisplayName!=='string'||s.DataType!==d.DataType))throw Error('Unsupported variable mapping record');
+   return {id:d.ID,index,name:d.Name,label:d.DisplayName,type:d.DataType,origin_type:d.OriginType,usage:d.UsageType,description:d.Description,
+    value:d.DisplayValue,is_null:d.ValueIsNull,source:s?{id:s.ID,name:s.Name,label:s.DisplayName,type:s.DataType}:null};
+  });
+  if(new Set(fields.map(f=>f.id)).size!==fields.length||new Set(fields.map(f=>f.name)).size!==fields.length)throw Error('Duplicate variable mapping identities');
+  o.variableMappingBindings??=new Map(rows.map(row=>[row.data.ID,row.data.ConnectedRecord]));
+  if(rows.some(row=>o.variableMappingBindings.get(row.data.ID)!==row.data.ConnectedRecord))throw Error('Variable mapping source connection changed');
+  const auto=exact(form+';btnAutoSyncThroughColumns'),button=auto.length===1&&Ext.getCmp(auto[0].id);
+  if(button?.el.dom!==auto[0]||typeof button.pressed!=='boolean')throw Error('Variable autosync owner required');
+  if(mode==='inventory')return {kind:task.mapping.kind,direction:'input',port:task.mapping.port,native_index:o.nativeIndex,port_guid:o.portGuid,
+   count:fields.length,store_count:store.getCount(),unique_ids:new Set(fields.map(f=>f.id)).size,autosync:button.pressed,fields};
+  const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
+   if(!visible(e)||box.width<=0||box.height<=0) return {pending:true};
+   if(!(hit===e||e.contains(hit))){
+    if([roots[0],es[0],...exact(form)].includes(hit))return {pending:true};
+    throw Error('Variable mapping control covered');
+   }return {x,y};};
+  if(mode==='row'){
+   const row=rows.find(row=>row.data.ID===extra.id),el=row&&grid.getView().getNode(row);
+   if(!el||grid.getView().getRecord(el)!==row)throw Error('Owned variable mapping row required');return point(el);
+  }
+  if(mode==='button'){
+   const es=exact(extra.tid).filter(visible),c=es.length===1&&Ext.getCmp(es[0].id);
+   if(es.length!==1||!roots[0].contains(es[0])||c?.el.dom!==es[0]||c.disabled)throw Error('Owned variable mapping button required');return point(es[0]);
+  }
+  const dialogs=exact('EditTuneVariableForm').filter(visible),dialog=dialogs[0];
+  const field=key=>{const es=exact('EditTuneVariableForm;'+key);return es.length===1&&Ext.getCmp(es[0].id)?.el.dom===es[0]?Ext.getCmp(es[0].id):null;};
+  if(dialogs.length!==1||Ext.getCmp(dialog.id)?.$className!=='bg.wizards.variables.view.EditVariableForm'
+   ||[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible).some(e=>e!==dialog)
+   ||field('cbxDataType')?.getValue()!==extra.type||field('cbxNullValue')?.getValue()!==extra.is_null)throw Error('Owned variable metadata editor required');
+  return true;
+ },{task,mode,extra});
+ const settle=async(expected)=>{
+  const end=Date.now()+Math.min(5000,remaining());let previous=null,matches=0;
+  while(true){
+   const current=await inspect('inventory'),snapshot=JSON.stringify(current);
+   matches=!current.pending&&(!expected||expected(current))?(snapshot===previous?matches+1:1):0;
+   if(matches>=3)return current;
+   if(Date.now()>=end)throw Error('Variable mapping stable applied state unconfirmed');
+   previous=current.pending?null:snapshot;await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
+ };
+ const point=async(mode,extra)=>{
+  const end=Date.now()+Math.min(5000,remaining());
+  while(true){const result=await inspect(mode,extra);if(!result.pending)return result;
+   if(Date.now()>=end)throw Error('Variable mapping control readiness unconfirmed');
+   await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
+ };
+ const click=async tid=>{const p=await point('button',{tid});await page.mouse.click(p.x,p.y);};
+ try{
+  let graph=await readNode(page,b);while(graph.surface_pending||graph.verified&&graph.locked){await page.waitForTimeout(Math.min(80,remaining()));graph=await readNode(page,b);}
+  if(!graph.verified||graph.surface!=='graph'||graph.locked)throw Error('Owned variable mapping graph required');
+  const opened=await openPort(page,{...task,direction:'input',kind:mapping.kind,port:mapping.port,operation_id:task.operation_id+':port'},readNode);
+  effect=opened.effect_possible===true;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
+  const before=await settle(task.expected_mapping?value=>JSON.stringify(value)===JSON.stringify(task.expected_mapping):null);let current=before;
+  if(!task.read_only){
+   const requested=mapping.fields??mapping.changes??[],all=mapping.fields!==undefined;
+   const selected=requested.map(f=>{const xs=before.fields.filter(row=>row.source?.name===f.source.name);if(xs.length!==1)throw Error('Unique connected variable source required: '+f.source.name);return {...xs[0],name:f.name??xs[0].name,label:f.label??xs[0].label};});
+   if(all&&(selected.length!==before.fields.length||selected.some(row=>!row.source)))throw Error('Complete connected field layout required; preserve local defaults with changes');
+   const expected=before.fields.map(row=>selected.find(v=>v.id===row.id)??row);
+   if(new Set(expected.map(row=>row.name)).size!==expected.length)throw Error('Requested variable names collide');
+   for(const want of selected){
+    const old=current.fields.find(f=>f.id===want.id);if(old.name===want.name&&old.label===want.label)continue;
+    const p=await point('row',{id:want.id});await page.mouse.click(p.x,p.y);await click(form+';btnEditMappingColumn');
+    await at('EditTuneVariableForm').waitFor({state:'visible',timeout:remaining()});
+    for(const [key,value] of [['edtName',want.name],['edtDisplayName',want.label]]){
+     await inspect('dialog',{type:want.type,is_null:want.is_null});const input=at('EditTuneVariableForm;'+key).locator('input:visible');
+     if(await input.count()!==1)throw Error('Unique variable metadata input required');await input.fill(value,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+    }
+    await inspect('dialog',{type:want.type,is_null:want.is_null});await at('EditTuneVariableForm;btnApply').click({timeout:remaining()});
+    await page.locator('[data-tid="EditTuneVariableForm"]').waitFor({state:'hidden',timeout:remaining()});
+    current=await settle(value=>value.fields.some(row=>row.id===want.id&&row.name===want.name&&row.label===want.label));
+   }
+   if(all)for(let destination=0;destination<selected.length;destination++){
+    while(current.fields.findIndex(f=>f.id===selected[destination].id)>destination){
+     const p=await point('row',{id:selected[destination].id});await page.mouse.click(p.x,p.y);await click(form+';btnMoveMappingColumnUp');
+     current=await settle(value=>value.fields.findIndex(f=>f.id===selected[destination].id)===current.fields.findIndex(f=>f.id===selected[destination].id)-1);
+    }
+   }
+   if(mapping.autosync!==undefined&&current.autosync!==mapping.autosync){await click(form+';btnAutoSyncThroughColumns');current=await settle(value=>value.autosync===mapping.autosync);}
+   const ordered=all?selected:expected;
+   const wanted={...before,autosync:mapping.autosync??before.autosync,fields:ordered.map((row,index)=>({...row,index,origin_type:row.name!==before.fields.find(f=>f.id===row.id).name||row.label!==before.fields.find(f=>f.id===row.id).label?1:row.origin_type}))};
+   current=await settle(value=>JSON.stringify(wanted)===JSON.stringify(value));
+  }
+  await click(root+(task.read_only?';btnClose':';btnDone'));
+  await page.waitForFunction(root=>!document.querySelector('[data-tid='+JSON.stringify(root)+']')?.checkVisibility({checkVisibilityCSS:true})
+    ||[...document.querySelectorAll('[role="dialog"],.x-message-box')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),root,{timeout:remaining()});
+  if(task.read_only&&await at(root).count()){
+   const yes=at('msgbox;tlb;yes');if(await yes.count()!==1||!await page.evaluate(()=>[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})).some(e=>e.innerText.replace(/\s+/g,' ').trim()==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет')))throw Error('Owned variable mapping cancellation required');await yes.click({timeout:remaining()});
+  }
+  await page.waitForFunction(root=>!document.querySelector('[data-tid='+JSON.stringify(root)+']')?.checkVisibility({checkVisibilityCSS:true})
+   &&![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),root,{timeout:remaining()});
+  const end=Date.now()+Math.min(5000,remaining());let previous=null,matches=0;
+  while(true){
+   graph=await readNode(page,b);
+   if(!graph.surface_pending&&!(graph.verified&&graph.locked)){
+    if(!graph.verified||graph.surface!=='graph')throw Error('Variable mapping graph return unconfirmed');
+    const ready=await inspect('graph'),snapshot=JSON.stringify(graph);
+    matches=ready.pending?0:snapshot===previous?matches+1:1;previous=ready.pending?null:snapshot;
+    if(matches>=3)break;
+   }else {matches=0;previous=null;}
+   if(Date.now()>=end)throw Error('Variable mapping graph settlement unconfirmed');
+   await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
+  }
+  return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:graph,mapping:current,source_identity_verified:true};
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:String(error.message).slice(0,500)};}
+}

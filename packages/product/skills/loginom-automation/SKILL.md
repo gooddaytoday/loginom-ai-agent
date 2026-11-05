@@ -143,6 +143,10 @@ Execute вычисляющих узлов ради чтения, ответа и
 
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
+| Переменные в столбцы | `variables.to_table` / columns | [читать](references/nodes/variables.to_table.md) |
+| User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
+| Соединить переменные | `variables.column_union` / append_variables | [читать](references/nodes/variables.column_union.md) |
+| Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
 | Качество таблицы | `research.quality` / `profile` | [Пять выходов](references/nodes/research.quality.md), `parameters:{}`. |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
 | Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
@@ -171,10 +175,11 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |
 |Импорт Loginom Data|`imports.lgd` / native|[читать](references/nodes/imports.lgd.md)|
 |Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
-| Вычисляемые формулы | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
+| Формулы, в том числе Var.* | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
 | Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
-| Фильтрация строк | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
+| Фильтр строк, включая условия из переменных | `transform.filter_data` / conditions | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
+|Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |

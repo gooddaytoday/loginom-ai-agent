@@ -87,5 +87,35 @@
         }
       ]
     }
-  ]
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "wanted",
+            "type": "string",
+            "value": "a"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
 }

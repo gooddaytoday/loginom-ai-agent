@@ -41,7 +41,8 @@ export function wizardOpenBinding(state) {
  const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard'));
  requireValue(controls.length===1,'One prepared settings control is required');
  const labels=state.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.tid===n.tid+';Label;Label');
- return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
+ return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),
+  ...(labels.length===1&&labels[0].signature?.native_graph?.status==='non_script'&&labels[0].signature.native_graph.icon==='bg-vendor-icon-variablestodata'?{variables_to_table:true}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
   graph_tid:n.tid,opening:structuredClone(controls[0].wizard_open)};
 }
 
@@ -52,11 +53,17 @@ export function wizardDeactivationDialogOwner(state,binding) {
  // captured by that settled gesture, with the same native pending node/path.
  if(binding?.kind==='deactivation'&&binding.release_opening){
   const b=binding.release_opening;
+  const navigation=state.workflow_navigation,expected=b.navigation;
+  // A native-bound source caption may overflow in the refusal receipt and
+  // become observable during cleanup. Only that exact pending crumb can vary.
+  const pendingNavigation=b.native_pending_overflow===true&&[navigation,expected].every(v=>v?.status==='observed'&&Array.isArray(v.path)&&Array.isArray(v.current_path)
+    &&(same(v.current_path,v.path)||same(v.current_path,[...v.path,b.node.pending_wizard_node])))
+   &&same({...navigation,current_path:null},{...expected,current_path:null});
   return n?.verified===true&&n.surface==='graph'&&n.locked===false&&same(n,b.node)
    &&state.wizard?.status==='absent'&&same(state.workflow_ref,b.workflow_ref)
    &&state.dom_epoch?.document===b.document&&state.origin===b.origin&&state.loginom_build===b.build
    &&state.active_tab_ref===b.active_tab_ref&&same(state.package_identity,b.package_identity)
-   &&same(state.workflow_navigation,b.navigation)&&ui?.dialogs?.length===1
+   &&(same(navigation,expected)||pendingNavigation)&&ui?.dialogs?.length===1
    &&same({...ui.dialogs[0],title:b.dialog.title,text:b.dialog.text},b.dialog)&&Array.isArray(ui.masks)
    &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===n.tid.split(';Graph;')[0]&&m.dialog_ref===null);
  }
@@ -121,7 +128,8 @@ export async function openPreparedWizard(channel) {
  const n=after.prepared_node_context,normalize=v=>typeof v==='string'?v.replace(/\s/g,''):'';
  const bound=n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof n[k]==='string'&&n[k]===binding.node[k]);
  const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
-  ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label);
+  ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label)
+  ||binding.variables_to_table===true&&after.wizard.stage==='variables_to_table'&&owner.node.label==='Переменные в таблицу';
  requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');

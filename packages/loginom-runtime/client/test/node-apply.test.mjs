@@ -42,6 +42,38 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const fault of [null,'type','transport','receipt','question','button','journal'])test('variables calculator deactivation refusal automatically releases only its owned question: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.calculator';p.mode='expressions';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expressions']});
+ const n={document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph',tid:'MF;TF-1;Graph;Source',locked:false,pending_wizard_node:{tid:p.workflow_ref.navigation_path.at(-1).tid+'>Source',label:'Source'}};
+ f.drivers.openWizard=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'ui.act'};if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Deactivation opening context changed'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'ui.act',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,error:{code:'WIZARD_CONTEXT_CHANGED'},trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:'begin_wizard'}],
+   output:{authenticated:true,origin:'https://app.loginom.ai/',loginom_build:'7.4.2',active_tab_ref:'tab',dom_epoch:{document:'browser'},workflow_ref:p.workflow_ref,package_identity:{path:null},prepared_node_context:n,wizard:{status:'absent'},workflow_navigation:{status:'observed',path:p.workflow_ref.navigation_path,current_path:p.workflow_ref.navigation_path},
+    ui:{dialogs:[{ref:'question',title:'Loginom 7.4.2',text:fault==='question'?'Удалить пакет?':'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет'}],masks:[{kind:'modal_background',target_tid:'MF;TF-1',dialog_ref:null}],elements:Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([id,label])=>({tid:'msgbox;tlb;'+id,label:fault==='button'?'Other':label,signature:{dialog_ref:'question'},allowed_actions:['click']}))}}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-vars-question');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:false}};};
+ const result=await f.run(p);assert.equal(result.status,fault?'AMBIGUOUS':'FAILED');assert.equal(result.cleanup_complete,!fault);assert.equal(result.pending_phase,fault?'open':null);assert.equal(f.calls.includes('cancel-vars-question'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
+for(const fault of [null,'type','transport','receipt','gesture','journal'])test('Union opening refusal automatically uses guarded release and durable ACK: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.column_union';p.mode='append_variables';
+ f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['append_variables']});
+ f.drivers.openWizard=async()=>{
+  f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'ui.act'};if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Node procedure step did not confirm completion'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'ui.act',phase:'observing',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+   output:{prepared_node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph'},wizard:{status:'absent'}},
+   trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:fault==='gesture'?'execute_wizard':'begin_wizard'}],error:{code:'WIZARD_CONTEXT_CHANGED'}}});
+ };
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-union-opening');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const result=await f.run(p);assert.equal(result.status,fault?'AMBIGUOUS':'FAILED');assert.equal(result.cleanup_complete,!fault);assert.equal(result.pending_phase,fault?'open':null);
+ assert.equal(result.error.code,'NODE_APPLY_STOPPED');assert.equal(f.calls.includes('cancel-owned-union-opening'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
+for(const fault of [null,'other-node','transport','receipt','journal'])test('Calculator variable mapping refusal cleanup is scoped and durably acknowledged: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='other-node'?'imports.text':'transform.calculator';p.mode='expression';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expression']});
+ f.drivers.mapPorts=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'node.variables.variable_mapping.internal'};
+  if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Unique connected variable source required: missing'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'node.variables.variable_mapping.internal',phase:'variable_mapping',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:'Unique connected variable source required: missing'}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-variable-mapping');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
+ assert.equal(f.calls.includes('cancel-owned-variable-mapping'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
 for(const corruptAck of [false,true])test('Calculator JSON Response read uses exact durable phase ACK: '+corruptAck,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  const journal=createExecutionJournal({directory,metadata:{}}),f=fixture();
@@ -791,4 +823,11 @@ test('failed final readback cannot certify settlement without an exact durable c
   assert.equal(result.status,'AMBIGUOUS');assert.match(result.error.message,/disk unavailable|acknowledgement differs/);
   assert.equal(f.operation.nodeApply.result,undefined);
  }
+});
+
+for(const owned of [false,true])test('W1 variable output requires an owned completed process before reading: '+owned,async()=>{
+ const f=fixture(),r=request();r.read.variable_ports=[0];
+ f.drivers.waitExecution=async()=>{f.calls.push('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'execution1',...(owned?{owner_verified:true,process_id:'1.1',process_record_id:'p'}:{})};};
+ f.drivers.readOutput=async()=>{f.calls.push('read');return {verified:true,cleanup_complete:true,status:'complete',execution_id:'execution1',evidence_ref:'e',ports:[{port:0,fresh:true}],variable_ports:[{port:0,kind:'variables',source:'execution',native_source:'VariablesForm',execution_id:'execution1',fresh:true,complete:true,read_id:'new-read',count:0,variables:[],completeness:{count:0,store_count:0,unique_ids:0}}]};};
+ const result=await f.run(r);assert.equal(result.status,owned?'SUCCEEDED':'AMBIGUOUS');assert.equal(f.calls.includes('read'),owned);
 });

@@ -89,6 +89,15 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none']:
+        variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty', 'row-filter-none': 'none'}[name]
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-variable-' + variant + '.md'),
+                    data=node / 'fixtures', base=None,
+                    input_files=['variables-empty.csv' if variant == 'empty' else 'variables.csv'],
+                    export_count=2 if variant == 'empty' else 4,
+                    expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
+                    filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'
@@ -97,6 +106,10 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='composite/expected.json' if composite else 'expected.json',
                     input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
                     ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
+    if name == 'variables-columns':
+        src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    input_files=[], expected_name='expected.json')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -307,6 +320,34 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'variables-column-union':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',
+                    source_package=src.parent / 'fixtures/source.lgp', variable_only=True, variable_audit='variables-column-union', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-column-union.mjs')
+    if name in ['variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        variant = name.removeprefix('variables-datatovar').lstrip('-')
+        expected = 'expected-' + variant + '-run.json' if variant else 'expected-run.json'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'), data=src.parent / 'fixtures',
+                    input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
+                    expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
+                    variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name == 'variables-calculator':
+        src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
+                    variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-user':
+        src = REPO / 'docs/node-development/variables/acceptance'
+        return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
+                    variable_only=True, oracle=REPO / 'scripts/node-acceptance/expected-outputs.mjs')
+    if name in ['calculator-vars', 'calculator-vars-update']:
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        update = name == 'calculator-vars-update'
+        return dict(source=src, prompt=src / ('task-variables-update.md' if update else 'task-variables.md'),
+                    data=src.parent / 'fixtures', input_files=['variables.csv'], base=None,
+                    expected_name='expected.json' if update else 'expected-initial.json', oracle=src / 'oracle-variables.py')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -1067,11 +1108,12 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+        if spec.get('variable_only') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not spec.get('variable_only') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
@@ -1079,7 +1121,7 @@ class Runner:
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
@@ -1300,7 +1342,8 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
-        invalid = port_failure(replies, folder / 'model.stdout') if not (rejection or refusal or execution_error or lgd_corrupt) or delivered else None
+        invalid = (port_failure(replies, folder / 'model.stdout')
+                   if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -1327,6 +1370,14 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if spec.get('variable_only'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'variable-events.json', evidence)
+            self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
+                src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-column-union'] else 'snapshot')})
+            return session, expected, None, None
         if refusal:
             self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
             return session, expected, None, None
@@ -1401,7 +1452,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            delimiter = check_csv(actual, expected['outputs'][index], header,
+            csv_expected = (read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
+                            else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
+            delimiter = check_csv(actual, csv_expected, header,
                                   column_order='any' if isinstance(case, Path) else None,
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
@@ -1448,6 +1501,9 @@ class Runner:
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    if spec.get('source_package'):
+                        write(folder / 'source-config.json', dict(login=login, package=r['package']))
+                        self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):
@@ -1459,7 +1515,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

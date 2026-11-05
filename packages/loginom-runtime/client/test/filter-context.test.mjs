@@ -120,3 +120,14 @@ test('filter input data kind comes from the bound native column metadata',()=>{
  f.inputs[0].data.DataKind=2;assert.equal(f.read().input_fields[0].data_kind,'Дискретный');
  delete f.inputs[0].data.DataKind;assert.equal(f.read().input_fields[0].data_kind,null);
 });
+
+test('filter variable binding matches complete cached identity without stripping display suffixes',()=>{
+ for(const [flag,operator,key,nativeKey,name,type,value] of [[1,3,'value','CompareValue','limit',4,15],[128,10,'values','CompareValueListAsString','codes',5,'C ( x )']]){
+  const f=fixture();Object.assign(f.data,{UseVariables:flag,RelationType:operator,[nativeKey]:`${name} ( ${value} )`});
+  f.controller.FVariablesData={FVariables:[{Index:2,DisplayName:name,DataType:type,Value:value,ValueAsString:String(value),IsNull:false}]};
+  assert.deepEqual(f.read().rows[0]?.[key],{kind:'variable',name});
+  f.data[nativeKey]=name;assert.deepEqual(f.read().rows[0]?.[key],{kind:'variable',name});
+  f.data[nativeKey]=name+' ( forged )';assert.equal(f.read().verified,false);
+  f.data[nativeKey]=name;f.controller.FVariablesData.FVariables.push({...f.controller.FVariablesData.FVariables[0],Index:3});assert.equal(f.read().verified,false);
+ }
+});

@@ -10,6 +10,63 @@ const sameNode=(context,node)=>context?.verified===true&&['document_id','workflo
 // phase. It never extends that phase or repeats any of its gestures.
 export const NODE_RELEASE_BUDGET_MS=90000;
 
+// Only completed, synchronous mapping refusals before Done are cancellable.
+// Transport/gesture uncertainty and every other node keep the existing gate.
+export function calculatorVariableMappingRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt;
+ return !operation.transportUncertain&&state?.request?.target?.type==='transform.calculator'&&state.pending?.phase==='input_mapping'
+  &&ref?.action_key==='node.variables.variable_mapping.internal'&&typeof ref.operation_id==='string'
+  &&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key&&receipt.phase==='variable_mapping'
+  &&receipt.status==='AMBIGUOUS'&&receipt.effect_possible===true&&receipt.cleanup_complete===false
+  &&receipt.output?.verified===false&&receipt.output.cleanup_complete===false
+  &&receipt.error?.code==='CROSSTABLE_VARIABLE_STEP_UNCONFIRMED'
+  &&/(?:^|Error: )(?:Foreign variable mapping mask|Unique connected variable source required:|Complete connected field layout required;|Requested variable names collide)/.test(receipt.error.message??'');
+}
+
+// Only a completed single opening click may settle into this node's own
+// union wizard for cancellation. It never permits configure/Done/Execute.
+export function unionWizardOpeningRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt,n=receipt?.output?.prepared_node_context,w=receipt?.output?.wizard;
+ const gestures=receipt?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+ return !operation.transportUncertain&&state?.request?.target?.type==='variables.column_union'&&state.pending?.phase==='open'
+  &&ref?.action_key==='ui.act'&&typeof ref.operation_id==='string'&&ref.id===ref.operation_id&&ref.id.startsWith(operation.id+':n')
+  &&receipt?.operation_id===ref.id&&receipt.action_key==='ui.act'&&receipt.status==='AMBIGUOUS'
+  &&receipt.effect_possible===true&&receipt.cleanup_complete===true&&sameNode(n,state.node)
+  &&(n.surface==='graph'&&w?.status==='absent'||n.surface==='wizard'&&w?.status==='observed'&&w.stage==='variables_column_union')
+  &&['WIZARD_CONTEXT_CHANGED','WIZARD_OPEN_NOT_CONFIRMED','UI_DEADLINE_EXCEEDED'].includes(receipt.error?.code)
+  &&gestures.length===1&&gestures[0].verb==='begin_wizard'
+  &&receipt.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='begin_wizard').length===1;
+}
+
+// Reuse the existing receipted deactivation cancellation, including its exact
+// question/buttons, native pending owner and fresh-surface checks.
+function deactivationOpeningBinding(operation,r){
+ const state=operation.nodeApply,ref=operation.lastReceipt,n=r?.output?.prepared_node_context;
+ const variables=state?.request?.target?.type==='variables.calculator',gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+ if(operation.transportUncertain||state?.pending?.phase!=='open'||!['imports.text','variables.calculator'].includes(state.request.target?.type)
+  ||r?.action_key!=='ui.act'||ref?.action_key!=='ui.act'||typeof ref.operation_id!=='string'||r.operation_id!==ref.operation_id
+  ||r.operation_id!==ref.id||!r.operation_id.startsWith(operation.id+':n')
+  ||r.status!=='AMBIGUOUS'||r.effect_possible!==true||r.cleanup_complete!==true||r.error?.code!=='WIZARD_CONTEXT_CHANGED'
+  ||gestures.length!==1||gestures[0].verb!=='begin_wizard'
+  ||r.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='begin_wizard').length!==1
+  ||!sameNode(n,state.node)||n.surface!=='graph'||n.locked!==false||typeof n.tid!=='string'
+  ||typeof n.pending_wizard_node?.tid!=='string'||!n.pending_wizard_node.label)return null;
+ const s=r.output,path=s.workflow_navigation?.path;
+ if(s.authenticated!==true||s.workflow_navigation?.status!=='observed'||!path?.length
+  ||!same(path,state.request.workflow_ref.navigation_path)
+  ||!(same(s.workflow_navigation.current_path,[...path,n.pending_wizard_node])||variables&&same(s.workflow_navigation.current_path,path))
+  ||!n.pending_wizard_node.tid.startsWith(path.at(-1).tid+'>')
+  ||typeof s.dom_epoch?.document!=='string'||typeof s.active_tab_ref!=='string'||s.ui?.dialogs?.length!==1)return null;
+ const binding={kind:'deactivation',release_opening:{node:n,workflow_ref:s.workflow_ref,document:s.dom_epoch.document,
+  origin:s.origin,build:s.loginom_build,active_tab_ref:s.active_tab_ref,package_identity:s.package_identity,
+  navigation:s.workflow_navigation,dialog:s.ui.dialogs[0],...(variables?{native_pending_overflow:true}:{})}};
+ return boundWizardDeactivationConfirmation(s,binding)?structuredClone(binding):null;
+}
+
+export function variablesCalculatorDeactivationRefusal(operation,receipt){
+ return operation.nodeApply?.request?.target?.type==='variables.calculator'&&!!deactivationOpeningBinding(operation,receipt);
+}
+
 export class NodeReleaseBlocked extends Error {
  constructor(message,userAction) {super(message);this.userAction=userAction;}
 }
@@ -25,7 +82,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false;
+ let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false,variableDraft=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -51,37 +108,17 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&r.output.wizard?.status==='observed'&&r.output.wizard.root_ref&&gestures.length===1
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
-  const draft=restDraft||exportDraft||wizardDraft;
+  variableDraft=calculatorVariableMappingRefusal(operation,r);
+  const draft=restDraft||exportDraft||wizardDraft||variableDraft;
   draftReceipt=draft;
   requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft),
    'The last browser gesture of this operation has no confirmed cleanup');
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
   const n=r.output?.prepared_node_context,w=r.output?.wizard;
-  if(state.pending.phase==='open'&&state.request.target?.type==='imports.text'
-   &&r.action_key==='ui.act'&&operation.lastReceipt.action_key==='ui.act'
-   &&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id
-   &&r.operation_id===operation.lastReceipt.id&&r.operation_id.startsWith(operation.id+':n')
-   &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===true
-   &&r.error?.code==='WIZARD_CONTEXT_CHANGED'&&gestures.length===1&&gestures[0].verb==='begin_wizard'
-   &&r.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='begin_wizard').length===1
-   &&sameNode(n,node)&&n.surface==='graph'&&n.locked===false&&typeof n.tid==='string'
-   &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label
-   &&r.output.authenticated===true&&r.output.workflow_navigation?.status==='observed'
-   &&r.output.workflow_navigation.path?.length>0
-   &&same(r.output.workflow_navigation.path,state.request.workflow_ref.navigation_path)
-   &&same(r.output.workflow_navigation.current_path,[...r.output.workflow_navigation.path,n.pending_wizard_node])
-   &&n.pending_wizard_node.tid.startsWith(r.output.workflow_navigation.path.at(-1).tid+'>')
-   &&typeof r.output.dom_epoch?.document==='string'&&typeof r.output.active_tab_ref==='string'
-   &&r.output.ui?.dialogs?.length===1){
-   const s=r.output;
-   const binding={kind:'deactivation',release_opening:{node:n,workflow_ref:s.workflow_ref,document:s.dom_epoch.document,
-    origin:s.origin,build:s.loginom_build,active_tab_ref:s.active_tab_ref,package_identity:s.package_identity,
-    navigation:s.workflow_navigation,dialog:s.ui.dialogs[0]}};
-   if(boundWizardDeactivationConfirmation(s,binding)){
-    openingConfirmation=structuredClone(binding);
-   }
-  }
+  if(unionWizardOpeningRefusal(operation,r))settleWizard={node:n,graph_only:true,union_opening:true,
+   opening_label:n.pending_wizard_node?.label,deadline};
+  openingConfirmation=deactivationOpeningBinding(operation,r)??undefined;
   if(draft){
    requireValue(typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id,
     'The completed draft receipt identity changed');
@@ -123,6 +160,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  }
  if(draftReceipt)requireValue(current.ui?.dialogs?.length===0&&current.ui?.masks?.length===0,
   'The stopped draft has a blocking dialog or mask');
+ if(variableDraft)requireValue(current.wizard?.stage==='input_mapping'
+  &&current.prepared_node_context?.input_port?.node_icon_class==='bg-vendor-icon-calcdata'
+  &&current.prepared_node_context.input_port.opening_operation_id===operation.lastReceipt.operation_id+':port',
+  'The stopped Calculator variable port owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',
