@@ -818,7 +818,6 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});
         const {native_bindings:bindings,...observed}=bindingGraph;
         if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_binding_graph_changed'};
-        const edge=effect.parameters.edge;
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
           if(edge.kind){
