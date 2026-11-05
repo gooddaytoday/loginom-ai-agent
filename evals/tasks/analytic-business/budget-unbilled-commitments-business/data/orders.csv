@@ -1,0 +1,5 @@
+order_id;cost_center;budget_item;committed_amount;status
+O01;CC1;I1;60.00;active
+O02;CC1;I1;10.00;active
+O03;CC1;I2;100.00;cancelled
+O04;CC1;I2;70.00;active

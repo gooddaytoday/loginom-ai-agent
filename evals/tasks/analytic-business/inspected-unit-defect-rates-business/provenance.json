@@ -1,0 +1,39 @@
+{
+  "task_id": "inspected-unit-defect-rates-business",
+  "source_task": "inspected-unit-defect-rates-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/inspected-unit-defect-rates-detailed/provenance.json",
+  "dataset_sha256": {
+    "defects.csv": "d50915244f8c45c74ee2c0c45eb731618bb897bb98271ce646d06fc0329fc312",
+    "inspections.csv": "3234de376046bba9ac97060689d8557eb1d1a60ddd31ce00cf1e83c5ba004350"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "1ba3ed87ddf8c720743696ea02a96e8bc94a28bf4eff85a28312c53c886f8090"
+  },
+  "reference_sha256": "9723c588f1f94c08a43a1093a5706a0f9eff0846eab596a8ade83306153be90d",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 6-unit inspections register and 5 defect records, frozen before manual gold and independent oracle under approved P12 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real production data or a derived real-data snapshot. Case-sensitive ASCII string keys; unique unit_id in inspections and defect_id in defects; every defects.unit_id exists in inspections. Nonempty cells/no NULL; severity integer 1/2/3. Multiple records, including repeated defect_code and severity for one unit, are intentional. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv"
+    ],
+    "algorithm": "Independent raw-CSV max severity per unit_id, then full inspections traversal with per supplier/line counts and max>0/max=3 flags; missing severity=0, shares over all inspected units, ASCII sorting, no intermediate rounding. Full manual 3×7 independently checked before native; no Loginom outputs used."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,5 +1,7 @@
 # Контракт параллельных evals по пользователям
 
+> Сведения о локальном окружении обезличены. Приватные подтверждения, упомянутые в документе, не включены в репозиторий.
+
 Редакция 2026-10-16. Нормативны решения владельца от этой даты и
 [дизайн](../../docs/plans/2026-10-11-evals-parallel-design.md).
 [План](../../docs/superpowers/plans/2026-10-16-evals-parallel.md) отслеживает работу;
@@ -105,13 +107,20 @@
     После SIGINT/timeout CLI слота получает до 90 секунд на собственный teardown;
     общий бюджет cleanup supervisor-а — 120 секунд с учётом дальнейшей эскалации.
     Для остальных владельцев сохраняются 30 секунд ожидания и 60 секунд cleanup.
+    Continuous judge без profile/sandbox допускает естественный выход ранее proven
+    ordinary descendant после exec: неизменны PID/starttime, UID, PGID/SID, меняются
+    только executable device/inode. Launcher/selected CLI/wrapper/browser/helper и
+    неизвестный origin исключены. Changed image остаётся refused без сигналов;
+    переход сохраняется, blocker снимают лишь два полных пустых прохода ≥100 мс при
+    свежепроверенном живом исходном subreaper, включая late descendants/adoption.
+    Остальные identity/чтение/capture/persistence failures остаются fatal; budget 60 с.
 25. Все секреты, включая пароли пользователей, авторизацию модели/судьи и admin,
     остаются вне env агента/судьи и вне results/prompts/диагностики. Runtime-auth
     и подготовленные подключения используются без передачи секретов через env.
     Секретные файлы не становятся произвольными mounts агента.
-26. Home судьи — `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`.
+26. Home судьи — `PRIVATE_ARCHIVE`.
     Разрешено снять только его удержанную бронь команды
-    `585940be-5c1b-4bff-a7c6-00459a4f7fa3`, сохраняя incident A00yuH.
+    `PRIVATE_ID`, сохраняя incident A00yuH.
     VPN launcher сохраняет caller home только при том же разобранном TOML lockdown-конфиге;
     исключаются лишь корневые строковые defaults model/model_reasoning_effort,
     заданные явно в judge command. Все остальные/вложенные настройки сравниваются

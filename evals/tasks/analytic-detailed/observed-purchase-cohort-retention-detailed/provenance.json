@@ -1,0 +1,130 @@
+{
+  "task_id": "observed-purchase-cohort-retention-detailed",
+  "dataset_sha256": {
+    "cohort_calendar.csv": "2d7f42ea91758247389c3fe8c63163e737970f422403907b89cd5ab71b30a8eb",
+    "purchase_lines.csv": "3aab0778269436cf035ba3a2d51e6fcda813ff0ce59ef9bfe0bfd92115ef13a5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "08225ecdbf36c7346d70cfed76d0ccfa2284125266aec76758301e33070e347f"
+  },
+  "reference_sha256": "a6c1c882d181f0439243489f8142f229894843f26e113b9ab35f6553c57f930c",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/purchase_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/cohort_calendar.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-31T19:16:32+03:00",
+    "duration_s": 980,
+    "tokens": {
+      "input": 209197,
+      "output": 7446,
+      "reasoning": 933
+    },
+    "tool_calls": 52,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 11-sale-line/6-calendar-row dataset frozen before independent manual gold and oracle under approved G06 P17 fixture plan; no answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real transactions, or a derived real-data snapshot. invoice_id may repeat; only customer_id may be empty. ASCII case-sensitive keys. qty signed integer; amount nonnegative. Calendar PK(cohort_month,age_month), ages0..2, observed0/1; all calendar cohorts positive. Local Europe/Moscow ISO timestamps; Jan/Feb2026 observed, Mar/Apr not observed; no timezone conversion. First observed eligible purchase is not lifetime first purchase."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent eligibility over raw lines; per-customer sets of local activity months; minimum month cohort; cohort member sets; observed calendar iteration; distinct active customers/cohort size without intermediate rounding; full independent manual3x5 before native."
+  },
+  "authoring_budget": {
+    "maximum_attempts": 3,
+    "observed_used": 1,
+    "reset": false
+  },
+  "requested_service_tier": "standard/default; no fast alias",
+  "response_service_tier": "NOT_OBSERVED",
+  "speed_comparison": "NOT_MEASURED",
+  "native_history": {
+    "null_retention_fix": "exec13 Jan1 retention=NULL from original field; same-node fix-retention-null, exec14 and persisted XML confirm NVLF(active_customers,0)/cohort_size; not a new CLI attempt or tool error",
+    "save": {
+      "operation": "save-cohort-package",
+      "status": "SUCCEEDED",
+      "save_completed": true,
+      "workflow_preserved": true,
+      "cleanup_complete": true,
+      "modified": false,
+      "persisted_content_verified": false,
+      "persisted_XML_verified_separately": true
+    },
+    "arrangement": {
+      "warning": true,
+      "result": "result_unconfirmed"
+    }
+  },
+  "accepted_verification": {
+    "native_qa": "PRIVATE_ARCHIVE",
+    "native_review": "PRIVATE_ARCHIVE",
+    "native_review_result": "SPEC+QUALITY APPROVE;34lines/root FULLREAD",
+    "cold_qa": "PRIVATE_ARCHIVE",
+    "cold_review": "PRIVATE_ARCHIVE",
+    "cold_review_result": "SPEC+QUALITY APPROVE;29lines/root FULLREAD",
+    "cold_rerun": "single park; exact saved LGP; all16 native nodes; fresh complete15cell CSV; server LGP SHA/stat and both raw unchanged; no Configure/Save; NoSave/Home/logout/ownTab[private]closed",
+    "idle_limitation": "reuses post-A1 idle with no subsequent profile calls; no new live status",
+    "F9_selection_warning": "not execution; subsequent native toolbar Execute all succeeded"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

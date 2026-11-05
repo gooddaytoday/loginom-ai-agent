@@ -1,0 +1,124 @@
+{
+  "sources": {
+    "SPEC.md": "f08e38fc3f3554a42a931370d0e6e771bb7d6a1f30d23ffa39bf1b88e60218f9",
+    "acceptance.json": "c08ae1338dbb9c7ddc4006734dd399b4e67b709a45ed38ebde3a6b5093a3a702",
+    "data/accounts.csv": "8b52775ac31ddc32a20385559057eebed13cdc08330b290b6945ae863ebbf15f",
+    "data/bills.csv": "4913bc031330a40a7f9559f9e9fd74138d3b9702dd9954ede2cb9005b59ccf3f",
+    "data/plans.csv": "89af794710cd18ab8367d561d348a2974b88c2b2da0db886f9d626f792453b9f",
+    "data/seats.csv": "b0ea799d2bb213fbd1c200903bd4f5761fa195e76a645a8b804b01ff7e94db43",
+    "oracle.csv": "3498b0302abd3c33ace5dc8557224d71bd43f63c21c72804b225d938d9383f8d",
+    "oracle.py": "8b181c4491f54700f41a672db317619405f16d815d34d3fc216d1c291b153500",
+    "provenance.json": "0d84c8a35f874710e98b1753785b2dc13def60d33c291a2c7b10d15a498c8ed0",
+    "reference.lgp": "a55f1bd62e7024d12a39b6d495a1de4255a9e04c6338cb19ed415e2bc33618c0",
+    "task.json": "6588f7a384e8eccc965bbb5b8602e8fd08c4cb868df83fa2e9430c3f7d50c890"
+  },
+  "cases": [
+    {
+      "id": "flags-or",
+      "kind": "filter",
+      "expected_failed": [
+        "seat-contract",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"8e6e7ca4-7548-4a68-8960-12f2aefc1d8b\" Name=\"billable\" ConcatenationType=\"ctAnd\" DataType=\"dtInteger\" RelationType=\"frtEqual\">",
+          "to": "<Item Guid=\"8e6e7ca4-7548-4a68-8960-12f2aefc1d8b\" Name=\"billable\" ConcatenationType=\"ctOr\" DataType=\"dtInteger\" RelationType=\"frtEqual\">",
+          "count": 1
+        }
+      ],
+      "result_csv": "flags-or.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "row[\"enabled\"] == \"1\" and row[\"billable\"] == \"1\"",
+            "to": "row[\"enabled\"] == \"1\" or row[\"billable\"] == \"1\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "minimum-ignored",
+      "kind": "column",
+      "expected_failed": [
+        "seat-contract",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Max(active_billable_seats, minimum_seats)\"",
+          "to": "Expression=\"active_billable_seats\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "minimum-ignored.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "billed = max(active, minimum)",
+            "to": "billed = active",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "no-seat-inner",
+      "kind": "filter",
+      "expected_failed": [
+        "account-registry",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"fd44a719-9def-47e2-9ca3-5e188e30eedc\">\n\t\t\t\t\t\t\t\t<Left Name=\"account_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"account_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"fd44a719-9def-47e2-9ca3-5e188e30eedc\">\n\t\t\t\t\t\t\t\t<Left Name=\"account_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"account_id\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "no-seat-inner.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for account in sorted(accounts):",
+            "to": "for account in sorted(account for account in accounts if seats[account]):",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "StrZero(Mod(Int(Round(Abs(expected_bill) * 100, 0)), 100), 2)",
+          "to": "StrZero(Mod(Int(Round(Abs(expected_bill) * 100, 0)), 100), 1)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "*(f\"{value:.2f}\" for value in [expected, actual, actual - expected])",
+            "to": "f\"{int(expected * 100) // 100}.{int(expected * 100) % 100:01d}\", f\"{actual:.2f}\", f\"{actual - expected:.2f}\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

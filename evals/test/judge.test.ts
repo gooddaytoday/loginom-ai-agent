@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { chmod, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -13,6 +13,7 @@ import { comparisonSummary } from "./helpers/compare-summary"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
 import { writeLeaseReceipt } from "../src/lease"
 import type { AttemptResult } from "../src/report"
+import { supervisedProcesses, type ProcessCleanup, type ProcessIdentity } from "../src/process-supervisor"
 
 const checklist = [
   { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
@@ -289,6 +290,304 @@ test("judgeTask: supervisor drains the judge's child before returning a verdict"
     await fixture.close()
   }
 }, 20_000)
+
+async function ordinaryExecFixture(lifetime = 1_200, late = false) {
+  const fixture = await gateFixture()
+  const file = (name: string) => path.join(fixture.root, name)
+  const wait = async (check: () => Promise<unknown> | unknown, timeout = 5_000) => {
+    const deadline = Date.now() + timeout
+    while (!await check()) {
+      if (Date.now() >= deadline) throw Error("Ordinary exec fixture did not settle")
+      await Bun.sleep(10)
+    }
+  }
+  if (late) await Bun.write(file("late-child.mjs"), `
+    import { readFileSync, writeFileSync } from "node:fs";
+    const root = ${JSON.stringify(fixture.root)};
+    process.on("SIGTERM", () => {});
+    writeFileSync(root + "/late-image", JSON.stringify({ pid: process.pid,
+      starttime: readFileSync("/proc/self/stat", "utf8").split(") ")[1].split(" ")[19] }));
+    await Bun.sleep(3_000);
+    writeFileSync(root + "/late-end", String(Date.now()));
+  `)
+  await Bun.write(file("after-exec.mjs"), `
+    import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
+    import { readlinkSync } from "node:fs";
+    const root = ${JSON.stringify(fixture.root)};
+    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => appendFileSync(root + "/signals", signal + "\\n"));
+    const fields = readFileSync("/proc/self/stat", "utf8").split(") ")[1].split(" ");
+    const exe = statSync("/proc/self/exe");
+    writeFileSync(root + "/image", JSON.stringify({ pid: process.pid, starttime: fields[19], uid: process.getuid(),
+      group: Number(fields[2]), session: Number(fields[3]), executable: readlinkSync("/proc/self/exe"), device: exe.dev, inode: exe.ino }));
+    while (!await Bun.file(root + "/finish-cli").exists()) await Bun.sleep(10);
+    if (${late}) {
+      while (!await Bun.file(root + "/spawn-late").exists()) await Bun.sleep(10);
+      Bun.spawn([process.execPath, root + "/late-child.mjs"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).unref();
+    }
+    await Bun.sleep(${lifetime});
+    writeFileSync(root + "/natural-end", String(Date.now()));
+  `)
+  await Bun.write(file("wrapper.mjs"), `
+    import { spawn } from "node:child_process";
+    const root = ${JSON.stringify(fixture.root)};
+    spawn("/bin/bash", ["-c", 'printf "%s" "$$" > "$1/pid"; while [[ ! -f "$1/exec" ]]; do sleep 0.05; done; exec "$2" "$1/after-exec.mjs"', "fixture", root, process.execPath],
+      { detached: true, stdio: "ignore" });
+    while (!await Bun.file(root + "/finish-cli").exists()) await Bun.sleep(10);
+    const fake = Bun.spawn([process.execPath, ${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))}, ...Bun.argv.slice(2)],
+      { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    process.exit(await fake.exited);
+  `)
+  const input = fixture.input("ordinary-exec")
+  const pending = judgeTask({ ...input, judge: { ...input.judge, command: [process.execPath, file("wrapper.mjs")] } })
+  const active = async (pid: number) => {
+    const raw = await Bun.file(`/proc/${pid}/stat`).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw !== "" && !["Z", "X"].includes(raw.split(") ")[1]!.split(" ")[0]!)
+  }
+  await wait(() => Bun.file(file("pid")).exists())
+  const pid = Number(await Bun.file(file("pid")).text())
+  const scope = () => supervisedProcesses().scopes.find(scope => scope.owner.id === input.outDir)
+  await wait(() => scope()?.processes?.some(entry => entry.pid === pid))
+  const before = scope()!.processes!.find(entry => entry.pid === pid)!
+  const launcher = scope()!.launcher
+  await Bun.write(file("exec"), "1")
+  await wait(() => Bun.file(file("image")).exists())
+  const after = await Bun.file(file("image")).json() as ProcessIdentity
+  expect(after).toMatchObject({ pid: before.pid, starttime: before.starttime, uid: before.uid, group: before.group, session: before.session })
+  expect([after.device, after.inode]).not.toEqual([before.device, before.inode])
+  await wait(() => scope()?.status === "unavailable")
+  return { ...fixture, file, wait, pending, pid, before, after, launcher, active,
+    proof: async () => await Bun.file(path.join(fixture.root, "ordinary-exec/judge-processes-1/process-cleanup.json")).json() as ProcessCleanup,
+    async close() {
+      await Bun.write(file("finish-cli"), "1")
+      await Bun.write(file("spawn-late"), "1")
+      await pending
+      await wait(async () => !await active(pid), 75_000)
+      if (await Bun.file(file("late-image")).exists()) {
+        const child = await Bun.file(file("late-image")).json() as { pid: number }
+        await wait(async () => !await active(child.pid), 10_000)
+      }
+      await fixture.close()
+    } }
+}
+
+test("ordinary exec: natural exit confirms judge verdict", async () => {
+  const fixture = await ordinaryExecFixture()
+  try {
+    await Bun.write(fixture.file("finish-cli"), "1")
+    expect(await fixture.pending).toMatchObject({ ok: true, attempts: 1 })
+    const proof = await fixture.proof()
+    expect(proof.status).toBe("confirmed")
+    expect(await Bun.file(fixture.file("natural-end")).exists()).toBe(true)
+    expect(await Bun.file(fixture.file("signals")).exists()).toBe(false)
+    expect(await fixture.active(fixture.pid)).toBe(false)
+    expect(proof.processes).toContainEqual(fixture.before)
+    expect(proof.admissions).toContainEqual({ pid: fixture.pid, starttime: fixture.before.starttime, status: "refused" })
+    expect(proof.verification?.every(pass => pass.owned_remaining === 0)).toBe(true)
+    expect(proof.executableTransitions).toContainEqual({ original: fixture.before, current: expect.objectContaining(fixture.after), observed_at: expect.any(String) })
+    expect(proof.pre_shutdown_verification).toHaveLength(2)
+    expect(Date.parse(proof.pre_shutdown_verification![1]!.observed_at) - Date.parse(proof.pre_shutdown_verification![0]!.observed_at)).toBeGreaterThanOrEqual(100)
+    expect(Date.parse(proof.lifetime!.finished_at!)).toBeGreaterThanOrEqual(Number(await Bun.file(fixture.file("natural-end")).text()) + 100)
+  } finally { await fixture.close() }
+}, 20_000)
+
+test("ordinary exec: live changed image reaches deadline without signal", async () => {
+  const fixture = await ordinaryExecFixture(65_000)
+  try {
+    const started = Date.now()
+    await Bun.write(fixture.file("finish-cli"), "1")
+    expect(await fixture.pending).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(Date.now() - started).toBeGreaterThanOrEqual(59_000)
+    const proof = await fixture.proof()
+    expect(proof.status).toBe("failed")
+    expect(await fixture.active(fixture.pid)).toBe(true)
+    expect((await stat(`/proc/${fixture.pid}/exe`)).ino).toBe(fixture.after.inode)
+    expect((await Bun.file(`/proc/${fixture.pid}/stat`).text()).split(") ")[1]!.split(" ")[19]).toBe(fixture.after.starttime)
+    expect(await Bun.file(fixture.file("signals")).exists()).toBe(false)
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+    await fixture.wait(async () => !await fixture.active(fixture.pid), 10_000)
+    expect(await Bun.file(fixture.file("natural-end")).exists()).toBe(true)
+  } finally { await fixture.close() }
+}, 90_000)
+
+test("ordinary exec: late descendant adoption prevents early proof", async () => {
+  const fixture = await ordinaryExecFixture(1_200, true)
+  let settled = false
+  const pending = fixture.pending.then(result => { settled = true; return result })
+  try {
+    await Bun.write(fixture.file("finish-cli"), "1")
+    await fixture.wait(async () => !await fixture.active(fixture.before.parent))
+    await Bun.write(fixture.file("spawn-late"), "1")
+    await fixture.wait(() => Bun.file(fixture.file("late-image")).exists())
+    const child = await Bun.file(fixture.file("late-image")).json() as Pick<ProcessIdentity, "pid" | "starttime">
+    await fixture.wait(async () => !await fixture.active(fixture.pid))
+    expect(await fixture.active(child.pid)).toBe(true)
+    expect(Number((await Bun.file(`/proc/${child.pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(fixture.launcher.pid)
+    await Bun.sleep(150)
+    expect(settled).toBe(false)
+    expect(await fixture.active(fixture.launcher.pid)).toBe(true)
+    expect(await pending).toMatchObject({ ok: true, attempts: 1 })
+    const proof = await fixture.proof()
+    expect(proof.origins).toContainEqual(expect.objectContaining({ pid: child.pid, starttime: child.starttime,
+      via: "parent", parent_pid: fixture.pid, parent_starttime: fixture.before.starttime }))
+    expect(proof.status).toBe("confirmed")
+    expect(await Bun.file(fixture.file("signals")).exists()).toBe(false)
+    expect(await fixture.active(child.pid)).toBe(false)
+    const ended = Number(await Bun.file(fixture.file("late-end")).text())
+    expect(Date.parse(proof.pre_shutdown_verification![0]!.observed_at)).toBeGreaterThanOrEqual(ended)
+    expect(Date.parse(proof.lifetime!.finished_at!)).toBeGreaterThanOrEqual(ended + 100)
+  } finally { await fixture.close() }
+}, 20_000)
+
+test("ordinary exec: selected CLI executable change remains fatal after natural exit", async () => {
+  const fixture = await gateFixture()
+  const file = (name: string) => path.join(fixture.root, name)
+  const wait = async (check: () => Promise<unknown> | unknown) => {
+    const deadline = Date.now() + 5_000
+    while (!await check()) {
+      if (Date.now() >= deadline) throw Error("Selected CLI fixture did not settle")
+      await Bun.sleep(10)
+    }
+  }
+  const active = async () => {
+    if (!await Bun.file(file("selected.pid")).exists()) return false
+    const raw = await Bun.file(`/proc/${(await Bun.file(file("selected.pid")).text()).trim()}/stat`).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw !== "" && !["Z", "X"].includes(raw.split(") ")[1]!.split(" ")[0]!)
+  }
+  await Bun.write(file("selected-after-exec.mjs"), `
+    import { appendFileSync, writeFileSync } from "node:fs";
+    const root = ${JSON.stringify(fixture.root)};
+    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => appendFileSync(root + "/selected-signals", signal + "\\n"));
+    const fake = Bun.spawn([process.execPath, ${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))}, ...Bun.argv.slice(2)],
+      { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    await fake.exited;
+    await Bun.sleep(600);
+    writeFileSync(root + "/selected-natural-end", "1");
+  `)
+  const input = fixture.input("selected-cli-exec")
+  const pending = judgeTask({ ...input, judge: { ...input.judge, command: ["/bin/bash", "-c",
+    'root=$1; runtime=$2; shift 2; printf "%s" "$$" > "$root/selected.pid"; while [[ ! -f "$root/selected-exec" ]]; do sleep 0.05; done; exec "$runtime" "$root/selected-after-exec.mjs" "$@"',
+    "fixture", fixture.root, process.execPath] } })
+  const scope = () => supervisedProcesses().scopes.find(scope => scope.owner.id === input.outDir)
+  try {
+    await wait(() => Bun.file(file("selected.pid")).exists())
+    const pid = Number(await Bun.file(file("selected.pid")).text())
+    await wait(() => scope()?.processes?.some(entry => entry.pid === pid))
+    await Bun.write(file("selected-exec"), "1")
+    await wait(() => scope()?.status === "unavailable")
+    await wait(async () => !await active())
+    expect(await Bun.file(file("selected-natural-end")).exists()).toBe(true)
+    const result = await pending
+    const proof = await Bun.file(path.join(fixture.root, "selected-cli-exec/judge-processes-1/process-cleanup.json")).json() as ProcessCleanup
+    // Readiness and the selected CLI identity arrive in one authentic receipt.
+    // Its admitted executable can never enter the ordinary-descendant exception.
+    expect(proof.origins?.find(entry => entry.pid === pid)?.via).toBe("cli")
+    expect(proof.launcher?.cli_pid).toBe(pid)
+    expect(proof.executableTransitions?.some(entry => entry.original.pid === pid) ?? false).toBe(false)
+    expect(proof.error).toContain("Process identity changed")
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(proof.status).toBe("failed")
+    expect(await Bun.file(file("selected-signals")).exists()).toBe(false)
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally {
+    await Bun.write(file("selected-exec"), "1")
+    await pending
+    await wait(async () => !await active())
+    await fixture.close()
+  }
+}, 90_000)
+
+test("ordinary exec: known browser helper stays fatal after adoption and natural exit", async () => {
+  const fixture = await gateFixture()
+  const file = (name: string) => path.join(fixture.root, name)
+  const wait = async (check: () => Promise<unknown> | unknown) => {
+    const deadline = Date.now() + 5_000
+    while (!await check()) {
+      if (Date.now() >= deadline) throw Error("Known helper fixture did not settle")
+      await Bun.sleep(10)
+    }
+  }
+  const active = async (pidFile: string) => {
+    if (!await Bun.file(file(pidFile)).exists()) return false
+    const raw = await Bun.file(`/proc/${(await Bun.file(file(pidFile)).text()).trim()}/stat`).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw !== "" && !["Z", "X"].includes(raw.split(") ")[1]!.split(" ")[0]!)
+  }
+  // A real executable basename establishes the native role before the helper
+  // is admitted; no process.title timing or actual browser is involved.
+  await cp(process.execPath, file("chrome"))
+  await Bun.write(file("helper-after-exec.mjs"), `
+    import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
+    const root = ${JSON.stringify(fixture.root)};
+    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => appendFileSync(root + "/helper-signals", signal + "\\n"));
+    const fields = readFileSync("/proc/self/stat", "utf8").split(") ")[1].split(" ");
+    const exe = statSync("/proc/self/exe");
+    writeFileSync(root + "/helper-image", JSON.stringify({ pid: process.pid, starttime: fields[19], uid: process.getuid(),
+      group: Number(fields[2]), session: Number(fields[3]), device: exe.dev, inode: exe.ino }));
+    await Bun.sleep(1_200);
+    writeFileSync(root + "/helper-natural-end", "1");
+  `)
+  await Bun.write(file("native-parent.mjs"), `
+    import { spawn } from "node:child_process";
+    const root = ${JSON.stringify(fixture.root)};
+    await Bun.write(root + "/native.pid", String(process.pid));
+    spawn("/bin/bash", ["-c", 'printf "%s" "$$" > "$1/helper.pid"; while [[ ! -f "$1/helper-exec" ]]; do sleep 0.05; done; exec "$2" "$1/helper-after-exec.mjs"',
+      "fixture", root, ${JSON.stringify(process.execPath)}], { detached: true, stdio: "ignore" }).unref();
+    while (!await Bun.file(root + "/parent-end").exists()) await Bun.sleep(10);
+    process.exit(0);
+  `)
+  await Bun.write(file("native-wrapper.mjs"), `
+    import { spawn } from "node:child_process";
+    const root = ${JSON.stringify(fixture.root)};
+    spawn(root + "/chrome", [root + "/native-parent.mjs"], { stdio: "ignore" }).unref();
+    while (!await Bun.file(root + "/finish-cli").exists()) await Bun.sleep(10);
+    const fake = Bun.spawn([process.execPath, ${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))}, ...Bun.argv.slice(2)],
+      { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    process.exit(await fake.exited);
+  `)
+  const input = fixture.input("known-browser-helper")
+  const pending = judgeTask({ ...input, judge: { ...input.judge, command: [process.execPath, file("native-wrapper.mjs")] } })
+  const scope = () => supervisedProcesses().scopes.find(scope => scope.owner.id === input.outDir)
+  try {
+    await wait(() => Bun.file(file("helper.pid")).exists())
+    const pid = Number(await Bun.file(file("helper.pid")).text())
+    const native = Number(await Bun.file(file("native.pid")).text())
+    await wait(() => scope()?.processes?.some(entry => entry.pid === pid && entry.parent === native))
+    const before = scope()!.processes!.find(entry => entry.pid === pid)!
+    const parent = scope()!.processes!.find(entry => entry.pid === native)!
+    expect(path.basename(parent.executable)).toBe("chrome")
+    await Bun.write(file("parent-end"), "1")
+    await wait(async () => !await active("native.pid"))
+    expect(Number((await Bun.file(`/proc/${pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(scope()!.launcher.pid)
+    await Bun.write(file("helper-exec"), "1")
+    await wait(() => Bun.file(file("helper-image")).exists())
+    const after = await Bun.file(file("helper-image")).json() as ProcessIdentity
+    expect(after).toMatchObject({ pid: before.pid, starttime: before.starttime, uid: before.uid, group: before.group, session: before.session })
+    expect([after.device, after.inode]).not.toEqual([before.device, before.inode])
+    await wait(() => scope()?.status === "unavailable")
+    await Bun.write(file("finish-cli"), "1")
+    const result = await pending
+    const proof = await Bun.file(path.join(fixture.root, "known-browser-helper/judge-processes-1/process-cleanup.json")).json() as ProcessCleanup
+    expect(proof.origins).toContainEqual(expect.objectContaining({ pid, starttime: before.starttime, via: "parent", parent_pid: native, parent_starttime: parent.starttime }))
+    expect(await Bun.file(file("helper-natural-end")).exists()).toBe(true)
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(proof.status).toBe("failed")
+    expect(await Bun.file(file("helper-signals")).exists()).toBe(false)
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally {
+    for (const marker of ["parent-end", "helper-exec", "finish-cli"]) await Bun.write(file(marker), "1")
+    await pending
+    await wait(async () => !await active("helper.pid") && !await active("native.pid"))
+    await fixture.close()
+  }
+}, 90_000)
 
 test("judgeTask: unconfirmed process evidence refuses verdict and retry", async () => {
   const fixture = await gateFixture()

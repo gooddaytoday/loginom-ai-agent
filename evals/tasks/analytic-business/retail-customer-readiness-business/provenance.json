@@ -1,0 +1,97 @@
+{
+  "task_id": "retail-customer-readiness-business",
+  "source_task": "retail-customer-readiness-detailed",
+  "reference_origin": "shared verified detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/retail-customer-readiness-detailed/provenance.json",
+  "dataset_sha256": {
+    "categories.csv": "33debd5bcc581e37548094b5311d275ec9b622bc890183af71067ef744e47f9c",
+    "synthetic-boundary.csv": "a41b6d82a766c20a63bc317fe091861aa775cdad204a623c0124742796027f3d",
+    "uci-retail.csv": "5497e6a87f8ac496f6b1160266bb92d9cbc68e6e939e2d14b7de42aa95769c08"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "c097da7390b2bf8906fdfbe959c2c0f572d3ae3247f0f843d09be5c61b82f760"
+  },
+  "reference_sha256": "33ab91c1268097e59b253b33a4acf6b2c947903d91b06b8766c8468e5d2d3ed1",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "mixed real snapshot and separately synthetic boundaries/domain",
+    "real_source": {
+      "citation": "Chen, D. (2015). Online Retail [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5BW33.",
+      "doi": "10.24432/C5BW33",
+      "dataset_url": "https://archive.ics.uci.edu/dataset/352/online%2Bretail",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "retrieved_utc": "2026-11-01T03:23:54.863941+00:00",
+      "archive_url": "https://archive.ics.uci.edu/static/public/352/online+retail.zip",
+      "archive_sha256": "f5385cbb54bbebf7196389109c6b0621faab0c304e3702548165e71c84aede8b",
+      "workbook_sha256": "43465a06f2ccf7c8b5bd2892bc7defb52f97487934fe93b16ae4c3936424676d",
+      "workbook": "Online Retail.xlsx",
+      "sheet": "Online Retail",
+      "source_rows": 541909,
+      "selected_rows": 26,
+      "selection": "ALL rows 2010-12-01 00:00:00 <= InvoiceDate < 2010-12-01 08:36:00; original worksheet order; all8 columns; no other selection",
+      "date_transformation": "Workbook returns naive datetime wall-clock values; preserve literal calendar/time; serialize YYYY-MM-DD HH:MM:SS without timezone assumption or conversion",
+      "value_transformation": "Identifiers integral numbers stringify as integer; strings unchanged; None becomes empty cell; Quantity and UnitPrice stringify source numeric values without rounding, trim or sign change; GBP units retained",
+      "source_schema_observation": "Actual full workbook has missing CustomerID/Description despite UCI page metadata No missing values; unchanged fixed slice has none. Missing-customer readiness is not a claim of erroneous sales.",
+      "selected_excel_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    "synthetic_notice": "Six boundary rows and Country=Synthetic are separately constructed and are not UCI observations",
+    "synthetic_files": {
+      "synthetic-boundary.csv": "Six constructed boundary rows; exact three-space Description retained; not UCI observations",
+      "categories.csv": "Four constructed ordered category domain rows, not source transactions"
+    },
+    "limitations": "Missing CustomerID means unsuitable for customer analysis, not proof of erroneous sales; fixed real slice has no missing CustomerID/Description. Numeric signs/GBP retained; source naive wall-clock timezone not inferred. All four categories populated by this fixed mixed fixture; no extra input variants run."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-row priority classification without trim, per-bucket InvoiceNo sets and Decimal signed Quantity*UnitPrice sums over complete category dictionary; separate full manual ledger before oracle/native."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G07 under canonical implementation plan; no new P28 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

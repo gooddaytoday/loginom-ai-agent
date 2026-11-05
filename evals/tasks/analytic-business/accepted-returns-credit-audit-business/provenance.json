@@ -1,0 +1,40 @@
+{
+  "task_id": "accepted-returns-credit-audit-business",
+  "source_task": "accepted-returns-credit-audit-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/accepted-returns-credit-audit-detailed/provenance.json",
+  "dataset_sha256": {
+    "credits.csv": "92a0d78af28685932c0e3a4286529344b1b823f56175db769d6c8be69e366cbc",
+    "order_lines.csv": "1dc07ac0a05db4aef26eab7847462e33ddf47e8d12c8b725313dc55a50c4e061",
+    "returns.csv": "bd89e9a515e4f502a1736185c13d02bf8669b09648c983e7256b7605926d55c9"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "58943375ba1503d088eae58805b1d6b6fbe3b1dcb9bedc5b6be9dbeded519634"
+  },
+  "reference_sha256": "da59b2cc8d5f7e6ee009bb4305055f4c8efe448bfb8c9f83c21ccbb0f3f152c6",
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw accepted and posted quantity ledgers plus separate posted Decimal amount ledger over complete order_lines, own post-discount Decimal net_unit_price, both nonnegative quantity differences and signed actual-expected; full manual 4x8 independently checked; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic four order lines, four returns and four credits prepared under approved P07 fixture plan and frozen before manual gold/oracle; raw quantities, status dictionaries, own net prices and independent posted amounts, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not real customers or documents. One monetary unit without tax or unagreed charges; no time window or status-change history. Complete unique order-line registry, unique operation IDs, valid non-null foreign keys, positive integer quantities, nonnegative money, returns accepted/rejected and credits posted/draft."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

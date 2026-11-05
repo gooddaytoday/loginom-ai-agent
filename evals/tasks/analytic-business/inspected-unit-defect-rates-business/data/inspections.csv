@@ -1,0 +1,7 @@
+unit_id;supplier_id;production_line
+U01;S01;L01
+U02;S01;L01
+U03;S01;L01
+U04;S01;L02
+U05;S01;L02
+U06;S02;L01

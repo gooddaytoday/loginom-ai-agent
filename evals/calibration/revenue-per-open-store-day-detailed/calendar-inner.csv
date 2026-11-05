@@ -1,0 +1,3 @@
+region;month;day_type;open_store_days;revenue;revenue_per_store_day
+R_A;2026-02;HOLIDAY;1;80.000000;80.000000
+R_A;2026-02;WORKDAY;3;90.000000;30.000000

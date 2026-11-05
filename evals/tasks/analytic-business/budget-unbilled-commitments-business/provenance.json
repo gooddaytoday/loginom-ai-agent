@@ -1,0 +1,40 @@
+{
+  "task_id": "budget-unbilled-commitments-business",
+  "source_task": "budget-unbilled-commitments-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/budget-unbilled-commitments-detailed/provenance.json",
+  "dataset_sha256": {
+    "budgets.csv": "29e00227845dcd34e6792ac931639b4b97af95203abac55dda38a9fa3d801459",
+    "expenses.csv": "472133d8f8e44db35592f22604f8bfce5bc92601911962c7cea8b230fcf6f2c9",
+    "orders.csv": "8e0c77429e654ab48e4cb9310ec12ee391eff4e19b2e0bcacacf3e08f6ef1c18"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "d29ae43f36bcda6e1a4328e27994dc176cd0b56049d5bd7ea61cae6dcab7c8dd"
+  },
+  "reference_sha256": "01fc4be161f6efc50054d233e746f0f807a00d434b234f3ef10934958eb9a0fb",
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw all-expense article ledger and nonempty-order expense ledger; per-active-order max(committed-own expenses,0) before article aggregation; complete composite budget registry, signed limit-spent-open, full manual 3x6 independently checked; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic three budgets, four orders and five posted expenses prepared under approved P08 fixture plan and frozen before manual gold/oracle; raw monetary values, active/cancelled statuses, a direct expense and an empty budget pair, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not real financial documents. One monetary unit without tax or unagreed charges; no time window or status-change history. Complete unique composite budget registry, unique order and expense IDs, valid foreign keys and matching budget pairs, ASCII keys, nonnegative two-decimal money, only direct E04.order_id empty, all other cells nonempty."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

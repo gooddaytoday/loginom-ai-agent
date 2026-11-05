@@ -1,0 +1,90 @@
+{
+  "task_id": "accepted-returns-credit-audit-detailed",
+  "dataset_sha256": {
+    "credits.csv": "92a0d78af28685932c0e3a4286529344b1b823f56175db769d6c8be69e366cbc",
+    "order_lines.csv": "1dc07ac0a05db4aef26eab7847462e33ddf47e8d12c8b725313dc55a50c4e061",
+    "returns.csv": "bd89e9a515e4f502a1736185c13d02bf8669b09648c983e7256b7605926d55c9"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "58943375ba1503d088eae58805b1d6b6fbe3b1dcb9bedc5b6be9dbeded519634"
+  },
+  "reference_sha256": "da59b2cc8d5f7e6ee009bb4305055f4c8efe448bfb8c9f83c21ccbb0f3f152c6",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/order_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/returns.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/credits.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Подготовь НОВЫЙ native draft по неизменённому заданию P07 и трём его входам; прежние пакеты/CSV не изменяй и не перезаписывай.\nШтатная композиция: imports; отдельно returns status=accepted и credits status=posted; независимые группировки по order_line_id; обе сводки через LEFT joins к полному order_lines; калькуляторы; окончательная схема; Sort; один CSV export.\nВ returns суммируй qty, в credits независимо qty и amount; не соединяй сырые журналы. actual_credit — сумма posted amount, не credited_qty*net_unit_price; кредит без accepted и строки без обоих журналов сохраняются, отсутствующие факты равны нулю.\nСначала заверши все числовые расчёты по заданию, оба неотрицательных количественных расхождения, expected_credit по accepted_qty и net_unit_price и знаковое deviation=actual_credit−expected_credit; промежуточного округления нет.\nДО создания Sort/export окончательно сформируй8 итоговых полей: четыре количества — целые без дроби; expected_credit/actual_credit/deviation — строки с точкой и ≥2 дробными цифрами, включая нули, без разделителей тысяч. Затем создай order_line_id ASC.\nДля existing target передавай точный текущий target.ref БЕЗ target.position: position означает move. Исполни ВСЕ созданные узлы и ветви, включая импорты; не оставляй ошибочные лишние ветви.\nРассчитывай из входов штатными узлами Loginom: без JavaScript, готовых ответов, внешнего изготовления CSV и XML-правок. Полный результат и формат соответствуют исходному заданию.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Один CSV UTF-8, ;, точные заголовки, двойная кавычка; получи actual export/file_artifacts/Save receipts.\nТолько existing inspect/recovery, неизвестный эффект не повторяй. Если после подтверждённых cleanup и released retry повторился тот же owned QuickView без нового reason, штатно сохрани доступный partial, честно укажи ограничение и остановись; новый конкретный cause можно диагностировать в бюджете.\nНе объявляй наличие файла успехом FAILED/AMBIGUOUS операции. Отчёт описывает фактическое исполнение, экспорт и Save с путями/ограничениями; Save не заменяет независимый native audit и cold rerun.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-30T16:31:48+03:00",
+    "duration_s": 922,
+    "tokens": {
+      "input": 174004,
+      "output": 8813,
+      "reasoning": 1193
+    },
+    "tool_calls": 55,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw accepted and posted quantity ledgers plus separate posted Decimal amount ledger over complete order_lines, own post-discount Decimal net_unit_price, both nonnegative quantity differences and signed actual-expected; full manual 4x8 independently checked; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic four order lines, four returns and four credits prepared under approved P07 fixture plan and frozen before manual gold/oracle; raw quantities, status dictionaries, own net prices and independent posted amounts, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not real customers or documents. One monetary unit without tax or unagreed charges; no time window or status-change history. Complete unique order-line registry, unique operation IDs, valid non-null foreign keys, positive integer quantities, nonnegative money, returns accepted/rejected and credits posted/draft."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

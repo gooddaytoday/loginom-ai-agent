@@ -5,10 +5,10 @@ import { once } from "node:events"
 import { fileURLToPath } from "node:url"
 import { createInterface } from "node:readline"
 
-test("flushed close ACK exits even when a later IPC frame is incomplete", async (t) => {
+for (const entry of ["managed-entry", "knowledge-entry"]) test(`${entry}: flushed close ACK exits even when a later IPC frame is incomplete`, async (t) => {
   // Real Node JSON IPC on a duplex pipe. Node's disconnect event waits for a
   // buffered partial frame, which is not an admitted runtime request.
-  const child = spawn(process.execPath, [fileURLToPath(new URL("../src/managed-entry.mjs", import.meta.url))], {
+  const child = spawn(process.execPath, [fileURLToPath(new URL(`../src/${entry}.mjs`, import.meta.url))], {
     stdio: ["ignore", "pipe", "pipe", "pipe"],
     env: { ...process.env, NODE_CHANNEL_FD: "3", NODE_CHANNEL_SERIALIZATION_MODE: "json" },
   })
@@ -41,7 +41,10 @@ for (const scenario of ["unstarted", "invalid-start", "signal"]) {
     if (scenario === "invalid-start") {
       const failed = message()
       child.send({ id: "start", operation: "start", input: { acceptanceCleanupPackage: "private-invalid-secret" } })
-      assert.deepEqual(await failed, { id: "start", error: "LOGINOM_START_INVALID" })
+      const response = await failed
+      assert.equal(response.id, "start")
+      assert.equal(response.error, "LOGINOM_START_INVALID")
+      assert.equal(JSON.stringify(response).includes("private-invalid-secret"), false)
     }
     if (scenario === "signal") {
       const ready = message()

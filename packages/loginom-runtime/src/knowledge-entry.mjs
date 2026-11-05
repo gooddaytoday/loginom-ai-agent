@@ -6,8 +6,10 @@ const state = { client: undefined, closing: undefined, controller: new AbortCont
 const requests = new Set();
 const calls = new Map();
 const send = (message, disconnect = false) => {
-  if (process.connected) process.send(message, () => {
-    if (disconnect && process.connected) process.disconnect();
+  if (process.connected) process.send(message, error => {
+    if (!disconnect) return;
+    if (!error && process.connected) process.disconnect();
+    stop(error ? 1 : 0);
   });
 };
 
@@ -21,11 +23,11 @@ function close() {
   })();
 }
 
-const stop = () => {
-  void close().then(() => process.exit(0), () => process.exit(1));
+const stop = (exitCode = 0) => {
+  void close().then(() => process.exit(exitCode), () => process.exit(1));
 };
-process.on('disconnect', stop);
-process.on('SIGTERM', stop);
+process.on('disconnect', () => stop());
+process.on('SIGTERM', () => stop());
 process.on('message', message => {
   const request = handle(message);
   // A close request must not wait for its own handler to settle.
@@ -87,7 +89,7 @@ async function handle(message) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
     if (['start', 'list'].includes(message.operation) && !state.startupDiagnostics.length)
       state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error, [state.apiKey]) });
-    send({ id: message.id, error: code, ...(['start', 'list'].includes(message.operation)
+    send({ id: message.id, error: code, startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
       ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === 'close');
   }
 }

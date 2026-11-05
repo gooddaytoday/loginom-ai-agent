@@ -1,0 +1,4 @@
+department;jobs;observed_jobs;imputed_jobs;observed_mean;completed_mean
+DEP_A;3;2;1;3;2.666666666666666666666666667
+DEP_B;2;1;1;2;6
+DEP_C;1;0;1;1;4

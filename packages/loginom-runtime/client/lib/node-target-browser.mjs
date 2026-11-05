@@ -799,6 +799,20 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
+        const edge=effect.parameters.edge,source=graph.nodes.find(n=>n.ref.node_id===edge.source);
+        if(!source||source.locked)throw Error('Exact unlocked link source required');
+        await call(`async page=>{
+          const t=${JSON.stringify(t)},remaining=()=>{
+            if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
+            const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
+          };
+          const guard=async()=>{remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,await (${readGraph.toString()})(page,t)))throw Error('Graph changed during link source navigation');};
+          await guard();
+          const navigation=await (${revealNodePlacement.toString()})({page,root:page.locator('[data-tid='+JSON.stringify(t.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']'),
+            nodeId:${JSON.stringify(source.ref.node_id)},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
+            remaining,guard,readViewport:${nodePlacementViewport.toString()},project:${nodePlacementPoint.toString()}});
+          await guard();if(!navigation.fully_visible)throw Error('Link source node and ports are not fully visible');return navigation;
+        }`,deadline);
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});

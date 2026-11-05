@@ -1,0 +1,139 @@
+{
+  "task_id": "measurement-unit-consistency-detailed",
+  "dataset_sha256": {
+    "samples.csv": "3f8709fa9071a1fc2510f96a29f837813d9025e4e4531e56fa605e06d5ba6246"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "c8490460f072180573c52a24a312b13936e2c3e6ab1db27037221b8e6546172c"
+  },
+  "reference_sha256": "5f7192fff64b53b0c50921e170285a6d1988e5cf7eb9247cf8e79dc31ee67afe",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/samples.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-11-01T08:24:04+03:00",
+    "duration_s": 834,
+    "tokens": {
+      "input": 112158,
+      "output": 8257,
+      "reasoning": 1704
+    },
+    "tool_calls": 60,
+    "tool_errors": 6,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint,savedpackage and Unit_0/Info.xml Name=Unit1;no separate deep-link visit claimed",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "samples.csv",
+    "selection": "Exact6 frozen samples across MAT_A/MAT_B before independent manual/oracle/native;unequal valid lengths and exact mm/cm/m versus ft/CM",
+    "units": "length in exact unit;mass_kg kg;length_m metres;kg_per_m kg/m;positive lengths/masses",
+    "transformations": "UTF8 semicolon CSV;no trim/casefold/guessed unit;unknown rows excluded from BOTH valid sums"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only exact unit factors,valid/unknown counts,valid-only sums by material,ratio of sums;full handwritten manual before source/native"
+  },
+  "authoring_observations": {
+    "requested_speed": "STANDARD",
+    "response_tier": "NOT_OBSERVED",
+    "speed": "NOT_MEASURED",
+    "original_errors": 6,
+    "original_recoveries": 3,
+    "prepare_calls": 2,
+    "first_prepare_error": "HOST_REQUEST_FAILED/leafUNKNOWN;secondREADY in sameA1",
+    "Save": {
+      "save_completed": true,
+      "workflow_preserved": true,
+      "reopened": false,
+      "persisted_content_verified": false,
+      "arrangement": "attempted/result_unconfirmed/warningtrue",
+      "original_data": "not_checked",
+      "original_goal": "not_verified"
+    },
+    "actual_argv_prompt_bytes": 9879,
+    "DB_main_bytes": 9882,
+    "DB_main_difference": "exteriorquotes+oneescapedASCIIquote,+3;remainder exact/literalnewlines/validJSONfalse",
+    "automatic_context_absence": "NOT_ATTESTED",
+    "numeric_representation": "Native Float versus frozen Decimal not byte-equal;numerical±.001;no minprecision/padding",
+    "observer_error": "Recovery2NDJSON parsed as one JSON;read-only correction,no runtime/oracle/check replay",
+    "prior_errors_not_promoted_by_success": true
+  },
+  "cold_rerun": {
+    "method": "Separate verified browser Packages→Open exact savedLGP→oneRunAll;NoConfigure/NoSave",
+    "run_at": "2026-11-01T05:54:43.271Z",
+    "native_nodes_green": 9,
+    "service_nodes_green": 1,
+    "ports_before_after": 28,
+    "server_package_and_raw_SHA_stat_unchanged": true,
+    "new_result_mtime": "2026-11-01T05:54:44.193836270Z",
+    "native_cold_bytes_equal": true,
+    "native_oracle_bytes_equal": false,
+    "full_named_cells": 12,
+    "integer_counter_texts": 4,
+    "empty_cells": 0,
+    "numeric_tolerance": 0.001,
+    "NoSave_logout_tabclosed_IAB_empty": true,
+    "two_full_scoped_zero_passes": true,
+    "metadata_limits_retained": true
+  },
+  "reference_evidence": {
+    "native_actual_review": "p31-native-actual-review.md APPROVE/rootFULLREAD0f418c/adopta3becd",
+    "native_numeric": "Private p31-support/native-numeric.json and original attempt evidence retained",
+    "cold": "Private p31-support/cold-server-after.json and idle-after-cold.json retained",
+    "original_finalizer_snapshot": "Private p31-support/public-original-finalizer-provenance.json saved before supplement"
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies;no new pair-only gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

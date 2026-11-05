@@ -48,6 +48,41 @@ process.exit(models ? 0 : 2)
   } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
 })
 
+test("management: retains redacted nonzero output and exit flags without stdin", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-capture-"))
+  let confirmed = false
+  try {
+    const driver = path.join(root, "management.ts")
+    await Bun.write(driver, `await Bun.stdin.text()
+console.log(JSON.stringify({ ok: false, code: "LOGINOM_CONNECTION_CHECK_FAILED", secret: "management-capture-secret" }))
+console.error("LOGINOM_CONNECTION_CHECK_FAILED management-capture-secret")
+process.exit(1)
+`)
+    const result = await management({ mode: "fake", cmd: [process.execPath, "--no-env-file", driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, cleanupDir: path.join(root, "evidence"),
+      cleanupSecrets: ["management-capture-secret"] }, ["loginom", "check", "--format", "json"], "stdin-only-canary")
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(result).toMatchObject({ exitCode: 1, timedOut: false, interrupted: false, sandboxError: null,
+      processCleanup: { status: "confirmed" } })
+    expect(result.stdout).toContain("management-capture-secret")
+    expect(result.stderr).toContain("management-capture-secret")
+    expect(await Bun.file(path.join(result.evidenceDir!, "events.jsonl")).exists()).toBe(true)
+    expect(await Bun.file(path.join(result.evidenceDir!, "events.jsonl")).json()).toEqual({ ok: false,
+      code: "LOGINOM_CONNECTION_CHECK_FAILED", secret: "[redacted]" })
+    expect(await Bun.file(path.join(result.evidenceDir!, "stderr.txt")).text()).toBe("LOGINOM_CONNECTION_CHECK_FAILED [redacted]\n")
+    expect(await Bun.file(path.join(result.evidenceDir!, "cleanup.json")).json()).toMatchObject({ command: ["loginom", "check"],
+      exitCode: 1, timedOut: false, interrupted: false, sandboxError: false, processes: { status: "confirmed" } })
+    expect((await stat(result.evidenceDir!)).mode & 0o077).toBe(0)
+    for (const name of ["events.jsonl", "stderr.txt", "process-cleanup.json", "cleanup.json"]) {
+      const file = path.join(result.evidenceDir!, name)
+      expect((await stat(file)).mode & 0o077).toBe(0)
+      const text = await Bun.file(file).text()
+      expect(text).not.toContain("management-capture-secret")
+      expect(text).not.toContain("stdin-only-canary")
+    }
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
+
 test("writerIdentity: observes an owner published during initial guard creation", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-initialization-"))
   try {
@@ -627,6 +662,20 @@ test("verifyProfile checks readiness and saved configuration without setup or re
     expect(await Bun.file(settings).text()).toBe('{"permission":{"*":"allow"}}')
     expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
   } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
+test("verifyProfile rejects matching ready status with a nonzero exit", async () => {
+  const context = await fakeProfile()
+  const file = await stateFile({ state: "ready", hasApiKey: true, url: context.config.loginom.url,
+    username: context.config.loginom.username, exitCode: 2 })
+  try {
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(context.config)))
+    await expect(verifyProfile(context.config, { ...context.command,
+      env: { ...context.command.env, EVAL_FAKE_STATE_FILE: file } })).rejects.toThrow("PROFILE_NOT_PREPARED")
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+  }
 })
 
 test("ensureProfile v2: failed status cannot admit a matching ready profile", async () => {

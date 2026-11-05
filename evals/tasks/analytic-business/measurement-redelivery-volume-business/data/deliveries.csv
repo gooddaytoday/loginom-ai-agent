@@ -1,0 +1,10 @@
+delivery_id;measurement_id;device;quantity
+D01;M01;DEV_A;5
+D02;M01;DEV_A;5
+D03;M02;DEV_A;5
+D04;M03;DEV_A;2
+D05;M03;DEV_A;2
+D06;M04;DEV_B;7
+D07;M04;DEV_B;7
+D08;M04;DEV_B;7
+D09;M05;DEV_C;4

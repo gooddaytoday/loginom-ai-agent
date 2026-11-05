@@ -1,0 +1,21 @@
+{
+  "task_id": "tariff-functional-conflicts-business",
+  "source_task": "tariff-functional-conflicts-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/tariff-functional-conflicts-detailed/provenance.json",
+  "dataset_sha256": {
+    "tariffs.csv": "83e2b00d8446b93a97101a07a31b0024bd1d0a43e4bdd520c8becf16cd38c498"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "29c9b15504e7288737e12d80a422e153113ce8fc10535b4d37888c23deefcf2e"
+  },
+  "reference_sha256": "69238e26e857ea853461f046110a3f688bde31e18d7c7e34c54985195dba7885",
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

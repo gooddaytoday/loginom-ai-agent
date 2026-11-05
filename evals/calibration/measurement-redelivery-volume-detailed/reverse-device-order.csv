@@ -1,0 +1,4 @@
+device;deliveries;measurements;repeated_deliveries;total_quantity
+DEV_C;1;1;0;4
+DEV_B;3;1;2;7
+DEV_A;5;3;2;12

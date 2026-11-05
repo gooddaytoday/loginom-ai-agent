@@ -1,0 +1,50 @@
+{
+  "task_id": "unreserved-lot-expiry-exposure-business",
+  "source_task": "unreserved-lot-expiry-exposure-detailed",
+  "reference_origin": "shared verified detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/unreserved-lot-expiry-exposure-detailed/provenance.json",
+  "dataset_sha256": {
+    "lots.csv": "fcac9875ed0e6b4200a412626f87980d761fd067b3aec9b08b560f969452a2b8",
+    "reservations.csv": "5c8513b43c7ce5e9ec5613d2cc00d39c13bb578c8b51763d41dc2cf7d18aac97"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "92fb55ababa629ef47d887faab5e754dee3c84a7a8cbac060ba0ed01dc2dc4d1"
+  },
+  "reference_sha256": "641a7c4f61e781e35c5732a4d957dde4eb43d299a331d1d4a26e5576beac1edc",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Seven physical lots and six reservations frozen before separate manual6x7 and stdlib Decimal oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "PK lot_id/reservation_id; reservation lot FK; nonempty ASCII/case-sensitive keys. status active/cancelled, only active reserves; positive integer quantities, active sum<=physical. Local Europe/Moscow dates, snapshot2026-03-15/horizon2026-03-20 inclusive; unit_cost positive in one synthetic monetary unit, no tax/fees. Includes missing and full reservations; exposure only, no sales/waste forecast."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib datetime",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent active-reservation sum by lot, physical-minus-reserved quantity, inclusive calendar classes, per-lot Decimal free-value sum by SKU/class. Separate manual full42 after raw freeze before oracle/native; no intermediate rounding."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G07 under canonical implementation plan; no new P25 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

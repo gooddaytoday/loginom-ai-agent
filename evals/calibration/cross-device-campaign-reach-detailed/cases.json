@@ -1,0 +1,132 @@
+{
+  "sources": {
+    "SPEC.md": "9ee50e479fe905a710eca3ac442f014f32721a17ce351b06f4c1f663918def42",
+    "acceptance.json": "59cb69d2c255fc41d89fa745323151f2a12275c96a3fad223a5c46bfe455b758",
+    "data/campaigns.csv": "c084a2565f86456d85a48e9fc1d9f4d63cc9a3c2731f79b44dbe9d5c15310215",
+    "data/identities.csv": "c1b1056d7e0f868a031b4964f3c42c3d7aa2602c406a36ef576a6dcc60dd782e",
+    "data/impressions.csv": "15619f11a99c6d0e47cc69f3879640980b55b6d5399b873aafa6797509d2c011",
+    "oracle.csv": "297c281b6460800dd2fcfc0c70301dd9097978f808e8befe0a68885ce74e5cb4",
+    "oracle.py": "84da5a01085c66b0eba8f3ef0cdc85be70147550d1a9158849c67b2920210c34",
+    "provenance.json": "fba7f7f5b0b34f6b2c9b5341c8ad796dfea86acc5fd2341d7e1b8b1ff41d8260",
+    "reference.lgp": "15b6cde2f741e4e562f6a6374eb4217014043d24219d5f0aee5bd0c7e4f40584",
+    "task.json": "f0b27e526a0851735b6e5920c878664e1e11f49effaef59a41f660c3a17012fd"
+  },
+  "cases": [
+    {
+      "id": "devices-instead-people",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"person_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"person_id\">",
+          "to": "<Item Name=\"person_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"device_id\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "person-identity-grain",
+        "identified-frequency-and-null",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "campaign[2].add(person)",
+            "to": "campaign[2].add(row[\"device_id\"])",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "devices-instead-people.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "unknown-merged-person",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t<Item Guid=\"c7eca3ee-c3d0-482d-9dc5-96b5e2b28964\" DisplayName=\"Известные люди\" VendorGuid=\"a0e49d86-6fe3-43fc-8046-29d1ce92c03d\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\"/>\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Соответствуют условию\"/>\n\t\t\t\t\t<Item Guid=\"99559aff-aff4-3e08-8f1e-a290790bba03\" Name=\"DataSourceElse\" DisplayName=\"Не соответствуют условию\"/>\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\"/>\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\"/>\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\"/>\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"person_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"person_id\"/>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<Variables SyncThroughVariables=\"true\">\n\t\t\t\t\t\t\t\t\t<Elements/>\n\t\t\t\t\t\t\t\t</Variables>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</InputSockets>\n\t\t\t\t\t<OutputSockets>\n\t\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Соответствуют условию\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"99559aff-aff4-3e08-8f1e-a290790bba03\" Name=\"DataSourceElse\" DisplayName=\"Не соответствуют условию\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</OutputSockets>\n\t\t\t\t\t<Engine xsi:type=\"TBGFilterDataEngine\">\n\t\t\t\t\t\t<Filter UseGlobalCaseSensitive=\"false\">\n\t\t\t\t\t\t\t<Item Guid=\"b5b64da0-da1d-4cd4-bcc3-090bb8eb6c78\" Name=\"person_id\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtIsNotNull\"/>\n\t\t\t\t\t\t</Filter>\n\t\t\t\t\t</Engine>\n\t\t\t\t</Component>\n\t\t\t\t<Position Left=\"496\" Top=\"96\"/>\n\t\t\t</Item>",
+          "to": "\t\t\t<Item Guid=\"c7eca3ee-c3d0-482d-9dc5-96b5e2b28964\" DisplayName=\"Известные люди\" VendorGuid=\"a0e49d86-6fe3-43fc-8046-29d1ce92c03d\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\"/>\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Соответствуют условию\"/>\n\t\t\t\t\t<Item Guid=\"99559aff-aff4-3e08-8f1e-a290790bba03\" Name=\"DataSourceElse\" DisplayName=\"Не соответствуют условию\"/>\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\"/>\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\"/>\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\"/>\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"event_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"event_id\"/>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<Variables SyncThroughVariables=\"true\">\n\t\t\t\t\t\t\t\t\t<Elements/>\n\t\t\t\t\t\t\t\t</Variables>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</InputSockets>\n\t\t\t\t\t<OutputSockets>\n\t\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Соответствуют условию\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"99559aff-aff4-3e08-8f1e-a290790bba03\" Name=\"DataSourceElse\" DisplayName=\"Не соответствуют условию\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</OutputSockets>\n\t\t\t\t\t<Engine xsi:type=\"TBGFilterDataEngine\">\n\t\t\t\t\t\t<Filter UseGlobalCaseSensitive=\"false\">\n\t\t\t\t\t\t\t<Item Guid=\"b5b64da0-da1d-4cd4-bcc3-090bb8eb6c78\" Name=\"event_id\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtIsNotNull\"/>\n\t\t\t\t\t\t</Filter>\n\t\t\t\t\t</Engine>\n\t\t\t\t</Component>\n\t\t\t\t<Position Left=\"496\" Top=\"96\"/>\n\t\t\t</Item>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"person_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utValue\" InputColumnInfoName=\"person_id\">",
+          "to": "<Item Name=\"person_id\" DataType=\"dtInteger\" DataKind=\"dkDiscrete\" UsageType=\"utValue\" InputColumnInfoName=\"identified_events\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "person-identity-grain",
+        "full-campaign-event-base",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "campaign[1] += 1",
+            "to": "campaign[1] += 1\n            campaign[2].add(\"__unknown__\")",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "unknown-merged-person.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "lost-zero-campaign",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"3069f513-ce99-491d-b6a9-76863a970a47\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"3069f513-ce99-491d-b6a9-76863a970a47\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "full-campaign-event-base",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "for campaign_id in sorted(campaigns):",
+            "to": "for campaign_id in sorted(key for key, value in campaigns.items() if value[0] > 0):",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "lost-zero-campaign.csv",
+      "expected_oracle_pass": false
+    },
+    {
+      "id": "all-impressions-numerator",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(known_people &gt; 0, (impressions - unknown_impressions) / known_people, Null)",
+          "to": "IF(known_people &gt; 0, impressions / known_people, Null)",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "identified-frequency-and-null",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "(impressions - unknown) / len(people)",
+            "to": "impressions / len(people)",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "all-impressions-numerator.csv",
+      "expected_oracle_pass": false
+    }
+  ]
+}

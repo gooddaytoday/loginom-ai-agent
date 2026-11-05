@@ -1,0 +1,130 @@
+{
+  "sources": {
+    "SPEC.md": "22d299526c4d669e9949e6631de60efe14f23f58bd45741d6b5660dd2fd5834b",
+    "acceptance.json": "d36fd247b6e9e2946097baadc38c4442edffbf1e7e4b943fdb65d008a5435aa5",
+    "data/bank_daily.csv": "7b87a2dc76ab541120f8a8aa00dc0527f741e0981a87283b23929459a232777c",
+    "data/cash_events.csv": "504388189e336b6a3690be985b7a252cb0929cd3c4240c7ba5bb7ee87e41c8e8",
+    "data/report_calendar.csv": "a2300e263e852998f48e4814d1362f8e82737894215896a97da16a80f8b11144",
+    "oracle.csv": "e81c1fde418172ba2f67b8c6053644224d8a23b9dee447639e6be288dfc98c97",
+    "oracle.py": "ca5839899e8a773bc08454c877a6da141a807d4174540738df8d838638c2a21d",
+    "provenance.json": "87d3158f4fedbe96960c2ef2582fafc43663cc197f1a432938a71aac7510987e",
+    "reference.lgp": "0f983497d47658b1710782eacd682c3ba1fc0e16472bf41681ea4948bffd0842",
+    "task.json": "1f4b8476d264a300a2994eeb4f83286a1aacc26247674b61eed6424fe82ed0e7"
+  },
+  "cases": [
+    {
+      "id": "timestamp-not-day",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"EncodeDate(Year(local_timestamp), Month(local_timestamp), Day(local_timestamp))\"",
+          "to": "Expression=\"local_timestamp\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "timestamp-not-day.csv",
+      "expected_failed": [
+        "native_daily_assignment",
+        "full_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        day = datetime.strptime(row[\"local_timestamp\"], \"%Y-%m-%d %H:%M:%S\").date()",
+            "to": "        day = datetime.strptime(row[\"local_timestamp\"], \"%Y-%m-%d %H:%M:%S\")",
+            "count": 1
+          },
+          {
+            "from": "        inflow = ledger[day][\"in\"]",
+            "to": "        inflow = ledger[datetime.combine(day, datetime.min.time())][\"in\"]",
+            "count": 1
+          },
+          {
+            "from": "        outflow = ledger[day][\"out\"]",
+            "to": "        outflow = ledger[datetime.combine(day, datetime.min.time())][\"out\"]",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "reversed-deviation",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"bank_net - (NVLF(inflow, 0) - NVLF(outflow, 0))\"",
+          "to": "Expression=\"(NVLF(inflow, 0) - NVLF(outflow, 0)) - bank_net\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "reversed-deviation.csv",
+      "expected_failed": [
+        "bank_minus_ledger",
+        "full_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "bank[day] - net",
+            "to": "net - bank[day]",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "three-decimal-money",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(IF(Round(inflow, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(inflow) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(inflow) * 100) - 100 * Int(Round(Abs(inflow) * 100) / 100), 2))\"",
+          "to": "Expression=\"Concat(IF(Round(inflow, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(inflow) * 1000) / 1000)), &quot;.&quot;, StrZero(Round(Abs(inflow) * 1000) - 1000 * Int(Round(Abs(inflow) * 1000) / 1000), 3))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(IF(Round(outflow, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(outflow) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(outflow) * 100) - 100 * Int(Round(Abs(outflow) * 100) / 100), 2))\"",
+          "to": "Expression=\"Concat(IF(Round(outflow, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(outflow) * 1000) / 1000)), &quot;.&quot;, StrZero(Round(Abs(outflow) * 1000) - 1000 * Int(Round(Abs(outflow) * 1000) / 1000), 3))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(IF(Round(ledger_net, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(ledger_net) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(ledger_net) * 100) - 100 * Int(Round(Abs(ledger_net) * 100) / 100), 2))\"",
+          "to": "Expression=\"Concat(IF(Round(ledger_net, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(ledger_net) * 1000) / 1000)), &quot;.&quot;, StrZero(Round(Abs(ledger_net) * 1000) - 1000 * Int(Round(Abs(ledger_net) * 1000) / 1000), 3))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(IF(Round(bank_net, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(bank_net) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(bank_net) * 100) - 100 * Int(Round(Abs(bank_net) * 100) / 100), 2))\"",
+          "to": "Expression=\"Concat(IF(Round(bank_net, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(bank_net) * 1000) / 1000)), &quot;.&quot;, StrZero(Round(Abs(bank_net) * 1000) - 1000 * Int(Round(Abs(bank_net) * 1000) / 1000), 3))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Concat(IF(Round(deviation, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(deviation) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(deviation) * 100) - 100 * Int(Round(Abs(deviation) * 100) / 100), 2))\"",
+          "to": "Expression=\"Concat(IF(Round(deviation, 2) &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(deviation) * 1000) / 1000)), &quot;.&quot;, StrZero(Round(Abs(deviation) * 1000) - 1000 * Int(Round(Abs(deviation) * 1000) / 1000), 3))\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "three-decimal-money.csv",
+      "expected_failed": [
+        "full_result"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{value:.2f}\"",
+            "to": "f\"{value:.3f}\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

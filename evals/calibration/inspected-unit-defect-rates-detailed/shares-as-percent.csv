@@ -1,0 +1,4 @@
+supplier_id;production_line;inspected_units;defective_units;critical_units;defective_share;critical_share
+S01;L01;3;2;1;66.6666666666667;33.3333333333333
+S01;L02;2;1;0;50;0
+S02;L01;1;0;0;0;0

@@ -1,0 +1,6 @@
+po_line_id;supplier_id;ordered_qty;accepted_qty;billed_qty;excess_billed_qty;price_deviation;price_problem_lines
+P01;S1;10;5;6;1;0.0;2
+P02;S1;4;4;2;0;1.0;1
+P03;S2;3;0;1;1;-0.5;1
+P04;S2;2;1;0;0;0.0;0
+P05;S2;1;0;0;0;0.0;0

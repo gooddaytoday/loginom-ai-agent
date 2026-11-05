@@ -1,0 +1,6 @@
+expense_id;order_id;cost_center;budget_item;amount
+E01;O01;CC1;I1;12.00
+E02;O01;CC1;I1;8.00
+E03;O02;CC1;I1;15.00
+E04;;CC1;I1;5.00
+E05;O03;CC1;I2;35.00

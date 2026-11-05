@@ -1,0 +1,132 @@
+{
+  "sources": {
+    "SPEC.md": "95537db58f4ec40a76e8aa3e2c54f23bea0c562f3f56696634b865761d776f55",
+    "acceptance.json": "978b43907a6be5fcb29139aa06a6574a3840ac5de5414b44f31def55b4ad7e82",
+    "data/jobs.csv": "c542b890a14cbc95049f244b50fd3c89663e9f812fab013b6c53022135860570",
+    "oracle.csv": "a2a47708bf32590df8190ca2e6b4eadfd5e3128789e13d1421ef021467377fa2",
+    "oracle.py": "819c1401f4bbfefbffda69d0d2a8ecc5e96aad6c4b5d9a5fc782b1f29627fbe0",
+    "provenance.json": "809189eb235259d249eb1c390031d18905c82dbda1c86ed29349175eca997907",
+    "reference.lgp": "ab70089f37263824db55822f2f9c1c826ebf819832e6ccaf3740aada218adf49",
+    "task.json": "668e0a5c4dac9e81ed63e5527db926d211263905d8c84eab530535be4f10cf53"
+  },
+  "cases": [
+    {
+      "id": "swapped-observation-counts",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"observed_jobs\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"originally_observed_Sum\"/>",
+          "to": "<Item Name=\"observed_jobs\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"originally_missing_Sum\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"imputed_jobs\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"originally_missing_Sum\"/>",
+          "to": "<Item Name=\"imputed_jobs\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"originally_observed_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "original-observation-provenance",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "writer.writerow([department, len(jobs), len(values), len(jobs) - len(values),",
+            "to": "writer.writerow([department, len(jobs), len(jobs) - len(values), len(values),",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "swapped-observation-counts.csv"
+    },
+    {
+      "id": "job-count-as-observed-mean",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"observed_mean\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"processing_hours_Avg\"/>",
+          "to": "<Item Name=\"observed_mean\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"job_id_Count\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "global-mean-and-denominators",
+        "complete-department-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "sum(values, Decimal(0)) / len(values) if values else \"\",",
+            "to": "len(jobs),",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "job-count-as-observed-mean.csv"
+    },
+    {
+      "id": "zero-as-original-missing",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(IsNull(processing_hours), 1, 0)\"",
+          "to": "Expression=\"IFF(NVLF(processing_hours, 0) = 0, 1, 0)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(IsNull(processing_hours), 0, 1)\"",
+          "to": "Expression=\"IFF(NVLF(processing_hours, 0) = 0, 0, 1)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "original-observation-provenance",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "writer.writerow([department, len(jobs), len(values), len(jobs) - len(values),",
+            "to": "writer.writerow([department, len(jobs), sum(value != 0 for value in values), len(jobs) - sum(value != 0 for value in values),",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "zero-as-original-missing.csv"
+    },
+    {
+      "id": "reverse-department-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"department\"/>",
+          "to": "<Item Name=\"department\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-department-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "department",
+          "descending": true
+        }
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-department-order.csv"
+    }
+  ]
+}

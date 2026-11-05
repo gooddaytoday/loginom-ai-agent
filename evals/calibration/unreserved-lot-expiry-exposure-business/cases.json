@@ -1,0 +1,129 @@
+{
+  "sources": {
+    "SPEC.md": "6875596b9e184c89cb8a674c14422fc61a0faccca8f098f439d934a54464b774",
+    "acceptance.json": "9dbccc1dec86031779cc3f52a2c4e10557d8da8487900d6c61c0ee227ed72781",
+    "data/lots.csv": "fcac9875ed0e6b4200a412626f87980d761fd067b3aec9b08b560f969452a2b8",
+    "data/reservations.csv": "5c8513b43c7ce5e9ec5613d2cc00d39c13bb578c8b51763d41dc2cf7d18aac97",
+    "oracle.csv": "92fb55ababa629ef47d887faab5e754dee3c84a7a8cbac060ba0ed01dc2dc4d1",
+    "oracle.py": "e9ad4899b754fb897d8a4f9b90bb1875d68b6b39ceede1916fd24595eb39a367",
+    "provenance.json": "2eda93e2e891560e91161b67815ea7c43cfb29548f13a7687c081a8942cc5286",
+    "reference.lgp": "641a7c4f61e781e35c5732a4d957dde4eb43d299a331d1d4a26e5576beac1edc",
+    "task.json": "08560b14b841b6fe63b3fe4894595b859334cc65e3b2e31fa9ef9093e0a02301"
+  },
+  "cases": [
+    {
+      "id": "expiry-day-expired",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "expiry_date &lt; EncodeDate(2026, 3, 15)",
+          "to": "expiry_date &lt;= EncodeDate(2026, 3, 15)",
+          "count": 2
+        }
+      ],
+      "expected_failed": [
+        "inclusive-expiry-classes",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "expiry < snapshot",
+            "to": "expiry <= snapshot",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "expiry-day-expired.csv"
+    },
+    {
+      "id": "cancelled-reserved",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "RelationType=\"frtEqual\"",
+          "to": "RelationType=\"frtNotEqual\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": ">active</CompareValue>",
+          "to": ">ignored</CompareValue>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "active-lot-balances",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "if row[\"status\"] == \"active\":",
+            "to": "if row[\"status\"] != \"ignored\":",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "cancelled-reserved.csv"
+    },
+    {
+      "id": "physical-stock-value",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"free_qty * unit_cost\"",
+          "to": "Expression=\"on_hand_qty * unit_cost\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-lot-exposure-value",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "free * Decimal(row[\"unit_cost\"])",
+            "to": "on_hand * Decimal(row[\"unit_cost\"])",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "physical-stock-value.csv"
+    },
+    {
+      "id": "reverse-expiry-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"expiry_order\"/>",
+          "to": "<Item Name=\"expiry_order\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-lot-exposure-value",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "order = {\"expired\": 0, \"within_horizon\": 1, \"later\": 2}",
+            "to": "order = {\"expired\": 2, \"within_horizon\": 1, \"later\": 0}",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-expiry-order.csv"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+reservation_id;lot_id;qty;status
+R01;L01;2;active
+R02;L02;1;active
+R03;L02;2;active
+R04;L02;3;cancelled
+R05;L03;2;cancelled
+R06;L05;6;active

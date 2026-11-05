@@ -1,0 +1,48 @@
+{
+  "task_id": "measurement-redelivery-volume-business",
+  "source_task": "measurement-redelivery-volume-detailed",
+  "reference_origin": "shared verified detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/measurement-redelivery-volume-detailed/provenance.json",
+  "dataset_sha256": {
+    "deliveries.csv": "86d4cb02135ca1a5be6324b8b7d82a6d59c4a8edf73d191a3d0900c03d73f4d6"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "5231535f9ed6a0d00d4a9237d19c02f3bd235204d88569c90fafd5bfb0f449c4"
+  },
+  "reference_sha256": "813f0848bd244a3464838d4451dfecb9783cb7ec1886d5c70b632a28ea5aded5",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Nine raw deliveries of five consistent measurements on three devices, frozen before independent manual3x5 and stdlib Counter oracle; no answer fields or real-data claim.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Unique delivery_id; globally consistent measurement_id→device/quantity; nonempty ASCII/case-sensitive identifiers, positive integer quantity in pieces, no date/money. Same quantity does not identify a fact. Includes double/triple delivery, separate equal-quantity facts and singleton device; no conflict resolution or arrival ordering implied."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections.Counter",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw delivery count by device and measurement_id identity map retaining consistent device/quantity, then count facts and quantity once per fact; repeats=raw count−facts. Separate manual full15 after raw freeze before oracle/native."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "G07 under canonical implementation plan; no new P26 ONLY-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

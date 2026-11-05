@@ -43,6 +43,29 @@ test('semantic catalog failure is not retried', async t => {
   assert.equal(listed, 1);
 });
 
+test('startup classification preserves only safe nested network and protocol evidence', async () => {
+  const { knowledgeStartupFailure } = await import('../lib/knowledge-client.mjs');
+  const error = new TypeError('fetch failed: PRIVATE-BODY https://private.test/?key=PRIVATE-KEY', {
+    cause: new AggregateError([
+      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'ECONNREFUSED', headers: { authorization: 'PRIVATE-KEY' } }),
+      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'PRIVATE-KEY' }),
+      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'UND_ERR_CONNECT_TIMEOUT' }),
+    ]),
+  });
+  assert.deepEqual(knowledgeStartupFailure(error, 'connect_initialize', 17, false), {
+    stage: 'connect_initialize', error_class: 'TypeError', code: null,
+    cause_codes: ['ECONNREFUSED', 'UND_ERR_CONNECT_TIMEOUT'], aborted: false, timeout: true, elapsed_ms: 17,
+  });
+  assert.deepEqual(knowledgeStartupFailure(Object.assign(Error('PRIVATE-BODY'), { name: 'PRIVATE-KEY', code: 403 }),
+    'catalog', 1, false), {
+    stage: 'catalog', error_class: 'Unknown', code: 403, cause_codes: [], aborted: false, timeout: false, elapsed_ms: 1,
+  });
+  for (const code of ['ETIMEDOUT', -32001])
+    assert.equal(knowledgeStartupFailure(Object.assign(Error('PRIVATE-MESSAGE'), { code }),
+      'connect_initialize', 1, false).timeout, true);
+
+});
+
 test('knowledge reads real authenticated MCP schemas and Help without browser modules or a child process', async t => {
   const server = await knowledgeServer(t);
   const hooks = registerHooks({ resolve(specifier, context, next) {

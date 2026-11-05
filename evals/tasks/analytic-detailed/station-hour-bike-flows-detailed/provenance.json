@@ -1,0 +1,141 @@
+{
+  "task_id": "station-hour-bike-flows-detailed",
+  "dataset_sha256": {
+    "station_hours.csv": "c416869e80069708fe60e089383bcc286dce59d8134ea6fec0f9b1862eaf74af",
+    "trips.csv": "a0caae6547fde75ad37693cf1a408ade1d1588b577de8ad3e5839bef20dcf74c"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "e4e6d6b01d1ac2a37f28f2ee269550818fb6a307b61bc80e0b3332d629e59576"
+  },
+  "reference_sha256": "80d9d901b47b29bd91b5adeac432fac023085afcc86476a3f843f72315883194",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/trips.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/station_hours.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T18:48:41+03:00",
+    "duration_s": 786,
+    "tokens": {
+      "input": 122415,
+      "output": 6206,
+      "reasoning": 809
+    },
+    "tool_calls": 37,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections.defaultdict",
+      "stdlib datetime"
+    ],
+    "algorithm": "Independent datetime parsing of each start/end timestamp, separate endpoint/station hourly counts, then full station_hours calendar iteration and arrivals minus departures; no Loginom outputs used."
+  },
+  "source_dataset": {
+    "publisher": "Oslo City Bike",
+    "page_url": "https://oslobysykkel.no/en/open-data/historical",
+    "data_url": "https://data.urbansharing.com/oslobysykkel.no/trips/v1/2024/01.csv",
+    "retrieved_at_utc": "2026-10-29T12:14:43.229623+00:00",
+    "license": {
+      "name": "Norwegian Licence for Open Government Data (NLOD) 2.0",
+      "url": "https://data.norge.no/nlod/en/2.0",
+      "attribution": "Contains data under the Norwegian licence for Open Government data (NLOD) distributed by Oslo City Bike."
+    },
+    "original": {
+      "file": "2024/01.csv",
+      "sha256": "07b645a7f55e2e293dacbbefd9029872b1204b0dd714d6c00564789ec72f3ce4",
+      "bytes": 1736725,
+      "data_rows": 8382,
+      "columns": [
+        "started_at",
+        "ended_at",
+        "duration",
+        "start_station_id",
+        "start_station_name",
+        "start_station_description",
+        "start_station_latitude",
+        "start_station_longitude",
+        "end_station_id",
+        "end_station_name",
+        "end_station_description",
+        "end_station_latitude",
+        "end_station_longitude"
+      ]
+    },
+    "selection": {
+      "station_ids": [
+        "412",
+        "516"
+      ],
+      "utc_start_inclusive": "2024-01-03T00:00:00+00:00",
+      "utc_end_exclusive": "2024-01-05T00:00:00+00:00",
+      "predicate": "(start_station_id in S or end_station_id in S) and (started_at in I or ended_at in I)",
+      "source_data_rows_one_based": [
+        358,
+        418,
+        434,
+        436,
+        473,
+        699,
+        710,
+        723,
+        725
+      ],
+      "frozen_before_oracle": true
+    },
+    "adaptation": [
+      "Map started_at/start_station_id and ended_at/end_station_id to start_timestamp/start_station and end_timestamp/end_station; preserve station values as strings.",
+      "Add technical trip_id OSLO202401-R plus six-digit one-based original data record number, excluding header; this is not an original trip ID.",
+      "Represent +00:00 timestamps as YYYY-MM-DDTHH:mm:ss UTC, removing the zero offset and fractional seconds without time-zone conversion; required year/month/day/hour remain unchanged.",
+      "Derive station_hours as the full 2-station by 48-hour analytical calendar; it does not measure station availability."
+    ],
+    "limitations": [
+      "Published anonymous trips of at least one minute during normal opening hours; cancellations and operator relocations are excluded.",
+      "No timestamp outside the selected time interval occurs in these nine trips; external station endpoints are present.",
+      "The original raw CSV is retained privately; runtime data contains only the two adapted frozen inputs."
+    ],
+    "endorsement": "Adaptation by the eval author; no endorsement by Oslo City Bike is claimed."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,135 @@
+{
+  "sources": {
+    "SPEC.md": "f12d26876a4a979040134c68a1726a3a873241976a46362131bcc2468ae1c67f",
+    "acceptance.json": "20fba0088ff0863e5b32369cda95aab979f614844166fdc7420424258459e874",
+    "data/products.csv": "f63df26dfab919bb70720e8aedcd2d2326114a6e26caab4855c072dad5c51910",
+    "data/supplier_quotes.csv": "e40dcc210dffc938eb8491b136ee1147f11b5e2fc46d74282a0a02da52adb6a4",
+    "oracle.csv": "a862bdd8e3f931c40723f65824697d8c5d7dc63acb2a0315aff08d70d9a6f0ee",
+    "oracle.py": "08f6651780753e4dad3c266c2cf2c2352dd46a8d4cdc36e1819e48d2535ef3dd",
+    "provenance.json": "42dc34e5ec0096816e55fc7ef52c03e4af1e07ac901cb7e1907e71f36ab6876f",
+    "reference.lgp": "7471e5f501a7c2d799585d46440da4956bd3e632070e6ca6ae51fdefb4941f41",
+    "task.json": "fe6a74dd21a0ce1657441cd1705097d4721903be46ed78f57a9f5b5d6d550dd5"
+  },
+  "cases": [
+    {
+      "id": "inactive-only",
+      "kind": "filter",
+      "edits": [
+        {
+          "from": "<CompareValue VarType=\"vrtInt64\">1</CompareValue>",
+          "to": "<CompareValue VarType=\"vrtInt64\">0</CompareValue>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "active-distinct-suppliers",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "if row[\"active\"] == \"1\":",
+            "to": "if row[\"active\"] == \"0\":",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "inactive-only.csv"
+    },
+    {
+      "id": "active-quote-count",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "from": "<Item Name=\"supplier_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utValue\" InputColumnInfoName=\"supplier_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdCount\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Name=\"supplier_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"supplier_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        },
+        {
+          "from": "<Item Name=\"quote_count\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" InputColumnInfoName=\"quote_count\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Name=\"quote_count\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"quote_count\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        },
+        {
+          "from": "<Mapping Source=\"supplier_id_Count\"/>",
+          "to": "<Mapping Source=\"quote_count_Sum\"/>",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "active-distinct-suppliers",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "suppliers.setdefault(row[\"sku\"], set()).add(row[\"supplier_id\"])",
+            "to": "suppliers.setdefault(row[\"sku\"], []).append(row[\"supplier_id\"])",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "active-quote-count.csv"
+    },
+    {
+      "id": "products-inner",
+      "kind": "filter",
+      "edits": [
+        {
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\" JoinType=\"jtJoin\">",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "complete-product-category-registry",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "with (root / \"data/products.csv\").open(newline=\"\", encoding=\"utf-8\") as source:\n    for row in csv.DictReader(source, delimiter=\";\"):\n",
+            "to": "with (root / \"data/products.csv\").open(newline=\"\", encoding=\"utf-8\") as source:\n    for row in csv.DictReader(source, delimiter=\";\"):\n        if row[\"sku\"] not in suppliers:\n            continue\n",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "products-inner.csv"
+    },
+    {
+      "id": "active-products-denominator",
+      "kind": "column",
+      "edits": [
+        {
+          "from": "Expression=\"one_supplier / products\"",
+          "to": "Expression=\"IFF(one_supplier + multiple_suppliers = 0, 0, one_supplier / (one_supplier + multiple_suppliers))\"",
+          "file": "Unit_0/Unit.xml",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "source-class-partition-share",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Decimal(counts[2]) / Decimal(counts[0])",
+            "to": "Decimal(counts[2]) / Decimal(max(1, counts[2] + counts[3]))",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "active-products-denominator.csv"
+    }
+  ]
+}

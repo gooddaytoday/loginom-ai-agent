@@ -1,0 +1,60 @@
+{
+  "task_id": "tariff-functional-conflicts-detailed",
+  "dataset_sha256": {
+    "tariffs.csv": "83e2b00d8446b93a97101a07a31b0024bd1d0a43e4bdd520c8becf16cd38c498"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "29c9b15504e7288737e12d80a422e153113ce8fc10535b4d37888c23deefcf2e"
+  },
+  "reference_sha256": "69238e26e857ea853461f046110a3f688bde31e18d7c7e34c54985195dba7885",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/tariffs.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": true,
+    "hint": "Последняя авторская попытка этой пары; работай с новым собственным пакетом и доставленным tariffs.csv, без старого незавершённого контекста. Рано сохрани импорт, затем значимые завершённые этапы и final Save.\nИспользуй уже подтверждённый эквивалентный штатный путь группировок, разрешённый Detailed-постановкой. Не повторяй пока не исправленную настройку Duplicates: она не объявляется неподдержанной, но не нужна для этого эквивалентного reference. Сначала сгруппируй supplier/service/currency/price с числом исходных строк каждого варианта; затем supplier/service с числом вариантов и суммой исходных строк. По ключу вычисли consistent/conflicting и число ВСЕХ строк конфликтного ключа, после чего агрегируй по supplier. Метаданные row_id/source_tag в ключ и содержание не включай; кратность копий сохраняй. Результат сортируется и экспортируется по исходному контракту. JS и подстановка готовых ответов запрещены.\nВ verified CLI исправлен конкретный viewport дефект перед connect через существующий native reveal. Не обходи runtime и не повторяй неизвестные apply/Execute; при отказе используй только exact предлагаемый managed recovery с fresh native proof. Никаких принудительных acknowledge/удаления guard. Итоговый новый полный CSV — UTF-8, ;, qualifier двойная кавычка, точная заданная схема. Проверь native результат и final Save; сообщи любое ограничение честно. Эта подсказка не содержит oracle или эталонных чисел.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T10:45:09+03:00",
+    "duration_s": 492,
+    "tokens": {
+      "input": 102899,
+      "output": 4444,
+      "reasoning": 451
+    },
+    "tool_calls": 32,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -1,0 +1,120 @@
+{
+  "sources": {
+    "SPEC.md": "73506183c1ccda672afdbbb144988ce758d0bf6c84e2fb3e8869e38fe8167e8f",
+    "acceptance.json": "b9ebbac0a07b0cf8531060bb7f3c5ed181c7ced28966c6a58ab09cd34051ae8d",
+    "data/samples.csv": "3f8709fa9071a1fc2510f96a29f837813d9025e4e4531e56fa605e06d5ba6246",
+    "oracle.csv": "c8490460f072180573c52a24a312b13936e2c3e6ab1db27037221b8e6546172c",
+    "oracle.py": "842b1fc00e750cb98cb13d65f76b84a2554a126ca10327bd4611841514d06c05",
+    "provenance.json": "ff903e55c21c7ade3a2227cab687ef18c971228e508eec8e60262858128083fc",
+    "reference.lgp": "5f7192fff64b53b0c50921e170285a6d1988e5cf7eb9247cf8e79dc31ee67afe",
+    "task.json": "31f48aa429906c38e0cc43ec3cb844ae9dab9dde65dcf7070e26e51fe908da94"
+  },
+  "cases": [
+    {
+      "id": "casefold-cm-code",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "&quot;^cm",
+          "to": "&quot;^(cm|CM)",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "exact-unit-coverage",
+        "valid-only-length-and-mass",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "\"cm\": Decimal(\"0.01\"),",
+            "to": "\"cm\": Decimal(\"0.01\"), \"CM\": Decimal(\"0.01\"),",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "casefold-cm-code.csv"
+    },
+    {
+      "id": "include-unknown-mass",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(factor_m &gt; 0, mass_kg, 0.0)\"",
+          "to": "Expression=\"mass_kg\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "valid-only-length-and-mass",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            values[1] += 1\n            continue",
+            "to": "            values[1] += 1\n            values[3] += Decimal(row[\"mass_kg\"])\n            continue",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "include-unknown-mass.csv"
+    },
+    {
+      "id": "inverted-mass-length-ratio",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"mass_kg / length_m\"",
+          "to": "Expression=\"length_m / mass_kg\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "ratio-of-sums-and-material-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "mass / length",
+            "to": "length / mass",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "inverted-mass-length-ratio.csv"
+    },
+    {
+      "id": "reverse-material-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"material\"/>",
+          "to": "<Item Name=\"material\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "ratio-of-sums-and-material-basis",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "material",
+          "descending": true
+        }
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-material-order.csv"
+    }
+  ]
+}

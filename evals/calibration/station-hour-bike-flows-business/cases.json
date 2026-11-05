@@ -1,0 +1,114 @@
+{
+  "sources": {
+    "SPEC.md": "c4581e54658d9007bcaca553b2a1145d252698ba4b828c4dddc530da430bbaaf",
+    "acceptance.json": "ca7382a2594900049b77fb536bbf34ee518090c7e731f679e1e910c1e60ccc66",
+    "data/station_hours.csv": "c416869e80069708fe60e089383bcc286dce59d8134ea6fec0f9b1862eaf74af",
+    "data/trips.csv": "a0caae6547fde75ad37693cf1a408ade1d1588b577de8ad3e5839bef20dcf74c",
+    "oracle.csv": "e4e6d6b01d1ac2a37f28f2ee269550818fb6a307b61bc80e0b3332d629e59576",
+    "oracle.py": "42e7ee6128383814ad928ad98f895ff1a42b4d765fc135e3247292c4156b3bfb",
+    "provenance.json": "1f6e1f580ca3bf9a23cbc9c1339cdfc131ced470243cfc90706c7f6f4e6ecb27",
+    "reference.lgp": "80d9d901b47b29bd91b5adeac432fac023085afcc86476a3f843f72315883194",
+    "task.json": "535ad2cd25b6f4ee0b03cf8d345529cb36739f7c5b9e9d79aba14f336d16b86c"
+  },
+  "cases": [
+    {
+      "id": "arrivals-at-start-hour",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Val(SubStr(end_timestamp, 1, 4))\"",
+          "to": "Expression=\"Val(SubStr(start_timestamp, 1, 4))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Val(SubStr(end_timestamp, 6, 2))\"",
+          "to": "Expression=\"Val(SubStr(start_timestamp, 6, 2))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Val(SubStr(end_timestamp, 9, 2))\"",
+          "to": "Expression=\"Val(SubStr(start_timestamp, 9, 2))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Val(SubStr(end_timestamp, 12, 2))\"",
+          "to": "Expression=\"Val(SubStr(start_timestamp, 12, 2))\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "arrivals-at-start-hour.csv",
+      "expected_failed": [
+        "own_endpoint_hours",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            timestamp = datetime.fromisoformat(row[f\"{role}_timestamp\"])",
+            "to": "            timestamp = datetime.fromisoformat(row[\"start_timestamp\"])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "departure-inner-drops-hours",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"3acbfd30-bd67-450c-9ac0-6a49ca597afd\">\n\t\t\t\t\t\t\t\t<Left Name=\"station_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_station\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"2bd6c97d-9286-436d-8594-9d4f3adc5c38\">\n\t\t\t\t\t\t\t\t<Left Name=\"year\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_year\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"75a411a3-e120-493a-ac34-70756342f2d4\">\n\t\t\t\t\t\t\t\t<Left Name=\"month\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_month\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"bc4fd730-63af-40e3-a5de-6e0dc8e8f090\">\n\t\t\t\t\t\t\t\t<Left Name=\"day\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_day\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"8f528484-2e7e-4196-a5a4-0f9ba987d44c\">\n\t\t\t\t\t\t\t\t<Left Name=\"hour\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_hour\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"3acbfd30-bd67-450c-9ac0-6a49ca597afd\">\n\t\t\t\t\t\t\t\t<Left Name=\"station_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_station\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"2bd6c97d-9286-436d-8594-9d4f3adc5c38\">\n\t\t\t\t\t\t\t\t<Left Name=\"year\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_year\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"75a411a3-e120-493a-ac34-70756342f2d4\">\n\t\t\t\t\t\t\t\t<Left Name=\"month\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_month\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"bc4fd730-63af-40e3-a5de-6e0dc8e8f090\">\n\t\t\t\t\t\t\t\t<Left Name=\"day\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_day\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"8f528484-2e7e-4196-a5a4-0f9ba987d44c\">\n\t\t\t\t\t\t\t\t<Left Name=\"hour\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"start_hour\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "departure-inner-drops-hours.csv",
+      "expected_failed": [
+        "calendar_population",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        departures, arrivals = flows.get((station, hour), (0, 0))",
+            "to": "        departures, arrivals = flows.get((station, hour), (0, 0))\n        if departures == 0:\n            continue",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "reversed-net-inflow",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"NVLF(arrivals, 0) - NVLF(departures, 0)\"",
+          "to": "Expression=\"NVLF(departures, 0) - NVLF(arrivals, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "reversed-net-inflow.csv",
+      "expected_failed": [
+        "counts_and_net",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            departures, arrivals, arrivals - departures,",
+            "to": "            departures, arrivals, departures - arrivals,",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

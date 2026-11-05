@@ -1,0 +1,139 @@
+{
+  "sources": {
+    "SPEC.md": "d33883ab5ea03fa528e5c567b7235686c20fd58cf3f5ecd6a6ae243352460246",
+    "acceptance.json": "122c0fd8b9283e4cafbba7428d378ff7638a15f9af4377ac865c30b958d12135",
+    "data/cohort_calendar.csv": "2d7f42ea91758247389c3fe8c63163e737970f422403907b89cd5ab71b30a8eb",
+    "data/purchase_lines.csv": "3aab0778269436cf035ba3a2d51e6fcda813ff0ce59ef9bfe0bfd92115ef13a5",
+    "oracle.csv": "08225ecdbf36c7346d70cfed76d0ccfa2284125266aec76758301e33070e347f",
+    "oracle.py": "8357c0a6785961ae331f843aa60ccd399ac2252f8ad293c936f00605a5f2af9d",
+    "provenance.json": "7a777701e090778d9114d3aec219b87fd7cefd1d1805dd21c3be7c7f1895872e",
+    "reference.lgp": "a6c1c882d181f0439243489f8142f229894843f26e113b9ab35f6553c57f930c",
+    "task.json": "3d6a3fa672d85342c911ddcbf50a9ed3b649490aedba6884404df30e7ee848b5"
+  },
+  "cases": [
+    {
+      "id": "cancel-prefix-lost",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "RelationType=\"frtNotStartingWith\"",
+          "to": "RelationType=\"frtNotEqual\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "eligible-first-observed-cohort",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "cancel-prefix-lost.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "row[\"invoice_id\"].startswith(\"C\")",
+            "to": "row[\"invoice_id\"] == \"C\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "line-count-not-customers",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"customer_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utValue\" InputColumnInfoName=\"customer_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdCount\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"activity_month\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"activity_month\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_count\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" InputColumnInfoName=\"line_count\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t",
+          "to": "<Item Name=\"customer_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"customer_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"activity_month\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"activity_month\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"1\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"line_count\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"line_count\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"active_customers\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"customer_id_Count\"/>",
+          "to": "<Item Name=\"active_customers\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"line_count_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "distinct-customer-retention",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "line-count-not-customers.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "months = defaultdict(set)",
+            "to": "months = defaultdict(list)",
+            "count": 1
+          },
+          {
+            "from": ".add(month)",
+            "to": ".append(month)",
+            "count": 1
+          },
+          {
+            "from": "active = len({customer for customer in members if row[\"activity_month\"] in months[customer]})",
+            "to": "active = sum(months[customer].count(row[\"activity_month\"]) for customer in members)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "future-zero-periods",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"c7277e7a-0b84-4299-a327-8009e1c62a35\" Name=\"age_month\" ConcatenationType=\"ctAnd\"",
+          "to": "<Item Guid=\"c7277e7a-0b84-4299-a327-8009e1c62a35\" Name=\"age_month\" ConcatenationType=\"ctOr\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "observed-calendar-coverage",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "future-zero-periods.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "int(row[\"observed\"]) == 1 and 0 <= int(row[\"age_month\"]) <= 2",
+            "to": "int(row[\"observed\"]) == 1 or 0 <= int(row[\"age_month\"]) <= 2",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "observed-zero-dropped",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "observed-calendar-coverage",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "observed-zero-dropped.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        writer.writerow([row[\"cohort_month\"], int(row[\"age_month\"]), len(members), active, str(Decimal(active) / len(members))])",
+            "to": "        if active:\n            writer.writerow([row[\"cohort_month\"], int(row[\"age_month\"]), len(members), active, str(Decimal(active) / len(members))])",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

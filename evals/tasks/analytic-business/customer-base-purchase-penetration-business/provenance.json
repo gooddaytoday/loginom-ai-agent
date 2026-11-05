@@ -1,0 +1,39 @@
+{
+  "task_id": "customer-base-purchase-penetration-business",
+  "source_task": "customer-base-purchase-penetration-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/customer-base-purchase-penetration-detailed/provenance.json",
+  "dataset_sha256": {
+    "customers.csv": "82cfdccc476fbb106d19e8a6df62b1acc46e9f4139c119f62f976419da606ba4",
+    "sales_lines.csv": "077dd4b526a689931dede0998c34f2140d35e1f2027a05869ff5a7afcd05c394"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "755534b1865666f13edb433338c1b11f2d86a91d96331b4878418e29e399a23f"
+  },
+  "reference_sha256": "0813bfd127713d24a8e424887f62fb3451de72338b4524a165d3fc843cf87715",
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw buyer customer-id set and Decimal revenue per customer over the complete customer registry; per-segment full-base cardinality, distinct any-line buyers including amount0, all-line revenue and full-base ratios; manual full3x6 independently checked, no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic six-customer complete base and five sales lines prepared under approved P09 fixture plan and frozen before manual gold/oracle; raw multiple invoices/lines per customer, nonbuyers, a zero-amount sale and a segment without sales, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real CRM or a derived real-client snapshot. One monetary unit without tax or unagreed charges. Whole sales file scope is February2026 [2026-02-01,2026-03-01), civil calendar without timestamps or time conversion. Unique customer_id and line_id; invoice determines customer, valid customer foreign keys, case-sensitive ASCII keys, all cells nonempty/no NULL, nonnegative two-decimal amounts."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

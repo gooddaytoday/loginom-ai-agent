@@ -40,7 +40,7 @@ export function readPreviewSchemaBrowser(binding){
   if(new Set(indexed.map(p=>p.index)).size!==indexed.length)return fail('preview_port_graph');
   indexed.sort((a,b)=>a.index-b.index);portIndex=indexed.findIndex(p=>p.port===port);
  }
- const caches=form.FFormCache;if(!caches||Object.keys(caches).length>16)return fail('preview_cache_bound');
+ const caches=form.FFormCache;if(!caches)return fail('preview_cache_bound');
  const candidates=Object.values(caches).filter(f=>f.FView?.el?.dom?.checkVisibility({checkVisibilityCSS:true}));
  if(candidates.length!==1)return fail('preview_visible_form');
  const data=candidates[0],root=data.FView.el.dom,tid=rootTid+';PreviewForm;DataSetForm';

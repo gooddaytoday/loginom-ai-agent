@@ -1,0 +1,7 @@
+"InvoiceNo";"StockCode";"Description";"Quantity";"InvoiceDate";"UnitPrice";"CustomerID";"Country"
+"CSYN01";"SYN_A";"";"-2";"2010-12-01 08:30:00";"3.00";"";"Synthetic"
+"CSYN02";"SYN_B";"";"-3";"2010-12-01 08:30:00";"2.00";"SYN_CUST";"Synthetic"
+"CSYN03";"SYN_C";"Synthetic credit";"-4";"2010-12-01 08:30:00";"1.25";"SYN_CUST";"Synthetic"
+"SYN04";"SYN_D";"   ";"2";"2010-12-01 08:30:00";"2.50";"SYN_CUST";"Synthetic"
+"SYN04";"SYN_E";"Synthetic sale";"1";"2010-12-01 08:30:00";"4.00";"SYN_CUST";"Synthetic"
+"SYN05";"SYN_F";"Synthetic customer missing";"1";"2010-12-01 08:30:00";"1.50";"";"Synthetic"

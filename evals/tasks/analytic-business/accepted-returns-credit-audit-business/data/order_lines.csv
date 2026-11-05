@@ -1,0 +1,5 @@
+order_line_id;customer_id;sold_qty;net_unit_price
+L01;C1;10;12.50
+L02;C1;4;7.00
+L03;C2;3;4.00
+L04;C2;2;5.00

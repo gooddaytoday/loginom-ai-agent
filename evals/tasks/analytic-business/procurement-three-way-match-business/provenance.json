@@ -1,0 +1,37 @@
+{
+  "task_id": "procurement-three-way-match-business",
+  "source_task": "procurement-three-way-match-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/procurement-three-way-match-detailed/provenance.json",
+  "dataset_sha256": {
+    "invoice_lines.csv": "049d7943a70cea12ff20d117a2ec2b0ef428268754d1df2b5b5fec8e20a23d8a",
+    "po_lines.csv": "639ef7ab85d88b7a63767e083dfb77430aebe442eae1849d1ffe4db2da6667ae",
+    "receipts.csv": "80644337e0a133ac0fd63602d5b0f8bedd86ce01e3591789c72c431789149bdc"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6ae253626d03b4d2fc236252625d828f24bc1d7f78de515582e4c870110e6e9f"
+  },
+  "reference_sha256": "24048e42c95993f1e169a120a2ba33220e47503c996eb949aa61f0b84f6d3e71",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw PO registry, receipt quantities and per-invoice Decimal price differences; independent quantity sums, per-line price-problem count, full PO iteration and positive billed-minus-accepted excess; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Five PO lines, four receipt rows and four invoice rows prepared under the approved P02 fixture plan and frozen before oracle computation; raw quantities and unit prices, no precomputed answer columns.",
+    "limitations": "One quantity unit and one monetary unit without tax; all fact PO references exist and input fields are non-null. Not real procurement data."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

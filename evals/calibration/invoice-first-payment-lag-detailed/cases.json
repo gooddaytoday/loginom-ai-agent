@@ -1,0 +1,119 @@
+{
+  "sources": {
+    "task.json": "9b4fa1301d43502db9779a53ec69e3329b3f953bcfb9513eb16b8bc8561cdd24",
+    "reference.lgp": "8df48fc5d5493f687021df8083a6993afdb8981afb849bc8d1ae4099c8042fba",
+    "SPEC.md": "ed618c2ffd8f6bad6560c4c3301c9d497fcdd0d201f15423ca959306c96480ab",
+    "acceptance.json": "5592310d098ba7943273b4a3abd1ed5caaf10f7b8d7ab2ebb67a51e31dc57653",
+    "provenance.json": "a8e4052b686086b7f0826b1787b2a1c3c2bb8a7ae7cd33d69c4d31196e5459e6",
+    "data/invoices.csv": "ebdbf121f0e1a66bde455399651fd06607766856ea6ef764c4005d5bb9998c91",
+    "data/payments.csv": "902f5f71dc4d49529c541f6082d8498a7d5b6e7346c45637b4e3ba514d497c95",
+    "oracle.csv": "076a8e36f9d0b7964cbb2957aad42f1880517fbea2114028d1d21e7828f51cf5",
+    "oracle.py": "50b0394c1dd85c781e13c17d65a8c88ae8beb2bd87f6f6bffe26245b7b0d691c"
+  },
+  "cases": [
+    {
+      "id": "latest-payment",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdMin\" Order=\"0\"",
+          "to": "GroupFunctions=\"gdMax\" Order=\"0\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Mapping Source=\"paid_at_Min\"/>",
+          "to": "<Mapping Source=\"paid_at_Max\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "latest-payment.csv",
+      "expected_failed": [
+        "eligible_first_payment",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        first[row[\"invoice_id\"]] = min(first.get(row[\"invoice_id\"], paid), paid)",
+            "to": "        first[row[\"invoice_id\"]] = max(first.get(row[\"invoice_id\"], paid), paid)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "month-without-year",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"12 * (payment_year - issue_year) + payment_month_number - issue_month_number\"",
+          "to": "Expression=\"payment_month_number - issue_month_number\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "month-without-year.csv",
+      "expected_failed": [
+        "calendar_classes",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "                lag = 12 * (paid.year - issued.year) + paid.month - issued.month\n                category = {0: \"same_month\", 1: \"next_month\"}.get(lag, \"later\")",
+            "to": "                lag = paid.month - issued.month\n                category = {0: \"same_month\", 1: \"next_month\"}.get(lag, \"later\" if lag > 1 else None)",
+            "count": 1
+          },
+          {
+            "from": "        group[category] += 1",
+            "to": "        if category is not None:\n            group[category] += 1",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "exclusive-snapshot",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Name=\"issued_at\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtLessOrEqual\"",
+          "to": "Name=\"issued_at\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtLess\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Name=\"paid_at\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtLessOrEqual\"",
+          "to": "Name=\"paid_at\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtLess\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "exclusive-snapshot.csv",
+      "expected_failed": [
+        "invoice_population",
+        "eligible_first_payment",
+        "complete_result"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "or paid > snapshot:",
+            "to": "or paid >= snapshot:",
+            "count": 1
+          },
+          {
+            "from": "        if issued > snapshot:",
+            "to": "        if issued >= snapshot:",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+account_id;active_billable_seats;minimum_seats;billed_seats;expected_bill;actual_bill;deviation
+A01;3;0;3;30.00;10.00;-20.00
+A02;0;3;3;60.00;55.00;-5.00
+A03;0;0;0;0.00;0.00;0.00
+A04;2;1;2;40.00;0.00;-40.00
