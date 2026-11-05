@@ -342,6 +342,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-user-real-date':
+        src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
+        return dict(source=src, prompt=src / 'task-real-datetime.md', data=src.parent / 'fixtures', input_files=['transactions.csv'], base=None,
+                    expected_name='expected-updated-run.json', variables_real_date=True, export_count=2)
     if name == 'variables-user':
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
@@ -1174,6 +1178,12 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if spec.get('variables_real_date'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'variable-events.json', evidence)
+            self.phase('user-real-date-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-user-real-date.mjs',
+                src / 'expected-initial-run.json', src / 'expected-updated-run.json', folder / 'variable-events.json'], folder, timeout=60)
         if spec.get('upload_only'):
             calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
                      if event.get('type') == 'tool_use']

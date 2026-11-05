@@ -382,8 +382,8 @@ export function parseExpectedVariableInventory(expected){
   need(o&&Object.keys(o).every(k=>['node','port','ordered','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
    &&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
   for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value','tolerance'].includes(k))
-   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string'].includes(x.type)
-   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'),'EXPECTED_VARIABLE_VALUE_INVALID');
+   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime'].includes(x.type)
+   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
   for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
    &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
   for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
@@ -411,7 +411,7 @@ export function matchVariableInventoryOutput(output,want){
  for(const x of want.variables){
   const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
   need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
-   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(x.tolerance?matchesCell(cell,x,x.value):(want.node.type==='variables.column_union'?Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value))):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
+   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(x.tolerance?matchesCell(cell,x,x.value):(want.node.type==='variables.column_union'?Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value))):x.type==='datetime'?matchesCell(cell,x,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
  }
  return true;
 }

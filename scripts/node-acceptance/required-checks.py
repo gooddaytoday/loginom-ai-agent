@@ -40,6 +40,7 @@ RULES = (
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union',)),
     ((C + 'variables-calculator-*.mjs',), ('live-ui',), ('variables-calculator',)),
+    ((C + 'crosstable-variables.mjs', 'docs/node-development/nodes/variables-user/acceptance/**', 'scripts/node-acceptance/variables-user-real-date.mjs'), ('live-ui',), ('variables-user-real-date',)),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18', 'throw1', 'js-declared-empty')),
     ((C + 'node-port-*.mjs', C + 'node-output-context.mjs', C + 'node-read*.mjs',
       C + '*tooltip*.mjs'), ('live-ui',), ('s1', 's3', 's5', 'n18', 'n19', 'n20', 'calculator-viewport')),

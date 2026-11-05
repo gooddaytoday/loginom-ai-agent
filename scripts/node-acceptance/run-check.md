@@ -543,3 +543,10 @@ rows task. Private delivery prepares a new package for each run. The native
 three-column output is checked in source order, including each Variant subtype,
 civil datetime milliseconds, NULL/empty/FALSE/zero; CSV, Save and independent
 cold execution with the same variable edge and confirmed cleanup are required.
+
+`variables-user-real-date`: builtin output 4, real threshold and civil report_date,
+typed NULL/empty/zero/false; two business reports before and after patching only
+two variables. Task and transactions.csv reach the model; independent stage-0
+oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
+check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
+cold typed variable inventory and both reports, package Close and logout apply.
