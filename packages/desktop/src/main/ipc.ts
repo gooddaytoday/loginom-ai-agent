@@ -220,6 +220,7 @@ export function registerIpcHandlers(deps: Deps) {
   )
 
   ipcMain.on("open-external", (_event: IpcMainEvent, url: string) => {
+    if (deps.updater.openUpdateLink(url)) return
     openExternalURL(url)
   })
 

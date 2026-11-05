@@ -88,7 +88,7 @@ export function updateSources(
       ? [
           {
             kind: "github" as const,
-            api: clean(github.api),
+            api: clean(github.api).replace(/\/+$/, ""),
             download: clean(github.download),
             channel: settings.channel,
           },
@@ -108,6 +108,13 @@ export function updateSources(
 // Only transport failures carry this type. Parsing, signature, TLS trust and
 // target validation errors must never select another source.
 export class UpdateTransportError extends Error {}
+export class UpdateHttpError extends Error {
+  readonly statusCode: number
+  constructor(statusCode: number) {
+    super("LOGINOM_UPDATE_FEED_HTTP_" + statusCode)
+    this.statusCode = statusCode
+  }
+}
 
 export function isUpdateTransportError(error: unknown) {
   if (error instanceof UpdateTransportError) return true
@@ -121,7 +128,7 @@ export function isUpdateTransportError(error: unknown) {
   if (failure.statusCode !== undefined)
     return [403, 429].includes(failure.statusCode) || (failure.statusCode >= 500 && failure.statusCode <= 599)
   const code = failure.code ?? failure.message.replace(/^.*net::/, "").split(/[ :]/)[0]
-  return /^(?:E(?:CONNRESET|CONNREFUSED|CONNABORTED|TIMEDOUT|NOTFOUND|AI_AGAIN|HOSTUNREACH|NETUNREACH)|ERR_(?:NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|CONNECTION_(?:CLOSED|RESET|REFUSED|ABORTED|FAILED|TIMED_OUT)|TIMED_OUT|NETWORK_CHANGED|INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR))$/.test(
+  return /^(?:E(?:CONNRESET|CONNREFUSED|CONNABORTED|TIMEDOUT|NOTFOUND|AI_AGAIN|HOSTUNREACH|NETUNREACH)|ERR_(?:NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|CONNECTION_(?:CLOSED|RESET|REFUSED|ABORTED|FAILED|TIMED_OUT)|TIMED_OUT|NETWORK_CHANGED|INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|TUNNEL_CONNECTION_FAILED|PROXY_CONNECTION_FAILED|SOCKS_CONNECTION_FAILED))$/.test(
     code,
   )
 }
@@ -156,7 +163,7 @@ export function readUpdateBytes(url: string, request: (url: string) => UpdateReq
         fail(
           [403, 429].includes(response.statusCode) || (response.statusCode >= 500 && response.statusCode <= 599)
             ? new UpdateTransportError(message)
-            : Error(message),
+            : new UpdateHttpError(response.statusCode),
         )
         return
       }
@@ -183,7 +190,7 @@ export type SelectedUpdate = {
   source: UpdateSource["kind"]
   feed: string
   signed: SignedUpdateInfo
-  url(file: string): string
+  url(file: string, signed?: boolean): string
 }
 
 export async function loadSignedUpdate(input: {
@@ -192,7 +199,7 @@ export async function loadSignedUpdate(input: {
   file: string
   currentVersion: string
   keys?: readonly string[]
-}): Promise<SelectedUpdate> {
+}): Promise<SelectedUpdate | undefined> {
   const failures: string[] = []
   for (const source of input.sources) {
     try {
@@ -203,6 +210,11 @@ export async function loadSignedUpdate(input: {
         return input.read(url, remaining)
       }
       const release = source.kind === "github" ? await githubUpdateRelease(source, read) : undefined
+      if (
+        source.kind === "github" &&
+        (!release || compareUpdateVersions(release.tag_name.slice(1), input.currentVersion) <= 0)
+      )
+        return undefined
       const feed = release
         ? new URL(encodeURIComponent(release.tag_name) + "/", source.kind === "github" ? source.download : "").href
         : (source as { feed: string }).feed
@@ -225,17 +237,31 @@ export async function loadSignedUpdate(input: {
         source: source.kind,
         feed,
         signed,
-        url: (file) =>
+        url: (file, signed = true) =>
           source.kind === "github"
             ? new URL(file.slice(file.lastIndexOf("/") + 1), feed).href
-            : transport(new URL(file.startsWith("releases/") ? "../" + file : file, feed).href),
+            : signed
+              ? transport(new URL(file.startsWith("releases/") ? "../" + file : file, feed).href)
+              : new URL(file.startsWith("releases/") ? "../" + file : file, feed).href,
       }
     } catch (error) {
+      if (source.kind === "github" && error instanceof UpdateHttpError && error.statusCode === 404) return undefined
       if (!(error instanceof UpdateTransportError)) throw error
       failures.push(source.kind + ": " + error.message)
     }
   }
   throw Error("LOGINOM_UPDATE_SOURCES_UNAVAILABLE (" + failures.join("; ") + ")")
+}
+
+export function updateNotificationLink(selected: SelectedUpdate, file: string) {
+  const url = selected.url(file, false)
+  return {
+    url,
+    resolve: (requested: string) => {
+      if (requested !== url) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+      return selected.url(file)
+    },
+  }
 }
 
 async function githubUpdateRelease(
@@ -255,21 +281,30 @@ async function githubUpdateRelease(
         "prerelease" in value &&
         typeof value.prerelease === "boolean",
     )
-  if (source.channel === "stable") {
-    const release: unknown = JSON.parse((await read(new URL("latest", source.api).href)).toString("utf8"))
-    if (!valid(release) || release.prerelease) throw Error("LOGINOM_UPDATE_RELEASE_INVALID")
-    return release
-  }
-  // A bounded scan avoids treating stable releases as unstable or hanging on a
-  // repository with no prereleases. Invalid API data is a hard configuration error.
+  const api = source.api.replace(/\/+$/, "")
+  const latest = await (async () => {
+    try {
+      const release: unknown = JSON.parse((await read(api + "/latest")).toString("utf8"))
+      if (!valid(release) || release.prerelease) throw Error("LOGINOM_UPDATE_RELEASE_INVALID")
+      return release
+    } catch (error) {
+      if (error instanceof UpdateHttpError && error.statusCode === 404) return undefined
+      throw error
+    }
+  })()
+  if (source.channel === "stable") return latest
+  // Keep release-list responses comfortably below the metadata byte limit.
   for (let page = 1; page <= 10; page++) {
-    const releases: unknown = JSON.parse((await read(source.api + `?per_page=100&page=${page}`)).toString("utf8"))
+    const releases: unknown = JSON.parse((await read(api + `?per_page=5&page=${page}`)).toString("utf8"))
     if (!Array.isArray(releases)) throw Error("LOGINOM_UPDATE_RELEASE_INVALID")
     const release = releases.filter(valid).find((item) => item.prerelease)
-    if (release) return release
-    if (releases.length < 100) break
+    if (release)
+      return !latest || compareUpdateVersions(release.tag_name.slice(1), latest.tag_name.slice(1)) > 0
+        ? release
+        : latest
+    if (releases.length < 5) break
   }
-  throw Error("LOGINOM_UPDATE_RELEASE_UNAVAILABLE")
+  return latest
 }
 
 export function configureSignedUpdate(
@@ -286,11 +321,11 @@ export function configureSignedUpdate(
         isUseMultipleRangeRequest: false,
       })
     }
-    async getLatestVersion() {
+    override async getLatestVersion() {
       // Keep approval evidence independent of the updater's mutable UpdateInfo.
       return structuredClone(selected.signed)
     }
-    resolveFiles(info: UpdateInfo) {
+    override resolveFiles(info: UpdateInfo) {
       matchUpdateManifest(selected.signed, info)
       return resolveFiles(info, new URL(selected.feed), selected.url)
     }
@@ -302,7 +337,7 @@ export function configureSignedUpdate(
 export async function downloadSignedUpdate(
   updater: AppUpdater,
   selected: SelectedUpdate,
-  fallback: () => Promise<SelectedUpdate>,
+  fallback: () => Promise<SelectedUpdate | undefined>,
 ) {
   updater.allowDowngrade = false
   try {
@@ -310,6 +345,7 @@ export async function downloadSignedUpdate(
   } catch (error) {
     if (selected.source !== "github" || !isUpdateTransportError(error)) throw error
     const next = await fallback()
+    if (!next) throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
     // A download fallback cannot silently replace the version already shown in
     // the UI. It needs the same signed target, rollout and minimum version.
     matchUpdateManifest(selected.signed, next.signed)

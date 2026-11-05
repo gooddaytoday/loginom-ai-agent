@@ -9,8 +9,15 @@ const {
   downloadSignedUpdate,
   updateSources,
   isUpdateTransportError,
+  updateNotificationLink,
 } = await import("./update-policy")
 import { presignUpdateGet } from "@loginom-ai-agent/product/update-signature"
+import { EventEmitter } from "node:events"
+import { ElectronHttpExecutor } from "electron-updater/out/electronHttpExecutor"
+import { createRequire } from "node:module"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 const key = generateKeyPairSync("ed25519")
 const keys = [key.publicKey.export({ type: "spki", format: "pem" }).toString()]
@@ -21,6 +28,232 @@ const metadata = (version = "0.4.2") =>
   Buffer.from(
     `version: ${version}\nminSupportedVersion: 0.4.0\nstagingPercentage: 100\npath: releases/${version}/${filename}\nsha512: ${sha512}\nfiles:\n  - url: releases/${version}/${filename}\n    sha512: ${sha512}\n    size: ${payload.length}\n`,
   )
+
+test("notification URLs are signed only when Download is selected, and cannot sign a different target", () => {
+  let signed = 0
+  const selected = {
+    source: "s3" as const,
+    feed: "https://updates.example.test/stable/",
+    signed: {} as import("./update-policy").SignedUpdateInfo,
+    url: (_file: string, sign = true) => "https://updates.example.test/asset" + (sign ? "?fresh=" + ++signed : ""),
+  }
+  const link = updateNotificationLink(selected, "releases/0.4.2/asset")
+  expect(signed).toBe(0)
+  expect(link.url).not.toContain("?")
+  expect(link.resolve(link.url)).toEndWith("?fresh=1")
+  expect(link.resolve(link.url)).toEndWith("?fresh=2")
+  expect(() => link.resolve("https://other.test/asset")).toThrow("TARGET_INVALID")
+})
+
+test("the real electron-updater Cannot download status 503 error retries the same signed target on S3", async () => {
+  const f = await fixture({ artifactStatus: 503 })
+  const dir = await mkdtemp(join(tmpdir(), "updater-download-"))
+  const require = createRequire(import.meta.url)
+  const { CancellationToken } = require(
+    require.resolve("builder-util-runtime", { paths: [require.resolve("electron-updater")] }),
+  )
+  class LocalExecutor extends ElectronHttpExecutor {
+    createRequest(
+      options: import("node:http").RequestOptions,
+      callback: (response: import("node:http").IncomingMessage) => void,
+    ) {
+      return request(options, callback)
+    }
+  }
+  const executor = new LocalExecutor()
+  let failure = ""
+  try {
+    const selected = await loadSignedUpdate({
+      sources: f.sources,
+      read: f.read,
+      file: "latest-linux.yml",
+      currentVersion: "0.4.1",
+      keys,
+    })
+    const updater = new Updater()
+    updater.read = async (url) => {
+      const path = join(dir, "payload")
+      try {
+        await executor.download(new URL(url), path, { cancellationToken: new CancellationToken(), sha512 })
+      } catch (error) {
+        failure = (error as Error).message
+        throw error
+      }
+      return readFile(path)
+    }
+    configureSignedUpdate(updater, selected!)
+    await updater.checkForUpdates()
+    await downloadSignedUpdate(updater, selected!, () =>
+      loadSignedUpdate({
+        sources: f.sources.slice(1),
+        read: f.read,
+        file: "latest-linux.yml",
+        currentVersion: "0.4.2",
+        keys,
+      }),
+    )
+    expect(failure).toContain('Cannot download "')
+    expect(failure).toContain("status 503")
+    expect(updater.urls).toEqual([f.base + `/download/v0.4.2/${filename}`, f.base + `/s3/releases/0.4.2/${filename}`])
+  } finally {
+    await f.close()
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+async function githubScenario(options: { stable?: string; pre?: string; missing?: string; large?: boolean } = {}) {
+  const calls: string[] = []
+  const server = createServer((req, res) => {
+    const url = new URL(req.url!, "http://local")
+    calls.push(req.url!)
+    const release = (version: string, prerelease: boolean) => ({
+      tag_name: "v" + version,
+      draft: false,
+      prerelease,
+      assets: options.large ? "x".repeat(310_000) : [],
+    })
+    if (url.pathname === "/api/releases/latest") {
+      if (!options.stable) {
+        res.writeHead(404).end()
+        return
+      }
+      res.end(JSON.stringify(release(options.stable, false)))
+      return
+    }
+    if (url.pathname === "/api/releases") {
+      const size = Number(url.searchParams.get("per_page"))
+      if (size > 5) {
+        res.end("x".repeat(2 * 1024 * 1024 + 1))
+        return
+      }
+      const list = options.pre ? [release(options.pre, true)] : []
+      res.end(
+        JSON.stringify(options.large ? [...list, ...Array.from({ length: 4 }, () => release("0.3.0", false))] : list),
+      )
+      return
+    }
+    if (url.pathname.startsWith("/download/")) {
+      if (url.pathname.endsWith(options.missing ?? "never")) {
+        res.writeHead(404).end()
+        return
+      }
+      const version = url.pathname.split("/")[2].slice(1)
+      const bytes = metadata(version)
+      if (url.pathname.endsWith(".sig")) {
+        res.end(sign(null, bytes, key.privateKey).toString("base64"))
+        return
+      }
+      res.end(bytes)
+      return
+    }
+    res.writeHead(404).end()
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  const read = (url: string) => readUpdateBytes(url, (url) => request(url), 2000)
+  const sources = [
+    {
+      kind: "github" as const,
+      api: base + "/api/releases/",
+      download: base + "/download/",
+      channel: "stable" as const,
+    },
+    { kind: "generic" as const, feed: base + "/s3/stable/" },
+  ]
+  return {
+    calls,
+    sources,
+    read,
+    close: async () => {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    },
+  }
+}
+
+for (const stable of ["0.4.0", "0.4.1", undefined])
+  test(`review 1: GitHub ${stable ?? "no release"} means no update and no S3`, async () => {
+    const f = await githubScenario({ stable })
+    try {
+      expect(
+        await loadSignedUpdate({
+          sources: f.sources,
+          read: f.read,
+          file: "latest-linux.yml",
+          currentVersion: "0.4.1",
+          keys,
+        }),
+      ).toBeUndefined()
+      expect(f.calls).toEqual(["/api/releases/latest"])
+    } finally {
+      await f.close()
+    }
+  })
+
+for (const missing of ["latest-mac.yml", "latest-mac.yml.sig"])
+  test(`review 1: GitHub missing ${missing} is no update`, async () => {
+    const f = await githubScenario({ stable: "0.4.2", missing })
+    try {
+      expect(
+        await loadSignedUpdate({
+          sources: f.sources,
+          read: f.read,
+          file: "latest-mac.yml",
+          currentVersion: "0.4.1",
+          keys,
+        }),
+      ).toBeUndefined()
+      expect(f.calls.some((url) => url.startsWith("/s3"))).toBe(false)
+    } finally {
+      await f.close()
+    }
+  })
+
+for (const [stable, pre, expected] of [
+  ["0.4.5", "0.4.3", "0.4.5"],
+  ["0.4.2", "0.4.3", "0.4.3"],
+  [undefined, "0.4.3", "0.4.3"],
+  ["0.4.2", undefined, "0.4.2"],
+])
+  test(`review 1/2: unstable chooses ${expected} from stable ${stable} and pre ${pre}`, async () => {
+    const f = await githubScenario({ stable, pre, large: true })
+    try {
+      const sources = [{ ...f.sources[0], channel: "unstable" as const }, f.sources[1]]
+      expect(
+        (await loadSignedUpdate({ sources, read: f.read, file: "latest-linux.yml", currentVersion: "0.4.1", keys }))
+          ?.signed.version,
+      ).toBe(expected!)
+      expect(f.calls).toContain("/api/releases?per_page=5&page=1")
+      expect(f.calls.some((url) => url.startsWith("/api/releases/?") || url.startsWith("/s3"))).toBe(false)
+    } finally {
+      await f.close()
+    }
+  })
+
+for (const code of ["ERR_TUNNEL_CONNECTION_FAILED", "ERR_PROXY_CONNECTION_FAILED", "ERR_SOCKS_CONNECTION_FAILED"])
+  test(`review 3: ${code} uses S3 without bypassing proxy policy`, async () => {
+    const f = await fixture()
+    try {
+      const read = (url: string) =>
+        url.includes("/api/")
+          ? readUpdateBytes(url, () =>
+              Object.assign(new EventEmitter(), {
+                setHeader() {},
+                abort() {},
+                end() {
+                  this.emit("error", Error("net::" + code))
+                },
+              }),
+            )
+          : f.read(url)
+      expect(
+        (await loadSignedUpdate({ sources: f.sources, read, file: "latest-linux.yml", currentVersion: "0.4.1", keys }))
+          ?.source,
+      ).toBe("generic")
+    } finally {
+      await f.close()
+    }
+  })
 
 test("private S3 rejects anonymous and modified GETs, then verifies SigV4 metadata and payload after GitHub failure", async () => {
   const calls: string[] = []
@@ -303,7 +536,7 @@ for (const options of [{ timeout: true }, { status: 503 }, { status: 500 }, { st
   })
 }
 
-for (const options of [{ badSignature: true }, { invalid: true }, { status: 404 }, { version: "0.4.0" }]) {
+for (const options of [{ badSignature: true }, { invalid: true }, { version: "0.4.0" }]) {
   test(`GitHub invalid evidence ${JSON.stringify(options)} never uses S3`, async () => {
     const f = await fixture(options)
     try {
@@ -482,9 +715,7 @@ test("unstable successfully checks and downloads a prerelease without selecting 
     expect((await updater.checkForUpdates())?.isUpdateAvailable).toBe(true)
     await updater.downloadUpdate()
     expect(updater.urls).toEqual([f.base + `/download/v0.4.3/${filename}`])
-    expect(f.calls.some((url) => url.startsWith("/s3") || url.includes("v0.4.2") || url.includes("/api/latest"))).toBe(
-      false,
-    )
+    expect(f.calls.some((url) => url.startsWith("/s3") || url.includes("v0.4.2"))).toBe(false)
   } finally {
     await f.close()
   }

@@ -13,8 +13,8 @@ test("Desktop resource contains only the read key; disabled or partial builds ca
     LOGINOM_UPDATES_S3_BUCKET: "updates-test",
     LOGINOM_UPDATES_S3_READ_ACCESS_KEY: "tenant:read-key",
     LOGINOM_UPDATES_S3_READ_SECRET_KEY: "read-test-secret",
-    LOGINOM_UPDATES_S3_ACCESS_KEY: "tenant:write-key",
-    LOGINOM_UPDATES_S3_SECRET_KEY: "write-test-secret",
+    LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY: "tenant:write-key",
+    LOGINOM_UPDATES_S3_WRITE_SECRET_KEY: "write-test-secret",
   }
   try {
     expect(await writeUpdateS3Resource(file, env)).toBe(true)

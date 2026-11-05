@@ -42,6 +42,7 @@ on:
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -51,10 +52,6 @@ env:
   LOGINOM_UPDATES_S3_ENDPOINT: ${{ vars.LOGINOM_UPDATES_S3_ENDPOINT }}
   LOGINOM_UPDATES_S3_REGION: ${{ vars.LOGINOM_UPDATES_S3_REGION }}
   LOGINOM_UPDATES_S3_BUCKET: ${{ vars.LOGINOM_UPDATES_S3_BUCKET }}
-  # The owner enables feeds only after signature acceptance on this exact source SHA.
-  LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA == github.sha && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
-  LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA == github.sha && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
-  LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA == github.sha && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
 
 jobs:
   cut:
@@ -135,9 +132,12 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       channel: ${{ steps.release.outputs.channel }}
       prerelease: ${{ steps.release.outputs.prerelease }}
+      feeds: ${{ steps.feeds.outputs.enabled }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
 
       # Every build stages this key into its resources; without it the app cannot use the knowledge service.
       - name: Require the built-in knowledge key
@@ -201,6 +201,21 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Building version \`$version\` on channel \`$channel\` (prerelease: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Setup Bun for feed authorization
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+
+      - name: Authorize update feeds
+        id: feeds
+        env:
+          LOGINOM_UPDATES_VERIFIED_SHA: ${{ vars.LOGINOM_UPDATES_VERIFIED_SHA }}
+          LOGINOM_UPDATES_FEEDS_OFF: ${{ vars.LOGINOM_UPDATES_FEEDS_OFF }}
+          LOGINOM_AI_AGENT_UPDATE_FEED: ${{ vars.LOGINOM_AI_AGENT_UPDATE_FEED }}
+          LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API }}
+          LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD }}
+        run: bun script/update-feed.ts release-config
+
   tests:
     name: tests
     needs: verify
@@ -229,6 +244,9 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
@@ -318,6 +336,9 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
@@ -397,6 +418,9 @@ jobs:
     env:
       LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      LOGINOM_AI_AGENT_UPDATE_FEED: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_FEED || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_API || '' }}
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
       LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
@@ -535,8 +559,13 @@ jobs:
           MIN_SUPPORTED: ${{ vars.LOGINOM_UPDATES_MIN_SUPPORTED_VERSION }}
         run: |
           set -euo pipefail
+          if [ -z "${LOGINOM_UPDATES_SIGNING_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_SIGNING_KEY"; exit 1; fi
           bun script/update-feed.ts sign-release --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --min-supported "${MIN_SUPPORTED:-${TAG#v}}"
-          bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
+
+      - name: Regenerate release checksums and notes
+        env:
+          LOGINOM_RELEASE_SKIP_MACOS: ${{ vars.LOGINOM_RELEASE_SKIP_MACOS }}
+        run: bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
 
       - name: Create draft release
         run: |
@@ -561,7 +590,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     concurrency:
-      group: update-channels
+      group: update-${{ github.event.release.tag_name }}
+      queue: max
       cancel-in-progress: false
     permissions:
       contents: read
@@ -600,11 +630,13 @@ jobs:
 
       - name: Mirror identical signed release and promote channel by server-side copy
         env:
-          LOGINOM_UPDATES_S3_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_ACCESS_KEY }}
-          LOGINOM_UPDATES_S3_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_SECRET_KEY }}
+          LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY }}
+          LOGINOM_UPDATES_S3_WRITE_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY }}
           PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           set -euo pipefail
+          if [ -z "${LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY"; exit 1; fi
+          if [ -z "${LOGINOM_UPDATES_S3_WRITE_SECRET_KEY:-}" ]; then echo "::error::Missing required environment secret LOGINOM_UPDATES_S3_WRITE_SECRET_KEY"; exit 1; fi
           channel=stable
           if [ "$PRERELEASE" = true ]; then channel=unstable; fi
           bun script/update-feed.ts mirror-release --assets "$RUNNER_TEMP/assets" --version "${TAG#v}" --channel "$channel"

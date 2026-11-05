@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { createHash, generateKeyPairSync } from "node:crypto"
+import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { mkdtemp, rm, chmod } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -18,6 +18,282 @@ import {
 import type { FetchHttpHandler } from "@smithy/fetch-http-handler"
 import { createServer } from "node:http"
 import { rename, readdir } from "node:fs/promises"
+import { readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { verifyUpdateManifest } from "../packages/desktop/src/main/update-policy"
+const { releaseFeedAuthorization } = await import("./update-feed")
+
+type Workflow = {
+  env: Record<string, string>
+  concurrency: { queue: string; "cancel-in-progress": boolean }
+  jobs: Record<
+    string,
+    {
+      environment?: string
+      env?: Record<string, string>
+      concurrency?: { group: string; queue?: string; "cancel-in-progress"?: boolean }
+      steps: {
+        name?: string
+        id?: string
+        run?: string
+        env?: Record<string, string>
+        with?: Record<string, unknown>
+      }[]
+    }
+  >
+}
+const workflow = () =>
+  Bun.YAML.parse(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8")) as Workflow
+
+test("review 4: only release-environment WRITE secrets are accepted and missing keys fail clearly", async () => {
+  const jobs = workflow().jobs
+  expect(jobs.release.environment).toBe("release")
+  expect(jobs["mirror-updates"].environment).toBe("release")
+  const signStep = jobs.release.steps.find((step) => step.env?.LOGINOM_UPDATES_SIGNING_KEY)!
+  const writeStep = jobs["mirror-updates"].steps.find((step) => step.env?.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY)!
+  expect(writeStep?.env?.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY).toBe("${{ secrets.LOGINOM_UPDATES_S3_WRITE_SECRET_KEY }}")
+  for (const [step, missing] of [
+    [signStep, "LOGINOM_UPDATES_SIGNING_KEY"],
+    [writeStep, "LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY"],
+    [writeStep, "LOGINOM_UPDATES_S3_WRITE_SECRET_KEY"],
+  ] as const) {
+    const env = {
+      PATH: process.env.PATH!,
+      LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY: "",
+      LOGINOM_UPDATES_S3_WRITE_SECRET_KEY: "",
+    }
+    if (missing === "LOGINOM_UPDATES_S3_WRITE_SECRET_KEY") env.LOGINOM_UPDATES_S3_WRITE_ACCESS_KEY = "test-only"
+    const child = Bun.spawn(["bash", "-c", step.run!], { env, stdout: "pipe", stderr: "pipe" })
+    const [code, out, err] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect(code).not.toBe(0)
+    expect(out + err).toContain(missing)
+  }
+  expect(signStep.run).not.toContain("release-notes.ts")
+})
+
+async function authorizationFixture() {
+  const dir = await mkdtemp(join(tmpdir(), "update-release-auth-"))
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.test", ...args], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: "pipe",
+    }).trim()
+  await Bun.write(
+    join(dir, "package.json"),
+    JSON.stringify({ version: "0.4.0", scripts: { build: "original" } }) + "\n",
+  )
+  await Bun.write(
+    join(dir, "packages/desktop/package.json"),
+    JSON.stringify({ version: "0.4.0", name: "desktop" }) + "\n",
+  )
+  await Bun.write(
+    join(dir, "bun.lock"),
+    '{\n  "workspaces": {\n    "packages/desktop": {\n      "name": "desktop",\n      "version": "0.4.0",\n    },\n  },\n}\n',
+  )
+  git("init", "-q")
+  git("add", ".")
+  git("commit", "-qm", "accepted source")
+  const verified = git("rev-parse", "HEAD")
+  for (const file of ["package.json", "packages/desktop/package.json", "bun.lock"])
+    await Bun.write(join(dir, file), (await Bun.file(join(dir, file)).text()).replaceAll("0.4.0", "0.4.1"))
+  git("add", ".")
+  git("commit", "-qm", "version bump")
+  return { dir, git, verified }
+}
+
+test("review 5: accepted parent permits only a version-only tag commit; feeds-off must be explicit", async () => {
+  const f = await authorizationFixture()
+  try {
+    const input = {
+      repository: f.dir,
+      head: f.git("rev-parse", "HEAD"),
+      verified: f.verified,
+      tag: "v0.4.1",
+      feedsOff: false,
+    }
+    expect(releaseFeedAuthorization(input)).toBe(true)
+    expect(releaseFeedAuthorization({ ...input, verified: input.head })).toBe(true)
+    expect(releaseFeedAuthorization({ ...input, verified: "0".repeat(40), feedsOff: true })).toBe(false)
+    expect(() => releaseFeedAuthorization({ ...input, verified: "0".repeat(40) })).toThrow(
+      "LOGINOM_UPDATES_VERIFIED_SHA",
+    )
+    await Bun.write(
+      join(f.dir, "package.json"),
+      (await Bun.file(join(f.dir, "package.json")).text()).replace("original", "injected"),
+    )
+    f.git("add", ".")
+    f.git("commit", "--amend", "--no-edit", "-q")
+    expect(() => releaseFeedAuthorization({ ...input, head: f.git("rev-parse", "HEAD") })).toThrow(
+      "LOGINOM_UPDATES_VERIFIED_SHA",
+    )
+    const gate = workflow().jobs.verify.steps.find((step) => step.id === "feeds")
+    expect(gate?.run).toContain("release-config")
+    expect(workflow().env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API).toBeUndefined()
+    expect(workflow().jobs.verify.steps[0].with?.["fetch-depth"]).toBe(0)
+    for (const job of ["build", "windows", "macos"]) {
+      for (const name of [
+        "LOGINOM_AI_AGENT_UPDATE_GITHUB_API",
+        "LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD",
+        "LOGINOM_AI_AGENT_UPDATE_FEED",
+      ])
+        expect(workflow().jobs[job].env?.[name]).toContain("needs.verify.outputs.feeds")
+    }
+  } finally {
+    await rm(f.dir, { recursive: true, force: true })
+  }
+})
+
+test("review 5: a tagged CLI run cannot silently disable feeds without the explicit switch", async () => {
+  for (const off of ["false", "true"]) {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "update-feed.ts"), "release-config"], {
+      cwd: join(import.meta.dir, ".."),
+      env: {
+        PATH: process.env.PATH!,
+        GITHUB_REF_TYPE: "tag",
+        GITHUB_REF_NAME: "v0.4.1",
+        LOGINOM_UPDATES_FEEDS_OFF: off,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [code, out, err] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    if (off === "true") {
+      expect(code).toBe(0)
+      expect(out).toContain("disabled explicitly")
+    } else {
+      expect(code).not.toBe(0)
+      expect(err).toContain("LOGINOM_UPDATES_VERIFIED_SHA")
+    }
+  }
+})
+
+for (const endpoint of [" ", "http://insecure.example.test/releases"])
+  test(`review 5: a verified tag refuses a disabled or invalid endpoint ${JSON.stringify(endpoint)}`, async () => {
+    const repository = join(import.meta.dir, "..")
+    const verified = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim()
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "update-feed.ts"), "release-config"], {
+      cwd: repository,
+      env: {
+        PATH: process.env.PATH!,
+        GITHUB_REF_TYPE: "tag",
+        GITHUB_REF_NAME: "v0.4.1",
+        LOGINOM_UPDATES_VERIFIED_SHA: verified,
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_API: endpoint,
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: "https://github.example.test/releases/download/",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [code, err] = await Promise.all([child.exited, new Response(child.stderr).text()])
+    expect(code).not.toBe(0)
+    expect(err).toContain("endpoint")
+  })
+
+test("review 6: channel promotion refuses a lower signed version unless rollback is explicit", async () => {
+  const dir = await signedFixture()
+  const m = memory()
+  try {
+    await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+    await releaseSums(dir)
+    const newer = Buffer.from("version: 0.5.0\n")
+    m.files.set("stable/latest.yml", { bytes: newer, cache: "no-cache" })
+    m.files.set("stable/latest.yml.sig", {
+      bytes: Buffer.from(sign(null, newer, pair.privateKey).toString("base64")),
+      cache: "no-cache",
+    })
+    await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("rollback")
+    expect(m.events).toHaveLength(0)
+    await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey], { allowRollback: true })
+    expect(m.files.get("stable/latest.yml")!.bytes).toEqual(await Bun.file(join(dir, "latest.yml")).bytes())
+    const concurrency = workflow().jobs["mirror-updates"].concurrency!
+    expect(concurrency.group).toContain("github.event.release.tag_name")
+    expect(concurrency.queue).toBe("max")
+    expect(concurrency["cancel-in-progress"]).toBe(false)
+    expect(workflow().concurrency.queue).toBe("max")
+    expect(workflow().concurrency["cancel-in-progress"]).toBe(false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("promotion rechecks an advanced pointer after uploads and can resume an interrupted identical copy", async () => {
+  const dir = await signedFixture()
+  const m = memory()
+  try {
+    await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+    await releaseSums(dir)
+    const put = m.store.put
+    m.store.put = async (...args) => {
+      await put(...args)
+      const newer = Buffer.from("version: 0.5.0\n")
+      m.files.set("stable/latest.yml", { bytes: newer, cache: "no-cache" })
+      m.files.set("stable/latest.yml.sig", {
+        bytes: Buffer.from(sign(null, newer, pair.privateKey).toString("base64")),
+        cache: "no-cache",
+      })
+    }
+    await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("rollback")
+    expect(m.events.some((event) => event.startsWith("copy stable/"))).toBe(false)
+    m.store.put = put
+    m.files.delete("stable/latest.yml")
+    m.files.delete("stable/latest.yml.sig")
+    const copy = m.store.copy
+    let interrupted = false
+    m.store.copy = async (...args) => {
+      await copy(...args)
+      if (!interrupted) {
+        interrupted = true
+        throw Error("interrupted")
+      }
+    }
+    await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("interrupted")
+    m.store.copy = copy
+    await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
+    for (const name of ["latest.yml", "latest-linux.yml", "latest-mac.yml"]) {
+      const raw = Buffer.from(m.files.get("stable/" + name)!.bytes)
+      const signature = Buffer.from(m.files.get("stable/" + name + ".sig")!.bytes).toString()
+      expect(verifyUpdateManifest(raw, signature, "https://updates.test/stable/", [publicKey]).version).toBe("0.4.0")
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+for (const changed of ["stable/latest.yml", "stable/latest.yml.sig"])
+  test(`promotion preserves a concurrent newer pointer when ${changed} changes immediately before copy`, async () => {
+    const dir = await signedFixture()
+    const m = memory()
+    try {
+      await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+      await releaseSums(dir)
+      await mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])
+      const copy = m.store.copy
+      m.store.copy = async (...args) => {
+        if (args[1] === changed) {
+          const newer = Buffer.from("version: 0.5.0\n")
+          m.files.set("stable/latest.yml", { bytes: newer, cache: "no-cache" })
+          m.files.set("stable/latest.yml.sig", {
+            bytes: Buffer.from(sign(null, newer, pair.privateKey).toString("base64")),
+            cache: "no-cache",
+          })
+        }
+        await copy(...args)
+      }
+      await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow("precondition")
+      expect(Buffer.from(m.files.get("stable/latest.yml")!.bytes).toString()).toContain("0.5.0")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
 const pair = generateKeyPairSync("ed25519")
 const key = pair.privateKey.export({ format: "pem", type: "pkcs8" }).toString()
@@ -39,7 +315,7 @@ test("S3 artifact GET and PUT survive a 16-second response while metadata and HE
     })
   })
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
-  const handler = createS3RequestHandler()
+  const handler = await createS3RequestHandler()
   const read = async (method: string, path: string) => {
     const input: Parameters<FetchHttpHandler["handle"]>[0] = {
       protocol: "http:",
@@ -92,9 +368,17 @@ function memory() {
     async head(name) {
       const file = files.get(name)
       if (!file) return undefined
-      return { size: file.bytes.length, cache: file.cache }
+      return {
+        size: file.bytes.length,
+        cache: file.cache,
+        etag: '"' + createHash("sha256").update(file.bytes).digest("hex") + '"',
+      }
     },
-    async copy(from, to, cache) {
+    async copy(from, to, cache, condition) {
+      const current = files.get(to)
+      const etag = current ? '"' + createHash("sha256").update(current.bytes).digest("hex") + '"' : undefined
+      if ((condition?.ifMatch && condition.ifMatch !== etag) || (condition?.ifNoneMatch === "*" && current))
+        throw Error("S3 precondition failed")
       events.push(`copy ${to}`)
       const file = files.get(from)
       if (!file) throw Error(`Missing ${from}`)
@@ -343,6 +627,7 @@ test("dual release signs GitHub bytes, mirrors immutable assets and server-copie
       server.closeAllConnections()
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
+    m.files.set("stable/latest.yml.sig", m.files.get("unstable/latest.yml.sig")!)
     m.files.set("releases/0.4.0/loginom-ai-agent-desktop.exe", { bytes: Buffer.from("tampered"), cache: "immutable" })
     await expect(mirrorRelease(m.store, dir, "0.4.0", "stable", [publicKey])).rejects.toThrow(
       "Immutable release differs",
@@ -379,6 +664,10 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     const path = req.url!.split("?")[0]
     const source = req.headers["x-amz-copy-source"]
     if (req.method === "PUT" && typeof source === "string") {
+      if (req.headers["if-match"] === "wrong") {
+        res.writeHead(412).end("<Error><Code>PreconditionFailed</Code></Error>")
+        return
+      }
       const data = objects.get("/" + decodeURIComponent(source).replace(/^\/?updates-test\//, ""))!
       objects.set(path, { bytes: data.bytes, cache: String(req.headers["cache-control"] ?? data.cache) })
       res.end('<CopyObjectResult><ETag>"test"</ETag></CopyObjectResult>')
@@ -435,6 +724,9 @@ test("cloud.ru SDK uses ru-central-1 and preserves copy bytes with no-cache meta
     expect(await store.head("missing")).toBeUndefined()
     await store.put("releases/0.4.0/latest.yml", new Blob(["signed bytes"]), "public, max-age=31536000, immutable")
     await store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache")
+    await expect(
+      store.copy("releases/0.4.0/latest.yml", "stable/latest.yml", "no-cache", { ifMatch: "wrong" }),
+    ).rejects.toThrow("pointer changed")
     expect(Buffer.from(await store.get("stable/latest.yml")).toString()).toBe("signed bytes")
     expect(await store.sha256?.("stable/latest.yml")).toBe(createHash("sha256").update("signed bytes").digest("hex"))
     expect(await store.head("stable/latest.yml")).toEqual({ size: 12, cache: "no-cache" })
@@ -465,6 +757,7 @@ test.skipIf(!process.env.LOGINOM_UPDATE_S3_TEST_BASE)(
           Bun.which("bun")!,
           join(import.meta.dir, "update-feed.ts"),
           ...args,
+          "--legacy",
           "--feed-base",
           base,
           "--public-key",

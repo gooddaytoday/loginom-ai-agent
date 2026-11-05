@@ -22,6 +22,7 @@ import {
   updateMode,
   updatePolicyPath,
   updateSources,
+  updateNotificationLink,
   type SelectedUpdate,
   type UpdateAdminPolicy,
   type UpdateChannel,
@@ -133,6 +134,7 @@ export function setupAutoUpdater(input: {
       timeout,
     )
   let approved: { info: UpdateInfo; selected: SelectedUpdate } | undefined
+  let notification: ReturnType<typeof updateNotificationLink> | undefined
   let verifiedUnsupported: boolean | undefined
   // 6.8.9 AppUpdater.js:413 stores result; :418 returns result.info;
   // :436/:462 pass that same object to doDownloadUpdate. Check identity as well
@@ -155,6 +157,7 @@ export function setupAutoUpdater(input: {
     backend: {
       async checkForUpdates() {
         approved = undefined
+        notification = undefined
         if (!settings.sources.length) throw Error("LOGINOM_UPDATE_FEED_UNAVAILABLE")
         const environment = await input.proxy()
         const proxy = updateProxyOptions(environment, input.systemProxyEnabled())
@@ -174,6 +177,7 @@ export function setupAutoUpdater(input: {
           currentVersion: app.getVersion(),
           read: readManifest,
         })
+        if (!selected) return { isUpdateAvailable: false }
         const signed = selected.signed
         configureSignedUpdate(autoUpdater, selected)
         const unsupported = compareUpdateVersions(app.getVersion(), signed.minSupportedVersion) < 0
@@ -186,6 +190,7 @@ export function setupAutoUpdater(input: {
           const extension = process.platform === "darwin" ? /\.(dmg|zip)$/i : /\.deb$/i
           const file = signed.files.find((file) => extension.test(file.url))
           if (!file) throw Error("LOGINOM_UPDATE_TARGET_INVALID")
+          notification = updateNotificationLink(selected, file.url)
           return {
             isUpdateAvailable:
               signed.stagingPercentage !== 0 &&
@@ -194,7 +199,7 @@ export function setupAutoUpdater(input: {
             updateInfo: signed,
             unsupported,
             notes,
-            url: selected.url(file.url),
+            url: notification.url,
           }
         }
         const result = await autoUpdater.checkForUpdates()
@@ -253,6 +258,17 @@ export function setupAutoUpdater(input: {
   })
   return {
     ...controller,
+    openUpdateLink(url: string) {
+      if (
+        !notification ||
+        notification.url !== url ||
+        controller.getState().status !== "available" ||
+        !settings.enabled
+      )
+        return false
+      openExternalURL(notification.resolve(url))
+      return true
+    },
     async setChannel(channel: UpdateChannel) {
       if (channel !== "stable" && channel !== "unstable") throw Error("LOGINOM_UPDATE_CHANNEL_INVALID")
       if (settings.channelLocked) throw Error("LOGINOM_UPDATE_POLICY_MANAGED")
@@ -304,7 +320,7 @@ export async function showUpdaterDialog(controller: ReturnType<typeof setupAutoU
       buttons: [nativeT("desktop.updater.download"), nativeT("desktop.updater.dialog.later")],
       cancelId: 1,
     })
-    if (response.response === 0) openExternalURL(state.url)
+    if (response.response === 0) controller.openUpdateLink(state.url)
     return
   }
   if (state.status !== "ready") return
