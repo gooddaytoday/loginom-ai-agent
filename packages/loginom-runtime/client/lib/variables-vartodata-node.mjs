@@ -4,9 +4,9 @@ import {configureVariablesToTable} from './variables-vartodata-procedure.mjs';
 import {configureVariablesToTableOutput} from './variables-vartodata-output.mjs';
 import {variablesToTableConfigurationReadback} from './variables-vartodata-readback.mjs';
 
-// W1 owns typed variable links; this module owns only the columns wizard and table output.
+// W1 owns typed variable links; this module owns both orientations and table output.
 export function createVariablesToTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'variables.to_table',mode:'columns',revision:'variables-vartodata-v1-internal-1',
+ type:'variables.to_table',modes:['columns','rows'],revision:'variables-vartodata-v2-internal-1',
  readback:variablesToTableConfigurationReadback,parameterSchema:variablesToTableParametersSchema,
  validate:validateVariablesToTableParameters,
  async configureInputs(channel,mappings){

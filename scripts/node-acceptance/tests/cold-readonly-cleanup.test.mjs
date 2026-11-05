@@ -40,18 +40,18 @@ for(const scenario of ['fallback error','prepared reason','preclassified reason'
 const prepared={status:'READY',document_id:'own-document',package_ref:{path},workflow_ref:{tab_tid:'own-tab',
  navigation_path:[{label:'Saved (только чтение)'}]}};
 
-for(const scenario of ['readonly','foreign path','dirty readonly','writable'])test('cold failure cleanup: '+scenario,async()=>{
+for(const scenario of ['readonly','foreign path','dirty readonly','writable','dirty writable'])test('cold failure cleanup: '+scenario,async()=>{
  const state={prepared:structuredClone(prepared),closed:false,cleanupAttempted:false,failure:'COLD_PACKAGE_NOT_WRITABLE'};
  if(scenario==='foreign path')state.prepared.package_ref.path='/foreign/other.lgp';
- if(scenario==='writable')state.prepared.workflow_ref.navigation_path[0].label='Saved';
+ if(scenario.endsWith('writable'))state.prepared.workflow_ref.navigation_path[0].label='Saved';
  const writes=new Map(),calls=[];let closed=false;
  await run({state,saved:{path},session:'own-session',config:{loginom_url:'https://loginom.invalid/app/',workflow_profile:{loginom_user:'own'}},
   makePackageCleanupCode,rawExecute:async code=>{
    const [options]=JSON.parse('['+code.slice(code.lastIndexOf(')(page,')+7,-1)+']');
    calls.push(options);
    assert.equal(options.documentId,'own-document');assert.equal(options.tabTid,'own-tab');assert.equal(options.packagePath,path);
-   const readonly=scenario!=='writable';
-   const reason=options.diagnosticReadOnly!==readonly?'PACKAGE_IDENTITY_CHANGED':scenario==='dirty readonly'?'UNSAVED_CHANGES':null;
+   const readonly=!scenario.endsWith('writable');
+   const reason=options.diagnosticReadOnly!==readonly?'PACKAGE_IDENTITY_CHANGED':scenario.startsWith('dirty ')?'UNSAVED_CHANGES':null;
    return {status:reason?'BLOCKED':'SUCCEEDED',reason,package_closed:!reason,logged_out:!reason,unsaved_changes_discarded:false};
   },writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),join:(...p)=>p.join('/'),args:{output:'cold'},context:{close:async()=>{closed=true;}}});
  assert.equal(closed,true);
@@ -60,10 +60,11 @@ for(const scenario of ['readonly','foreign path','dirty readonly','writable'])te
  assert.equal(result.status,'FAIL');assert.equal(result.error,'COLD_PACKAGE_NOT_WRITABLE');
  assert.equal(result.cleanup.package_closed,['readonly','writable'].includes(scenario));
  assert.equal(result.cleanup.logged_out,result.cleanup.package_closed);
- assert.equal(result.cleanup.reason,scenario==='foreign path'?'CLEANUP_NOT_ADMITTED':scenario==='dirty readonly'?'UNSAVED_CHANGES':null);
+ assert.equal(result.cleanup.reason,scenario==='foreign path'?'CLEANUP_NOT_ADMITTED':scenario.startsWith('dirty ')?'UNSAVED_CHANGES':null);
  if(scenario!=='foreign path'){
-  assert.equal(calls[0].diagnosticReadOnly,scenario!=='writable');
-  if(scenario!=='writable'){assert.equal(calls[0].diagnosticDiscard,false);assert.equal(calls[0].diagnosticWaitForIdle,false);}
+  assert.equal(calls[0].diagnosticReadOnly,!scenario.endsWith('writable'));
+  assert.equal(calls[0].diagnosticDiscard,false);
+  assert.equal(calls[0].diagnosticWaitForIdle,false);
  }
 });
 

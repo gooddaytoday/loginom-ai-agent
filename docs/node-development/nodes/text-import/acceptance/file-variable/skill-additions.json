@@ -1,0 +1,16 @@
+{
+  "routing": [
+    {
+      "old": "| Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |",
+      "proposed": "| Экспорт CSV/TXT, путь из переменной | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |"
+    },
+    {
+      "old": "| Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |",
+      "proposed": "| Импорт CSV/TXT, путь из переменной | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |"
+    }
+  ],
+  "node_reference_append": {
+    "imports.text": "\nПредложение v0.4.1: file_name_variable={kind:\"variable\",name} связывает имя файла с точным именем W1-переменной. На каждой операции указывай текущий source_path и подтверждённый source. Путь должен совпасть с наблюдённым строковым значением и входить в inputs. NULL, пустое значение и шаблоны %Name% отклоняются до мутации. При смене даты переиспользуй тот же Import и binding.\n",
+    "exports.text": "\nПредложение v0.4.1: file_name_variable={kind:\"variable\",name} связывает имя файла с точным именем W1-переменной. Каждый вызов требует текущий destination в exports, совпадающий со значением переменной. NULL, пустое значение и шаблоны %Name% отклоняются до мутации. Для даты вычисли полный путь в Калькуляторе переменных. Повторно используй тот же Export; overwrite=replace только с явным разрешением пользователя.\n"
+  }
+}

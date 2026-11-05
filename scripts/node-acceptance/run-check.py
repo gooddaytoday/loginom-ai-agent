@@ -106,6 +106,10 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='composite/expected.json' if composite else 'expected.json',
                     input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
                     ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
+    if name == 'variables-rows':
+        src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
+        return dict(source=src, prompt=src / 'task-rows.md', data=src / 'data', base=None,
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected-rows.json')
     if name == 'variables-columns':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,

@@ -6,6 +6,10 @@ import {restRequestCapability} from '../lib/rest-request.mjs';
 function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
+ const advanced=root+';AdditionalParamsWizard',values={pedTimeout:options.timeout??-1,pedFailedRequestRepeat:options.retries??0},writes=[];
+ const inputs=Object.fromEntries(Object.keys(values).map(k=>[k,{id:k,value:String(values[k]),readOnly:false,disabled:false}]));
+ const advancedElement={contains:e=>Object.values(inputs).includes(e)};
+ const fields=Object.fromEntries(Object.keys(values).map(k=>[k,{el:{dom:inputs[k]},inputEl:{dom:inputs[k]},getXType:()=>"numberfield",getValue:()=>values[k]}]));
  const names=options.empty?[]:['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=options.inputPage?-1:0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
@@ -22,15 +26,16 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const p={FView:{el:{dom:paramElement}},FColumnsStore:columns,FParamStore:parameters,FGrdParamStore:parameters,FRequestParamLinks:saved,
   FItems:{grdFields:{getStore:()=>columns},grdParams:{getStore:()=>parameters},pnlLinkGrid:grid}};
  class RESTRequestWizard{constructor(){this.FRequestConfig=p;this.FVerb=0;}}
- const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:card}})}};
+ const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:stage===2?advancedElement:card}})}};
  const element={getBoundingClientRect:()=>({x:10,y:10,width:100,height:20}),contains:()=>false,closest:()=>null};
- const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
+ const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(advanced)+']'?[advancedElement]:Object.keys(values).some(k=>s==='[data-tid='+JSON.stringify(advanced+';'+k+';ValueControl')+']')?[inputs[Object.keys(values).find(k=>s.includes(k))]]:s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
  const Workspace={getActiveTab:()=>({Controller:{FController:controller}})};
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
- const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},Ext:{getCmp:()=>component}});
+ const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},Ext:{getCmp:id=>fields[id]??component}});
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
  const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
  const page={evaluate,waitForTimeout:async ms=>options.tick?.(ms),locator:selector=>({
+  locator:()=>({fill:async value=>{const k=Object.keys(values).find(k=>selector.includes(k));assert.ok(k);values[k]=Number(value);inputs[k].value=value;writes.push([k,Number(value)]);},press:async()=>{}}),
   count:async()=>{
    if(selector.startsWith('.x-mask'))return options.stall==='loading'||stage===-1?1:0;
    if(selector.includes(';btnError'))return 0;
@@ -50,8 +55,8 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
   assert.ok(column&&parameter,'the drag must use the owned native records');
   draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
- return {saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
-  query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
+ return {values,writes,saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
+  new_node:options.new_node===true,query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
 }
 
 test('plain GET commits an empty parameter inventory without AutoLink or a data table',async()=>{
@@ -132,4 +137,11 @@ for(const duplicate of ['column','parameter'])test('REST refuses duplicate '+dup
  assert.equal(result.cleanup_complete,true);
  assert.equal(f.drags(),0);
  assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:0});
+});
+
+for(const new_node of [true,false])test('REST timeout defaults apply only to new nodes: '+new_node,async()=>{
+ const f=fixture(null,false,null,{empty:true,new_node,timeout:new_node?-1:75,retries:new_node?0:4});
+ const result=await f.run();assert.equal(result.verified,true,result.error);
+ assert.deepEqual(f.values,new_node?{pedTimeout:30,pedFailedRequestRepeat:0}:{pedTimeout:75,pedFailedRequestRepeat:4});
+ assert.deepEqual(f.writes,new_node?[["pedTimeout",30]]:[]);
 });

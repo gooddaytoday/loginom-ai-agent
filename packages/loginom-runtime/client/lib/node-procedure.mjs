@@ -259,6 +259,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     now,
     async readOutputPort(request) {
       checkBudget();
+      if((operation.nodeApply?.request??operation.parameters)?.target?.type==='variables.to_table')request={...request,typedVariants:true};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
@@ -477,6 +478,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const started = now(), monotonicStarted = settleOutputPort||settleProcessConsole?.quiet?undefined:monotonicNow();
       const observationNow = settleOutputPort||settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
       let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort||settleProcessConsole?.quiet?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
+      // Journal latency must not reclassify a timely UI sample. ACKs still
+      // consume the original operation/receipt budget and cannot authorize late work.
+      const acknowledge = async (phase, details) => {
+        const ackDeadline = Math.min(operation.deadline, settleWizard?.deadline ?? Infinity);
+        const remaining = ackDeadline - now();
+        const expired = () => new Error('Node observation journal acknowledgement exceeded the original operation deadline: '+phase);
+        if (remaining <= 0) throw expired();
+        let timer;
+        try {
+          const saved = await Promise.race([entry(phase, details), new Promise((_, reject) => {
+            timer = setTimeout(() => reject(expired()), remaining);
+          })]);
+          if (now() >= ackDeadline) throw expired();
+          signal?.throwIfAborted();
+          return saved;
+        } finally { clearTimeout(timer); }
+      };
       const readTimeout = () => Math.min(35000, Math.max(settleWizard||settleProcessConsole?.quiet?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
       const read = async (code,options,readDeadline=deadline) => {
         const limit=settleOutputPort?Math.min(readDeadline,deadline,now()+OUTPUT_SETTLEMENT_READ_MS):deadline;
@@ -520,7 +538,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
           throw Error('Original wizard receipt context changed');
       };
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
+      let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -1063,29 +1081,30 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           || result.output.ui.masks.every(m=>result.output.ui.dialogs.length===1&&allowedNodeEditor(result.output.ui.dialogs[0],result.output)
             &&m.kind==='modal_background'&&m.target_tid===result.output.wizard.root_tid&&m.ref===result.output.wizard.root_ref)
             &&result.output.ui.dialogs.every(d=>allowedDialog(d,tableDialog)||allowedOutputEditor(d,result.output)||allowedNodeEditor(d,result.output)))
-          && ready(result.output) === true && observationNow() < deadline;
+          && ready(result.output) === true;
+        observedAt = observationNow();
+        satisfied &&= observedAt < deadline;
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
-        await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started },
+        await acknowledge('node_observation_sample', { step, sample, internal_operation_id: id,
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started },
           outcome: structuredClone(result) });
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
         if (satisfied && confirmations >= (confirmIdentity ? 2 : 1)) break;
       }
-      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
+      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1)) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
       }
-      const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
-        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
+      const persisted = await acknowledge('node_observation_completed', { step, internal_operation_id: id,
+        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
-      if((settleOutputPort||settleWizard)&&observationNow()>=Math.min(deadline,settleWizard?.deadline??Infinity))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;

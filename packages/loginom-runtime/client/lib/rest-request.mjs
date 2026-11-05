@@ -127,7 +127,30 @@ export async function restRequestCapability(page,t,readContext){
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){
    const caption=(await title()).trim();if(caption==='Описание узла')return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
-   need(allowed.includes(caption),'unexpected REST wizard page: '+caption);await advance();
+   need(allowed.includes(caption),'unexpected REST wizard page: '+caption);
+   if(caption==='Дополнительные параметры'&&t.new_node===true){
+    const advanced=root+';AdditionalParamsWizard';
+    const readDefaults=async()=>{await guard();return page.evaluate(({advanced})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('Owned REST additional parameters page changed');
+     return Object.fromEntries(['pedTimeout','pedFailedRequestRepeat'].map(key=>{
+      const es=exact(advanced+';'+key+';ValueControl'),e=es[0],field=e&&Ext.getCmp(e.id);
+      if(es.length!==1||!roots[0].contains(e)||field?.el?.dom!==e||field.getXType()!=='numberfield'
+       ||!field.inputEl?.dom||field.inputEl.dom.readOnly||field.inputEl.dom.disabled)throw Error('REST default field binding unavailable');
+      return [key,field.getValue()];
+     }));
+    },{advanced});};
+    await quiet();await readDefaults();
+    // A body stall after HTTP 200 reaches the native overall timeout without
+    // another timeout interval; leave retry settings at their native value.
+    const tid=advanced+';pedTimeout;ValueControl';await quiet();await guard();await point(tid);
+    const input=find(tid).locator('input');effect=true;await input.fill('30',{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+    const observed=await wait('REST timeout defaults readback',async()=>{const r=await readDefaults();return r.pedTimeout===30?r:null;});
+    // Private configure evidence; the public parameter/readback contracts stay fixed.
+    configuration.request_defaults={timeout_seconds:observed.pedTimeout,retries:observed.pedFailedRequestRepeat};
+   }
+   await advance();
   }
   throw Error('REST wizard page bound exceeded');
  }catch(error){

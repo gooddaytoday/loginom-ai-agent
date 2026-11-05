@@ -1,5 +1,6 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {openPreparedOutputPort} from './node-port-open.mjs';
+import {decodePortCell} from './node-port-output.mjs';
 
 export function validateVariablePortMapping(mapping){
  const need=(v,m)=>{if(!v)throw Error('Variable mapping: '+m);};
@@ -12,9 +13,9 @@ export function validateVariablePortMapping(mapping){
 export function makeVariablePortMappingCode(binding,options){
  validatePreparedNodeContext(binding);validateVariablePortMapping(options.mapping);
  return `async page=>{
-  const run=${configureVariablePortMapping.toString()},read=${readPreparedNodeContext.toString()},open=${openPreparedOutputPort.toString()},task=${JSON.stringify({binding,...options})};
-  const configured=await run(page,task,read,open);if(configured.status!=='SUCCEEDED')return configured;
-  const observed=await run(page,{...task,operation_id:task.operation_id+':readback',read_only:true,expected_mapping:configured.mapping},read,open);
+  const run=${configureVariablePortMapping.toString()},read=${readPreparedNodeContext.toString()},open=${openPreparedOutputPort.toString()},decode=${decodePortCell.toString()},task=${JSON.stringify({binding,...options})};
+  const configured=await run(page,task,read,open,decode);if(configured.status!=='SUCCEEDED')return configured;
+  const observed=await run(page,{...task,operation_id:task.operation_id+':readback',read_only:true,expected_mapping:configured.mapping},read,open,decode);
   if(observed.status!=='SUCCEEDED'||JSON.stringify(observed.mapping)!==JSON.stringify(configured.mapping))return {...observed,status:'AMBIGUOUS',verified:false,effect_possible:true,error:('Independent variable mapping readback differs'+(observed.error?': '+observed.error:'')).slice(0,500)};
   return {...configured,node_context:observed.node_context,independent_readback:true};
  }`;
@@ -22,11 +23,11 @@ export function makeVariablePortMappingCode(binding,options){
 
 // Fixed native UI procedure. Only the owned input wizard is edited; cached
 // ConnectedRecord identity is retained across every metadata/order gesture.
-export async function configureVariablePortMapping(page,task,readNode,openPort){
+export async function configureVariablePortMapping(page,task,readNode,openPort,decode=decodePortCell){
  const b=task.binding,mapping=task.mapping,root=b.workflow_ref.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';let effect=false;
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable mapping deadline');return n;};
  const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
- const inspect=(mode,extra={})=>page.evaluate(({task,mode,extra})=>{
+ const inspect=(mode,extra={})=>page.evaluate(({task,mode,extra,decoderCode})=>{
   const b=task.binding,p=globalThis.__loginomDockPreparationV1,a=globalThis.bg?.app,card=a?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card?.Controller?.FController;
   const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode);
@@ -77,11 +78,18 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
   const fields=rows.map((row,index)=>{
    const d=row.data,s=d.ConnectedRecord?.data;
    if(!row.isModel||!Number.isSafeInteger(d.ID)||d.Index!==index||typeof d.Name!=='string'||typeof d.DisplayName!=='string'
-     ||![1,4,5].includes(d.DataType)||![0,1].includes(d.OriginType)||typeof d.ValueIsNull!=='boolean'
-     ||d.DisplayValue!==null&&!['string','number','boolean'].includes(typeof d.DisplayValue)
+     ||![1,2,3,4,5].includes(d.DataType)||![0,1].includes(d.OriginType)||typeof d.ValueIsNull!=='boolean'
+     ||d.DisplayValue!==null&&!['string','number','boolean'].includes(typeof d.DisplayValue)&&!(d.DataType===2&&d.DisplayValue instanceof Date)
      ||s&&(!Number.isSafeInteger(s.ID)||typeof s.Name!=='string'||typeof s.DisplayName!=='string'||s.DataType!==d.DataType))throw Error('Unsupported variable mapping record');
+   let value=d.DisplayValue;
+   // Preserve the established primitive readback; decode W2 additions exactly.
+   if(d.DataType===2||d.DataType===3){
+    const decoded=eval('('+decoderCode+')')(d.ValueIsNull?null:value,d.DataType===2?'datetime':'real');
+    if(decoded.limitations.length)throw Error('Variable mapping scalar precision is unverified');
+    value=decoded.cell.value;
+   }
    return {id:d.ID,index,name:d.Name,label:d.DisplayName,type:d.DataType,origin_type:d.OriginType,usage:d.UsageType,description:d.Description,
-    value:d.DisplayValue,is_null:d.ValueIsNull,source:s?{id:s.ID,name:s.Name,label:s.DisplayName,type:s.DataType}:null};
+    value,is_null:d.ValueIsNull,source:s?{id:s.ID,name:s.Name,label:s.DisplayName,type:s.DataType}:null};
   });
   if(new Set(fields.map(f=>f.id)).size!==fields.length||new Set(fields.map(f=>f.name)).size!==fields.length)throw Error('Duplicate variable mapping identities');
   o.variableMappingBindings??=new Map(rows.map(row=>[row.data.ID,row.data.ConnectedRecord]));
@@ -110,7 +118,7 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
    ||[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible).some(e=>e!==dialog)
    ||field('cbxDataType')?.getValue()!==extra.type||field('cbxNullValue')?.getValue()!==extra.is_null)throw Error('Owned variable metadata editor required');
   return true;
- },{task,mode,extra});
+ },{task,mode,extra,decoderCode:decode.toString()});
  const settle=async(expected)=>{
   const end=Date.now()+Math.min(5000,remaining());let previous=null,matches=0;
   while(true){

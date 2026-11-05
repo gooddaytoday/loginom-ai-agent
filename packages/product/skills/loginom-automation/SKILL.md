@@ -131,6 +131,10 @@ Execute вычисляющих узлов ради чтения, ответа и
 ограничения; затем запроси `parameter_schema`.
 Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
 для словаря соответствий с другим типом результата — Замену.
+Для REST запрашивай только нужные поля и небольшие страницы (select, limit/skip);
+не запрашивай gzip. При пустом теле проверь ErrorCode/ErrorDesc на порту 1.
+При REST_RESPONSE_BODY_MISSING перенеси код и подсказку инструмента в итоговый
+ответ; пустую таблицу не выдавай за успешный результат. Сам запрос не повторяй.
 Для ответа REST → таблица используй Калькулятор → Свёртка → Кросс-таблица;
 деревья выбирай по просьбе о дереве или для ровных записей без вложенных контейнеров.
 На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
@@ -143,7 +147,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 
 | Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
-| Переменные в столбцы | `variables.to_table` / columns | [читать](references/nodes/variables.to_table.md) |
+| Переменные в таблицу | `variables.to_table` / columns, rows | [читать](references/nodes/variables.to_table.md) |
 | User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
 | Соединить переменные | `variables.column_union` / append_variables | [читать](references/nodes/variables.column_union.md) |
 | Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |

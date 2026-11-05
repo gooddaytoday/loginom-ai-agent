@@ -537,3 +537,9 @@ Only the user task reaches the model; expected values and oracle stay private.
 Модель получает исходный task.md и inputs.json. Аудит проверяет два свежих
 полных упорядоченных native вывода, patch правого a0, неизменные связи и mapping.
 Cold W1 проверяет сохранённый граф, типы, значения и порядок, затем cleanup.
+
+`variables-rows` uses the authored variable Calculator package and approved r02
+rows task. Private delivery prepares a new package for each run. The native
+three-column output is checked in source order, including each Variant subtype,
+civil datetime milliseconds, NULL/empty/FALSE/zero; CSV, Save and independent
+cold execution with the same variable edge and confirmed cleanup are required.

@@ -4694,20 +4694,20 @@ function readRenderedInputMapping(observation) {
             &&s.ui.dialogs[0].ref===s.wizard.calculator_preview.root_ref
             &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===s.wizard.root_tid);
           for(let attempt=0;attempt<60&&owned(observed)&&!accepted(observed);attempt++) {
-            if(observed.ui.dialogs.length===1&&observed.ui.dialogs[0].identity?.anchor_tid==='msgbox') {
-              const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+            if(observed.ui.dialogs.length===1&&/^msgbox(?:-[0-9]+)?$/.test(observed.ui.dialogs[0].identity?.anchor_tid??'')) {
+              const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot,dialogTid=dialog.identity.anchor_tid;
               postActionRoot=dialog.ref;
               try {
-                const popup=await readUi(),buttons=popup.ui.elements.filter(e=>e.tid==='msgbox;tlb;ok'
+                const popup=await readUi(),buttons=popup.ui.elements.filter(e=>e.tid===dialogTid+';tlb;ok'
                   &&e.label==='OK'&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click'));
-                const readError=()=>page.evaluate(()=>{
+                const readError=()=>page.evaluate(tid=>{
                   const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
                   const instance=own(globalThis.bg?.ext?.errormessage?.ErrorMsg,'FInstance'),box=own(instance,'FMessageBox');
-                  const root=own(own(box,'el'),'dom'),roots=document.querySelectorAll('[data-tid="msgbox"]');
+                  const root=own(own(box,'el'),'dom'),roots=document.querySelectorAll('[data-tid="'+tid+'"]');
                   if(roots.length!==1||roots[0]!==root||globalThis.Ext?.getCmp?.(root.id)!==box)return null;
                   const text=root.innerText;
                   return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
-                });
+                },dialogTid);
                 const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
                 if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
                   ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1

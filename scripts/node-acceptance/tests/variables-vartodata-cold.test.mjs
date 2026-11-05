@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {NODE_TYPES} from '../../../packages/loginom-runtime/client/lib/node-contracts.mjs';
@@ -36,4 +37,15 @@ test('production cold rechecks the same native link after the full table read an
    adapter:{activateWorkflow:async()=>({status:fault==='return'?'NOT_APPLIED':'SUCCEEDED',verified:true,cleanup_complete:true}),observe:async()=>current},record:async e=>events.push(e)};
   if(fault)await assert.rejects(audit(f));else {await audit(f);assert.equal(events[0].phase,'cold_variable_links_after_table');assert.deepEqual(events[0].links,original.variable_links);}
  }
+});
+
+test('rows scenario privately delivers the authored package and retains the exact typed cold oracle',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util,json
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('variables-rows');print(json.dumps({k:str(c[k]) for k in ['prompt','expected_name','source_package']}))`],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
+ assert.equal(r.status,0,r.stderr);const spec=JSON.parse(r.stdout);
+ assert.ok(spec.prompt.endsWith('task-rows.md'));assert.equal(spec.expected_name,'expected-rows.json');assert.ok(spec.source_package.endsWith('fixtures/source.lgp'));
+ const e=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-vartodata/acceptance/expected-rows.json',import.meta.url)));
+ e.package_path='/own/rows.lgp';assert.equal(parseExpectedOutputs(e).outputs[0].rows.length,8);
+ assert.equal(parseExpectedVariableInventory(e).links.length,1);
 });
