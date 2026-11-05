@@ -85,7 +85,7 @@ def expected(mode='columns'):
         # oracle independently proves all eight typed values and field metadata.
         result['variable_inventory'] = {
             'outputs': [],
-            'links': [{'source': {'type': 'bg-vendor-icon-calcvariables'}, 'output': 0,
+            'links': [{'source': {'type': 'variables.calculator'}, 'output': 0,
                        'target': {'type': 'variables.to_table'}, 'input': 0, 'kind': 'variables'}],
         }
     return result
