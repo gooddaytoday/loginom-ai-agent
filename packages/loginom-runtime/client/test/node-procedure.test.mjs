@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
 
-function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
+function fixture({ recordFailure, onRecord, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
   const operation = sharedOperation ?? { id: 'parent', action: { action_key: 'node.import.configure', revision: '1' },
     deadline: 10000, checkpoint: { workflow_ref: { prefix: 'MF;TF-1', tab_tid: 'tab' }, document_id: 'doc' } };
@@ -13,7 +13,7 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
       elements: [{ ref: 'ui-button', allowed_actions: ['click'] }] } };
   const channel = createNodeProcedure({ operation, maxSteps, signal, now, monotonicNow, wait,
     targetOrigin: 'http://example.test', targetBuild: '7.4.2',
-    record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); return structuredClone(entry); },
+    record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); await onRecord?.(entry); return structuredClone(entry); },
     wrapMutation: (code, options) => { events.push('wrapped'); return { code, options }; },
     execute: async (code, options) => {
       if (typeof code === 'string') { reads++;
@@ -119,6 +119,86 @@ test('bounded observation waits for loading without permitting a masked mutation
 test('ready condition completes without redundant identical snapshots', async () => {
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: () => true });
   assert.equal(f.records.filter(r => r.phase === 'node_observation_sample').length, 1);
+});
+for(const delayedPhase of ['node_observation_sample','node_observation_completed'])test('Table nulls observed at 172.8 ms survives late '+delayedPhase+' acknowledgement',async()=>{
+  let clock=0,started=0,delayed=false;
+  const f=fixture({now:()=>clock,onRead:()=>{clock+=86.4},
+    onRecord:r=>{
+      if(r.phase===delayedPhase&&r.readiness.condition==='Table nulls enabled'){
+        assert.equal(r.readiness.satisfied,true);
+        clock=started+15069;delayed=true;
+      }
+    }});
+  f.operation.deadline=600000;
+  f.operation.nodeStepSequence=81;
+  await f.channel.observe({condition:'enable Table nulls',ready:()=>true});
+  await f.channel.act({verb:'click',ref:'ui-button'});
+  started=clock;
+  await f.channel.observe({condition:'Table nulls enabled',ready:()=>true,timeoutMs:15000});
+  assert.equal(delayed,true);
+  const completed=f.records.at(-1);
+  assert.equal(completed.phase,'node_observation_completed');
+  assert.equal(completed.step,84);
+  assert.equal(completed.readiness.timeout_ms,15000);
+  assert.ok(Math.abs(completed.readiness.elapsed_ms-172.8)<0.001);
+  assert.equal(f.records.some(r=>r.phase==='node_observation_timeout'),false);
+  assert.equal(f.events.filter(e=>e==='mutated').length,1);
+  assert.equal(f.operation.deadline,600000);
+});
+test('late journal acknowledgement cannot satisfy a false condition',async()=>{
+  let clock=0;
+  const f=fixture({now:()=>clock,onRead:()=>{clock+=86.4},
+    onRecord:r=>{if(r.phase==='node_observation_sample')clock=15069}});
+  f.operation.deadline=600000;
+  await assert.rejects(f.channel.observe({condition:'Table nulls enabled',ready:()=>false,timeoutMs:15000}),
+    {name:'NodeReadinessTimeout'});
+  assert.equal(f.records.at(-1).phase,'node_observation_timeout');
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
+for(const phase of ['node_observation_sample','node_observation_completed'])test('failed '+phase+' write invalidates a previously usable observation',async()=>{
+  let fail=false;
+  const f=fixture({onRecord:r=>{if(fail&&r.phase===phase)throw Error('disk failure')}});
+  await f.channel.observe({condition:'button ready',ready:()=>true});
+  fail=true;
+  await assert.rejects(f.channel.observe({condition:'Table nulls enabled',ready:()=>true}),/disk failure/);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
+for(const phase of ['node_observation_sample','node_observation_completed'])test(phase+' acknowledgement past the parent deadline reports a journal failure',async()=>{
+  let clock=0;
+  const f=fixture({now:()=>clock,onRecord:r=>{if(r.phase===phase)clock=f.operation.deadline}});
+  await assert.rejects(f.channel.observe({condition:'Table nulls enabled',ready:()=>true}),
+    error=>error.name!=='NodeReadinessTimeout'&&/journal acknowledgement.*deadline/i.test(error.message));
+  assert.equal(f.records.some(r=>r.phase==='node_observation_timeout'),false);
+  assert.ok(!f.events.includes('mutated'));
+  assert.equal(f.operation.deadline,10000);
+});
+test('a journal delay before the second identity sample does not extend readiness',async()=>{
+  let clock=0;
+  const f=fixture({now:()=>clock,onRecord:r=>{if(r.phase==='node_observation_sample')clock=15069}});
+  f.operation.deadline=600000;
+  await assert.rejects(f.channel.observe({condition:'stable Table',ready:()=>true,confirmIdentity:()=>({table:'same'}),timeoutMs:15000}),
+    {name:'NodeReadinessTimeout'});
+  assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,1);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+});
+for(const phase of ['node_observation_sample','node_observation_completed'])test('a stalled '+phase+' acknowledgement is bounded by the original deadline',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  let clock=0,writing;
+  const started=new Promise(resolve=>{writing=resolve});
+  const f=fixture({now:()=>clock,onRecord:r=>{
+    if(r.phase===phase){writing();return new Promise(()=>{});}
+  }});
+  const failed=assert.rejects(f.channel.observe({condition:'Table nulls enabled',ready:()=>true}),
+    error=>error.name!=='NodeReadinessTimeout'&&/journal acknowledgement.*deadline/i.test(error.message));
+  await started;
+  clock=f.operation.deadline;
+  t.mock.timers.tick(10000);
+  await failed;
+  clock=0;
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
 });
 for(const readMs of [20,350])test('pending polling includes the read time in its 200 ms interval: '+readMs,async()=>{
   let clock=1,checks=0,reads=0;const starts=[],waits=[];
