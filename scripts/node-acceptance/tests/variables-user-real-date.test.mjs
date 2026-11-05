@@ -45,3 +45,10 @@ test('both business phases use stock typed matching and retain the same variable
   const events=history();change(events);assert.throws(()=>auditUserRealDate(events,initial,final));
  }
 });
+test('observed Calculator expressions empty reexecution preserves consumers, while edits still refuse',()=>{
+ const events=history();events.push({phase:'node_apply_prepared',request:{target:{type:'transform.calculator',kind:'existing'},parameters:{expressions:[]},inputs:[],mappings:[]}});
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+ for(const parameters of [{expressions:[{}]},{expressions:[],order:['changed']},{expressions:[],extra:true}]){
+  const bad=structuredClone(events);bad.at(-1).request.parameters=parameters;assert.throws(()=>auditUserRealDate(bad,initial,final));
+ }
+});

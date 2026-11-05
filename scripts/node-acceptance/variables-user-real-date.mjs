@@ -33,7 +33,8 @@ export function auditUserRealDate(events,initial,final){
   need(b,'UPDATED_BUSINESS_'+i);
  }
  for(const e of events.slice(patch+1).filter(e=>e.phase==='node_apply_prepared'&&['transform.calculator','transform.filter_data'].includes(e.request?.target?.type))){
-  const r=e.request;need(r.target.kind==='existing'&&Object.keys(r.parameters).length===0&&!r.inputs.length&&!r.mappings.length&&!(r.variable_inputs?.length),'CONSUMER_RECONFIGURED');
+  const r=e.request,noOp=Object.keys(r.parameters).length===0||r.target.type==='transform.calculator'&&Object.keys(r.parameters).join(',')==='expressions'&&Array.isArray(r.parameters.expressions)&&r.parameters.expressions.length===0;
+  need(r.target.kind==='existing'&&noOp&&!r.inputs.length&&!r.mappings.length&&!(r.variable_inputs?.length),'CONSUMER_RECONFIGURED');
  }
  return {status:'PASS',initial_read:first.result.output.variable_ports[0].read_id,updated_read:updated.result.output.variable_ports[0].read_id};
 }
