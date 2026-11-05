@@ -10,6 +10,19 @@ const sameNode=(context,node)=>context?.verified===true&&['document_id','workflo
 // phase. It never extends that phase or repeats any of its gestures.
 export const NODE_RELEASE_BUDGET_MS=90000;
 
+// Only completed, synchronous mapping refusals before Done are cancellable.
+// Transport/gesture uncertainty and every other node keep the existing gate.
+export function calculatorVariableMappingRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt;
+ return !operation.transportUncertain&&state?.request?.target?.type==='transform.calculator'&&state.pending?.phase==='input_mapping'
+  &&ref?.action_key==='node.variables.variable_mapping.internal'&&typeof ref.operation_id==='string'
+  &&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key&&receipt.phase==='variable_mapping'
+  &&receipt.status==='AMBIGUOUS'&&receipt.effect_possible===true&&receipt.cleanup_complete===false
+  &&receipt.output?.verified===false&&receipt.output.cleanup_complete===false
+  &&receipt.error?.code==='CROSSTABLE_VARIABLE_STEP_UNCONFIRMED'
+  &&/(?:^|Error: )(?:Foreign variable mapping mask|Unique connected variable source required:|Complete connected field layout required;|Requested variable names collide)/.test(receipt.error.message??'');
+}
+
 export class NodeReleaseBlocked extends Error {
  constructor(message,userAction) {super(message);this.userAction=userAction;}
 }
@@ -25,7 +38,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false;
+ let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false,variableDraft=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -51,7 +64,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&r.output.wizard?.status==='observed'&&r.output.wizard.root_ref&&gestures.length===1
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
-  const draft=restDraft||exportDraft||wizardDraft;
+  variableDraft=calculatorVariableMappingRefusal(operation,r);
+  const draft=restDraft||exportDraft||wizardDraft||variableDraft;
   draftReceipt=draft;
   requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft),
    'The last browser gesture of this operation has no confirmed cleanup');
@@ -123,6 +137,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  }
  if(draftReceipt)requireValue(current.ui?.dialogs?.length===0&&current.ui?.masks?.length===0,
   'The stopped draft has a blocking dialog or mask');
+ if(variableDraft)requireValue(current.wizard?.stage==='input_mapping'
+  &&current.prepared_node_context?.input_port?.node_icon_class==='bg-vendor-icon-calcdata'
+  &&current.prepared_node_context.input_port.opening_operation_id===operation.lastReceipt.operation_id+':port',
+  'The stopped Calculator variable port owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

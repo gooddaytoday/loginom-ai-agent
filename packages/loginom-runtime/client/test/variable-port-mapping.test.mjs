@@ -42,11 +42,12 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const done=add(root+';btnDone',wizard),close=add(root+';btnClose',wizard);
  const header=cover==='disabled-header'?add(form+';colTargetDelete',panel):null;
  if(header)Object.assign(components.get(header.id),{$className:'Ext.grid.column.Action',disabled:true});
- const mask=cover?add('mask',cover==='foreign'?document.body:header??panel,'x-mask'):null;
+ const mask=cover==='owned-root'?wizard:cover?add('mask',cover==='foreign'?document.body:header??panel,'x-mask'):null;
+ if(cover==='owned-root')wizard.attrs.class='bg-mask-message';
  if(mask)mask.box=header?.box??auto.box;
  const graphEl=add(workflow.prefix+';ModelForm'),diagram=add(workflow.prefix+';ModelForm;cmpDiagram',graphEl);
  graphEl.style.display='none';
- const nodeData={},portData={},node={FGuid:'node',data:nodeData},port={FSubType:3,data:portData};
+ const nodeData={},portData={},node={FGuid:'node',FIconCls:'bg-vendor-icon-calcdata',data:nodeData},port={FSubType:3,data:portData};
  const nodeTree={FModelNode:nodeData},portTree={FModelNodePort:portData},owner={FView:{el:{dom:wizard}},FModelSocket:{}};
  const receipt={phase:'verified',operation_id:'map:port',workflow:'wf-native',node_id:'node',portIndex:0,wizard:owner,enginePort:owner.FModelSocket,port,node,nodeData,portData,nodeTree,portTree,nativeIndex:1,portGuid:'port'};
  const graphModel={FView:{el:{dom:graphEl}},FDiagram:{FmxGraph:{container:diagram},FNodes:{FCollection:[node]}}};
@@ -57,7 +58,7 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const context=vm.createContext({document,Date:clock.Date,location:{origin:'https://loginom.test'},Ext:{getCmp:id=>components.get(id)},__loginomDockPreparationV1:preparation,
   bg:{app}});
  let pending=null,closed=null;
- const advance=ms=>{clock.advance(ms);if(mask&&cover==='owned'&&clock.Date.now()>=delay)mask.style.display='none';if(pending&&clock.Date.now()>=pending){button.pressed=false;if(drift)record.data.DisplayValue=8;pending=null;}
+ const advance=ms=>{clock.advance(ms);if(cover==='owned-root'&&clock.Date.now()>=delay)wizard.attrs.class='';if(mask&&cover==='owned'&&clock.Date.now()>=delay)mask.style.display='none';if(pending&&clock.Date.now()>=pending){button.pressed=false;if(drift)record.data.DisplayValue=8;pending=null;}
   if(unstable&&clock.Date.now()>=delay)button.pressed=clock.Date.now()<delay+240&&Math.floor(clock.Date.now()/80)%2===1;
   if(closed!==null&&graphDelay)graphEl.attrs.class=clock.Date.now()>=closed+40&&clock.Date.now()<closed+graphDelay?'bg-mask-message':'';
  };
@@ -74,8 +75,20 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const graph=async()=>({verified:true,surface:'graph',locked:false});
  const open=async()=>({status:'SUCCEEDED',effect_possible:true});
  const run=async()=>{context.page=page;context.task=task;context.read=graph;context.open=open;return vm.runInContext('('+configureVariablePortMapping.toString()+')(page,task,read,open)',context);};
- return {run,clicks,task,clock,closed:()=>closed};
+ return {run,clicks,task,clock,node,wizard,closed:()=>closed};
 }
+
+test('Calculator waits for the native loading class on its exact wizard root; foreign/Ext/modal masks still refuse',async()=>{
+ const f=mappingFixture({cover:'owned-root'}),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);assert.ok(f.clock.Date.now()>=240);
+ for(const fault of ['other-node','ext-mask','dialog']){
+  const x=mappingFixture({cover:'owned-root'});
+  if(fault==='other-node')x.node.FIconCls='bg-vendor-icon-sortdata';
+  if(fault==='ext-mask')x.wizard.attrs.class+=' x-mask';
+  if(fault==='dialog')x.wizard.attrs.role='dialog';
+  const r=await x.run();assert.equal(r.status,'AMBIGUOUS',fault);assert.equal(x.clicks.length,0,fault);
+ }
+});
 
 test('mapping waits for delayed autosync application without clicking twice',async()=>{
  const f=mappingFixture(),result=await f.run();
@@ -89,6 +102,11 @@ test('mapping waits out its owned mask and refuses a foreign overlay',async()=>{
   assert.equal(result.status,cover==='owned'?'SUCCEEDED':'AMBIGUOUS',result.error);
   if(cover==='foreign')assert.equal(f.clicks.length,0);
  }
+});
+test('Calculator foreign-mask refusal identifies the blocker without text, values or actionable refs',async()=>{
+ const r=await mappingFixture({cover:'foreign'}).run();
+ assert.match(r.error,/Foreign variable mapping mask: /);assert.match(r.error,/"root_tid":"MF;TF-1;WizrdMCF"/);
+ assert.match(r.error,/"parent_tid":null/);assert.ok(!r.error.includes('Amount'));
 });
 test('delayed mapping application cannot hide collateral value drift',async()=>{
  const f=mappingFixture({drift:true}),result=await f.run();

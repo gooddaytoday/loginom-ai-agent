@@ -43,6 +43,12 @@ test('inactive calculator preflight reads native fields, cancels and journals un
  assert.ok(f.events.indexOf('schema')<f.events.indexOf('close'));assert.ok(f.events.indexOf('close')<f.events.indexOf('outputs'));
  assert.equal(f.events.at(-1),'journal');
 });
+test('incomplete Calculator table mapping refuses with confirmed source cleanup before a target can be created',async()=>{
+ const f=inactiveFixture();
+ f.options.operation.parameters.mappings=[{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'amount'}}]}];
+ await assert.rejects(f.run(),error=>error.nodePhaseRefusal?.cleanup_complete===true&&/Input mapping/.test(error.message));
+ assert.ok(f.events.includes('close'));assert.equal(f.events.at(-1),'journal');
+});
 test('inactive calculator source is reselected after native editor cancellation hides its ports',async()=>{
  const f=inactiveFixture('deselected');assert.equal((await f.run()).verified,true);
  assert.ok(f.events.indexOf('close')<f.events.indexOf('select'));assert.equal(f.events.at(-1),'journal');

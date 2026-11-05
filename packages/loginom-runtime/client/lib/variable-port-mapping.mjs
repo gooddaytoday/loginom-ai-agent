@@ -60,8 +60,18 @@ export async function configureVariablePortMapping(page,task,readNode,openPort){
    });
    // Wait only for masks contained by this receipt's native wizard. Global
    // modal/reconnect masks and unrelated controls are never retryable.
-   if(masks.some(e=>![roots[0],es[0],...exact(form)].includes(e.parentElement)
-     ||e.getAttribute('role')==='dialog'))throw Error('Foreign variable mapping mask');
+   const foreignMask=masks.find(e=>!(o.node.FIconCls==='bg-vendor-icon-calcdata'&&e===roots[0]
+      &&e.classList.contains('bg-mask-message')&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
+      ||[roots[0],es[0],...exact(form)].includes(e.parentElement))
+     ||e.getAttribute('role')==='dialog');
+   if(foreignMask){
+    const window=globalThis.Ext?.WindowManager?.getActive?.();
+    const detail=o.node.FIconCls==='bg-vendor-icon-calcdata'?': '+JSON.stringify({root_tid:roots[0].getAttribute('data-tid'),
+     mask_tid:foreignMask.getAttribute('data-tid'),mask_class:foreignMask.getAttribute('class')?.slice(0,64),
+     parent_tid:foreignMask.parentElement?.getAttribute('data-tid')??null,
+     window_tid:window?.el?.dom?.getAttribute('data-tid')??null,window_class:window?.$className??null}):'';
+    throw Error('Foreign variable mapping mask'+detail);
+   }
    if(masks.length||store.isLoading())return {pending:true};
   }
   const fields=rows.map((row,index)=>{

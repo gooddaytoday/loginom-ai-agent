@@ -42,6 +42,15 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const fault of [null,'other-node','transport','receipt','journal'])test('Calculator variable mapping refusal cleanup is scoped and durably acknowledged: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='other-node'?'imports.text':'transform.calculator';p.mode='expression';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expression']});
+ f.drivers.mapPorts=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'node.variables.variable_mapping.internal'};
+  if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Unique connected variable source required: missing'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'node.variables.variable_mapping.internal',phase:'variable_mapping',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:'Unique connected variable source required: missing'}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-variable-mapping');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
+ assert.equal(f.calls.includes('cancel-owned-variable-mapping'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
 for(const corruptAck of [false,true])test('Calculator JSON Response read uses exact durable phase ACK: '+corruptAck,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  const journal=createExecutionJournal({directory,metadata:{}}),f=fixture();

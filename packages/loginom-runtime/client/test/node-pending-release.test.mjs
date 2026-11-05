@@ -19,13 +19,13 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false,views=false}={}) {
+function surface({wizard=false,foreign=false,locked=false,dialog=false,views=false,variableMapping=false}={}) {
  let open=wizard,visualizers=views;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
  const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'views'},
   workflow_navigation:{status:'observed',control_ref:'ui-nav',control_tid:'MF;TF-1;path',path},
   ui:{elements:[{tid:'MF;TF-1;path',ref:'ui-nav',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
-  prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard'},
+  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:variableMapping?'input_mapping':'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
+  prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard',...(variableMapping?{input_port:{direction:'input',port:0,native_index:1,port_guid:'variables',opening_operation_id:'apply:n7:port',node_icon_class:'bg-vendor-icon-calcdata'}}:{})},
   ui:{elements:[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
   :{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
    ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:[]}};
@@ -38,6 +38,17 @@ const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_comple
  nodeApply:{pending:{phase:'configure'},node,request:{document_id:'doc',workflow_ref:workflow}},
  nodeTargetAdapter:{observe:async()=>graph()},receipt});
 const release=(operation,channel,restoreRead)=>releasePendingNode({operation,channel,restoreRead,readReceipt:async()=>operation.receipt});
+
+for(const fault of [null,'pending','transport','identity','action','phase','type','foreign','unknown','port-owner','mask'])test('Calculator variable mapping refusal cleanup retains exact receipt/native ownership: '+fault,async()=>{
+ const s=surface({wizard:true,variableMapping:true,foreign:fault==='foreign'}),operation=stopped();
+ operation.nodeApply.pending.phase=fault==='phase'?'configure':'input_mapping';operation.nodeApply.request.target={type:fault==='type'?'transform.filter_data':'transform.calculator'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'node.variables.variable_mapping.internal'};
+ operation.transportUncertain=fault==='transport';
+ operation.receipt={state:fault==='pending'?'pending':'completed',receipt:{operation_id:fault==='identity'?'other':'apply:n7',action_key:fault==='action'?'ui.act':'node.variables.variable_mapping.internal',phase:'variable_mapping',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:fault==='unknown'?'page.mouse.click: connection closed':'Unique connected variable source required: missing'}}};
+ if(['port-owner','mask'].includes(fault)){const observe=s.channel.observe;s.channel.observe=async options=>{const state=await observe(options);if(fault==='mask')state.ui.masks=[{kind:'busy',ref:'foreign'}];else state.prepared_node_context.input_port.opening_operation_id='other:port';return state;};}
+ if(fault){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ else {const proof=await release(operation,s.channel);assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);}
+});
 
 test('release proves a quiet unchanged graph without a gesture',async()=>{
  const s=surface(),proof=await release(stopped(),s.channel);
