@@ -52,6 +52,52 @@ test('observed Calculator expressions empty reexecution preserves consumers, whi
   const bad=structuredClone(events);bad.at(-1).request.parameters=parameters;assert.throws(()=>auditUserRealDate(bad,initial,final));
  }
 });
+for(const type of ['transform.calculator','transform.filter_data'])
+test(type+' edits between initial business results and the variable patch refuse',()=>{
+ const events=history();events.splice(3,0,{phase:'node_apply_prepared',operation_id:'consumer-edit',request:{
+  target:{type,kind:'existing'},mode:'configure',parameters:type==='transform.calculator'?{expressions:[{name:'flag',expression:'false'}]}:{conditions:[{field:'Share',operator:'greater',value:0.3}]},inputs:[],mappings:[]}});
+ assert.throws(()=>auditUserRealDate(events,initial,final),/USER_REAL_DATE_CONSUMER_RECONFIGURED/);
+});
+test('initial consumer configuration before the initial business results is allowed',()=>{
+ const events=history();events.splice(1,0,{phase:'node_apply_prepared',operation_id:'initial-consumer',request:{
+  target:{type:'transform.calculator',kind:'new'},mode:'configure',parameters:{expressions:[{name:'flag',expression:'Share > threshold'}]},inputs:[],mappings:[]}});
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+});
+function appendConsumerRead(events,id,index){
+ const result=structuredClone(events[index].result);
+ result.operation_id=id;result.configuration={status:'not_requested'};
+ const prepared={phase:'node_apply_prepared',operation_id:id,request:{
+  target:{type:'transform.filter_data',kind:'existing',ref:structuredClone(result.node)},
+  mode:'read_existing_output',finish:'execute',parameters:{source_operation_id:index===6?'day':'above',schemas:[{port:0,schema:structuredClone(result.output.ports[0].schema)}]},inputs:[],mappings:[]}};
+ const checkpoint={phase:'node_checkpoint',result};events.push(prepared,checkpoint);
+ return {prepared,checkpoint};
+}
+test('R3 day-final and above-final reads with confirmed not_requested configuration preserve consumers',()=>{
+ const events=history();appendConsumerRead(events,'day-final',6);appendConsumerRead(events,'above-final',7);
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+});
+test('confirmed consumer reads between initial business results and the variable patch are allowed',()=>{
+ const events=history();appendConsumerRead(events,'day-before-patch',1);appendConsumerRead(events,'above-before-patch',2);
+ events.splice(3,0,...events.splice(-4));
+ assert.equal(auditUserRealDate(events,initial,final).status,'PASS');
+});
+test('real consumer reconfiguration still refuses, including a read mode with changed configuration',()=>{
+ for(const mode of ['configure','read_existing_output']){
+  const events=history(),{prepared,checkpoint}=appendConsumerRead(events,'day-final',6);
+  prepared.request.mode=mode;prepared.request.parameters={conditions:[{field:'Share',operator:'greater',value:0.3}]};
+  checkpoint.result.configuration={status:'SUCCEEDED'};
+  assert.throws(()=>auditUserRealDate(events,initial,final),/USER_REAL_DATE_CONSUMER_RECONFIGURED/);
+ }
+});
+test('consumer read exemption requires its own successful later checkpoint and unchanged connections',()=>{
+ for(const corrupt of [(_p,c)=>c.result.operation_id='other',(_p,c)=>c.result.node.node_id='other',
+  (_p,c)=>c.result.status='FAILED',(_p,c)=>c.result.cleanup_complete=false,(_p,c)=>delete c.result.configuration,
+  p=>p.request.inputs.push({source:'other'}),p=>p.request.mappings.push({port:0}),
+  (_p,_c,e)=>e.pop(),(_p,_c,e)=>e.splice(e.length-2,0,e.pop())]){
+  const events=history(),{prepared,checkpoint}=appendConsumerRead(events,'day-final',6);corrupt(prepared,checkpoint,events);
+  assert.throws(()=>auditUserRealDate(events,initial,final),/USER_REAL_DATE_CONSUMER_RECONFIGURED/);
+ }
+});
 test('independent creation readback proves initial values without requiring a redundant public snapshot',()=>{
  const events=history(),first=events[0].result,variables=first.output.variable_ports[0].variables;
  first.output={ports:[]};first.configuration={readback:{kind:'user_variables',mode:'values',scope:'observed_after_verified_finish',values_are:'independent_owned_user_variables',variables,receipt_ids:['first:configure']}};

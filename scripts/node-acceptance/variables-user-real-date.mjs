@@ -43,16 +43,24 @@ export function auditUserRealDate(events,initial,final){
  }
  const configured=checkpoints.find(c=>c.result.operation_id===events[patch].operation_id);
  need(configured?.result.configuration?.readback?.values_are==='independent_owned_user_variables','PATCH_READBACK');
+ let initialResultsEnd=-1;
  for(const [i,want] of initial.outputs.entries()){
   const owns=c=>c.result.execution?.status==='completed'&&(c.result.output?.ports??[]).some(p=>p.port===0&&p.fresh===true&&p.execution_id===c.result.execution.execution_id&&matchesExpectedOutput(p,want));
   const a=checkpoints.find(c=>c.index<patch&&owns(c));need(a,'INITIAL_BUSINESS_'+i);
+  initialResultsEnd=Math.max(initialResultsEnd,a.index);
   const b=checkpoints.find(c=>c.index>patch&&sameNode(a,c)&&c.result.execution?.execution_id!==a.result.execution.execution_id
    &&(c.result.output?.ports??[]).some(p=>p.port===0&&p.fresh===true&&p.execution_id===c.result.execution.execution_id&&matchesExpectedOutput(p,final.outputs[i])));
   need(b,'UPDATED_BUSINESS_'+i);
  }
- for(const e of events.slice(patch+1).filter(e=>e.phase==='node_apply_prepared'&&['transform.calculator','transform.filter_data'].includes(e.request?.target?.type))){
+ for(const [index,e] of events.entries()){
+  // Initial setup ends once both original business results have been observed.
+  if(index<=initialResultsEnd||e.phase!=='node_apply_prepared'||!['transform.calculator','transform.filter_data'].includes(e.request?.target?.type))continue;
   const r=e.request,noOp=Object.keys(r.parameters).length===0||r.target.type==='transform.calculator'&&Object.keys(r.parameters).join(',')==='expressions'&&Array.isArray(r.parameters.expressions)&&r.parameters.expressions.length===0;
-  need(r.target.kind==='existing'&&noOp&&!r.inputs.length&&!r.mappings.length&&!(r.variable_inputs?.length),'CONSUMER_RECONFIGURED');
+  // Output reads retain source/schema parameters but never configure the node.
+  // Require this operation's later successful proof, not just its claimed mode.
+  const preserves=r.mode==='read_existing_output'?typeof e.operation_id==='string'&&r.target.ref&&checkpoints.some(c=>c.index>index
+   &&c.result.operation_id===e.operation_id&&c.result.configuration?.status==='not_requested'&&isDeepStrictEqual(c.result.node,r.target.ref)):noOp;
+  need(r.target.kind==='existing'&&preserves&&!r.inputs.length&&!r.mappings.length&&!(r.variable_inputs?.length),'CONSUMER_RECONFIGURED');
  }
  return {status:'PASS',initial_evidence_id:first.result.output?.variable_ports?.[0]?.read_id??first.result.configuration.readback.receipt_ids[0],final_read_id:reread.result.output.variable_ports[0].read_id};
 }
