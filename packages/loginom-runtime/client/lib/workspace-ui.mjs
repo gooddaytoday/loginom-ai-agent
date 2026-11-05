@@ -4050,9 +4050,11 @@ function readRenderedInputMapping(observation) {
     // The deactivation question can hide its node breadcrumb before Settings
     // exists. Reuse the native GUID/component-bound overflow reader for that
     // pending node; hidden controls remain non-actionable.
-    preparedNavigationNode:(nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port)
+    // Preserve graph navigation even for a refused foreign GUID: omitting it
+    // would incorrectly promote that node overview to a workflow surface.
+    preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id
-      ?nodeContext.navigation_node??(nodeContext.surface==='graph'?nodeContext.pending_wizard_node:null)??null:null,
+      ?nodeContext.navigation_node??(nodeContext.surface==='graph'&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.pending_wizard_node:null)??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedPortReturn,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
