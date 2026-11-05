@@ -98,7 +98,8 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   const b=task.binding,p=globalThis.__loginomDockPreparationV1,a=bg.app,card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
   const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
-  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode)
    ||!(r.nodeTargetWorkflowNode.ParentNode instanceof a.ModelUnitItemTreeNode))throw Error('Root user snapshot owner changed');
   const tabs=exact(b.workflow_ref.tab_tid);if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active'))throw Error('User snapshot tab changed');
   if(mode==='dirty'){
@@ -269,7 +270,8 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   const fail=s=>{throw Error('CrossTable variables: '+s);},visible=e=>e.checkVisibility({checkVisibilityCSS:true}),exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
   const cmp=t=>{const es=exact(t);return es.length===1&&Ext.getCmp(es[0].id)?.el.dom===es[0]?Ext.getCmp(es[0].id):null;};
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode);
-  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1)fail('document/workflow');
+  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(r=>r.tab!==rs[0].tab||r.packageNode!==rs[0].packageNode||r.nodeTargetWorkflowNode!==rs[0].nodeTargetWorkflowNode))fail('document/workflow');
   const wf=rs[0].nodeTargetWorkflowNode,root=b.workflow_ref.prefix+';WizrdMCF',gridTid=root+';TuneVariablesMappingWizard;grdTargetColumns';
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||box.width<=0||box.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))fail('rendered hit');return {x,y};};
   if(['graph','menu','graph_finished','leave_hover'].includes(mode)){

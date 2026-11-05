@@ -77,8 +77,20 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const graph=async()=>({verified:true,surface:'graph',locked:false});
  const open=async()=>({status:'SUCCEEDED',effect_possible:true});
  const run=async()=>{context.page=page;context.task=task;context.read=graph;context.open=open;context.decode=decodePortCell;return vm.runInContext('('+configureVariablePortMapping.toString()+')(page,task,read,open,decode)',context);};
- return {run,clicks,task,clock,node,wizard,record,source,closed:()=>closed};
+ return {run,clicks,task,clock,node,wizard,record,source,preparation,closed:()=>closed};
 }
+
+test('variable mapping retains ownership across coherent existing-workflow receipts and refuses conflicts',async()=>{
+ for(const conflict of [null,'tab','packageNode','nodeTargetWorkflowNode']){
+  const f=mappingFixture(),first=f.preparation.receipts.get('node');
+  Object.assign(first,{tab:{},packageNode:{}});
+  const second={...first};if(conflict)second[conflict]={};
+  f.preparation.receipts.set('existing-workflow',second);
+  const result=await f.run();
+  assert.equal(result.status,conflict?'AMBIGUOUS':'SUCCEEDED',result.error);
+  if(conflict){assert.match(result.error,/Owned complete variable mapping required/);assert.deepEqual(f.clicks,[]);}
+ }
+});
 
 // LAB-899 settings-rate-calc source receipt: real rate=92.5. Live mapping
 // inventory also observes native datetime=2 and real=3 with NULL defaults.

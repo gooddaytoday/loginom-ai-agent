@@ -36,7 +36,8 @@ export async function configureVariablePortMapping(page,task,readNode,openPort,d
   const es=exact(form+';grdTargetColumns'),grid=es.length===1&&Ext.getCmp(es[0].id),store=grid?.getStore?.(),rows=store?.getData?.()?.items;
   if(mode==='graph'){
    const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
-   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
+   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+    ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode)||!o
     ||o.workflow!==r.nodeTargetWorkflowNode||o.graph!==m||o.node.FGuid!==b.node.node_id||o.node.data!==o.nodeData
     ||o.port.data!==o.portData||o.port.parent!==o.node||roots.length!==1||m.FView?.el.dom!==roots[0]
     ||diagrams.length!==1||m.FDiagram?.FmxGraph?.container!==diagrams[0]||!roots[0].contains(diagrams[0]))throw Error('Owned variable mapping graph required');
@@ -45,7 +46,8 @@ export async function configureVariablePortMapping(page,task,readNode,openPort,d
     ||[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].some(visible))throw Error('Foreign variable mapping graph overlay');
    return {pending:masks.length>0};
   }
-  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1||!o
+  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode)||!o
    ||o.workflow!==r.nodeTargetWorkflowNode||o.node_id!==b.node.node_id||o.portIndex!==task.mapping.port||o.wizard!==m||o.enginePort!==m.FModelSocket
    ||o.port.FSubType!==(task.mapping.kind==='control'?4:3)||o.node.FGuid!==b.node.node_id||o.nodeData!==o.node.data||o.portData!==o.port.data
    ||card.Controller.Node.data.node.ParentNode!==o.portTree||o.portTree.FModelNodePort!==o.portData||o.nodeTree.FModelNode!==o.nodeData
