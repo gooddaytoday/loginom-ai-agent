@@ -29,8 +29,6 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
 import { ProviderError } from "@/provider/error"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { Npm } from "@opencode-ai/core/npm"
-import { NpmTest } from "../fake/npm"
 
 type ConfigModel = NonNullable<NonNullable<ConfigV1.Info["provider"]>[string]["models"]>[string]
 
@@ -56,9 +54,7 @@ const openAIConfig = (model: ModelsDev.Provider["models"][string], baseURL: stri
   }
 }
 
-// Local plugin fixtures have no npm dependencies. Keep config's background
-// install out of these header/stream assertions (including its shared lock).
-const it = testEffect(AppNodeBuilder.build(LayerNode.group([LLM.node, Provider.node]), [[Npm.node, NpmTest.noop]]))
+const it = testEffect(AppNodeBuilder.build(LayerNode.group([LLM.node, Provider.node])))
 
 // LLM.stream returns a Stream, not an Effect, so we can't use the serviceUse proxy.
 const drain = (input: LLM.StreamInput) => LLM.Service.use((svc) => svc.stream(input).pipe(Stream.runDrain))

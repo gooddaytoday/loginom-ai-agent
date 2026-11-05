@@ -159,10 +159,12 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
      const full=await detail(root,toolbar);
      requireValue(sameOwner(full),'Delivery toolbar owner changed');
-     // Roots carry the native tab identity in workflow_ref, but only a detail
-     // read issues active_tab_ref. Pin that ref across subsequent detail reads.
-     requireValue(typeof full.active_tab_ref==='string'&&(!toolbarTab||full.active_tab_ref===toolbarTab),'Delivery toolbar tab changed');
-     toolbarTab??=full.active_tab_ref;
+     // An empty workspace has no tab, even when Files is already reachable.
+     // Only detail reads issue tab refs; pin the first one and refuse its loss.
+     requireValue(typeof full.active_tab_ref==='string'
+       ? toolbarTab===undefined||full.active_tab_ref===toolbarTab
+       : full.active_tab_ref===null&&full.workflow_ref===null&&toolbarTab===undefined,'Delivery toolbar tab changed');
+     if(typeof full.active_tab_ref==='string')toolbarTab??=full.active_tab_ref;
      return full;
     };
     const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
