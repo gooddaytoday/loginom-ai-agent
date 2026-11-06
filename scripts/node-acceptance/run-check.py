@@ -125,6 +125,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name == 'lgd-import-compression':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/compression', prompt=node / 'acceptance/compression/task.md',
+                    data=node / 'fixtures/64bit', input_files=['compression-none.lgd', 'compression-lzo.lgd', 'compression-lz4.lgd'],
+                    expected_name='expected.json', base=None, lgd='compression',
+                    oracle=node / 'acceptance/oracle.py')
     if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt']:
         export = name == 'lgd-export'
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')

@@ -106,6 +106,29 @@ def fixtures():
     assert len(a) == len(b)
     assert [i for i, pair in enumerate(zip(a,b)) if pair[0] != pair[1]] == [320]
     assert a[320] ^ b[320] == 1
+    compression = ROOT / "fixtures/64bit/files.json"
+    if compression.exists():
+        for entry in json.loads(compression.read_text())["files"]:
+            data = (compression.parent / entry["name"]).read_bytes()
+            assert len(data) == entry["bytes"]
+            assert hashlib.sha256(data).hexdigest() == entry["sha256"]
+
+
+def compression_expectations():
+    spec = table(ROOT, "properties-values.csv", "properties-schema.json")
+    rows = [dict(zip([c["name"] for c in spec["columns"]], row)) for row in spec["rows"]]
+    cases = [("Без сжатия", "Без сжатия", "Нет", "compression-none.lgd"),
+             ("LZO", "LZO", "Нет", "compression-lzo.lgd"),
+             ("LZ4", "LZ4", "Сжатых данных", "compression-lz4.lgd")]
+    return {"package_path": "{{PACKAGE_PATH}}",
+            "nodes": [{"type": "imports.lgd", "label": label} for label, _, _, _ in cases],
+            "lgd": {"kind": "compression", "imports": [
+                {"label": label, "compression": compression, "bitness": "64-битная система",
+                 "written_checksum": checksum, "checksum": True, "filename": filename, "columns": spec["columns"]}
+                for label, compression, checksum, filename in cases]},
+            "outputs": [{"output_node_type": "imports.lgd", "output_node_label": label,
+                         "output_port": 0, "ordered": True, "column_order": "exact",
+                         "columns": spec["columns"], "rows": rows} for label, _, _, _ in cases]}
 
 
 if __name__ == "__main__":
@@ -117,8 +140,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     fixtures()
     imported, exported = expectations()
-    for folder, value in [(ROOT, imported), (EXPORT, exported)]:
-        path = folder / "acceptance/expected.json"
+    for path, value in [(ROOT / "acceptance/expected.json", imported),
+                        (EXPORT / "acceptance/expected.json", exported),
+                        (ROOT / "acceptance/compression/expected.json", compression_expectations())]:
         if args.write:
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
         if args.check:
