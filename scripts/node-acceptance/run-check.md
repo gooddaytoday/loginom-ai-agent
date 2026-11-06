@@ -1,5 +1,11 @@
 Run live acceptance without repeatedly reading live logs:
 
+`graph-large-execute` opens a saved 40-node background graph through the existing
+source-package phase, then imports customers, executes and reconfigures one
+Grouping node. The unchanged grouping-unique table oracle checks CSV, Save, cold reexecution
+and cleanup; the production observation journal supplies the graph node count. Only task.md and CSV reach
+the model; the source fixture and expected tables stay in the acceptance harness.
+
 `quality-default` and `quality-spikes` use the approved five-output fixtures in
 `nodes/research-quality/acceptance/`. Only task/data reach the model. The stock
 typed matcher checks full production receipts before and after the same Import
