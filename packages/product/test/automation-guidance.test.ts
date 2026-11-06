@@ -6,6 +6,10 @@ const chain = skill.split("## Один расчёт цепочки\n")[1].split(
 test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
   const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
   expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
+  const entry = skill.split("\n## ")[0]
+  expect(entry).toContain("открыть «Loginom»")
+  expect(entry).toContain("адрес, логин и пароль")
+  expect(entry).toContain("без поиска конфигураций/ключей")
   expect(browser).toContain("LOGINOM_CONFIG_REQUIRED")
   expect(browser).toContain("state=unconfigured")
   expect(browser).toContain("открыть «Loginom»")

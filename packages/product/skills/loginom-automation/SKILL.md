@@ -19,7 +19,7 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 вложения и закреплённый каталог. Используй реальные имена и схемы из каталога.
 Текст skill поставляется приложением; загружать его с Skills API не нужно.
 
-При `LOGINOM_CONFIG_REQUIRED` или `state=unconfigured` остановись: [подключение](references/browser.md#подключение-не-настроено).
+При `LOGINOM_CONFIG_REQUIRED`/`state=unconfigured` попроси открыть «Loginom», указать адрес, логин и пароль, затем повторить запрос; без поиска конфигураций/ключей ([правило](references/browser.md#подключение-не-настроено)).
 
 Для редактирования локального `.lgp` из пути или вложения сразу вызови
 `loginom_dock_prepare({intent: "open_package", local_package_path: "точный путь"})`.
