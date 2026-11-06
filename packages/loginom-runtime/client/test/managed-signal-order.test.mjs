@@ -24,6 +24,7 @@ for(const signal of ['SIGINT','SIGTERM','SIGHUP'])for(const policy of ['last_con
 for(const dirty of [false,true])test(signal+' orders native close/logout before browser; '+policy+' dirty='+dirty,async()=>{
  const events=[],timers=[];const process=new EventEmitter();let done;
  process.exit=code=>{events.push('exit:'+code);done?.();};
+ Object.defineProperty(process,'exitCode',{set(code){events.push('exit:'+code);done?.();}});
  const state={browser:{close:async()=>events.push('browser')},client:{close:async()=>events.push('client')},
   bridge:{close:async()=>{events.push('saved-state');events.push(dirty?'UNSAVED_CHANGES':'native-close');if(!dirty)events.push('logout');
    return {browser_transport_closed:true,browser_process_terminated:true,clipboard_leases_retained:0,
