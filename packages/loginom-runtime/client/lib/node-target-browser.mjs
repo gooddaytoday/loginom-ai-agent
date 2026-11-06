@@ -620,7 +620,7 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
       await guard();
       const node=before.nodes.find(n=>n.ref.node_id===task.effect.parameters.edge.source);
       const target=task.effect.parameters.edge.target;
-      const navigation=await reveal({page,root,nodeId:target===undefined?node.ref.node_id:[node.ref.node_id,target],position:node.position,prefix:task.request.workflow_ref.prefix,
+      const navigation=await reveal({page,root,nodeId:target===undefined?node.ref.node_id:[node.ref.node_id,target].map(node_id=>({node_id,ports_only:true})),position:node.position,prefix:task.request.workflow_ref.prefix,
         scrollNode:true,remaining,guard,readViewport,project});
       if(target!==undefined&&!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');
       await guard();point=null;
@@ -808,10 +808,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
             if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
             const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
           };
-          const guard=async()=>{remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,await (${readGraph.toString()})(page,t)))throw Error('Graph changed during link endpoint navigation');};
+          const guard=async()=>{remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,await (${readGraph.toString()})(page,t)))throw Error('Graph changed during link source navigation');};
           await guard();
           const navigation=await (${revealNodePlacement.toString()})({page,root:page.locator('[data-tid='+JSON.stringify(t.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']'),
-            nodeId:${JSON.stringify([source.ref.node_id,target.ref.node_id])},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
+            nodeId:${JSON.stringify([source.ref.node_id,target.ref.node_id].map(node_id=>({node_id,ports_only:true})))},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
             remaining,guard,readViewport:${nodePlacementViewport.toString()},project:${nodePlacementPoint.toString()}});
           await guard();if(!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');return navigation;
         }`,deadline);

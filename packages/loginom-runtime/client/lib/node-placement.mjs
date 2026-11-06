@@ -9,7 +9,8 @@ export function nodePlacementViewport(element,nodeId) {
  if(g?.container!==element||!g.view||!Number.isFinite(g.view.scale)||g.view.scale<=0||!Number.isFinite(g.view.translate?.x)||!Number.isFinite(g.view.translate?.y))throw Error('Native canvas transform unavailable');
  let nodeBounds;
  if(nodeId!==undefined){
-  // A link needs the combined drawing footprint of both native endpoints.
+  // Links reveal both port footprints; full node labels/bodies can exceed
+  // the canvas at minimum zoom even when the ports fit together.
   const ids=Array.isArray(nodeId)?nodeId:[nodeId];
   const boxes=ids.flatMap(id=>{
    const nodes=d.FNodes?.FCollection?.filter(n=>n.FGuid===(typeof id==='object'?id.node_id:id));
@@ -19,7 +20,9 @@ export function nodePlacementViewport(element,nodeId) {
    const drawings=[...element.querySelectorAll('[data-tid]')].filter(e=>{const id=e.getAttribute('data-tid');return id===tid||id.startsWith(tid+';');});
    if(drawings.length>128||!drawings.includes(body))throw Error('Placement node drawing bound exceeded');
    // Existing Export settings open targets the full native body, not its label/ports.
-   const bounds=(id?.body_only===true?[body]:drawings).map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+   const footprint=id?.body_only===true?[body]:id?.ports_only===true
+    ?drawings.filter(e=>/^(?:(?:Input|Output)_(?:Data(?:Tree)?|Var)-\d+|Input_ControlVar)$/.test(e.getAttribute('data-tid').slice(tid.length+1))):drawings;
+   const bounds=footprint.map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
    if(!bounds.length)throw Error('Placement node has no rendered bounds');
    return bounds;
   });
