@@ -5,7 +5,7 @@ import { runInNewContext } from "node:vm"
 const recipe = new URL("../skills/loginom-automation/references/recipes/parent-child.md", import.meta.url)
 const fixtures = new URL("../../../docs/node-development/nodes/trees-datatotree/acceptance/parent-child/expected.json", import.meta.url)
 
-function execute(rows: { id: string; parent_id: string | null; name: string }[]) {
+function execute(rows: { id: string; parent_id: string | null | undefined; name: string }[]) {
   const text = readFileSync(recipe, "utf8")
   const code = text.match(/```javascript\n([\s\S]*?)\n```/)?.[1]
   expect(code).toBeDefined()
@@ -60,9 +60,11 @@ test("orphan lists row ids rather than inventing roots or dropping records", () 
 })
 
 test("empty parent cells become null; empty forest is one document", () => {
-  const result = execute([{ id: "001", parent_id: "", name: "001" }])
-  result.run()
-  expect(JSON.parse(result.output[0].JSON)).toEqual({ roots: [{ id: "001", parent_id: null, name: "001", children: [] }] })
+  for (const parent_id of ["", null, undefined]) {
+    const result = execute([{ id: "001", parent_id, name: "001" }])
+    result.run()
+    expect(JSON.parse(result.output[0].JSON)).toEqual({ roots: [{ id: "001", parent_id: null, name: "001", children: [] }] })
+  }
   const empty = execute([])
   empty.run()
   expect(JSON.parse(empty.output[0].JSON)).toEqual({ roots: [] })
