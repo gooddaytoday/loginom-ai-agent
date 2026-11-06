@@ -149,13 +149,14 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/variable', input_files=['variable-a.lgd', 'variable-b.lgd'],
                     expected_name='expected.json', lgd_initial='expected-initial.json', base=None, lgd='variable',
                     oracle=node / 'acceptance/oracle.py')
-    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt']:
-        export = name == 'lgd-export'
+    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-overwrite', 'lgd-export-variable']:
+        export = name.startswith('lgd-export')
+        export_case = name.removeprefix('lgd-export-') if name.startswith('lgd-export-') else None
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')
-        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt'}[name]
-        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
-                    data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
-                    expected_name='expected-' + variant + '-run.json', base=None, lgd=variant,
+        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt', 'lgd-export-overwrite': 'roundtrip', 'lgd-export-variable': 'roundtrip'}[name]
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-' + export_case + '.md' if export_case else 'task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
+                    data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
+                    expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=export_case,
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
@@ -870,6 +871,35 @@ def check_lgd_variable_switch(replies, switch):
     assert first and second and first[1]['source_path'] != second[1]['source_path'], 'LGD_VARIABLE_SWITCH_SAME_NODE_MISSING'
 
 
+def check_lgd_export_case(replies, case, destination, initial_destination):
+    successful = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                  if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                  and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export']
+    def files(o, path):
+        return [f for f in o.get('output', {}).get('file_artifacts', [])
+                if f.get('destination') == path and f.get('bytes', 0) > 0 and len(f.get('sha256', '')) == 64]
+    final = [(n, o, r) for n, o, r in successful if r.get('destination') == destination and files(o, destination)]
+    assert final, 'LGD_FINAL_EXPORT_MISSING'
+    if case == 'overwrite':
+        rejected = [n for n, o in replies if o.get('status') == 'FAILED' and o.get('cleanup_complete') is True
+                    and 'LGD destination exists; reject policy preserved it' in o.get('error', {}).get('message', '')]
+        assert rejected, 'LGD_DEFAULT_REJECT_MISSING'
+        first = [(n, o, r) for n, o, r in final if r.get('destination_check', {}).get('existed') is False]
+        replaced = [(n, o, r) for n, o, r in final if r.get('destination_check', {}).get('existed') is True
+                    and r['destination_check'].get('decision') == 'replace' and r['destination_check'].get('overwrite') == 'replace']
+        assert any(a < reject < b and ra.get('node') == rb.get('node')
+                   and files(oa, destination)[0]['sha256'] != files(ob, destination)[0]['sha256']
+                   for a, oa, ra in first for b, ob, rb in replaced for reject in rejected), 'LGD_REPLACE_CHAIN_MISSING'
+    elif case == 'variable':
+        first = [(n, o, r) for n, o, r in successful if r.get('destination') == initial_destination and files(o, initial_destination)]
+        binding = {'destination': {'variable': 'LgdPath'}}
+        assert any(a < b and ra.get('node') == rb.get('node') and ra.get('bindings') == rb.get('bindings') == binding
+                   and ra.get('destination_check', {}).get('existed') is False and rb.get('destination_check', {}).get('existed') is False
+                   for a, _, ra in first for b, _, rb in final), 'LGD_VARIABLE_REEVALUATION_MISSING'
+    else:
+        raise AssertionError('LGD_EXPORT_CASE_UNKNOWN')
+
+
 def check_lgd_checksum_switch(replies, filename):
     reads, seen = [], set()
     for _, reply in replies:
@@ -1169,6 +1199,8 @@ class Runner:
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
             prompt = prompt.replace('{{EXPORT_DIRECTORY}}/roundtrip.lgd', lgd_destination)
+            lgd_initial_destination = str(Path(lgd_destination).with_name(Path(lgd_destination).stem + '-first.lgd'))
+            prompt = prompt.replace('{{LGD_INITIAL_DESTINATION}}', lgd_initial_destination)
         if spec.get('local_file') and spec['attachment'] == 'path':
             prompt = prompt.replace('{{SOURCE_PATH}}', str(spec['local_file']))
             if spec.get('upload_only') and str(spec['local_file']) not in prompt:
@@ -1222,6 +1254,9 @@ class Runner:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
+        if spec.get('lgd_case') == 'variable':
+            expected['lgd']['initial_destination'] = lgd_initial_destination
+            expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -1260,6 +1295,14 @@ class Runner:
             try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
             except (ValueError, TypeError): continue
             if isinstance(reply, dict): replies.append((n, reply))
+        if spec.get('lgd_case'):
+            for n, event in events:
+                state = event.get('part', {}).get('state', {})
+                if event.get('type') != 'tool_use' or state.get('status') != 'error': continue
+                try: value = json.JSONDecoder().raw_decode(state.get('error', ''))[0]
+                except (ValueError, TypeError): continue
+                if isinstance(value, dict): replies.append((n, value))
+            replies.sort(key=lambda item: item[0])
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1498,6 +1541,7 @@ class Runner:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
         if spec.get('lgd') == 'roundtrip':
+            if spec.get('lgd_case'): check_lgd_export_case(replies, spec['lgd_case'], lgd_destination, lgd_initial_destination)
             assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
                        and o.get('configuration', {}).get('readback', {}).get('destination') == lgd_destination
                        and o.get('configuration', {}).get('readback', {}).get('settings', {}).get('compression') == 2

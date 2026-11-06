@@ -18,8 +18,8 @@ export function lgdExportReadback({node,phases}){
  need(configured?.value?.configuration&&input?.value?.source_identity_verified&&finish?.status==='verified','Export readback chain incomplete');
  const c=configured.value.configuration;
  return {kind:'lgd_export',scope:'observed_before_verified_finish',node,receipt_ids:[input.receipt_id,configured.receipt_id,finish.receipt_id],values_are:'observed_ui_values',
-  destination:c.destination,settings:Object.fromEntries(Object.values(c.configured).filter(x=>x?.values).flatMap(x=>Object.entries(x.values).map(([k,v])=>[k,v.value]))),
-  input_mapping:{port:0,autosync:input.value.native_mapping.autosync,fields:input.value.native_mapping.target_fields.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source.name}))},package_persistence_verified:false};
+  destination:c.destination,bindings:c.configured.lgd_export.values.destination.variable?{destination:{variable:c.configured.lgd_export.values.destination.variable_name}}:{},settings:Object.fromEntries(Object.values(c.configured).filter(x=>x?.values).flatMap(x=>Object.entries(x.values).map(([k,v])=>[k,v.value]))),
+  destination_check:c.configured.destination_check??null,input_mapping:{port:0,autosync:input.value.native_mapping.autosync,fields:input.value.native_mapping.target_fields.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source.name}))},package_persistence_verified:false};
 }
 export function createLgdExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
  let storageContinuation=null;
@@ -27,7 +27,7 @@ export function createLgdExportNodeSupport({targetOrigin,targetBuild,storageDire
   validate:(p,m,r)=>validateLgdExportParameters(p,m,r,storageDirectories),configurationReadback:lgdExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p.lgd_export??{})}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
-  let channel,signal,driver,execution,configuration,inputMapping,recoveryReads=0;
+  let channel,signal,driver,execution,configuration,inputMapping,variableMapping=null,recoveryReads=0;
   const enter=ctx=>{signal=ctx.signal;operation.deadline=ctx.deadline;return channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,
    signal:{throwIfAborted:()=>signal?.throwIfAborted(),get aborted(){return signal?.aborted;},get reason(){return signal?.reason;}},
    preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
@@ -96,6 +96,18 @@ export function createLgdExportNodeSupport({targetOrigin,targetBuild,storageDire
     const definition=await readOutputDefinitionPages(channel,{expectedCount:inputMapping.target_fields.length});
     need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'Export input definition differs');
     const completed=await finish('done',ctx,true,definition);
+    const request=operation.nodeApply.request;
+    if(request.target.kind==='existing'||request.variable_inputs?.length){
+     const g=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+     need(g.complete===true&&g.document_id===ctx.document_id&&g.workflow_ref.workflow_id===ctx.workflow_ref.workflow_id,'Complete LGD variable source graph required');
+     const links=(g.variable_links??[]).filter(e=>e.target===ctx.node.node_id&&e.kind==='variables'&&e.input===0);
+     need(links.length<=1,'Unique LGD variable source required');
+     if(links.length){
+      const mapped=await channel.mapVariablePort({direction:'input',kind:'variables',port:0});
+      need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true&&mapped.source_identity_verified===true,'LGD variable mapping readback unconfirmed');
+      variableMapping=mapped.mapping;
+     }
+    }
     return verified({effect_possible:true,source_identity_verified:true,native_mapping:inputMapping,definition,finish:completed});
    },
    async openWizard(ctx){enter(ctx);if(operation.nodeApply.request.finish==='execute'){driver=createNodeExecutionProcedure(channel,ctx.node);await driver.prepare();}
@@ -106,7 +118,7 @@ export function createLgdExportNodeSupport({targetOrigin,targetBuild,storageDire
      resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'))).ref,expected_stage:'lgd_export'})});
     return verified({effect_possible:true});
    },
-   async configureExport(ctx,p){enter(ctx);const r=await configureLgdExport(channel,p,{...ctx,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,close:closePreparedWizard});configuration=r.configuration;return r;},
+   async configureExport(ctx,p){enter(ctx);const r=await configureLgdExport(channel,p,{...ctx,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,variableMapping,close:closePreparedWizard});configuration=r.configuration;return r;},
    finish,
    async waitExecution(ctx){enter(ctx);need(driver,'Export execution baseline missing');
     try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});}
