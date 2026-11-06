@@ -1,6 +1,6 @@
 Run live acceptance without repeatedly reading live logs:
 
-`graph-large-execute` opens a saved 40-node background graph through the existing
+`graph-large-execute` opens a saved 72-node background graph through the existing
 source-package phase, then imports customers, executes and reconfigures one
 Grouping node. The unchanged grouping-unique table oracle checks CSV, Save, cold reexecution
 and cleanup; the production observation journal supplies the graph node count. Only task.md and CSV reach
