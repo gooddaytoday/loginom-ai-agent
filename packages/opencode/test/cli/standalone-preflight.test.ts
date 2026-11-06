@@ -447,3 +447,81 @@ test.each(["valid-help", "invalid-key"])(
   },
   30_000,
 )
+
+test("saved cloud settings without sign-in stop headless chat before the model", async () => {
+  await using fixture = await standaloneFixture()
+  const provider = ManagedRuntime.make(TestLLMServer.layer)
+  try {
+    const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
+    await store.stage({
+      mode: "cloud",
+      apiKey: "",
+      generation: 1,
+      revision: 1,
+      username: "user",
+      password: "",
+      url: "http://127.0.0.1:1/app/",
+    })
+    await store.activate(1)
+    const llm = await provider.runPromise(TestLLMServer)
+    await provider.runPromise(llm.text("Must not run"))
+    await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
+    const result = await invoke(fixture, ["--headless", "--", "Обычный вопрос"])
+    expect(result.exit).toBe(1)
+    expect(result.errors).toContain("LOGINOM_CONNECTION_REQUIRED")
+    expect(result.errors).toContain("loginom connect")
+    expect(await provider.runPromise(llm.calls)).toBe(0)
+    expect(await readdir(fixture.profile)).not.toContain(".writer")
+  } finally {
+    await provider.dispose()
+  }
+}, 30_000)
+
+test("cloud setup before sign-in saves through the real Node Host without launching a browser", async () => {
+  await using fixture = await standaloneFixture()
+  const marker = join(fixture.directory, "browser-started")
+  await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+  await writeFile(
+    join(fixture.bundle, "runtime/src/managed-entry.mjs"),
+    `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(marker)},'started');process.exit(1);`,
+  )
+  async function command(args: string[], input?: object) {
+    const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format=json"], {
+      cwd: resolve(import.meta.dir, "../.."),
+      env: {
+        ...process.env,
+        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+        LOGINOM_AI_AGENT_CHANNEL: "dev",
+        LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
+        LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
+        LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+      },
+      stdin: input ? new Blob([JSON.stringify(input)]) : "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const output = new Response(child.stdout).text()
+    const errors = new Response(child.stderr).text()
+    return { exit: await child.exited, errors: await errors, result: JSON.parse(await output) }
+  }
+  expect(
+    await command(["setup", "--stdin-json"], {
+      mode: "cloud",
+      url: "http://127.0.0.1:1/app/",
+      username: "user",
+      password: "",
+    }),
+  ).toMatchObject({
+    exit: 0,
+    errors: "",
+    result: {
+      generation: 1,
+      state: "connection-required",
+      help: { state: "connection-required" },
+      browser: { state: "unknown" },
+    },
+  })
+  await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+  expect(await command(["disconnect"])).toMatchObject({ exit: 0, errors: "", result: { cloud: { connected: false } } })
+  expect(await readdir(fixture.profile)).not.toContain(".writer")
+}, 30_000)

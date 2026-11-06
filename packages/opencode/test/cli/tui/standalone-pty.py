@@ -15,6 +15,8 @@ assert not resume_mode or (prompt_mode and not attachment_mode), "--resume requi
 assert not attachment_mode or prompt_mode, "--attachment requires --prompt"
 proxy_notice = "--proxy-notice" in sys.argv
 unconfigured = "--unconfigured" in sys.argv
+cloud_without_login = "--cloud-without-login" in sys.argv
+ordinary_chat = unconfigured or cloud_without_login
 cancel_setup = "--cancel-setup" in sys.argv
 password_setup = "--password" in sys.argv
 onboarding = "--setup" in sys.argv or cancel_setup
@@ -56,7 +58,7 @@ command=[binary] if binary else [bun,'run','src/standalone.ts']
 subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
 env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),LOGINOM_AI_AGENT_CLI_BUNDLE=str(bundle),LOGINOM_AI_AGENT_PURE='1',BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',TERM='xterm-256color')
 if not unconfigured and not onboarding:
- setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input=json.dumps({'mode':'custom','endpoint':'https://example.test/mcp','apiKey':'fixture-key'}),text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
+ setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input=json.dumps({'mode':'cloud'} if cloud_without_login else {'mode':'custom','endpoint':'https://example.test/mcp','apiKey':'fixture-key'}),text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
  assert setup.returncode==0,setup.stderr
 elif prompt_mode:
  status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
@@ -99,13 +101,13 @@ class Provider(BaseHTTPRequestHandler):
   state["tool_result"] |= tool_result
   delta = {"content": "TUI fixture title" if title else "standalone tui completed"}
   finish = "stop"
-  if not title and not tool_result and not unconfigured:
+  if not title and not tool_result and not ordinary_chat:
    delta = {"tool_calls": [{"index": 0, "id": phase["call"], "type": "function", "function": {"name": "loginom_probe", "arguments": "{}"}}]}
    finish = "tool-calls"
   chunks = [{"id": "tui-test", "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": value, "finish_reason": reason}]} for value, reason in [(delta, None), ({}, finish)]]
   data = ("".join("data: " + json.dumps(chunk) + "\n\n" for chunk in chunks) + "data: [DONE]\n\n").encode()
   self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
-  if (tool_result or unconfigured) and not title: state["finished"] = True
+  if (tool_result or ordinary_chat) and not title: state["finished"] = True
 server = None
 if prompt_mode:
  server = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
@@ -132,8 +134,8 @@ if proxy_notice:
  for key in ['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','NODE_USE_ENV_PROXY']:
   env.pop(key, None)
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
-child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
-os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
+child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if ordinary_chat else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
+os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; connect_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
 setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('Сервер Loginom AI',b'\x1b[B\r'),('MCP endpoint',b'https://example.test/mcp\r'),('Ключ сервера',b'fixture-key\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
 if password_setup: setup_steps.append(('Новый пароль',b'fixture-password\r'))
 while child.poll() is None and time.monotonic()-start<(90 if attachment_mode else 30):
@@ -145,6 +147,8 @@ while child.poll() is None and time.monotonic()-start<(90 if attachment_mode els
    os.write(master,setup_steps[setup_step][1]);setup_step+=1
   if unconfigured and not setup_skipped and 'Настроить Loginom сейчас?'.encode() in output:
    os.write(master,b'\r');setup_skipped=True
+  if ordinary_chat and not connect_skipped and 'Подключиться к Loginom AI сейчас?'.encode() in output:
+   os.write(master,b'\r');connect_skipped=True
   if b'\x1b[6n' in chunk: os.write(master,b'\x1b[1;1R')
   if b'\x1b[c' in chunk: os.write(master,b'\x1b[?1;2c')
  if attachment_mode and (not onboarding or setup_step==len(setup_steps)):
@@ -186,13 +190,16 @@ if onboarding and not cancel_setup:
  saved=json.loads((profile/'loginom/connection/connection.json').read_text())
  result['custom_saved']=saved.get('mode')=='custom' and saved.get('endpoint')=='https://example.test/mcp'
  assert result['setup_completed'] and result['custom_saved'] and not result['secret_visible'], 'Custom setup must persist without displaying the key'
-if unconfigured: assert setup_skipped and not (bundle/'fixture-pids.jsonl').exists(), 'Unconfigured TUI must offer setup without launching a runtime'
+if ordinary_chat:
+ assert connect_skipped and (setup_skipped or cloud_without_login) and not (bundle/'fixture-pids.jsonl').exists(), 'TUI must offer cloud sign-in and allow ordinary chat without launching a runtime'
+ result['connect_declined']=connect_skipped
+ result['saved_cloud']=cloud_without_login
 result['tool_called'] = (bundle/'fixture-calls.jsonl').exists()
 result['history_verified'] = False
 if prompt_mode:
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   parts = [json.loads(row[0]) for row in db.execute('select data from part')]
- result['history_verified'] = (unconfigured or any(p.get('tool') == 'loginom_probe' and p.get('state', {}).get('status') == 'completed' and p.get('state', {}).get('output') == 'TUI private host completed' for p in parts)) and any(p.get('type') == 'text' and p.get('text') == 'standalone tui completed' for p in parts)
+ result['history_verified'] = (ordinary_chat or any(p.get('tool') == 'loginom_probe' and p.get('state', {}).get('status') == 'completed' and p.get('state', {}).get('output') == 'TUI private host completed' for p in parts)) and any(p.get('type') == 'text' and p.get('text') == 'standalone tui completed' for p in parts)
 if resume_mode:
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   sessions=list(db.execute('select id from session'))
@@ -215,4 +222,4 @@ if invalid_session:
  sys.exit(0 if child.returncode==2 and not forced and not result['guard'] and not alive and b'CLI_ARGUMENT_INVALID' in output else 1)
 if cancel_setup:
  sys.exit(0 if child.returncode==130 and not forced and not result['guard'] and not alive and not result['secret_visible'] and not result['tool_called'] else 1)
-sys.exit(0 if child.returncode==0 and not forced and not result['guard'] and not alive and ((state['finished'] and not state['tool_advertised'] and not result['tool_called'] and result['history_verified'] if unconfigured else all(state.values()) and result['tool_called'] and result['history_verified']) if prompt_mode else result['provider_dialog']) else 1)
+sys.exit(0 if child.returncode==0 and not forced and not result['guard'] and not alive and ((state['finished'] and not state['tool_advertised'] and not result['tool_called'] and result['history_verified'] if ordinary_chat else all(state.values()) and result['tool_called'] and result['history_verified']) if prompt_mode else result['provider_dialog']) else 1)

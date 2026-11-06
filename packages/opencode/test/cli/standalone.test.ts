@@ -401,3 +401,54 @@ test("provider cancellation waits for its credential command to exit", async () 
     server.stop(true)
   }
 }, 30_000)
+
+test.each([{ args: ["loginom", "connect"] }, { args: ["loginom", "--format=json", "connect"] }, { args: [] }])(
+  "startup cancellation owns connect and TUI until cleanup: %j",
+  async ({ args }) => {
+    const root = await temporary()
+    const result = await run(
+      root,
+      `
+    import { standalone } from './src/cli/standalone.ts';
+    import { standaloneCancellation } from './src/cli/standalone-cancellation.ts';
+    import { existsSync } from 'node:fs';
+    const listeners = process.listenerCount('SIGINT');
+    await standalone(${JSON.stringify(args)}, async (_, paths) => {
+      const signal = standaloneCancellation();
+      if (!signal) throw Error('SIGNAL_MISSING');
+      process.emit('SIGINT');
+      await Promise.resolve();
+      process.emit('SIGINT');
+      console.log(signal.aborted && existsSync(paths.root + '/.writer') && process.listenerCount('SIGINT') === listeners + 1);
+    });
+    console.log(!standaloneCancellation() && process.listenerCount('SIGINT') === listeners);
+  `,
+    )
+    expect(result.code).toBe(0)
+    expect(result.out).toBe("true\ntrue\n")
+    expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+  },
+)
+
+test("TUI handoff clears startup cancellation idempotently without aborting or releasing its profile", async () => {
+  const root = await temporary()
+  const result = await run(
+    root,
+    `
+    import { standalone } from './src/cli/standalone.ts';
+    import { standaloneCancellation, handoffStandaloneCancellation } from './src/cli/standalone-cancellation.ts';
+    import { existsSync } from 'node:fs';
+    const listeners = process.listenerCount('SIGINT');
+    await standalone([], async (_, paths) => {
+      const signal = standaloneCancellation();
+      handoffStandaloneCancellation();
+      handoffStandaloneCancellation();
+      console.log(!signal.aborted && !standaloneCancellation() && existsSync(paths.root + '/.writer') && process.listenerCount('SIGINT') === listeners);
+    });
+    console.log(!standaloneCancellation() && process.listenerCount('SIGINT') === listeners);
+  `,
+  )
+  expect(result.code).toBe(0)
+  expect(result.out).toBe("true\ntrue\n")
+  expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+})

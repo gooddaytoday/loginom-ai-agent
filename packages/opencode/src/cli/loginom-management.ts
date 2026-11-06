@@ -1,4 +1,6 @@
 import { Option, Schema } from "effect"
+import { setTimeout } from "node:timers/promises"
+import { standaloneCancellation } from "./standalone-cancellation"
 import { Loginom } from "@opencode-ai/schema/loginom"
 import type { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 
@@ -45,18 +47,70 @@ export function setupCandidate(json: string, current: Loginom.View): Loginom.Can
 }
 
 export async function loginomManagement(
-  host: Awaited<ReturnType<typeof launchNodeHost>>,
+  host: Pick<Awaited<ReturnType<typeof launchNodeHost>>, "request">,
   command: string,
   options: {
     stdinJSON: boolean
     acknowledge: boolean
     ids?: string[]
+    now?: () => number
+    wait?: (ms: number, signal?: AbortSignal) => Promise<void>
+    openUrl?: (url: string) => Promise<unknown>
   },
 ) {
   const decoded = view(await host.request("connection.status", {}))
   if (Option.isNone(decoded)) throw new Error("LOGINOM_REPLY_INVALID")
   const current = decoded.value
   if (command === "status") return current
+  if (command === "disconnect") {
+    const disconnected = view(await host.request("connection.cloud-disconnect", {}))
+    if (Option.isNone(disconnected)) throw Error("LOGINOM_REPLY_INVALID")
+    return disconnected.value
+  }
+  if (command === "connect") {
+    if (current.cloud.connected) {
+      process.stderr.write("Сначала выполните loginom disconnect для смены аккаунта.\n")
+      throw Error("LOGINOM_CLOUD_ALREADY_CONNECTED")
+    }
+    const signal = standaloneCancellation()
+    const now = options.now ?? Date.now
+    const wait = options.wait ?? ((ms, signal) => setTimeout(ms, undefined, { signal }))
+    let latest = current
+    try {
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      const started = view(await host.request("connection.cloud-start", {}))
+      if (Option.isNone(started)) throw Error("LOGINOM_REPLY_INVALID")
+      latest = started.value
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      if (latest.cloud.pending) {
+        process.stderr.write(`Код: ${latest.cloud.pending.userCode}\n${latest.cloud.pending.verificationUrl}\n`)
+        const open =
+          options.openUrl ??
+          (async (url: string) => {
+            const { openUrl } = await import("@opencode-ai/core/open")
+            return openUrl(url)
+          })
+        void open(latest.cloud.pending.verificationUrl).catch(() => {})
+      }
+      while (latest.cloud.pending && now() < latest.cloud.pending.expiresAt && !signal?.aborted) {
+        await wait(1000, signal)
+        if (signal?.aborted) throw Error("CLI_CANCELLED")
+        const polled = view(await host.request("connection.status", {}))
+        if (Option.isNone(polled)) throw Error("LOGINOM_REPLY_INVALID")
+        latest = polled.value
+      }
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      if (latest.cloud.failure) throw Error(latest.cloud.failure)
+      if (!latest.cloud.connected) throw Error("LOGINOM_CLOUD_EXPIRED")
+      return latest
+    } catch (error) {
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      throw error
+    } finally {
+      if (!latest.cloud.connected) await host.request("connection.cloud-cancel", {})
+    }
+  }
+
   if (command === "cancel-pending") return host.request("connection.cancel-pending", { revision: current.revision })
   if (command === "recover") {
     if (!current.recoveries?.length) return current
@@ -88,7 +142,12 @@ export async function loginomManagement(
   }
   if (command !== "setup") throw new Error("CLI_ARGUMENT_INVALID")
   const candidate = options.stdinJSON ? setupCandidate(await readSetup(), current) : await interactiveSetup(current)
-  const checked = validation(await host.request("connection.check", candidate))
+  const checked = validation(
+    await host.request("connection.check", {
+      ...candidate,
+      ...((candidate.mode ?? current.mode) === "cloud" && !current.cloud.connected ? { verifyBrowser: false } : {}),
+    }),
+  )
   if (Option.isNone(checked)) throw new Error("LOGINOM_REPLY_INVALID")
   const saved = view(
     await host.request("connection.save", { revision: current.revision, validationId: checked.value.validationId }),

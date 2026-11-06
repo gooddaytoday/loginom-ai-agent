@@ -261,3 +261,236 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
   },
   60000,
 )
+
+test.each([false, true])(
+  "TUI offers saved cloud sign-in on the same Host and hands off cancellation: accept=%s",
+  async (accept) => {
+    const directory = await mkdtemp(join(tmpdir(), "tui-cloud-startup-"))
+    const bundle = join(directory, "bundle")
+    const profile = join(directory, "profile")
+    await mkdir(join(bundle, "bin"), { recursive: true })
+    await mkdir(join(bundle, "host"))
+    await symlink(process.env.LOGINOM_AI_AGENT_TEST_NODE!, join(bundle, "bin/node"))
+    const calls = join(directory, "calls.jsonl")
+    await writeFile(
+      join(bundle, "host/node-host.mjs"),
+      `
+    import {appendFileSync} from 'node:fs';
+    let connected=false;
+    process.on('message', m => {
+      appendFileSync(${JSON.stringify(calls)},JSON.stringify(m.method)+'\\n');
+      if(m.method==='start') return process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
+      if(m.method==='close') return process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
+      if(m.method==='connection.cloud-start')connected=true;
+      process.send({id:m.id,result:{mode:'cloud',hasApiKey:false,server:'primary',help:{state:connected?'ready':'connection-required'},cloud:{connected},revision:1,generation:1,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:connected?'ready':'connection-required'}});
+    });`,
+    )
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        `
+    import {mock} from 'bun:test';
+    import {existsSync} from 'node:fs';
+    import {standalone} from './src/cli/standalone.ts';
+    import {standaloneCancellation} from './src/cli/standalone-cancellation.ts';
+    Object.defineProperty(process.stdin,'isTTY',{value:true});
+    mock.module('@clack/prompts',()=>({confirm:async options=>{
+      console.log(JSON.stringify({prompt:options.message,signal:!!standaloneCancellation(),guard:existsSync(${JSON.stringify(join(profile, ".writer"))})}));
+      return ${accept};
+    },isCancel:()=>false}));
+    mock.module('./src/cli/cmd/tui',()=>({setTuiLoginomHost:()=>{},setTuiStartupWarning:()=>{},TuiThreadCommand:{command:'$0',handler:()=>{console.log(JSON.stringify({tui:true,signal:!!standaloneCancellation(),guard:existsSync(${JSON.stringify(join(profile, ".writer"))})}));}}}));
+    const {standaloneRun}=await import('./src/cli/standalone-run.ts');
+    await standalone([],(_,paths)=>standaloneRun([],paths,'tui'));
+    process.stdin.pause();
+  `,
+      ],
+      {
+        cwd: resolve(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+          LOGINOM_AI_AGENT_CHANNEL: "dev",
+          LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+          LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+          LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+          LOGINOM_AI_AGENT_PURE: "1",
+        },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    const output = new Response(child.stdout).text()
+    const errors = new Response(child.stderr).text()
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
+    try {
+      expect({ exit: await child.exited, errors: await errors }).toEqual({
+        exit: 0,
+        errors: accept ? "" : "Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n",
+      })
+      const rows = (await output)
+        .trim()
+        .split("\n")
+        .map((row) => JSON.parse(row))
+      expect(rows).toEqual([
+        {
+          prompt: "Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения.",
+          signal: true,
+          guard: true,
+        },
+        { tui: true, signal: false, guard: true },
+      ])
+      const operations = (await readFile(calls, "utf8"))
+        .trim()
+        .split("\n")
+        .map((row) => JSON.parse(row))
+      expect(operations.filter((operation) => operation === "start")).toHaveLength(1)
+      expect(operations.filter((operation) => operation === "connection.cloud-start")).toHaveLength(accept ? 1 : 0)
+      expect(operations.at(-1)).toBe("close")
+      await expect(access(join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
+    } finally {
+      clearTimeout(timer)
+      child.kill()
+      await child.exited
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  30_000,
+)
+
+test.each([
+  { confirmed: true, tui: false, complete: false },
+  { confirmed: false, tui: false, complete: false },
+  { confirmed: true, tui: true, complete: false },
+  { confirmed: false, tui: true, complete: false },
+  { confirmed: true, tui: false, complete: true },
+  { confirmed: false, tui: false, complete: true },
+])(
+  "connect cancellation keeps the writer through repeated SIGINT and confirmed shutdown: %j",
+  async ({ confirmed, tui, complete }) => {
+    const directory = await mkdtemp(join(tmpdir(), "connect-cleanup-"))
+    const bundle = join(directory, "bundle")
+    const profile = join(directory, "profile")
+    await mkdir(join(bundle, "bin"), { recursive: true })
+    await mkdir(join(bundle, "host"))
+    await symlink(process.env.LOGINOM_AI_AGENT_TEST_NODE!, join(bundle, "bin/node"))
+    await writeFile(
+      join(bundle, "host/node-host.mjs"),
+      `
+    import {writeFileSync,existsSync} from 'node:fs';
+    const root=${JSON.stringify(directory)};
+    const view={mode:'cloud',hasApiKey:false,server:'primary',help:{state:'connection-required'},cloud:{connected:false},revision:1,generation:1,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:'connection-required'};
+    function after(file,run){const timer=setInterval(()=>{if(!existsSync(root+'/'+file))return;clearInterval(timer);run();},10)}
+    process.on('message',m=>{
+      if(m.method==='start')return process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
+      if(m.method==='connection.cloud-start'){
+        writeFileSync(root+'/starting','1');
+        return after('release-start',()=>process.send({id:m.id,result:{...view,cloud:${complete ? "{connected:true}" : "{connected:false,pending:{userCode:'SAFE-CODE',verificationUrl:'https://example.test/device',expiresAt:Date.now()+60000}}"}}}));
+      }
+      if(m.method==='close'){
+        writeFileSync(root+'/closing',JSON.stringify({pid:process.pid,tmp:process.env.TMPDIR}));
+        return after('release-close',()=>process.send({id:m.id,result:{closed:${confirmed}}},()=>process.exit(0)));
+      }
+      process.send({id:m.id,result:view});
+    });`,
+    )
+    const environment = {
+      ...process.env,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_CHANNEL: "dev",
+      LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+      LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+    }
+    const child = Bun.spawn(
+      tui
+        ? [
+            process.execPath,
+            "-e",
+            `
+    import {mock} from 'bun:test';
+    Object.defineProperty(process.stdin,'isTTY',{value:true});
+    mock.module('@clack/prompts',()=>({confirm:async()=>true,isCancel:()=>false}));
+    process.argv=['bun','standalone','--format=json'];
+    await import('./src/standalone.ts');
+  `,
+          ]
+        : [process.execPath, "run", "./src/standalone.ts", "loginom", "connect", "--format=json"],
+      { cwd: resolve(import.meta.dir, "../.."), env: environment, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    )
+    const output: string[] = []
+    const errors = new Response(child.stderr).text()
+    const drained = (async () => {
+      const reader = child.stdout.getReader()
+      while (true) {
+        const chunk = await reader.read()
+        if (chunk.done) return
+        output.push(Buffer.from(chunk.value).toString())
+      }
+    })()
+    const timer = setTimeout(() => child.kill("SIGKILL"), 15_000)
+    async function until(file: string) {
+      const deadline = Date.now() + 10_000
+      while (Date.now() < deadline && child.exitCode === null) {
+        if (await Bun.file(join(directory, file)).exists()) return
+        await Bun.sleep(10)
+      }
+      throw Error(`Missing ${file}: ${await errors}`)
+    }
+    try {
+      await until("starting")
+      if (!complete) child.kill("SIGINT")
+      await writeFile(join(directory, "release-start"), "1")
+      await until("closing")
+      expect(
+        await access(join(profile, ".writer")).then(
+          () => true,
+          () => false,
+        ),
+      ).toBe(true)
+      child.kill("SIGINT")
+      await Bun.sleep(50)
+      expect(child.exitCode).toBeNull()
+      expect(output.join("")).toBe("")
+      const busy = Bun.spawn(
+        [process.execPath, "run", "./src/standalone.ts", "loginom", "disconnect", "--format=json"],
+        { cwd: resolve(import.meta.dir, "../.."), env: environment, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+      )
+      expect(await busy.exited).toBe(3)
+      expect(await new Response(busy.stderr).text()).toContain("PROFILE_BUSY")
+      await writeFile(join(directory, "release-close"), "1")
+      expect(await child.exited).toBe(confirmed ? 130 : 1)
+      await drained
+      expect(await errors).toContain(confirmed ? "CLI_CANCELLED" : "LOGINOM_HOST_CLEANUP_FAILED")
+      expect(output.join("")).toBe(
+        confirmed
+          ? tui
+            ? '{"type":"error","error":{"name":"CLI_CANCELLED","data":{"message":"CLI_CANCELLED"}}}\n'
+            : '{"ok":false,"code":"CLI_CANCELLED"}\n'
+          : "",
+      )
+      expect(
+        await access(join(profile, ".writer")).then(
+          () => true,
+          () => false,
+        ),
+      ).toBe(!confirmed)
+      const owner = JSON.parse(await readFile(join(directory, "closing"), "utf8"))
+      expect(() => process.kill(owner.pid, 0)).toThrow()
+    } finally {
+      clearTimeout(timer)
+      await writeFile(join(directory, "release-start"), "1")
+      await writeFile(join(directory, "release-close"), "1")
+      child.kill()
+      await child.exited
+      const owner = await readFile(join(directory, "closing"), "utf8").then(JSON.parse, () => undefined)
+      if (owner?.tmp && (await realpath(owner.tmp).catch(() => undefined)) === join(profile, "cache/tmp")) {
+        await unlink(owner.tmp)
+        await rmdir(dirname(owner.tmp))
+      }
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  30_000,
+)

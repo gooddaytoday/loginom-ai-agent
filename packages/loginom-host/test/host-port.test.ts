@@ -7,6 +7,8 @@ import { tmpdir } from "node:os"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
+import { RuntimeStartupError } from "../src/supervisor"
+import type { CallBudget } from "../src/cloud-auth"
 import { LoginomHost } from "../src/adapter"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
@@ -875,7 +877,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
   }
 }, 15000)
 
-test("Help and diagnostics never use a browser runtime, including after chat preparation", async () => {
+test("Help and diagnostics never use a browser runtime, including a new run after chat preparation", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-readiness-tools-"))
@@ -926,13 +928,26 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   const requests = new EventEmitter()
   const replies = new EventEmitter()
+  const catalog = { refusing: false, calls: 0 }
   const port = loginomHostPort(
     {
       postMessage: (value) => replies.emit("message", { data: value }),
       on: requests.on.bind(requests),
       start() {},
     },
-    host,
+    {
+      ...host,
+      api: { ...host.api, status: async () => {
+        const status = await host.api.status()
+        return catalog.refusing ? { ...status, state: "recoverable-error" as const, help: { state: "recoverable-error" as const } } : status
+      } },
+      catalog: async (generation, budget) => {
+        if (!catalog.refusing) return host.catalog(generation, budget)
+        if (++catalog.calls === 1) throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+        await client.request("release", { run: "fallback" })
+        throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      },
+    },
   )
   const client = transport({
     postMessage: (value) => requests.emit("message", { data: value }),
@@ -984,6 +999,18 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
       { chat, name: "dock_prepare" },
       { chat, name: "dock_action_describe" },
     ])
+    await client.request("release", { run: "one" })
+    expect(host.hasRuntime(1, chat)).toBe(true)
+    await client.request("acquire", { run: "next", session: "chat" })
+    await client.request("scope", { run: "next", mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
+    expect(await client.request("tools", { run: "next" })).toMatchObject({ tools: expect.arrayContaining([expect.objectContaining({ name: "dock_action_describe" })]) })
+    await client.request("release", { run: "next" })
+    expect(host.hasRuntime(1, chat)).toBe(true)
+    await client.request("acquire", { run: "fallback", session: "chat" })
+    await client.request("scope", { run: "fallback", mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
+    catalog.refusing = true
+    expect(await client.request("tools", { run: "fallback" })).toMatchObject({ tools: [{ name: "dock_prepare" }, { name: "dock_diagnostics" }] })
+    expect(catalog.calls).toBe(1)
   } finally {
     client.close()
     await port.close()
@@ -1018,3 +1045,94 @@ test("diagnostics projects model-safe fields while cloud login is pending", asyn
     await rm(directory, { recursive: true, force: true })
   }
 }, 30000)
+
+
+test.each(
+  ["interrupt", "release", "close", "deadline", "cleanup", "unknown"].flatMap((ending) =>
+    ["tools", "prepare"].map((operation) => ({ ending, operation })),
+  ),
+)("local tools fallback preserves critical failure: %j", async ({ ending, operation }) => {
+  const directory = await mkdtemp(join(tmpdir(), "local-tools-failure-"))
+  const host = await createLoginomHost({
+    root: join(directory, "profile"),
+    resources: join(directory, "resources"),
+    codec: credentials("linux"),
+    environment: {},
+  })
+  const entered = Promise.withResolvers<CallBudget>()
+  const gate = Promise.withResolvers<void>()
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const status = {
+    ...(await host.api.status()),
+    mode: "custom" as const,
+    endpoint: "https://example.test/mcp",
+    hasApiKey: true,
+    generation: 1,
+    state: "recoverable-error" as const,
+    help: { state: "recoverable-error" as const },
+  }
+  const port = loginomHostPort(
+    { postMessage: (value) => replies.emit("message", { data: value }), on: requests.on.bind(requests), start() {} },
+    {
+      ...host,
+      api: { ...host.api, status: async () => status },
+      catalog: async (_generation, budget) => {
+        if (!budget) throw Error("TEST_BUDGET_MISSING")
+        entered.resolve(budget)
+        await gate.promise
+        if (ending === "cleanup") throw new RuntimeStartupError(Error("LOGINOM_KNOWLEDGE_UNAVAILABLE"), false)
+        throw Error(ending === "unknown" ? "unknown" : "LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      },
+    },
+  )
+  const client = transport({
+    postMessage: (value) => requests.emit("message", { data: value }),
+    on: replies.on.bind(replies),
+    start() {},
+  })
+  let closing: Promise<void> | undefined
+  try {
+    await client.request("acquire", { run: "one", session: "chat" })
+    if (operation === "prepare")
+      await client.request("scope", {
+        run: "one",
+        mode: "bind",
+        scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+      })
+    const tools =
+      operation === "tools"
+        ? client.request("tools", { run: "one" })
+        : client.request("call", { run: "one", name: "dock_prepare", args: {}, userMessage: "msg_original" })
+    void tools.catch(() => {})
+    const budget = await entered.promise
+    expect(budget.deadline - Date.now()).toBeGreaterThan(100_000)
+    expect(budget.deadline - Date.now()).toBeLessThanOrEqual(120_000)
+    if (ending === "interrupt") await client.request("interrupt", { run: "one" })
+    if (ending === "release") await client.request("release", { run: "one" })
+    if (ending === "close") {
+      closing = port.close()
+      client.close()
+    }
+    // The controlled catalog boundary consumes its supplied budget without patching the global clock.
+    if (ending === "deadline") budget.deadline = Date.now() - 1
+    if (["interrupt", "release", "close"].includes(ending)) expect(budget.signal.aborted).toBe(true)
+    gate.resolve()
+    await expect(tools).rejects.toThrow(
+      ending === "close"
+        ? "LOGINOM_HOST_CLOSED"
+        : ending === "unknown"
+          ? "LOGINOM_HOST_REQUEST_FAILED"
+          : operation === "prepare" && ["interrupt", "release"].includes(ending)
+            ? "LOGINOM_CONNECTION_NOT_READY"
+            : "LOGINOM_KNOWLEDGE_UNAVAILABLE",
+    )
+    await closing
+  } finally {
+    gate.resolve()
+    client.close()
+    await port.close()
+    await host.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})

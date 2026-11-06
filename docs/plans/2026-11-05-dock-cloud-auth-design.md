@@ -395,3 +395,29 @@ Runtime/сборки/production не запускались. Следующий 
 - Ревью P2 исправлены: status не начинается во время cloudBusy; Check с Help connection-required не заявляет Help success; оба RED→GREEN и current GUI PASS.
 - Full baked tuple/settings-live — Task13; native Windows/macOS/site/reserve — Task15. Следующий шаг: повторное независимое ревью двух исправлений Task10.
 - Push/PR/merge/release не выполнялись; Task11 не начата.
+
+## Ревью Task10 — 2026-11-06
+
+- SHA `c238d0ad7d`: scoped re-review Spec compliant / Quality Approved; оба Important/P2 закрыты, новых замечаний нет.
+- Status не стартует во время cloud management; явная проверка при Help connection-required не заявляет доступность AI/Help.
+- App32/147, Desktop47/138, typechecks, current isolated candidate/settings-ux/inventory5117/asar-byte checks PASS; без встроенного ключа.
+- Live cloud/settings-live — Task13, native/site/reserve — Task15. Следующий шаг: Task11 CLI; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task11 — 2026-11-06
+
+- База SHA `c238d0ad7d`; Task11 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- CLI connect/disconnect, выбранный cloud/custom setup, раздельные Help/browser; вход не применяет другой режим.
+- Setup cloud без credentials сохраняет Loginom до входа без browser; код/ссылка только stderr, итог stdout — один JSON.
+- Connect делает короткие start/status/cancel до expiresAt; clock181с и opener resolve/reject/never проверены без OS browser.
+- Один invocation handler/Host/guard для connect/TUI; handoff идемпотентен, SIGINT130 только после ACK+exit; bad cleanup держит guard.
+- TUI предлагает вход и при сохранённом cloud; отказ сохраняет ordinary chat. Поздний вход требует выхода из TUI.
+- Headless/automation gate проверяет верхний connection-required; исходный unconfigured ordinary path сохранён.
+- Исправлен прежний Host tools/prepare boundary: отказ Help сохраняет local descriptors; actual prepare остаётся not-ready.
+- Abort/release/close/deadline/неподтверждённый cleanup не превращаются в local success; retry/budgets/finally сохранены.
+- Fix1/P2: после Help fallback сохранённый runtime не запускает второй lease/catalog/list; успешный новый run сохраняет listing.
+- CLI69 PASS/1 SKIP/656 и PTY3 переиспользованы; fix1: Host48/341, CLI lazy1/8, Host typecheck и diff-check PASS; knowledge4 прежние PASS.
+- Isolated source PTY unconfigured/saved-cloud refusal+ordinary model/history и cancel-setup PASS; guard=false/alive=[].
+- Skip compiled constructor-recovery и настоящий compiled cloud transport/PTY/baked tuple — Task13, не installed/live acceptance.
+- Отчёт/точные команды/RED-GREEN: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-11-report.md`.
+- Новых dependencies/pins/common contracts/endpoint override нет; site/установка/пользовательские профили не изменялись.
+- Следующий шаг: независимое ревью Task11 родителем, затем Task12. Push/PR/merge/release не выполнялись.

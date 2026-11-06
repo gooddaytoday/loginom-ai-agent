@@ -7,6 +7,7 @@ import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
+import { RuntimeStartupError } from "./supervisor"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
 
@@ -54,6 +55,19 @@ function catalogTools(input: unknown) {
   )
     throw Error("LOGINOM_REPLY_INVALID")
   return input.tools
+}
+
+function recoverableCatalogFailure(error: unknown) {
+  return (
+    error instanceof Error &&
+    [
+      "LOGINOM_KNOWLEDGE_AUTH_FAILED",
+      "LOGINOM_KNOWLEDGE_UNAVAILABLE",
+      "LOGINOM_KNOWLEDGE_FAILED",
+      "LOGINOM_KNOWLEDGE_CATALOG_INVALID",
+    ].includes(error.message) &&
+    (!(error instanceof RuntimeStartupError) || error.cleanupConfirmed)
+  )
 }
 
 export type HostPort = {
@@ -158,7 +172,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             timer = setTimeout(abort, remaining)
             budget.signal.addEventListener("abort", abort, { once: true })
           }),
-        ])
+        ]).catch((error: unknown) => {
+          if (preparation && !cancelled() && Date.now() < budget.deadline && recoverableCatalogFailure(error))
+            throw new Error("LOGINOM_CONNECTION_NOT_READY", { cause: error })
+          throw error
+        })
       } finally {
         clearTimeout(timer)
         if (abort) budget.signal.removeEventListener("abort", abort)
@@ -392,16 +410,23 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const knowledge =
             (status.mode === "custom" || status.cloud.connected) &&
             (run.lease || status.help.state === "ready" || status.help.state === "recoverable-error")
-              ? catalogTools(
-                  await service.catalog(generation, knowledgeBudget),
-                ).filter((tool) => knowledgeTools.has(tool.name))
+              ? await service.catalog(generation, knowledgeBudget)
+                  .then((value) => catalogTools(value).filter((tool) => knowledgeTools.has(tool.name)))
+                  .catch((error: unknown) => {
+                    if (
+                      state.closed || run.released || knowledgeBudget.signal.aborted ||
+                      Date.now() >= knowledgeBudget.deadline || !recoverableCatalogFailure(error)
+                    ) throw error
+                    // Remote Help refusal does not hide local diagnostics or automation preparation.
+                    return undefined
+                  })
               : []
           // Listing an existing browser is an external operation; an empty local
           // catalog must remain usable when that connection cannot be leased.
-          if (automation && !run.lease && service.hasRuntime(generation, run.chat))
+          if (knowledge !== undefined && automation && !run.lease && service.hasRuntime(generation, run.chat))
             await connectionLease(input.run, run).catch(() => undefined)
           const listed =
-            automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
+            knowledge !== undefined && automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
               ? await (await service.runtime(run.lease.generation, run.chat)).request("list")
               : undefined
           // The runtime lists recovery tools only under its own capability; the host
@@ -416,7 +441,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               id: data.id,
               result: {
                 tools: [
-                  ...knowledge,
+                  ...(knowledge ?? []),
                   ...(automation ? [prepareTool] : []),
                   diagnosticTool,
                   ...browser.filter(

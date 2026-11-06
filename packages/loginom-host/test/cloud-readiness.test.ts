@@ -235,7 +235,9 @@ test("tools retries an unavailable initial catalog in the same generation", asyn
     await expect(f.host.catalog(1)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
     expect(await f.host.api.status()).toMatchObject({ generation: 1, state: "recoverable-error" })
     await f.client.request("acquire", { run: "one", session: "chat" })
-    await expect(f.client.request("tools", { run: "one" })).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+    expect(await f.client.request("tools", { run: "one" })).toMatchObject({
+      tools: [expect.objectContaining({ name: "dock_diagnostics" })],
+    })
     available = true
     expect(await f.client.request("tools", { run: "one" })).toMatchObject({
       tools: expect.arrayContaining([expect.objectContaining({ name: "read" })]),
@@ -684,3 +686,47 @@ test("logout settles pre-ACK admission after completed but unconfirmed cleanup",
     })
   }
 }, 180000)
+
+test("unavailable custom Help preserves local automation tools without claiming readiness or starting a browser", async () => {
+  const f = await networkFixture(
+    {
+      request: async (_body, _request, response) => {
+        response.writeHead(503)
+        response.end()
+        return true
+      },
+    },
+    false,
+    undefined,
+    "custom",
+  )
+  try {
+    await f.host.settled()
+    await expect(f.host.catalog(1)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+    await f.client.request("acquire", { run: "one", session: "chat" })
+    await f.client.request("scope", {
+      run: "one",
+      mode: "bind",
+      scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+    })
+    expect(await f.client.request("tools", { run: "one" })).toMatchObject({
+      tools: [{ name: "dock_prepare" }, { name: "dock_diagnostics" }],
+    })
+    expect(await f.host.api.status()).toMatchObject({
+      mode: "custom",
+      generation: 1,
+      state: "recoverable-error",
+      help: { state: "recoverable-error" },
+    })
+    expect(
+      await f.client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "msg_original" }),
+    ).toMatchObject({ structuredContent: { state: "recoverable-error" } })
+    await expect(
+      f.client.request("call", { run: "one", name: "dock_prepare", args: {}, userMessage: "msg_original" }),
+    ).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    expect(await readdir(f.root)).not.toContain("runtime")
+    expect(f.host.journal.pending()).toEqual([])
+  } finally {
+    await f.close()
+  }
+}, 30_000)
