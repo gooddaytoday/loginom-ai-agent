@@ -27,7 +27,9 @@ export async function readGraph(page, task) {
     if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
     const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
     const blockers = [...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
-    if (blockers.length) fail('Graph is blocked');
+    if (blockers.length) fail('Graph is blocked: '+JSON.stringify(blockers.slice(0,3).map(e=>({
+      role:e.getAttribute('role')?.slice(0,40)??null,class_name:e.getAttribute('class')?.slice(0,96)??null,
+      tid:e.getAttribute('data-tid')?.slice(0,160)??null}))));
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
@@ -500,10 +502,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
 }
 
 // Read-only mask settling is shared by link navigation and hover preparation.
-async function observeLinkGraph(page,task,read) {
+async function observeLinkGraph(page,task,read,blocked) {
   for(let attempt=0;attempt<3;attempt++){
     try{return await read(page,task);}catch(error){
       if(attempt===2||!String(error.message).includes('Graph is blocked'))throw error;
+      if(blocked&&blocked.length<4)blocked.push(String(error.message).slice(0,400));
       const timeout=Math.min(15000,Math.max(1,task.deadline-Date.now()));
       await page.waitForFunction(()=>![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),null,{timeout});
     }
@@ -806,17 +809,20 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
         const edge=effect.parameters.edge,source=graph.nodes.find(n=>n.ref.node_id===edge.source),target=graph.nodes.find(n=>n.ref.node_id===edge.target);
         if(!source||source.locked||!target||target.locked)throw Error('Exact unlocked link endpoints required');
-        await call(`async page=>{
+        const navigation=await call(`async page=>{
           const t=${JSON.stringify(t)},remaining=()=>{
             if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
             const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
           };
-          const guard=async()=>{remaining();const graph=await (${observeLinkGraph.toString()})(page,t,${readGraph.toString()});remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,graph))throw Error('Graph changed during link source navigation');};
+          const blocked=[];
+          const guard=async()=>{remaining();const graph=await (${observeLinkGraph.toString()})(page,t,${readGraph.toString()},blocked);remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,graph))throw Error('Graph changed during link source navigation');};
+          try{
           await guard();
           const navigation=await (${revealNodePlacement.toString()})({page,root:page.locator('[data-tid='+JSON.stringify(t.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']'),
             nodeId:${JSON.stringify([source.ref.node_id,target.ref.node_id].map(node_id=>({node_id,ports_only:true})))},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
             remaining,guard,readViewport:${nodePlacementViewport.toString()},project:${nodePlacementPoint.toString()}});
-          await guard();if(!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');return navigation;
+          await guard();if(!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');return {...navigation,blocking_windows:blocked};
+          }catch(error){if(blocked.length)error.message='Connect navigation blocker: '+blocked[0]+'; '+error.message;throw error;}
         }`,deadline);
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.
@@ -845,9 +851,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
           source_port:{kind:bound.source.kind,index:bound.source.index},target_port:{kind:bound.target.kind,index:bound.target.index}};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        return await call(makeCapabilityCode(pinned.actions.get('link.create'),pinned.selectors,params,{mode:'apply',operation_id:effect.id,expected_build:build,
+        const receipt=await call(makeCapabilityCode(pinned.actions.get('link.create'),pinned.selectors,params,{mode:'apply',operation_id:effect.id,expected_build:build,
           deadline_at:deadline,node_target_graph_reader:readGraph,node_target_context:{request,graph_baseline:graph,graph_probe:task(),dom_epoch:graph.dom_epoch,nodes:[{id:effect.parameters.edge.source,tid:bound.source.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.source).dom_epoch},{id:effect.parameters.edge.target,tid:bound.target.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.target).dom_epoch}]},node_target_cancellation_id:effect.id,receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
           receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')}),deadline);
+        return navigation.blocking_windows?.length?{...receipt,placement_navigation:{blocking_windows:navigation.blocking_windows}}:receipt;
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};

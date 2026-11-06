@@ -170,7 +170,7 @@ for(const placement of ['offscreen source','distant target','minimum zoom','tran
  workspace.getActiveTab=()=>({Controller:{FController:page.model,Node:{data:{node:{ParentNode:packageNode}}}}});
  const request={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:page.prefix,tab_tid:page.tabTid,navigation_path:[]}};
  let mask=false,waits=0;
- const blocker={visible:true,getBoundingClientRect:()=>({width:100,height:100})};
+ const blocker={visible:true,getBoundingClientRect:()=>({width:100,height:100}),getAttribute:name=>({role:null,class:'x-panel bg-mask-message','data-tid':page.prefix+';ModelForm'})[name]};
  const document={querySelectorAll:selector=>selector==='[role="dialog"],.bg-mask-message,.x-mask-msg'&&mask?[blocker]:selector.startsWith('[data-tid')?page.match(selector):[],elementFromPoint:(x,y)=>{
   if(x<0||x>=1280||y<0||y>=800)return null;
   return page.elements().filter(e=>e.kind==='port').find(e=>page.contains(e.box,{x,y}))??root;
@@ -226,6 +226,11 @@ for(const placement of ['offscreen source','distant target','minimum zoom','tran
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.cleanup_complete,true);
  if(placement==='offscreen source')assert.equal(zooms,1);
  if(masked)assert.equal(waits,1);
+ if(masked){
+  assert.match(result.placement_navigation.blocking_windows[0],/"role":null/);
+  assert.match(result.placement_navigation.blocking_windows[0],/"class_name":"x-panel bg-mask-message"/);
+  assert.match(result.placement_navigation.blocking_windows[0],/"tid":"MF;TF-1;ModelForm"/);
+ }
  assert.equal(page.drops,1);assert.equal(page.down,false);
  const after=await adapter.observe(request,Date.now()+15000);
  assert.deepEqual(after.links,[effect.parameters.edge]);
