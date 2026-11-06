@@ -25,7 +25,7 @@ for(const dirty of [false,true])test(signal+' orders native close/logout before 
  const events=[],timers=[];const process=new EventEmitter();let done;
  process.exit=code=>{events.push('exit:'+code);done?.();};
  Object.defineProperty(process,'exitCode',{set(code){events.push('exit:'+code);done?.();}});
- const state={browser:{close:async()=>events.push('browser')},client:{close:async()=>events.push('client')},
+ const state={timers:new Map([[1,{unref:()=>events.push('timer-unref')}]]),browser:{close:async()=>events.push('browser')},client:{close:async()=>events.push('client')},
   bridge:{close:async()=>{events.push('saved-state');events.push(dirty?'UNSAVED_CHANGES':'native-close');if(!dirty)events.push('logout');
    return {browser_transport_closed:true,browser_process_terminated:true,clipboard_leases_retained:0,
     package_cleanup:{policy,status:dirty?'BLOCKED':'SUCCEEDED',package_closed:!dirty,logged_out:!dirty}};}}};
@@ -34,7 +34,7 @@ for(const dirty of [false,true])test(signal+' orders native close/logout before 
   setTimeout:(fn,ms)=>{const timer={fn,ms,unref(){}};timers.push(timer);return timer;},clearTimeout:()=>{}});
  assert.equal(process.listenerCount(signal),1);
  process.emit(signal);process.emit(signal);await finished;
- assert.deepEqual(events,['client','saved-state',dirty?'UNSAVED_CHANGES':'native-close',...dirty?[]:['logout'],'browser','exit:'+(dirty?1:0)]);
+ assert.deepEqual(events,['client','saved-state',dirty?'UNSAVED_CHANGES':'native-close',...dirty?[]:['logout'],'browser','exit:'+(dirty?1:0),...dirty?[]:['timer-unref']]);
  assert.equal(timers.length,1);assert.equal(timers[0].ms,30000);
 });
 test('signal cleanup budget records possible lock and closes only its own browser before failed exit',async()=>{

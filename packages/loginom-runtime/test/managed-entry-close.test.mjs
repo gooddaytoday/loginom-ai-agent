@@ -5,6 +5,30 @@ import { once } from "node:events"
 import { fileURLToPath } from "node:url"
 import { createInterface } from "node:readline"
 
+test("checked managed close does not wait for a completed operation's race timeout", async (t) => {
+  // Pinned Playwright waitForCompletion races completed requests against a
+  // referenced 5s timeout without cancelling the losing timer.
+  const entry = new URL("../src/managed-entry.mjs", import.meta.url).href
+  const child = spawn(process.execPath, ["--input-type=module", "-e", `
+    await import(${JSON.stringify(entry)});
+    await Promise.race([Promise.resolve(), new Promise(resolve => setTimeout(resolve, 5000))]);
+    process.send({ ready: true });
+  `], { stdio: ["ignore", "ignore", "ignore", "ipc"] })
+  t.after(async () => {
+    if (child.exitCode !== null || child.signalCode !== null) return
+    const exited = once(child, "exit")
+    child.kill("SIGKILL")
+    await exited
+  })
+  assert.deepEqual((await once(child, "message", { signal: AbortSignal.timeout(5000) }))[0], { ready: true })
+  const reply = once(child, "message", { signal: AbortSignal.timeout(5000) })
+  const exited = once(child, "exit", { signal: AbortSignal.timeout(1500) })
+  child.send({ id: "close", operation: "close" })
+  assert.deepEqual((await reply)[0], { id: "close", result: { closed: true } })
+  t.diagnostic("Resource close ACK received with a completed operation's timeout still pending")
+  assert.deepEqual(await exited, [0, null])
+})
+
 test("managed entry closes while a background V8 allocation waits for foreground GC", async (t) => {
   // Exercise the real entrypoint with Node's reproducer for nodejs/node#66171:
   // process.exit() joins platform workers before disposing their isolate.

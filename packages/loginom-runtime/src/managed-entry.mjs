@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
+import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
@@ -33,7 +34,20 @@ const state = {
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
+  timers: new Map(),
+  exiting: false,
 }
+// In-memory MCP shares this process with Playwright, whose completed operations
+// can leave referenced Promise.race timeout losers. Retain them during resource
+// cleanup; after checked close they must not postpone normal isolate disposal.
+createHook({
+  init(id, type, _trigger, resource) {
+    if (type !== "Timeout") return
+    if (state.exiting) { resource.unref(); return }
+    state.timers.set(id, resource)
+  },
+  destroy(id) { state.timers.delete(id) },
+}).enable()
 const requests = new Set()
 const terminalTrace = (stage) => {
   if (!state.session?.directory) return
@@ -88,6 +102,9 @@ const stop = (exitCode = 0) => {
       process.channel?.unref()
       if (process.connected) process.disconnect()
       process.exitCode = exitCode
+      state.exiting = true
+      state.timers.forEach(timer => timer.unref())
+      state.timers.clear()
     },
     () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
