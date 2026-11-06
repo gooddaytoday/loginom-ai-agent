@@ -288,8 +288,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async openJavascriptPreview(port){
       checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','transform.join_data'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group, Sort, Calculator, Filter and Join preflight');
+      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','transform.join_data','transform.enrich_data'].includes(operation.parameters?.target?.type))
+        throw Error('Managed preview is restricted to native Group, Sort, Calculator, Filter, Join and Enrich preflight');
       const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
         workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},

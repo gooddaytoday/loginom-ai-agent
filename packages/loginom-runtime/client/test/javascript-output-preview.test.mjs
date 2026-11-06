@@ -202,8 +202,8 @@ function preflightFixture(type){
    return {status:'SUCCEEDED',output:structuredClone(state)};
   }};
  const config={targetOrigin:'http://localhost',targetBuild:'7.4.2'};
- if(type.startsWith('join_input_')){options.operation.parameters.target.type='transform.join_data';options.operation.parameters.inputs[0].input=Number(type.at(-1));}
- return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=>type.startsWith('join_input_')
+ if(type.startsWith('join_input_')||type.startsWith('enrich_input_')){options.operation.parameters.target.type=type.startsWith('enrich_input_')?'transform.enrich_data':'transform.join_data';options.operation.parameters.inputs[0].input=Number(type.at(-1));}
+ return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=>type.startsWith('join_input_')||type.startsWith('enrich_input_')
   ?preflightTabularSource(options,{},config,{required:true,inputPort:Number(type.at(-1)),label:type,resolve:()=>{}})
   :type==='transform.filter_data'
    ?preflightTabularSource(options,{},config,{required:true,label:'filter',resolve:resolveFilterConditions})
@@ -286,7 +286,7 @@ for(const type of ['transform.filter_rows','transform.union_data'])test('private
  await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/restricted/);assert.deepEqual(f.events,[]);
 });
 
-for(const type of ['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
+for(const type of ['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','join_input_0','join_input_1','enrich_input_0','enrich_input_1','enrich_input_2'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
  for(const changed of [false,true]){
   const f=preflightFixture(type),browser=channelFixture(),records=[];
   const original=f.options.execute,root=f.binding.workflow_ref.prefix+';ModelForm;PreviewWindow';
@@ -315,6 +315,14 @@ for(const type of ['transform.group_data','transform.sorting','transform.calcula
   assert.equal(f.options.operation.cleanupConfirmed,true);
   assert.equal(records.at(-1).proof.parameters_valid,!changed);
   assert.deepEqual(records.at(-1).proof.managed_javascript_source,{source_operation_id:'pareto-001',execution_id:f.history.outcome.output.execution.execution_id});
+ }
+});
+for(const type of ['enrich_input_0','enrich_input_1','enrich_input_2'])test(type+' refuses unsettled, stale or foreign managed JS before preview',async()=>{
+ for(const change of [f=>f.history.cleanup_confirmed=false,
+  f=>f.history.outcome.output.output.ports[0].fresh=false,
+  f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
+  const f=preflightFixture(type);change(f);await assert.rejects(f.run(),/not settled|ambiguous|freshly executed/);
+  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
  }
 });
 test('foreign managed gesture receipt cannot mark preview cleanup confirmed',async()=>{

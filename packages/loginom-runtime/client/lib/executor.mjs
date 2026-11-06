@@ -1,4 +1,5 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
+import {createRedactor} from './redact.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -1827,7 +1828,7 @@ export function withBrowserReceipt(body, options) {
   return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, () => ${body})`;
 }
 
-export function parseCapabilityResult(response) {
+export function parseCapabilityResult(response,{redactor}={}) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
     // Keep the original cause private; upload journals it through its
@@ -1843,7 +1844,12 @@ export function parseCapabilityResult(response) {
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  const error=new Error('Pinned browser capability returned no typed result');
+  const message=(response?.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+    // Generated source can precede the modal state and exhaust the diagnostic
+    // allowance. Retain browser feedback, never the echoed capability code.
+    .map(block=>block.text.replace(/(?:^|\n)### Ran Playwright code\n[\s\S]*?(?=\n### |$)/g,'')).join('\n');
+  const error=new Error('Pinned browser capability returned no typed result',
+    {cause:new Error(Buffer.from((redactor??createRedactor()).text(message)).subarray(0,2048).toString().replace(/�$/, ''))});
   if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
   throw error;
 }
