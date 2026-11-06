@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
+import { cliCredentials } from "../src/connection/cli-credentials"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
@@ -219,12 +220,12 @@ test.each([
         password: f.candidate.password.value,
       })
       expect(
-        await f.host.knowledge(1).request("call", {
+        await f.host.callKnowledge(1, {
           run: "docs",
           id: "help",
           name: "read",
           arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
-        }),
+        }, { deadline: Date.now() + 120000, signal: new AbortController().signal }),
       ).toMatchObject({ content: [{ type: "text", text: expect.stringContaining("Help/node.md") }] })
       expect(f.host.hasRuntime(1, "docs")).toBe(false)
       expect(f.host.journal.pending()).toEqual([])
@@ -462,3 +463,25 @@ test.each(["host", "node"])("Check can validate custom Help without launching a 
     await f.close()
   }
 }, 15_000)
+
+test("Node connection.ready retries the same generation after initial Help failure", async () => {
+  let available = false
+  const f = await fixture("", { request: async (_body, _request, response) => {
+    if (available) return false
+    response.writeHead(503); response.end(); return true
+  } })
+  await f.host.close()
+  const store = connectionStore(join(f.root, "connection"), cliCredentials("linux"))
+  const record = { ...f.candidate, generation: 1, revision: 1, apiKey: "UNIT-NONSECRET", password: "" }
+  await store.stage(record)
+  await store.activate(1)
+  const owner = await launchNodeHost({ node: process.env.LOGINOM_AI_AGENT_TEST_NODE!, entry: await buildNodeHost(join(f.resources, "host")), root: f.root, resources: f.resources, headless: true, environment: {} })
+  try {
+    await expect(owner.request("connection.ready", {})).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    expect(await owner.request("connection.status", {})).toMatchObject({ generation: 1, state: "recoverable-error" })
+    available = true
+    expect(await owner.request("connection.ready", {})).toMatchObject({ generation: 1, revision: 1, state: "ready" })
+    expect(await store.read()).toEqual(record)
+    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await owner.close(); await f.close() }
+}, 180000)

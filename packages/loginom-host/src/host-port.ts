@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
+import type { CallBudget } from "./cloud-auth"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
@@ -131,39 +132,41 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     id: string,
     run: NonNullable<ReturnType<typeof runs.get>>,
     preparation?: { deadline: number; signal: AbortSignal; waited: boolean },
+    inputBudget?: CallBudget,
   ) {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
     if (run.lease) return run.lease
     const status = await service.api.status()
     if (run.lease) return run.lease
     if (!status.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")
-    if (preparation && status.state === "starting") {
-      // Reuse this generation's startup request; it spends the prepare budget.
-      preparation.waited = true
-      const remaining = preparation.deadline - Date.now()
+    if ((preparation && status.state === "starting") || status.help.state === "recoverable-error") {
+      const budget = preparation ??
+        inputBudget ?? { deadline: Date.now() + 120_000, signal: AbortSignal.timeout(120_000) }
+      if (preparation) preparation.waited = true
+      const remaining = budget.deadline - Date.now()
       if (remaining <= 0) throw new Error("LOGINOM_CONNECTION_NOT_READY")
-      const cancelled = () => state.closed || run.released || preparation.signal.aborted
+      const cancelled = () => state.closed || run.released || budget.signal.aborted
       if (cancelled()) throw new Error("LOGINOM_CONNECTION_NOT_READY")
       let timer: ReturnType<typeof setTimeout> | undefined
       let abort: (() => void) | undefined
       try {
         await Promise.race([
-          service.catalog(status.generation),
+          service.catalog(status.generation, budget),
           new Promise<never>((_, reject) => {
             abort = () => reject(new Error("LOGINOM_CONNECTION_NOT_READY"))
             timer = setTimeout(abort, remaining)
-            preparation.signal.addEventListener("abort", abort, { once: true })
+            budget.signal.addEventListener("abort", abort, { once: true })
           }),
         ])
       } finally {
         clearTimeout(timer)
-        if (abort) preparation.signal.removeEventListener("abort", abort)
+        if (abort) budget.signal.removeEventListener("abort", abort)
       }
       const current = await service.api.status()
       if (
         cancelled() ||
         runs.get(id) !== run ||
-        Date.now() >= preparation.deadline ||
+        Date.now() >= budget.deadline ||
         current.generation !== status.generation ||
         current.state !== "ready"
       )
@@ -379,10 +382,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const automation = run.scope?.profile === "loginom-automation"
           const generation = run.lease?.generation ?? status.generation
           const knowledge =
-            run.lease || status.state === "ready"
-              ? catalogTools(await service.catalog(generation).catch(() => ({ tools: [] }))).filter((tool) =>
-                  knowledgeTools.has(tool.name),
-                )
+            (status.mode === "custom" || status.cloud.connected) &&
+            (run.lease || status.help.state === "ready" || status.help.state === "recoverable-error")
+              ? catalogTools(
+                  await service.catalog(generation, {
+                    deadline: started + 120_000,
+                    signal: AbortSignal.timeout(Math.max(1, started + 120_000 - Date.now())),
+                  }),
+                ).filter((tool) => knowledgeTools.has(tool.name))
               : []
           // Listing an existing browser is an external operation; an empty local
           // catalog must remain usable when that connection cannot be leased.
@@ -501,7 +508,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             reply({ id: data.id, result: true })
             return
           }
-          await service.knowledge(run.lease.generation).request("interrupt", { run: `${owner}:${input.run}` })
+          await service.interruptKnowledge(run.lease.generation, { run: `${owner}:${input.run}` })
           if (!service.hasRuntime(run.lease.generation, run.chat)) {
             reply({ id: data.id, result: true })
             return
@@ -520,18 +527,41 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
           throw new Error("LOGINOM_CALL_INVALID")
         if (knowledgeTools.has(input.name)) {
-          const lease = await connectionLease(input.run, run)
-          const result = await service.knowledge(lease.generation).request("call", {
-            run: `${owner}:${input.run}`,
-            id: data.id,
-            name: input.name,
-            arguments: "args" in input ? input.args : undefined,
-          })
+          const budget = {
+            deadline: started + 120_000,
+            signal: AbortSignal.timeout(Math.max(1, started + 120_000 - Date.now())),
+          }
+          const lease = await connectionLease(input.run, run, undefined, budget)
+          const result = await service.callKnowledge(
+            lease.generation,
+            {
+              run: `${owner}:${input.run}`,
+              id: data.id,
+              name: input.name,
+              arguments: "args" in input ? input.args : undefined,
+            },
+            budget,
+          )
           reply({ id: data.id, result }, lease.generation)
           return
         }
         if (input.name === "dock_diagnostics") {
-          const status = await service.api.status()
+          const view = await service.api.status()
+          const status = {
+            revision: view.revision,
+            generation: view.generation,
+            url: view.url,
+            username: view.username,
+            folder: view.folder,
+            hasPassword: view.hasPassword,
+            state: view.state,
+            browser: view.browser,
+            failure: view.failure,
+            recoveries: view.recoveries,
+            mode: view.mode,
+            server: view.server,
+            help: view.help,
+          }
           reply(
             {
               id: data.id,

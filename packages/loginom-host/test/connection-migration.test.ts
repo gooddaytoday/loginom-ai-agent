@@ -25,10 +25,10 @@ async function fixture(codec: CredentialCodec) {
   const prepared: string[] = []
   const services: Awaited<ReturnType<typeof connectionService>>[] = []
   const runtime: ConnectionRuntime = {
-    async check() {},
+    async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
     async prepare(record) {
       prepared.push(record.url)
-      return { async close() {} }
+      return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
     },
   }
   return {
@@ -81,7 +81,7 @@ for (const [name, codec] of [
           import { credentials } from ${JSON.stringify(new URL("../src/connection/credentials.ts", import.meta.url).href)};
           import { cliCredentials } from ${JSON.stringify(new URL("../src/connection/cli-credentials.ts", import.meta.url).href)};
           const store = connectionStore(process.argv[1], ${name === "CLI" ? "cliCredentials" : "credentials"}("linux"));
-          const service = await connectionService(store, {async check(){}, async prepare(){return {async close(){}}}});
+          const service = await connectionService(store, {async check(){return {help:{state:"ready" as const},browser:{state:"unknown" as const}}}, async prepare(){return {observeHelp(listener){listener({state:"ready"})},async close(){}}}});
           await service.settled();
           console.log(JSON.stringify(await service.api.status()));
           await service.close();

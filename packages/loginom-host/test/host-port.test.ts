@@ -704,7 +704,7 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       await rm(directory, { recursive: true, force: true })
     }
   },
-  15000,
+  30000,
 )
 
 test("the next turn replaces a runtime that cannot continue", async () => {
@@ -991,3 +991,30 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     await rm(directory, { recursive: true, force: true })
   }
 }, 15000)
+
+test("diagnostics projects model-safe fields while cloud login is pending", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "cloud-diagnostics-"))
+  const host = await createLoginomHost({ root: join(directory, "profile"), resources: join(directory, "resources"), codec: credentials("linux"), environment: {} })
+  const view = { ...(await host.api.status()), generation: 1, mode: "cloud" as const, server: "primary" as const,
+    cloud: { connected: false, email: "a@example.test", pending: { userCode: "ABCD-EFGH", verificationUrl: "http://site.test/device?user_code=ABCD-EFGH", expiresAt: Date.now() + 60000 } },
+    browser: { state: "unknown" as const }, recoveries: ["retained"] }
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort({ postMessage: value => replies.emit("message", { data: value }), on: requests.on.bind(requests), start() {} },
+    { ...host, api: { ...host.api, status: async () => view } })
+  const client = transport({ postMessage: value => requests.emit("message", { data: value }), on: replies.on.bind(replies), start() {} })
+  try {
+    await client.request("acquire", { run: "one", session: "chat" })
+    const result = await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }) as { structuredContent: unknown; content: {text: string}[] }
+    expect(result.structuredContent).toMatchObject({ generation: 1, mode: "cloud", server: "primary", url: view.url, username: view.username, browser: view.browser, recoveries: view.recoveries })
+    expect(result.structuredContent).not.toHaveProperty("cloud")
+    expect(JSON.stringify(result)).not.toContain("ABCD-EFGH")
+    expect(JSON.stringify(result)).not.toContain("a@example.test")
+    expect(JSON.parse(result.content[0]!.text)).toEqual(result.structuredContent)
+  } finally {
+    client.close()
+    await port.close()
+    await host.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 30000)

@@ -17,9 +17,9 @@ const active = {
   password: "private-password",
 }
 const runtime = {
-  async check() {},
+  async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
   async prepare() {
-    return { async close() {} }
+    return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
   },
 }
 

@@ -39,6 +39,7 @@ test("startup timeout retains the writer through Help close and permits a real s
     await writeFile(
       join(bundle, "runtime/src/knowledge-entry.mjs"),
       `import fs from "node:fs";
+      let started = false;
       process.on("message", message => {
         if (message.operation === "start") {
           fs.writeFileSync(${JSON.stringify(knowledgePid)}, String(process.pid));
@@ -47,7 +48,7 @@ test("startup timeout retains the writer through Help close and permits a real s
             clearInterval(start);
             process.send({ id: message.id, result: {
               protocol: 1, generation: message.input.generation, started: true
-            }});
+            }}, (error) => { if (!error) started = true; });
           }, 10);
         }
         if (message.operation === "list") process.send({ id: message.id, result: { tools: [] } });
@@ -55,7 +56,8 @@ test("startup timeout retains the writer through Help close and permits a real s
         if (message.operation === "close") {
           fs.writeFileSync(${JSON.stringify(closing)}, "closing");
           const gate = setInterval(() => {
-            if (!fs.existsSync(${JSON.stringify(release)})) return;
+            // Both gates can open in one turn; never send the start ACK after disconnecting.
+            if (!started || !fs.existsSync(${JSON.stringify(release)})) return;
             clearInterval(gate);
             process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
           }, 10);
@@ -823,7 +825,8 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       await rm(directory, { recursive: true, force: true })
     }
   },
-  90_000,
+  // Bounds the whole fixture: several CLI processes and durable profile writes.
+  240_000,
 )
 
 // Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies

@@ -27,9 +27,10 @@ test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s
   const service = await connectionService(
     store,
     {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare() {
         return {
+          observeHelp(listener) { listener({ state: "ready" }) },
           async reset() {
             entered.resolve()
             await reset.promise

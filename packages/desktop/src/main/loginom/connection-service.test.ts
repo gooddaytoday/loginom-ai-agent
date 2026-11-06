@@ -23,9 +23,10 @@ async function fixture(runtime?: ConnectionRuntime) {
   const service = await connectionService(
     store,
     runtime ?? {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare(record) {
         return {
+          observeHelp(listener) { listener({ state: "ready" }) },
           async close() {
             closed.push(record.generation)
           },
@@ -87,9 +88,9 @@ test("automation query stays out of saved settings and restored public views", a
     await f.store.stage({ ...record, generation: 2, revision: 2, url: "https://example.test/app/?a=b&testable=true" })
     await f.store.activate(2)
     const restored = await connectionService(f.store, {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare() {
-        return { async close() {} }
+        return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
       },
     })
     try {
@@ -153,10 +154,10 @@ test("cancelling a pending switch keeps the active identity and invalidates stal
 
 test("failed readiness keeps the old runtime and durable connection", async () => {
   const f = await fixture({
-    async check() {},
+    async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
     async prepare(record) {
       if (record.generation === 2) throw new Error("internal failure private-api-key")
-      return { async close() {} }
+      return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
     },
   })
   try {
@@ -291,9 +292,10 @@ test("post-rename durability failure keeps runtime and active file on the same g
       },
     },
     {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare(record) {
         return {
+          observeHelp(listener) { listener({ state: "ready" }) },
           async close() {
             closed.push(record.generation)
           },
@@ -343,8 +345,8 @@ test("implicit edits retain custom mode and cannot replace custom credentials", 
 test("legacy candidate credentials cannot enable custom mode", async () => {
   const checked: string[] = []
   const f = await fixture({
-    async check(record) { checked.push(record.apiKey) },
-    async prepare() { return { async close() {} } },
+    async check(record) { checked.push(record.apiKey); return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
+    async prepare() { return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} } },
   })
   try {
     await save(f.service, { revision: 0, url: candidate.url, username: candidate.username, password: candidate.password,

@@ -41,7 +41,7 @@
 
 Это один план клиентской функции. Задачи 1–13 дают проверяемый Agent с локальными fixtures. Задача14 проверяет существующие возможности Dock и готовит его эксплуатационные требования; отдельного нового сервиса или replication framework нет. Задача15 — внешняя приёмка после реализации сайта и reserve. Она не является планом разработки сайта и не позволяет объявить облачный вход готовым по локальным fixtures.
 
-Зависимости: `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9`; затем `10` (Desktop/UI), `11` (CLI), `12` (harness) и `13` (упаковка). 10 и11 можно поручить разным исполнителям после фиксации интерфейсов8 и сетевой границы9; они не редактируют schema/Host. 14 независимо готовится после2. 15 требует всех остальных и внешних сервисов. Последовательность при одном исполнителе — по номерам. Task3 сразу переводит существующие Help fixtures и минимальный CLI custom setup на явные credentials; переходного legacy fallback нет. Task6 атомарно добавляет cloud API, Host composition, Desktop preload/IPC и typed stubs; Task8 добавляет Node routes и model projection. Живые облачные проверки через собранные Node Host/Desktop/CLI из8–11 выполняются в13, когда есть baked tuple; раньше используются программная Host injection или узкий management stub.
+Зависимости: `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9`; затем `10` (Desktop/UI), `11` (CLI), `12` (harness) и `13` (упаковка). 10 и11 можно поручить разным исполнителям после фиксации интерфейсов8 и сетевой границы9; они не редактируют schema/Host. 14 независимо готовится после2. 15 требует всех остальных и внешних сервисов. Последовательность при одном исполнителе — по номерам. Task3 сразу переводит существующие Help fixtures и минимальный CLI custom setup на явные credentials; переходного legacy fallback нет. Task6 атомарно добавляет cloud API, Host composition, Desktop preload/IPC, typed stubs и model projection; Task8 добавляет Node routes. Живые облачные проверки через собранные Node Host/Desktop/CLI из8–11 выполняются в13, когда есть baked tuple; раньше используются программная Host injection или узкий management stub.
 
 Одноразовая проба Better Auth до5–8 могла бы проверить device Bearer, raw-token revokeSession и disabledPaths/configId. Это отдельное необязательное предложение вне согласованного объёма: текущий план её не запускает и не добавляет как условие начала клиентских задач. Настоящие серверные гарантии проверяются в15.
 
@@ -411,6 +411,7 @@ Task5 evidence: `docs/plans/2026-11-05-dock-cloud-auth-design.md`, checkpoint Ta
 
 // knowledge-session.ts импортирует ActiveConnection, CloudAuth, CloudEndpoints, CallBudget.
 export type KnowledgeSession = {
+  admission: Promise<void> // one-shot local startup outcome, never catalog readiness
   ensure(input: CallBudget): Promise<void>
   catalog(input: CallBudget): Promise<unknown>
   call(input: {run:string; id:string; name:string; arguments?:unknown}, budget: CallBudget): Promise<unknown>
@@ -424,6 +425,7 @@ export type KnowledgeSessionOptions = {
   cloud: CloudAuth
   endpoints: CloudEndpoints
   resources: string
+  stateDir: string // writable private profile evidence; resources stays read-only
   environment: NodeJS.ProcessEnv
   signal: AbortSignal
   changed(status: {state: Loginom.HelpState; failure?:string}): void
@@ -439,9 +441,9 @@ export declare function createKnowledgeSession(options: KnowledgeSessionOptions)
 
 ```
 
-При опущенном budget в локальном startup/старых test helpers Host создаёт один120с budget; вызовы из HostPort всегда передают исходный. Выбранный server хранится **один раз в createLoginomHost**, не в generation: session получает `selected(): "primary"|"reserve"` и `selectReserve(): void`. На этом этапе selection всегда primary; failover добавляется7.
+При опущенном budget в локальном startup/старых test helpers Host создаёт один120с budget; вызовы из HostPort всегда передают исходный. Выбранный server хранится **один раз в createLoginomHost**, не в generation: session получает `selected(): "primary"|"reserve"` и `selectReserve(): void`. На этом этапе selection всегда primary; failover добавляется7. Локальная session-owned `admission` Promise сохраняет исход для `settled`/Host handshake: resolve только после validated Help start ACK и регистрации child либо при no-creds без child; reject при terminal pre-ACK failure/cancel после cleanup, включая failed retirement. Host.prepare при rejection дожидается disposal и удаляет failed generation, сохраняя рабочее поколение; terminal error не разрешает activate. Ошибка remote catalog после ACK меняет только наблюдаемую Help readiness. Старые attempts не завершают admission новой попытки; validation наблюдает ensure без floating rejection.
 
-- [ ] **1. RED:** В новом cloud-readiness тесте создать настоящий Host, отдельный root, `connectionStore`, symlink pinned Node и resource manifest по образцу `knowledge.test.ts`. Для первого теста knowledge-entry fixture только пишет forbiddenHelpMarker при запуске и завершается с ошибкой; отсутствие marker доказывает, что пустой cloud Help не запускался. directory layout не является критерием поведения. Сохранить до входа:
+- [x] **1. RED:** В новом cloud-readiness тесте создать настоящий Host, отдельный root, `connectionStore`, symlink pinned Node и resource manifest по образцу `knowledge.test.ts`. Для первого теста knowledge-entry fixture только пишет forbiddenHelpMarker при запуске и завершается с ошибкой; отсутствие marker доказывает, что пустой cloud Help не запускался. directory layout не является критерием поведения. Сохранить до входа:
 
 ```ts
 const checked = await host.api.check({
@@ -457,11 +459,11 @@ expect(saved).toMatchObject({ state: "connection-required", generation: 1 })
 await expect(access(forbiddenHelpMarker)).rejects.toMatchObject({ code: "ENOENT" })
 ```
 
-- [ ] **2. Запустить RED:** Host `bun test test/cloud-readiness.test.ts`; сейчас Help стартует без ключа и check/save не проходит.
-- [ ] **3. GREEN:** Host определяет отсутствие cloud credentials; check проверяет Loginom поля и выдаёт обычный validation token без Help. `verifyBrowser:false` пропускает только браузер; при явном check с default true browser проверяется через Task1, без Dock. Для custom/connected cloud Help обязателен независимо от флага. Не убирать validationId/revision/expiry, cleanup guard и безопасное применение pending.
+- [x] **2. Запустить RED:** Host `bun test test/cloud-readiness.test.ts`; сейчас Help стартует без ключа и check/save не проходит.
+- [x] **3. GREEN:** Host определяет отсутствие cloud credentials; check проверяет Loginom поля и выдаёт обычный validation token без Help. `verifyBrowser:false` пропускает только браузер; при явном check с default true browser проверяется через Task1, без Dock. Для custom/connected cloud Help обязателен независимо от флага. Не убирать validationId/revision/expiry, cleanup guard и безопасное применение pending.
 
 Обновить `ConnectionRuntime.check`, `validations` и `Validation` вместе. Runtime prepare создаёт локальную generation с KnowledgeSession, но при отсутствующих credentials не запускает Help. Начальный RuntimeHandle больше не имеет независимого rejected promise, навсегда определяющего phase. Host/session сохраняет текущий HelpStatus. После установки state.active/state.handle service вызывает handle.observeHelp(callback), который синхронно выдаёт последний снимок и далее сообщает изменения. Callback проверяет state.handle === handle и closing. Так публикация до завершения prepare не теряется, а старый handle игнорируется; отдельный service.helpStatus не вводить.
-- [ ] **4. Следующий RED→GREEN:** Скопировать существующую реалистичную network fixture из `knowledge.test.ts` в новый тест; site responses Task5 и один `knowledgeServer` с `apiKey:"p-secret"`. На этом шаге атомарно добавить три cloud метода в schema API, Host composition, Desktop preload/IPC и typed API stubs App. Generation service владеет только прежними методами: его тип сузить до `Pick<Loginom.API, "read" | "status" | "check" | "save" | "cancelPending" | "acknowledgeRecovery">`; cloud методы добавляет Host, а не service-заглушки. Desktop уже использует Host напрямую, поэтому три канала должны работать в этой же задаче; откладывать их до8 или10 нельзя. Task8 добавляет Node router. Assert через `host.api.cloudStart()`:
+- [x] **4. Следующий RED→GREEN:** Скопировать существующую реалистичную network fixture из `knowledge.test.ts` в новый тест; site responses Task5 и один `knowledgeServer` с `apiKey:"p-secret"`. На этом шаге атомарно добавить три cloud метода в schema API, Host composition, Desktop preload/IPC и typed API stubs App. Generation service владеет только прежними методами: его тип сузить до `Pick<Loginom.API, "read" | "status" | "check" | "save" | "cancelPending" | "acknowledgeRecovery">`; cloud методы добавляет Host, а не service-заглушки. Desktop уже использует Host напрямую, поэтому три канала должны работать в этой же задаче; откладывать их до8 или10 нельзя. Task8 добавляет Node router. Assert через `host.api.cloudStart()`:
 
 ```ts
 const before = await host.api.status()
@@ -478,9 +480,23 @@ expect(await store.read()).toEqual(savedRecord)
 Не добавлять IPC «записать credentials». Полную management transport проверку выполнить в8/13. Saved legacy record без mode должен дать тот же переход без пересохранения.
 
 В preload добавить `cloudStart: () => ipcRenderer.invoke("loginom-cloud-start")`, `cloudCancel`/`cloudDisconnect` с одноимёнными kebab-case каналами. Каждый main handler сначала вызывает существующий `sender(event)`, затем соответствующий `api.cloudStart/cloudCancel/cloudDisconnect()`. Не добавлять optional API methods/throwing stubs ради компиляции. App test API stub возвращает полную View; schema/consumer fixtures включают help во всех Validation overrides. UI кнопки добавляет10. Полный Desktop dispatch проверяет settings-live в13; здесь Host behavioral tests и обязательные typechecks потребителей.
-- [ ] **5. Следующие RED→GREEN:** initial каталог недоступен → HTTP fixture становится доступным → новый tools/call/connection.ready восстанавливает то же поколение. Запускать retry **до** ready gate в connectionLease и tools; для первичного локального acquire/diagnostics не требовать сети. `tools` без creds возвращает разрешённые local descriptors/diagnostics, не выдуманный Help catalog. Если temporary startup failed, tools инициирует одну bounded загрузку; подтверждённая ошибка не скрывается как успешный полный каталог.
-- [ ] **6. Следующие RED→GREEN:** два одновременных retry ждут один child/catalog; поздний ответ первой попытки не меняет новую readiness; отмена/close не начинает новую. Очистка Help failure не стирает store/cleanup failure или browser warning. Pending остаётся pending, а его Help readiness отдельно. Existing run leases и browser PID не меняются при invalidate Help.
-- [ ] **7. GREEN-схема состояния:** Каждая новая Help попытка получает локальный порядковый номер. В finally очищать текущий promise только если он всё ещё тот же. Публикация результата проверяет generation/attempt/credentials revision. Ошибку Help хранить отдельно от fatal store/cleanup error; callback observeHelp не присваивает общий failure=undefined без проверки владельца ошибки.
+- [x] **4a. RED→GREEN — model projection:** В тесте host-port с pending login сохранить прежние assertions generation/url/username/browser/recoveries, дополнить:
+
+```ts
+const status = result.structuredContent
+expect(status).toMatchObject({ generation: 1, mode: "cloud", server: "primary" })
+expect(status).not.toHaveProperty("cloud")
+expect(JSON.stringify(result)).not.toContain("ABCD-EFGH")
+expect(JSON.stringify(result)).not.toContain("a@example.test")
+expect(JSON.parse(result.content[0].text)).toEqual(status)
+```
+
+Проекцию собрать явно в host-port: `revision,generation,url,username,folder,hasPassword,state,browser,failure,recoveries,mode,server,help`. Одно значение использовать для content и structuredContent. Не распространять весь View и затем удалять несколько секретных полей.
+Поправка порядка после независимой проверки: этот прежний шаг Task8 выполняется здесь до публикации реального cloud status, поскольку spec§5 уже запрещает email/userCode/verificationUrl в model diagnostics. Набор полей и тест не меняются; Node routes остаются Task8.
+
+- [x] **5. Следующие RED→GREEN:** initial каталог недоступен → HTTP fixture становится доступным → новый tools/call/connection.ready восстанавливает то же поколение. Запускать retry **до** ready gate в connectionLease и tools; для первичного локального acquire/diagnostics не требовать сети. `tools` без creds возвращает разрешённые local descriptors/diagnostics, не выдуманный Help catalog. Если temporary startup failed, tools инициирует одну bounded загрузку; подтверждённая ошибка не скрывается как успешный полный каталог.
+- [x] **6. Следующие RED→GREEN:** два одновременных retry ждут один child/catalog; поздний ответ первой попытки не меняет новую readiness; отмена/close не начинает новую. Очистка Help failure не стирает store/cleanup failure или browser warning. Pending остаётся pending, а его Help readiness отдельно. Existing run leases и browser PID не меняются при invalidate Help.
+- [x] **7. GREEN-схема состояния:** Каждая новая Help попытка получает локальный порядковый номер. В finally очищать текущий promise только если он всё ещё тот же. Публикация результата проверяет generation/attempt/credentials revision. Ошибку Help хранить отдельно от fatal store/cleanup error; callback observeHelp не присваивает общий failure=undefined без проверки владельца ошибки.
 
 ```ts
 const attempt = ++state.attempt
@@ -489,7 +505,7 @@ const current = () => !state.closed && attempt === state.attempt && revision ===
 // После каждого await результат меняет current/catalog/readiness только при current().
 ```
 
-- [ ] **8. Проверка/коммит:** Host `bun test test/cloud-readiness.test.ts test/connection-readiness.test.ts test/connection-validation.test.ts test/knowledge.test.ts test/host.test.ts test/host-port.test.ts`; Desktop `bun test src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App browser settings test командой Task3; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts`. Из schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Commit `feat(loginom): recover Help readiness within a generation`.
+- [x] **8. Проверка/коммит:** Host `bun test test/cloud-readiness.test.ts test/connection-readiness.test.ts test/connection-validation.test.ts test/knowledge.test.ts test/host.test.ts test/host-port.test.ts`; Desktop `bun test src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App browser settings test командой Task3; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts`. Из schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Commit `feat(loginom): recover Help readiness within a generation`.
 
 ## Task 7: Общий deadline, failover, refresh и выход
 
@@ -551,18 +567,7 @@ await enqueueWrite(() => store.clear())
 - [ ] **1. RED:** В существующем node-host fixture вызвать `connection.cloud-cancel` и `connection.cloud-disconnect` на неподключённом профиле; они возвращают redacted View без обращения к site. Для cloud-start здесь проверить router/decoder через Host композицию Task6 и его программную injection. Полный сетевой device flow через launchNodeHost выполнить в13 **только** с собранным dev Node Host с baked tuple: startup handshake не получает endpoint overrides. Assertions start/status/cancel: status.pending имеет userCode/verificationUrl/expiresAt, whole replies не содержат device/session/installation/Dock canaries; локальный тест не обращается к loginom.ai.
 - [ ] **2. Запустить:** Host `bun test test/node-host.test.ts test/host-port.test.ts`; новая management operation пока неизвестна.
 - [ ] **3. GREEN:** Добавить три router ветки к существующему node-entry management switch; каждая вызывает общий Host API. Start ждёт только device/code, не пользователя; поллинг остаётся Host-owned до отмены/expiry/close. Host.beginClose отменяет auth/refresh до drain. Decoder поля verifyBrowser остаётся private management.
-- [ ] **4. RED→GREEN — model projection:** В тесте host-port с pending login сохранить прежние assertions generation/url/username/browser/recoveries, дополнить:
-
-```ts
-const status = result.structuredContent
-expect(status).toMatchObject({ generation: 1, mode: "cloud", server: "primary" })
-expect(status).not.toHaveProperty("cloud")
-expect(JSON.stringify(result)).not.toContain("ABCD-EFGH")
-expect(JSON.stringify(result)).not.toContain("a@example.test")
-expect(JSON.parse(result.content[0].text)).toEqual(status)
-```
-
-Проекцию собрать явно в host-port: `revision,generation,url,username,folder,hasPassword,state,browser,failure,recoveries,mode,server,help`. Одно значение использовать для content и structuredContent. Не распространять весь View и затем удалять несколько секретных полей.
+- [ ] **4. Регрессия model projection:** Проекция и её исходный тест перенесены в Task6, одновременно с появлением реальных cloud полей. Здесь сохранить безопасный набор и равенство text/structuredContent при Node management integration; `cloud` и pending-login данные модели не передаются.
 - [ ] **5. Проверка/коммит:** Schema `bun test test/loginom.test.ts`; Host `bun test test/node-host.test.ts test/host-port.test.ts test/transport.test.ts`; из schema/loginom-host/app/desktop/opencode `bun typecheck`. Если правка потребовала нового общего поля, все его fixtures и поведенческие проверки обновить здесь, не ждать10–11. Commit `feat(loginom): expose cloud management through private Host API`.
 
 ## Task 9: Site и Help используют явный proxy и системные CA

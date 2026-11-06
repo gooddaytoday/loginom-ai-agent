@@ -16,6 +16,18 @@ export function registerLoginomIpc(api: Loginom.API) {
         url.origin === new URL(process.env.ELECTRON_RENDERER_URL).origin)
     if (!valid) throw new Error("LOGINOM_SENDER_INVALID")
   }
+  ipcMain.handle("loginom-cloud-start", (event) => {
+    sender(event)
+    return api.cloudStart()
+  })
+  ipcMain.handle("loginom-cloud-cancel", (event) => {
+    sender(event)
+    return api.cloudCancel()
+  })
+  ipcMain.handle("loginom-cloud-disconnect", (event) => {
+    sender(event)
+    return api.cloudDisconnect()
+  })
   const candidate = Schema.decodeUnknownOption(Loginom.Check)
   const save = Schema.decodeUnknownOption(Loginom.Save)
   const cancel = Schema.decodeUnknownOption(Loginom.Cancel)

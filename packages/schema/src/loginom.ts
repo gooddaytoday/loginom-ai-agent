@@ -85,6 +85,9 @@ export const Cancel = Schema.Struct({ revision: NonNegativeInt })
 export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids: Schema.Array(Schema.String) })
 
 export type API = {
+  cloudStart(): Promise<View>
+  cloudCancel(): Promise<View>
+  cloudDisconnect(): Promise<View>
   read(): Promise<View>
   status(): Promise<View>
   check(candidate: Check): Promise<typeof Validation.Type>

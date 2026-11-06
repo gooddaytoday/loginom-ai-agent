@@ -4,15 +4,20 @@ import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
 import { Loginom } from "@opencode-ai/schema/loginom"
-import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
+import { RuntimeStartupError, supervise } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
 import { fileReferences } from "./file-reference"
+import { Product } from "@loginom-ai-agent/product"
+import { createCloudAuth, type CloudEndpoints, type CallBudget } from "./cloud-auth"
+import { cloudStore } from "./connection/cloud-store"
+import { createKnowledgeSession, type KnowledgeSession } from "./knowledge-session"
 
 export async function createLoginomHost(options: {
   root: string
+  cloudEndpoints?: CloudEndpoints
   resources: string
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
@@ -35,12 +40,38 @@ export async function createLoginomHost(options: {
     number,
     {
       connection: ActiveConnection
-      knowledge: Awaited<ReturnType<typeof superviseKnowledge>>
-      catalog: Promise<unknown>
-      ready: Promise<void>
+      knowledge: KnowledgeSession
       children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>>
     }
   >()
+  const lifetime = new AbortController()
+  const endpoints = options.cloudEndpoints ?? Product.cloud
+  const selection = { server: "primary" as "primary" | "reserve" }
+  let cloudRevision = 0
+  const cloud = await createCloudAuth({
+    store: cloudStore(join(root, "connection"), options.codec),
+    endpoints,
+    changed() {
+      if (lifetime.signal.aborted || cloud.revision() === cloudRevision) return
+      cloudRevision = cloud.revision()
+      for (const generation of generations.values()) {
+        if (generation.connection.mode !== "cloud") continue
+        void generation.knowledge
+          .invalidate()
+          .then(() => generation.knowledge.ensure(budget()))
+          .catch(backgroundFailure)
+      }
+    },
+  })
+  function budget(): CallBudget {
+    return { deadline: Date.now() + 120_000, signal: lifetime.signal }
+  }
+  function backgroundFailure(error: unknown) {
+    try {
+      startupFailure(error)
+    } catch {}
+  }
+  let authClose: Promise<void> | undefined
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
@@ -107,7 +138,10 @@ export async function createLoginomHost(options: {
   }
   function startupFailure(error: unknown): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
-    if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) {
+    if (
+      (error instanceof RuntimeStartupError && !error.cleanupConfirmed) ||
+      (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+    ) {
       startupCleanup.failed = true
       throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: error })
     }
@@ -118,47 +152,46 @@ export async function createLoginomHost(options: {
     {
       async check(candidate, signal, verifyBrowser) {
         signal?.throwIfAborted()
-        if (candidate.mode !== "custom" || !candidate.endpoint || !candidate.apiKey)
+        const needsConnection = candidate.mode === "cloud" && !cloud.credentials()
+        if (candidate.mode === "custom" && (!candidate.endpoint || !candidate.apiKey))
           throw Error("LOGINOM_CONNECTION_REQUIRED")
         const connection = candidate
         const chat = randomUUID()
         try {
-          const knowledge = await superviseKnowledge(
-            {
-              node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-              entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-              // Knowledge has no mutable cwd state; retain its private close evidence after validation cleanup.
-              stateDir: join(root, "knowledge", String(connection.generation)),
+          if (!needsConnection) {
+            const knowledge = createKnowledgeSession({
               generation: connection.generation,
-              endpoint: connection.endpoint!,
-              apiKey: connection.apiKey,
+              connection,
+              cloud,
+              endpoints,
+              resources,
+              stateDir: join(root, "knowledge", String(connection.generation)),
               environment,
-            },
-            signal,
-          ).catch(startupFailure)
-          const cancel = () => {
-            void knowledge.close().catch(() => undefined)
-          }
-          signal?.addEventListener("abort", cancel, { once: true })
-          try {
-            signal?.throwIfAborted()
-            await knowledge.request("list")
-            signal?.throwIfAborted()
-          } finally {
-            signal?.removeEventListener("abort", cancel)
-            await knowledge.close()
+              signal: signal ?? lifetime.signal,
+              changed() {},
+              selected: () => selection.server,
+              selectReserve() {
+                selection.server = "reserve"
+              },
+            })
+            try {
+              await knowledge.ensure({ deadline: Date.now() + 120_000, signal: signal ?? lifetime.signal })
+            } finally {
+              await knowledge.close()
+            }
           }
           signal?.throwIfAborted()
-          if (verifyBrowser === false) return { state: "unknown" as const }
+          const help = { state: needsConnection ? ("connection-required" as const) : ("ready" as const) }
+          if (verifyBrowser === false) return { help, browser: { state: "unknown" as const } }
           const child = await launch(connection, chat, true, signal).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
           })
-          if ("state" in child) return child
+          if ("state" in child) return { help, browser: child }
           await child.close()
           signal?.throwIfAborted()
-          return { state: "verified" as const }
+          return { help, browser: { state: "verified" as const } }
         } finally {
           await Promise.all([
             rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
@@ -168,26 +201,40 @@ export async function createLoginomHost(options: {
           ])
         }
       },
-      async prepare(candidate) {
-        if (candidate.mode !== "custom" || !candidate.endpoint || !candidate.apiKey)
-          throw Error("LOGINOM_CONNECTION_REQUIRED")
-        const connection = candidate
-        const knowledge = await superviseKnowledge({
-          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-          stateDir: join(root, "knowledge", String(connection.generation)),
+      async prepare(connection) {
+        let status: { state: Loginom.HelpState; failure?: string } = { state: "starting" }
+        let observer: ((value: typeof status) => void) | undefined
+        const knowledge = createKnowledgeSession({
           generation: connection.generation,
-          endpoint: connection.endpoint!,
-          apiKey: connection.apiKey,
+          connection,
+          cloud,
+          endpoints,
+          resources,
+          stateDir: join(root, "knowledge", String(connection.generation)),
           environment,
-        }).catch(startupFailure)
-        const catalog = knowledge.request("list")
-        const ready = catalog.then(() => undefined)
-        const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
+          signal: lifetime.signal,
+          changed(value) {
+            status = value
+            observer?.(value)
+          },
+          selected: () => selection.server,
+          selectReserve() {
+            selection.server = "reserve"
+          },
+        })
+        const generation = { connection, knowledge, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
-        void ready.catch(() => undefined)
+        void knowledge.ensure(budget()).catch(backgroundFailure)
+        await knowledge.admission.catch(async (error: unknown) => {
+          generations.delete(connection.generation)
+          await knowledge.close().catch(startupFailure)
+          startupFailure(error)
+        })
         return {
-          ready,
+          observeHelp(listener) {
+            observer = listener
+            listener(status)
+          },
           async reset() {
             const results = await Promise.allSettled(
               [...generation.children.entries()].map(async ([chat, child]) => {
@@ -212,13 +259,26 @@ export async function createLoginomHost(options: {
     },
     journal,
   )
+  function management(view: Loginom.View): Loginom.View {
+    return { ...view, cloud: cloud.status(), server: view.mode === "custom" ? "custom" : selection.server }
+  }
+  function beginClose() {
+    authClose ??= cloud.close()
+    if (!lifetime.signal.aborted) {
+      lifetime.abort(Error("LOGINOM_HOST_CLOSED"))
+      for (const generation of generations.values()) void generation.knowledge.invalidate().catch(backgroundFailure)
+    }
+    service.beginClose()
+  }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
     browserRecovery: options.browserRecovery === true,
     references,
+    beginClose,
     async close() {
-      await service.close()
+      beginClose()
+      await Promise.all([service.close(), authClose])
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.
       if (startupCleanup.failed || shutdown.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
@@ -226,24 +286,52 @@ export async function createLoginomHost(options: {
     },
     api: {
       ...service.api,
+      async read() {
+        return management(await service.api.read())
+      },
+      async status() {
+        return management(await service.api.status())
+      },
+      async save(input: Parameters<typeof service.api.save>[0]) {
+        return management(await service.api.save(input))
+      },
+      async cancelPending(input: Parameters<typeof service.api.cancelPending>[0]) {
+        return management(await service.api.cancelPending(input))
+      },
+      async cloudStart() {
+        await cloud.start()
+        return management(await service.api.status())
+      },
+      async cloudCancel() {
+        await cloud.cancel()
+        return management(await service.api.status())
+      },
+      async cloudDisconnect() {
+        await cloud.disconnect()
+        return management(await service.api.status())
+      },
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {
         const view = await service.api.acknowledgeRecovery(input)
         recoveries.clear()
-        return view
+        return management(view)
       },
     },
     journal,
     recoveries,
-    knowledge(generation: number) {
+    async callKnowledge(generation: number, input: Parameters<KnowledgeSession["call"]>[0], inputBudget: CallBudget) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
-      return current.knowledge
+      return current.knowledge.call(input, inputBudget).catch(startupFailure)
     },
-    async catalog(generation: number) {
+    async interruptKnowledge(generation: number, input: { run: string; id?: string }) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
-      await current.ready
-      return structuredClone(await current.catalog)
+      return current.knowledge.interrupt(input)
+    },
+    async catalog(generation: number, inputBudget = budget()) {
+      const current = generations.get(generation)
+      if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+      return current.knowledge.catalog(inputBudget).catch(startupFailure)
     },
     resetRestarts(chat: string) {
       restarts.delete(chat)
@@ -275,7 +363,7 @@ export async function createLoginomHost(options: {
     async interruptAll() {
       const results = await Promise.allSettled(
         [...generations.values()].flatMap((generation) => [
-          generation.knowledge.request("interrupt", { all: true }),
+          generation.knowledge.invalidate(),
           ...[...generation.children.values()].map(async (child) => (await child).request("interrupt")),
         ]),
       )

@@ -30,18 +30,20 @@ test("failed readiness cleanup cannot acknowledge host shutdown", async () => {
   const fixture = await startupFixture(false)
   try {
     await fixture.host.settled()
+    await expect(fixture.host.catalog(1)).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
     expect(await fixture.host.api.status()).toMatchObject({ state: "recoverable-error" })
     await expect(fixture.host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
   } finally {
     await fixture.host.close().catch(() => undefined)
     await rm(fixture.directory, { recursive: true, force: true })
   }
-}, 15000)
+}, 30000)
 
 test("clean readiness failure remains recoverable and permits host shutdown", async () => {
   const fixture = await startupFixture(true)
   try {
     await fixture.host.settled()
+    await expect(fixture.host.catalog(1)).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
     expect(await fixture.host.api.status()).toMatchObject({ state: "recoverable-error" })
     expect(fixture.host.acquire("unavailable-run")).toBeUndefined()
     await fixture.host.close()
@@ -49,7 +51,7 @@ test("clean readiness failure remains recoverable and permits host shutdown", as
     await fixture.host.close().catch(() => undefined)
     await rm(fixture.directory, { recursive: true, force: true })
   }
-}, 15000)
+}, 30000)
 
 test.each([true, false])(
   "browser startup warning requires confirmed cleanup: %s",

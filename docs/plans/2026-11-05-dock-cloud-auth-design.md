@@ -240,3 +240,49 @@ Runtime/сборки/production не запускались. Следующий 
 - Общий shutdown deadline применяется композицией6/7: auth close начинается в beginClose до operation drain; API close() сохранён.
 - Ревью `06a66330bb`: три P1 закрыты тестами45–48 — epoch отзыва, общий cancel/close cleanup, disabled-old read-back.
 - Следующий шаг: scoped re-review исправлений от `06a66330bb`, затем Task6; recovery/cooldown/failover остаются Task7.
+
+## Ревью Task5 и уточнение порядка Task6 — 2026-11-06
+
+- Task5 SHA `b22cbc6557`: scoped re-review Spec compliant / Quality Approved; все три P1 закрыты.
+- Host60 PASS/252 assertions, typecheck и diff-check PASS; реальные fsync/revoke/cancel regressions сохранены.
+- Независимая read-only проверка Task6 выявила sequencing: текущая diagnostics передаёт весь management View.
+- Прежний шаг Task8 projection и тот же тест перенесены в Task6 до появления email/pending; Node routes остаются Task8.
+- Это выполнение прежнего spec§5: явный безопасный набор полей, одно значение для text и structuredContent.
+- Контракты/критерии не менялись; подтверждение и карта кода — task-6-context.md в task scratch.
+- Следующий шаг: Task6 — save-before-login, mutable Help readiness и атомарная Host/Desktop API интеграция.
+
+## Checkpoint Task 6 — 2026-11-06
+
+- База SHA: `b22cbc6557`; результат — `feat(loginom): recover Help readiness within a generation`.
+- Save-before-login выдаёт validation token без Help; browser check остаётся отдельным, verifyBrowser:false пропускает только его.
+- CloudAuth/CloudStore подключены к Host; login/logout заменяют Help прежнего поколения, не меняют settings record/revision/browser/leases.
+- KnowledgeSession владеет попыткой/child/catalog: singleflight, revision/attempt fence, cleanup retirement и повтор до readiness gates.
+- RuntimeHandle публикует текущий Help snapshot; pending, browser warning и store/cleanup failures независимы, старые/closing handles игнорируются.
+- Private stateDir сохраняет evidence в profile; admitted barrier сохраняет local start ACK, не ждёт remote catalog; shutdown начинает auth close до drain.
+- Три cloud API атомарно проведены через schema/Host/Desktop IPC/preload/App stubs; Node cloud routes остаются Task8.
+- Diagnostics явно проецирует прежние несекретные поля +mode/server/help, без cloud/email/userCode/verificationUrl.
+- TDD подтверждает legacy/no-creds/connected/custom, retry tools/call/connection.ready, concurrent/stale/cancel/close и logout tools во время retirement.
+- Host mandatory: 68 PASS/474 assertions; неизменённые migration18/recovery2 PASS переиспользованы; CLI9 PASS/206, Desktop30 PASS/80, App19 PASS/81, Schema2 PASS/13.
+- Все5 package typechecks и diff-check PASS; публичные Protocol/HttpApi не менялись, генерация SDK не требуется.
+- Измерены fixture I/O: outer30с для restart/двух cleanup tests; heavyCLI240с после177.8с/105fsync; product deadlines/assertions сохранены.
+- Сохранён local ACK контракт; CLI fixture упорядочивает start ACK до close ACK/disconnect, не ослабляя writer/cleanup проверки.
+- Evidence/точные команды/первичные failures: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-6-report.md`;61 clean close receipts отдельно.
+- Ограничения: synthetic localhost/Linux; сайт/production/reserve/native/installed GUI не проверялись. Исходный journal timeout не классифицирован; final PASS.
+- Следующий шаг: независимое ревью Task6; затем Task7 recovery/cooldown/failover. Слияния/выпуска не выполнялись.
+
+## Checkpoint Task 6, fix round1 — 2026-11-06
+
+- Fix base SHA: `d2abf2a4ae`; независимое ревью выявило два Important terminal-admission дефекта; исправлены в том же Task6 commit через amend.
+- Notify-only callback/Host resolver заменены одной session-owned admission Promise: success/no-creds resolve, terminal pre-ACK outcome reject после cleanup.
+- Failed prepare удаляет свою generation из Host и ждёт session disposal; проверенный кандидат с неверным ACK не активируется и не закрывает рабочее поколение/browser.
+- Current failed retirement завершает initial admission ошибкой; старые invalidations не завершают новую попытку, cleanup uncertainty остаётся sticky.
+- Initial prepare rejection переводит существующее Help readiness в recoverable-error; applying/settled завершаются, последующий check не блокируется.
+- Validation продолжает ждать ensure/catalog; admission rejection обработан без замены исходной Promise и без unhandled rejection.
+- Два постоянных real-Node regression: success-check→failed-saveACK RED→GREEN; logout-beforeACK/closed:false/exit0→terminal settled RED→GREEN.
+- Cloud-readiness:16 PASS/73 assertions; mandatory Host6:70 PASS/487; Host typecheck PASS; CLI startup/writer focused:1 PASS/14 assertions.
+- Schema/App/Desktop/остальные CLI checks переиспользованы: public contracts/call sites/happy-path fixtures не менялись; heavy CLI не повторялся.
+- Два старых pre-ACK Host tests требуют unavailable generation после disposal, сохраняя прежние status/cleanup assertions; own fixture teardown идёт через finally.
+- Публичные schema/IPC/API, remote catalog recovery и product deadlines не менялись; дополнительных status flags/caches/dependencies нет.
+- Exact RED/GREEN/covering outputs и self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-6-report.md`.
+- Ограничения прежние: synthetic localhost/Linux, без installed GUI/native/site; независимое одобрение ещё не заявлено.
+- Следующий шаг: scoped re-review `d2abf2a4ae..amended HEAD` у исходного reviewer; затем решение владельца о Task7.
