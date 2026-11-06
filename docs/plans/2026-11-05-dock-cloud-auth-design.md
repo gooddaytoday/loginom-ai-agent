@@ -444,3 +444,30 @@ Runtime/сборки/production не запускались. Следующий 
 - Task13 завершает удаление встроенного ключа из настоящих пакетов; live evals и installed artifacts здесь не проверялись.
 - Отчёт: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-12-report.md`.
 - Следующий шаг: независимое ревью Task12 родителем, затем Task13. Push/PR/merge/release не выполнялись.
+
+## Ревью Task12 — 2026-11-06
+
+- SHA `d65979d3a7`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Harness использует custom stdin; stand key отсутствует в build/model env, missing-key/prepare-only и slot guards сохранены.
+- Evals108/2 существующих opt-in SKIP, node10, typecheck/freeze/diff/secret PASS. Реальная упаковка — Task13, USER provisioning/stand acceptance отдельно.
+- Следующий шаг: Task13 key removal, baked dev tuple и compiled integration; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task13 — 2026-11-06
+
+- База `d65979d3a7`; Task13 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Shared staging и оба build callers больше не читают/пакуют общий Dock key; исторические отчёты сохранены.
+- Один build-only JSON tuple разрешён только explicit local dev; Node/Electron получают literal, runtime env/manifest его не меняют.
+- Release guard отвергает любую defined override во всех четырёх jobs, включая dev/empty; exact24 combinations PASS.
+- TDD: staging/key, tuple/callers, compiled release collector0; pinned Node24.19.0/Chromium1246/Electron42.3.3 не менялись.
+- Штатные current CLI и Desktop dev build/package PASS; inventories6141/5117, payload canaries/profile/key absent, ASAR byte equality PASS.
+- Реальный settings-live preload→IPC→Host: save-before-login/start/cancel/ready той же generation/disconnect, first-shell proxy/direct0 PASS.
+- Current compiled Node1/17, management1/28, constructor recovery1/13 и PTY connect/decline/Ctrl+C3/3 PASS; все отложенные local gates8–11 закрыты.
+- Реальный terminal Ctrl+C выявил ранний SIGINT Host: POSIX own session без unref; ACK+exit/guard сохранены, owner-loss IPC regression PASS.
+- Source Host86/557 + изменённый Node27/162, CLI54/574, Desktop65/256 PASS; source compiled opt-in skips покрыты отдельными current gates.
+- Desktop2 native SKIP остаются; Host/Desktop/Opencode typechecks, proxy runner, diff-check PASS; бюджеты не ослаблены.
+- Desktop не зависит от node-client; после launcher fix пересобран CLI. Build metadata содержит BASE/dirty source, не финальный SHA.
+- Initial mixed Desktop и harness failures сохранены с причинами/неопределённостью; повторные isolated checks PASS.
+- Evidence/команды/RED→GREEN/freeze: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-13-report.md`.
+- Это own Linux dev fixtures, не installed/native Windows/macOS/production site/reserve/authentic0.3.9 приёмка; эти gates — Task15.
+- Профили пользователя, production и pins/dependencies не менялись; push/PR/merge/release не выполнялись.
+- Следующий шаг: независимое ревью Task13 родителем, затем Task14 local Dock/USER ACL.

@@ -3,6 +3,9 @@ import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 import { execFileSync } from "node:child_process"
+import { cloudBuild } from "../loginom-host/script/cloud-build"
+
+const endpoints = cloudBuild(process.env)
 
 const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
 
@@ -54,6 +57,7 @@ const sentry =
 export default defineConfig({
   main: {
     define: {
+      "import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD": JSON.stringify(endpoints) ?? "undefined",
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY": JSON.stringify(source.dirty),

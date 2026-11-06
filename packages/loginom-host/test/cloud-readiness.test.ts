@@ -95,6 +95,8 @@ async function networkFixture(
   })
   // These readiness cases recover primary; reserve is independently unavailable.
   const reserve = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(null, { status: 503 }) })
+  let collected = 0
+  const collector = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => { collected++; return new Response(null, { status: 500 }) } })
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
   await mkdir(join(resources, "bin"), { recursive: true })
@@ -106,7 +108,7 @@ async function networkFixture(
       fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
       join(resources, "runtime/src/knowledge-entry.mjs"),
     )
-  await writeFile(join(resources, "resource-manifest.json"), "{}")
+  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: collector.url.href }))
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),
     `
@@ -148,7 +150,7 @@ async function networkFixture(
     root,
     resources,
     codec: credentials("linux"),
-    environment: {},
+    environment: { LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT: collector.url.href },
     cloudEndpoints: { site: site.url.origin, primary: server.endpoint, reserve: reserve.url.origin },
   })
   const requests = new EventEmitter()
@@ -172,6 +174,8 @@ async function networkFixture(
     token,
     client,
     async close() {
+      expect(collected).toBe(0)
+      collector.stop(true)
       gate.resolve()
       client.close()
       await port.close()

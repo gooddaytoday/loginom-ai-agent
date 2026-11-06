@@ -25,7 +25,7 @@ test("stdin setup distinguishes missing secrets, explicit empty password and rep
     operation: "replace",
     value: "new-password",
   })
-  // Older setup scripts may still send a key; the built-in knowledge key replaced it.
+  // A legacy key without explicit custom mode never authorizes a connection.
   for (const json of ['{"apiKey":"old-key"}', '{"apiKey":""}'])
     expect(setupCandidate(json, current)).not.toHaveProperty("apiKey")
   expect(() => setupCandidate('{"password":null}', current)).toThrow("CLI_SETUP_INVALID")
@@ -349,3 +349,78 @@ test("pending code and link stay in stderr when automatic browser launch fails",
   expect(text).not.toContain("SAFE-CODE")
   expect(await errors).toBe("Код: SAFE-CODE\nhttps://example.test/device\n")
 })
+
+test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN || !process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE)(
+  "compiled CLI connects and cancels through its real Host while retaining the profile guard",
+  async () => {
+    const { mkdtemp, mkdir, writeFile, chmod, readFile, rm } = await import("node:fs/promises")
+    const { join } = await import("node:path")
+    const { tmpdir } = await import("node:os")
+    const cloud = await Bun.file(process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE!).json()
+    const root = await mkdtemp(join(tmpdir(), "compiled-cloud-management-"))
+    const profile = join(root, "profile")
+    await mkdir(join(root, "bin"))
+    const opener = join(root, "bin/xdg-open")
+    await writeFile(opener, `#!/bin/sh\nprintf opened >> '${root}/opened'\n`)
+    await chmod(opener, 0o700)
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: root, XDG_CONFIG_HOME: join(root, "config"), XDG_DATA_HOME: join(root, "data"),
+      XDG_CACHE_HOME: join(root, "cache"), XDG_CURRENT_DESKTOP: "generic", DESKTOP_SESSION: "generic", DISPLAY: "", WAYLAND_DISPLAY: "",
+      PATH: join(root, "bin") + ":/usr/bin:/bin", BROWSER: opener, LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+      LOGINOM_AI_AGENT_PURE: "1", LOGINOM_AI_AGENT_SYSTEM_PROXY: "off", NODE_EXTRA_CA_CERTS: cloud.cert,
+      HTTPS_PROXY: cloud.proxy, HTTP_PROXY: cloud.proxy, NO_PROXY: "", https_proxy: "", http_proxy: "", all_proxy: "", ALL_PROXY: "", no_proxy: "" }
+    delete env.LOGINOM_AI_AGENT_CLI_BUNDLE
+    const run = (args: string[], stdin?: string) => {
+      const child = Bun.spawn([process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN!, "loginom", ...args, "--format", "json"], {
+        env, cwd: root, stdin: stdin === undefined ? "ignore" : new Blob([stdin]), stdout: "pipe", stderr: "pipe",
+      })
+      const output = new Response(child.stdout).text()
+      const errors = new Response(child.stderr).text()
+      return { child, async done() { return { code: await child.exited, output: await output, errors: await errors } } }
+    }
+    const before = await (await fetch(cloud.control)).json()
+    try {
+      const setup = await run(["setup", "--stdin-json"], JSON.stringify({ mode: "cloud", url: cloud.control + "/app/", username: "fixture" })).done()
+      expect(setup.code).toBe(0)
+      expect(JSON.parse(setup.output)).toMatchObject({ state: "connection-required" })
+      for (const cancel of [false, true]) {
+        const starts = (await (await fetch(cloud.control)).json()).starts
+        const operation = run(["connect"])
+        const processIDs: number[] = []
+        try {
+          for (let attempt = 0; attempt < 300; attempt++) {
+            if ((await (await fetch(cloud.control)).json()).starts > starts && await Bun.file(join(root, "opened")).exists()) break
+            await Bun.sleep(100)
+          }
+          expect((await (await fetch(cloud.control)).json()).starts).toBe(starts + 1)
+          expect(await Bun.file(join(root, "opened")).exists()).toBe(true)
+          expect(await Bun.file(join(profile, ".writer/owner")).exists()).toBe(true)
+          const children = (await readFile(`/proc/${operation.child.pid}/task/${operation.child.pid}/children`, "utf8")).trim().split(/\s+/).filter(Boolean)
+          for (const pid of children) {
+            const command = await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "")
+            if (command.includes("node-host.mjs")) processIDs.push(Number(pid))
+          }
+          expect(processIDs).toHaveLength(1)
+          const busy = await run(["disconnect"]).done()
+          expect(busy.code).not.toBe(0)
+          expect(busy.errors).toContain("PROFILE_BUSY")
+          if (cancel) operation.child.kill("SIGINT")
+          if (!cancel) await fetch(cloud.control + "/approve")
+          const result = await operation.done()
+          expect(result.code).toBe(cancel ? 130 : 0)
+          expect(result.output + result.errors).not.toContain("CANARY")
+          if (!cancel) expect(JSON.parse(result.output)).toMatchObject({ cloud: { connected: true } })
+          if (cancel) expect(result.output + result.errors).toContain("CLI_CANCELLED")
+          expect(await Bun.file(join(profile, ".writer/owner")).exists()).toBe(false)
+          for (const pid of processIDs) expect(() => process.kill(pid, 0)).toThrow()
+          if (!cancel) expect((await run(["disconnect"]).done()).code).toBe(0)
+        } finally {
+          if (operation.child.exitCode === null) { operation.child.kill("SIGTERM"); await operation.child.exited }
+        }
+      }
+      const after = await (await fetch(cloud.control)).json()
+      expect(after.direct - before.direct).toBe(0)
+      expect(after.requests.slice(before.requests.length)).toContain("/primary/mcp")
+      expect(JSON.parse((await run(["status"]).done()).output)).toMatchObject({ cloud: { connected: false } })
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }, 120000,
+)

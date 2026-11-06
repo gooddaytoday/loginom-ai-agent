@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
-import { EventEmitter } from "node:events"
+import { EventEmitter, once } from "node:events"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildKeychain } from "../script/build-keychain"
@@ -637,3 +637,123 @@ test.skipIf(process.platform === "win32")(
   },
   75_000,
 )
+
+test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE || !process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
+  "current compiled CLI Host uses baked cloud endpoints through Node transport and explicit proxy",
+  async () => {
+    const { dirname, resolve } = await import("node:path")
+    const cloud = await Bun.file(process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE!).json()
+    const resources = resolve(dirname(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN!), "../resources/loginom")
+    const root = join(fixture.directory, "compiled-cloud")
+    const before = await (await fetch(cloud.control)).json()
+    const host = await launchNodeHost({ node: fixture.node, entry: join(resources, "host/node-host.mjs"), root, resources,
+      headless: true, environment: { NODE_EXTRA_CA_CERTS: cloud.cert, HTTPS_PROXY: cloud.proxy, NO_PROXY: "" } })
+    const results: unknown[] = []
+    try {
+      const validation = await host.request("connection.check", { revision: 0, mode: "cloud", url: cloud.control + "/app/",
+        username: "fixture", password: { operation: "empty" }, verifyBrowser: false }) as typeof import("@opencode-ai/schema/loginom").Loginom.Validation.Type
+      const saved = await host.request("connection.save", { revision: 0, validationId: validation.validationId }) as import("@opencode-ai/schema/loginom").Loginom.View
+      expect(saved).toMatchObject({ state: "connection-required", browser: { state: "unknown" } })
+      results.push(await host.request("connection.cloud-start", {}))
+      results.push(await host.request("connection.status", {}))
+      results.push(await host.request("connection.cloud-cancel", {}))
+      results.push(await host.request("connection.cloud-start", {}))
+      await fetch(cloud.control + "/approve")
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const view = await host.request("connection.status", {}) as import("@opencode-ai/schema/loginom").Loginom.View
+        if (view.cloud.connected) break
+        await Bun.sleep(100)
+      }
+      const ready = await host.request("connection.ready", {})
+      expect(ready).toMatchObject({ state: "ready", generation: saved.generation, revision: saved.revision, cloud: { connected: true } })
+      results.push(ready)
+      await expect(host.request("connection.cloud-start", {})).rejects.toThrow("LOGINOM_CLOUD_ALREADY_CONNECTED")
+      await host.request("acquire", { run: "compiled", session: "compiled" })
+      results.push(await host.request("tools", { run: "compiled" }))
+      for (const [name, args] of Object.entries({ find: { query: "fixture" }, search: { query: "fixture" },
+        read: { uris: ["viking://resources/loginom-dock/test"] }, grep: { uri: "viking://resources/loginom-dock", pattern: ["fixture"] },
+        glob: { uri: "viking://resources/loginom-dock", pattern: "*" }, list: { uri: "viking://resources/loginom-dock" },
+        tree: { uri: "viking://resources/loginom-dock" } }))
+        results.push(await host.request("call", { run: "compiled", name, args, userMessage: "Read fixture documentation" }))
+      await host.request("release", { run: "compiled" })
+      results.push(await host.request("connection.cloud-disconnect", {}))
+      expect(JSON.stringify(results)).not.toContain("CANARY")
+      const after = await (await fetch(cloud.control)).json()
+      expect(after.starts - before.starts).toBe(2)
+      expect(after.direct - before.direct).toBe(0)
+      expect(after.primaryCalls - before.primaryCalls).toBe(7)
+      expect(after.requests.slice(before.requests.length)).toContain("/primary/mcp")
+    } finally { await host.close() }
+    expect(await host.exited).toEqual({ code: 0, signal: null })
+    for (const bypass of [true, false]) {
+      const before = await (await fetch(cloud.control)).json()
+      const probe = await launchNodeHost({ node: fixture.node, entry: join(resources, "host/node-host.mjs"), resources,
+        root: join(root, bypass ? "bypass" : "unavailable"), headless: true,
+        environment: { NODE_EXTRA_CA_CERTS: cloud.cert, HTTPS_PROXY: bypass ? cloud.proxy : "http://127.0.0.1:1", NO_PROXY: bypass ? new URL(cloud.endpoints.site).hostname : "" } })
+      try {
+        if (bypass) {
+          expect(await probe.request("connection.cloud-start", {})).toMatchObject({ cloud: { pending: { userCode: "TASK13-CODE" } } })
+          await probe.request("connection.cloud-cancel", {})
+        }
+        if (!bypass) await expect(probe.request("connection.cloud-start", {})).rejects.toThrow("LOGINOM_CLOUD_UNAVAILABLE")
+      } finally { await probe.close() }
+      const after = await (await fetch(cloud.control)).json()
+      expect(after.direct - before.direct).toBe(bypass ? 1 : 0)
+      expect(after.starts - before.starts).toBe(bypass ? 1 : 0)
+      expect(await probe.exited).toEqual({ code: 0, signal: null })
+    }
+  }, 60000,
+)
+
+test.skipIf(process.platform === "win32")("terminal SIGINT leaves the private Host available for acknowledged owner cleanup", async () => {
+  const { fork } = await import("node:child_process")
+  const entry = join(fixture.directory, "terminal-owner.ts")
+  const output = join(fixture.directory, "terminal-owner.mjs")
+  await writeFile(entry, `
+    import { launchNodeHost } from ${JSON.stringify(join(import.meta.dir, "../src/node-client.ts"))};
+    const host = await launchNodeHost({node:${JSON.stringify(fixture.node)},entry:${JSON.stringify(fixture.entry)},
+      root:${JSON.stringify(join(fixture.directory, "terminal-profile"))},resources:${JSON.stringify(fixture.directory)},headless:true,environment:{}});
+    process.once('SIGINT', async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const result = {};
+      try { result.state = (await host.request('connection.status',{})).state; }
+      catch (error) { result.requestError = error.message; }
+      try { await host.close(); result.closed = true; }
+      catch (error) { result.cleanupError = error.message; }
+      result.exit = await host.exited;
+      process.send(result, () => process.disconnect());
+    });
+    process.send({ready:true});
+  `)
+  const builder = Bun.spawn([process.execPath, "build", entry, "--target=node", "--outfile=" + output], { stdout: "pipe", stderr: "pipe" })
+  expect(await builder.exited).toBe(0)
+  const owner = fork(output, [], { execPath: fixture.node, execArgv: [], detached: true, env: {}, stdio: ["ignore", "pipe", "pipe", "ipc"] })
+  const exited = once(owner, "exit")
+  try {
+    expect(await once(owner, "message")).toEqual([{ ready: true }, undefined])
+    const result = once(owner, "message")
+    process.kill(-owner.pid!, "SIGINT")
+    expect((await result)[0]).toEqual({ state: "unconfigured", closed: true, exit: { code: 0, signal: null } })
+    expect(await exited).toEqual([0, null])
+    if (process.platform === "linux") {
+      const abandoned = fork(output, [], { execPath: fixture.node, execArgv: [], detached: true, env: {}, stdio: ["ignore", "pipe", "pipe", "ipc"] })
+      const ownerExited = once(abandoned, "exit")
+      await once(abandoned, "message")
+      const children = (await readFile(`/proc/${abandoned.pid}/task/${abandoned.pid}/children`, "utf8")).trim().split(/\s+/).map(Number)
+      expect(children).toHaveLength(1)
+      abandoned.kill("SIGKILL")
+      await ownerExited
+      try {
+        for (let attempt = 0; attempt < 50; attempt++) {
+          if (!await Bun.file(`/proc/${children[0]}/stat`).exists()) break
+          await Bun.sleep(100)
+        }
+        expect(() => process.kill(children[0], 0)).toThrow()
+      } finally {
+        try { process.kill(children[0], "SIGKILL") } catch {}
+      }
+    }
+  } finally {
+    if (owner.exitCode === null) { owner.kill("SIGTERM"); await exited }
+  }
+}, 15000)

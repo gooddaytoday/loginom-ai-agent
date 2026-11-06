@@ -756,7 +756,7 @@ stdin = json.dumps(dict(
 
 ## Task 13: Удаление встроенного ключа, staging tuple и документация
 
-**Files:** Modify `packages/loginom-host/script/{stage-resources,build-cli,build-node-host}.ts`, Create `packages/loginom-host/script/cloud-build.ts`, `packages/loginom-host/test/cloud-build.test.ts`; Modify `packages/desktop/{scripts/bundle-loginom.ts,electron.vite.config.ts}`, `.github/workflows/release.yml`. Runtime fallback в host.ts удалён в3.
+**Files:** Modify `packages/loginom-host/script/{stage-resources,build-cli,build-node-host}.ts`, Create `packages/loginom-host/script/cloud-build.ts`, `packages/loginom-host/test/cloud-build.test.ts`; Modify `packages/desktop/{scripts/bundle-loginom.ts,electron.vite.config.ts}`, `.github/workflows/release.yml`. Runtime fallback в host.ts удалён в3. Compiled PTY обнаружил доставку terminal SIGINT одновременно CLI и private Host: минимальная правка `src/node-client.ts` изолирует POSIX process group без unref; owner-loss через IPC и ACK+exit остаются обязательными. Regression — настоящий process-group SIGINT и parent death в node-host test.
 
 Tests: `packages/loginom-host/test/{node-host,cloud-proxy,cloud-readiness,stage-resources}.test.ts`, `packages/desktop/test/loginom/{settings-live.mjs,environment-proxy.ts}`, `packages/opencode/test/cli/{standalone-status,loginom-management}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`. Существующие custom fixtures уже перенесены в3; здесь завершаются отложенные compiled cloud проверки8–11.
 
@@ -764,10 +764,10 @@ Docs: `packages/app/AGENTS.md`, `packages/loginom-host/AGENTS.md`, `packages/des
 
 **Interfaces:** Удалить `stageResources.knowledgeKey` и упаковку `knowledge-key`; runtime чтения файла/withKnowledgeKey уже нет с3. Новый **build-only** `cloudBuild(environment: NodeJS.ProcessEnv): CloudEndpoints | undefined`; вход — одна JSON переменная `LOGINOM_AI_AGENT_CLOUD_BUILD` со всеми site/primary/reserve. Она используется только build scripts; compiled constant `import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD` передаётся Host из Node bundle и Electron main. Обычный runtime process.env не читается для выбора cloud endpoints.
 
-- [ ] **1. RED:** В stage-resources тесте проверить успешный bundle без key, отсутствие файла; в Host test поставить runtime `LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT` и manifest.endpoint на listener-сборщик, а cloud tuple инъекцией на свои три fixtures. Ни одного запроса с cloud key на collector. Существующие custom fixtures использовать через сохранённый endpoint, не legacy env override.
-- [ ] **2. Запустить RED:** Host `bun test test/stage-resources.test.ts test/cloud-build.test.ts test/cloud-readiness.test.ts`. Для полноценных staging tests нужны pinned Node/Browser inputs, иначе этот пункт не объявлять пройденным.
-- [ ] **3. GREEN:** Удалить embedded key из staging, обоих build callers и release secret checks/env. Проверить, что раннее удаление runtime fallback в3 сохранилось: manifest.endpoint/env не выбирает адресата, custom использует явный endpoint. Shared manifest endpoint при необходимости остаётся историческим metadata. Миграция без mode из3 сохраняется.
-- [ ] **4. RED→GREEN — build tuple:** Создать cloud-build тест:
+- [x] **1. RED:** В stage-resources тесте проверить успешный bundle без key, отсутствие файла; в Host test поставить runtime `LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT` и manifest.endpoint на listener-сборщик, а cloud tuple инъекцией на свои три fixtures. Ни одного запроса с cloud key на collector. Существующие custom fixtures использовать через сохранённый endpoint, не legacy env override.
+- [x] **2. Запустить RED:** Host `bun test test/stage-resources.test.ts test/cloud-build.test.ts test/cloud-readiness.test.ts`. Для полноценных staging tests нужны pinned Node/Browser inputs, иначе этот пункт не объявлять пройденным.
+- [x] **3. GREEN:** Удалить embedded key из staging, обоих build callers и release secret checks/env. Проверить, что раннее удаление runtime fallback в3 сохранилось: manifest.endpoint/env не выбирает адресата, custom использует явный endpoint. Shared manifest endpoint при необходимости остаётся историческим metadata. Миграция без mode из3 сохраняется.
+- [x] **4. RED→GREEN — build tuple:** Создать cloud-build тест:
 
 ```ts
 expect(() => cloudBuild({
@@ -791,16 +791,16 @@ fi
 ```
 
 Не печатать значение tuple. Проверить exact guard с unset / empty / tuple при channel prod и dev: unset проходит, заданная переменная всегда завершает шаг до сборки. Helper channel-check и CI guard решают разные границы; второй не заменяется первым.
-- [ ] **5. Следующий RED→GREEN:** В запущенном compiled release Host runtime env CLOUD_BUILD/KNOWLEDGE_ENDPOINT не меняет адрес. Проверки release build/CI с запрещённой override падают до создания artifact, включая CI channel dev. Compiled dev Host и Desktop собраны с одним tuple трёх локальных HTTPS endpoints; отдельные test profiles и доверенная тестовая CA. Здесь завершить отложенные проверки:
+- [x] **5. Следующий RED→GREEN:** В запущенном compiled release Host runtime env CLOUD_BUILD/KNOWLEDGE_ENDPOINT не меняет адрес. Проверки release build/CI с запрещённой override падают до создания artifact, включая CI channel dev. Compiled dev Host и Desktop собраны с одним tuple трёх локальных HTTPS endpoints; отдельные test profiles и доверенная тестовая CA. Здесь завершить отложенные проверки:
   - Node management start/status/cancel из8: настоящие short calls, без endpoint override в handshake и без утечки canaries.
   - Site+Help proxy из9, включая первый Desktop request после login-shell env, direct count0, NO_PROXY и отказ недоступного proxy.
   - `settings-live.mjs` из10: настоящий preload → IPC → Host → fixture, save-before-login → connect → ready в том же поколении, cancel/disconnect; renderer handlers не подменяются.
   - CLI management/PTY из11: настоящий compiled Host, connect/cancel/Ctrl+C, профиль удерживается до cleanup; TUI startup connect использует один Host, отказ сохраняет обычный чат. Unit проверка ожидания больше180с остаётся в11, здесь подтверждается настоящий transport/lifecycle.
 
 Программная unit injection не является public handshake method. До появления этой сборки перечисленные cloud integration checks не отмечать выполненными.
-- [ ] **6. Проверить всех потребителей:** `rg -n 'knowledge-key|knowledgeKey|LOGINOM_MCP_API_KEY|LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT|hasApiKey' packages scripts evals .github` и классифицировать совпадения. Runtime/build fallback отсутствует; negative tests/исторические документы могут упоминать имя. Fixtures с3 используют custom stdin/records и actual Help state, а не ждут этой задачи для миграции. UI-01 находится в `docs/testing/loginom-ai-agent/README.md`.
-- [ ] **7. Docs вместе с поведением:** заменить module правила про встроенный ключ. Зафиксировать API/setup примеры, сохранение до входа, независимость профилей, logout/revoke границу, KB-root ограничение custom, proxy variant A. Добавить в runbook отдельную секцию stage14/15 с ограничениями native/site. Системный proxy v2 не менять.
-- [ ] **8. Проверка/коммит:** затронутые Host/CLI/Desktop tests, package typechecks; реальный shared staging и оба build callers штатными runbook командами при наличии inputs. Проверить inventory: `knowledge-key` отсутствует, fixture secret canaries отсутствуют в payload, User profile не включён. `git diff --check`. Commit `chore(loginom): remove embedded Dock key and pin cloud endpoints`.
+- [x] **6. Проверить всех потребителей:** `rg -n 'knowledge-key|knowledgeKey|LOGINOM_MCP_API_KEY|LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT|hasApiKey' packages scripts evals .github` и классифицировать совпадения. Runtime/build fallback отсутствует; negative tests/исторические документы могут упоминать имя. Fixtures с3 используют custom stdin/records и actual Help state, а не ждут этой задачи для миграции. UI-01 находится в `docs/testing/loginom-ai-agent/README.md`.
+- [x] **7. Docs вместе с поведением:** заменить module правила про встроенный ключ. Зафиксировать API/setup примеры, сохранение до входа, независимость профилей, logout/revoke границу, KB-root ограничение custom, proxy variant A. Добавить в runbook отдельную секцию stage14/15 с ограничениями native/site. Системный proxy v2 не менять.
+- [x] **8. Проверка/коммит:** затронутые Host/CLI/Desktop tests, package typechecks; реальный shared staging и оба build callers штатными runbook командами при наличии inputs. Проверить inventory: `knowledge-key` отсутствует, fixture secret canaries отсутствуют в payload, User profile не включён. `git diff --check`. Commit `chore(loginom): remove embedded Dock key and pin cloud endpoints`.
 
 ## Task 14: Проверка ACL/Help на одном Dock и runbook развёртывания
 

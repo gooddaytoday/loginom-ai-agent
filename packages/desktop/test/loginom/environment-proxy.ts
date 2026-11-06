@@ -9,7 +9,7 @@ import { once } from "node:events"
 import { superviseKnowledge } from "../../../loginom-host/src/supervisor"
 import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
-export async function environmentProxy(handler?: (req: IncomingMessage, res: ServerResponse) => void) {
+export async function environmentProxy(handler?: (req: IncomingMessage, res: ServerResponse) => void, targetHost = "127.0.0.1") {
   // Real Node HTTP, fetch and TLS CONNECT, without global fetch stubs.
   const directory = await mkdtemp(join(tmpdir(), "loginom-proxy-test-"))
   const cert = join(directory, "cert.pem")
@@ -31,7 +31,7 @@ export async function environmentProxy(handler?: (req: IncomingMessage, res: Ser
       "-subj",
       "/CN=proxy-target.test",
       "-addext",
-      "subjectAltName=DNS:proxy-target.test,IP:127.0.0.1",
+      `subjectAltName=DNS:proxy-target.test,IP:127.0.0.1,IP:${targetHost}`,
     ],
     { stdio: "ignore" },
   )
@@ -85,7 +85,7 @@ export async function environmentProxy(handler?: (req: IncomingMessage, res: Ser
       sockets.add(socket)
       socket.on("close", () => sockets.delete(socket))
     })
-    server.listen(0, "127.0.0.1")
+    server.listen(0, server === target ? targetHost : "127.0.0.1")
     await once(server, "listening")
   }
   const port = (server: typeof local) => {
@@ -98,10 +98,10 @@ export async function environmentProxy(handler?: (req: IncomingMessage, res: Ser
       tunnels.push(req.url!)
       const authority = new URL(`http://${req.url}`)
       const destination =
-        authority.hostname === "127.0.0.1"
+        (authority.hostname === "127.0.0.1" || authority.hostname === targetHost)
           ? Number(authority.port)
           : port(authority.port === "443" ? target : httpTarget)
-      const upstream = connect(destination, "127.0.0.1", () => {
+      const upstream = connect(destination, authority.hostname === targetHost ? targetHost : "127.0.0.1", () => {
         upstreamPorts.add(upstream.localPort!)
         socket.write("HTTP/1.1 200 Connection Established\r\n\r\n")
         if (head.length) upstream.write(head)

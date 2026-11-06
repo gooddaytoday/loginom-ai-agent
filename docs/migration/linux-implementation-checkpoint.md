@@ -706,3 +706,15 @@ Installed/live приёмка предыдущего Linux payload не пере
 и оба typecheck PASS. ASAR main/preload/renderer побайтово равны current out.
 Это не installed/release/live-cloud приёмка; пользовательские app/профили не менялись.
 [Канонический checkpoint и evidence](../plans/2026-11-05-dock-cloud-auth-design.md#checkpoint-task10--2026-11-06).
+
+## 2026-11-06 — Task13 cloud build и текущие local artifacts
+
+База `d65979d3a7`, ветка `dock-cloud-auth`: shared key удалён из staging/callers/CI;
+один explicit-dev tuple встроен в текущие CLI Node Host и Desktop main.
+Реальные compiled Node/CLI/PTY и Desktop preload→IPC→Host gates8–11 PASS,
+включая proxy/direct0, save-before-login, cancel и guard после ACK+exit.
+POSIX Host изолирован от terminal SIGINT; Linux owner-loss cleanup PASS.
+Штатные build/package, inventories, secret scan и ASAR byte equality PASS.
+Это локальные Linux dev fixtures; external site/reserve, native Windows/macOS,
+установленный выпуск и authentic0.3.9 остаются Task15. Пользовательские профили не менялись.
+[Канонический checkpoint и evidence](../plans/2026-11-05-dock-cloud-auth-design.md#checkpoint-task13--2026-11-06).

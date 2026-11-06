@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { createLoginomHost } from "./host"
+import type { CloudEndpoints } from "./cloud-auth"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
@@ -102,6 +103,7 @@ async function dispatch(message: unknown) {
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
+        cloudEndpoints: import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD as unknown as CloudEndpoints | undefined,
       }
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
