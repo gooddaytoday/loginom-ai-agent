@@ -13,8 +13,8 @@ export type Launch = {
   stateDir: string
   generation: number
   chat: string
-  endpoint: string
-  connection: { apiKey: string; password: string; url: string; username: string }
+  endpoint?: string
+  connection: { apiKey?: string; password: string; url: string; username: string }
   actionManifestUri?: string
   actionManifestSha256?: string
   validation?: boolean
@@ -31,7 +31,7 @@ export type Launch = {
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
-export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+export type KnowledgeLaunch = ProcessLaunch & { endpoint: string; apiKey: string }
 
 export class RuntimeStartupError extends Error {
   constructor(
@@ -108,8 +108,23 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Browser validation follows the separate key-only Help check in Host.
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, diagnosticSecrets: [input.connection.password, input.connection.username] },
+    {
+      protocol: 1,
+      resources: input.resources,
+      stateDir: input.stateDir,
+      generation: input.generation,
+      chat: input.chat,
+      connection: { password: input.connection.password, url: input.connection.url, username: input.connection.username },
+      actionManifestUri: input.actionManifestUri,
+      actionManifestSha256: input.actionManifestSha256,
+      validation: input.validation,
+      headless: input.headless,
+      acceptanceCleanupPackage: input.acceptanceCleanupPackage,
+      closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown,
+      browserRecovery: input.browserRecovery,
+      startupDeadline: input.startupDeadline,
+    },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
     input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,

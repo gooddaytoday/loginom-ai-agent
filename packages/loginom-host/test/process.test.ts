@@ -16,7 +16,7 @@ test("private process transport preserves spaces and Unicode, rejects wrong gene
       `
 process.on('message', message => {
  if (message.operation === 'start') {
-  const valid = !process.argv.join(' ').includes('private-key') && !Object.values(process.env).includes('private-key') && message.input.connection.apiKey === 'private-key' && !message.input.environment && !process.env.OPENAI_API_KEY;
+  const valid = !process.argv.join(' ').includes('private-password') && !Object.values(process.env).includes('private-password') && message.input.connection.password === 'private-password' && !('apiKey' in message.input.connection) && !('endpoint' in message.input) && !message.input.environment && !process.env.OPENAI_API_KEY;
   process.send({id:message.id, result:{protocol:1,generation:valid?message.input.generation:-1,chat:message.input.chat,ready:true}});
  }
  if (message.operation === 'close') { process.send({id:message.id,result:{closed:true}},()=>process.disconnect()); }
@@ -32,7 +32,7 @@ process.on('message', message => {
       chat: "one",
       environment: { ...process.env, OPENAI_API_KEY: "provider-secret-must-not-reach-runtime" },
       endpoint: "https://example.test/mcp",
-      connection: { apiKey: "private-key", password: "", url: "http://example.test", username: "user" },
+      connection: { apiKey: "private-key", password: "private-password", url: "http://example.test", username: "user" },
     })
     expect(child.ready).toMatchObject({ generation: 7, ready: true })
     await child.close()
@@ -46,7 +46,7 @@ process.on('message', message => {
         generation: 7,
         chat: "one",
         endpoint: "https://example.test/mcp",
-        connection: { apiKey: "wrong", password: "", url: "http://example.test", username: "user" },
+        connection: { apiKey: "wrong", password: "wrong", url: "http://example.test", username: "user" },
       }),
     ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
   } finally {

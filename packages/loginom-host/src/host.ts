@@ -84,7 +84,7 @@ export async function createLoginomHost(options: {
         stateDir: join(root, validation ? "validation" : "runtime"),
         generation: connection.generation,
         chat,
-        connection,
+        connection: { password: connection.password, url: connection.url, username: connection.username },
         validation,
         // CLI applies its explicit browser policy to validation too; Desktop
         // retains quiet validation while Help readiness stays browser-free.
@@ -92,7 +92,6 @@ export async function createLoginomHost(options: {
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
-        endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
         ...(deadline !== undefined ? { startupDeadline: deadline } : {}),

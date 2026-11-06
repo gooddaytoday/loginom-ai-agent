@@ -153,7 +153,7 @@ export declare function createCloudAuth(options: CloudAuthOptions): Promise<Clou
 
 **Interfaces:** Удалить endpoint/apiKey из payload **managed browser**, сохранить их в `superviseKnowledge`. `createBridge` распознаёт `config.mode === "executor-replay" && config.resultProfile === "user-v1" && config.bundledCatalog === true && managedBrowserTransport`; другие режимы используют прежний remote startup.
 
-- [ ] **1. RED:** В `support/bundled-catalog-bridge.mjs` существующий `ExternalClient` разрешает только browser client. Убрать endpoint/apiKey из его `config`; остальные bundled fixture и metadata assertions оставить:
+- [x] **1. RED:** В `support/bundled-catalog-bridge.mjs` существующий `ExternalClient` разрешает только browser client. Убрать endpoint/apiKey из его `config`; остальные bundled fixture и metadata assertions оставить:
 
 ```js
 constructor(identity) {
@@ -163,8 +163,8 @@ constructor(identity) {
 ```
 
 Это проверяет startup реального bridge, включая pin локального каталога и close. Существующий `reads` остаётся пустым.
-- [ ] **2. Запустить RED:** из `packages/loginom-runtime/client`: `node --test test/bundled-catalog-bridge.test.mjs`; ожидается `Remote Dock must not start`.
-- [ ] **3. GREEN:** Ограничить существующие connect/list ветки условием:
+- [x] **2. Запустить RED:** из `packages/loginom-runtime/client`: `node --test test/bundled-catalog-bridge.test.mjs`; ожидается `Remote Dock must not start`.
+- [x] **3. GREEN:** Ограничить существующие connect/list ветки условием:
 
 ```js
 const localOnly = config.mode === 'executor-replay'
@@ -179,8 +179,8 @@ if (!localOnly) connections.push(connectRemote(() => ({
 ```
 
 Сохранить существующий Promise.allSettled и обработку неуспеха. `remoteTools` при localOnly — `[]`, `readCatalog(remote)` не вызывается; `createRecoveryContext` этому пути не нужен. `pinActionCatalog` использует существующие bundled releases. `closeClients` уже допускает отсутствующий remote. Host и supervisor явно выбирают browser поля без Dock key. Не переделывать classic bridge и не оставлять managed direct remote dispatch доступным через имя инструмента.
-- [ ] **4. Следующий RED→GREEN:** classic/non-bundled fixture по-прежнему выполняет remote handshake; managed prepare выполняет локальное browser действие, никакой Dock ключ не появился в его IPC/env/argv.
-- [ ] **5. Проверка/коммит:** runtime scoped tests и из `packages/loginom-host` `bun test test/prepare-startup.test.ts test/knowledge.test.ts`, `bun typecheck`; `git diff --check`; commit `refactor(loginom): start managed browser without Dock`.
+- [x] **4. Следующий RED→GREEN:** classic/non-bundled fixture по-прежнему выполняет remote handshake; managed prepare выполняет локальное browser действие, никакой Dock ключ не появился в его IPC/env/argv.
+- [x] **5. Проверка/коммит:** runtime scoped tests и из `packages/loginom-host` `bun test test/prepare-startup.test.ts test/knowledge.test.ts`, `bun typecheck`; `git diff --check`; commit `refactor(loginom): start managed browser without Dock`.
 
 ## Task 2: Все Help-чтения ограничены официальной KB
 

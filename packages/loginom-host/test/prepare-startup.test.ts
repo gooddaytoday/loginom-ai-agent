@@ -54,6 +54,11 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
       import { appendFileSync } from 'node:fs';
       process.on('message', m => {
         if (m.operation === 'start') {
+          if ('endpoint' in m.input || 'apiKey' in m.input.connection
+            || process.argv.join(' ').includes('UNIT-NONSECRET') || Object.values(process.env).includes('UNIT-NONSECRET')) {
+            process.send({id:m.id,error:'LOGINOM_HANDSHAKE_INVALID'});
+            return;
+          }
           appendFileSync(${JSON.stringify(join(directory, "startup.json"))}, JSON.stringify({deadline:m.input.startupDeadline})+'\\n');
           process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
         }

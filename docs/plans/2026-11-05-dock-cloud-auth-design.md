@@ -1,6 +1,6 @@
 # Проектирование и проверка подключения к Loginom AI
 
-Ветка `dock-cloud-auth`, база `loginom` (`dd2f949d11`). Код продукта не изменялся.
+Ветка `dock-cloud-auth`, база `loginom` (`dd2f949d11`). Ход реализации — в checkpoints ниже.
 Канонические решения: [спецификация](../superpowers/specs/2026-11-05-dock-cloud-auth-design.md).
 Этот файл содержит план работы и свидетельства проверки, не вторую спецификацию.
 
@@ -145,3 +145,30 @@ Better Auth остаётся предложением вне текущего о
 TUI cancellation явно охватывает startup/cleanup и передаёт управление обычному
 чату после успеха. Проверены структура, ссылки, типы commits и git diff --check.
 Runtime/сборки/production не запускались. Следующий шаг — выполнение Task1.
+
+## Checkpoint исполнения — 2026-11-06
+
+- SHA: `fd489f49a1`, ветка `dock-cloud-auth`; исходный worktree чистый.
+- Прочитан файл цели; выполнение Task1 ещё не начато, implementation checkboxes не изменены.
+- Обе разрешённые копии Node совпадают с закреплённым SHA-256 Node 24.19.0.
+- Блокер: в текущей сессии Codex не зарегистрированы OpenViking search/read tools.
+- `ov-memory-doctor` без proxy env: timeout; с `NODE_USE_ENV_PROXY=1`: exit 0,
+  credentials приняты, status 200, MCP tools/list 24, все подсистемы ready исправны.
+- Это подтверждает доступность сервера, но не доступ к памяти из Agent runtime.
+- Согласно пользовательским AGENTS-инструкциям работа остановлена при недоступности памяти.
+- Следующий шаг: восстановить MCP-инструменты в сессии либо получить разрешение
+  владельца продолжить без памяти; затем дочитать spec/plan и выполнить Task1.
+
+## Checkpoint Task 1 — 2026-11-06
+
+- SHA базы: `fd489f49a1`; результат фиксируется коммитом `refactor(loginom): start managed browser without Dock`.
+- OpenViking восстановлен: настоящие actor search и exact read успешны; блокер снят.
+- Независимое ревью полного плана/spec и источников Task1–2: Approved.
+- Pre-flight: 1→2 browser/Help разделены; 3→6 mode/check/view согласованы со всеми consumers;
+  4→5→7 cloud-store/auth/recovery; 6→8→10/11 API; 9→13 proxy/tuple; 12→13 harness; 2→14 scope.
+- Исполнение inline (executing-plans), ledger — этот журнал; временные материалы только в storage/tmp.
+- RED→GREEN: remote startup запрещён; browser IPC/env/argv без Dock key; local prepare и диагностика без remote probe.
+- Runtime: pinned Node, bundled/bridge/classic/user-profile — 20 PASS; Host prepare/knowledge/process — 16 PASS.
+- `bun typecheck` Host и `git diff --check`: PASS. Зависимости установлены по frozen lock, pins не менялись.
+- Ограничения: проверки source/fixtures, установленный GUI и native Windows/macOS этим не подтверждены.
+- Следующий шаг: Task2, ограничить семь Help-чтений официальной KB.
