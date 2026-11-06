@@ -36,6 +36,14 @@ test('LGD native source inventory omits kind while target retains observed kind 
  }
 });
 const request=type=>({target:{kind:'new',type},inputs:type==='exports.lgd'?[{}]:[],mappings:[],read:{ports:type==='exports.lgd'?[]:[0],sample_rows:0,require_exact_numbers:false}});
+test('LGD source binding requires a verified file and the native ordinary variable input',()=>{
+ const source={artifact_id:'fixture',upload_operation_id:'delivery'};
+ const r={...request('imports.lgd'),variable_inputs:[{kind:'variables',input:0,output:0}]};
+ const p={source,lgd_import:{checksum:'verify',bindings:{source_path:{variable:'SourceFile'}}}};
+ assert.doesNotThrow(()=>validateLgdImportParameters(p,'native',r));
+ for(const changed of [{...p,source:undefined},{...p,lgd_import:{checksum:'verify',bindings:{source_path:{variable:'bad name'}}}}])assert.throws(()=>validateLgdImportParameters(changed,'native',r));
+ assert.throws(()=>validateLgdImportParameters(p,'native',{...r,variable_inputs:[{kind:'control',input:0,output:0}]}));
+});
 test('LGD checksum refusal releases only a proven discarded own wizard and never executes',async()=>{
  for(const foreign of [false,true]){
   const node={document_id:'doc',workflow_id:'workflow',node_id:'node'},operation={id:'lgd-corrupt'},phases=[];

@@ -179,7 +179,7 @@ page = context.pages()[0]
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
-  if(expected.lgd&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
+  if(expected.lgd&&!expected.lgd.source_variable&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');
@@ -450,7 +450,8 @@ page = context.pages()[0]
   }
   }
   // LGD sources materialize their output definitions on the first cold Execute.
-  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected,outputProperties:true});
+  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin,outputProperties:true});
+  if(expected.lgd?.source_variable)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
   // REST-dependent schemas are restored by cold execution. Inspect the saved
   // export input only after its source has executed and its output was read.
   if(exportInput){
