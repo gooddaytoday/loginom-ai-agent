@@ -2220,6 +2220,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
         const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
           record:nodeTargetRecord,deadline:now()+15000});
+        if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase.move_mismatch&&!operation.targetPhase.pending){
+          const outcome={...operation.outcome.output,status:'FAILED',pending_phase:null,cleanup_complete:true,
+            error:{code:'NODE_APPLY_STOPPED',message:result.error}};
+          const event={operation_id:operation.id,action_key:'node.apply',action_revision:state.request.contract_revision,
+            phase:'node_checkpoint',signature:state.signature,result:outcome};
+          const ack=await onRecord(event);
+          if(!ack||fingerprint('ack',ack.result)!==fingerprint('ack',event.result))throw Error('Node target failure journal acknowledgement differs');
+          state.pending=null;state.cleanup_complete=true;state.result=structuredClone(outcome);
+        }
         if(result.cleanup_complete===true && !operation.targetPhase.pending
           && (result.resume_available===true || result.status==='SUCCEEDED')){
           // Only child effects have been reconciled. The node remains pending
@@ -2255,7 +2264,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const result=await inspectNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,deadline:now()+15000});
     const outcome=nodeTargetOutcome(operation,result);await remember(operation,'reconciled',outcome);
     operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
-    if(result.status==='SUCCEEDED')pending=null;
+    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
     return outcome;
   };
   const reconcilePending = async () => {
@@ -3753,6 +3762,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
+              if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
+                error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
+                  settings_unchanged:true,verification:'node_move_position_mismatch'};
               if(result.status==='NOT_APPLIED' && result.partial_effect===false && result.cleanup_complete===true
                 && operation.targetPhase?.effect_possible===false && !operation.targetPhase?.pending){
                 if(preflight?.effect_possible!==true)
