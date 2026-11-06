@@ -106,11 +106,10 @@ def fixtures():
     assert len(a) == len(b)
     assert [i for i, pair in enumerate(zip(a,b)) if pair[0] != pair[1]] == [320]
     assert a[320] ^ b[320] == 1
-
-    manifest = ROOT / "fixtures/64bit/files.json"
-    if manifest.exists():
-        for entry in json.loads(manifest.read_text())["files"]:
-            data = (manifest.parent / entry["name"]).read_bytes()
+    compression = ROOT / "fixtures/64bit/files.json"
+    if compression.exists():
+        for entry in json.loads(compression.read_text())["files"]:
+            data = (compression.parent / entry["name"]).read_bytes()
             assert len(data) == entry["bytes"]
             assert hashlib.sha256(data).hexdigest() == entry["sha256"]
     manifest = ROOT / "fixtures/variable/files.json"
@@ -137,6 +136,26 @@ def variable_expectations(final):
         result["lgd"] = {"kind": "variable", "source_variable": "SourceFile", "filename": "variable-b.lgd", "columns": spec["columns"],
                          "source_switch": {"before": "variable-a.lgd", "after": "variable-b.lgd", "variable": "SourceFile"}}
     return result
+
+
+def compression_expectations():
+    spec = table(ROOT, "properties-values.csv", "properties-schema.json")
+    for column in spec["columns"]:
+        if column["type"] != "real":
+            column.pop("tolerance", None)
+    rows = [dict(zip([c["name"] for c in spec["columns"]], row)) for row in spec["rows"]]
+    cases = [("Без сжатия", "Без сжатия", "Нет", "compression-none.lgd"),
+             ("LZO", "LZO", "Нет", "compression-lzo.lgd"),
+             ("LZ4", "LZ4", "Сжатых данных", "compression-lz4.lgd")]
+    return {"package_path": "{{PACKAGE_PATH}}",
+            "nodes": [{"type": "imports.lgd", "label": label} for label, _, _, _ in cases],
+            "lgd": {"kind": "compression", "imports": [
+                {"label": label, "compression": compression, "bitness": "64-битная система",
+                 "written_checksum": checksum, "checksum": True, "filename": filename, "columns": spec["columns"]}
+                for label, compression, checksum, filename in cases]},
+            "outputs": [{"output_node_type": "imports.lgd", "output_node_label": label,
+                         "output_port": 0, "ordered": True, "column_order": "exact",
+                         "columns": spec["columns"], "rows": rows} for label, _, _, _ in cases]}
 
 
 def checksum_expectations():
@@ -172,6 +191,7 @@ if __name__ == "__main__":
                         (EXPORT / "acceptance/expected.json", exported),
                         (ROOT / "acceptance/variable/expected.json", variable_expectations(True)),
                         (ROOT / "acceptance/variable/expected-initial.json", variable_expectations(False)),
+                        (ROOT / "acceptance/compression/expected.json", compression_expectations()),
                         (ROOT / "acceptance/checksum/expected.json", checksum_expectations())]:
         if args.write:
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
