@@ -4,7 +4,7 @@ import {chromium} from 'playwright-core';
 import {configureLgdImportBrowser} from '../lib/lgd-import-procedure.mjs';
 test('native LGD import retains properties, checks corruption and refuses a foreign owner',async t=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
- for(const fault of [null,'header_pending','corrupt','corrupt_early','corrupt_preview','owner']){
+ for(const fault of [null,'header_pending','corrupt','corrupt_early','corrupt_preview','owner','source_variable','unverified_source_variable']){
   const page=await browser.newPage();t.after(()=>page.close());
   await page.route('http://lgd.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('http://lgd.test/');
   await page.evaluate(fault=>{
@@ -14,9 +14,17 @@ test('native LGD import retains properties, checks corruption and refuses a fore
    const make=(id,value)=>{const e=document.createElement('div');e.id='c'+components.size;e.dataset.tid=card.dataset.tid+';'+id;card.append(e);
     const input=document.createElement('input');input.type=typeof value==='boolean'?'checkbox':'text';input.value=String(value);input.checked=value===true;e.append(input);
     components.set(e.id,{el:{dom:e},inputEl:{dom:input},getValue:()=>typeof value==='boolean'?input.checked:input.value,getRawValue:()=>typeof value==='boolean'?input.checked:input.value,pressed:false});
-    if(id.endsWith(';ValueControl')){const s=document.createElement('div');s.id='s'+components.size;s.dataset.tid=e.dataset.tid.replace(';ValueControl',';SwitchButton');card.append(s);components.set(s.id,{pressed:false});}
+    if(id.endsWith(';ValueControl')){const s=document.createElement('div');s.id='s'+components.size;s.dataset.tid=e.dataset.tid.replace(';ValueControl',';SwitchButton');card.append(s);components.set(s.id,{pressed:false,el:{dom:s}});}
    };
    for(const [id,v]of Object.entries({'edtFileName;ValueControl':'','edtUseChecksum;ValueControl':true,edtConnection:'Локальное',edtCompression:fault==='header_pending'||fault==='corrupt_early'?'':'LZ4',edtDDFSystem:'64-битная система',edtWrittenChecksum:'Сжатых данных'}))make(id,v);
+   if(['source_variable','unverified_source_variable'].includes(fault)){
+    const button=card.querySelector('[data-tid$=";edtFileName;SwitchButton"]');components.get(button.id).pressed=true;
+    const staticField=card.querySelector('[data-tid$=";edtFileName;ValueControl"]');staticField.style.display='none';
+    const variable=document.createElement('div');variable.id='variable-file';variable.dataset.tid=card.dataset.tid+';edtFileName;VariableControl';card.append(variable);
+    const proxy={},record={data:{field1:proxy,field2:'SourceFile ( /own/source.lgd )'}};
+    const input=document.createElement('input');input.value=record.data.field2;variable.append(input);
+    components.set(variable.id,{el:{dom:variable},inputEl:{dom:input},getValue:()=>proxy,getRawValue:()=>record.data.field2,getStore:()=>({getData:()=>({items:[record]})})});
+   }
    const pages={ImportNativePreviewWizard:card};
    for(const id of ['ColumnsMappingEngineOutputPortWizard','DoneWizard']){const e=document.createElement('div');e.dataset.tid=root.dataset.tid+';'+id;e.textContent=id;e.style.display='none';root.append(e);pages[id]=e;}
    const error=document.createElement('button');error.dataset.tid=root.dataset.tid+';btnError';error.dataset.qtip='Контрольная сумма блока не совпадает';error.style.display='none';root.append(error);
@@ -35,9 +43,11 @@ test('native LGD import retains properties, checks corruption and refuses a fore
    const workspace={getActiveTab:()=>({Controller:{FController:model}})};
    globalThis.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
   },fault);
-  const task={document_id:'doc',workflow_ref:{prefix:'MF;TF-1'},node:{node_id:'node'},source_path:'/own/source.lgd',checksum:'verify',origin:'http://lgd.test',build:'7.4.2',deadline:Date.now()+5000};
+  const task={document_id:'doc',workflow_ref:{prefix:'MF;TF-1'},node:{node_id:'node'},source_path:fault==='unverified_source_variable'?undefined:'/own/source.lgd',variables:[{id:0,name:'SourceFile',label:'SourceFile',type:5,value:'/own/source.lgd',is_null:false,source:{name:'SourceFile',type:5}}],checksum:'verify',origin:'http://lgd.test',build:'7.4.2',deadline:Date.now()+5000};
   const result=await configureLgdImportBrowser(page,task,async()=>({verified:fault!=='owner',surface:'wizard',node_id:'node'}));
-  assert.equal(result.verified,fault===null||fault==='header_pending');
+  assert.equal(result.verified,[null,'header_pending','source_variable'].includes(fault),JSON.stringify({fault,result}));
+  if(fault==='source_variable'){assert.equal(result.configuration.source.source_path,'/own/source.lgd');assert.equal(result.configuration.source.source_variable,'SourceFile');}
+  if(fault==='unverified_source_variable'){assert.match(result.error,/exact verified file/);assert.equal(await page.evaluate(()=>globalThis.nexts),0);}
   if(!fault||fault==='header_pending'){assert.equal(result.configuration.source.source_path,'/own/source.lgd');assert.equal(result.configuration.source.checksum,true);assert.equal(result.configuration.source.compression,'LZ4');}
   if(fault?.startsWith('corrupt')){assert.match(result.error,/Контрольная сумма/);assert.equal(result.configuration,undefined);}
   if(fault==='corrupt_early')assert.equal(await page.evaluate(()=>globalThis.nexts),0);

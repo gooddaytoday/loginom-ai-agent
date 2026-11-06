@@ -5,7 +5,7 @@ export function verifyLgdFields(fields,expected){
   &&f.data_kind===({discrete:'Дискретный',continuous:'Непрерывный'}[expected[i].data_kind]??expected[i].data_kind)))throw Error('LGD_COLD_FIELD_PROPERTIES');
  return true;
 }
-export async function inspectSavedLgd({load,graph,channelFor,execute,expected,outputProperties=false}){
+export async function inspectSavedLgd({load,graph,channelFor,execute,expected,origin,outputProperties=false}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
@@ -18,21 +18,42 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
   const graphState=await channel.observe({condition:'LGD cold own source',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
   await selectPreparedGraphNode(channel,graphState,'cold select LGD source',{refreshReplacedBody:true});
   if(!outputProperties){
+  const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
+  let variables=[];
+  if(expected.lgd.source_variable){
+   const {configureVariablePortMapping}=await load('client/lib/variable-port-mapping.mjs');
+   const {openPreparedOutputPort}=await load('client/lib/node-port-open.mjs');
+   const {decodePortCell}=await load('client/lib/node-port-output.mjs');
+   const task={binding,mapping:{direction:'input',kind:'variables',port:0},read_only:true,origin,build:'7.4.2',operation_id:'lgd-cold-variable-'+target.ref.node_id,deadline:Date.now()+300000};
+   const result=await execute(`async page=>(${configureVariablePortMapping.toString()})(page,${JSON.stringify(task)},${readPreparedNodeContext.toString()},${openPreparedOutputPort.toString()},${decodePortCell.toString()})`);
+   if(!result.verified||!result.cleanup_complete)throw Error('LGD_COLD_VARIABLE_MAPPING');
+   variables=result.mapping.fields.filter(v=>v.type===5&&!v.is_null&&v.source?.type===5);
+  }
   await openPreparedWizard(channel);
   const s=await channel.observe({condition:'LGD cold source settings',ready:s=>s.wizard?.stage==='lgd_import'});
-  const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
   const values=await execute(`async page=>{
    const b=${JSON.stringify(binding)},before=await (${readPreparedNodeContext.toString()})(page,b);
    if(!before.verified||before.surface!=='wizard')throw Error('LGD_COLD_OWNER');
-   const r=await page.evaluate(base=>{
+   const r=await page.evaluate(({base,variables})=>{
     const read=id=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(base+id)+']'),c=es.length===1&&Ext.getCmp(es[0].id);if(c?.el?.dom!==es[0])throw Error('LGD_COLD_CONTROL');return c.getValue();};
-    return {path:read('edtFileName;ValueControl'),checksum:read('edtUseChecksum;ValueControl'),compression:read('edtCompression'),written_checksum:read('edtWrittenChecksum')};
-   },b.workflow_ref.prefix+';WizrdMCF;ImportNativePreviewWizard;');
+    const buttons=document.querySelectorAll('[data-tid='+JSON.stringify(base+'edtFileName;SwitchButton')+']'),button=buttons.length===1&&Ext.getCmp(buttons[0].id);
+    if(!button||button.el.dom!==buttons[0]||typeof button.pressed!=='boolean')throw Error('LGD_COLD_BINDING_MODE');
+    let path,source_variable;
+    if(button.pressed){
+     const es=document.querySelectorAll('[data-tid='+JSON.stringify(base+'edtFileName;VariableControl')+']'),c=es.length===1&&Ext.getCmp(es[0].id);
+     if(!c||c.el.dom!==es[0])throw Error('LGD_COLD_BINDING_OWNER');
+     const rows=c.getStore().getData().items.filter(r=>r.data.field1===c.getValue());
+     const matches=variables.filter(v=>rows.length===1&&rows[0].data.field2===v.label+' ( '+v.value+' )');
+     if(matches.length!==1)throw Error('LGD_COLD_BINDING_VARIABLE');path=matches[0].value;source_variable=matches[0].name;
+    }else path=read('edtFileName;ValueControl');
+    return {path,source_variable,checksum:read('edtUseChecksum;ValueControl'),compression:read('edtCompression'),written_checksum:read('edtWrittenChecksum')};
+   },{base:b.workflow_ref.prefix+';WizrdMCF;ImportNativePreviewWizard;',variables:${JSON.stringify(variables)}});
    const after=await (${readPreparedNodeContext.toString()})(page,b);
    if(JSON.stringify(before)!==JSON.stringify(after))throw Error('LGD_COLD_OWNER_CHANGED');return r;
   }`);
   if(values.checksum!==true||values.compression!=='LZ4'||values.written_checksum!=='Сжатых данных'||!/\.lgd$/i.test(values.path)
-   ||expected.lgd.destination&&values.path!==expected.lgd.destination)throw Error('LGD_COLD_SOURCE_SETTINGS');
+   ||expected.lgd.destination&&values.path!==expected.lgd.destination||expected.lgd.source_variable&&values.source_variable!==expected.lgd.source_variable
+   ||expected.lgd.filename&&!values.path.endsWith('-'+expected.lgd.filename))throw Error('LGD_COLD_SOURCE_SETTINGS');
   const closed=await closePreparedWizard(channel);if(!closed.verified||closed.settings_applied!==false)throw Error('LGD_COLD_CANCEL');
   }else{
   await channel.openOutputPort(0);

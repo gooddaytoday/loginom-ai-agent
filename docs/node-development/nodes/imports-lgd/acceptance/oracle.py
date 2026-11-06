@@ -107,6 +107,31 @@ def fixtures():
     assert [i for i, pair in enumerate(zip(a,b)) if pair[0] != pair[1]] == [320]
     assert a[320] ^ b[320] == 1
 
+    manifest = ROOT / "fixtures/variable/files.json"
+    if manifest.exists():
+        for entry in json.loads(manifest.read_text())["files"]:
+            data = (manifest.parent / entry["name"]).read_bytes()
+            assert len(data) == entry["bytes"]
+            assert hashlib.sha256(data).hexdigest() == entry["sha256"]
+
+
+def variable_expectations(final):
+    spec = table(ROOT, "properties-values.csv", "properties-schema.json")
+    for column in spec["columns"]:
+        if column["type"] != "real":
+            column.pop("tolerance", None)
+    rows = [dict(zip([c["name"] for c in spec["columns"]], row)) for row in spec["rows"]]
+    result = {"package_path": "{{PACKAGE_PATH}}", "nodes": [
+        {"type": "imports.lgd", "label_any": True}, {"type": "variables.calculator", "label_any": True}],
+        "outputs": [{"output_node_type": "imports.lgd", "output_port": 0, "ordered": True,
+                     "column_order": "exact", "columns": spec["columns"], "rows": rows}]}
+    if final:
+        for row in rows:
+            row["RecordId"] += 10
+        result["lgd"] = {"kind": "variable", "source_variable": "SourceFile", "filename": "variable-b.lgd", "columns": spec["columns"],
+                         "source_switch": {"before": "variable-a.lgd", "after": "variable-b.lgd", "variable": "SourceFile"}}
+    return result
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -117,8 +142,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     fixtures()
     imported, exported = expectations()
-    for folder, value in [(ROOT, imported), (EXPORT, exported)]:
-        path = folder / "acceptance/expected.json"
+    for path, value in [(ROOT / "acceptance/expected.json", imported),
+                        (EXPORT / "acceptance/expected.json", exported),
+                        (ROOT / "acceptance/variable/expected.json", variable_expectations(True)),
+                        (ROOT / "acceptance/variable/expected-initial.json", variable_expectations(False))]:
         if args.write:
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
         if args.check:

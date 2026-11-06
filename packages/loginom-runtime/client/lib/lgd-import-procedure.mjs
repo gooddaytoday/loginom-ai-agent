@@ -26,22 +26,55 @@ export async function configureLgdImportBrowser(page,t,readContext){
    return r.width>0&&r.height>0&&h&&(h===e||e.contains(h))&&!e.closest('.x-item-disabled,.x-btn-disabled')?{x,y}:null;
   }));};
   const click=async l=>{const p=await point(l);await guard();effect=true;await page.mouse.click(p.x,p.y);};
-  const native=async()=>{await quiet();await guard();return page.evaluate(file=>{
+  const fileMode=async()=>{await quiet();await guard();return page.evaluate(file=>{
+   const root=document.querySelector('[data-tid='+JSON.stringify(file.slice(0,-1))+']'),e=root?.querySelector('[data-tid='+JSON.stringify(file+'edtFileName;SwitchButton')+']'),c=e&&Ext.getCmp(e.id);
+   if(!c||c.el.dom!==e||typeof c.pressed!=='boolean')throw Error('LGD filename mode owner changed');return c.pressed;
+  },file);};
+  const native=async()=>{await quiet();await guard();return page.evaluate(({file,variables})=>{
    const root=document.querySelector('[data-tid='+JSON.stringify(file.slice(0,-1))+']');
+   let source_variable;
    const read=(id,variable=false)=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+id)+']'),e=es[0],c=e&&Ext.getCmp(e.id);
     if(es.length!==1||!root?.contains(e)||c?.el?.dom!==e)throw Error('LGD field owner changed');
-    if(variable){const s=document.querySelector('[data-tid='+JSON.stringify(file+id.replace(';ValueControl',';SwitchButton'))+']');if(!s||Ext.getCmp(s.id)?.pressed!==false)throw Error('LGD variables unsupported');}
+    if(variable){const s=document.querySelector('[data-tid='+JSON.stringify(file+id.replace(';ValueControl',';SwitchButton'))+']');if(!s||!root.contains(s)||typeof Ext.getCmp(s.id)?.pressed!=='boolean')throw Error('LGD variable mode unavailable');
+     if(Ext.getCmp(s.id).pressed){
+      if(id!=='edtFileName;ValueControl')throw Error('LGD checksum variables unsupported');
+      const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+'edtFileName;VariableControl')+']'),e=es[0],combo=e&&Ext.getCmp(e.id);
+      if(es.length!==1||!root.contains(e)||combo?.el.dom!==e)throw Error('LGD filename variable owner changed');
+      if(combo.inputEl?.dom&&typeof combo.getRawValue?.()==='string'&&combo.inputEl.dom.value!==combo.getRawValue())throw Error('LGD uncommitted filename variable');
+      const rows=combo.getStore().getData().items.filter(r=>r.data.field1===combo.getValue());
+      const chosen=variables.filter(v=>v.type===5&&!v.is_null&&v.source?.type===5&&rows.length===1&&rows[0].data.field2===v.label+' ( '+v.value+' )');
+      if(chosen.length!==1||typeof chosen[0].value!=='string'||!/^\/(?!\/)/.test(chosen[0].value)||!/\.lgd$/i.test(chosen[0].value))throw Error('LGD selected filename variable is not a verified mapped string');
+      source_variable=chosen[0].name;return chosen[0].value;
+     }
+    }
     const value=c.getValue();if(!['string','boolean'].includes(typeof value))throw Error('LGD field value unavailable');
     if(c.inputEl?.dom&&typeof c.getRawValue?.()==='string'&&c.inputEl.dom.value!==c.getRawValue())throw Error('LGD uncommitted field');return value;};
-   return {source_path:read('edtFileName;ValueControl',true),checksum:read('edtUseChecksum;ValueControl',true),compression:read('edtCompression'),bitness:read('edtDDFSystem'),written_checksum:read('edtWrittenChecksum'),connection:read('edtConnection')};
-  },file);};
-  await wait('source page',()=>find(file+'edtFileName;ValueControl').isVisible());
-  if(t.source_path!==undefined){
+   const source_path=read('edtFileName;ValueControl',true);
+   return {source_path,...(source_variable?{source_variable}:{}),checksum:read('edtUseChecksum;ValueControl',true),compression:read('edtCompression'),bitness:read('edtDDFSystem'),written_checksum:read('edtWrittenChecksum'),connection:read('edtConnection')};
+  },{file,variables:t.variables??[]});};
+  await wait('source page',async()=>await find(file.slice(0,-1)).isVisible()&&await find(file+'edtFileName;SwitchButton').count()===1);
+  if(t.source_binding!==undefined){
+   const chosen=(t.variables??[]).filter(v=>v.name===t.source_binding&&v.type===5&&!v.is_null&&v.source?.type===5&&typeof v.value==='string');
+   need(chosen.length===1&&chosen[0].value===t.source_path,'binding must select the exact verified source path');
+   if(!await fileMode())await click(find(file+'edtFileName;SwitchButton'));
+   await click(find(file+'edtFileName;VariableControl;trg_picker'));
+   const tid=await page.evaluate(({file,chosen})=>{
+    const root=document.querySelector('[data-tid='+JSON.stringify(file.slice(0,-1))+']'),es=document.querySelectorAll('[data-tid='+JSON.stringify(file+'edtFileName;VariableControl')+']'),e=es[0],c=e&&Ext.getCmp(e.id);
+    if(es.length!==1||!root.contains(e)||c?.el.dom!==e)throw Error('LGD binding picker owner changed');
+    const rows=c.getStore().getData().items.filter(r=>r.data.field2===chosen.label+' ( '+chosen.value+' )'),picker=c.picker,item=rows.length===1&&picker?.getNode(rows[0]);
+    if(!item||picker.getRecord(item)!==rows[0]||!picker.el.dom.contains(item))throw Error('LGD binding option ambiguous');
+    return item.getAttribute('data-tid');
+   },{file,chosen:chosen[0]});
+   need(typeof tid==='string'&&tid.startsWith(file+'edtFileName;VariableControl;boundlist;'),'LGD bound option identity required');await click(find(tid));
+  }
+  if(t.source_path!==undefined&&!await fileMode()){
    need(typeof t.source_path==='string'&&/^\/(?!\/)/.test(t.source_path)&&/\.lgd$/i.test(t.source_path),'verified .lgd source required');
    const l=find(file+'edtFileName;ValueControl').locator('input');
    if(await l.inputValue()!==t.source_path){await point(l);await guard();effect=true;await l.fill(t.source_path);await l.press('Tab');}
   }
   let observed=await native();
+  need(!observed.source_variable||observed.source_path===t.source_path,'filename variable requires source for the exact verified file; the binding is preserved');
+  need(t.source_binding===undefined||observed.source_variable===t.source_binding,'selected source binding changed');
   if(t.checksum==='verify'&&observed.checksum===false){await click(find(file+'edtUseChecksum;ValueControl'));observed=await native();}
   need(observed.checksum===true&&observed.connection==='Локальное','checksum verify and local file storage required');
   need(t.source_path===undefined||observed.source_path===t.source_path,'source changed');
@@ -56,9 +89,9 @@ export async function configureLgdImportBrowser(page,t,readContext){
    return await find(root+';'+target).isVisible()&&await page.evaluate(target=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().el.dom.getAttribute('data-tid').endsWith(';'+target),target);
   });};
   await advance('ColumnsMappingEngineOutputPortWizard');
-  const selectedSource=observed.source_path;
+  const selectedSource=observed;
   observed=await native();
-  need(observed.source_path===selectedSource&&observed.checksum===true&&observed.connection==='Локальное','source or checksum changed during native validation');
+  need(observed.source_path===selectedSource.source_path&&observed.source_variable===selectedSource.source_variable&&observed.checksum===true&&observed.connection==='Локальное','source or checksum changed during native validation');
   need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported retained native LGD format');
   await advance('DoneWizard');
   return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source:observed}};

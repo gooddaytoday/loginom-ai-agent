@@ -6,6 +6,21 @@ from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
+    def test_variable_switch_requires_same_node_fresh_executions_and_both_bound_paths(self):
+        def result(file, execution, node='same', variable='SourceFile'):
+            return {'status': 'SUCCEEDED', 'cleanup_complete': True, 'node': {'node_id': node},
+                    'configuration': {'readback': {'kind': 'lgd_import', 'source': {'source_path': '/own/hash-' + file, 'source_variable': variable}}},
+                    'execution': {'status': 'completed', 'execution_id': execution},
+                    'output': {'ports': [{'port': 0, 'schema': [], 'sample': [], 'sample_complete': True,
+                                          'freshness_basis': 'completed_execution_port_source'}]}}
+        switch = {'before': 'a.lgd', 'after': 'b.lgd', 'variable': 'SourceFile'}
+        first = result('a.lgd', 'one')
+        runner.check_lgd_variable_switch([(1, first), (2, result('b.lgd', 'two'))], switch)
+        for second in [result('b.lgd', 'one'), result('b.lgd', 'two', 'foreign'),
+                       result('b.lgd', 'two', variable='Other'), result('a.lgd', 'two')]:
+            with self.assertRaisesRegex(AssertionError, 'SAME_NODE_MISSING'):
+                runner.check_lgd_variable_switch([(1, first), (2, second)], switch)
+
     def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
         reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
                  'configuration': {'readback': {'kind': 'lgd_import'}},
