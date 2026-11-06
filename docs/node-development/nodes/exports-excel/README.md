@@ -4,9 +4,18 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; этап 0 LAB-641 — `blocked` по общим изменениям. Живое [discovery](discovery.md), [контракт](acceptance/parameter-schema.json) и [приёмочное предложение](acceptance/README.md) подготовлены. Type/mode `exports.excel` / `xlsx` — предложение владельцу. До разрешения observer/lifecycle/cold изменений и утверждения критериев `ready_for_development` не выставляется. Реестр готовности не менялся.
+Зарегистрирован `exports.excel` / `xlsx`. Новая XLSX-книга, один именованный лист; header none/names/labels; overwrite reject; output.file_artifacts, без табличных выходов.
+
+Ограничения: Без append, XLS и числового форматирования; live names/none/empty отдельно не подтверждены.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [exports-excel-node.mjs](../../../../packages/loginom-runtime/client/lib/exports-excel-node.mjs):1–158; [exports-excel-parameters.mjs](../../../../packages/loginom-runtime/client/lib/exports-excel-parameters.mjs):1–36; [exports.excel.md](../../../../packages/product/skills/loginom-automation/references/nodes/exports.excel.md):1–14. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
+
 
 Внешняя среда: сервер Loginom с доступным штатным Excel exporter, собственный каталог экспорта; независимый XLSX reader, а для этапа .xls — квалифицированный XLS reader и подходящий серверный build. Если среда/компонент недоступны — Blocked, документальное покрытие сохраняется.
 
