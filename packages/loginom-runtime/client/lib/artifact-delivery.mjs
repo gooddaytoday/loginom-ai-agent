@@ -158,6 +158,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      requireValue(sameOwner(root),'Delivery toolbar owner changed');
      const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
      const full=await detail(root,toolbar);
+     // Initial roots can precede creation of the first native tab. Confirm
+     // its newly observed owner with fresh roots before authorizing Files.
+     if(r.workflow_ref===null&&full.workflow_ref!=null){
+      const fresh=await roots();
+      requireValue(fresh.dom_epoch?.document===r.dom_epoch.document
+        &&JSON.stringify(fresh.workflow_ref)===JSON.stringify(full.workflow_ref),'Delivery toolbar owner changed');
+      r=fresh;
+     }
      requireValue(sameOwner(full),'Delivery toolbar owner changed');
      // An empty workspace has no tab, even when Files is already reachable.
      // Only detail reads issue tab refs; pin the first one and refuse its loss.

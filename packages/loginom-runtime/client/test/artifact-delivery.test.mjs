@@ -443,6 +443,35 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
 });
 
+for(const fault of [null,'document','workflow'])test('empty workspace toolbar discovery is confirmed by fresh roots: '+fault,async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let roots=0,opened=false;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;
+  s.file_storage={status:'unobserved'};
+  const root=!options.rootRef;
+  if(root){
+   roots++;delete s.active_tab_ref;
+   if(roots===1)s.workflow_ref=null;
+   if(roots>1&&fault==='document')s.dom_epoch.document='foreign';
+   if(roots>1&&fault==='workflow')s.workflow_ref={prefix:'MF;TF-foreign'};
+  }
+  s.ui.elements=root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar'}]:[
+   {ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,
+    allowed_actions:['click'],interaction:{state:'point_observed'}}];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){assert.equal(a.ref,'files');assert.equal(roots,2);opened=true;
+   return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));
+ assert.equal(opened,!fault);assert.equal(f.calls.filter(c=>c==='upload').length,fault?0:1);
+ if(fault)assert.match(result.error.message,/toolbar owner changed/);
+});
+
 test('an inaccessible input folder reports an admitted artifact and never uploads',async()=>{
  const f=fixture(),observe=f.runtime.observe;
  f.runtime.observe=async options=>{
@@ -553,6 +582,32 @@ test('no-effect verification cannot erase an already submitted upload',async()=>
  assert.equal(r.outcome.status,'AMBIGUOUS');assert.equal(r.outcome.upload_submitted_or_unknown,true);
  assert.equal(r.outcome.inspection_required,true);assert.equal(f.service.unsettled,true);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+
+test('native delivery adapter rebinds the first tab before its single Files gesture',async()=>{
+ const vm=await import('node:vm');
+ const {createActionRuntime}=await import('../lib/executor.mjs');
+ const {Page,origin,build}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),toolbar=page.add('div','MF;cntMain;tlbMainToolbar','',{x:0,y:40,width:48,height:700});
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.tab.remove();
+ page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:0,y:240,width:48,height:48},toolbar);
+ const f=fixture(),events=[];
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
+  targetOrigin:origin,targetBuild:build,artifactStore:{getUploadGrant:()=>f.artifact},onRecord:async e=>{
+   events.push(e);
+   // LAB-950 :2 has no tab; :3 discovers the first native tab during detail.
+   if(e.phase==='observation_completed'&&e.outcome.output.workflow_ref===null)page.document.body.append(page.tab);
+   return e;
+  },execute:code=>{
+   // The upload is outside this regression: stop after the real Files gesture.
+   if(page.events.includes('click'))throw Error('End of toolbar regression boundary');
+   return vm.runInContext(`(${code})`,page.context)(page);
+  }});
+ await runtime.deliverArtifact(request);
+ const navigation=events.filter(e=>e.operation_id==='delivery:nav1'&&e.outcome?.status==='SUCCEEDED');
+ assert.equal(navigation.length,1,JSON.stringify(events));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(events.some(e=>e.phase==='artifact_delivery_upload_receipt'),false);
 });
 
 for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files readiness and safe refusal clear the runtime delivery gate: '+mode,async()=>{
