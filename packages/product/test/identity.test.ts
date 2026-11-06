@@ -8,6 +8,14 @@ test("bundled MCP and first-run Loginom defaults use the public service addresse
   expect(Product.connection.url).toBe("https://app.loginom.ai")
 })
 
+test("cloud device and Dock endpoints are fixed product addresses", () => {
+  expect(Product.cloud).toEqual({
+    site: "https://loginom.ai",
+    primary: "https://mcp.loginom.ai/mcp",
+    reserve: "https://mcp-reserve.loginom.ai/mcp",
+  })
+})
+
 test("release channels cannot share application storage identity", () => {
   const channels = ["prod", "beta", "dev"] as const
   expect(new Set(channels.map((channel) => Product.channels[channel])).size).toBe(3)

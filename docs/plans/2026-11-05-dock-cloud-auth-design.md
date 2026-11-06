@@ -220,4 +220,23 @@ Runtime/сборки/production не запускались. Следующий 
 - Host/Desktop `bun typecheck` и `git diff --check` PASS; schema/Protocol/HttpApi не менялись.
 - Поправка порядка: memory/status regression требует controller; перенесён в Task5 явно, store durable semantics проверены здесь.
 - Ограничения: native safeStorage/DPAPI/Keychain, installed GUI, сайт и production не проверены; используются fixtures на Linux.
-- Следующий шаг: независимое ревью Task4, затем Task5 с обязательным memory/status reconciliation regression.
+- Независимое ревью `411fe5f68e`: Spec compliant, Quality Approved; замечаний нет.
+- Следующий шаг: Task5 с обязательным memory/status reconciliation regression.
+
+## Checkpoint Task 5 — 2026-11-06
+
+- SHA базы: `411fe5f68e`; результат — `feat(loginom): implement cloud device authorization client`.
+- Native fetch + schema: device/code → token → full durable pair; публичный status без device/bootstrap/Dock/installation secrets.
+- Fixed Product.cloud tuple; семь точных безопасных cloud-кодов в private IPC allowlist.
+- TDD: interval/slow_down/429/expiry, bounded native requests, cancel/close, URL/redirect/protocol trust и already-connected guard.
+- GET pair/DELETE current используют только installation key; bootstrap revoke привязан к raw token той же device-сессии.
+- Epoch и последовательные writes защищают от старых ответов; отменённый начатый login-write очищается после завершения.
+- Post-rename fsync failure: memory/revision сверяются с actual disk; invalid read-back не активируется; rollback не обещан.
+- Ошибки durable clear не скрываются; remote revoke ограничен5с и возвращает unconfirmed; completed credentials close сохраняет.
+- Host: cloud-auth/cloud-store/transport — 60 PASS / 252 assertions (`--timeout 30000` для filesystem runner); `bun typecheck` и diff-check PASS.
+- Product: genuine RED→GREEN, полный `bun test` — 34 PASS / 96 assertions; `bun typecheck` PASS (root handoff).
+- Evidence и requirement→TDD mapping: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-5-report.md`.
+- Ограничения: localhost synthetic fixtures; Better Auth/site, installed GUI, production/reserve и native ОС не проверялись.
+- Общий shutdown deadline применяется композицией6/7: auth close начинается в beginClose до operation drain; API close() сохранён.
+- Ревью `06a66330bb`: три P1 закрыты тестами45–48 — epoch отзыва, общий cancel/close cleanup, disabled-old read-back.
+- Следующий шаг: scoped re-review исправлений от `06a66330bb`, затем Task6; recovery/cooldown/failover остаются Task7.
