@@ -6,6 +6,16 @@ from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
+    def test_empty_export_is_a_real_zero_row_lgd_roundtrip(self):
+        case = runner.scenario('lgd-export-empty-variant')
+        self.assertEqual(case['lgd'], 'edges')
+        self.assertTrue(case['lgd_empty_variant'])
+        expected = runner.expected_for(case, '/own/empty.lgp')
+        self.assertEqual(expected['outputs'][0]['output_node_type'], 'imports.lgd')
+        self.assertEqual(expected['outputs'][0]['rows'], [])
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['Id', 'Text', 'Amount', 'Occurred', 'Active'])
+        self.assertEqual(case['input_files'], ['typed.csv', 'schema.json'])
+
     def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
         reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
                  'configuration': {'readback': {'kind': 'lgd_import'}},
