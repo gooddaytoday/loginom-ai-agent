@@ -281,7 +281,14 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         return {reachable:p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&!!hit&&(hit===e||e.contains(hit)),
           graph_rect:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight},screen_point:p,hit_inside:!!hit&&(hit===e||e.contains(hit))};
       },{point:placementNavigation.point,scale:placementNavigation.view?.scale,prefix:task.request.workflow_ref.prefix});
-      if(!reachable.reachable){placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};throw new Error('Requested drop surface is not reachable');}
+      if(!reachable.reachable){
+        placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};
+        const v=placementNavigation.view,q=reachable.screen_point,b=reachable.graph_rect;
+        const outside=q.x<b.x||q.y<b.y||q.x>=Math.min(b.x+b.width,reachable.viewport.width)||q.y>=Math.min(b.y+b.height,reachable.viewport.height);
+        throw new Error(outside
+          ? 'Requested position ('+p.position.x+','+p.position.y+') is outside the reachable canvas after bounded native zoom and scroll (scale '+(v.scale*100).toFixed(2)+'%, scroll '+v.scroll.x+','+v.scroll.y+'). Choose a reachable model position or enlarge the canvas; existing nodes were not moved.'
+          : 'Requested drop surface is not reachable');
+      }
       const target=reachable.screen_point;placementNavigation.point=target;
       if(p.type==='exports.text'){
         const args={owner_tid:task.request.workflow_ref.prefix+';ModelForm;pnlVendors;tree',item_tid:palette};

@@ -8,7 +8,7 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlace
 
 // LAB-636 :2567 / LAB-656 DOM: the collapsed workarea splitter starts at
 // y=794, while the requested grid origin projects to y=793.9779209731565.
-for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog'])test('minimum-scale placement under '+cover,{
+for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog','beyond_canvas'])test('minimum-scale placement under '+cover,{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:20000,
 },async()=>{
  const {chromium}=await import('playwright-core');
@@ -48,7 +48,7 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
     globalThis.testGraph.nodes.push({ref:{document_id:'doc',workflow_id:'flow',node_id:'created'},type:'transform.calculator',label:'Calculator',dom_epoch:2,position:{x,y},locked:false,inputs:[0],outputs:[0]});
    });
   },{cover,graph});
-  const root=page.locator('#graph'),position={x:2400,y:1800};
+  const root=page.locator('#graph'),position=cover==='beyond_canvas'?{x:2560,y:400}:{x:2400,y:1800};
   const initial=nodePlacementPoint(await root.evaluate(nodePlacementViewport),position);
   assert.equal(await root.evaluate((e,p)=>e.contains(document.elementFromPoint(p.x,p.y)),initial),false);
   const read=()=>page.evaluate(()=>globalThis.testGraph);
@@ -61,6 +61,13 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
   const drops=await page.evaluate(()=>globalThis.drops);
   assert.equal(drops.length,owned?1:0);
   assert.equal(await page.locator('#outline').isVisible(),false);
+  if(cover==='beyond_canvas'){
+   assert.match(result.error,/position \(2560,400\).*outside.*canvas.*zoom.*scroll/i);
+   assert.match(result.error,/38\.55%/);
+   assert.equal(result.effect_possible,false);
+   assert.deepEqual(await read(),graph);
+   assert.deepEqual(result.placement_refusal.requested_position,position);
+  }
   if(owned){
    assert.equal(drops[0].inside,true);
    assert.deepEqual(result.after.nodes[0].position,position);
