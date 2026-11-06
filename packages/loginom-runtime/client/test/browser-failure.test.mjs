@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {parseCapabilityResult} from '../lib/executor.mjs';
 import {operationFailureDiagnostic} from '../lib/browser-failure.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {createRedactor} from '../lib/redact.mjs';
+import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import vm from 'node:vm';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -71,6 +74,49 @@ test('untyped browser reply retains only bounded text in its private cause',()=>
   assert.ok(!error.cause.message.includes('OMITTED_TAIL'));
   return true;
  });
+});
+
+test('untyped diagnostics redact known secrets before the UTF-8 boundary cuts them',()=>{
+ const secret='PARTIAL_SECRET_THAT_CROSSES_THE_DIAGNOSTIC_BOUNDARY';
+ assert.throws(()=>parseCapabilityResult({content:[{type:'text',text:' '.repeat(2034)+secret}]},
+  {redactor:createRedactor([secret])}),error=>{
+  assert.equal(error.message,'Pinned browser capability returned no typed result');
+  assert.ok(Buffer.byteLength(error.cause.message)<=2048);
+  assert.ok(!error.cause.message.includes('PARTIAL'));
+  assert.ok(error.cause.message.includes('[redacted]'));
+  return true;
+ });
+});
+
+test('real target adapter keeps an untyped move pending and inspects without replay',async()=>{
+ const ref={document_id:'doc',workflow_id:'wf',node_id:'node'};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'},
+  target:{kind:'existing',type:'programming.javascript',ref,position:{x:500,y:300}},inputs:[]};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
+  nodes:[{ref,type:'programming.javascript',label:'Compact',position:{x:240,y:464},dom_epoch:2,locked:false,inputs:[0],outputs:[0]}],links:[],foreign_links:[]};
+ const page={},redactor=createRedactor(['PRIVATE']);let moves=0;
+ const adapter=createNodeTargetBrowserAdapter({origin:'https://loginom.test',build:'7.4.2',execute:async code=>{
+  if(code.includes('async function mutateGraph')){
+   moves++;
+   // MCP may return its modal state without running the submitted capability.
+   // Keep that unknown reply separate from proof of a completed browser effect.
+   return parseCapabilityResult({content:[{type:'text',text:'### Modal state\nconfirm PRIVATE'}]},{redactor});
+  }
+  if(code.includes('async function readGraph'))return structuredClone(graph);
+  return vm.runInNewContext('('+code+')')(page);
+ }});
+ const deadline=Date.now()+10000;
+ await adapter.observe(request,deadline);
+ const effect={id:'move',kind:'move',before:graph,parameters:{ref,position:request.target.position}};
+ await assert.rejects(adapter.mutate(effect,deadline),error=>{
+  assert.equal(error.message,'Pinned browser capability returned no typed result');
+  assert.match(error.cause.message,/Modal state\nconfirm \[redacted\]/);
+  return true;
+ });
+ const receipt=await adapter.reconcile(effect,graph,deadline);
+ assert.equal(receipt.completed,false);assert.equal(receipt.verified,false);
+ assert.equal(receipt.cleanup_complete,false);
+ assert.equal(moves,1);
 });
 
 for(const isError of [true,false])test('private transport journal redacts the retained cause and keeps the public refusal fixed: '+isError,async()=>{

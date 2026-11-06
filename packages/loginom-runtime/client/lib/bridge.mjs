@@ -186,7 +186,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
         } }, undefined, options);
-        try{return parseCapabilityResult(response);}
+        try{return parseCapabilityResult(response,{redactor});}
         catch(error){
           if(error.message==='Pinned browser capability returned no typed result'){
             const cause=redactor.text(error.cause?.message??'');
