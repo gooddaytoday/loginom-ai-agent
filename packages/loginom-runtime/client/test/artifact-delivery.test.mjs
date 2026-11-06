@@ -443,6 +443,34 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
 });
 
+for(const fault of [null,'persistent','owner','tab','uncertain'])test('Files stale-epoch retry retains owner and a bounded gesture proof: '+fault,async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct,attempts=[];let opened=false,reads=0;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;s.file_storage={status:'unobserved'};s.observation_id='toolbar-'+(++reads);
+  if(attempts.length&&fault==='owner')s.dom_epoch.document='foreign';
+  if(attempts.length&&fault==='tab')s.active_tab_ref='foreign';
+  if(!options.rootRef){delete s.active_tab_ref;s.ui.elements=[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar'}];}
+  else s.ui.elements=[{ref:'files-'+reads,tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,
+   allowed_actions:['click'],interaction:{state:'point_observed'}}];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(opened)return act(a,o);
+  attempts.push({id:o.operationId,ref:a.ref,observation:o.observationId});
+  if(fault==='uncertain')return {...noEffect(o.operationId),status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false};
+  if(attempts.length===1||fault==='persistent')return noEffect(o.operationId,{error:{code:'UI_EPOCH_CHANGED'}});
+  opened=true;return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,fault==='uncertain'?'AMBIGUOUS':fault?'NOT_APPLIED':'SUCCEEDED');
+ assert.equal(attempts.length,fault==='persistent'?3:fault?1:2);
+ assert.equal(f.calls.filter(c=>c==='upload').length,fault?0:1);
+ assert.equal(new Set(attempts.map(a=>a.id)).size,attempts.length);
+ assert.equal(new Set(attempts.map(a=>a.ref)).size,attempts.length);
+ assert.equal(new Set(attempts.map(a=>a.observation)).size,attempts.length);
+});
+
 for(const fault of [null,'document','workflow'])test('empty workspace toolbar discovery is confirmed by fresh roots: '+fault,async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let roots=0,opened=false;
  f.runtime.observe=async options=>{
@@ -584,19 +612,23 @@ test('no-effect verification cannot erase an already submitted upload',async()=>
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
 });
 
-test('native delivery adapter rebinds the first tab before its single Files gesture',async()=>{
+for(const stale of [false,true])test('native delivery adapter rebinds the first tab before its single Files gesture; stale='+stale,async()=>{
  const vm=await import('node:vm');
  const {createActionRuntime}=await import('../lib/executor.mjs');
  const {Page,origin,build}=await import('./support/workspace-ui-fixture.mjs');
  const page=new Page(),toolbar=page.add('div','MF;cntMain;tlbMainToolbar','',{x:0,y:40,width:48,height:700});
  page.context.innerWidth=1000;page.context.innerHeight=800;page.tab.remove();
  page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:0,y:240,width:48,height:48},toolbar);
- const f=fixture(),events=[];
+ const f=fixture(),events=[];let invalidated=false;
  const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
   targetOrigin:origin,targetBuild:build,artifactStore:{getUploadGrant:()=>f.artifact},onRecord:async e=>{
    events.push(e);
    // LAB-950 :2 has no tab; :3 discovers the first native tab during detail.
    if(e.phase==='observation_completed'&&e.outcome.output.workflow_ref===null)page.document.body.append(page.tab);
+   if(stale&&!invalidated&&e.phase==='observation_completed'
+     &&e.outcome.output.ui.elements.some(c=>c.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage')){
+    invalidated=true;page.mutationObserver.pending.push({type:'childList',target:toolbar,addedNodes:[],removedNodes:[]});
+   }
    return e;
   },execute:code=>{
    // The upload is outside this regression: stop after the real Files gesture.
@@ -604,8 +636,13 @@ test('native delivery adapter rebinds the first tab before its single Files gest
    return vm.runInContext(`(${code})`,page.context)(page);
   }});
  await runtime.deliverArtifact(request);
- const navigation=events.filter(e=>e.operation_id==='delivery:nav1'&&e.outcome?.status==='SUCCEEDED');
+ const navigation=events.filter(e=>e.operation_id==='delivery:nav'+(stale?2:1)&&e.outcome?.status==='SUCCEEDED');
  assert.equal(navigation.length,1,JSON.stringify(events));
+ if(stale){
+  const refusal=events.find(e=>e.operation_id==='delivery:nav1'&&e.outcome?.status==='NOT_APPLIED')?.outcome;
+  assert.equal(refusal?.error?.code,'UI_EPOCH_CHANGED');
+  assert.equal(refusal.effect_possible,false);assert.equal(refusal.cleanup_complete,true);
+ }
  assert.equal(page.events.filter(e=>e==='click').length,1);
  assert.equal(events.some(e=>e.phase==='artifact_delivery_upload_receipt'),false);
 });

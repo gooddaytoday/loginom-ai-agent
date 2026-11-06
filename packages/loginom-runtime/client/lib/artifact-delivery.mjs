@@ -177,12 +177,17 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     };
     const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
       &&e.enabled===true&&e.visible===true&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed').length===1;
-    let full=await readToolbar(r);
-    // Preparation can return while the toolbar is still outside the viewport.
-    // Wait for a fresh owned hit point; never send the known offscreen click.
-    if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
-    const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
-    await click(full,files);
+    for(let attempt=0;;attempt++){
+     let full=await readToolbar(attempt===0?r:await roots());
+     // Preparation can return while the toolbar is still outside the viewport.
+     // Wait for a fresh owned hit point; never send the known offscreen click.
+     if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
+     const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
+     // Reuse folder navigation's matched, no-effect stale-epoch proof.
+     // An uncertain click never reaches a second attempt.
+     if(await click(full,files,'click',{},true))break;
+     requireValue(attempt<2,'Delivery toolbar navigation remained stale; inspection required');
+    }
    }
    let s=await directory();
    requireValue(s.file_storage?.status==='observed','Storage path is not observed');
