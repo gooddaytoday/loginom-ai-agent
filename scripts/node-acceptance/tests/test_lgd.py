@@ -6,6 +6,32 @@ from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
+    def test_export_cases_require_real_same_node_transitions(self):
+        path, first = '/own/final.lgd', '/own/first.lgd'
+        def exported(destination, sha, existed=False, binding=None):
+            return {'status': 'SUCCEEDED', 'execution': {'status': 'completed'},
+                    'configuration': {'readback': {'kind': 'lgd_export', 'node': {'node_id': 'sink'},
+                        'destination': destination, 'bindings': binding or {},
+                        'destination_check': {'existed': existed, 'decision': 'replace' if existed else None, 'overwrite': 'replace' if existed else 'reject'}}},
+                    'output': {'file_artifacts': [{'destination': destination, 'bytes': 397, 'sha256': sha * 64}]}}
+        rejected = {'status': 'FAILED', 'cleanup_complete': True, 'error': {'message': 'LGD destination exists; reject policy preserved it'}}
+        rounds = [(1, exported(path, 'a')), (2, rejected), (3, exported(path, 'b', True))]
+        runner.check_lgd_export_case(rounds, 'overwrite', path, first)
+        for mutate in [lambda r: r.pop(1),
+                       lambda r: r[-1][1]['configuration']['readback']['node'].update(node_id='other'),
+                       lambda r: r[-1][1]['output']['file_artifacts'][0].update(sha256='a' * 64),
+                       lambda r: r[-1][1]['configuration']['readback']['destination_check'].update(decision='reject')]:
+            changed = json.loads(json.dumps(rounds)); mutate(changed)
+            with self.assertRaises(AssertionError): runner.check_lgd_export_case(changed, 'overwrite', path, first)
+        binding = {'destination': {'variable': 'LgdPath'}}
+        rounds = [(1, exported(first, 'a', binding=binding)), (2, exported(path, 'a', binding=binding))]
+        runner.check_lgd_export_case(rounds, 'variable', path, first)
+        for mutate in [lambda r: r[-1][1]['configuration']['readback'].update(bindings={}),
+                       lambda r: r[-1][1]['configuration']['readback'].update(destination=first),
+                       lambda r: r[-1][1]['configuration']['readback']['node'].update(node_id='other')]:
+            changed = json.loads(json.dumps(rounds)); mutate(changed)
+            with self.assertRaises(AssertionError): runner.check_lgd_export_case(changed, 'variable', path, first)
+
     def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
         reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
                  'configuration': {'readback': {'kind': 'lgd_import'}},
