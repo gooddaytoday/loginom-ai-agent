@@ -307,12 +307,13 @@ test("management: сохраняет отдельное процессное д�
   const context = await fakeProfile()
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-evidence-"))
   const command = { ...context.command, cleanupDir: out }
-  const result = await management(command, ["loginom", "setup", "--stdin-json", "--format", "json"], '{"password":"private-password"}')
+  const result = await management(command, ["loginom", "setup", "--stdin-json", "--format", "json"], JSON.stringify({ mode: "custom", endpoint: "https://x/mcp", apiKey: "private-key-canary", password: "private-password" }))
   const { readdir } = await import("node:fs/promises")
   const directories = await readdir(out)
   expect(directories).toHaveLength(1)
   const evidence = await Bun.file(path.join(out, directories[0]!, "cleanup.json")).text()
   expect(JSON.parse(evidence).processes.status).toBe("confirmed")
+  expect(evidence).not.toContain("private-key-canary")
   expect(evidence).not.toContain("private-password")
   expect(evidence).not.toContain("stdin")
   expect(result.exitCode).toBe(0)
@@ -535,9 +536,26 @@ test("ensureProfile: unconfigured при существующем cli-profile.js
   expect(written.permission).toEqual({ "loginom_*": "allow" })
 })
 
+test.each([
+  { state: "connection-required" }, { mode: "cloud" }, { mode: undefined },
+  { hasApiKey: false }, { hasApiKey: undefined }, { endpoint: "https://other.test/mcp" },
+])("ensureProfile prepares a nonmatching custom connection %j", async mismatch => {
+  const context = await fakeProfile()
+  const state = await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", hasApiKey: true,
+    url: context.config.loginom.url, username: context.config.loginom.username, ...mismatch })
+  try {
+    expect(await ensureProfile(context.config, { ...context.command,
+      env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } })).toEqual({ fresh: true })
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(true)
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(state), { recursive: true, force: true })
+  }
+})
+
 test("ensureProfile: ready с hasApiKey не вызывает setup и пишет config", async () => {
   const { config, command, profileDir } = await fakeProfile({
-    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true }),
   })
   expect((await ensureProfile(config, command)).fresh).toBe(false)
   expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(false)
@@ -554,7 +572,7 @@ test.each(["username", "url", "missing-username", "missing-url"] as const)("ensu
   try {
     const mismatch = kind === "username" ? { username: "eval-b" } : kind === "url" ? { url: "http://127.0.0.1:80/app/" }
       : kind === "missing-username" ? { username: undefined } : { url: undefined }
-    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, ...mismatch }))
+    await Bun.write(state, JSON.stringify({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username, ...mismatch }))
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
     expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
@@ -571,7 +589,7 @@ test("ensureProfile v2: matching ready profile is reused without setup or genera
   const calls = path.join(context.profileDir, "calls.jsonl")
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
   try {
-    const view = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, revision: 4, generation: 9 }
+    const view = { state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username, revision: 4, generation: 9 }
     await Bun.write(state, JSON.stringify(view))
     await Bun.write(path.join(context.profileDir, "cli-profile.json"), "preserve-profile")
     expect(await ensureProfile(config, command)).toEqual({ fresh: false })
@@ -589,13 +607,17 @@ test("setupProfile rebinds username before ensureProfile", async () => {
     loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-next", password: "new-password-canary" } }
   const state = path.join(context.profileDir, "view.json")
   const calls = path.join(context.profileDir, "calls.jsonl")
-  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls, EVAL_FAKE_SETUP_INPUT_FILE: path.join(context.profileDir, "private-input.json") } }
   try {
-    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: "eval-previous" }))
+    await Bun.write(state, JSON.stringify({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: "eval-previous" }))
     await Bun.write(path.join(context.profileDir, "data/loginom-ai-agent.db"), "preserve-history")
     await Bun.write(path.join(context.profileDir, "data/auth.json"), '{"preserve":"auth"}')
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
     await setupProfile(config, command)
+    expect(await Bun.file(path.join(context.profileDir, "private-input.json")).json()).toMatchObject({
+      mode: "custom", endpoint: new URL("/mcp", config.dock.baseUrl).href,
+      apiKey: config.dock.apiKey, username: config.loginom.username,
+    })
     const observed = await management(command, ["loginom", "status", "--format", "json"])
     expect(observed.exitCode).toBe(0)
     expect(observed.processCleanup.status).toBe("confirmed")
@@ -610,6 +632,24 @@ test("setupProfile rebinds username before ensureProfile", async () => {
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
+test.each([
+  { mode: "cloud" }, { mode: undefined }, { endpoint: "https://other.test/mcp" },
+  { endpoint: undefined }, { hasApiKey: false }, { help: { state: "failed" } }, { help: undefined },
+])("verifyProfile refuses an unprepared custom Help connection %j", async mismatch => {
+  const context = await fakeProfile()
+  const state = await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", hasApiKey: true,
+    help: { state: "ready" }, url: context.config.loginom.url, username: context.config.loginom.username, ...mismatch })
+  try {
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(context.config)))
+    await expect(verifyProfile(context.config, { ...context.command,
+      env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } })).rejects.toThrow("PROFILE_NOT_PREPARED")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(state), { recursive: true, force: true })
+  }
+})
+
 test("verifyProfile checks a starting standalone host without setup or recovery", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a" } }
@@ -617,7 +657,7 @@ test("verifyProfile checks a starting standalone host without setup or recovery"
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
   try {
     await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
-    await Bun.write(state, JSON.stringify({ state: "starting", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(state, JSON.stringify({ state: "starting", mode: "custom", endpoint: "https://x/mcp", help: { state: "starting" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
     await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } }))
     expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
@@ -633,7 +673,7 @@ test("verifyProfile accepts the native schema annotation while preserving permis
   const saved = JSON.stringify({ $schema: "urn:loginom-ai-agent:config", ...agentConfigJson(config) }, null, 2)
   try {
     await Bun.write(settings, saved)
-    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(state, JSON.stringify({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
     expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
     expect(await Bun.file(settings).text()).toBe(saved)
     await Bun.write(settings, JSON.stringify({ $schema: "urn:loginom-ai-agent:config", permission: { "*": "allow" } }))
@@ -655,7 +695,7 @@ test("verifyProfile checks readiness and saved configuration without setup or re
     await Bun.write(settings, saved)
     await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
     await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
-    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(state, JSON.stringify({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
     expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
     await Bun.write(settings, '{"permission":{"*":"allow"}}')
     await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
@@ -666,7 +706,7 @@ test("verifyProfile checks readiness and saved configuration without setup or re
 
 test("verifyProfile rejects matching ready status with a nonzero exit", async () => {
   const context = await fakeProfile()
-  const file = await stateFile({ state: "ready", hasApiKey: true, url: context.config.loginom.url,
+  const file = await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: context.config.loginom.url,
     username: context.config.loginom.username, exitCode: 2 })
   try {
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(context.config)))
@@ -685,7 +725,7 @@ test("ensureProfile v2: failed status cannot admit a matching ready profile", as
   const state = path.join(context.profileDir, "view.json")
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
   try {
-    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, exitCode: 2 }))
+    await Bun.write(state, JSON.stringify({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username, exitCode: 2 }))
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_STATUS_FAILED")
     expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
@@ -702,7 +742,7 @@ test("ensureProfile v2: successful setup exit with a foreign reply refuses befor
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
   try {
     await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
-    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    const saved = { state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
     await Bun.write(setup, JSON.stringify({ reply: { ...saved, username: "eval-b" }, state: saved }))
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
@@ -721,7 +761,7 @@ test("ensureProfile v2: setup acknowledgement does not replace fresh settings re
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
   try {
     await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
-    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    const saved = { state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
     await Bun.write(setup, JSON.stringify({ reply: saved, state: { ...saved, username: "eval-b" } }))
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
@@ -738,7 +778,7 @@ test("ensureProfile v2: failed read-back refuses a successful matching setup", a
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
   try {
     await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
-    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    const saved = { state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
     await Bun.write(setup, JSON.stringify({ reply: saved, state: { ...saved, exitCode: 2 } }))
     await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
     await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_STATUS_FAILED")
@@ -758,14 +798,14 @@ test("ensureProfile v2: fresh stdin setup binds settings and is reused on the ne
     await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
     expect(await ensureProfile(config, command)).toEqual({ fresh: true })
     expect(await ensureProfile(config, command)).toEqual({ fresh: false })
-    expect(await Bun.file(state).json()).toEqual({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username })
+    expect(await Bun.file(state).json()).toEqual({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, url: config.loginom.url, username: config.loginom.username })
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status", "status"])
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
 test("ensureProfile: source без cache/models.json засевает каталог из product snapshot", async () => {
   const { config, command, profileDir } = await fakeProfile({
-    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true }),
   })
   const source = { ...config, agent: { ...config.agent, cliMode: "source" as const } }
   await ensureProfile(source, command)
@@ -777,7 +817,7 @@ test("ensureProfile: source без cache/models.json засевает катал
 
 test("ensureProfile: fake не засевает cache/models.json", async () => {
   const { config, command, profileDir } = await fakeProfile({
-    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true }),
   })
   await ensureProfile(config, command)
   expect(await Bun.file(path.join(profileDir, "cache", "models.json")).exists()).toBe(false)

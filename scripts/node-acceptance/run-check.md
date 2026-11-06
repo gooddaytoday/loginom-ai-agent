@@ -83,11 +83,26 @@ At a phase deadline, SIGINT goes to the CLI owner first, with 100 seconds for
 normal close/ACK. If it stays alive, the process group receives SIGINT and
 another 40-second wait, then SIGKILL as the final fallback.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
-They embed the knowledge service key like release builds: `LOGINOM_MCP_API_KEY`
-from the environment or `~/.config/loginom-ai-agent/mcp-api-key` (mode 600) on
-the stand; it reaches only the build environment. The pair `api_key` is no longer
-sent to setup. A supplied build must have matching SHA, `sourceDirty=false` and
-`resources/loginom/knowledge-key`.
+Harness build and `--prepare-only` paths do not read or supply a Dock key. A supplied
+build must have matching SHA and `sourceDirty=false`. Setup reads
+`LOGINOM_DOCK_API_KEY`, or the compatible private input file
+`~/.config/loginom-ai-agent/mcp-api-key` (mode 600), only when setup is needed.
+It sends `mode: custom`, key and Loginom credentials through JSON stdin;
+`LOGINOM_DOCK_ENDPOINT` defaults to `https://mcp.loginom.ai/mcp`.
+Both `LOGINOM_MCP_API_KEY` and `LOGINOM_DOCK_API_KEY` are excluded from build and
+model environments; the legacy variable is no longer an input. Missing setup key
+fails before the model. The pair `api_key` is not used.
+
+Before disabling the shared legacy key, an administrator must issue a separate
+USER key for evals/node acceptance with read access to the official KB, update
+the private stand secret and verify real setup plus a KB read. Do not issue
+ADMIN/ROOT credentials to the harness. The existing private file may remain as
+manual input, but its value must be independent of the shared 0.3.9 key. Source
+code cannot establish the owner/role of its current value; never print it to
+check. Production provisioning and legacy key disablement are separate work.
+Removing embedded keys from actual packages remains the separate build staging
+migration (Task13); harness unit fixtures alone do not certify real artifacts.
+
 The total budget is shared by sequential scenarios. If it expires before a
 scenario starts (including its first load/spacing gate), that scenario is
 `NOT_RUN` with reason `BATCH_BUDGET_EXHAUSTED`, displayed as

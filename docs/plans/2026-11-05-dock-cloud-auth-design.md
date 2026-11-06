@@ -421,3 +421,26 @@ Runtime/сборки/production не запускались. Следующий 
 - Отчёт/точные команды/RED-GREEN: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-11-report.md`.
 - Новых dependencies/pins/common contracts/endpoint override нет; site/установка/пользовательские профили не изменялись.
 - Следующий шаг: независимое ревью Task11 родителем, затем Task12. Push/PR/merge/release не выполнялись.
+
+## Ревью Task11 — 2026-11-06
+
+- SHA `8b3756a4e2`: scoped re-review Spec compliant / Quality Approved; Important/P2 закрыт, новых замечаний нет.
+- Local fallback не запускает повторные lease/catalog/list; успешный existing-runtime path сохранён, отмена и cleanup остаются ошибками.
+- Свежие Host48/341, CLI lazy1/8 и Host typecheck PASS; прежние CLI69/1 compiled-only SKIP, knowledge4, Opencode typecheck и PTY3 переиспользованы по неизменённым путям.
+- Compiled cloud/PTY/constructor recovery — Task13, native/site/reserve — Task15. Следующий шаг: Task12 harness stdin; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task12 — 2026-11-06
+
+- База `8b3756a4e2`; Task12 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Evals setup передаёт custom mode, `/mcp` из dock.baseUrl и ключ только через stdin.
+- Fresh detection мигрирует старое/cloud/connection-required; совпадающий custom ready сохраняет generation.
+- Slot user/url guards до setup сохранены; verify требует custom endpoint/key и готовый Help; browser отдельно.
+- Node acceptance читает stand key только при setup; legacy/new key vars исключены из build/model env.
+- Missing key отказывает до setup/model, prepare-only не требует ключа harness; default/custom endpoints проверены.
+- RED→GREEN subprocess и unit canaries: stdin, env, argv, evidence и отсутствие knowledge-key в build fixture.
+- Source freeze5/5; evals profile108 PASS/2 proc-denial SKIP, bun typecheck PASS, node unittest10 PASS, diff-check PASS.
+- Typecheck потребовал ignored symlink на существующие зависимости с идентичными package.json/bun.lock; pins не менялись.
+- До отключения legacy требуется отдельный USER key + реальный setup/KB read; production/key provisioning не выполнялись.
+- Task13 завершает удаление встроенного ключа из настоящих пакетов; live evals и installed artifacts здесь не проверялись.
+- Отчёт: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-12-report.md`.
+- Следующий шаг: независимое ревью Task12 родителем, затем Task13. Push/PR/merge/release не выполнялись.

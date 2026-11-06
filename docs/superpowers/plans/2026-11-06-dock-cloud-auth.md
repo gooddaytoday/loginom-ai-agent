@@ -725,7 +725,7 @@ Fix1: после local fallback оставшийся runtime не запуска
 
 **Interfaces:** `setupProfile` передаёт `mode:"custom", endpoint: new URL("/mcp", config.dock.baseUrl).href, apiKey:config.dock.apiKey`. `config.dock.baseUrl` — существующий базовый HTTP API URL, не отдельный новый параметр. Node acceptance читает stand key только при setup, передаёт stdin в уже существующий `phase(...,stdin=...)`; build не читает секрет.
 
-- [ ] **1. RED:** Расширить существующий profile subprocess fixture: прочитать JSON stdin в fake setup и завершить exit2 при отсутствующем mode/custom endpoint/key. Положительный тест вызывает настоящий `setupProfile`; ожидаемое тело:
+- [x] **1. RED:** Расширить существующий profile subprocess fixture: прочитать JSON stdin в fake setup и завершить exit2 при отсутствующем mode/custom endpoint/key. Положительный тест вызывает настоящий `setupProfile`; ожидаемое тело:
 
 ```ts
 expect(input).toMatchObject({
@@ -737,9 +737,9 @@ expect(input).toMatchObject({
 ```
 
 `input` захватывается только внутри temp test driver; секреты не сохранять в обычные evidence. Existing canary redaction assertions оставить.
-- [ ] **2. Запустить:** из evals `bun test test/profile.test.ts -t 'setupProfile'`; текущий setup не передаёт mode/endpoint.
-- [ ] **3. GREEN:** Изменить JSON setup и fresh detection: unconfigured, connection-required, не custom либо нет custom key → нужна подготовка harness; уже совпадающий custom ready профиль не перенастраивается и не меняет generation. `verifyProfile` проверяет mode/custom endpoint/hasApiKey и actual Help readiness; browser отдельно. Проверки user/url для slots сохраняют отказ до перенастройки чужого профиля. Не очищать пользовательские профили ради миграции.
-- [ ] **4. Следующий RED→GREEN:** Node acceptance build fixture больше не создаёт `knowledge-key`, build с отсутствующим stand key успешен и env не содержит его. Выполнение setup без stand key завершается явной ошибкой **до прогона модели**. Читать существующий файл `~/.config/loginom-ai-agent/mcp-api-key` можно как секрет стенда; `LOGINOM_MCP_API_KEY` перестаёт быть build input, для harness задать `LOGINOM_DOCK_API_KEY`/`LOGINOM_DOCK_ENDPOINT` с тем же файлом как совместимым ручным источником key. Сохранить default endpoint `https://mcp.loginom.ai/mcp`, если стенд не задан явно; никакого логирования key.
+- [x] **2. Запустить:** из evals `bun test test/profile.test.ts -t 'setupProfile'`; текущий setup не передаёт mode/endpoint.
+- [x] **3. GREEN:** Изменить JSON setup и fresh detection: unconfigured, connection-required, не custom либо нет custom key → нужна подготовка harness; уже совпадающий custom ready профиль не перенастраивается и не меняет generation. `verifyProfile` проверяет mode/custom endpoint/hasApiKey и actual Help readiness; browser отдельно. Проверки user/url для slots сохраняют отказ до перенастройки чужого профиля. Не очищать пользовательские профили ради миграции.
+- [x] **4. Следующий RED→GREEN:** Node acceptance build fixture больше не создаёт `knowledge-key`, build с отсутствующим stand key успешен и env не содержит его. Выполнение setup без stand key завершается явной ошибкой **до прогона модели**. Читать существующий файл `~/.config/loginom-ai-agent/mcp-api-key` можно как секрет стенда; `LOGINOM_MCP_API_KEY` перестаёт быть build input, для harness задать `LOGINOM_DOCK_API_KEY`/`LOGINOM_DOCK_ENDPOINT` с тем же файлом как совместимым ручным источником key. Сохранить default endpoint `https://mcp.loginom.ai/mcp`, если стенд не задан явно; никакого логирования key.
 
 ```python
 stdin = json.dumps(dict(
@@ -752,7 +752,7 @@ stdin = json.dumps(dict(
 Использовать stdin в existing setup phase; helper error говорит «required for setup», не «required to build». Удалить key из build env и assert наличия knowledge-key. Подготовка `--prepare-only` должна собирать без ключа.
 
 В run-check.md и evals runbook записать эксплуатационную зависимость: **до отключения общего legacy key** администратор выдаёт отдельный USER key для evals/node acceptance с чтением официальной KB; секрет стенда обновляется и проверяется реальным setup + чтением KB. Текущий private-файл можно сохранить, но его значение не должно зависеть от общего ключа0.3.9. По исходникам нельзя установить, кому принадлежит уже лежащий в нём ключ; секрет ради проверки не выводить. ADMIN/ROOT harness не выдавать. В canary test подтвердить stdin-only передачу, отсутствие key в build env/artifact/evidence. Production provisioning и отключение legacy key этой задачей не выполнять.
-- [ ] **5. Проверка/коммит:** evals `bun test test/profile.test.ts`, `bun typecheck`; из `scripts/node-acceptance` `python3 -m unittest discover -s tests -p 'test_run_check_build.py'`, с TMPDIR. Это проверка настройки harness, не запуск всех live node evals. Commit `fix(evals): configure custom Dock without embedded credentials`.
+- [x] **5. Проверка/коммит:** evals `bun test test/profile.test.ts`, `bun typecheck`; из `scripts/node-acceptance` `python3 -m unittest discover -s tests -p 'test_run_check_build.py'`, с TMPDIR. Это проверка настройки harness, не запуск всех live node evals. Commit `fix(evals): configure custom Dock without embedded credentials`.
 
 ## Task 13: Удаление встроенного ключа, staging tuple и документация
 
