@@ -105,6 +105,10 @@ const stop = (exitCode = 0) => {
       state.exiting = true
       state.timers.forEach(timer => timer.unref())
       state.timers.clear()
+      setTimeout(() => {
+        terminalTrace("exit_fallback")
+        process.exit(exitCode)
+      }, 3000).unref()
     },
     () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
