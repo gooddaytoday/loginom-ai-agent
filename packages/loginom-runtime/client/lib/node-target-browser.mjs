@@ -211,7 +211,7 @@ export async function readGraph(page, task) {
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
-export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
+export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
   let gestureBefore=task.effect.before;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
@@ -285,8 +285,20 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};
         const v=placementNavigation.view,q=reachable.screen_point,b=reachable.graph_rect;
         const outside=q.x<b.x||q.y<b.y||q.x>=Math.min(b.x+b.width,reachable.viewport.width)||q.y>=Math.min(b.y+b.height,reachable.viewport.height);
+        let suggested=null;
+        if(outside&&overflow&&gap){
+          const occupied=await canvas.evaluate(e=>[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0).map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom})));
+          suggested=overflow(v,occupied,64,10000,0,p.position,point=>gap(v,point,occupied));
+          if(suggested){
+            const candidate=projectPosition(v,suggested);
+            const hit=await canvas.evaluate((e,p)=>{const h=document.elementFromPoint(p.x,p.y);return !!h&&(h===e||e.contains(h))&&!h.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg');},candidate);
+            if(!hit||JSON.stringify(await canvas.evaluate(readViewport))!==JSON.stringify(v))suggested=null;
+          }
+          await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during placement suggestion');
+          if(suggested)placementRefusal.suggested_position=suggested;
+        }
         throw new Error(outside
-          ? 'Requested position ('+p.position.x+','+p.position.y+') is outside the reachable canvas after bounded native zoom and scroll (scale '+(v.scale*100).toFixed(2)+'%, scroll '+v.scroll.x+','+v.scroll.y+'). Choose a reachable model position or enlarge the canvas; existing nodes were not moved.'
+          ? 'Requested position ('+p.position.x+','+p.position.y+') is outside the reachable canvas after bounded native zoom and scroll (scale '+(v.scale*100).toFixed(2)+'%, scroll '+v.scroll.x+','+v.scroll.y+'). '+(suggested?'Repeat with target.position='+JSON.stringify(suggested)+' and a new operation_id; no node was created and existing nodes were not moved.':'No free reachable position was verified; enlarge the canvas; existing nodes were not moved.')
           : 'Requested drop surface is not reachable');
       }
       const target=reachable.screen_point;placementNavigation.point=target;
@@ -883,7 +895,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
-      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()})`,options),deadline);
+      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementOverflow.toString()},${nodePlacementGap.toString()})`,options),deadline);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
     },
     async reconcile(effect,graph,deadline){

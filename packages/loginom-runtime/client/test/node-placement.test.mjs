@@ -54,7 +54,7 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
   const read=()=>page.evaluate(()=>globalThis.testGraph);
   const result=await mutateGraph(page,{deadline:Date.now()+15000,request:{document_id:'doc',workflow_ref},
    types:{'transform.calculator':{title:'Calculator',palette_group:'Data'}},effect:{id:'create',kind:'create',parameters:{type:'transform.calculator',position},before:graph}},
-   read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph);
+   read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph,nodePlacementOverflow,nodePlacementGap);
   const owned=cover==='owned_splitter'||cover==='splitter_child';
   assert.equal(result.status,owned?'SUCCEEDED':'NOT_APPLIED',result.error);
   assert.equal(result.cleanup_complete,true);
@@ -67,6 +67,16 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
    assert.equal(result.effect_possible,false);
    assert.deepEqual(await read(),graph);
    assert.deepEqual(result.placement_refusal.requested_position,position);
+   const suggested=result.placement_refusal.suggested_position;
+   assert.ok(suggested,'a reachable model position is supplied before any drag');
+   assert.match(result.error,/repeat.*position.*operation/i);
+   assert.ok(suggested.x<position.x);
+   const retry=await mutateGraph(page,{deadline:Date.now()+15000,request:{document_id:'doc',workflow_ref},
+    types:{'transform.calculator':{title:'Calculator',palette_group:'Data'}},effect:{id:'create-retry',kind:'create',parameters:{type:'transform.calculator',position:suggested},before:await read()}},
+    read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph,nodePlacementOverflow,nodePlacementGap);
+   assert.equal(retry.status,'SUCCEEDED',retry.error);
+   assert.deepEqual(retry.after.nodes[0].position,suggested);
+   assert.equal((await page.evaluate(()=>globalThis.drops)).length,1);
   }
   if(owned){
    assert.equal(drops[0].inside,true);
