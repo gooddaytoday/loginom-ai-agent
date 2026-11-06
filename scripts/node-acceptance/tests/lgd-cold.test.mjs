@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import {verifyLgdFields} from '../lgd-cold.mjs';
 import {readFile} from 'node:fs/promises';
 import {parseExpectedOutputs} from '../expected-outputs.mjs';
+test('LGD edge expectations use the qualified oracle and retain Variant metadata',async()=>{
+ const fixture=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/exports-lgd/acceptance/expected-empty-variant-run.json',import.meta.url),'utf8'));
+ fixture.package_path='/own/edges.lgp';
+ const {outputs}=parseExpectedOutputs(fixture);
+ assert.equal(outputs.length,2);assert.equal(outputs[0].rows.length,0);assert.equal(outputs[1].rows.length,3);
+ const columns=outputs[1].columns,observed=columns.map(f=>({...f,data_kind:f.type==='variant'?'Неопределенное':'Дискретный',excluded:false}));
+ assert.equal(verifyLgdFields(observed,columns),true);
+ const coerced=structuredClone(observed);coerced[2].type='string';assert.throws(()=>verifyLgdFields(coerced,columns),/LGD_COLD_FIELD_PROPERTIES/);
+});
 test('native empty/Variant golden uses the complete stock cold contract',async()=>{
  const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/empty-variant/expected.json',import.meta.url),'utf8'));
  const {outputs}=parseExpectedOutputs({...expected,package_path:'/own/empty-variant.lgp'});

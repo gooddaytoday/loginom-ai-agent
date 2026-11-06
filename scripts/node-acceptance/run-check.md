@@ -41,6 +41,10 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 два актуальных пути одной привязки LgdPath и сохранение bindings после reopen.
 Оба используют штатные LGD reverse-import/CSV oracle, Save и cleanup.
 
+`lgd-export-empty-variant` сохраняет схему пустого набора и Variant
+(integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
+CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty

@@ -67,6 +67,16 @@ class LgdTests(unittest.TestCase):
             changed = json.loads(json.dumps(rounds)); mutate(changed)
             with self.assertRaises(AssertionError): runner.check_lgd_export_case(changed, 'variable', path, first)
 
+    def test_empty_export_is_a_real_zero_row_lgd_roundtrip(self):
+        case = runner.scenario('lgd-export-empty-variant')
+        self.assertEqual(case['lgd'], 'edges')
+        self.assertTrue(case['lgd_empty_variant'])
+        expected = runner.expected_for(case, '/own/empty.lgp')
+        self.assertEqual(expected['outputs'][0]['output_node_type'], 'imports.lgd')
+        self.assertEqual(expected['outputs'][0]['rows'], [])
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['Id', 'Text', 'Amount', 'Occurred', 'Active'])
+        self.assertEqual(case['input_files'], ['typed.csv', 'schema.json'])
+
     def test_checksum_switch_requires_two_fresh_full_reads_on_same_node(self):
         def result(checksum, execution, node='same'):
             return {'status': 'SUCCEEDED', 'cleanup_complete': True, 'node': {'node_id': node},

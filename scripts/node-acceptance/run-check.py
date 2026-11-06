@@ -149,14 +149,15 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/variable', input_files=['variable-a.lgd', 'variable-b.lgd'],
                     expected_name='expected.json', lgd_initial='expected-initial.json', base=None, lgd='variable',
                     oracle=node / 'acceptance/oracle.py')
-    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-overwrite', 'lgd-export-variable', 'lgd-export-compression']:
+    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-overwrite', 'lgd-export-variable', 'lgd-export-compression', 'lgd-export-empty-variant']:
         export = name.startswith('lgd-export')
         export_case = name.removeprefix('lgd-export-') if name.startswith('lgd-export-') else None
+        edges = name == 'lgd-export-empty-variant'
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')
-        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt', 'lgd-export-overwrite': 'roundtrip', 'lgd-export-variable': 'roundtrip', 'lgd-export-compression': 'compression'}[name]
+        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt', 'lgd-export-overwrite': 'roundtrip', 'lgd-export-variable': 'roundtrip', 'lgd-export-compression': 'compression', 'lgd-export-empty-variant': 'edges'}[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-' + export_case + '.md' if export_case else 'task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
-                    expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if name == 'lgd-export-compression' else export_case, lgd_export_compression=name == 'lgd-export-compression',
+                    expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
@@ -1207,7 +1208,7 @@ class Runner:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
-        if spec.get('lgd_export_compression'):
+        if spec.get('lgd_empty_variant') or spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 fmt['destination'] = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + fmt['name'] + '.lgd'
                 prompt = prompt.replace('{{EXPORT_DIRECTORY}}/' + fmt['name'] + '.lgd', fmt['destination'])
@@ -1559,7 +1560,7 @@ class Runner:
             binary = lgd_file.read_bytes()
             assert len(binary) > 20 and binary[:6] == b'BGDATA' and binary[16:20] == bytes.fromhex('04224d18'), 'LGD_LZ4_HEADER'
             shutil.copyfile(lgd_file, folder / 'roundtrip.lgd')
-        if spec.get('lgd_export_compression'):
+        if spec.get('lgd_empty_variant') or spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 destination = fmt['destination']
                 assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
@@ -1576,6 +1577,8 @@ class Runner:
                 lgd_file = downloaded_csv(profile, destination)
                 binary = lgd_file.read_bytes()
                 assert len(binary) > 20 and binary[:6] == b'BGDATA', 'LGD_COMPRESSION_HEADER:' + fmt['name']
+                if spec.get('lgd_empty_variant'):
+                    assert binary[16:20] == bytes.fromhex('04224d18'), 'LGD_EDGE_HEADER:' + fmt['name']
                 shutil.copyfile(lgd_file, folder / (fmt['name'] + '.lgd'))
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
