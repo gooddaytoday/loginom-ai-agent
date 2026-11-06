@@ -182,9 +182,15 @@ jobs:
 
       - name: Prepare runtime Chromium dependencies
         working-directory: packages/loginom-runtime/client
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium'
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          # Match chromium-direct: Ubuntu 24.04 otherwise denies the user
+          # namespaces required by our sandboxed, non-system Chromium build.
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Verify complete supervised runtime suite with pinned Chromium
+        timeout-minutes: 6
         working-directory: packages/loginom-runtime
         run: |
           set -euo pipefail
@@ -197,7 +203,9 @@ jobs:
             exit 1
           fi
           # Leave CPU for the real managed children on the 4-vCPU runner.
-          nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=2 test/*.test.mjs
+          # Bound every test and the process tree, including broken test cleanup.
+          # GNU timeout exits 124 on a hang; the job then fails within minutes.
+          timeout --kill-after=10s 5m nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 test/*.test.mjs
 
       - name: Verify explicit proxy environment with real Node networking
         working-directory: packages/desktop
