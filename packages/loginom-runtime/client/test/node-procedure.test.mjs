@@ -2,6 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
+import { readOutputDefinitionPages } from '../lib/import-definition-pages.mjs';
+
+test('input definition rediscovery retains its native owner and original deadline without gestures',async()=>{
+ for(const fault of [null,'root','stage','port','node','dialog','expired']) {
+  let time=1,mutations=0;
+  const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const operation={id:'definition',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,input_port:{index:0},verified:true,surface:'wizard',tid:'MF;TF-1;WizrdMCF'},
+   wizard:{status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF',stage:'input_mapping',output_columns:{fields:[],page:{status:'unverified_definition_page',offset:0,limit:8}}},
+   ui:{elements:[],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;
+    if(time<25000)return;
+    if(fault==='root')state.wizard.root_ref='other';
+    if(fault==='stage')state.wizard.stage='output_mapping';
+    if(fault==='port')state.prepared_node_context.input_port={index:1};
+    if(fault==='node')state.prepared_node_context.node_id='other';
+    if(fault==='dialog')state.ui.dialogs=[{ref:'foreign'}];
+    if(fault!=='expired')state.wizard.output_columns={fields:[{index:0,status:'observed',name:'OrderID'}],page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:1,returned:1,next_offset:null}};
+   },record:async e=>structuredClone(e),execute:async code=>{assert.equal(typeof code,'string');return {status:'SUCCEEDED',output:structuredClone(state)};},wrapMutation:()=>{mutations++;}});
+  const run=()=>readOutputDefinitionPages(channel,{expectedCount:1});
+  if(fault)await assert.rejects(run());else{assert.equal((await run()).definition_complete,true);assert.ok(time>=25000);}
+  assert.equal(operation.deadline,30000);assert.ok(time<=30000);assert.equal(mutations,0);
+ }
+});
 
 function fixture({ recordFailure, onRecord, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
