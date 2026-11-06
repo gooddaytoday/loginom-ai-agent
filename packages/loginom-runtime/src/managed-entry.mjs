@@ -48,7 +48,12 @@ const send = (message, disconnect = false) => {
     process.send(message, (error) => {
       if (!disconnect) return
       terminalTrace(error ? "reply_failed" : "reply_flushed")
-      if (!error && process.connected) process.disconnect()
+      if (!error && process.connected) {
+        // disconnect() clears process.channel even when an incomplete frame
+        // keeps the underlying pipe open. Release its event-loop reference first.
+        process.channel?.unref()
+        process.disconnect()
+      }
       terminalTrace("disconnect_returned")
       // Node may postpone 'disconnect' while an incomplete later IPC frame is
       // buffered. The reply is flushed and admitted work/resources are already
@@ -74,7 +79,16 @@ const stop = (exitCode = 0) => {
     void Promise.resolve().then(() => state.browser?.close()).finally(() => process.exit(1))
   }, 30000)
   void close().then(
-    () => { clearTimeout(timer); terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => {
+      clearTimeout(timer)
+      terminalTrace("exit_requested")
+      // Let Node dispose the isolate before joining V8 workers. process.exit()
+      // can deadlock after 'exit' when a worker needs foreground GC (#66171).
+      // The owner still requires the close ACK and actual clean process exit.
+      process.channel?.unref()
+      if (process.connected) process.disconnect()
+      process.exitCode = exitCode
+    },
     () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
 }
