@@ -36,6 +36,9 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 владельца не применяется. Corrupt требует исходную ошибку checksum, сообщение
 пользователю и Save без успешного импорта; холодное выполнение отрицательного
 случая не запускается. Stock-проверки остальных сценариев сохранены.
+`lgd-export-empty-variant` сохраняет схему пустого набора и Variant
+(integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
+CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
 
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,

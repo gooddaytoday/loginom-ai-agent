@@ -11,8 +11,11 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {readPreparedNodeContext}=await load('client/lib/node-context.mjs');
  const imports=graph.nodes.filter(n=>n.type==='imports.lgd');
- if(imports.length!==1)throw Error('LGD_COLD_IMPORT_COUNT');
+ const formats=expected.lgd.kind==='edges'?expected.lgd.formats:null;
+ if(imports.length!==(formats?.length??1))throw Error('LGD_COLD_IMPORT_COUNT');
  for(const target of imports){
+  const format=formats?.find(f=>f.import_label===target.label);
+  if(formats&&!format)throw Error('LGD_COLD_IMPORT_IDENTITY');
   const channel=channelFor(target.ref,outputProperties?'lgd-saved-output':'lgd-saved-settings');
   await channel.revealGraphNode({target:'body'});
   const graphState=await channel.observe({condition:'LGD cold own source',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
@@ -31,13 +34,13 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
    const after=await (${readPreparedNodeContext.toString()})(page,b);
    if(JSON.stringify(before)!==JSON.stringify(after))throw Error('LGD_COLD_OWNER_CHANGED');return r;
   }`);
-  if(values.checksum!==true||values.compression!=='LZ4'||values.written_checksum!=='Сжатых данных'||!/\.lgd$/i.test(values.path)
-   ||expected.lgd.destination&&values.path!==expected.lgd.destination)throw Error('LGD_COLD_SOURCE_SETTINGS');
+  if(values.checksum!==true||values.compression!==(format?.compression_display??'LZ4')||values.written_checksum!==(format?.checksum_display??'Сжатых данных')||!/\.lgd$/i.test(values.path)
+   ||(format?.destination??expected.lgd.destination)&&values.path!==(format?.destination??expected.lgd.destination))throw Error('LGD_COLD_SOURCE_SETTINGS');
   const closed=await closePreparedWizard(channel);if(!closed.verified||closed.settings_applied!==false)throw Error('LGD_COLD_CANCEL');
   }else{
   await channel.openOutputPort(0);
   const mapping=await channel.observe({condition:'LGD cold saved output properties',readMappings:true,ready:s=>s.node_mapping?.verified&&s.node_mapping.inventory_complete});
-  verifyLgdFields(mapping.node_mapping.target_fields,expected.lgd.columns);
+  verifyLgdFields(mapping.node_mapping.target_fields,format?.columns??expected.lgd.columns);
   const done=await closePreparedWizard(channel);if(!done.verified||done.settings_applied!==false)throw Error('LGD_COLD_MAPPING_CANCEL');
   }
  }
@@ -45,6 +48,11 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
   const {observeExportDestinations}=await import('./static-source-proof.mjs');
   const ds=await observeExportDestinations({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='exports.lgd')},channelFor,execute});
   if(ds.length!==1||ds[0].destination!==expected.lgd.destination||ds[0].lgd_settings?.compression!==2||ds[0].lgd_settings?.checksum!==1)throw Error('LGD_COLD_EXPORT_SETTINGS');
+ }
+ if(!outputProperties&&formats){
+  const {observeExportDestinations}=await import('./static-source-proof.mjs');
+  const ds=await observeExportDestinations({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='exports.lgd')},channelFor,execute});
+  if(ds.length!==formats.length||!formats.every(f=>ds.filter(d=>d.destination===f.destination&&d.lgd_settings?.compression===f.native_compression&&d.lgd_settings?.checksum===f.native_checksum).length===1))throw Error('LGD_COLD_EXPORT_SETTINGS');
  }
  return true;
 }

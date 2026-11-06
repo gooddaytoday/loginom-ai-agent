@@ -125,13 +125,14 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
-    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt']:
-        export = name == 'lgd-export'
+    if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-empty-variant']:
+        export = name in ['lgd-export', 'lgd-export-empty-variant']
+        edges = name == 'lgd-export-empty-variant'
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')
-        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt'}[name]
-        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
+        variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt', 'lgd-export-empty-variant': 'edges'}[name]
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-empty-variant.md' if edges else 'task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
-                    expected_name='expected-' + variant + '-run.json', base=None, lgd=variant,
+                    expected_name='expected-' + ('empty-variant' if edges else variant) + '-run.json', base=None, lgd=variant, lgd_empty_variant=edges, export_count=2 if edges else 1,
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
@@ -1107,6 +1108,10 @@ class Runner:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
+        if spec.get('lgd_empty_variant'):
+            for fmt in expected['lgd']['formats']:
+                fmt['destination'] = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + fmt['name'] + '.lgd'
+                prompt = prompt.replace('{{EXPORT_DIRECTORY}}/' + fmt['name'] + '.lgd', fmt['destination'])
         if spec.get('tree_conversion'):
             labels = [n['label'] for n in expected['nodes'] if n.get('label')]
             prompt += '\nНазови узел дерева «' + labels[0] + '», узел JSON «' + labels[1] + '».'
@@ -1437,6 +1442,24 @@ class Runner:
             binary = lgd_file.read_bytes()
             assert len(binary) > 20 and binary[:6] == b'BGDATA' and binary[16:20] == bytes.fromhex('04224d18'), 'LGD_LZ4_HEADER'
             shutil.copyfile(lgd_file, folder / 'roundtrip.lgd')
+        if spec.get('lgd_empty_variant'):
+            for fmt in expected['lgd']['formats']:
+                destination = fmt['destination']
+                assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
+                           and o['configuration']['readback'].get('destination') == destination
+                           and o['configuration']['readback'].get('settings', {}).get('compression') == fmt['native_compression']
+                           and o['configuration']['readback'].get('settings', {}).get('checksum') == fmt['native_checksum']
+                           and any(f.get('destination') == destination and f.get('bytes', 0) > 0 for f in o.get('output', {}).get('file_artifacts', []))
+                           for _, o in replies), 'LGD_EDGE_SINK_EVIDENCE:' + fmt['name']
+                assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_import'
+                           and o['configuration']['readback'].get('source', {}).get('source_path') == destination
+                           and o['configuration']['readback']['source'].get('compression') == fmt['compression_display']
+                           and o['configuration']['readback']['source'].get('written_checksum') == fmt['checksum_display']
+                           for _, o in replies), 'LGD_EDGE_IMPORT_METADATA:' + fmt['name']
+                lgd_file = downloaded_csv(profile, destination)
+                binary = lgd_file.read_bytes()
+                assert len(binary) > 20 and binary[:6] == b'BGDATA' and binary[16:20] == bytes.fromhex('04224d18'), 'LGD_EDGE_HEADER:' + fmt['name']
+                shutil.copyfile(lgd_file, folder / (fmt['name'] + '.lgd'))
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
             actual = folder / Path(destinations[0]).name
