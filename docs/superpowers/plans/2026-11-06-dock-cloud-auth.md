@@ -921,14 +921,16 @@ uv run pytest tests/server/test_agent_cloud_access.py tests/server/test_admin_ap
 **Files:** Create `docs/testing/loginom-ai-agent/cloud-auth.md`; при автоматизации повторяемых действий расширять существующие Desktop/CLI acceptance scripts, не новый test runner. Modify ссылки в `docs/testing/loginom-ai-agent/README.md`, checkpoint в `docs/plans/2026-11-05-dock-cloud-auth-design.md`.
 
 **Результат source/local на 2026-11-06:** [отчёт](../../testing/loginom-ai-agent/cloud-auth.md).
-Пакетные и локальные интеграционные проверки PASS с указанными в отчёте source SHA;
-пункт1 остаётся открытым до независимого ревью Task15 и всей ветки от `dd2f949d11`.
+Source/local gates PASS на итоговом runtime SHA `a688c02c83453d1fbc8e03dc95dcb217aa496bc4`.
+Scoped Task15 Approved; whole-branch `dd2f949d11..7ae457baf4` нашёл F1/F2,
+оба исправлены в `a688c02c83`, scoped fix review — Approved/OPEN0/new Critical/Important0.
+Затронутые App/Host tests, новые assembled CLI/Desktop и проверки source provenance PASS.
 Пункты3–4 — NOT_RUN: native стенды и разрешённая внешняя staging topology не предоставлены.
 Настоящий0.3.9 — NOT_RUN; source migration fixture его не заменяет. Облачный выпуск не готов.
 
 **Interfaces:** Реальные staging site + два независимых Dock, нерелизные Desktop и CLI из одного source SHA. Проверки fixtures из1–14 и матрица ниже имеют отдельные результаты. Секретные подготовленные accounts/keys не сохранять в git/evidence. Production rollout и отключение legacy key требуют отдельной команды владельца.
 
-- [ ] **1. Source gate:** выполнить пакетные проверки, перечисленные в задачах, на финальном diff. Повторять только затронутые после последних исправлений; зафиксировать команды, exit codes, source SHA. `git diff --check` и независимое ревью изменения обязательны. Удалить ненужные additions, найденные при ревью.
+- [x] **1. Source gate:** выполнить пакетные проверки, перечисленные в задачах, на финальном diff. Повторять только затронутые после последних исправлений; зафиксировать команды, exit codes, source SHA. `git diff --check` и независимое ревью изменения обязательны. Удалить ненужные additions, найденные при ревью.
 - [x] **2. Local integration gate:** управляемый HTTP site fixture + два настоящих MCP fixtures подтверждают login/save/recovery/logout/migration/redaction/redirect/budgets. Документировать как «клиентский контракт», не «Better Auth проверен». Для GUI использовать isolated dev profile; CLI — иной root. Upgrade fixture старой записи проверяет source migration, не подлинный бинарник0.3.9.
 - [ ] **3. Native gate Windows/macOS:** на собранных Desktop/CLI проверить system CA и explicit HTTP(S)_PROXY/NO_PROXY для site и Help, недоступный proxy без direct fallback, отсутствие OS/PAC auto-discovery в этих двух клиентах. Проверить native safeStorage/DPAPI/Keychain сохранение/чтение/удаление cloud payload; чужой профиль не расшифровывает CLI Keychain запись. Linux отдельно подтверждает plaintext0600/0700. Browser Loginom остаётся прямым.
 - [ ] **4. Внешний gate после готовности сайта/reserve:** выполнить следующую матрицу. До их появления статус этого пункта «не выполнен: отсутствуют внешние сервисы», а не mock PASS.

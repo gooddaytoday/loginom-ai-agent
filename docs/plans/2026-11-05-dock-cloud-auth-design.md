@@ -508,3 +508,24 @@ Runtime/сборки/production не запускались. Следующий 
 - Ранний own-fixture diagnostic leak14 описан честно; sanitized summaries/retired-secret cleanup не выданы за отсутствие экспозиции.
 - Следующий шаг: parent reviews, закрыть обязательные findings, docs-only update source gate; затем отдельные staging/native/legacy проверки владельца.
 - Push/PR/merge/release/production/website/legacy-disable не выполнялись. Scratch: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-15-report.md`.
+
+
+## Финальный checkpoint cloud-auth — 2026-11-06
+
+- Итоговый runtime source SHA `a688c02c83453d1fbc8e03dc95dcb217aa496bc4`; source/local gates PASS, задачи1–14 приняты.
+- Initial15 `7ae457baf4`: scoped Spec compliant / Quality Approved; общее ревью `dd2f949d11..7ae` нашло два Important/P2, Critical0.
+- F1: Desktop Connect автоматически открывает точный pending URL один раз; manual fallback/polling/cancel/dispose сохранены, App35/161 PASS.
+- F2: исходный HostPort read имеет общий refresh/reserve allowance для catalog+read; независимые calls независимы, recovery25/109 PASS.
+- Fix `7ae..a688`: Spec compliant / Quality Approved, ADDRESSED2/OPEN0/new Critical/Important0; обязательные замечания общего ревью закрыты.
+- Host combined127 PASS/2 corrected FAIL переиспользован по срезам; не заявлен новый129 PASS. Host/Desktop/Opencode types и unchanged App types PASS.
+- Desktop полный src/main/loginom47/138 PASS41.27s; прежний5s timeout и focused1/8 сохранены, причина не установлена, deadlines не ослаблены.
+- Fresh dev CLI/Desktop/package, compiledNode1/22 и GUI Connect-only automatic2/manual0/direct0 PASS; product bytes равны freeze/a688.
+- Новые артефакты BASE7ae/dirtytrue; CLI0.0.0-dev-202611062033, Desktop0.3.9dev; чистый finalSHA не приписан metadata.
+- Inventory5117/6141 и canary scans6136CLI/5222Desktop PASS; свои процессы/fixture завершены, GUI successful profile удалён.
+- Exact affectedpytest19/2 + separate request-wait4/processor15/native2 перенесены в durable report; Dock14/CI24/staging/release evidence неизменны.
+- Native Windows/macOS/system trust/full120s и внешний site/два независимых Dock/accounts — NOT_RUN; public availability не проверялась.
+- До Windows native gate исправить legacy manual driver/input cloud и POSIX platform setup; helper здесь не менялся. Authentic0.3.9 NOT_RUN без safe inputs.
+- Durable команды/provenance/limits: `docs/testing/loginom-ai-agent/cloud-auth.md`; final closure docs-only, runtime suites/builds не повторялись.
+- Legacy key/production/website/owner profiles/apps не тронуты; early14 synthetic private-log incident описан и sanitized, не скрыт.
+- Следующие действия владельца: staging site/reserve/accounts, native CA/proxy/storage, безопасный0.3.9 стенд; legacy-disable отдельно. Cloud выпуск не готов.
+- Push/PR/merge/release не выполнялись; новый docs commit сохраняет runtimeSHA a688 и историю7ae/sourcefix без amend/rebase.

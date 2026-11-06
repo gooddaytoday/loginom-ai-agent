@@ -2,14 +2,17 @@
 
 Дата: 2026-11-06. Ветка `dock-cloud-auth`; принятая база Task15 —
 `0b9e5d5948ea8968b3fa165146340e82c53497a0` (Task14).
+Итоговый проверенный runtime source SHA — `a688c02c83453d1fbc8e03dc95dcb217aa496bc4`.
 [Спецификация](../../superpowers/specs/2026-11-05-dock-cloud-auth-design.md) задаёт
 поведение; [план, Task15](../../superpowers/plans/2026-11-06-dock-cloud-auth.md#task-15-сквозная-приёмка-и-готовность-к-выпуску)
 и [журнал](../../plans/2026-11-05-dock-cloud-auth-design.md) фиксируют исполнение.
 
 Клиентский контракт проверен исходными тестами, собранными нерелизными Linux
 Desktop/CLI и настоящим локальным Dock. Задачи1–14 независимо приняты.
-Source gate пока **PENDING**: пакетные проверки PASS, но независимое ревью Task15
-и всего diff от `dd2f949d11` ещё не завершено. Local integration gate — **PASS**.
+Source gate и local integration gate — **PASS**: пакетные/сквозные проверки,
+независимое ревью Task15, всего diff и обязательных исправлений завершены.
+Общее ревью нашло два Important/P2; они исправлены и независимо приняты,
+а не скрыты за прежними Approvals.
 Native Windows/macOS, внешняя staging-интеграция и настоящий0.3.9 — **NOT_RUN**.
 Облачный выпуск не готов; локальные fixtures не подтверждают Better Auth.
 
@@ -24,11 +27,12 @@ Native Windows/macOS, внешняя staging-интеграция и насто�
 `2bf6c1e354`, `0a6f69ae4c`, `f2cfcfe12b`, `411fe5f68e`, `b22cbc6557`,
 `3cbcc83f17`, `3f1e1f80a7`, `f3249af43f`, `2f0f279fa4`, `c238d0ad7d`,
 `8b3756a4e2`, `d65979d3a7`, `39d1fce83f`, `0b9e5d5948`.
-Ревью каждой задачи: Spec compliant / Quality Approved; финальное общее ревью
-остаётся отдельным обязательным шагом.
+Ревью каждой задачи: Spec compliant / Quality Approved. Initial Task15
+`7ae457baf4` также scoped Approved; итог общего ревью и закрытие F1/F2 записаны ниже.
 
-Все Bun tests и `bun typecheck` запускались из указанного package directory,
-не из корня. `TMPDIR=TMP=TEMP=$HOME/storage/tmp/`; Python Task14 использовал
+Зачтённые Bun tests и `bun typecheck` запускались из указанного package directory,
+не из корня. Ошибочный root Turbo typecheck финального fix вышел139 и не засчитан;
+авторитетны успешные повторные package-local typechecks. `TMPDIR=TMP=TEMP=$HOME/storage/tmp/`; Python Task14 использовал
 собственный подкаталог там же. Node tests использовали явный
 `LOGINOM_AI_AGENT_TEST_NODE=<project-root>/packages/desktop/resources/loginom/bin/node`:
 24.19.0, SHA256 `bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12`.
@@ -45,7 +49,9 @@ Desktop не включает `node-client.ts` в emitted dependency closure. Fr
 Task14 изменил Python Dock, тестовый probe и документацию. В Task15 команда
 `git diff --exit-code 39d1fce83f..0b9e5d5948 -- packages/product packages/schema packages/loginom-host packages/loginom-runtime/src packages/loginom-runtime/client packages/app packages/ui packages/desktop packages/opencode bun.lock .github/workflows/release.yml`
 дала exit0; Python Dock не входит в сборщики клиентских артефактов.
-Повторная сборка только ради номера Task14 не требовалась.
+Повторная сборка только ради номера Task14 не требовалась. После F1/F2 оба
+клиента собраны заново: эти артефакты заменяют затронутое assembled evidence13,
+сохраняя его исторические paths/version/provenance.
 
 ## Source gate: проверенные срезы
 
@@ -134,48 +140,115 @@ Task7. CLI polling свыше180s — виртуальное время181s Task
 полного native120s worst-case: такой прогон не выполнялся. IPC120s/outer180s,
 один refresh и один failover, cooldown30s не ослаблялись ради тестов.
 
-## Local integration gate: собранные клиенты и настоящий Dock
+## Итог общего ревью и source fix
 
-Task13 использовал existing acceptance scripts, собственные loopback HTTPS site
-и два настоящих MCP HTTP fixtures с разными ключами; это клиентский контракт.
-Desktop dev profile и CLI root различны. Production forwarding отсутствовал;
-release endpoint guard проверялся отказывающим proxy без контакта с production.
+Независимый аудит всего `dd2f949d11..7ae457baf4dcbf7614898b5fd83d13af51bee7fc`
+(134 файла/19 commits) дал **Needs fixes**, два Important/P2, Critical0:
 
-- Штатные `bun script/build-cli.ts <own-output> --no-archive` из Host и
-  `bun run build` из Desktop —exit0. Electron package:
-  `electron-builder --dir --x64 --publish never --config.electronDist=<pinned-electron>`
-  —exit0. Release override guard:24 комбинации PASS; compiled release boundary:
- 7 PASS/156 assertions, runtime env не меняет release endpoints.
-- Реальный `settings-live.mjs` через pinned Node/Xvfb —exit0: renderer→preload→IPC→Host,
-  save до входа без site request, start/cancel/start, device exchange,
-  ready в той же generation/revision1, disconnect; browser unknown.
-  Site/Help direct0; первый site запрос прошёл через свой login-shell proxy.
-  Перехвачен только OS opener; настоящий browser Loginom здесь не проверялся.
+- F1: Desktop Connect возвращал pending URL, но не открывал его; старый GUI
+  harness сам нажимал ручную ссылку и не доказывал автоматическое открытие.
+- F2: один исходный HostPort read мог refresh дважды: при catalog/lease recovery
+  и при actual read. Независимый real HTTP probe подтвердил2 GET/2 read attempts.
+
+Оба исправлены отдельным source commit
+`a688c02c83453d1fbc8e03dc95dcb217aa496bc4` —
+`fix(loginom): open cloud login and bound Help recovery`:
+Desktop использует существующий OS opener ровно один раз для актуального pending
+URL, без блокирования polling, с manual fallback и cancel/dispose guards.
+HostPort создаёт один внутренний recovery allowance исходного запроса, общий для
+catalog и read. Независимые/direct Host calls сохраняют отдельные allowance;
+Schema/API/IPC/dependencies/pins/global registry не менялись.
+
+Scoped review всего `7ae457baf4..a688c02c83` — **Spec compliant / Quality Approved**:
+F1/F2 ADDRESSED2, OPEN0, новых Critical/Important0. Это фактическое закрытие
+обязательных findings общего аудита. Source gate закрыт на указанном runtime SHA.
+
+Применимые финальные source проверки, с общим environment выше:
+
+- App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`
+  —exit0,35 PASS/161 assertions. Точный URL/один opener, sync/async failure,
+  late cancel/dispose; новое поведение RED→GREEN.
+- Host `bun test test/cloud-readiness.test.ts test/host-port.test.ts test/cloud-recovery.test.ts test/cloud-auth.test.ts`
+  первоначально —exit1,127 PASS/2 FAIL/721 assertions. Два failures:
+  concurrent401 и late401; lazy mutation budget ошибочно связала независимые
+  direct calls. Исправление отделило ownership HostPort от direct Host.
+  `bun test test/cloud-recovery.test.ts` после исправления —exit0,25 PASS/109.
+  Остальные127 green cases применимы; это не один новый запуск129 PASS.
+  Постоянный real transport→HostPort→Host→Help regression требует error,
+  refresh1/read1/no logout и успех следующего независимого вызова.
+- Desktop `bun test src/main/loginom` на `a688c02c83` —exit0,47 PASS/138,
+  41.27s/0 unhandled. Ранее46 PASS/1 runner timeout5000ms в неизменённом
+  two-active-drains case, затем focused1 PASS/8; причина исходного timeout
+  не доказана. Полный неизменённый slice повторно прошёл; budgets/assertions
+  не ослаблялись.
+- Финальные `bun typecheck` из loginom-host/desktop/opencode —exit0;
+  App typecheck PASS на неизменённом после его проверки исходнике.
+  Другие source checks выше переиспользованы по неизменным срезам.
+
+## Local integration gate: актуальные собранные клиенты
+
+В source fix штатные сборщики снова выполнили из Host
+`bun script/build-cli.ts <scratch>/final-fix-cli --no-archive`, из Desktop
+`bun run build` и `bun run package:linux --dir --x64 --publish never --config.directories.output=<scratch>/final-fix-desktop --config.electronDist=<pinned-electron-zip>`
+—все exit0. `<scratch>` здесь —
+`$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl`.
+Одна dev HTTPS tuple из собственного site и двух реальных MCP fixtures встроена
+в оба клиента. Desktop profile и CLI root различны. Это клиентский контракт,
+не Better Auth. Production forwarding отсутствовал; release fixed-endpoint
+и24 CI guard combinations из13 не затронуты fix и не повторялись.
+
+17532 source inputs заморожены до сборки и не менялись во время неё. Итоговые
+product bytes соответствуют `a688c02c83`; после build изменён только Node test
+(new outage expected error и гарантированный close после auxiliary fixture reset).
+Build metadata правдиво содержит BASE `7ae457baf4`/dirty=true, не clean final SHA.
+
+- CLI: `<scratch>/final-fix-cli`, version `0.0.0-dev-202611062033`,
+  sourceTreeSha256 `5402e89389b1f87616992e708801bb472594299b7959bce1b0951d407ce4b1c7`.
+  Desktop: `<scratch>/final-fix-desktop/linux-unpacked`, version0.3.9/dev,
+  Electron42.3.3. Это own dev artifacts, не installed release/authentic legacy0.3.9.
 - Host `bun test test/node-host.test.ts --test-name-pattern 'current compiled CLI Host'`
-  с `LOGINOM_AI_AGENT_TEST_CLI_BIN=<own-cli>` и
-  `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE=<own-fixture.json>` —1 PASS/17 assertions.
-  Save/start/status/cancel, repeated-start refusal, authenticated ready, все семь
-  Help calls, safe replies, disconnect/clean exit, proxy/NO_PROXY/dead proxy.
-- Opencode `bun test test/cli/loginom-management.test.ts --test-name-pattern 'compiled CLI connects'`
-  —1 PASS/28; `bun test test/cli/standalone-startup.test.ts --test-name-pattern 'compiled CLI recovers'`
-  —1 PASS/13. Использован тот же current artifact/fixture, отдельный CLI root.
-- Existing `python3 test/cli/tui/standalone-pty.py --compiled-cloud --cloud-without-login`
-  с `LOGINOM_AI_AGENT_TEST_CLI_EXE=<own-cli>` и тем же fixture:
-  `--cloud-cancel`, `--cloud-connect --prompt`, `--prompt` —3/3 PASS.
-  Keyboard Ctrl+C130, connect0/decline0; forced=false, один Host,
-  guard отсутствует только после cleanup, alive0. Ответы chat проверены в SQLite.
-  Process-group SIGINT и owner-SIGKILL regressions подтвердили cleanup POSIX Host.
-- CLI dev artifact: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task13-cli`,
-  version `0.0.0-dev-202611061850`, sourceTreeSha256
-  `949b6e6cd53e3d5578950d98e3625fa021817adcd664a234de82fab7f6eb86dc`.
-  Desktop: тот же scratch, `task13-desktop`, version0.3.9/dev, snapshot
-  `b6ca8ce58e7ebf7ebedcc727c9f0ace3187a0fad045da706116ba399e2242801`.
-  Исторические BASE/dirty metadata сохранены. Это собственные dev candidates,
-  не установленные приложения и не проверка настоящего legacy0.3.9.
-- ASAR main/preload/renderer byte equality PASS; ASAR SHA256
-  `49030acd69ceb153f6911841949dfac6ea0a8e62b3906de3aa30d86393f9f68b`.
-  Resource inventory5117 и CLI inventory6141 entries PASS; canary scan6136 CLI /
-  5222 Desktop regular files: общего Dock key, fixture secrets и профилей нет.
+  с `LOGINOM_AI_AGENT_TEST_CLI_BIN=<scratch>/final-fix-cli/bin/loginom-ai-agent-cli`
+  и `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE=<scratch>/final-fix-fixture.json`
+  —exit0,1 PASS/22 assertions. Реальный bundled Node→HostPort→Help HTTP:
+  save/login/same generation, семь reads, обе Dock outage, catalog401→refresh→
+  actual read401 с refresh1/read1/error/no logout и дальнейшим независимым recovery.
+  Site/Help direct0, NO_PROXY/dead proxy и acknowledged clean exit сохранены.
+- Из Desktop `xvfb-run -a "$LOGINOM_AI_AGENT_TEST_NODE" test/loginom/settings-live.mjs`
+  с JSON stdin `{executable,connection,cloud}` из своего descriptor —exit0.
+  Только Connect, без ручного клика: automaticOpenRequests2 для двух попыток,
+  каждый exact URL ровно раз, manualLinkClicks0/osBrowserOpens0.
+  Реальные renderer→controller→preload→IPC→Host; save-before-login/start/cancel,
+  ready в той же generation/revision1, disconnect, login-shell proxy/direct0.
+  Только OS opener перехвачен; настоящий Loginom browser не запускался.
+  Evidence: `$HOME/storage/tmp/loginom-settings-live-peGOQa`;
+  собственный successful profile удалён после acknowledged close, screenshot/summary сохранены.
+- ASAR main/preload/renderer current-byte equality PASS; ASAR SHA256
+  `6f345dc7277a8af5e617e6596cbbda7589fe542efa09b95e7549e788418d1c7f`.
+  Resource inventory5117 и CLI6141 entries PASS. Full byte scan6136 CLI /
+  5222 Desktop regular files: общий Dock key, fixture secrets и profile files отсутствуют.
+  Свои artifact processes завершены; fixture SIGTERM/wait exit0, PID отсутствует.
+
+Исторические compiled gates13 остаются доказательствами на своей ревизии:
+management1/28, constructor1/13 и PTY3/3 через существующие Opencode tests/driver.
+Команды management/constructor:
+`bun test test/cli/loginom-management.test.ts --test-name-pattern 'compiled CLI connects'`,
+`bun test test/cli/standalone-startup.test.ts --test-name-pattern 'compiled CLI recovers'`.
+PTY: `python3 test/cli/tui/standalone-pty.py --compiled-cloud --cloud-without-login`
+с `--cloud-cancel`, `--cloud-connect --prompt`, `--prompt`, собственными
+`LOGINOM_AI_AGENT_TEST_CLI_EXE`/`LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE`:
+Ctrl+C130, connect0/decline0, forced=false/one Host/guard=false/alive0,
+provider reply в SQLite. CLI lifecycle/launcher и эти contracts не менялись;
+F1 проверен новым GUI, затронутый F2 HostPort — новым compiled Node gate выше.
+Это не повтор этих management/PTY checks на a688.
+
+Исторические paths13 не переименовывались: `<scratch>/task13-cli`
+(version `0.0.0-dev-202611061850`, snapshot
+`949b6e6cd53e3d5578950d98e3625fa021817adcd664a234de82fab7f6eb86dc`),
+`<scratch>/task13-desktop` (0.3.9/dev, snapshot
+`b6ca8ce58e7ebf7ebedcc727c9f0ace3187a0fad045da706116ba399e2242801`,
+ASAR `49030acd69ceb153f6911841949dfac6ea0a8e62b3906de3aa30d86393f9f68b`).
+Оба BASE12/dirty; historical GUI evidence `loginom-settings-live-shAv1M`.
+Временные candidate paths не обещают бессрочного хранения артефактов.
 
 Task14 (`0b9e5d5948`) дополнительно проверил настоящий Python Dock на loopback:
 RagFS/vector x86_avx2 реально загружены, отдельные workspace/auth registry,
@@ -193,9 +266,16 @@ uv run --frozen --no-sync pytest tests/server/test_agent_cloud_access.py tests/s
 ```
 
 Exit0,6 PASS/0 SKIP. После усиления exact-content/cleanup assertions новые
-native/network tests повторно2 PASS. Tracker/processor15 PASS из affected run;
+native/network tests повторно2 PASS. Исходная affected-команда из того же package:
+
+```sh
+uv run --frozen --no-sync pytest tests/server/test_agent_cloud_access.py tests/server/test_request_wait_tracking.py tests/telemetry/test_request_wait_tracker.py tests/storage/test_semantic_processor_target_preexisting.py tests/storage/test_semantic_processor_identity.py
+```
+
+Exit1,19 PASS/2 FAIL:15 tracker/processor cases прошли, два request-wait cases
+показали устаревший unit stub. После его исправления
 `uv run --frozen --no-sync pytest tests/server/test_request_wait_tracking.py`
-—exit0,4 PASS после исправления устаревшего unit stub. Это применимые21 поведения,
+—exit0,4 PASS. Вместе с final native/network2 PASS это применимые21 поведения,
 не один вымышленный запуск21 PASS. Native mandatory ACL test выявил дефект
 `write(wait:true)`: disabled telemetry теряла request identity. Минимальный bind
 в SemanticProcessor восстановил ожидание embedding/creator MANAGE; неизменённый
@@ -224,6 +304,12 @@ native cloud save/read/delete в safeStorage/DPAPI/Keychain и отказ чуж
 профилю расшифровать Keychain запись. Browser Loginom остаётся прямым.
 Linux plaintext0700/0600 и local CA/proxy fixtures PASS; это не installed OS trust
 и не полный native worst-case budget. Установленные приложения не запускались.
+Перед Windows gate восстановить совместимый manual driver/input и platform setup:
+`packages/loginom-host/script/windows-settings-live.ts` передаёт старое
+`{executable,connection}` без обязательного `cloud`, а общий `settings-live.mjs`
+создаёт POSIX shell fixture. Текущий helper не подтверждает Windows; его совместимость
+нужно исправить либо выбрать подходящий entry point до настоящего native прогона.
+Этой docs-only задачей native helper не менялся.
 
 **Внешний gate:** не выполнен — разрешённые staging site, два независимых Dock
 registry/accounts и подготовленные тестовые установки не предоставлены.
@@ -279,10 +365,17 @@ Task13 freeze/inventory/candidate verification JSON, settings-live evidence
 Это временные материалы, не обязательная долговечная копия git-документации;
 команды, source provenance, результаты и условия продолжения сохранены выше.
 
-Task15 меняет только документацию. До commit выполнены self-review,
-`git diff --check`, проверка локальных ссылок и smoke исправленного примера
-запуска/readiness/cleanup собственной fixture. Независимое ревью Task15 и свежий
-whole-branch review от `dd2f949d11` пока PENDING; результаты и итоговый SHA будут
-добавлены в журнал после их получения. Обязательные findings закрываются до
-завершения source gate. Чистый status фиксируется после commit, не предполагается.
+Initial Task15 docs commit `7ae457baf4` прошёл scoped review и документальные
+проверки, включая actual fixture start/readiness/own-PID cleanup smoke.
+Независимое whole-branch ревью нашло F1/F2; source fix `a688c02c83` проверен
+отдельным scoped review, оба findings закрыты, новых Critical/Important нет.
+Точный affected pytest command из Minor15 перенесён выше без повторного запуска.
+
+Заключительная правка Task15 — только документация поверх стабильного runtime SHA
+`a688c02c83453d1fbc8e03dc95dcb217aa496bc4`: source/local gates закрыты,
+native/external остаются NOT_RUN. Проверяются изменённые ссылки, checkboxes,
+checkpoint<=20 строк, diff и неизменность кода. Новые suites/builds не запускались;
+результаты/пределы исходных проверок сохранены. Следующие действия владельца —
+изолированные site/reserve/accounts, native CA/proxy/storage приёмка с совместимым
+Windows driver, безопасный authentic0.3.9 стенд; legacy-disable отдельной командой.
 Push, PR, merge, release, production rollout и отключение legacy key не выполнялись.
