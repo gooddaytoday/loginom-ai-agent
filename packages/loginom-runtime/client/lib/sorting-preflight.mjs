@@ -48,7 +48,7 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  if(port.active===false&&inactiveSource)return inactiveSource({channel,binding,port,state:s});
  if(port.active!==true){const error=Error(label+' preflight requires an active source output');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
- const admission=['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
+ const admission=['sorting','calculator','filter','join_input_0','join_input_1','enrich_input_0','enrich_input_1','enrich_input_2'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
  let preview;
  if(admission){
   // Join input 0's preview can leave its source selected. Select the owned JS
