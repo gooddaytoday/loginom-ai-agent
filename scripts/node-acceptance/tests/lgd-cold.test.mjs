@@ -10,6 +10,10 @@ test('native empty/Variant golden uses the complete stock cold contract',async()
  assert.equal(outputs[1].rows.length,25);assert.equal(outputs[1].columns[2].type,'variant');
  assert.deepEqual(new Set(outputs[1].rows.flatMap(r=>r.Values?[r.Values.cell_type]:[])),new Set(['integer','string','real','datetime','boolean']));
 });
+test('LGD checksum fixture uses the stock cold expected contract',async()=>{
+ const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/checksum/expected.json',import.meta.url),'utf8'));
+ assert.equal(parseExpectedOutputs({...expected,package_path:'/own/checksum.lgp'}).outputs.length,3);
+});
 test('LGD cold audits retained source before execution and materialized output properties after full reading',async()=>{
  const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('  let coldChannelSequence=0;'),source.indexOf('  const matched=correspondence.map'));
