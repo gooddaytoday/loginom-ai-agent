@@ -9,6 +9,8 @@ import {nodeApiTools} from '../lib/node-api.mjs';
 import {userNodeTool,createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 import {lgdExportNext} from '../lib/lgd-export-procedure.mjs';
+import {readLgdExportBrowser} from '../lib/lgd-export-context.mjs';
+import {LGD_EXPORT_FIELDS} from '../lib/lgd-parameters.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
 import {verifyLgdOutputMapping,validateLgdChecksumChange} from '../lib/lgd-import-node.mjs';
 test('explicit checksum opt-out cannot bypass a known native checksum refusal for the same bytes or node',()=>{
@@ -102,6 +104,53 @@ test('LGD preflight rejects disabled checksums, foreign format options and synth
  assert.doesNotThrow(()=>validateLgdImportParameters({},'native',{...request('imports.lgd'),target:{kind:'existing'}}));
  const p={lgd_export:{destination:'/test-2/out.lgd',compression:'lz4',checksum:'compressed',overwrite:'reject'}};
  assert.doesNotThrow(()=>validateLgdExportParameters(p,'native',request('exports.lgd')));
- for(const change of [{compression:'lzo'},{checksum:'none'},{overwrite:'replace'},{destination:'/test-2/out.xlsx'}])assert.throws(()=>validateLgdExportParameters({lgd_export:{...p.lgd_export,...change}},'native',request('exports.lgd')));
+ for(const change of [{compression:'lzo'},{checksum:'none'},{overwrite:'append'},{destination:'/test-2/out.xlsx'}])assert.throws(()=>validateLgdExportParameters({lgd_export:{...p.lgd_export,...change}},'native',request('exports.lgd')));
  assert.throws(()=>validateLgdExportParameters(p,'native',{...request('exports.lgd'),read:{ports:[0]}}));
+});
+test('LGD replacement requires an explicitly authorized own destination in every request',()=>{
+ const existing={...request('exports.lgd'),target:{kind:'existing'}};
+ const own={packages:'/test-2',inputs:'/test-2',exports:'/test-2'},other={packages:'/other',inputs:'/other',exports:'/other'};
+ assert.doesNotThrow(()=>validateLgdExportParameters({lgd_export:{destination:'/test-2/out.lgd',overwrite:'replace'}},'native',existing,own));
+ assert.throws(()=>validateLgdExportParameters({lgd_export:{overwrite:'replace'}},'native',existing,own),/explicit destination/);
+ assert.throws(()=>validateLgdExportParameters({lgd_export:{destination:'/test-2/out.lgd',overwrite:'replace'}},'native',existing,other));
+ assert.doesNotThrow(()=>validateLgdExportParameters({},'native',existing,own));
+});
+test('LGD destination bindings require one exact variable and never accept a conflicting literal',()=>{
+ const r=request('exports.lgd'),settings={compression:'lz4',checksum:'compressed',overwrite:'reject',bindings:{destination:{variable:'LgdPath'}}};
+ assert.doesNotThrow(()=>validateLgdExportParameters({lgd_export:settings},'native',r));
+ for(const bindings of [{destination:{variable:''}},{compression:{variable:'LgdPath'}},{destination:{variable:'LgdPath',value:'/test-2/out.lgd'}}])
+  assert.throws(()=>validateLgdExportParameters({lgd_export:{...settings,bindings}},'native',r));
+ assert.throws(()=>validateLgdExportParameters({lgd_export:{...settings,destination:'/test-2/out.lgd'}},'native',r));
+});
+test('LGD Next replaces only the exact file after explicit authorization',async()=>{
+ let question=false,done=false;const gestures=[];
+ const node={verified:true,surface:'wizard',node_id:'sink'},before={verified:true,stage:'lgd_export',values:{destination:{value:'/test-2/out.lgd'}},node_context:node};
+ const task={operation_id:'lgd-replace',origin:'https://example.test',deadline:Date.now()+5000,overwrite:'replace',destination:'/test-2/out.lgd',before,binding:{node:{node_id:'sink'},workflow_ref:{prefix:'MF;TF-1'}}};
+ const page={evaluate:async fn=>fn.toString().includes('location.origin')?true:{present:question,exact:question},locator:selector=>({count:async()=>1,elementHandle:async()=>({evaluate:async()=>true,dispose:async()=>{},click:async()=>{
+  gestures.push(selector);if(gestures.length===1)question=true;else{question=false;done=true;}
+ }})}),waitForTimeout:async()=>{}};
+ const result=await lgdExportNext(page,task,async()=>node,async()=>done?{verified:true,stage:'done',node_context:node}:structuredClone(before),()=>{},{});
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.decision,'replace');assert.equal(result.output.existed,true);
+ assert.equal(gestures.length,2);assert.match(gestures[1],/msgbox;tlb;yes/);
+});
+test('LGD bound path reads the independently mapped string without dereferencing native proxies',()=>{
+ const oldDocument=globalThis.document,oldExt=globalThis.Ext,prefix='own',base=prefix+';WizrdMCF;',elements=new Map(),components=new Map();
+ const proxy=new Proxy({},{get(){assert.fail('native variable proxy must not be dereferenced');}});
+ const add=(tid,c)=>{const e={id:tid,checkVisibility:()=>true};elements.set(tid,e);components.set(tid,{...c,el:{dom:e}});return e;};
+ const root=add(base+'ExportNativeParamsWizard',{ });root.contains=()=>true;
+ for(const [key,[card,id]]of Object.entries(LGD_EXPORT_FIELDS)){
+  const tid=base+card+';'+id,value={destination:'hidden-old-path',compression:2,checksum:1,string_cache_max_size:131072}[key];
+  add(tid+';SwitchButton',{pressed:key==='destination'});add(tid+';ValueControl',{getValue:()=>value});
+ }
+ add(base+'ExportNativeParamsWizard;edtConnection',{getValue:()=>'Локальное'});
+ add(base+'ExportNativeParamsWizard;edtFileName;VariableControl',{getValue:()=>proxy,getStore:()=>({getData:()=>({items:[{data:{field1:proxy,field2:'LgdPath ( /test-2/current.lgd )'}}]})})});
+ globalThis.document={querySelectorAll:selector=>{const tid=JSON.parse(selector.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};
+ globalThis.Ext={getCmp:id=>components.get(id)};
+ const variableMapping={kind:'variables',direction:'input',port:0,fields:[{name:'LgdPath',type:5,value:'/test-2/current.lgd',is_null:false,source:{name:'SourcePath'}}]};
+ try{
+  const result=readLgdExportBrowser({prefix,fields:LGD_EXPORT_FIELDS,variableMapping});
+  assert.equal(result.verified,true);assert.deepEqual(result.values.destination,{value:'/test-2/current.lgd',display:'LgdPath ( /test-2/current.lgd )',tid:base+'ExportNativeParamsWizard;edtFileName;VariableControl',variable:true,variable_name:'LgdPath'});
+  for(const change of [null,{...variableMapping,fields:[]},{...variableMapping,fields:[{...variableMapping.fields[0],is_null:true}]},{...variableMapping,fields:[{...variableMapping.fields[0],type:1}]},{...variableMapping,fields:variableMapping.fields.concat(variableMapping.fields)}])
+   assert.equal(readLgdExportBrowser({prefix,fields:LGD_EXPORT_FIELDS,variableMapping:change}).reason,'lgd_export_destination_variable');
+ }finally{globalThis.document=oldDocument;globalThis.Ext=oldExt;}
 });

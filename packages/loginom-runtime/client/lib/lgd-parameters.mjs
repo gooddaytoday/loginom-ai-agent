@@ -7,10 +7,11 @@ export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['veri
   description:'Bind filename to one mapped string variable from an executed source. Use variable_inputs kind variables, input 0 (native Input_Var-1), not control. Supply source for the exact current verified file when selecting a binding.'}});
 export const lgdImportParametersSchema=object({source:importSourceSchema,lgd_import:lgdImportSettingsSchema});
 export const lgdExportSettingsSchema=object({
- destination:{type:'string',minLength:1,maxLength:512,description:'New absolute .lgd file in the selected own export directory.'},
+ destination:{type:'string',minLength:1,maxLength:512,description:'Absolute .lgd file in the selected own export directory. Exclusive with bindings.destination.'},
  compression:{type:'string',enum:['lz4'],description:'Native LZ4 compression.'},
  checksum:{type:'string',enum:['compressed'],description:'Checksum of compressed data.'},
- overwrite:{type:'string',enum:['reject'],description:'Never overwrite an existing file.'},
+ overwrite:{type:'string',enum:['reject','replace'],description:'Default reject. Replace requires an explicit destination or binding in this request; only the exact own file may be replaced.'},
+ bindings:object({destination:{type:'object',additionalProperties:false,properties:{variable:{type:'string',minLength:1,maxLength:128}},required:['variable'],description:'Exact string variable on the connected variables input 0; its observed value must be an own absolute .lgd path.'}}),
 });
 export const lgdExportParametersSchema=object({lgd_export:lgdExportSettingsSchema});
 export function validateLgdImportParameters(p,mode,r){
@@ -34,9 +35,19 @@ export function validateLgdExportParameters(p,mode,r,directories=null){
  need(mode==='native'&&p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='lgd_export'),'use lgd_export, mode native');
  const s=p.lgd_export??{};
  need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>Object.hasOwn(lgdExportSettingsSchema.properties,k)),'unknown export setting');
- if(r.target.kind==='new')for(const k of Object.keys(lgdExportSettingsSchema.properties))need(Object.hasOwn(s,k),'new export requires '+k);
+ const bindings=s.bindings;
+ if(bindings!==undefined)need(bindings&&typeof bindings==='object'&&!Array.isArray(bindings)&&Object.keys(bindings).join(',')==='destination'
+  &&bindings.destination&&typeof bindings.destination==='object'&&!Array.isArray(bindings.destination)&&Object.keys(bindings.destination).join(',')==='variable'
+  &&typeof bindings.destination.variable==='string'&&bindings.destination.variable.length>0&&bindings.destination.variable.length<=128&&!/[\0\r\n]/.test(bindings.destination.variable)
+  &&s.destination===undefined,'bindings require one exact destination variable without a conflicting literal');
+ if(r.target.kind==='new'){
+  for(const k of ['compression','checksum','overwrite'])need(Object.hasOwn(s,k),'new export requires '+k);
+  need(Object.hasOwn(s,'destination')||bindings,'new export requires destination or bindings.destination');
+ }
  if('destination'in s)validateLgdExportDestination(s.destination,directories);
- for(const [k,v]of Object.entries({compression:'lz4',checksum:'compressed',overwrite:'reject'}))need(!(k in s)||s[k]===v,'unsupported '+k);
+ for(const [k,v]of Object.entries({compression:'lz4',checksum:'compressed'}))need(!(k in s)||s[k]===v,'unsupported '+k);
+ need(!('overwrite'in s)||['reject','replace'].includes(s.overwrite),'unsupported overwrite');
+ need(s.overwrite!=='replace'||Object.hasOwn(s,'destination')||bindings,'replace requires explicit destination or binding in this request');
  need(r.read.ports.length===0&&(r.read.sample_rows??0)===0&&(r.read.require_exact_numbers??false)===false,'sink requires read ports [], sample_rows 0, require_exact_numbers false');
  need(r.mappings.length===0&&r.inputs.length<=1&&(r.target.kind==='existing'||r.inputs.length===1),'new export needs one table; no requested mappings');
 }
