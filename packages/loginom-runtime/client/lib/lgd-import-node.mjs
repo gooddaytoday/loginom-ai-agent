@@ -16,8 +16,8 @@ export function validateLgdChecksumChange(checksum,source,history,node){
 }
 export function verifyLgdOutputMapping(m){
  need(m.inventory_complete&&m.source_identity_verified&&m.source_fields.length>0&&m.source_fields.length===m.target_fields.length
-  &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime'].includes(f.type)
-   &&['Дискретный','Непрерывный'].includes(f.data_kind)&&!f.excluded&&f.source
+  &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime','variant'].includes(f.type)
+   &&(f.type==='variant'?f.data_kind==='Неопределенное':['Дискретный','Непрерывный'].includes(f.data_kind))&&!f.excluded&&f.source
    &&JSON.stringify(f.source)===JSON.stringify(m.source_fields[i])
    &&['name','label','type'].every(k=>f[k]===m.source_fields[i][k])),'native LGD output properties changed');
  return m;
@@ -38,15 +38,26 @@ export function createLgdImportNodeSupport(config){
   readback:lgdImportReadback,configurationObservation:{condition:'owned LGD source',ready:s=>s.wizard?.stage==='lgd_import'},
   configureInputs:async()=>verified({not_applicable:true})};
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,definition).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
-  const {operation,onRecord,execute,receiptOptions}=options;let source;
+  const {operation,onRecord,execute,receiptOptions}=options;let source,variables=[];
   const drivers=createTabularTransformNodeSupport(config,{...definition,
+   async beforeOpen(channel,request){
+    const graph=await operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},operation.deadline);
+    need(graph.complete===true,'complete LGD variable graph required');
+    if(![...graph.links,...graph.variable_links??[]].some(e=>e.kind==='variables'&&e.target===operation.nodeApply.node.node_id))return;
+    const existing=operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.variable_mappings;
+    const mapped=existing?.find(m=>m.kind==='variables'&&m.port===0);
+    const observed=mapped??(await channel.mapVariablePort({direction:'input',kind:'variables',port:0})).mapping;
+    need(observed?.kind==='variables'&&observed.port===0,'verified LGD input variables required');
+    variables=observed.fields.filter(v=>v.type===5&&!v.is_null&&typeof v.value==='string'&&v.source?.type===5);
+   },
    async configure(channel,p){
     const step=operation.nodeStepSequence=(operation.nodeStepSequence??0)+1,id=operation.id+':n'+step,key='node.lgd_import.configure.internal';
     const task={document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref,node:operation.nodeApply.node,
-     deadline:operation.deadline,origin:config.targetOrigin,build:config.targetBuild,source_path:source?.source?.destination,checksum:p.lgd_import?.checksum};
+     deadline:operation.deadline,origin:config.targetOrigin,build:config.targetBuild,source_path:source?.source?.destination,checksum:p.lgd_import?.checksum,
+     source_binding:p.lgd_import?.bindings?.source_path?.variable,variables};
     const signature=createHash('sha256').update(JSON.stringify(task)).digest('hex');
     const entry=(phase,value)=>onRecord({operation_id:operation.id,action_key:'node.apply',action_revision:'1.0.0',phase,internal_provenance:'client_node_procedure_v1',step,internal_operation_id:id,...value});
-    const action={verb:'lgd_import_configure',source_path:task.source_path,checksum:task.checksum};
+    const action={verb:'lgd_import_configure',source_path:task.source_path,checksum:task.checksum,source_binding:task.source_binding};
     const ack=await entry('node_step_prepared',{action,signature});need(ack?.signature===signature&&JSON.stringify(ack.action)===JSON.stringify(action),'durable preparation differs');
     const code=makeLgdImportConfigureCode(task);
     const envelope=`async page=>{const r=await (${code})(page);return {status:r.verified?'SUCCEEDED':r.effect_possible?'FAILED':'NOT_APPLIED',action_key:${JSON.stringify(key)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'configure',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'LGD_CONFIGURATION_REFUSED',message:r.error}:null,trace:[]}}`;

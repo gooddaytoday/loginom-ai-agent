@@ -1,0 +1,22 @@
+{
+  "writer": {
+    "product": "Loginom",
+    "version": "7.4.2",
+    "bitness": 64,
+    "compression": "LZ4",
+    "checksum": "Сжатых данных"
+  },
+  "provenance": "Native Export in Loginom Data wizard (?testable=true); empty: properties table filtered RecordId<0; Variant: native Collapse columns of source.lgd, all five fields in source order, information=[], ignore_empty=false.",
+  "files": [
+    {
+      "name": "empty.lgd",
+      "bytes": 164,
+      "sha256": "4c385007cdda726feba8c6a38795747e7f5c01ea5a0d4b2bd6e30a455ecc00d3"
+    },
+    {
+      "name": "variant.lgd",
+      "bytes": 758,
+      "sha256": "e706219a7e81ec2300a7a56e2bcd392f31d9e6a061d2f2b21561f2239864c0b7"
+    }
+  ]
+}

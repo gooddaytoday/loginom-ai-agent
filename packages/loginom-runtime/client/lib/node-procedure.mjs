@@ -260,7 +260,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     now,
     async readOutputPort(request) {
       checkBudget();
-      if((operation.nodeApply?.request??operation.parameters)?.target?.type==='variables.to_table')request={...request,typedVariants:true};
+      if(['variables.to_table','imports.lgd'].includes((operation.nodeApply?.request??operation.parameters)?.target?.type))request={...request,typedVariants:true};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;

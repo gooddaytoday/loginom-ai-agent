@@ -125,6 +125,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name == 'lgd-import-empty-variant':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/empty-variant', prompt=node / 'acceptance/empty-variant/task.md',
+                    data=node / 'fixtures/empty-variant', input_files=['empty.lgd', 'variant.lgd'],
+                    expected_name='expected.json', base=None, lgd='empty_variant',
+                    oracle=node / 'acceptance/oracle.py')
     if name == 'lgd-import-compression':
         node = REPO / 'docs/node-development/nodes/imports-lgd'
         return dict(source=node / 'acceptance/compression', prompt=node / 'acceptance/compression/task.md',
@@ -136,6 +142,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/checksum', prompt=node / 'acceptance/checksum/task.md',
                     data=node / 'fixtures/64bit', input_files=['checksum-none.lgd', 'checksum-compressed.lgd', 'checksum-both.lgd'],
                     expected_name='expected.json', base=None, lgd='checksum',
+                    oracle=node / 'acceptance/oracle.py')
+    if name == 'lgd-import-variable':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/variable', prompt=node / 'acceptance/variable/task.md',
+                    data=node / 'fixtures/variable', input_files=['variable-a.lgd', 'variable-b.lgd'],
+                    expected_name='expected.json', lgd_initial='expected-initial.json', base=None, lgd='variable',
                     oracle=node / 'acceptance/oracle.py')
     if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-overwrite', 'lgd-export-variable', 'lgd-export-compression']:
         export = name.startswith('lgd-export')
@@ -625,6 +637,11 @@ def export_null_marker(events, destination):
             node = readback.get('node')
         elif ((readback.get('destination') or parameters.get('destination')) == destination
               or node is not None and request.get('target', {}).get('ref') == node):
+            if readback.get('destination') not in [None, destination]:
+                # A verified move to another file does not rewrite the earlier
+                # file's marker. Stop following that node for this destination.
+                node = None
+                continue
             settings = readback.get('settings', {})
             found = readback.get('destination') == destination and 'null_marker' in settings
             marker, node = settings.get('null_marker'), readback.get('node', node)
@@ -833,6 +850,25 @@ def check_lgd_import_result(replies, row_count):
                and any(p.get('port') == 0 and p.get('sample_complete') is True
                        and p.get('row_count') == row_count and port_path(owner, p) is not None
                        for owner, p in ports(o)) for _, o in replies), 'LGD_IMPORT_FULL_RESULT_MISSING'
+
+
+def check_lgd_variable_switch(replies, switch):
+    reads, seen = [], set()
+    for _, reply in replies:
+        for owner, port in ports(reply):
+            readback = owner.get('configuration', {}).get('readback', {})
+            source = readback.get('source', {})
+            execution = owner.get('execution', {}).get('execution_id')
+            if (owner.get('status') == 'SUCCEEDED' and owner.get('cleanup_complete') is True
+                    and readback.get('kind') == 'lgd_import' and owner.get('execution', {}).get('status') == 'completed'
+                    and source.get('source_variable') == switch['variable'] and execution and execution not in seen
+                    and port.get('port') == 0 and port.get('sample_complete') is True and port_path(owner, port) == 'port'):
+                reads.append((owner, source))
+                seen.add(execution)
+    first = next((r for r in reads if r[1].get('source_path', '').endswith('-' + switch['before'])), None)
+    second = next((r for r in reads[reads.index(first) + 1:] if r[0].get('node') == first[0].get('node')
+                   and r[1].get('source_path', '').endswith('-' + switch['after'])), None) if first else None
+    assert first and second and first[1]['source_path'] != second[1]['source_path'], 'LGD_VARIABLE_SWITCH_SAME_NODE_MISSING'
 
 
 def check_lgd_export_case(replies, case, destination, initial_destination):
@@ -1502,6 +1538,8 @@ class Runner:
             check_lgd_import_result(replies, len(expected['outputs'][0]['rows']))
         if expected.get('lgd', {}).get('checksum_switch_filename'):
             check_lgd_checksum_switch(replies, expected['lgd']['checksum_switch_filename'])
+        if expected.get('lgd', {}).get('source_switch'):
+            check_lgd_variable_switch(replies, expected['lgd']['source_switch'])
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None
@@ -1587,7 +1625,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
+            csv_expected = (read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('lgd_initial')
+                            else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
                             else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
             delimiter = check_csv(actual, csv_expected, header,
                                   column_order='any' if isinstance(case, Path) else None,
