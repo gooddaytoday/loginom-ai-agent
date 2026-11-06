@@ -131,6 +131,12 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/empty-variant', input_files=['empty.lgd', 'variant.lgd'],
                     expected_name='expected.json', base=None, lgd='empty_variant',
                     oracle=node / 'acceptance/oracle.py')
+    if name == 'lgd-import-compression':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/compression', prompt=node / 'acceptance/compression/task.md',
+                    data=node / 'fixtures/64bit', input_files=['compression-none.lgd', 'compression-lzo.lgd', 'compression-lz4.lgd'],
+                    expected_name='expected.json', base=None, lgd='compression',
+                    oracle=node / 'acceptance/oracle.py')
     if name == 'lgd-import-checksum':
         node = REPO / 'docs/node-development/nodes/imports-lgd'
         return dict(source=node / 'acceptance/checksum', prompt=node / 'acceptance/checksum/task.md',

@@ -51,17 +51,18 @@ export async function configureLgdImportBrowser(page,t,readContext){
   // Keep the source page visible until that preview succeeds or reports its
   // own error; advancing early can hide a failed preview behind the next card.
   observed=await wait('source preview',async()=>{const v=await native();return v.compression!==''&&v.written_checksum!==''&&v.bitness!==''?v:null;});
-  const written=['Нет','Сжатых данных','Сжатых и несжатых данных'];
-  need(observed.compression==='LZ4'&&written.includes(observed.written_checksum)&&observed.bitness==='64-битная система','unsupported native LGD format');
+  const supported=v=>v.bitness==='64-битная система'&&(v.compression==='LZ4'&&['Нет','Сжатых данных','Сжатых и несжатых данных'].includes(v.written_checksum)
+   ||['Без сжатия','LZO'].includes(v.compression)&&v.written_checksum==='Нет');
+  need(supported(observed),'unsupported native LGD format');
   const advance=async target=>{await nativeError();await click(find(root+';btnNext'));await wait(target,async()=>{
    await nativeError();
    return await find(root+';'+target).isVisible()&&await page.evaluate(target=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().el.dom.getAttribute('data-tid').endsWith(';'+target),target);
   });};
   await advance('ColumnsMappingEngineOutputPortWizard');
-  const selectedSource=observed.source_path;
+  const selectedSource=observed;
   observed=await native();
-  need(observed.source_path===selectedSource&&observed.checksum===expectedChecksum&&observed.connection==='Локальное','source or checksum changed during native validation');
-  need(observed.compression==='LZ4'&&written.includes(observed.written_checksum)&&observed.bitness==='64-битная система','unsupported retained native LGD format');
+  need(observed.source_path===selectedSource.source_path&&observed.checksum===expectedChecksum&&observed.connection==='Локальное','source or checksum changed during native validation');
+  need(supported(observed)&&['compression','written_checksum','bitness'].every(k=>observed[k]===selectedSource[k]),'unsupported retained native LGD format');
   await advance('DoneWizard');
   return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source:observed}};
  }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
