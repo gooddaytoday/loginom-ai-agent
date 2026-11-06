@@ -468,6 +468,23 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
                 runner.check_csv(path, expected, export_events=events, **options)
 
+    def test_export_marker_remains_bound_to_each_file_when_one_node_moves_to_another_destination(self):
+        node = dict(document_id='doc', workflow_id='workflow', node_id='export-node')
+        events = []
+        for operation, destination, kind, marker in [('before', '/test/before.csv', 'new', 'NULL'),
+                                                     ('after', '/test/after.csv', 'existing', '?')]:
+            batch = self.export_events(marker, destination=destination, kind=kind, readback=marker)
+            request = batch[0][1]['part']['state']['input']
+            request['operation_id'] = operation
+            if kind == 'existing': request['target']['ref'] = node
+            outcome = json.loads(batch[1][1]['part']['state']['output'])
+            outcome['operation_id'] = operation
+            outcome['configuration']['readback']['node'] = node
+            batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            events += batch
+        self.assertEqual(runner.export_null_marker(events, '/test/before.csv'), 'NULL')
+        self.assertEqual(runner.export_null_marker(events, '/test/after.csv'), '?')
+
     def test_empty_export_null_marker_rejects_empty_strings_but_accepts_null_only(self):
         expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
         with tempfile.TemporaryDirectory() as directory:

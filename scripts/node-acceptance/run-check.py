@@ -618,6 +618,11 @@ def export_null_marker(events, destination):
             node = readback.get('node')
         elif ((readback.get('destination') or parameters.get('destination')) == destination
               or node is not None and request.get('target', {}).get('ref') == node):
+            if readback.get('destination') not in [None, destination]:
+                # A verified move to another file does not rewrite the earlier
+                # file's marker. Stop following that node for this destination.
+                node = None
+                continue
             settings = readback.get('settings', {})
             found = readback.get('destination') == destination and 'null_marker' in settings
             marker, node = settings.get('null_marker'), readback.get('node', node)
