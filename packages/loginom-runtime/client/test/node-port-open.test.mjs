@@ -350,6 +350,47 @@ test('active port opening confirms its bound question once and replay performs n
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
+for(const direction of ['input','output'])for(const [condition,change] of Object.entries({
+ one_dialog:f=>{const query=f.document.querySelectorAll,extra=f.el('foreign-dialog');f.document.querySelectorAll=q=>q==='[role="dialog"],.x-message-box'?[f.dialog,extra]:query(q);},
+ native_dialog:f=>{f.nativeControls.get(f.dialog.id).el.dom={};},
+ question:f=>{f.dialog.innerText='PRIVATE_UI_TEXT_SECRET'.repeat(1000);},
+ graph:f=>{f.card.Controller.FController={constructor:{name:'OtherController'}};},
+ port:f=>{f.graph.FCurrentPortMenu={};},
+ unlocked:f=>{f.node.FLocked=true;},
+ workflow:f=>{f.card.Controller.Node.data.node={};},
+}))test(direction+' port refusal diagnoses '+condition+' without confirming the dialog',async()=>{
+ const f=fixture(direction);f.flags.deactivation=true;f.flags.beforeConfirm=()=>change(f);
+ const result=await f.run(),prefix='Port deactivation question owner changed: ';
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);
+ assert.equal(f.gestures.length,2);assert.equal(f.prep[direction+'PortOpenReceipts'].get('open').phase,'open_issued');
+ assert.ok(result.error.startsWith(prefix),result.error);
+ const diagnostic=JSON.parse(result.error.slice(prefix.length));
+ assert.deepEqual(diagnostic.checks,{one_dialog:condition!=='one_dialog',native_dialog:condition!=='native_dialog',question:condition!=='question',
+  graph:condition!=='graph',port:condition!=='port',unlocked:condition!=='unlocked',workflow:condition!=='workflow'});
+ assert.equal(diagnostic.controller,condition==='graph'?'OtherController':'ModelForm');
+ assert.equal(diagnostic.wizard_visible,false);
+ assert.ok(Buffer.byteLength(result.error)<=500);assert.ok(!result.error.includes('PRIVATE_UI_TEXT_SECRET'));
+});
+
+test('port refusal bounds the controller class and never includes the rejected UI text',async()=>{
+ const f=fixture('input');f.flags.deactivation=true;f.flags.beforeConfirm=()=>{
+  f.graph.constructor={name:'C'.repeat(1000)};f.dialog.innerText='PRIVATE_UI_TEXT_SECRET'.repeat(1000);f.wizard.FView.el.dom.visible=true;
+ };
+ const result=await f.run(),prefix='Port deactivation question owner changed: ';
+ assert.ok(result.error.startsWith(prefix),result.error);
+ const diagnostic=JSON.parse(result.error.slice(prefix.length));
+ assert.equal(diagnostic.controller,'C'.repeat(64));assert.equal(diagnostic.checks.question,false);assert.equal(diagnostic.wizard_visible,true);
+ assert.ok(Buffer.byteLength(result.error)<=500);assert.ok(!result.error.includes('PRIVATE_UI_TEXT_SECRET'));
+ assert.equal(f.gestures.length,2);
+});
+
+for(const direction of ['input','output'])test(direction+' successful port opening does not emit refusal diagnostics',async()=>{
+ const f=fixture(direction);f.flags.deactivation=true;const result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(f.gestures.length,3);
+ for(const key of ['checks','controller','wizard_visible'])assert.ok(!JSON.stringify(result).includes('"'+key+'"'));
+ assert.equal(result.error,undefined);
+});
+
 test('deactivation ignores hidden controls retained by an earlier dialog',async()=>{
  for(const direction of ['input','output'])for(const name of ['yes','no','cancel']){
   const f=fixture(direction);f.flags.deactivation=true;

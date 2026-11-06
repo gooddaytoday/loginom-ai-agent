@@ -206,6 +206,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data',
                     input_files=['keys.csv'], base=None, expected_name='expected.json')
+    if name in ['tree-parent-child', 'tree-parent-roots', 'tree-parent-cycle', 'tree-parent-orphan']:
+        node = REPO / 'docs/node-development/nodes/trees-datatotree'
+        kind = {'tree-parent-child': 'org', 'tree-parent-roots': 'multiple-roots',
+                'tree-parent-cycle': 'cycle', 'tree-parent-orphan': 'orphan'}[name]
+        src = node / 'acceptance/parent-child'
+        return dict(source=src, prompt=node / 'acceptance/task-parent-child.md' if kind == 'org' else src / ('task-' + kind + '.md'),
+                    data=node / 'fixtures/parent-child', input_files=[kind + '.csv'], base=None,
+                    expected_name='expected-' + kind + '-run.json')
     if name in ['table-tree-json', 'json-tree-json']:
         slug = 'trees-datatotree' if name == 'table-tree-json' else 'trees-treetojson'
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
