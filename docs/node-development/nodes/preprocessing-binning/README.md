@@ -6,7 +6,7 @@ ID `component.preprocessing.Binning`, slug `preprocessing-binning`.
 
 Зарегистрирован `preprocessing.binning` / `internal`, `apply`. internal: обучение на текущем входе; count/width с явными пределами, frequency с ties-next; apply: сохранённые интервалы без Train; порты 0/1.
 
-Ограничения: Только Integer/Real; без округления и открытых концов. Saved-model Apply workflow в PR #618 заблокирован до применения; independent матрица не подтверждена.
+Ограничения: Только Integer/Real; без автоматических пределов, округления, открытых концов, СКО и ручной правки интервалов. Apply требует existing узел с сохранёнными интервалами, parameters={}, inputs=[], mappings=[], finish=execute; без Train и коммита draft. При отсутствии интервалов нужен internal.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [binning-node.mjs](../../../../packages/loginom-runtime/client/lib/binning-node.mjs):1–52; [binning-parameters.mjs](../../../../packages/loginom-runtime/client/lib/binning-parameters.mjs):1–31; [preprocessing.binning.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.binning.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

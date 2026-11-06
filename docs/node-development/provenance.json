@@ -8128,7 +8128,7 @@
       "repo_path": "docs/node-development/registry.json",
       "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
       "source_sha256": "74cf54d2be7f38aaa84c1d53d056e016969ebe3327a4bd2a3d57b7fe788b064f",
-      "adapted_sha256": "664a35e9c019cb77ffe8a4d7c19669e03db043ae482c68d205228cee0a15daf1",
+      "adapted_sha256": "5febc1d5a43d73ad7c73c1db27a0e8c0dde3385842e3bc5aa9c4e936f1f1498b",
       "transformations": [
         "retain_historical_candidate_evidence_without_readiness_change",
         "refresh_retained_v040_documentation_preserve_original_checksum"

@@ -177,7 +177,7 @@
   "common_limitations": [
     "Публичный preview: по умолчанию 10 строк, максимум 100 и ограничения объёма/числа ячеек; выборка не доказывает полноту.",
     "dock_node_read связан с завершённой квитанцией и заново выполняет узел; это не универсальное безопасное восстановление.",
-    "Без нового живого прогона не повышать статус для свежей ревизии исходников, runtime или клиента.",
+    "Без нового живого прогона не повышать статус технической или аналитической приёмки свежей ревизии исходников, runtime или клиента; регистрация проверяется отдельно по коду.",
     "Sampling/Partition: sequential, random, stratified, biased зарегистрированы; uniform не поддержан.",
     "Логистический отбор: Deviance с пользовательскими entry/removal либо AIC/AICc/BIC/HQIC без significance-порогов; Enter без selection.",
     "ISO: iso_week_end не поддержан из-за ограничения Loginom; minute/second доступны в calendar."
@@ -4283,7 +4283,7 @@
         ]
       },
       "card": "nodes/row-filter/README.md",
-      "initial_scope": "OR между группами, AND внутри; scalar-условия и два выхода true/false.",
+      "initial_scope": "conditions и row_number; выходы подходящих/неподходящих строк.",
       "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
       "limitations": [
         "Scalar-условия, integer/string переменные (scalar/list), row_number; Variant не поддержан. Для строк явный case_sensitive.",
@@ -4402,7 +4402,7 @@
         ]
       },
       "card": "nodes/grouping/README.md",
-      "initial_scope": "Упорядоченные ключи и меры sum/count/avg/min/max; согласованная схема результата.",
+      "initial_scope": "Упорядоченные ключи и меры sum/count/min/max/avg/unique_count; measures=[] удаляет полные дубли ключей. unique_count поддерживает integer/string; NULL исключён из числа уникальных, пустая строка считается значением. Count включает NULL.",
       "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
       "limitations": [
         "От 1 до 128 ключей, до 256 мер; одно поле не может быть ключом и мерой.",
@@ -4638,7 +4638,7 @@
         ]
       },
       "card": "nodes/join/README.md",
-      "initial_scope": "Две таблицы, точные пары ключей одинакового типа, явные регистр и включение ключей справа.",
+      "initial_scope": "inner/left/right/full/difference; одинаковые типы ключей; явные пары ключей, регистр и включение ключей справа.",
       "scope_basis": "implemented_contract_and_scoped_historical_acceptance",
       "limitations": [
         "Cross join и неявное приведение типов ключей не поддержаны; конфликты имён — явными mappings."
@@ -4873,7 +4873,7 @@
         ]
       },
       "card": "nodes/replacement/README.md",
-      "initial_scope": "exact и regex; внутренняя таблица правил; output_mode add/replace; политика отсутствия совпадения.; exact: rules[].result_type string/integer/real/datetime; пропуск сохраняет входной type. type/from — тип ключа; to и other.value — тип результата.",
+      "initial_scope": "exact и regex; внутренняя таблица правил; output_mode add/replace; политика отсутствия совпадения. exact: rules[].result_type string/integer/real/datetime; пропуск сохраняет входной type. type/from — тип ключа; to и other.value — тип результата.",
       "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
         "При смене result_type other.keep запрещён, чтобы не создавать Variant; для datetime только other.null и локальное ISO-время с целыми секундами. Boolean-правил нет.",
@@ -5109,7 +5109,7 @@
         ]
       },
       "card": "nodes/date-time/README.md",
-      "initial_scope": "calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date.; ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week.",
+      "initial_scope": "calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date. ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week.",
       "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
         "iso_week_end не поддержан из-за ограничения Loginom.",
@@ -5250,7 +5250,7 @@
         ]
       },
       "card": "nodes/missing-values/README.md",
-      "initial_scope": "impute: mean для непрерывных integer/real; zero для integer/real непрерывного и дискретного вида без value; constant для дискретных string, включая пустую строку.; Для zero фиксированная замена применяется независимо от доли NULL, включая полностью пустое числовое поле; порог max_nulls_percent продолжает действовать для mean.",
+      "initial_scope": "impute: mean для непрерывных integer/real; zero для integer/real непрерывного и дискретного вида без value; constant для дискретных string, включая пустую строку. Для zero фиксированная замена применяется независимо от доли NULL, включая полностью пустое числовое поле; порог max_nulls_percent продолжает действовать для mean.",
       "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
         "Только явно неупорядоченный вход (ordered=false); произвольная числовая constant не поддержана, для нуля используется method=zero без value.",
@@ -5475,7 +5475,7 @@
         ]
       },
       "card": "nodes/text-export/README.md",
-      "initial_scope": "delimited: UTF-8 и Windows-1251; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink.; Windows-1251: BOM игнорируется, файл без BOM; символы вне CP1251 заменяются байтом 0x1A (SUB), требуется предупреждение о потере данных.",
+      "initial_scope": "delimited: UTF-8 и Windows-1251; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink. Windows-1251: BOM игнорируется, файл без BOM; символы вне CP1251 заменяются байтом 0x1A (SUB), требуется предупреждение о потере данных.",
       "scope_basis": "v039_static_contract_and_multica_independent_acceptance",
       "limitations": [
         "Windows-1251 выбирается явно; рекомендуемое bom=false. Замена символов вне кодировки — потеря данных, не транслитерация.",
@@ -5947,7 +5947,7 @@
         ]
       },
       "card": "nodes/datamining-assnrules/README.md",
-      "initial_scope": "Небольшие подготовленные транзакции и ограниченный набор порогов; точные правила, поддержка и достоверность.",
+      "initial_scope": "FP-growth: дискретные строковые ID транзакций и товары; support/confidence 0…100, max_items; Train текущего входа; порты 0/1, доли результата 0…1.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без рекомендаций (порт 2), второго входа, сохранённого apply и дополнительных фильтров."
@@ -6093,7 +6093,7 @@
         ]
       },
       "card": "nodes/datamining-clustering/README.md",
-      "initial_scope": "Один наблюдённый алгоритм на чистых числовых данных с заданным числом кластеров и чтением всех выходов.",
+      "initial_scope": "k_means: k 2…1000, seed; normalization none/standardize/scale_minus_one_one/scale_zero_one/absolute_scale. Train текущего входа; выход 0 — строки, Cluster/Distance; выход 1 — центры в исходных единицах. Distance в нормированных единицах.",
       "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
         "Только continuous integer/real, один вход, без mapping overrides; g-means и saved-model apply не поддержаны.",
@@ -6154,7 +6154,7 @@
           "note": "Тип в source GitHub pre-release v0.3.2 (c130548b) и v0.3.3–v0.3.7 (90b0cb81); отдельная установленная приёмка узла не выполнялась."
         }
       },
-      "next_action": "Этап 1 принят (LAB-87); g-means и нормализация — отдельным назначением этапа 2.",
+      "next_action": "Перепроверка k_means и пяти поддерживаемых нормировок на точном SHA по назначению; g-means и saved-model apply остаются вне среза.",
       "plan": "nodes/datamining-clustering/plan.md",
       "plan_status": "accepted",
       "acceptance": {
@@ -6369,7 +6369,7 @@
         ]
       },
       "card": "nodes/datamining-logregression/README.md",
-      "initial_scope": "Бинарная строковая цель, явное событие и классификационный threshold (p >= threshold); Train текущего входа; порт 0. Отбор: native Deviance, entry 0.05, removal 0.1.",
+      "initial_scope": "Бинарная String-цель, явные event и threshold (p >= threshold); Train текущего входа, порт 0. selection.criterion: deviance/aic/aicc/bic/hqic; Deviance: entry_significance для forward, removal_significance для backward, оба и entry<removal для stepwise; пороги в (0,1). Пропуск selection сохраняет Deviance 0.05/0.1.",
       "scope_basis": "v039_static_registration_and_scoped_reports",
       "limitations": [
         "Apply, веса, чтение коэффициентов/сводки не поддержаны. Enter запрещает selection; информационные критерии запрещают significance-пороги."
@@ -6895,7 +6895,7 @@
         ]
       },
       "card": "nodes/exports-lgd/README.md",
-      "initial_scope": "Экспорт одной таблицы в LGD в выбранном штатном режиме сжатия с сохранением свойств полей.",
+      "initial_scope": "Новый LGD: compression=lz4, checksum=compressed, overwrite=reject; output.file_artifacts, без табличного выхода.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без append, DDF, Variant, переменных и иных вариантов сжатия; Save пакета отдельно."
@@ -7218,7 +7218,7 @@
         ]
       },
       "card": "nodes/imports-excel/README.md",
-      "initial_scope": "Импорт xlsx: один явно выбранный лист и диапазон, заголовки, типы и пропуски; без расширения на xls или макросы.",
+      "initial_scope": "xlsx: один именованный лист sheet_name (первый по умолчанию); 1–12 явных столбцов; source_switch сохраняет схему и выбор листа при пропуске sheet_name.",
       "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
         "Только XLSX, без named ranges и автоопределения типов; source_switch без изменения columns/mappings."
@@ -7388,7 +7388,7 @@
         ]
       },
       "card": "nodes/imports-lgd/README.md",
-      "initial_scope": "Импорт самостоятельного LGD с подтверждёнными полями, видами, типами, Null и значениями; повреждённый файл даёт отказ.",
+      "initial_scope": "Исходный LGD через проверенную доставку либо серверный источник; checksum=verify; сохраняются порядок, типы, метки и NULL.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Повреждённый checksum отклоняется; без DDF, Variant, переменных и отключения проверки."
@@ -7828,7 +7828,7 @@
         ]
       },
       "card": "nodes/integration-restrequest/README.md",
-      "initial_scope": "Чтение контролируемого HTTP-сервиса по ограниченным входным строкам, параметры запроса и все результаты/ошибки.",
+      "initial_scope": "request: GET полного URL с REST-подключением; запрос без входа/query либо с параметрами строки запроса из входной таблицы.",
       "scope_basis": "live_discovery_and_stage1_contract",
       "limitations": [
         "Прочие HTTP-методы, тело, произвольные заголовки, retry и auth/TLS вне среза; независимый plain GET подтверждён LAB-690."
@@ -8062,7 +8062,8 @@
       "initial_scope": "internal: обучение на текущем входе; count/width с явными пределами, frequency с ties-next; apply: сохранённые интервалы без Train; порты 0/1.",
       "scope_basis": "v039_static_registration_and_scoped_reports",
       "limitations": [
-        "Только Integer/Real; без округления и открытых концов. Saved-model Apply workflow в PR #618 заблокирован до применения; independent матрица не подтверждена."
+        "Только Integer/Real; без автоматических пределов, округления, открытых концов, СКО и ручной правки интервалов.",
+        "Apply требует existing узел с сохранёнными интервалами, parameters={}, inputs=[], mappings=[], finish=execute; без Train и коммита draft. При отсутствии интервалов нужен internal."
       ],
       "prerequisites": [
         "accepted_base",
@@ -8156,7 +8157,7 @@
         ]
       },
       "card": "nodes/preprocessing-coarseclasses/README.md",
-      "initial_scope": "Один бинарный пример: роли полей, разбиение признака, WoE/IV и применение сохранённых классов.",
+      "initial_scope": "Дискретный String-предиктор и бинарная String-цель; automatic-классы; internal обучает, apply существующего узла использует сохранённые классы; порты 0/1/2.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без непрерывных предикторов, external/manual/frozen-классов, переменных и неизвестных/NULL значений предиктора."
@@ -8244,7 +8245,7 @@
         ]
       },
       "card": "nodes/preprocessing-datapartition/README.md",
-      "initial_scope": "sequential и random с seed; test/train/unused; порты 0 combined с IsTestSet, 1 train, 2 test.",
+      "initial_scope": "sequential, random, stratified, biased; явные размеры и seed для случайных методов; strata_fields для stratified, bias_field/bias_factors для biased. Сэмплинг: count; разбиение: train_count/test_count и выходы combined/train/test; allocation_order только для sequential.",
       "scope_basis": "v039_static_registration_and_scoped_reports",
       "limitations": [
         "uniform не поддержан. Bias — дискретное строковое поле, факторы 0…1 для всех наблюдённых категорий; размер не задаёт точные квоты категорий."
@@ -8475,7 +8476,7 @@
         ]
       },
       "card": "nodes/preprocessing-sampling/README.md",
-      "initial_scope": "sequential: первые/последние строки; random: seed и size.",
+      "initial_scope": "sequential, random, stratified, biased; явные размеры и seed для случайных методов; strata_fields для stratified, bias_field/bias_factors для biased. Сэмплинг: count; разбиение: train_count/test_count и выходы combined/train/test; allocation_order только для sequential.",
       "scope_basis": "v039_static_registration_and_scoped_reports",
       "limitations": [
         "uniform не поддержан. Bias — дискретное строковое поле, факторы 0…1 для всех наблюдённых категорий; размер не задаёт точные квоты категорий."
@@ -9084,7 +9085,7 @@
         ]
       },
       "card": "nodes/research-factoranalysis/README.md",
-      "initial_scope": "Один наблюдённый метод, фиксированное число факторов и ограниченная настройка вращения.",
+      "initial_scope": "PCA корреляционной матрицы: полный набор конечных continuous Integer/Real, фиксированное число факторов, rotation=none; порты 0/1.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без констант, пропусков, вырожденных данных, автоматического отбора, вращений и сохранённого apply. При K<P неиспользованные scores NULL, loadings нулевые."
@@ -9168,7 +9169,7 @@
         ]
       },
       "card": "nodes/research-quality/README.md",
-      "initial_scope": "Настройка реально добавляемого узла «Качество данных» и проверка смысла всех пяти табличных выходов; точный метод определить после discovery.",
+      "initial_scope": "Штатный profile с parameters={}: continuous integer/real и discrete string; пять портов 0…4, точное чтение Moda/variant.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без изменения порогов/исправления данных, скрытых настроек, обучения и apply. Порты 1/2 могут быть пустыми при ненулевых Out/Extr; порт 3 сохраняет вход, не фильтрует NULL."
@@ -9252,7 +9253,7 @@
         ]
       },
       "card": "nodes/transform-coluniondata/README.md",
-      "initial_scope": "Две таблицы: соединение колонок по позиции строки, включая разные длины и пустой вход; переменные позднее.",
+      "initial_scope": "Ровно две таблицы по позиции: row_count minimum/maximum/input; determining_input main/attached; padding null/repeat/last; выход 0.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без третьего входа, переменных и apply; пустой источник при repeat/last дополняется NULL. Это позиционное соединение, не Слияние по ключам."
@@ -9330,10 +9331,13 @@
           "94551fa4933ba0e23ab442ff47febaa6142d1c01:packages/loginom-runtime/client/lib/crosstable-node.mjs:1-86",
           "94551fa4933ba0e23ab442ff47febaa6142d1c01:packages/loginom-runtime/client/lib/crosstable-parameters.mjs:1-61",
           "94551fa4933ba0e23ab442ff47febaa6142d1c01:packages/product/skills/loginom-automation/references/nodes/transform.cross_table.md:1-47"
+        ],
+        "capabilities": [
+          "Фиксированные и скользящие колонки; агрегаты, NULL/Other-группы и изменение схемы при чтении того же узла после смены источника."
         ]
       },
       "card": "nodes/transform-crosstable/README.md",
-      "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
+      "initial_scope": "Фиксированные и скользящие колонки; агрегаты, NULL/Other-группы и изменение схемы при чтении того же узла после смены источника.",
       "scope_basis": "live_discovery_and_staged_crosstable_contract",
       "limitations": [
         "Native-чтение ограничено 50 строками × 8 колонками и 1 MiB, протокол 321; шире — точный formatted reader.",
@@ -9444,7 +9448,7 @@
         ]
       },
       "card": "nodes/transform-enrichdata/README.md",
-      "initial_scope": "Основная таблица и до двух справочников: ключи каждого входа, префиксы и левое дополнение.",
+      "initial_scope": "Левое обогащение основного входа 0 одним или двумя справочниками 1/2; составные ключи, префиксы; NULL совпадает с NULL, дубликаты расширяют все сочетания.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без других join, третьего справочника, конверсий и переменных; пропуск настроек сохраняет их только при неизменных источниках. Для точного порядка нужен полный output mapping autosync=false."
@@ -9637,7 +9641,7 @@
         ]
       },
       "card": "nodes/transform-ungroupdata/README.md",
-      "initial_scope": "Два входа: распределение групповых итогов по явно заданным опорным долям.",
+      "initial_scope": "Распределение итогов входа 0 по явно заданным долям входа 1; rounding none/precision/multiple, balance none/last/proportional/equal; выход 0.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без вычисляемых весов, сезонности, переменных и чтения порта 1. Один итог на группу; NULL-доли пропускаются, NULL-итоги и отсутствующие группы не дают строк."
@@ -9779,7 +9783,7 @@
         ]
       },
       "card": "nodes/trees-datatotree/README.md",
-      "initial_scope": "Плоская таблица в ограниченную структуру дерева с явно заданными уровнями и порядком.",
+      "initial_scope": "Ручная структура: каждая строка таблицы — отдельный объект массива под Root; точные source_field и типы, порядок, Int64, Boolean, NULL и empty.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Один массив и не более одного вложенного объекта; без группировки, XSD, дат, Variant, переменных и пустого входа."
@@ -10139,7 +10143,7 @@
         ]
       },
       "card": "nodes/trees-treetojson/README.md",
-      "initial_scope": "Самостоятельное типизированное дерево в JSON с явной семантикой структуры и сохранением типов.",
+      "initial_scope": "Типизированное объектное дерево в одну компактную JSON-строку на выходе 0: exclude_root=true, pretty=false, keys=names, multi_row=false, datetime=iso8601.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без корневых массивов, дат, Variant, меток вместо имён, форматирования, разделения и переменных. Полное исходное дерево читается перед преобразованием."
@@ -10281,7 +10285,7 @@
         ]
       },
       "card": "nodes/variables-calculator/README.md",
-      "initial_scope": "Ограниченные выражения над типизированными переменными и явные выходные имена.",
+      "initial_scope": "Упорядоченные выражения Loginom создают integer/real/string/boolean переменные; existing patch сохраняет неуказанные выражения; variable output 0.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без datetime, Variant, промежуточных выражений, замены входных переменных, кэша, перестановки и JavaScript."
@@ -10364,7 +10368,7 @@
         ]
       },
       "card": "nodes/variables-coluniondatavar/README.md",
-      "initial_scope": "Два набора переменных с явным разрешением одинаковых имён и проверкой типов/значений.",
+      "initial_scope": "Два разных набора переменных, automatic mapping, integer/real/string/boolean и typed NULL, максимум 128; сначала вход 0, затем 1; native имена коллизий.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без ручных mappings, преобразований типов, управляющего и третьего входов; читать фактические имена результата."
@@ -10448,7 +10452,7 @@
         ]
       },
       "card": "nodes/variables-datatovar/README.md",
-      "initial_scope": "Выбранные значения небольшой таблицы в типизированные переменные с явной политикой строк и имён.",
+      "initial_scope": "Числовые поля таблицы в переменные: sum/count/min/max/avg; variable output 0, без обучения. Count включает NULL, другие функции пропускают NULL.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Полная настройка выбранных полей/функций; sum/avg real, count integer, min/max тип входа. На пустой таблице count=0, прочие NULL."
@@ -10532,7 +10536,7 @@
         ]
       },
       "card": "nodes/variables-replace/README.md",
-      "initial_scope": "Внутренняя таблица правил для выбранных переменных с явной политикой отсутствующего соответствия.",
+      "initial_scope": "Точные пары замен переменных integer/real/string/boolean, включая NULL; other=keep, строкам case_sensitive=true, числам precision=0; variable output 0.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без regex, файлов правил, datetime, Variant и смены типа. Одно исходное значение заменяется один раз, без каскада."
@@ -10616,7 +10620,7 @@
         ]
       },
       "card": "nodes/variables-vartodata/README.md",
-      "initial_scope": "Самостоятельный набор типизированных переменных в таблицу с заданными полями и порядком.",
+      "initial_scope": "Непустой набор integer/real/boolean/string/datetime и typed NULL в таблицу: columns — одна строка; rows — Name/DisplayName/Value variant; порядок источника сохраняется.",
       "scope_basis": "production_source_snapshot",
       "limitations": [
         "Без переключения режима existing, изменения набора переменных, Variant на входе и пустых наборов; гражданское datetime сохраняет миллисекунды."
