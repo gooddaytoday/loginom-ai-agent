@@ -15,7 +15,7 @@ test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s
   // codec rather than requesting the host OS's unavailable desktop safeStorage.
   const store = connectionStore(join(directory, "connection"), credentials("linux"))
   const journal = await recoveryStore(join(directory, "recovery"), { strict: true })
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",

@@ -82,7 +82,7 @@ test.each(
           )
         }
         const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
-        await store.stage({
+        await store.stage({ mode: "custom", endpoint: server?.endpoint ?? "http://127.0.0.1:1/mcp",
           generation: 1,
           revision: 1,
           apiKey: "UNIT-NONSECRET",
@@ -175,7 +175,7 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
       JSON.stringify({ ...manifest, endpoint: server.endpoint }),
     )
     const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: server?.endpoint ?? "http://127.0.0.1:1/mcp",
       generation: 1,
       revision: 1,
       apiKey: "UNIT-NONSECRET",
@@ -187,7 +187,7 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
     const llm = await provider.runPromise(TestLLMServer)
     await provider.runPromise(
       llm.toolMatch((hit) => JSON.stringify(hit.body.tools ?? []).includes('"name":"loginom_read"'), "loginom_read", {
-        uri: "help://component",
+        uris: ["viking://resources/loginom-dock/Help/component"],
       }),
     )
     await provider.runPromise(
@@ -206,7 +206,7 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
       result.events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_read")?.part.state,
     ).toMatchObject({ status: "error", error: "LOGINOM_CONNECTION_NOT_READY" })
     expect(result.events.find((event) => event.type === "text")?.part.text).toBe("Ответ: 4.")
-    expect(server.calls).toEqual([{ name: "read", arguments: { uri: "help://component" } }])
+    expect(server.calls).toEqual([{ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/component"] } }])
     expect(await readdir(fixture.profile)).not.toContain(".writer")
     expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
   } finally {
@@ -254,13 +254,12 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
         join(fixture.bundle, "resource-manifest.json"),
         JSON.stringify({ ...manifest, endpoint: server.endpoint }),
       )
-      // The stored legacy key would be accepted; only the built-in key decides Help availability.
-      if (mode.includes("unavailable")) await writeFile(join(fixture.bundle, "knowledge-key"), "REJECTED-NONSECRET")
+      // A rejected custom key must keep Help unavailable.
       const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
-      await store.stage({
+      await store.stage({ mode: "custom", endpoint: server?.endpoint ?? "http://127.0.0.1:1/mcp",
         generation: 1,
         revision: 1,
-        apiKey: "UNIT-NONSECRET",
+        apiKey: mode.includes("unavailable") ? "REJECTED-NONSECRET" : "UNIT-NONSECRET",
         password: "PRIVATE-NONSECRET",
         username: "user",
         url: "http://127.0.0.1:1/app/",
@@ -404,11 +403,11 @@ test.each(["valid-help", "invalid-key"])(
         await child.exited
       }
     }
-    if (mode === "invalid-key") await writeFile(join(fixture.bundle, "knowledge-key"), "WRONG-NONSECRET")
     try {
       // An older setup script still sends a key that the server would accept; it is ignored.
       const setup = await command(["setup", "--stdin-json"], {
-        apiKey: "UNIT-NONSECRET",
+        mode: "custom", endpoint: server.endpoint,
+        apiKey: mode === "invalid-key" ? "WRONG-NONSECRET" : "UNIT-NONSECRET",
         url: "http://127.0.0.1:1/app/",
         username: "user",
         password: "PRIVATE-NONSECRET",

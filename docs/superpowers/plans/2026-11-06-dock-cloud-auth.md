@@ -237,7 +237,7 @@ if (!inside || ambiguous || traversal) throw Error("LOGINOM_KNOWLEDGE_SCOPE_DENI
 
 `connection.check` в node-entry и `loginom-check` в Desktop декодируют новый `Loginom.Check` уже здесь. Все View/Validation fixtures, включая overrides в settings-loginom.test.ts, получают честные mode/server/help/cloud/hasApiKey; не делать обязательные поля optional ради старых тестов. CLI setupSchema/setupCandidate и interactiveSetup получают custom-поля здесь, поскольку существующие subprocess/PTY проверки используют настоящий setup. Облачные команды и обработка connection-required в CLI остаются11.
 
-- [ ] **1. RED:** Добавить store тест миграции на реальном файле, используя существующий temp fixture и codec. Старый plaintext record сохраняется без нового поля:
+- [x] **1. RED:** Добавить store тест миграции на реальном файле, используя существующий temp fixture и codec. Старый plaintext record сохраняется без нового поля:
 
 ```ts
 await writeFile(join(directory, "connection.json"), JSON.stringify({
@@ -250,8 +250,8 @@ expect(await store.read()).toMatchObject({
 })
 ```
 
-- [ ] **2. Запустить RED:** из Desktop `bun test src/main/loginom/connection-store.test.ts`; ожидание mode/cloud и пустого legacy key пока не выполняется.
-- [ ] **3. GREEN:** В decode на границе store сделать явное преобразование; исторический файл не перезаписывать:
+- [x] **2. Запустить RED:** из Desktop `bun test src/main/loginom/connection-store.test.ts`; ожидание mode/cloud и пустого legacy key пока не выполняется.
+- [x] **3. GREEN:** В decode на границе store сделать явное преобразование; исторический файл не перезаписывать:
 
 ```ts
 const legacy = record.mode === undefined
@@ -266,9 +266,9 @@ return {
 ```
 
 `secrets` получается существующим codec decode и проверкой schema, а не чтением необработанного JSON. При stage/save выбирать поля явно, включая mode/endpoint. Сохранить revision conflict, pending, generation immutability, urlSource и testable-normalization.
-- [ ] **4. Следующие RED→GREEN:** cloud→custom с явно введёнными credentials вызывает локальный MCP fixture; custom→cloud→custom сохраняет custom key/endpoint. `new URL(endpoint)` принимает только http/https, без username/password; пустой endpoint/key в выбранном custom отклоняется. Host не применяет cloud fallback при ошибке custom. В тесте использовать `knowledgeServer` из Task2 и явный `mode:"custom"` в stage/candidate.
-- [ ] **5. Следующий RED→GREEN:** `apiKey` без `mode` в входящем legacy candidate не превращает запись в custom. Для текущего custom кандидат с отсутствующим mode сохраняет режим и key; replacement key разрешён только при явном custom. Поле `endpoint` без custom не создаёт новую custom конфигурацию. `hasApiKey` true только когда сохранён непустой custom key.
-- [ ] **6. RED→GREEN — минимальный CLI custom setup:** перенести сюда custom-часть CLI, иначе ранние fixture setup будут отклонять новые поля. Добавить в setupSchema mode/endpoint и проверить настоящий setupCandidate:
+- [x] **4. Следующие RED→GREEN:** cloud→custom с явно введёнными credentials вызывает локальный MCP fixture; custom→cloud→custom сохраняет custom key/endpoint. `new URL(endpoint)` принимает только http/https, без username/password; пустой endpoint/key в выбранном custom отклоняется. Host не применяет cloud fallback при ошибке custom. В тесте использовать `knowledgeServer` из Task2 и явный `mode:"custom"` в stage/candidate.
+- [x] **5. Следующий RED→GREEN:** `apiKey` без `mode` в входящем legacy candidate не превращает запись в custom. Для текущего custom кандидат с отсутствующим mode сохраняет режим и key; replacement key разрешён только при явном custom. Поле `endpoint` без custom не создаёт новую custom конфигурацию. `hasApiKey` true только когда сохранён непустой custom key.
+- [x] **6. RED→GREEN — минимальный CLI custom setup:** перенести сюда custom-часть CLI, иначе ранние fixture setup будут отклонять новые поля. Добавить в setupSchema mode/endpoint и проверить настоящий setupCandidate:
 
 ```ts
 expect(setupCandidate(JSON.stringify({
@@ -281,7 +281,7 @@ expect(setupCandidate('{"apiKey":"legacy-canary"}', current)).not.toHaveProperty
 ```
 
 Отсутствующий key сохраняет текущий custom key; пустой при явном custom становится empty и не проходит обязательную проверку. Interactive setup добавляет выбор cloud/custom, endpoint и hidden key prompt; отмена сохраняет существующий CLI_CANCELLED. PTY сценарий `--setup` выбирает custom и передаёт fixture key скрытым вводом; остальные setup JSON получают mode/endpoint/apiKey. Secret argv options не вводить.
-- [ ] **7. Миграция fixtures и удаление runtime fallback:** `rg -n 'knowledge-key|knowledgeKey|endpoint:|store.stage|connection.check' packages/loginom-host/test packages/desktop/test/loginom packages/opencode/test/cli packages/opencode/test/fixture` — все fixtures, ожидающие работающий Help, используют явные custom credentials. Пример записи:
+- [x] **7. Миграция fixtures и удаление runtime fallback:** `rg -n 'knowledge-key|knowledgeKey|endpoint:|store.stage|connection.check' packages/loginom-host/test packages/desktop/test/loginom packages/opencode/test/cli packages/opencode/test/fixture` — все fixtures, ожидающие работающий Help, используют явные custom credentials. Пример записи:
 
 ```ts
 await store.stage({
@@ -292,7 +292,9 @@ await store.activate(1)
 ```
 
 Удалить `withKnowledgeKey` и выбор `environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint` из Host. Endpoint/key берутся только из выбранной конфигурации; до cloud controller отсутствие cloud credentials даёт явную ошибку подключения без запуска Help, исключение save-before-login добавляет6. Не использовать наличие knowledge-key или отсутствие cloud.json как разрешение на legacy fallback. Старые записи без mode оставить только в migration tests с ожидаемым cloud без ключа. В startup tests сохранить проверки cleanup/guard, а не заменить их быстрым отсутствием credentials. Shutdown-validation передаёт custom endpoint/key в check; файл embedded key и manifest.endpoint не направляют Host. Stage-resources тест пока проверяет прежнюю упаковку, её удаляет13; остальные fixture key files удалить здесь.
-- [ ] **8. Проверка/коммит:** Host `bun test test/connection-validation.test.ts test/knowledge.test.ts test/node-host.test.ts test/host.test.ts test/prepare-startup.test.ts`; Desktop `bun test src/main/loginom/connection-store.test.ts src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts test/cli/standalone-preflight.test.ts test/cli/standalone-startup.test.ts`. Из каждого schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Обновлённые native shutdown/PTY сценарии выполнить штатными командами при наличии inputs, иначе явно записать ограничение. Commit `feat(loginom): add explicit custom Dock configuration`.
+- [x] **8. Проверка/коммит:** Host `bun test test/connection-validation.test.ts test/knowledge.test.ts test/node-host.test.ts test/host.test.ts test/prepare-startup.test.ts`; Desktop `bun test src/main/loginom/connection-store.test.ts src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts test/cli/standalone-preflight.test.ts test/cli/standalone-startup.test.ts`. Из каждого schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Обновлённые native shutdown/PTY сценарии выполнить штатными командами при наличии inputs, иначе явно записать ограничение. Commit `feat(loginom): add explicit custom Dock configuration`.
+
+Task3 evidence: `docs/plans/2026-11-05-dock-cloud-auth-design.md`, checkpoint Task3; полный scratch report — `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-3-report.md`. Native shutdown ждёт fresh isolated Desktop artifact; PTY custom setup/password/cancel — PASS. Старый PTY `--prompt` provider fixture требует исправления scope в Task11.
 
 ## Task 4: Отдельное хранение облачных credentials
 

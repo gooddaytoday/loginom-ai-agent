@@ -85,7 +85,7 @@ test.each([true, false])(
       headless: true,
     })
     try {
-      const checking = host.api.check({
+      const checking = host.api.check({ mode: "custom", endpoint: "http://example.test/mcp",
         revision: 0,
         url: "https://example.test/app/",
         username: "fixture",
@@ -137,10 +137,9 @@ test("failed Knowledge validation preserves safe startup evidence after validati
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`)
   await writeFile(join(resources, "resource-manifest.json"),
     JSON.stringify({ endpoint: `${server.url}mcp?token=${secrets[1]}` }))
-  await writeFile(join(resources, "knowledge-key"), secrets[0]!)
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, headless: true })
   try {
-    await expect(host.api.check({ revision: 0, url: "https://example.test/app/", username: "fixture",
+    await expect(host.api.check({ mode: "custom", endpoint: `${server.url}mcp?token=${secrets[1]}`, apiKey: { operation: "replace", value: secrets[0]! }, revision: 0, url: "https://example.test/app/", username: "fixture",
       password: { operation: "empty" },
     })).rejects.toMatchObject({ message: "LOGINOM_KNOWLEDGE_AUTH_FAILED" })
     await host.close()
@@ -193,7 +192,7 @@ async function startupFixture(closed: boolean) {
   )
   const codec = credentials("linux")
   const store = connectionStore(join(root, "connection"), codec)
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "https://example.test/app/",

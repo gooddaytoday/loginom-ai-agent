@@ -11,7 +11,7 @@ test("async CLI codec persists a private versioned format separate from Desktop"
   try {
     const codec = cliCredentials("linux")
     const store = connectionStore(root, codec)
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",

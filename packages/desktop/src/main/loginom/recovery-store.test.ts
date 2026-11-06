@@ -8,6 +8,7 @@ import { connectionStore } from "./connection-store"
 import { credentials } from "./credentials"
 
 const active = {
+  mode: "custom" as const, endpoint: "http://example.test/mcp",
   generation: 1,
   revision: 1,
   url: "http://example.test/app/",

@@ -3,11 +3,14 @@ import { constants } from "node:fs"
 import { link, lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { Option, Schema } from "effect"
+import { Loginom } from "@opencode-ai/schema/loginom"
 import { credentials, type CredentialCodec } from "./credentials"
 
 const RecordSchema = Schema.Struct({
   generation: Schema.Number,
   revision: Schema.Number,
+  mode: Schema.optional(Loginom.Mode),
+  endpoint: Schema.optional(Schema.String),
   url: Schema.String,
   urlSource: Schema.optional(Schema.Literal("explicit")),
   username: Schema.String,
@@ -22,7 +25,11 @@ const RecordSchema = Schema.Struct({
   ]),
 })
 export type ConnectionRecord = typeof RecordSchema.Type
-export type ActiveConnection = Omit<ConnectionRecord, "secrets"> & { apiKey: string; password: string }
+export type ActiveConnection = Omit<ConnectionRecord, "secrets" | "mode"> & {
+  mode: Loginom.Mode
+  apiKey: string
+  password: string
+}
 const decode = Schema.decodeUnknownOption(Schema.fromJsonString(RecordSchema))
 
 // Only the owning host accesses this directory; it is outside renderer stores.
@@ -117,13 +124,18 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     return join(directory, "generations", `${generation}.json`)
   }
   async function decodeRecord(record: ConnectionRecord): Promise<ActiveConnection> {
+    const secrets = await codec.decode(record.secrets)
+    const legacy = record.mode === undefined
     return {
+      mode: record.mode ?? "cloud",
+      endpoint: legacy ? undefined : record.endpoint,
       generation: record.generation,
       revision: record.revision,
       url: record.url,
       ...(record.urlSource ? { urlSource: record.urlSource } : {}),
       username: record.username,
-      ...(await codec.decode(record.secrets)),
+      apiKey: legacy ? "" : secrets.apiKey,
+      password: secrets.password,
     }
   }
   return {
@@ -135,6 +147,8 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
       await write(
         join(directory, "pending.json"),
         {
+          mode: value.mode,
+          endpoint: value.endpoint,
           generation: value.generation,
           revision: value.revision,
           url: value.url,
@@ -178,6 +192,8 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     },
     async stage(value: ActiveConnection) {
       const record = {
+        mode: value.mode,
+        endpoint: value.endpoint,
         generation: value.generation,
         revision: value.revision,
         url: value.url,

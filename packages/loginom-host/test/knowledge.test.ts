@@ -122,13 +122,12 @@ test("restored Host starts only knowledge and local settled does not wait for th
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: server.endpoint,
     generation: 1,
     revision: 1,
-    // A connection saved by an older build keeps its own key; Help uses the built-in one.
-    apiKey: "LEGACY-NONSECRET",
+    // The profile explicitly selects the local custom Dock fixture.
+    apiKey: "UNIT-NONSECRET",
     password: "PRIVATE-NONSECRET-PASSWORD",
     username: "user",
     url: "http://unavailable.example/app/?custom=1",

@@ -76,7 +76,7 @@ test("startup timeout retains the writer through Help close and permits a real s
       await standalone(["loginom", "status"], async (args, paths) => {
         await fs.writeFile(${JSON.stringify(alias)}, process.env.TMPDIR);
         const store = connectionStore(path.join(paths.loginom, "connection"), cliCredentials(process.platform, { root: paths.loginom, resources: ${JSON.stringify(bundle)} }));
-        await store.stage({ generation: 1, revision: 1, url: "https://example.test", username: "fixture", apiKey: "fixture-key", password: "" });
+        await store.stage({ mode: "custom", endpoint: "http://example.test/mcp", generation: 1, revision: 1, url: "https://example.test", username: "fixture", apiKey: "fixture-key", password: "" });
         await store.activate(1);
         const host = await launchNodeHost({ node: ${JSON.stringify(bundledNode)}, entry: ${JSON.stringify(join(bundle, "host/node-host.mjs"))}, root: paths.loginom, resources: ${JSON.stringify(bundle)}, headless: true }, { start: 5000, close: 10000, terminate: 1000, teardown: 15000 });
         await host.close();
@@ -343,7 +343,6 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       )
       await mkdir(join(bundle, "bin"), { recursive: true })
       await mkdir(join(bundle, "runtime/src"), { recursive: true })
-      await writeFile(join(bundle, "knowledge-key"), "private-setup-key")
       await symlink(bundledNode, join(bundle, "bin/node"))
       if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
       await cp(host, join(bundle, "host"), { recursive: true })
@@ -421,8 +420,8 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       expect(
         await command(
           ["setup", "--stdin-json"],
-          // Older setup scripts still send a key; the built-in one is used and never stored.
-          JSON.stringify({ apiKey: "legacy-setup-key", password: "initial-password" }),
+          // The custom key is passed privately through stdin.
+          JSON.stringify({ mode: "custom", endpoint: help.endpoint, apiKey: "private-setup-key", password: "initial-password" }),
         ),
       ).toMatchObject({
         code: 0,
@@ -445,7 +444,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         await cliCredentials(process.platform, { root: join(profile, "loginom"), resources: bundle }).decode(
           persisted.secrets,
         ),
-      ).toEqual({ apiKey: "", password: "" })
+      ).toEqual({ apiKey: "private-setup-key", password: "" })
       expect(persisted.secrets.protection).toBe(
         process.platform === "darwin" ? "keychain" : process.platform === "win32" ? "dpapi" : "plaintext",
       )

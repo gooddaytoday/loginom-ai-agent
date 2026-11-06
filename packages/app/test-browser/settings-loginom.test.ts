@@ -10,6 +10,12 @@ import {
 
 function setup(initial: Partial<Loginom.View> = {}) {
   let view: Loginom.View = {
+    mode: "custom",
+    endpoint: "http://loginom.test/mcp",
+    hasApiKey: true,
+    server: "custom",
+    help: { state: "ready" },
+    cloud: { connected: false },
     revision: 1,
     generation: 1,
     url: "http://loginom.test/app/",
@@ -19,7 +25,7 @@ function setup(initial: Partial<Loginom.View> = {}) {
     state: "ready",
     ...initial,
   }
-  const checks: Loginom.Candidate[] = []
+  const checks: Loginom.Check[] = []
   const saves: Array<{ revision: number; validationId: string }> = []
   const closed: Loginom.View[] = []
   const api: Loginom.API = {
@@ -27,7 +33,7 @@ function setup(initial: Partial<Loginom.View> = {}) {
     status: async () => ({ ...view }),
     check: async (candidate) => {
       checks.push(candidate)
-      return { validationId: "checked", expiresAt: Date.now() + 10000 }
+      return { help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000 }
     },
     save: async (input) => {
       saves.push(input)
@@ -78,7 +84,7 @@ describe("Loginom settings", () => {
   test("a browser warning keeps Help successful and still permits saving", async () => {
     const f = setup({ browser: { state: "unknown" } })
     const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_ACCOUNT_MISMATCH" }
-    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    f.api.check = async () => ({ help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000, browser })
     try {
       await f.form.load()
       f.form.edit({ password: "replacement", passwordMode: "replace" })
@@ -102,7 +108,7 @@ describe("Loginom settings", () => {
       { state: "failed" as const, failure: "LOGINOM_LOGIN_REJECTED" as const },
     ]) {
       const f = setup()
-      f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      f.api.check = async () => ({ help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000, browser })
       try {
         await f.form.load()
         await f.form.submit(false)
@@ -233,7 +239,7 @@ describe("Loginom settings", () => {
       await f.form.load()
       await f.form.submit(false)
       expect(f.form.state.message).toBe("loginom.checkedSaved")
-      // The built-in knowledge key replaced the user key; the form never sends one.
+      // Omitting the Dock key preserves the saved custom credentials.
       expect(f.checks[0]).not.toHaveProperty("apiKey")
       expect(f.checks[0].password).toEqual({ operation: "preserve" })
       await f.form.submit(true)
@@ -258,7 +264,7 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
-  test("a rejected built-in key keeps the form and draft; no persistence takes place", async () => {
+  test("a rejected Dock key keeps the form and draft; no persistence takes place", async () => {
     const f = setup()
     try {
       await f.form.load()
@@ -295,7 +301,7 @@ describe("Loginom settings", () => {
     const f = setup()
     try {
       await f.form.load()
-      const checking = Promise.withResolvers<{ validationId: string; expiresAt: number }>()
+      const checking = Promise.withResolvers<Awaited<ReturnType<Loginom.API["check"]>>>()
       let calls = 0
       f.api.check = () => {
         calls++
@@ -306,7 +312,7 @@ describe("Loginom settings", () => {
       expect(f.form.requestClose()).toBe(false)
       await f.form.submit(true)
       expect(calls).toBe(1)
-      checking.resolve({ validationId: "checked", expiresAt: Date.now() + 10000 })
+      checking.resolve({ help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000 })
       await save
       expect(f.closed).toHaveLength(1)
     } finally {

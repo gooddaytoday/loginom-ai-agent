@@ -16,7 +16,9 @@ async function readinessFixture(options: Parameters<typeof knowledgeServer>[1]) 
   const cleanup: (() => void | Promise<void>)[] = []
   const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) }, options)
   const store = connectionStore(join(directory, "connection"), credentials("linux"))
-  const original = { generation: 1, revision: 1, url: "http://unavailable.example/app/?custom=1",
+  const original = {
+  mode: "custom" as const,
+  endpoint: server.endpoint, generation: 1, revision: 1, url: "http://unavailable.example/app/?custom=1",
     username: "user", apiKey: "UNIT-NONSECRET", password: "PRIVATE-NONSECRET-PASSWORD" }
   const processes: Awaited<ReturnType<typeof superviseKnowledge>>[] = []
   const readiness: Promise<void>[] = []
@@ -28,8 +30,8 @@ async function readinessFixture(options: Parameters<typeof knowledgeServer>[1]) 
       const child = await superviseKnowledge({
         node, entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
         stateDir: directory, generation: connection.generation, endpoint: server.endpoint,
-        // Like the host, every generation uses the built-in key, not the saved one.
-        apiKey: "UNIT-NONSECRET", environment: {},
+        // Every generation uses its saved custom credentials.
+        apiKey: connection.apiKey, environment: {},
       })
       processes.push(child)
       const ready = child.request("list").then(() => undefined)

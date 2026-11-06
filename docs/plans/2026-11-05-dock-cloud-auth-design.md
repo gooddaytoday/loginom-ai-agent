@@ -187,3 +187,19 @@ Runtime/сборки/production не запускались. Следующий 
 - Поправка плана: allowlist scope-error перенесён из5 в2, поскольку ошибка пересекает IPC уже сейчас.
 - Ограничения: настоящий Python Dock/ACL проверяется Task14; production не затронут.
 - Следующий шаг: Task3, explicit custom configuration и безопасная legacy migration.
+
+## Checkpoint Task 3 — 2026-11-06
+
+- SHA базы: `0a6f69ae4c`; результат — `feat(loginom): add explicit custom Dock configuration`.
+- Executor с Task3: subagent-driven-development; scratch/report workspace `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl`.
+- Legacy без mode → cloud без старого key; исторические файлы неизменны, Loginom credentials/URL сохранены.
+- Explicit custom endpoint/key, сохранение при переключениях, Check и обязательные View/Validation fields готовы; runtime fallback удалён.
+- TDD edge-ветки исправлены до commit: возврат к проверенному срезу, затем по одному RED→GREEN; mapping в scratch report.
+- Host mandatory:60 PASS; final validation:20 PASS; Desktop:31 PASS; Schema:2 PASS; App:19 PASS.
+- CLI cumulative:25 PASS/1 native skip; stale KB-read fixture исправлен, preflight+parser rerun:14 PASS.
+- Adjacent: Desktop7 PASS, migration18 PASS; все5 `bun typecheck` и `git diff --check` PASS.
+- PTY custom setup/password:code0, cancel:130; secrets скрыты, guards сняты, своих живых children нет.
+- Native shutdown/oracle/oauth NOT_RUN: нужен fresh isolated Desktop artifact и private inputs; source syntax PASS.
+- PTY --prompt старый provider зовёт недоступный loginom_probe; свой loop завершён, исправление fixture — Task11.
+- Cloud без credentials намеренно не запускает Help; save-before-login и cloud API — Task6. Production/site/native ОС не проверены.
+- Следующий шаг: Task4, отдельное хранение cloud credentials; независимое ревью Task3 организует parent.

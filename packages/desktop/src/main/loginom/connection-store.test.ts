@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { connectionStore } from "./connection-store"
 import { credentials } from "./credentials"
 
-const initial = { generation: 1, revision: 1, url: "http://example.test/app/", username: "user", apiKey: "test-key-private", password: "" }
+const initial = { mode: "custom" as const, endpoint: "http://example.test/mcp", generation: 1, revision: 1, url: "http://example.test/app/", username: "user", apiKey: "test-key-private", password: "" }
 
 test("Linux persists plaintext with private permissions and a staged generation cannot change active settings", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-store-"))
@@ -47,4 +47,17 @@ test("does not follow a symlink for the generation directory", async () => {
     await symlink(target, join(directory, "generations"))
     await expect(connectionStore(directory, credentials("linux")).stage(initial)).rejects.toThrow("LOGINOM_STORE_OWNER_INVALID")
   } finally { await rm(directory, { recursive: true, force: true }); await rm(target, { recursive: true, force: true }) }
+})
+
+test("legacy records default to cloud and discard the old Dock key without rewriting the file", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-store-"))
+  try {
+    const store = connectionStore(directory, credentials("linux"))
+    const file = join(directory, "connection.json")
+    const record = JSON.stringify({ generation: 1, revision: 1, url: "http://stand.test/app/", username: "user",
+      secrets: { apiKey: "LEGACY-CANARY", password: "password-canary" } })
+    await writeFile(file, record, { mode: 0o600 })
+    expect(await store.read()).toMatchObject({ mode: "cloud", apiKey: "", password: "password-canary", url: "http://stand.test/app/", generation: 1 })
+    expect(await readFile(file, "utf8")).toBe(record)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })

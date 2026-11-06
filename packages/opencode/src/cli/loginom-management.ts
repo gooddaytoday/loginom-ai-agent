@@ -3,9 +3,10 @@ import { Loginom } from "@opencode-ai/schema/loginom"
 import type { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 
 const setupSchema = Schema.Struct({
+  mode: Schema.optionalKey(Loginom.Mode),
+  endpoint: Schema.optionalKey(Schema.String),
   url: Schema.optionalKey(Schema.String),
   username: Schema.optionalKey(Schema.String),
-  // Older setup scripts still send their own MCP key; the built-in key replaced it.
   apiKey: Schema.optionalKey(Schema.String),
   password: Schema.optionalKey(Schema.String),
 })
@@ -17,6 +18,20 @@ export function setupCandidate(json: string, current: Loginom.View): Loginom.Can
   const decoded = setup(json, { onExcessProperty: "error" })
   if (Option.isNone(decoded)) throw new Error("CLI_SETUP_INVALID")
   return {
+    ...(decoded.value.mode ? { mode: decoded.value.mode } : {}),
+    ...(decoded.value.mode === "custom"
+      ? {
+          ...(decoded.value.endpoint !== undefined ? { endpoint: decoded.value.endpoint } : {}),
+          ...(decoded.value.apiKey === undefined
+            ? {}
+            : {
+                apiKey:
+                  decoded.value.apiKey === ""
+                    ? { operation: "empty" as const }
+                    : { operation: "replace" as const, value: decoded.value.apiKey },
+              }),
+        }
+      : {}),
     revision: current.revision,
     url: decoded.value.url ?? current.url,
     username: decoded.value.username ?? current.username,
@@ -67,7 +82,7 @@ export async function loginomManagement(
     return {
       ok: true,
       code: "LOGINOM_CONNECTION_VALID",
-      help: { state: "ready" },
+      help: checked.value.help,
       browser: checked.value.browser ?? { state: "unknown" },
     }
   }
@@ -100,6 +115,34 @@ async function readSetup() {
 async function interactiveSetup(current: Loginom.View): Promise<Loginom.Candidate> {
   if (!process.stdin.isTTY) throw new Error("CLI_STDIN_REQUIRED")
   const { password, text, select } = await import("@clack/prompts")
+  const connectionMode = await select({
+    message: "Сервер Loginom AI",
+    initialValue: current.mode,
+    output: process.stderr,
+    options: [
+      { value: "cloud", label: "Облачный сервер" },
+      { value: "custom", label: "Свой сервер" },
+    ],
+  })
+  if (connectionMode !== "cloud" && connectionMode !== "custom") throw new Error("CLI_CANCELLED")
+  const endpoint =
+    connectionMode === "custom"
+      ? await text({
+          message: "MCP endpoint",
+          initialValue: current.endpoint,
+          defaultValue: current.endpoint,
+          output: process.stderr,
+        })
+      : undefined
+  if (connectionMode === "custom" && typeof endpoint !== "string") throw new Error("CLI_CANCELLED")
+  const key =
+    connectionMode === "custom"
+      ? await password({
+          message: current.hasApiKey ? "Ключ сервера (Enter — сохранить текущий)" : "Ключ сервера",
+          output: process.stderr,
+        })
+      : undefined
+  if (connectionMode === "custom" && typeof key !== "string") throw new Error("CLI_CANCELLED")
   const url = await text({
     message: "URL Loginom",
     defaultValue: current.url,
@@ -128,6 +171,8 @@ async function interactiveSetup(current: Loginom.View): Promise<Loginom.Candidat
   if (typeof secret !== "string") throw new Error("CLI_CANCELLED")
   return setupCandidate(
     JSON.stringify({
+      mode: connectionMode,
+      ...(connectionMode === "custom" ? { endpoint, ...(key || !current.hasApiKey ? { apiKey: key } : {}) } : {}),
       url,
       username,
       ...(mode === "preserve" ? {} : { password: secret }),

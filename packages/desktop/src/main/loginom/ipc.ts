@@ -16,7 +16,7 @@ export function registerLoginomIpc(api: Loginom.API) {
         url.origin === new URL(process.env.ELECTRON_RENDERER_URL).origin)
     if (!valid) throw new Error("LOGINOM_SENDER_INVALID")
   }
-  const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
+  const candidate = Schema.decodeUnknownOption(Loginom.Check)
   const save = Schema.decodeUnknownOption(Loginom.Save)
   const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
   const acknowledge = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)

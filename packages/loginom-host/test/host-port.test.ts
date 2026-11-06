@@ -62,7 +62,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     )
     const root = join(directory, "profile")
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",
@@ -221,7 +221,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",
@@ -296,7 +296,7 @@ test.each(["local", "leased"])(
     )
     const root = join(directory, "profile")
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",
@@ -422,7 +422,7 @@ test("restarting the host drops an uncertain record without replaying it", async
   const calls = join(directory, "calls.jsonl")
   await Bun.write(calls, "")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",
@@ -501,7 +501,7 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",
@@ -602,7 +602,7 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
     )
     const root = join(directory, "profile")
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",
@@ -739,7 +739,7 @@ test("the next turn replaces a runtime that cannot continue", async () => {
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",
@@ -824,7 +824,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",
@@ -914,7 +914,7 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",

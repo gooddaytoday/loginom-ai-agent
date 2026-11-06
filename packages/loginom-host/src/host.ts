@@ -74,7 +74,13 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal, deadline?: number) {
+  async function launch(
+    connection: ActiveConnection,
+    chat: string,
+    validation = false,
+    signal?: AbortSignal,
+    deadline?: number,
+  ) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise(
       {
@@ -99,13 +105,6 @@ export async function createLoginomHost(options: {
       signal,
     ).catch(startupFailure)
   }
-  // The knowledge service accepts the key built into the resources; the key a
-  // user saved with an older build is never sent. Release builds always carry
-  // the key; without one the knowledge entry refuses to start.
-  async function withKnowledgeKey(connection: ActiveConnection) {
-    const apiKey = await readFile(join(resources, "knowledge-key"), "utf8").catch(() => "")
-    return { ...connection, apiKey: apiKey.trim() }
-  }
   function startupFailure(error: unknown): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
     if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) {
@@ -117,12 +116,13 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(candidate, signal) {
+      async check(candidate, signal, verifyBrowser) {
         signal?.throwIfAborted()
-        const connection = await withKnowledgeKey(candidate)
+        if (candidate.mode !== "custom" || !candidate.endpoint || !candidate.apiKey)
+          throw Error("LOGINOM_CONNECTION_REQUIRED")
+        const connection = candidate
         const chat = randomUUID()
         try {
-          const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
           const knowledge = await superviseKnowledge(
             {
               node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -130,7 +130,7 @@ export async function createLoginomHost(options: {
               // Knowledge has no mutable cwd state; retain its private close evidence after validation cleanup.
               stateDir: join(root, "knowledge", String(connection.generation)),
               generation: connection.generation,
-              endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+              endpoint: connection.endpoint!,
               apiKey: connection.apiKey,
               environment,
             },
@@ -149,6 +149,7 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
+          if (verifyBrowser === false) return { state: "unknown" as const }
           const child = await launch(connection, chat, true, signal).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
@@ -168,14 +169,15 @@ export async function createLoginomHost(options: {
         }
       },
       async prepare(candidate) {
-        const connection = await withKnowledgeKey(candidate)
-        const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+        if (candidate.mode !== "custom" || !candidate.endpoint || !candidate.apiKey)
+          throw Error("LOGINOM_CONNECTION_REQUIRED")
+        const connection = candidate
         const knowledge = await superviseKnowledge({
           node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
           entry: join(resources, "runtime/src/knowledge-entry.mjs"),
           stateDir: join(root, "knowledge", String(connection.generation)),
           generation: connection.generation,
-          endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+          endpoint: connection.endpoint!,
           apiKey: connection.apiKey,
           environment,
         }).catch(startupFailure)

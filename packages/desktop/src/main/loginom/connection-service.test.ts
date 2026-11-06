@@ -8,6 +8,8 @@ import { connectionService, type ConnectionRuntime } from "./connection-service"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 
 const candidate: Loginom.Candidate = {
+  mode: "custom",
+  endpoint: "http://example.test/mcp",
   revision: 0,
   url: "http://example.test/app/?a=b",
   username: "User",
@@ -67,8 +69,8 @@ test("safe views expose defaults and presence flags only; a successful save surv
       state: "ready",
     })
     expect(JSON.stringify(await f.service.api.read())).not.toContain("private-api-key")
-    // A key sent by an older client is ignored; the built-in knowledge key is never stored.
-    expect((await f.store.read())?.apiKey).toBe("")
+    // Explicit custom credentials remain private in the store.
+    expect((await f.store.read())?.apiKey).toBe("private-api-key")
   } finally {
     await f.close()
   }
@@ -251,7 +253,7 @@ test("replacing pending settings commits only the latest candidate", async () =>
     expect(await f.service.api.status()).toMatchObject({ state: "pending", generation: 1, revision: 3 })
     run.release()
     await f.service.settled()
-    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "" })
+    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "replacement-key" })
   } finally {
     await f.close()
   }
@@ -313,4 +315,60 @@ test("post-rename durability failure keeps runtime and active file on the same g
     await service.close()
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test("mode switches preserve custom credentials", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service)
+    await save(f.service, { ...candidate, revision: 1, mode: "cloud", endpoint: "http://ignored.test", apiKey: { operation: "replace", value: "ignored" } })
+    expect(await f.store.read()).toMatchObject({ mode: "cloud", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+    await save(f.service, { ...candidate, revision: 2, mode: "custom", apiKey: { operation: "preserve" } })
+    expect(await f.store.read()).toMatchObject({ mode: "custom", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+    expect(await f.service.api.read()).toMatchObject({ mode: "custom", hasApiKey: true, server: "custom", help: { state: "ready" }, cloud: { connected: false } })
+  } finally { await f.close() }
+})
+
+test("implicit edits retain custom mode and cannot replace custom credentials", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service)
+    await save(f.service, { revision: 1, url: candidate.url, username: candidate.username, password: candidate.password,
+      endpoint: "http://ignored.test", apiKey: { operation: "replace", value: "ignored" } })
+    expect(await f.store.read()).toMatchObject({ mode: "custom", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+  } finally { await f.close() }
+})
+
+
+test("legacy candidate credentials cannot enable custom mode", async () => {
+  const checked: string[] = []
+  const f = await fixture({
+    async check(record) { checked.push(record.apiKey) },
+    async prepare() { return { async close() {} } },
+  })
+  try {
+    await save(f.service, { revision: 0, url: candidate.url, username: candidate.username, password: candidate.password,
+      endpoint: "http://ignored.test/mcp", apiKey: { operation: "replace", value: "LEGACY-CANARY" } })
+    expect(checked).toEqual([""])
+    expect(await f.store.read()).toMatchObject({ mode: "cloud", apiKey: "" })
+    expect((await f.store.read())?.endpoint).toBeUndefined()
+    expect(await f.service.api.read()).toMatchObject({ mode: "cloud", server: "primary", hasApiKey: false })
+  } finally { await f.close() }
+})
+
+for (const [label, endpoint] of [["empty", ""], ["malformed", "not-a-url"], ["non-HTTP", "file:///private"], ["credential-bearing", "https://user:secret@example.test/mcp"]]) {
+  test(`custom rejects ${label} endpoint before starting runtime`, async () => {
+    const f = await fixture({ async check() { throw Error("RUNTIME_MUST_NOT_START") }, async prepare() { throw Error("unreachable") } })
+    try {
+      await expect(f.service.api.check({ ...candidate, endpoint })).rejects.toThrow("LOGINOM_ENDPOINT_INVALID")
+      expect(await f.store.read()).toBeUndefined()
+    } finally { await f.close() }
+  })
+}
+
+test("custom requires a nonempty key before starting runtime", async () => {
+  const f = await fixture({ async check() { throw Error("RUNTIME_MUST_NOT_START") }, async prepare() { throw Error("unreachable") } })
+  try {
+    await expect(f.service.api.check({ ...candidate, apiKey: { operation: "empty" } })).rejects.toThrow("LOGINOM_API_KEY_REQUIRED")
+  } finally { await f.close() }
 })

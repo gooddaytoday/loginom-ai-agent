@@ -29,15 +29,19 @@ workspace=root/'workspace'; workspace.mkdir()
 csv=b'amount\n10\n20\n25\n'
 if attachment_mode: (workspace/'sales.csv').write_bytes(csv)
 (bundle/'bin').mkdir(parents=True); (bundle/'runtime/src').mkdir(parents=True)
-(bundle/'bin/node').symlink_to(repo/'packages/desktop/resources/loginom/bin/node')
+(bundle/'bin/node').symlink_to(os.environ.get('LOGINOM_AI_AGENT_TEST_NODE', repo/'packages/desktop/resources/loginom/bin/node'))
 (bundle/'resource-manifest.json').write_text(json.dumps({'endpoint':'https://example.test'}))
-# The built-in knowledge key; the fixture runtime starts only with it.
-(bundle/'knowledge-key').write_text('fixture-key')
+(bundle/'runtime/src/knowledge-entry.mjs').write_text("""process.on('message', m => {
+ if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.apiKey==='fixture-key'?m.input.generation:-1,started:true}});
+ if(m.operation==='list')process.send({id:m.id,result:{tools:[]}});
+ if(m.operation==='interrupt')process.send({id:m.id,result:{interrupted:true}});
+ if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+});""")
 (bundle/'runtime/src/managed-entry.mjs').write_text('''import { appendFileSync, existsSync } from 'node:fs';
 appendFileSync(new URL('../../fixture-pids.jsonl', import.meta.url),JSON.stringify([process.pid,process.ppid])+'\\n');
 process.on('message', m => {
  if(m.operation==='start')appendFileSync(new URL('../../fixture-starts.jsonl', import.meta.url),JSON.stringify({chat:m.input.chat,headless:m.input.headless})+'\\n');
- if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:m.input.connection.apiKey==='fixture-key' && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
+ if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:!('apiKey' in m.input.connection) && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
  if(m.operation==='list')process.send({id:m.id,result:{tools:[{name:'probe',description:'Probe the private TUI host',inputSchema:{type:'object',properties:{}}}]}});
  if(m.operation==='call'){appendFileSync(new URL('../../fixture-calls.jsonl',import.meta.url),JSON.stringify(m.input)+'\\n');process.send({id:m.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'TUI private host completed'}]}}});}
  if(m.operation==='admit')process.send({id:m.id,result:{admitted:true}});
@@ -52,7 +56,7 @@ command=[binary] if binary else [bun,'run','src/standalone.ts']
 subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
 env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),LOGINOM_AI_AGENT_CLI_BUNDLE=str(bundle),LOGINOM_AI_AGENT_PURE='1',BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',TERM='xterm-256color')
 if not unconfigured and not onboarding:
- setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{}',text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
+ setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input=json.dumps({'mode':'custom','endpoint':'https://example.test/mcp','apiKey':'fixture-key'}),text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
  assert setup.returncode==0,setup.stderr
 elif prompt_mode:
  status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
@@ -130,7 +134,7 @@ if proxy_notice:
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
 child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
 os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
-setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
+setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('Сервер Loginom AI',b'\x1b[B\r'),('MCP endpoint',b'https://example.test/mcp\r'),('Ключ сервера',b'fixture-key\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
 if password_setup: setup_steps.append(('Новый пароль',b'fixture-password\r'))
 while child.poll() is None and time.monotonic()-start<(90 if attachment_mode else 30):
  if select.select([master],[],[],0.1)[0]:
@@ -178,7 +182,10 @@ result['unconfigured'] = unconfigured
 result['setup_skipped'] = setup_skipped
 result['setup_completed'] = onboarding and setup_step==len(setup_steps)
 result['secret_visible'] = b'fixture-key' in output or b'fixture-password' in output
-if onboarding and not cancel_setup: assert result['setup_completed'] and not result['secret_visible'], 'Setup must complete without displaying the key'
+if onboarding and not cancel_setup:
+ saved=json.loads((profile/'loginom/connection/connection.json').read_text())
+ result['custom_saved']=saved.get('mode')=='custom' and saved.get('endpoint')=='https://example.test/mcp'
+ assert result['setup_completed'] and result['custom_saved'] and not result['secret_visible'], 'Custom setup must persist without displaying the key'
 if unconfigured: assert setup_skipped and not (bundle/'fixture-pids.jsonl').exists(), 'Unconfigured TUI must offer setup without launching a runtime'
 result['tool_called'] = (bundle/'fixture-calls.jsonl').exists()
 result['history_verified'] = False

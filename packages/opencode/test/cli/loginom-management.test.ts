@@ -3,6 +3,7 @@ import { setupCandidate } from "../../src/cli/loginom-management"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 
 const current: Loginom.View = {
+  mode: "custom", endpoint: "https://example.test/mcp", hasApiKey: true, server: "custom", help: { state: "ready" }, cloud: { connected: false },
   revision: 4,
   generation: 2,
   url: "http://example.test/app/",
@@ -30,4 +31,12 @@ test("stdin setup distinguishes missing secrets, explicit empty password and rep
   expect(() => setupCandidate('{"password":null}', current)).toThrow("CLI_SETUP_INVALID")
   expect(() => setupCandidate('{"folder":"/not-a-setup-field"}', current)).toThrow("CLI_SETUP_INVALID")
   expect(() => setupCandidate("secret-broken-json", current)).toThrow("CLI_SETUP_INVALID")
+})
+
+test("stdin setup admits explicit custom credentials while ignoring a legacy key", () => {
+  expect(setupCandidate(JSON.stringify({ mode: "custom", endpoint: "https://stand.test/mcp", apiKey: "custom-canary" }), current)).toMatchObject({
+    mode: "custom", endpoint: "https://stand.test/mcp", apiKey: { operation: "replace", value: "custom-canary" },
+  })
+  expect(setupCandidate('{"apiKey":"legacy-canary"}', current)).not.toHaveProperty("apiKey")
+  expect(setupCandidate('{"mode":"custom","apiKey":""}', current).apiKey).toEqual({ operation: "empty" })
 })

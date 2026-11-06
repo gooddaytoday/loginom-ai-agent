@@ -47,7 +47,6 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
       join(resources, "runtime/src/knowledge-entry.mjs"),
     )
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    await Bun.write(join(resources, "knowledge-key"), "UNIT-NONSECRET")
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
@@ -71,7 +70,7 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
     `,
     )
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: server.endpoint,
       generation: 1,
       revision: 1,
       url: "http://example.test",

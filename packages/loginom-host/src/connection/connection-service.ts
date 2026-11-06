@@ -7,10 +7,14 @@ import type { recoveryStore } from "./recovery-store"
 
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
 export type ConnectionRuntime = {
-  check(candidate: ActiveConnection, signal?: AbortSignal): Promise<void | Loginom.BrowserStatus>
+  check(
+    candidate: ActiveConnection,
+    signal?: AbortSignal,
+    verifyBrowser?: boolean,
+  ): Promise<void | Loginom.BrowserStatus>
   prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
 }
-const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
+const decodeCandidate = Schema.decodeUnknownOption(Loginom.Check)
 
 export async function connectionService(
   store: ReturnType<typeof connectionStore>,
@@ -118,6 +122,21 @@ export async function connectionService(
   function view(): Loginom.View {
     const current = state.active
     return {
+      mode: current?.mode ?? "cloud",
+      endpoint: current?.endpoint,
+      hasApiKey: !!current?.apiKey,
+      server: current?.mode === "custom" ? "custom" : "primary",
+      help: {
+        state:
+          state.phase === "ready"
+            ? "ready"
+            : state.phase === "starting" || state.phase === "pending"
+              ? state.readiness
+              : state.phase === "unconfigured"
+                ? "connection-required"
+                : state.phase,
+      },
+      cloud: { connected: false },
       revision: state.revision,
       generation: current?.generation ?? 0,
       url: settingsAddress(current?.url ?? Product.connection.url),
@@ -159,6 +178,8 @@ export async function connectionService(
         .then((previous) => {
           if (!previous) return store.stage(candidate)
           if (
+            previous.mode !== candidate.mode ||
+            previous.endpoint !== candidate.endpoint ||
             previous.revision !== candidate.revision ||
             previous.url !== candidate.url ||
             previous.urlSource !== candidate.urlSource ||
@@ -177,7 +198,9 @@ export async function connectionService(
             state.failure = "LOGINOM_STORE_WRITE_FAILED"
             const persisted = await store.read().catch(() => undefined)
             return (
-              persisted?.generation === candidate.generation &&
+              persisted?.mode === candidate.mode &&
+              persisted.endpoint === candidate.endpoint &&
+              persisted.generation === candidate.generation &&
               persisted.revision === candidate.revision &&
               persisted.url === candidate.url &&
               persisted.username === candidate.username &&
@@ -260,7 +283,25 @@ export async function connectionService(
           : candidate.password.operation === "empty"
             ? ""
             : candidate.password.value
+      const current = state.pending ?? state.active
+      const mode = candidate.mode ?? current?.mode ?? "cloud"
+      const endpoint = candidate.mode === "custom" ? (candidate.endpoint ?? current?.endpoint) : current?.endpoint
+      const apiKey =
+        candidate.mode !== "custom" || !candidate.apiKey || candidate.apiKey.operation === "preserve"
+          ? (current?.apiKey ?? "")
+          : candidate.apiKey.operation === "empty"
+            ? ""
+            : candidate.apiKey.value
+      if (mode === "custom") {
+        if (!endpoint || !URL.canParse(endpoint)) throw Error("LOGINOM_ENDPOINT_INVALID")
+        const address = new URL(endpoint)
+        if (!["http:", "https:"].includes(address.protocol) || address.username || address.password)
+          throw Error("LOGINOM_ENDPOINT_INVALID")
+        if (!apiKey.trim()) throw Error("LOGINOM_API_KEY_REQUIRED")
+      }
       const record = {
+        mode,
+        endpoint,
         generation: state.generation + 1,
         revision: state.revision + 1,
         url: settingsAddress(candidate.url),
@@ -268,12 +309,11 @@ export async function connectionService(
         // preserves saved URLs independently of this marker.
         urlSource: "explicit" as const,
         username: candidate.username,
-        // The knowledge service uses the built-in key; a key sent by older clients is ignored.
-        apiKey: "",
+        apiKey,
         password,
       }
       const controller = new AbortController()
-      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal))
+      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal, candidate.verifyBrowser))
       checks.set(controller, checking)
       const browser = (await checking
         .catch((error: unknown) => {
@@ -312,7 +352,7 @@ export async function connectionService(
       const timer = setTimeout(() => validations.delete(validationId), 5 * 60_000)
       timer.unref()
       validations.set(validationId, { candidate: record, browser, expiresAt, timer })
-      return { validationId, expiresAt, browser: { ...browser } }
+      return { validationId, expiresAt, help: { state: "ready" }, browser: { ...browser } }
     },
     async save(input) {
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")

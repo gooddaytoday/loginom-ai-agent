@@ -26,7 +26,7 @@ const port: HostPort = {
   },
   start() {},
 }
-const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
+const candidate = Schema.decodeUnknownOption(Loginom.Check)
 const save = Schema.decodeUnknownOption(Loginom.Save)
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
