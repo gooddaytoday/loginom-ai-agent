@@ -12,6 +12,10 @@ test('LGD edge expectations use the qualified oracle and retain Variant metadata
  assert.equal(verifyLgdFields(observed,columns),true);
  const coerced=structuredClone(observed);coerced[2].type='string';assert.throws(()=>verifyLgdFields(coerced,columns),/LGD_COLD_FIELD_PROPERTIES/);
 });
+test('LGD compression fixture uses the stock cold expected contract',async()=>{
+ const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/compression/expected.json',import.meta.url),'utf8'));
+ assert.equal(parseExpectedOutputs({...expected,package_path:'/own/compression.lgp'}).outputs.length,3);
+});
 test('LGD checksum fixture uses the stock cold expected contract',async()=>{
  const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/checksum/expected.json',import.meta.url),'utf8'));
  assert.equal(parseExpectedOutputs({...expected,package_path:'/own/checksum.lgp'}).outputs.length,3);
