@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`tree-parent-child`, `tree-parent-roots`, `tree-parent-cycle`, `tree-parent-orphan`
+use the owner-approved id/parent_id cases under `trees-datatotree/acceptance/parent-child`.
+Only one CSV and its business task reach the model. The independent Python oracle
+generates stock JSON AST expectations for CSV/cold and observed execution-error
+expectations (cycle A, B; orphan Z). All cases require Save and cleanup; negative
+cases require the exact id list, no export and no partial result, as in `throw1`.
+
 `quality-default` and `quality-spikes` use the approved five-output fixtures in
 `nodes/research-quality/acceptance/`. Only task/data reach the model. The stock
 typed matcher checks full production receipts before and after the same Import

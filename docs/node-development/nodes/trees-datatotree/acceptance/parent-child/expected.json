@@ -1,6 +1,5 @@
 {
-  "status": "proposal_pending_owner_and_native_mode",
-  "native_result": "not_checked",
+  "status": "owner_approved_2026-11-06",
   "cases": {
     "org": {
       "outcome": "success",
@@ -86,11 +85,20 @@
     "cycle": {
       "outcome": "reject",
       "reason": "cycle",
+      "ids": [
+        "A",
+        "B"
+      ],
+      "text": "Parent-child cycle ids: A, B",
       "partial_output_allowed": false
     },
     "orphan": {
       "outcome": "reject",
       "reason": "orphan",
+      "ids": [
+        "Z"
+      ],
+      "text": "Parent-child orphan ids: Z",
       "partial_output_allowed": false
     }
   }
