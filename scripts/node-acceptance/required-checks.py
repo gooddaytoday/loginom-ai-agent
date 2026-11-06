@@ -38,6 +38,7 @@ RULES = (
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
+    ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact',)),
     ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union',)),
     ((C + 'variables-calculator-*.mjs',), ('live-ui',), ('variables-calculator',)),
     ((C + 'crosstable-variables.mjs', 'docs/node-development/nodes/variables-user/acceptance/**', 'scripts/node-acceptance/variables-user-real-date.mjs'), ('live-ui',), ('variables-user-real-date',)),

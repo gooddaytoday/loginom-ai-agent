@@ -1,4 +1,5 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
+import {createRedactor} from './redact.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -1827,7 +1828,7 @@ export function withBrowserReceipt(body, options) {
   return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, () => ${body})`;
 }
 
-export function parseCapabilityResult(response) {
+export function parseCapabilityResult(response,{redactor}={}) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
     // Keep the original cause private; upload journals it through its
@@ -1843,7 +1844,12 @@ export function parseCapabilityResult(response) {
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  const error=new Error('Pinned browser capability returned no typed result');
+  const message=(response?.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+    // Generated source can precede the modal state and exhaust the diagnostic
+    // allowance. Retain browser feedback, never the echoed capability code.
+    .map(block=>block.text.replace(/(?:^|\n)### Ran Playwright code\n[\s\S]*?(?=\n### |$)/g,'')).join('\n');
+  const error=new Error('Pinned browser capability returned no typed result',
+    {cause:new Error(Buffer.from((redactor??createRedactor()).text(message)).subarray(0,2048).toString().replace(/�$/, ''))});
   if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
   throw error;
 }
@@ -2220,6 +2226,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
         const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
           record:nodeTargetRecord,deadline:now()+15000});
+        if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase.move_mismatch&&!operation.targetPhase.pending){
+          const outcome={...operation.outcome.output,status:'FAILED',pending_phase:null,cleanup_complete:true,
+            error:{code:'NODE_APPLY_STOPPED',message:result.error}};
+          const event={operation_id:operation.id,action_key:'node.apply',action_revision:state.request.contract_revision,
+            phase:'node_checkpoint',signature:state.signature,result:outcome};
+          const ack=await onRecord(event);
+          if(!ack||fingerprint('ack',ack.result)!==fingerprint('ack',event.result))throw Error('Node target failure journal acknowledgement differs');
+          state.pending=null;state.cleanup_complete=true;state.result=structuredClone(outcome);
+        }
         if(result.cleanup_complete===true && !operation.targetPhase.pending
           && (result.resume_available===true || result.status==='SUCCEEDED')){
           // Only child effects have been reconciled. The node remains pending
@@ -2255,7 +2270,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const result=await inspectNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,deadline:now()+15000});
     const outcome=nodeTargetOutcome(operation,result);await remember(operation,'reconciled',outcome);
     operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
-    if(result.status==='SUCCEEDED')pending=null;
+    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
     return outcome;
   };
   const reconcilePending = async () => {
@@ -2978,7 +2993,25 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
-        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]}));
+        const read=buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]});
+        // Save can rename the open package without replacing its workflow.
+        // Completed node receipts retain their original navigation; follow only
+        // this runtime's verified, non-reopening Save chain before a fresh read.
+        for(const save of operations.values()){
+          const outcome=save.outcome;
+          if(save.action.action_key!=='package.save_checkpoint'||outcome?.action_key!=='package.save_checkpoint'
+            ||outcome.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||save.cleanupConfirmed!==true
+            ||outcome.output?.save_completed!==true||outcome.output.workflow_preserved!==true||outcome.output.reopened!==false)continue;
+          for(const continuation of outcome.output.workflow_continuations??[]){
+            const previous=continuation.previous_workflow_ref,next=continuation.workflow_ref,current=read.workflow_ref;
+            if(continuation.document_id!==read.document_id||!previous||!next
+              ||!['workflow_id','tab_tid','prefix'].every(key=>previous[key]===current[key]&&next[key]===current[key])
+              ||previous.navigation_path?.length!==current.navigation_path.length
+              ||!previous.navigation_path.every((part,i)=>part.tid===current.navigation_path[i].tid&&part.label===current.navigation_path[i].label))continue;
+            read.workflow_ref=structuredClone(next);
+          }
+        }
+        return nodeJobs.start(read);
       }
       if(!sourceReads.has(args.operation_id)
         &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
@@ -3753,6 +3786,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
+              if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
+                error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
+                  settings_unchanged:true,verification:'node_move_position_mismatch'};
               if(result.status==='NOT_APPLIED' && result.partial_effect===false && result.cleanup_complete===true
                 && operation.targetPhase?.effect_possible===false && !operation.targetPhase?.pending){
                 if(preflight?.effect_possible!==true)

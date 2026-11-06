@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {openPreparedOutputPort} from '../lib/node-port-open.mjs';
+import {makePreparedInputPortOpenCode,openPreparedOutputPort} from '../lib/node-port-open.mjs';
 
 for(const direction of ['input','output'])for(const fault of ['none','mf','foreign-store','foreign-node','no-owned-node','running','duplicate','foreign-close','disabled','covered-close','foreign-window','mask','changed-port','persistent','lost-reply','deadline','changed-before-close'])test(direction+' port recovers only its native completed graph console: '+fault,async()=>{
  const f=fixture(direction);await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
@@ -115,6 +115,71 @@ function groupingBusy(f){
  f.graph.FView={el:{dom:panel}};f.node.FIconCls='bg-vendor-icon-groupdata';
  f.flags.graphMasks=[panel];return panel;
 }
+
+function calculatorBusy(){
+ const f=fixture('input'),panel=groupingBusy(f);
+ f.node.FIconCls='bg-vendor-icon-calcdata';
+ const ref=f.task.binding.workflow_ref,prepared=[...f.prep.receipts.values()][0];
+ ref.tab_tid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';prepared.tab.tid=ref.tab_tid;
+ const crumb=f.el(ref.prefix+';cnrNaviMode;b.s_Workflow');crumb.textContent='Workflow';
+ ref.navigation_path=[{tid:crumb.tid,label:crumb.textContent}];
+ f.page.evaluate(()=>{
+  const a=bg.app,p=[...__loginomDockPreparationV1.receipts.values()][0];
+  a.WorkFlowTreeNode=class WorkFlowTreeNode{};a.PackageTreeNode=class PackageTreeNode{};
+  Object.setPrototypeOf(p.nodeTargetWorkflowNode,a.WorkFlowTreeNode.prototype);
+  Object.setPrototypeOf(p.packageNode,a.PackageTreeNode.prototype);
+  p.nodeTargetWorkflowNode.ParentNode=p.packageNode;
+  globalThis.getComputedStyle=()=>({visibility:'visible'});
+ },null);
+ f.run=()=>{
+  const {binding,direction,...options}=f.task;
+  return vm.runInNewContext('('+makePreparedInputPortOpenCode(binding,options)+')',{Date})(f.page);
+ };
+ return {f,panel};
+}
+
+for(const stage of ['begin','menu_issued','open_issued'])test('calculator input adapter waits read-only for ModelForm at '+stage,async()=>{
+ const {f,panel}=calculatorBusy();let waits=0;
+ if(stage!=='begin')f.flags.graphMasks=[];
+ if(stage==='menu_issued'){
+  const evaluate=f.page.evaluate;let reads=0;
+  f.page.evaluate=(fn,arg)=>{const result=evaluate(fn,arg);if(!arg.mode&&arg.document_id==='doc'&&++reads===2)f.flags.graphMasks=[panel];return result;};
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)f.flags.graphMasks=[panel];};return l;
+  };
+ }
+ f.page.waitForTimeout=async()=>{
+  if(!f.flags.graphMasks.length)return;
+  assert.equal(f.gestures.length,stage==='open_issued'?1:0);
+  if(++waits===3)f.flags.graphMasks=[];
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(waits,3);assert.equal(f.gestures.length,2);
+ assert.ok(result.trace.some(x=>x.event==='input_port_graph_busy'&&x.mode===stage&&x.samples===3));
+});
+
+for(const fault of ['persistent','deadline','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','changed-owner'])test('calculator input adapter refuses ModelForm '+fault,async t=>{
+ if(fault==='deadline')t.mock.timers.enable({apis:['Date'],now:10000});
+ const {f,panel}=calculatorBusy();
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
+ let waits=0;f.page.waitForTimeout=async()=>{
+  waits++;assert.deepEqual(f.gestures,[]);
+  if(fault==='deadline')t.mock.timers.tick(20001);
+  if(fault==='changed-owner')f.graph.FView.el.dom={};
+  if(waits>150)throw Error('Test wait bound exceeded');
+ };
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED',result.error);
+ assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.gestures,[]);assert.equal(f.prep.inputPortOpenReceipts.size,0);
+ assert.equal(waits,fault==='persistent'?150:['deadline','changed-owner'].includes(fault)?1:0);
+});
 
 function userBusy(f){
  const panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-modelvariables';
