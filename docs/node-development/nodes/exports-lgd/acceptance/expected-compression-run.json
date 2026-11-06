@@ -1,0 +1,543 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "exports.lgd",
+      "label": "WriteNone"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadNone"
+    },
+    {
+      "type": "exports.lgd",
+      "label": "WriteLzo"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadLzo"
+    },
+    {
+      "type": "exports.lgd",
+      "label": "WriteLz4None"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadLz4None"
+    },
+    {
+      "type": "exports.lgd",
+      "label": "WriteLz4Compressed"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadLz4Compressed"
+    },
+    {
+      "type": "exports.lgd",
+      "label": "WriteLz4All"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadLz4All"
+    }
+  ],
+  "lgd": {
+    "kind": "compression",
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Номер",
+        "type": "integer",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Text",
+        "label": "Текст",
+        "type": "string",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "data_kind": "continuous",
+        "tolerance": {
+          "abs": 0,
+          "rel": 0
+        }
+      },
+      {
+        "name": "Occurred",
+        "label": "Момент",
+        "type": "datetime",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Active",
+        "label": "Активен",
+        "type": "boolean",
+        "data_kind": "discrete"
+      }
+    ],
+    "formats": [
+      {
+        "name": "None",
+        "compression": "none",
+        "checksum": "none",
+        "import_label": "ReadNone",
+        "export_label": "WriteNone",
+        "native_compression": 0,
+        "native_checksum": 0,
+        "compression_display": "Без сжатия",
+        "checksum_display": "Нет"
+      },
+      {
+        "name": "Lzo",
+        "compression": "lzo",
+        "checksum": "none",
+        "import_label": "ReadLzo",
+        "export_label": "WriteLzo",
+        "native_compression": 1,
+        "native_checksum": 0,
+        "compression_display": "LZO",
+        "checksum_display": "Нет"
+      },
+      {
+        "name": "Lz4None",
+        "compression": "lz4",
+        "checksum": "none",
+        "import_label": "ReadLz4None",
+        "export_label": "WriteLz4None",
+        "native_compression": 2,
+        "native_checksum": 0,
+        "compression_display": "LZ4",
+        "checksum_display": "Нет"
+      },
+      {
+        "name": "Lz4Compressed",
+        "compression": "lz4",
+        "checksum": "compressed",
+        "import_label": "ReadLz4Compressed",
+        "export_label": "WriteLz4Compressed",
+        "native_compression": 2,
+        "native_checksum": 1,
+        "compression_display": "LZ4",
+        "checksum_display": "Сжатых данных"
+      },
+      {
+        "name": "Lz4All",
+        "compression": "lz4",
+        "checksum": "all",
+        "import_label": "ReadLz4All",
+        "export_label": "WriteLz4All",
+        "native_compression": 2,
+        "native_checksum": 2,
+        "compression_display": "LZ4",
+        "checksum_display": "Сжатых и несжатых данных"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ],
+      "output_node_label": "ReadNone"
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ],
+      "output_node_label": "ReadLzo"
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ],
+      "output_node_label": "ReadLz4None"
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ],
+      "output_node_label": "ReadLz4Compressed"
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        },
+        {
+          "Id": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null,
+          "Active": null
+        },
+        {
+          "Id": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": false
+        },
+        {
+          "Id": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000",
+          "Active": true
+        }
+      ],
+      "output_node_label": "ReadLz4All"
+    }
+  ]
+}
