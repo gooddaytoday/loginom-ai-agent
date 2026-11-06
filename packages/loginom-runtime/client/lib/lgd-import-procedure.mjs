@@ -42,15 +42,17 @@ export async function configureLgdImportBrowser(page,t,readContext){
    if(await l.inputValue()!==t.source_path){await point(l);await guard();effect=true;await l.fill(t.source_path);await l.press('Tab');}
   }
   let observed=await native();
-  if(t.checksum==='verify'&&observed.checksum===false){await click(find(file+'edtUseChecksum;ValueControl'));observed=await native();}
-  need(observed.checksum===true&&observed.connection==='Локальное','checksum verify and local file storage required');
+  const expectedChecksum=t.checksum===undefined?observed.checksum:t.checksum==='verify';
+  if(observed.checksum!==expectedChecksum){await click(find(file+'edtUseChecksum;ValueControl'));observed=await native();}
+  need(observed.checksum===expectedChecksum&&observed.connection==='Локальное','requested checksum policy and local file storage required');
   need(t.source_path===undefined||observed.source_path===t.source_path,'source changed');
   need(/\.lgd$/i.test(observed.source_path),'standalone LGD required');
   // Loginom fills these fields only after ReadHeaderAsync + PreviewDataAsync.
   // Keep the source page visible until that preview succeeds or reports its
   // own error; advancing early can hide a failed preview behind the next card.
   observed=await wait('source preview',async()=>{const v=await native();return v.compression!==''&&v.written_checksum!==''&&v.bitness!==''?v:null;});
-  need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported native LGD format');
+  const written=['Нет','Сжатых данных','Сжатых и несжатых данных'];
+  need(observed.compression==='LZ4'&&written.includes(observed.written_checksum)&&observed.bitness==='64-битная система','unsupported native LGD format');
   const advance=async target=>{await nativeError();await click(find(root+';btnNext'));await wait(target,async()=>{
    await nativeError();
    return await find(root+';'+target).isVisible()&&await page.evaluate(target=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().el.dom.getAttribute('data-tid').endsWith(';'+target),target);
@@ -58,8 +60,8 @@ export async function configureLgdImportBrowser(page,t,readContext){
   await advance('ColumnsMappingEngineOutputPortWizard');
   const selectedSource=observed.source_path;
   observed=await native();
-  need(observed.source_path===selectedSource&&observed.checksum===true&&observed.connection==='Локальное','source or checksum changed during native validation');
-  need(observed.compression==='LZ4'&&observed.written_checksum==='Сжатых данных'&&observed.bitness==='64-битная система','unsupported retained native LGD format');
+  need(observed.source_path===selectedSource&&observed.checksum===expectedChecksum&&observed.connection==='Локальное','source or checksum changed during native validation');
+  need(observed.compression==='LZ4'&&written.includes(observed.written_checksum)&&observed.bitness==='64-битная система','unsupported retained native LGD format');
   await advance('DoneWizard');
   return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source:observed}};
  }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
