@@ -2,7 +2,17 @@ import {readPreparedNodeContext,validatePreparedNodeContext} from './node-contex
 import {readVariablesReplaceContext,readVariablesReplaceBrowser} from './variables-replace-context.mjs';
 export function variablesReplaceLocator(page,tid){return page.locator('[data-tid='+JSON.stringify(tid)+']:visible:not(tr.x-grid-row-summary *)');}
 export async function revealVariablesReplaceControl(page,tid,locate=variablesReplaceLocator,timeout=15000){
- const inView=await locate(page,tid).evaluate(e=>{const b=e.getBoundingClientRect();return e.isConnected&&b.width>0&&b.height>0&&b.left>=0&&b.top>=0&&b.right<=innerWidth&&b.bottom<=innerHeight;},undefined,{timeout});
+ const inView=await locate(page,tid).evaluate(e=>{
+  const b=e.getBoundingClientRect();
+  if(!e.isConnected||b.width<=0||b.height<=0||b.left<0||b.top<0||b.right>innerWidth||b.bottom>innerHeight)return false;
+  // Native grid rows can be inside the window but clipped by their scroll view.
+  for(let p=e.parentElement;p;p=p.parentElement){
+   const style=getComputedStyle(p),box=p.getBoundingClientRect(),left=box.left+p.clientLeft,top=box.top+p.clientTop;
+   if(/auto|scroll|hidden|clip/.test(style.overflowX)&&(b.left<left||b.right>left+p.clientWidth))return false;
+   if(/auto|scroll|hidden|clip/.test(style.overflowY)&&(b.top<top||b.bottom>top+p.clientHeight))return false;
+  }
+  return true;
+ },undefined,{timeout});
  if(!inView)await locate(page,tid).scrollIntoViewIfNeeded({timeout});
 }
 export function makeVariablesReplaceConfigureCode(binding,options){
@@ -55,7 +65,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    }
    if(input){const inputs=[...e.querySelectorAll('input,textarea')].filter(visible);need(inputs.length===1,'unique input');e=inputs[0];}
    const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
-   need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target '+JSON.stringify({tid,box:{x:box.x,y:box.y,width:box.width,height:box.height},hit:hit?.getAttribute('data-tid'),hit_class:hit?.className,ancestors:[...function*(e){for(let p=e.parentElement;p;p=p.parentElement)yield p;}(e)].filter(p=>/auto|scroll|hidden/.test(getComputedStyle(p).overflowY)).map(p=>{const b=p.getBoundingClientRect();return {tid:p.getAttribute('data-tid'),x:b.x,y:b.y,width:b.width,height:b.height,scrollTop:p.scrollTop};})}));return {x,y};
+   need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target');return {x,y};
   },{tid,grid,row,dialog,input,root,base,origin:task.origin,build:task.build});
  };
  const click=async(tid,options={},double=false)=>{lastAction=tid;await owned();await reveal(page,tid,locate,remaining());const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
