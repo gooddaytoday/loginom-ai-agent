@@ -43,7 +43,7 @@ export async function configureLgdImportBrowser(page,t,readContext){
   }
   let observed=await native();
   const expectedChecksum=t.checksum===undefined?observed.checksum:t.checksum==='verify';
-  if(observed.checksum!==expectedChecksum){await click(find(file+'edtUseChecksum;ValueControl'));observed=await native();}
+  if(observed.checksum!==expectedChecksum){await click(find(file+'edtUseChecksum;ValueControl;DisplayEl'));observed=await native();}
   need(observed.checksum===expectedChecksum&&observed.connection==='Локальное','requested checksum policy and local file storage required');
   need(t.source_path===undefined||observed.source_path===t.source_path,'source changed');
   need(/\.lgd$/i.test(observed.source_path),'standalone LGD required');

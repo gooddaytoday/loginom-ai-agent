@@ -12,7 +12,11 @@ test('native LGD import retains properties, checks corruption and refuses a fore
    const components=new Map();let stage='ImportNativePreviewWizard';
    const card=document.createElement('div');card.dataset.tid=root.dataset.tid+';ImportNativePreviewWizard';root.append(card);
    const make=(id,value)=>{const e=document.createElement('div');e.id='c'+components.size;e.dataset.tid=card.dataset.tid+';'+id;card.append(e);
-    const input=document.createElement('input');input.type=typeof value==='boolean'?'checkbox':'text';input.value=String(value);input.checked=value===true;e.append(input);if(typeof value==='boolean')e.onclick=event=>{if(event.target===e)input.checked=!input.checked;};
+    const input=document.createElement('input');input.type=typeof value==='boolean'?'checkbox':'text';input.value=String(value);input.checked=value===true;e.append(input);
+    if(typeof value==='boolean'){
+     e.style.cssText='position:relative;width:240px;height:24px';input.id=e.id+'-input';input.dataset.tid=e.dataset.tid+';InputEl';
+     const display=document.createElement('label');display.htmlFor=input.id;display.dataset.tid=e.dataset.tid+';DisplayEl';display.style.cssText='position:absolute;left:4px;top:3px;width:18px;height:18px';e.append(display);
+    }
     components.set(e.id,{el:{dom:e},inputEl:{dom:input},getValue:()=>typeof value==='boolean'?input.checked:input.value,getRawValue:()=>typeof value==='boolean'?input.checked:input.value,pressed:false});
     if(id.endsWith(';ValueControl')){const s=document.createElement('div');s.id='s'+components.size;s.dataset.tid=e.dataset.tid.replace(';ValueControl',';SwitchButton');card.append(s);components.set(s.id,{pressed:false});}
    };

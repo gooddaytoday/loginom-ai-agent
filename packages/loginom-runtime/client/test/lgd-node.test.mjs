@@ -19,6 +19,7 @@ test('explicit checksum opt-out cannot bypass a known native checksum refusal fo
  assert.doesNotThrow(()=>validateLgdChecksumChange('verify',source,history,node));
  assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',{...source,sha256:'b'.repeat(64)},history,{node_id:'new-node'}));
  assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',source,[{source,outcome:{error:{message:'unrelated refusal'}}}],node));
+ assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',source,[{source,outcome:{error:{message:'LGD import: requested checksum policy and local file storage required'},output:{node}}}],node));
 });
 test('LGD native source inventory omits kind while target retains observed kind and exact source order',()=>{
  const sources=[{record_id:'1',index:0,name:'RecordId',label:'Идентификатор',type:'integer'},

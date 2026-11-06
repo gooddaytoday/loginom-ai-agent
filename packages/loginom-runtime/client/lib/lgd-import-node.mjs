@@ -9,7 +9,7 @@ const need=(v,m)=>{if(!v)throw Error('LGD import: '+m);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export function validateLgdChecksumChange(checksum,source,history,node){
  if(checksum!=='ignore')return;
- const corrupt=history.some(h=>/контрольн[\s\S]*сумм|checksum/i.test(h.outcome?.error?.message??'')
+ const corrupt=history.some(h=>/(?:ошиб|невер|поврежд|не удалось)[\s\S]{0,120}контрольн[\s\S]{0,60}сумм|контрольн[\s\S]{0,60}сумм[\s\S]{0,120}(?:не совпада|ошиб|невер|поврежд)|checksum[\s\S]{0,60}(?:mismatch|fail|invalid)|(?:mismatch|invalid)[\s\S]{0,60}checksum/i.test(h.outcome?.error?.message??'')
   &&(source&&h.source?.sha256===source.sha256&&h.source?.bytes===source.bytes
    ||node&&(h.outcome?.output?.node??h.outcome?.node)?.node_id===node.node_id));
  need(!corrupt,'checksum cannot be disabled after a checksum failure for this source or node');
