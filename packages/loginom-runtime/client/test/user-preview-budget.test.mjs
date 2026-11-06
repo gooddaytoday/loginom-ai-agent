@@ -159,10 +159,14 @@ test('JSON transported negative zero compacts to decimal without reducing legacy
  assert.deepEqual(transported,before);
 });
 
-test('actual MCP delivery keeps the JavaScript full refusal separate from ordinary preview trimming',()=>{
+test('actual MCP delivery bounds a source-bound JavaScript preview without changing its retained rows',()=>{
  const source=raw([[{...string('x'.repeat(24000)),precision:'source_text',representation:'data_source_string'}]]);
  source.outcome.output.output.javascript_source={policy:'javascript-module-v1'};
  const before=structuredClone(source),reply=nodeResultReply(source,{userProfile:true});
- assert.equal(reply.isError,true);assert.equal(JSON.parse(reply.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+ assert.notEqual(reply.isError,true);assert.ok(Buffer.byteLength(JSON.stringify(reply))<=46000);
+ const value=JSON.parse(reply.content[0].text);
+ assert.deepEqual(value.output.javascript_source,source.outcome.output.output.javascript_source);
+ assert.equal(value.output.ports[0].sample_rows,0);assert.equal(value.output.ports[0].sample_complete,false);
+ assert.ok(value.limitations.some(s=>s.includes('exports.text')));
  assert.deepEqual(source,before);assert.equal(source.outcome.output.output.ports[0].sample_rows,1);
 });

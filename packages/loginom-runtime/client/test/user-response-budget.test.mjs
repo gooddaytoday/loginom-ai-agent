@@ -8,11 +8,55 @@ import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {userActionInventory} from '../lib/user-workflow.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
-import {compactNodeResult,userResultSchema} from '../lib/user-results.mjs';
+import {compactNodeResult,compactActionResult,userResultSchema} from '../lib/user-results.mjs';
+import {actionReply} from '../lib/bridge.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 
 const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
+
+test('compact JS delivery bounds only analytical rows and inspection preserves the original effects',()=>{
+ const configuration={status:'applied',readback:{kind:'javascript',source:{sha256:'a'.repeat(64),utf8_bytes:771,lf_lines:18},
+  receipt_ids:['compact:configure','compact:finish','compact:execute','compact:read'],
+  wizard_commit_verified:true,settings_preserved:true,input_mapping:{fields:[{name:'Items',type:'string'}]}}};
+ const result={operation_id:'compact',attempt:1,state:'settled',outcome:{operation_id:'compact',status:'SUCCEEDED',
+  action_key:'node.apply',phase:'node_ready',effect_possible:true,cleanup_complete:true,output:{configuration,
+   phases:[{phase:'read',receipt_id:'compact:read',status:'verified'}],node:{document_id:'doc',workflow_id:'wf',node_id:'js'},
+   execution:{status:'completed',execution_id:'execution'},package_saved:false,output:{status:'complete',evidence_ref:'compact:read',
+    javascript_source:{policy:'javascript-module-v1',source_operation_id:'compact',source_sha256:'a'.repeat(64)},
+    ports:[{port:0,port_guid:'port-guid',fresh:true,execution_id:'execution',row_count:72,sample_rows:72,sample_complete:true,
+     schema:[{index:0,name:'Compact',label:'Compact',type:'string'}],
+     sample:Array.from({length:72},(_,i)=>[{type:'string',value:i+':'+ 'данные"\\😀'.repeat(45),is_null:false,precision:'source_text',representation:'data_source_string'}])}]}}}};
+ const before=structuredClone(result);
+ for(const tool of ['dock_node_wait','dock_node_status','dock_node_apply','dock_node_read']){
+  const delivered=nodeResultReply(result,{userProfile:true,tool});
+  assert.notEqual(delivered.isError,true,tool);assert.ok(bytes(delivered)<=46000);
+  const value=JSON.parse(delivered.content[0].text),port=value.output.ports[0];
+  assert.deepEqual(value.configuration,configuration);assert.equal(value.status,'SUCCEEDED');assert.equal(value.cleanup_complete,true);
+  assert.deepEqual(value.execution,result.outcome.output.execution);assert.equal(value.package_saved,false);
+  assert.deepEqual(value.output.javascript_source,result.outcome.output.output.javascript_source);
+  assert.ok(port.sample_rows>0&&port.sample_rows<72);assert.equal(port.sample_complete,false);assert.equal(port.row_count,72);
+  assert.deepEqual(port.schema,result.outcome.output.output.ports[0].schema);
+  assert.deepEqual(port.sample.map(r=>r[0].value),result.outcome.output.output.ports[0].sample.slice(0,port.sample_rows).map(r=>r[0].value));
+  assert.ok(value.limitations.some(s=>s.includes('exports.text')));
+ }
+ for(const state of ['resolved','pending']){
+  const inspected={operation_id:'compact',status:'SUCCEEDED',action_key:'operation.inspect',effect_possible:false,output:{
+   state,cleanup_confirmed:state==='resolved',effect_state:state==='resolved'?'verified':'partial_or_unverified',
+   outcome:result.outcome,next_steps:[{tool:'dock_node_status',arguments:{operation_id:'compact'}}]}};
+  const retained=structuredClone(inspected);
+  const compact=compactActionResult(inspected,{wireSize:value=>bytes(actionReply(value,{userProfile:true}))});
+  const delivered=boundedUserToolReply(actionReply(compact,{userProfile:true}),{tool:'dock_operation_inspect',operationId:'compact'});
+  assert.notEqual(delivered.isError,true,state);assert.ok(bytes(delivered)<=46000);
+  const value=JSON.parse(delivered.content[0].text),output=value.output.outcome.output;
+  assert.deepEqual({...value.output,outcome:null},{...inspected.output,outcome:null});
+  assert.deepEqual({...output,output:null,warnings:null},{...result.outcome.output,output:null,warnings:null});
+  assert.ok(output.output.ports[0].sample_rows<72);assert.equal(output.output.ports[0].sample_complete,false);
+  assert.ok(output.warnings.some(s=>s.includes('never repeat')&&s.includes('exports.text')));
+  assert.deepEqual(inspected,retained);
+ }
+ assert.deepEqual(result,before);
+});
 
 test('only user-v1 wait removes the structured table copy and retains the declared output schema',()=>{
  const result={operation_id:'large-js',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
@@ -31,15 +75,17 @@ test('only user-v1 wait removes the structured table copy and retains the declar
  assert.equal(new AjvJsonSchemaValidator().getValidator(userResultSchema)(delivered.structuredContent).valid,true);
  assert.equal(JSON.stringify(result),before);
  for(const tool of ['dock_node_apply','dock_node_status','dock_node_resume','dock_node_read','dock_node_cancel','dock_node_stop','dock_operation_inspect',undefined]){
-  assert.equal(nodeResultReply(result,{userProfile:true,tool}).isError,true);
+  const bounded=nodeResultReply(result,{userProfile:true,tool});
+  assert.notEqual(bounded.isError,true);assert.ok(bytes(bounded)<=46000);
+  assert.deepEqual(bounded.structuredContent.configuration,result.outcome.output.configuration);
+  assert.ok(bounded.structuredContent.output.ports[0].sample_rows<29);
   assert.deepEqual(nodeResultReply(result,{tool}),nodeResultReply(result));
  }
- // Even one serialized table can exceed the unchanged final-envelope budget.
+ // An oversized ordinary cell is omitted as a whole row, never sliced.
  result.outcome.output.output.ports[0].sample[0][0].value='"'.repeat(24000);
- const oversized=JSON.stringify(result),refused=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
- assert.equal(refused.isError,true);
- assert.equal(JSON.parse(refused.content[0].text).error.code,'USER_RESPONSE_BUDGET');
- assert.equal(JSON.parse(refused.content[0].text).original_operation_id,'large-js');
+ const oversized=JSON.stringify(result),bounded=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
+ assert.notEqual(bounded.isError,true);assert.ok(bytes(bounded)<=46000);
+ assert.equal(JSON.parse(bounded.content[0].text).output.ports[0].sample_rows,0);
  assert.equal(JSON.stringify(result),oversized);
 });
 
@@ -151,7 +197,7 @@ test('JS full configuration is retained for bounded delivery instead of a readba
  assert.equal(JSON.stringify(result),before);assert.equal(result.outcome.output.configuration.readback_summary,undefined);
 });
 
-test('source-bound JS output reread refuses overflow without dropping rows or its source binding',()=>{
+test('source-bound JS preview reread omits oversized rows while preserving its source binding',()=>{
  const javascript_source={source_operation_id:'created-js',source_sha256:'a'.repeat(64),source_utf8_bytes:80,
   source_lf_lines:3,settings_sha256:'b'.repeat(64),policy:'javascript-module-v1'};
  const result={operation_id:'reread-js',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
@@ -159,8 +205,11 @@ test('source-bound JS output reread refuses overflow without dropping rows or it
    output:{status:'complete',javascript_source,ports:[{port:0,schema:[{index:0,name:'Value',label:'Value',type:'string'}],
     row_count:1,sample_rows:1,sample_complete:true,
     sample:[[{type:'string',value:'"'.repeat(20000),is_null:false,precision:'display_text'}]]}]}}}};
- const before=JSON.stringify(result),refused=nodeResultReply(result,{userProfile:true});
- assert.equal(refused.isError,true);assert.equal(JSON.parse(refused.content[0].text).original_operation_id,'reread-js');
+ const before=JSON.stringify(result),bounded=nodeResultReply(result,{userProfile:true});
+ assert.notEqual(bounded.isError,true);assert.ok(bytes(bounded)<=46000);
+ assert.deepEqual(bounded.structuredContent.output.javascript_source,javascript_source);
+ assert.equal(bounded.structuredContent.output.ports[0].sample_rows,0);
+ assert.equal(bounded.structuredContent.output.ports[0].sample_complete,false);
  assert.equal(JSON.stringify(result),before);assert.equal(result.outcome.output.output.ports[0].sample.length,1);
  result.outcome.output.output.ports[0].sample[0][0].value='value';
  const delivered=nodeResultReply(result,{userProfile:true});assert.equal(delivered.isError,undefined);
