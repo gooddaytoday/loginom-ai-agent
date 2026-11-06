@@ -489,3 +489,22 @@ Runtime/сборки/production не запускались. Следующий 
 - Evidence/команды/пределы: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-14-report.md`.
 - Production, сайт, реальный reserve, installed/native платформы и authentic0.3.9 не проверялись; это внешние gates15. Task15 не выполнялся.
 - Следующий шаг: независимое ревью Task14 родителем. Push/PR/merge/release не выполнялись.
+
+Независимое ревью Task14 (`0b9e5d5948`): Spec compliant / Quality Approved; обязательных замечаний нет. Четыре прежних Pydantic warnings отмечены Minor без изменения scope. Задачи1–14 завершены; следующий этап — Task15 source/local отчёт и общее ревью ветки от `dd2f949d11`.
+
+## Checkpoint Task15 — 2026-11-06
+
+- Принятый source SHA `0b9e5d5948ea8968b3fa165146340e82c53497a0`; задачи1–14 Spec compliant / Quality Approved.
+- Task15 docs commit содержит этот checkpoint; отчёт: `docs/testing/loginom-ai-agent/cloud-auth.md`, команды/SHA/результаты сохранены в git.
+- Source package/typecheck/build evidence переиспользовано по неизменным срезам; Task14 Python не меняет build inputs клиентов13 (git diff exit0).
+- Local integration PASS: реальные assembled Desktop/CLI→Host→Help с own HTTPS site/двумя MCP fixtures13 и native Dock/ACL14.
+- Source migration не равна authentic0.3.9; HTTP fixture не равен Better Auth. BASE/dirty metadata артефактов сохранены, final SHA не приписан сборкам.
+- Linux filesystem0700/0600 и local CA/proxy PASS; native Windows/macOS/system trust/full120s worst-case — NOT_RUN с условиями продолжения.
+- Внешний staging gate NOT_RUN: site/два независимых registry/accounts не предоставлены; доступность public production не проверялась.
+- Настоящий0.3.9 NOT_RUN: нет безопасных isolated inputs; binary/key/owner profiles не трогались, legacy key не отключён.
+- Исправлен existing standalone fixture example: own start/bounded readiness/own-PID cleanup; smoke PASS, без нового runner/поведения продукта.
+- Source gate PENDING независимого ревью Task15 и всего diff от `dd2f949d11`; до их исхода checkbox1 открыт, cloud выпуск не готов.
+- Task15 — только документация; TDD/runtime suites не повторялись без изменения поведения, SDK/locks/dependencies/pins неизменны.
+- Ранний own-fixture diagnostic leak14 описан честно; sanitized summaries/retired-secret cleanup не выданы за отсутствие экспозиции.
+- Следующий шаг: parent reviews, закрыть обязательные findings, docs-only update source gate; затем отдельные staging/native/legacy проверки владельца.
+- Push/PR/merge/release/production/website/legacy-disable не выполнялись. Scratch: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-15-report.md`.

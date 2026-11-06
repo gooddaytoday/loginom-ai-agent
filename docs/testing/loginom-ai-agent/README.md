@@ -1,5 +1,8 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+Облачное подключение: [source/local приёмка и оставшиеся gates](cloud-auth.md).
+Это отдельный клиентский результат; native и внешняя облачная приёмка ещё не выполнены.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);

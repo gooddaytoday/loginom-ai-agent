@@ -695,12 +695,23 @@ Release endpoints закреплены в Product: `https://loginom.ai`,
 Release CI запрещает любую определённую переменную, в том числе пустую и канал dev.
 
 Использовать отдельный каталог под `$HOME/storage/tmp/`, закреплённые
-Node/npm и Chromium из Product и свою тестовую CA. Пример из корня репозитория
+Node/npm и Chromium из Product и свою тестовую CA. Пример в отдельном shell из корня репозитория
 (файл `fixture.json` создаёт собственный `packages/loginom-host/test/support/cloud-fixture.ts`):
 
 ```sh
+set -eu
 export TMPDIR=$HOME/storage/tmp TMP=$HOME/storage/tmp TEMP=$HOME/storage/tmp
 run=$(mktemp -d $HOME/storage/tmp/loginom-cloud-dev-XXXXXX)
+bun packages/loginom-host/test/support/cloud-fixture.ts "$run/fixture.json" >"$run/fixture.log" 2>&1 &
+fixture_pid=$!
+trap 'kill "$fixture_pid" 2>/dev/null || :; wait "$fixture_pid" 2>/dev/null || :' EXIT
+# Дождаться завершённой записи descriptor, максимум 10 секунд.
+for attempt in $(seq 1 100); do
+  rg -q '^Local cloud fixture ready$' "$run/fixture.log" && break
+  kill -0 "$fixture_pid" 2>/dev/null || exit 1
+  sleep 0.1
+done
+rg -q '^Local cloud fixture ready$' "$run/fixture.log" || exit 1
 export LOGINOM_AI_AGENT_CHANNEL=dev
 # fixture.json содержит только локальные endpoints, proxy, cert и control, без ключей.
 export LOGINOM_AI_AGENT_CLOUD_BUILD="$(bun -e 'const f=await Bun.file(process.argv[1]).json(); process.stdout.write(JSON.stringify(f.endpoints))' "$run/fixture.json")"
@@ -710,6 +721,7 @@ export LOGINOM_AI_AGENT_TEST_ONBOARDING=1
 # NODE_SOURCE/BROWSER_SOURCE заранее указывают на проверенные inputs.
 bun packages/loginom-host/script/build-cli.ts "$run/cli" --no-archive
 (cd packages/desktop && bun run build)
+# В этом же shell выполнить проверки ниже; при выходе trap завершит только fixture_pid.
 ```
 
 Не запускать dev tuple в рабочем Desktop root. Для GUI использовать
