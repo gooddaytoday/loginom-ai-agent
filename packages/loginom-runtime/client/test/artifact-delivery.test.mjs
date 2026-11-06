@@ -429,6 +429,25 @@ test('folder navigation waits for the requested breadcrumb without repeating its
  assert.deepEqual(f.calls,['click','double_click','double_click','upload','inspect','verify','inspect']);
 });
 
+test('Files readiness waits for its storage root instead of binding a transient home navigation panel',async()=>{
+ const f=fixture(),observe=f.runtime.observe;let roots=0,wrongDetail=0;
+ f.runtime.observe=async options=>{
+  if(options.scope==='roots')roots++;
+  const result=await observe(options),s=result.output;
+  // LAB-955 seed-2 :6-14: Home/Files tabs change while native Files loads.
+  if(roots>=2&&roots<=4){
+   if(options.rootRef){wrongDetail++;throw Error('Transient home navigation detached');}
+   s.workflow_ref={prefix:'MF;TF-home'};s.file_storage={status:'unobserved'};
+   s.ui.elements=[{ref:'home-navigation',tid:'MF;TF-home;NavigationBar;NavigationPanel'}];
+  }
+  return result;
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(wrongDetail,0);assert.ok(roots>=5);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 test('delivery reads the observed toolbar when a populated graph only yields roots',async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let opened=false;
  f.runtime.observe=async options=>{

@@ -105,7 +105,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    const r=await roots(),prefix=r.workflow_ref?.prefix;
    const bars=r.ui.elements.filter(e=>e.tid===prefix+';NavigationBar;NavigationPanel');
    requireValue(bars.length<=1,'Storage navigation is ambiguous');
-   return bars.length?detail(r,bars[0]):null;
+   // Native Files opening can temporarily expose Home's navigation panel.
+   // Wait for the same form's actual storage root before binding its detail.
+   const storage=r.ui.elements.some(e=>e.tid===prefix+';FileStorageForm;pnlFileStorage;tbl');
+   return storage&&bars.length?detail(r,bars[0]):null;
   },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
   const readRow=async(name,parent)=>{
    const owner=JSON.stringify({document:parent.dom_epoch?.document,workflow:parent.workflow_ref});
