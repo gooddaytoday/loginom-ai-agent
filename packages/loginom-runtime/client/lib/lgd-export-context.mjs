@@ -21,6 +21,16 @@ export function readLgdExportBrowser({prefix,fields}){
   const input=c.inputEl?.dom,display=typeof c.getRawValue==='function'?c.getRawValue():value;
   if(input&&typeof display==='string'&&input.value!==display)return fail('lgd_export_uncommitted_'+key);
   values[key]={value,display,tid:tid+';ValueControl',variable:false};
+  if(key==='checksum'){
+   const disabled=typeof c.isDisabled==='function'?c.isDisabled():c.disabled;
+   if(typeof disabled==='boolean')values[key].disabled=disabled;
+  }
+ }
+ // Loginom restores the inactive checksum combo to its default on reopen.
+ // Without compression/LZO the writer ignores it; retain its raw value while
+ // exposing the effective "none" only with an observed disabled control.
+ if([0,1].includes(values.compression.value)&&values.checksum.disabled===true&&[0,1,2].includes(values.checksum.value)){
+  values.checksum.native_value=values.checksum.value;values.checksum.value=0;
  }
  if(cmp(base+'ExportNativeParamsWizard;edtConnection')?.getValue?.()!=='Локальное')return fail('lgd_export_connection');
  return {verified:true,stage:'lgd_export',values,connection:'Локальное',format:'lgd',settings_applied:false};
