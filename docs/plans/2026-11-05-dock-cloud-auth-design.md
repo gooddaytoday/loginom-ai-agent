@@ -172,3 +172,18 @@ Runtime/сборки/production не запускались. Следующий 
 - `bun typecheck` Host и `git diff --check`: PASS. Зависимости установлены по frozen lock, pins не менялись.
 - Ограничения: проверки source/fixtures, установленный GUI и native Windows/macOS этим не подтверждены.
 - Следующий шаг: Task2, ограничить семь Help-чтений официальной KB.
+
+## Checkpoint Task 2 — 2026-11-06
+
+- SHA Task1: `2bf6c1e354`; результат Task2 — коммит `fix(loginom): scope Help reads to official knowledge base`.
+- Все семь Help-чтений проверяются до отправки: root/descendants, search list-only,
+  полный read-array, относительный glob; чужие/неоднозначные URI не нормализуются в разрешённые.
+- Опубликованные схемы сужены до combineCatalogs; portable read array сохранён.
+- Реальные MCP fixtures: mixed read даёт 0 remote calls; find получает KB root.
+- RED→GREEN: каждый scope-сценарий, сетевой mixed read, published schemas и передача safe error через Host.
+- Runtime client: 27 PASS; entry: 11 PASS; Host knowledge: 3 PASS;
+  дополнительно Host knowledge+prepare: 13 PASS и `bun typecheck` PASS; `git diff --check` PASS.
+- Независимая проверка scope и regex/runtime: замечаний нет; ошибочные fixture read.offset/limit удалены.
+- Поправка плана: allowlist scope-error перенесён из5 в2, поскольку ошибка пересекает IPC уже сейчас.
+- Ограничения: настоящий Python Dock/ACL проверяется Task14; production не затронут.
+- Следующий шаг: Task3, explicit custom configuration и безопасная legacy migration.

@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { catalogStartup, combineCatalogs, connectRemote, readCatalog } from './catalog.mjs';
+import { scopeKnowledgeArguments, scopeKnowledgeTool } from './knowledge-scope.mjs';
 
 const names = new Set(['find', 'search', 'read', 'grep', 'glob', 'list', 'tree']);
 
@@ -23,7 +24,7 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal, startu
     });
   });
   try {
-    const catalog = combineCatalogs({ remote: (await readCatalog(remote, { startup })).filter(tool => names.has(tool.name)) });
+    const catalog = combineCatalogs({ remote: (await readCatalog(remote, { startup })).filter(tool => names.has(tool.name)).map(scopeKnowledgeTool) });
     if (catalog.tools.length !== names.size) throw Error('LOGINOM_KNOWLEDGE_CATALOG_INVALID');
     const state = { closed: false, closing: undefined };
     const pending = new Map();
@@ -39,7 +40,7 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal, startu
         const entry = { run: input.run, id: input.id, controller: new AbortController(), promise: undefined };
         pending.set(key, entry);
         try {
-          entry.promise = remote.callTool({ name: input.name, arguments: input.arguments ?? {} }, CallToolResultSchema,
+          entry.promise = remote.callTool({ name: input.name, arguments: scopeKnowledgeArguments(input.name, input.arguments ?? {}) }, CallToolResultSchema,
             { signal: AbortSignal.any([entry.controller.signal, ...(signal ? [signal] : [])]), timeout: 60000 });
           return await entry.promise;
         } catch (error) {

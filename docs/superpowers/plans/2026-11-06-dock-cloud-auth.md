@@ -188,7 +188,7 @@ if (!localOnly) connections.push(connectRemote(() => ({
 
 **Interfaces:** `scopeKnowledgeArguments(name: string, args: Record<string, unknown>): Record<string, unknown>`; возвращает проверенные/defaulted args, иначе `Error("LOGINOM_KNOWLEDGE_SCOPE_DENIED")`. Вызывается непосредственно перед remote call. Tool schemas/описания ограничиваются **до combineCatalogs**, чтобы catalogSha256 соответствовал опубликованной схеме; неподдерживаемое имя отклоняется.
 
-- [ ] **1. RED:** Создать тест первого нужного поведения:
+- [x] **1. RED:** Создать тест первого нужного поведения:
 
 ```js
 import { test } from "node:test"
@@ -202,8 +202,8 @@ test("find defaults to the official knowledge base", () => {
 })
 ```
 
-- [ ] **2. Запустить:** из `packages/loginom-runtime/client` `node --test test/knowledge-scope.test.mjs`; RED — отсутствует функция/ожидаемое ограничение.
-- [ ] **3. GREEN:** Нормализовать аргументы только этого поведения, сохранив query и остальные разрешённые параметры. Затем расширять по одному сценарию таблицы; после каждого запускать тот же тест.
+- [x] **2. Запустить:** из `packages/loginom-runtime/client` `node --test test/knowledge-scope.test.mjs`; RED — отсутствует функция/ожидаемое ограничение.
+- [x] **3. GREEN:** Нормализовать аргументы только этого поведения, сохранив query и остальные разрешённые параметры. Затем расширять по одному сценарию таблицы; после каждого запускать тот же тест.
 
 | Следующий отдельный тест | Минимальное поведение |
 | --- | --- |
@@ -226,8 +226,8 @@ if (!inside || ambiguous || traversal) throw Error("LOGINOM_KNOWLEDGE_SCOPE_DENI
 ```
 
 Дополнить проверку string/empty и согласовать допустимый trailing slash с canonical root. Не применять decode/rewrite, который превращает запрещённый URI в разрешённый. Не сокращать неизвестный URI до root.
-- [ ] **4. Интеграционный RED→GREEN:** Исправить `knowledgeServer` fixture: сейчас он неверно требует `uri` у всех инструментов. Схемы взять из `services/loginom-ai/openviking/server/mcp_endpoint.py`: `read.uris`, `find/search.target_uri`, остальные `uri`; старые test calls заменить с `uri:"Help/node.md"` на `uris:["viking://resources/loginom-dock/Help/node.md"]`. В `test/knowledge-entry.test.mjs` также заменить read calls и `gates.get(params.arguments.uri)` на ключ по проверенному `uris`, иначе entered.promise зависнет; assertions исходной remote schema заменить ограниченной схемой. В existing `knowledgeServer` fixture вызвать настоящий knowledge client с mixed read; collector remote вызовов остаётся пустым. Валидный find действительно получает root на сервере. Test schemas ограничивают опубликованные аргументы, а не заменяют runtime validation. Не фильтровать только результаты после отправки.
-- [ ] **5. Проверка/коммит:** из runtime client `node --test test/knowledge-scope.test.mjs test/knowledge-client.test.mjs`; из Runtime `node --test test/knowledge-entry.test.mjs`; из Host `bun test test/knowledge.test.ts`; commit `fix(loginom): scope Help reads to official knowledge base`.
+- [x] **4. Интеграционный RED→GREEN:** Исправить `knowledgeServer` fixture: сейчас он неверно требует `uri` у всех инструментов. Схемы взять из `services/loginom-ai/openviking/server/mcp_endpoint.py`: `read.uris`, `find/search.target_uri`, остальные `uri`; старые test calls заменить с `uri:"Help/node.md"` на `uris:["viking://resources/loginom-dock/Help/node.md"]`. В `test/knowledge-entry.test.mjs` также заменить read calls и `gates.get(params.arguments.uri)` на ключ по проверенному `uris`, иначе entered.promise зависнет; assertions исходной remote schema заменить ограниченной схемой. В existing `knowledgeServer` fixture вызвать настоящий knowledge client с mixed read; collector remote вызовов остаётся пустым. Валидный find действительно получает root на сервере. Test schemas ограничивают опубликованные аргументы, а не заменяют runtime validation. Не фильтровать только результаты после отправки. Новый `LOGINOM_KNOWLEDGE_SCOPE_DENIED` добавить в private allowlist Host здесь же: иначе supervisor скрывает его ещё до Task5. Published read.uris сохраняет portable array-схему Dock; runtime принимает string и array.
+- [x] **5. Проверка/коммит:** из runtime client `node --test test/knowledge-scope.test.mjs test/knowledge-client.test.mjs`; из Runtime `node --test test/knowledge-entry.test.mjs`; из Host `bun test test/knowledge.test.ts`; commit `fix(loginom): scope Help reads to official knowledge base`.
 
 ## Task 3: Custom-конфигурация и безопасное чтение старых настроек
 

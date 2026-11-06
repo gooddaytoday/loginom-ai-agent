@@ -1,7 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
+import Ajv from 'ajv';
 import { knowledgeServer } from './support/knowledge-server.mjs';
+
+test('a mixed KB and foreign read is refused before any remote call', async t => {
+  const server = await knowledgeServer(t);
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  t.after(() => knowledge.close());
+  await assert.rejects(knowledge.call({ run: 'scope', id: 'mixed', name: 'read', arguments: {
+    uris: ['viking://resources/loginom-dock/Help/node.md', 'viking://agent/skills/private.md'],
+  } }), /LOGINOM_KNOWLEDGE_SCOPE_DENIED/);
+  assert.equal(server.calls.length, 0);
+});
+
+test('published Help schemas describe and enforce the official KB boundary', async t => {
+  const server = await knowledgeServer(t);
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  t.after(() => knowledge.close());
+  const root = 'viking://resources/loginom-dock';
+  const ajv = new Ajv();
+  for (const tool of knowledge.tools) {
+    assert.match(tool.description, /official.*knowledge base/i);
+    const validate = ajv.compile(tool.inputSchema);
+    const valid = tool.name === 'read' ? { uris: [`${root}/Help/node.md`] }
+      : ['find', 'search'].includes(tool.name) ? { query: 'Join', target_uri: root }
+      : tool.name === 'grep' ? { uri: root, pattern: ['Join'] }
+      : tool.name === 'glob' ? { uri: root, pattern: '**/*.md' } : { uri: root };
+    assert.equal(validate(valid), true, `${tool.name}: ${JSON.stringify(validate.errors)}`);
+    const field = tool.name === 'read' ? 'uris' : ['find', 'search'].includes(tool.name) ? 'target_uri' : 'uri';
+    for (const uri of ['viking://agent/skills', `${root}-evil`, `${root}/../x`, `${root}//x`, `${root}/%2e`, `${root}/x?y`, `${root}\n`])
+      assert.equal(validate({ ...valid, [field]: field === 'uris' ? [root, uri] : uri }), false, `${tool.name}: ${uri}`);
+    if (tool.name === 'read') assert.equal(validate({ uris: [] }), false);
+    if (tool.name === 'search') assert.equal(validate({ ...valid, mode: 'context' }), false);
+    if (tool.name === 'glob') for (const pattern of ['../x', '/x', 'viking://agent/*', 'x\\y'])
+      assert.equal(validate({ ...valid, pattern }), false);
+  }
+  await knowledge.call({ run: 'scope', id: 'find', name: 'find', arguments: { query: 'Join' } });
+  assert.deepEqual(server.calls, [{ name: 'find', arguments: { query: 'Join', target_uri: root } }]);
+});
 
 for (const stage of ['initialize', 'tools/list']) for (const failures of [1, 2]) {
   test(`catalog startup ${stage}: ${failures} transient HTTP failures, at most one retry`, async t => {
@@ -79,10 +118,14 @@ test('knowledge reads real authenticated MCP schemas and Help without browser mo
   const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   t.after(() => knowledge.close());
   assert.deepEqual(knowledge.tools.map(tool => tool.name).toSorted(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
-  assert.deepEqual(knowledge.tools.find(tool => tool.name === 'read'), server.tools.find(tool => tool.name === 'read'));
+  const schema = knowledge.tools.find(tool => tool.name === 'read').inputSchema;
+  assert.equal(schema.properties.uris.type, 'array');
+  assert.equal(schema.properties.uris.minItems, 1);
+  assert.deepEqual(knowledge.tools.find(tool => tool.name === 'find').inputSchema.properties.limit,
+    server.tools.find(tool => tool.name === 'find').inputSchema.properties.limit);
   const uri = 'viking://resources/loginom-dock/sources/loginom-help/README.md';
-  const reply = await knowledge.call({ run: 'run-a', id: 'read-1', name: 'read', arguments: { uri } });
-  assert.deepEqual(JSON.parse(reply.content[0].text), { name: 'read', arguments: { uri } });
+  const reply = await knowledge.call({ run: 'run-a', id: 'read-1', name: 'read', arguments: { uris: [uri] } });
+  assert.deepEqual(JSON.parse(reply.content[0].text), { name: 'read', arguments: { uris: [uri] } });
   assert.equal(server.calls.length, 1);
   assert.ok(server.requests.every(request => request.authorization === 'Bearer UNIT-NONSECRET'));
   assert.match(knowledge.catalogSha256, /^[a-f0-9]{64}$/);
@@ -93,7 +136,7 @@ test('knowledge refuses requests after close with its own lifecycle error', asyn
   const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
   const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   await knowledge.close();
-  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'later', name: 'read', arguments: { uri: 'help' } }),
+  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'later', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/help'] } }),
     /LOGINOM_KNOWLEDGE_CLOSED/);
   assert.equal(server.calls.length, 0);
 });
@@ -102,7 +145,7 @@ test('interrupting one run cancels its concurrent Help request and leaves the ot
   const started = new Map(['a', 'b'].map(name => [name, Promise.withResolvers()]));
   const finished = new Map(['a', 'b'].map(name => [name, Promise.withResolvers()]));
   const server = await knowledgeServer(t, { call: async request => {
-    const name = request.arguments.uri;
+    const name = request.arguments.uris[0].split('/').at(-1);
     started.get(name).resolve();
     return finished.get(name).promise;
   } });
@@ -110,10 +153,10 @@ test('interrupting one run cancels its concurrent Help request and leaves the ot
   const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
   const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   t.after(() => knowledge.close());
-  const a = knowledge.call({ run: 'run-a', id: 'same-id', name: 'read', arguments: { uri: 'a' } });
+  const a = knowledge.call({ run: 'run-a', id: 'same-id', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/a'] } });
   const rejected = assert.rejects(a, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
   void rejected.catch(() => {});
-  const b = knowledge.call({ run: 'run-b', id: 'same-id', name: 'read', arguments: { uri: 'b' } });
+  const b = knowledge.call({ run: 'run-b', id: 'same-id', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/b'] } });
   void b.catch(() => {});
   await Promise.all([...started.values()].map(gate => gate.promise));
   knowledge.interrupt({ run: 'run-a' });
@@ -136,7 +179,7 @@ test('close aborts and drains the active Help request before resolving', async t
   const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
   const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   t.after(() => knowledge.close());
-  const call = knowledge.call({ run: 'run-a', id: 'request-a', name: 'read', arguments: { uri: 'help' } });
+  const call = knowledge.call({ run: 'run-a', id: 'request-a', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/help'] } });
   const rejected = assert.rejects(call, /LOGINOM_KNOWLEDGE_CLOSED/);
   void rejected.catch(() => {});
   await started.promise;
@@ -170,7 +213,7 @@ test('unknown, mutable catalog and browser tool names cannot reach the remote se
   t.after(() => knowledge.close());
   knowledge.tools.push(server.tools.find(tool => tool.name === 'write'));
   for (const name of ['write', 'dock_prepare', 'browser_navigate', 'READ'])
-    await assert.rejects(() => knowledge.call({ run: 'run-a', id: name, name, arguments: { uri: 'help' } }),
+    await assert.rejects(() => knowledge.call({ run: 'run-a', id: name, name, arguments: { uris: ['viking://resources/loginom-dock/help'] } }),
       /LOGINOM_KNOWLEDGE_TOOL_DENIED/);
   assert.equal(server.calls.length, 0);
 });
@@ -182,7 +225,7 @@ test('an already aborted request never reaches the remote service', async t => {
   t.after(() => knowledge.close());
   const controller = new AbortController();
   controller.abort(Error('PRE_ABORTED'));
-  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'read', name: 'read', arguments: { uri: 'help' } },
+  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'read', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/help'] } },
     controller.signal), /PRE_ABORTED/);
   assert.equal(server.calls.length, 0);
 });
@@ -195,7 +238,7 @@ test('a concurrent duplicate request id cannot overwrite the first cancellation 
   const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
   const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   t.after(() => knowledge.close());
-  const input = { run: 'run-a', id: 'duplicate', name: 'read', arguments: { uri: 'help' } };
+  const input = { run: 'run-a', id: 'duplicate', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/help'] } };
   const active = knowledge.call(input);
   const rejected = assert.rejects(active, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
   void rejected.catch(() => {});

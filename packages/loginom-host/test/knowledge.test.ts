@@ -98,7 +98,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
         return { tools: server.tools }
       },
       call: async (params) => {
-        const gate = typeof params.arguments?.uri === "string" ? held.get(params.arguments.uri) : undefined
+        const gate = Array.isArray(params.arguments?.uris) ? held.get(params.arguments.uris[0].split("/").at(-1)) : undefined
         if (gate) {
           if (++count.held === 2) both.resolve()
           return gate.promise
@@ -173,7 +173,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
       client.request("call", {
         run: "before-ready",
         name: "read",
-        args: { uri: "Help/node.md" },
+        args: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
         userMessage: "original",
       }),
     ).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
@@ -186,7 +186,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
       tools: expect.arrayContaining([
         expect.objectContaining({
           name: "read",
-          inputSchema: server.tools.find((tool) => tool.name === "read")?.inputSchema,
+          inputSchema: expect.objectContaining({ properties: expect.objectContaining({ uris: expect.objectContaining({ type: "array", minItems: 1 }) }) }),
         }),
         expect.objectContaining({ name: "dock_diagnostics" }),
       ]),
@@ -195,24 +195,30 @@ test("restored Host starts only knowledge and local settled does not wait for th
       await client.request("call", {
         run: "one",
         name: "read",
-        args: { uri: "Help/node.md" },
+        args: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
         userMessage: "original",
       }),
     ).toEqual({
-      content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uri: "Help/node.md" } }) }],
+      content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }) }],
     })
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),
     ).toMatchObject({ structuredContent: { state: "ready", generation: 1 } })
+    const count = server.calls.length
+    await expect(client.request("call", {
+      run: "one", name: "read", userMessage: "original",
+      args: { uris: ["viking://resources/loginom-dock/Help/node.md", "viking://agent/skills/private.md"] },
+    })).rejects.toThrow("LOGINOM_KNOWLEDGE_SCOPE_DENIED")
+    expect(server.calls).toHaveLength(count)
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(host.journal.pending()).toEqual([])
     expect(await readdir(join(root, "recovery"))).toEqual([])
     expect(await client.request("acquire", { run: "other", session: "other-chat" })).toEqual({ generation: 1 })
-    const first = client.request("call", { run: "one", name: "read", args: { uri: "A" }, userMessage: "original" })
+    const first = client.request("call", { run: "one", name: "read", args: { uris: ["viking://resources/loginom-dock/A"] }, userMessage: "original" })
     const other = client.request("call", {
       run: "other",
       name: "read",
-      args: { uri: "B" },
+      args: { uris: ["viking://resources/loginom-dock/B"] },
       userMessage: "other-original",
     })
     ;[first, other].forEach((call) => call.catch(() => {}))
@@ -273,17 +279,17 @@ test("supervised real knowledge entry acknowledges before the server catalog is 
             name: "read",
             inputSchema: {
               type: "object",
-              properties: { uri: { type: "string" } },
-              required: ["uri"],
+              properties: expect.objectContaining({ uris: expect.objectContaining({ type: "array", minItems: 1 }) }),
+              required: ["uris"],
               additionalProperties: false,
             },
           }),
         ]),
       })
       expect(
-        await runtime.request("call", { run: "run", id: "request", name: "read", arguments: { uri: "Help/node.md" } }),
+        await runtime.request("call", { run: "run", id: "request", name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }),
       ).toEqual({
-        content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uri: "Help/node.md" } }) }],
+        content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }) }],
       })
     } finally {
       release.resolve()
