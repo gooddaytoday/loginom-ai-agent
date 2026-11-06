@@ -437,6 +437,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             const delivered=structuredClone(result);
             if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);
             if(delivered.workspace?.browser_geometry)delete delivered.workspace.browser_geometry.observed;
+            // Open-package paths also occur in the first knowledge/upload
+            // reply. Geometry duplicates those identities and is diagnostic;
+            // retain its full receipt locally without spending delivery space.
+            if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
             const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
             if (ready && reply.isError !== true) userBundleDelivered = true;
             return reply;
