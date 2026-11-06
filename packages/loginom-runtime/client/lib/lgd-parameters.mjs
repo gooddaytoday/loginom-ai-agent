@@ -2,7 +2,7 @@ import {importSourceSchema,validateImportSource,requireExportDestination} from '
 const need=(v,m)=>{if(!v)throw Error('LGD: '+m);};
 const object=properties=>({type:'object',properties,required:[],additionalProperties:false});
 export const LGD_EXPORT_FIELDS=Object.freeze(Object.fromEntries(Object.entries({destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum',string_cache_max_size:'edtStringCacheMaxSize'}).map(([key,id])=>[key,['ExportNativeParamsWizard',id]])));
-export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['verify'],description:'Verify the stored checksum; never disable after corruption.'},
+export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['verify','ignore'],description:'Use verify by default. ignore requires an explicit user request before any checksum failure; never disable after corruption.'},
  bindings:{type:'object',properties:{source_path:{type:'object',properties:{variable:{type:'string',pattern:'^[_A-Za-z][_A-Za-z0-9]{0,127}$'}},required:['variable'],additionalProperties:false}},required:['source_path'],additionalProperties:false,
   description:'Bind filename to one mapped string variable from an executed source. Use variable_inputs kind variables, input 0 (native Input_Var-1), not control. Supply source for the exact current verified file when selecting a binding.'}});
 export const lgdImportParametersSchema=object({source:importSourceSchema,lgd_import:lgdImportSettingsSchema});
@@ -17,13 +17,13 @@ export function validateLgdImportParameters(p,mode,r){
  need(mode==='native'&&p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['source','lgd_import'].includes(k)),'use source and lgd_import, mode native');
  if(p.source!==undefined)validateImportSource(p.source);
  const s=p.lgd_import??{};
- need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['checksum','bindings'].includes(k))&&(s.checksum===undefined||s.checksum==='verify'),'checksum must be verify');
+ need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['checksum','bindings'].includes(k))&&(s.checksum===undefined||['verify','ignore'].includes(s.checksum)),'checksum must be verify or explicit ignore');
  if(s.bindings!==undefined)need(p.source&&s.bindings&&Object.keys(s.bindings).join(',')==='source_path'
   &&s.bindings.source_path&&Object.keys(s.bindings.source_path).join(',')==='variable'
   &&typeof s.bindings.source_path.variable==='string'&&/^[_A-Za-z][_A-Za-z0-9]{0,127}$/.test(s.bindings.source_path.variable),'binding requires a verified source and exact mapped variable name');
  need((r.variable_inputs??[]).length<=1&&(r.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),'LGD uses the ordinary variables input 0, not a hidden control port');
  if(r.target.kind==='new'&&s.bindings)need(r.variable_inputs?.length===1,'new binding needs the executed variable source');
- if(r.target.kind==='new')need(p.source&&s.checksum==='verify','new import requires verified source and checksum verify');
+ if(r.target.kind==='new')need(p.source&&['verify','ignore'].includes(s.checksum),'new import requires verified source and an explicit checksum policy (default verify)');
  need(r.inputs.length===0&&r.mappings.every(m=>m.kind==='variables'&&m.direction==='input'&&m.port===0)&&r.read.ports.every(p=>p===0)&&r.read.ports.length<=1,'import has no table inputs; only variable input mapping 0 and table output 0');
 }
 export function validateLgdExportDestination(path,directories=null){
