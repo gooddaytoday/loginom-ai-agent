@@ -122,9 +122,23 @@ for(const fault of ['position','label','lock','root','document','links','ports',
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
 });
 
-test('pinned connect reveals an offscreen source before one exact link without moving nodes',async()=>{
+for(const placement of ['offscreen source','distant target','minimum zoom','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
+ const masked=placement.includes('mask');
  const page=new Page(),cache=new Map(),elements=page.elements.bind(page);page.clock=Date.now();
- page.app.Version='7.4.2';page.addNode('Sort',1056,72,['Output_Data-0']);page.addNode('Export',560,208,['Input_Data-0']);
+ page.app.Version='7.4.2';
+ page.addNode('Sort',placement==='offscreen source'||masked?1056:144,placement==='offscreen source'||masked?72:80,['Output_Data-0']);
+ page.addNode('Export',placement==='offscreen source'||masked?560:2400,placement==='offscreen source'||masked?208:1800,['Input_Data-0']);
+ // Start at the source after its reveal: the distant target is offscreen.
+ const minimum=.3855432894295314;
+ if(placement==='minimum zoom'){
+  // LAB-929: target rename is visible at minimum zoom with scroll (18,42).
+  // Revealing the clipped source alone then scrolls the target out of view.
+  page.viewScale=minimum;let left=18,top=42;
+  Object.defineProperties(page.graph,{
+   scrollLeft:{get:()=>left,set:value=>{left=Math.max(0,value);}},
+   scrollTop:{get:()=>top,set:value=>{top=Math.max(0,value);}},
+  });
+ }
  page.elements=()=>{const all=elements().map(element=>{
   const old=cache.get(element.tid);if(old){Object.assign(old,element);return old;}cache.set(element.tid,element);return element;
  }).map(element=>{
@@ -155,7 +169,9 @@ test('pinned connect reveals an offscreen source before one exact link without m
  const packageNode=new page.app.PackageTreeNode(),workspace=page.app.Application.FInstance.FMainForm.Items.Workspace;
  workspace.getActiveTab=()=>({Controller:{FController:page.model,Node:{data:{node:{ParentNode:packageNode}}}}});
  const request={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:page.prefix,tab_tid:page.tabTid,navigation_path:[]}};
- const document={querySelectorAll:selector=>selector.startsWith('[data-tid')?page.match(selector):[],elementFromPoint:(x,y)=>{
+ let mask=false,waits=0;
+ const blocker={visible:true,getBoundingClientRect:()=>({width:100,height:100})};
+ const document={querySelectorAll:selector=>selector==='[role="dialog"],.bg-mask-message,.x-mask-msg'&&mask?[blocker]:selector.startsWith('[data-tid')?page.match(selector):[],elementFromPoint:(x,y)=>{
   if(x<0||x>=1280||y<0||y>=800)return null;
   return page.elements().filter(e=>e.kind==='port').find(e=>page.contains(e.box,{x,y}))??root;
  }};
@@ -163,6 +179,21 @@ test('pinned connect reveals an offscreen source before one exact link without m
  await page.execute('async page=>true');
  Object.assign(page.context,{document,location:{origin:'http://loginom.test'},innerWidth:1280,innerHeight:800,__loginomDockPreparationV1:preparation,setTimeout,clearTimeout,requestAnimationFrame:callback=>callback(0)});
  page.viewportSize=()=>({width:1280,height:800});
+ page.waitForFunction=async(fn,arg,options)=>{
+  waits++;
+  assert.equal(page.drops,0);assert.equal(page.down,false);
+  assert.ok(options.timeout>0&&options.timeout<=15000);
+  assert.equal(await page.evaluate(fn,arg),false);
+  if(placement==='persistent mask'){
+   page.clock+=options.timeout;
+   throw Error('Timeout waiting for loading mask');
+  }
+  mask=false;
+  assert.equal(await page.evaluate(fn,arg),true);
+  if(placement==='changed after mask')native[1].FCell.geometry.x+=8;
+  if(placement==='recurring mask')mask=true;
+  if(placement==='deadline after mask')page.clock=Date.now()+15001;
+ };
  // Use the existing capability DOM model, evaluating real hit tests for the
  // adapter/reveal instead of its capability-only interaction shortcut.
  const locator=page.locator.bind(page),direct=loc=>{
@@ -172,17 +203,30 @@ test('pinned connect reveals an offscreen source before one exact link without m
  let zooms=0;
  page.locator=selector=>{
   if(selector.includes(';ModelForm;cntDiagram'))return {count:async()=>1,isVisible:async()=>true,locator:()=>({count:async()=>1,isVisible:async()=>true,getAttribute:async()=> 'Уменьшить масштаб',click:async()=>{
-   zooms++;page.viewScale*=.75;for(const key of cache.keys())if(key.includes(';Graph;'))cache.delete(key);
+   zooms++;page.viewScale=placement==='minimum zoom'?Math.max(minimum,page.viewScale*.75):page.viewScale*.75;
+   for(const key of cache.keys())if(key.includes(';Graph;'))cache.delete(key);
+   if(masked)mask=true;
   }})};
   return direct(locator(selector));
  };
  const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{actions,selectors},execute:code=>page.execute(code)});
  const before=await adapter.observe(request,Date.now()+15000),effect={id:'connect',kind:'connect',before,parameters:{edge:{source:'sort-guid',output:0,target:'export-guid',input:0}}};
- assert.ok(exact(page.prefix+';Graph;Sort;Output_Data-0')[0].box.x>1280);
- assert.ok(exact(page.prefix+';Graph;Export;Input_Data-0')[0].box.x<1280);
+ const source=exact(page.prefix+';Graph;Sort;Output_Data-0')[0].box;
+ assert.ok(placement==='offscreen source'||masked?source.x>1280:source.x>300&&source.x<1280);
+ const target=exact(page.prefix+';Graph;Export;Input_Data-0')[0].box;
+ assert.ok(placement==='distant target'?target.x>1280&&target.y>800:target.x>0&&target.x<1280&&target.y>0&&target.y<800);
+ if(placement==='minimum zoom')assert.ok(source.y<100);
+ if(masked&&placement!=='transient mask'){
+  await assert.rejects(adapter.mutate(effect,Date.now()+15000),placement==='persistent mask'?/Timeout waiting for loading mask/:placement==='changed after mask'?/Graph changed during link source navigation/:placement==='deadline after mask'?/Connect deadline elapsed/:/Graph is blocked/);
+  assert.equal(waits,placement==='recurring mask'?2:1);
+  assert.equal(page.drops,0);assert.equal(page.down,false);assert.deepEqual(page.edges,[]);
+  return;
+ }
  const result=await adapter.mutate(effect,Date.now()+15000);
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.cleanup_complete,true);
- assert.equal(zooms,1);assert.equal(page.drops,1);assert.equal(page.down,false);
+ if(placement==='offscreen source')assert.equal(zooms,1);
+ if(masked)assert.equal(waits,1);
+ assert.equal(page.drops,1);assert.equal(page.down,false);
  const after=await adapter.observe(request,Date.now()+15000);
  assert.deepEqual(after.links,[effect.parameters.edge]);
  assert.deepEqual(after.nodes.map(({dom_epoch,...node})=>node),before.nodes.map(({dom_epoch,...node})=>node));
