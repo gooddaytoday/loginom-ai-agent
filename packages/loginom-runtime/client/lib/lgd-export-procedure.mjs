@@ -83,6 +83,8 @@ export async function lgdExportNext(page,task,readNode,readContext,readBrowser,f
   remaining();
   const before=await read();if(!before.verified||before.stage!=='lgd_export'||!same(before,task.before)||!task.change_binding&&before.values.destination.value!==task.destination)return result('NOT_APPLIED','EXPORT_NEXT_CONTEXT',{},true);
   const click=async(tid,label)=>{
+   remaining();const owner=await readNode(page,task.binding);remaining();
+   if(!owner.verified||owner.surface!=='wizard'||owner.node_id!==task.binding.node.node_id)throw Error('owner changed');
    remaining();const l=page.locator('[data-tid='+JSON.stringify(tid)+']');if(await l.count()!==1)throw Error('ambiguous control');remaining();
    const h=await l.elementHandle();try{
     remaining();const ok=await h.evaluate((e,label)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2);return e.isConnected&&b.width>0&&b.height>0&&!e.classList.contains('x-item-disabled')&&(!label||e.textContent.trim()===label)&&!!hit&&(hit===e||e.contains(hit));},label);
