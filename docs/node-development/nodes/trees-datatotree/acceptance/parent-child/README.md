@@ -2,7 +2,7 @@
 
 Решение владельца от 06.11.2026: агент вычисляет иерархию на существующих узлах.
 В 7.4.2 штатного рекурсивного режима id/parent_id в «Таблица в дерево» нет.
-Рецепт продукта: `references/nodes/trees.parent_child.md` навыка loginom-automation.
+Рецепт продукта: `references/recipes/parent-child.md` навыка loginom-automation.
 
 | Сценарий run-check | CSV из ../../fixtures/parent-child | Критерий |
 |---|---|---|
