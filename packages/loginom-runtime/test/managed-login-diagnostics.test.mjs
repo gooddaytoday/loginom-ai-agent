@@ -46,7 +46,15 @@ for (const writable of [true,false]) test("managed login retains sanitized navig
   child.send({id:"start",operation:"start",input:{protocol:1,generation:1,chat:"test",stateDir,resources,validation:true,headless:true,
     connection:{url:`http://127.0.0.1:${server.address().port}/app/?opaque=public secret-query#secret-fragment`,
       username:"secret-user",password:"secret-password",apiKey:"secret-key"}}})
-  assert.deepEqual(await failed,{id:"start",error:"LOGINOM_LOGIN_UNAVAILABLE"})
+  const failure=await failed
+  // Startup evidence is part of the private IPC contract, including when the
+  // sanitized file cannot be retained. Keep the complete response assertion.
+  assert.deepEqual(failure,{id:"start",error:"LOGINOM_LOGIN_UNAVAILABLE",startupDiagnostics:[{
+    phase:"runtime.start",retry:false,error:{name:"Error",code:"",message:"LOGINOM_LOGIN_UNAVAILABLE",
+      cause:{name:"Error",code:"",message:"[object Object]"}},
+  }]})
+  for(const secret of ["secret-query","secret-fragment","secret-user","secret-password","secret-key","?"])
+    assert.ok(!JSON.stringify(failure).includes(secret),secret)
   const closed=reply(),exited=once(child,"exit",{signal:AbortSignal.timeout(5000)})
   child.send({id:"close",operation:"close"})
   assert.deepEqual(await closed,{id:"close",result:{closed:true}})

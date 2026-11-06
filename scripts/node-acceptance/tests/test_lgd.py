@@ -32,6 +32,25 @@ class LgdTests(unittest.TestCase):
             changed = json.loads(json.dumps(rounds)); mutate(changed)
             with self.assertRaises(AssertionError): runner.check_lgd_export_case(changed, 'variable', path, first)
 
+    def test_checksum_switch_requires_two_fresh_full_reads_on_same_node(self):
+        def result(checksum, execution, node='same'):
+            return {'status': 'SUCCEEDED', 'cleanup_complete': True, 'node': {'node_id': node},
+                    'configuration': {'readback': {'kind': 'lgd_import', 'source': {
+                        'source_path': '/own/hash-checksum-both.lgd', 'checksum': checksum}}},
+                    'execution': {'status': 'completed', 'execution_id': execution},
+                    'output': {'ports': [{'port': 0, 'sample_complete': True, 'schema': [{'name': 'Id', 'type': 'integer'}],
+                                          'sample': [{'Id': {'type': 'integer', 'value': 1}}],
+                                          'freshness_basis': 'completed_execution_port_source'}]}}
+        first, second = result(True, 'one'), result(False, 'two')
+        runner.check_lgd_checksum_switch([(1, first), (2, second)], 'checksum-both.lgd')
+        for replies in [[(1, second)], [(1, first), (2, result(False, 'one'))],
+                        [(1, first), (2, result(False, 'two', 'foreign'))]]:
+            with self.assertRaisesRegex(AssertionError, 'SAME_NODE_MISSING'):
+                runner.check_lgd_checksum_switch(replies, 'checksum-both.lgd')
+        second['output']['ports'][0]['sample'][0]['Id']['value'] = 2
+        with self.assertRaisesRegex(AssertionError, 'VALUES_CHANGED'):
+            runner.check_lgd_checksum_switch([(1, first), (2, second)], 'checksum-both.lgd')
+
     def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
         reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
                  'configuration': {'readback': {'kind': 'lgd_import'}},

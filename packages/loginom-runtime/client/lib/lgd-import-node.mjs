@@ -7,6 +7,13 @@ import {withBrowserReceipt} from './executor.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('LGD import: '+m);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
+export function validateLgdChecksumChange(checksum,source,history,node){
+ if(checksum!=='ignore')return;
+ const corrupt=history.some(h=>/(?:ошиб|невер|поврежд|не удалось)[\s\S]{0,120}контрольн[\s\S]{0,60}сумм|контрольн[\s\S]{0,60}сумм[\s\S]{0,120}(?:не совпада|ошиб|невер|поврежд)|checksum[\s\S]{0,60}(?:mismatch|fail|invalid)|(?:mismatch|invalid)[\s\S]{0,60}checksum/i.test(h.outcome?.error?.message??'')
+  &&(source&&h.source?.sha256===source.sha256&&h.source?.bytes===source.bytes
+   ||node&&(h.outcome?.output?.node??h.outcome?.node)?.node_id===node.node_id));
+ need(!corrupt,'checksum cannot be disabled after a checksum failure for this source or node');
+}
 export function verifyLgdOutputMapping(m){
  need(m.inventory_complete&&m.source_identity_verified&&m.source_fields.length>0&&m.source_fields.length===m.target_fields.length
   &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime'].includes(f.type)
@@ -62,9 +69,12 @@ export function createLgdImportNodeSupport(config){
    },
   }).nodeApplyDriverFactory(options);
   return {...drivers,async verifySource(p){
+   const history=options.nodeHistory?.()??[],node=operation.parameters.target.ref;
+   validateLgdChecksumChange(p.lgd_import?.checksum,null,history,node);
    if(!p.source)return verified({not_applicable:true,source_kind:'saved_lgd_source'});
    const proof=p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref):undefined;
    source=verifyTextImportSource({source:p.source,settings:proof?{source:{source_path:proof.destination}}:{}},options.verifiedUploads(),options.uploadHistory?.(),proof);
+   validateLgdChecksumChange(p.lgd_import?.checksum,source.source,history,node);
    need(/\.lgd$/i.test(source.source.destination),'verified standalone .lgd required');return source;
   }};
  }};

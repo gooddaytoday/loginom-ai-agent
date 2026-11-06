@@ -125,6 +125,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name == 'lgd-import-checksum':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/checksum', prompt=node / 'acceptance/checksum/task.md',
+                    data=node / 'fixtures/64bit', input_files=['checksum-none.lgd', 'checksum-compressed.lgd', 'checksum-both.lgd'],
+                    expected_name='expected.json', base=None, lgd='checksum',
+                    oracle=node / 'acceptance/oracle.py')
     if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-overwrite', 'lgd-export-variable']:
         export = name.startswith('lgd-export')
         export_case = name.removeprefix('lgd-export-') if name.startswith('lgd-export-') else None
@@ -852,6 +858,26 @@ def check_lgd_export_case(replies, case, destination, initial_destination):
         raise AssertionError('LGD_EXPORT_CASE_UNKNOWN')
 
 
+def check_lgd_checksum_switch(replies, filename):
+    reads, seen = [], set()
+    for _, reply in replies:
+        for owner, port in ports(reply):
+            readback = owner.get('configuration', {}).get('readback', {})
+            source = readback.get('source', {})
+            execution = owner.get('execution', {}).get('execution_id')
+            if (owner.get('status') == 'SUCCEEDED' and owner.get('cleanup_complete') is True
+                    and readback.get('kind') == 'lgd_import' and source.get('source_path', '').endswith('-' + filename)
+                    and owner.get('execution', {}).get('status') == 'completed' and execution and execution not in seen
+                    and port.get('port') == 0 and port.get('sample_complete') is True and port_path(owner, port) == 'port'):
+                reads.append((owner, port, source))
+                seen.add(execution)
+    first = next((r for r in reads if r[2].get('checksum') is True), None)
+    second = next((r for r in reads[reads.index(first) + 1:] if r[2].get('checksum') is False
+                   and r[0].get('node') == first[0].get('node')), None) if first else None
+    assert first and second, 'LGD_CHECKSUM_SWITCH_SAME_NODE_MISSING'
+    assert first[1]['sample'] == second[1]['sample'] and first[1]['schema'] == second[1]['schema'], 'LGD_CHECKSUM_SWITCH_VALUES_CHANGED'
+
+
 def check_tree(port, expected):
     tree = port.get('tree', {})
     assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
@@ -1462,6 +1488,8 @@ class Runner:
             return session, expected, None, None
         if spec.get('lgd'):
             check_lgd_import_result(replies, len(expected['outputs'][0]['rows']))
+        if expected.get('lgd', {}).get('checksum_switch_filename'):
+            check_lgd_checksum_switch(replies, expected['lgd']['checksum_switch_filename'])
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None

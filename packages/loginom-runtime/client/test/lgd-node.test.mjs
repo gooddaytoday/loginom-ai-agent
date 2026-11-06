@@ -12,7 +12,17 @@ import {lgdExportNext} from '../lib/lgd-export-procedure.mjs';
 import {readLgdExportBrowser} from '../lib/lgd-export-context.mjs';
 import {LGD_EXPORT_FIELDS} from '../lib/lgd-parameters.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
-import {verifyLgdOutputMapping} from '../lib/lgd-import-node.mjs';
+import {verifyLgdOutputMapping,validateLgdChecksumChange} from '../lib/lgd-import-node.mjs';
+test('explicit checksum opt-out cannot bypass a known native checksum refusal for the same bytes or node',()=>{
+ const source={sha256:'a'.repeat(64),bytes:359},node={node_id:'failed-node'};
+ const history=[{source,outcome:{status:'FAILED',error:{message:'LGD import: Ошибка контрольной суммы'},output:{node}}}];
+ assert.throws(()=>validateLgdChecksumChange('ignore',source,history),/cannot be disabled/);
+ assert.throws(()=>validateLgdChecksumChange('ignore',null,history,node),/cannot be disabled/);
+ assert.doesNotThrow(()=>validateLgdChecksumChange('verify',source,history,node));
+ assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',{...source,sha256:'b'.repeat(64)},history,{node_id:'new-node'}));
+ assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',source,[{source,outcome:{error:{message:'unrelated refusal'}}}],node));
+ assert.doesNotThrow(()=>validateLgdChecksumChange('ignore',source,[{source,outcome:{error:{message:'LGD import: requested checksum policy and local file storage required'},output:{node}}}],node));
+});
 test('LGD native source inventory omits kind while target retains observed kind and exact source order',()=>{
  const sources=[{record_id:'1',index:0,name:'RecordId',label:'Идентификатор',type:'integer'},
   {record_id:'2',index:1,name:'Amount',label:'Сумма',type:'real'}];
@@ -81,7 +91,8 @@ test('model-visible LGD cards and routing fit their budgets',()=>{
 test('LGD preflight rejects disabled checksums, foreign format options and synthetic sink output',()=>{
  const source={artifact_id:'fixture',upload_operation_id:'delivery'};
  assert.doesNotThrow(()=>validateLgdImportParameters({source,lgd_import:{checksum:'verify'}},'native',request('imports.lgd')));
- for(const p of [{source,lgd_import:{checksum:'ignore'}},{source,excel:{}},{}])assert.throws(()=>validateLgdImportParameters(p,'native',request('imports.lgd')));
+ assert.doesNotThrow(()=>validateLgdImportParameters({source,lgd_import:{checksum:'ignore'}},'native',request('imports.lgd')));
+ for(const p of [{source,lgd_import:{checksum:'unknown'}},{source,excel:{}},{}])assert.throws(()=>validateLgdImportParameters(p,'native',request('imports.lgd')));
  assert.doesNotThrow(()=>validateLgdImportParameters({},'native',{...request('imports.lgd'),target:{kind:'existing'}}));
  const p={lgd_export:{destination:'/test-2/out.lgd',compression:'lz4',checksum:'compressed',overwrite:'reject'}};
  assert.doesNotThrow(()=>validateLgdExportParameters(p,'native',request('exports.lgd')));
