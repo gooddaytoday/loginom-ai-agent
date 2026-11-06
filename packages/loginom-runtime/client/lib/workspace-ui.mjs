@@ -3399,7 +3399,16 @@ function readRenderedInputMapping(observation) {
       if(!dom||!d.FmxGraph.container.contains(dom)||getTid(dom)!==workflow.prefix+';Graph;'+getTid(dom)?.split(';Graph;')[1])return null;
       return {node_id:preparedNodeId,node_ref:refOf(dom),mode:execute?'execute':'deactivate',source:'native_selected_graph_node'};
     };
-    const elements = controls.slice(0, 240).map(element => {
+    // Large graphs can fill the compact page before its workflow toolbar or
+    // the prepared predecessor's ports. Reserve their exact bound controls,
+    // then fill the remaining slots in the existing order. This changes only
+    // inclusion under pressure; native execution/interaction checks still apply.
+    const requiredControls=new Set(controls.length>240&&preparedNodeId&&wizard.status==='absent'
+      ?controls.filter(element=>getTid(element)===workflow?.prefix+';ModelForm;btnToggleActivateCurrent'
+        ||preparedGraphTid&&getTid(element)?.startsWith(preparedGraphTid+';')
+          &&/^(?:Input|Output)_(?:Data|Var)-[0-9]+$/.test(getTid(element).slice(preparedGraphTid.length+1))).slice(0,240):[]);
+    const retainedControls=new Set([...requiredControls,...controls.filter(element=>!requiredControls.has(element)).slice(0,240-requiredControls.size)]);
+    const elements = controls.filter(element=>retainedControls.has(element)).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
       // Data-preview scrollers carry navigation identity, never row values.

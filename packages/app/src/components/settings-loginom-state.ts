@@ -34,6 +34,21 @@ export function loginomBrowserMessage(browser?: Loginom.BrowserStatus) {
 
 const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 1000))
 
+export function createLoginomConnectionStatus(api: Loginom.API | undefined) {
+  const [state, setState] = createStore({ value: undefined as Loginom.View["state"] | undefined })
+  let disposed = false
+  onCleanup(() => {
+    disposed = true
+  })
+  return {
+    required: () => state.value === "unconfigured",
+    async refresh() {
+      const view = await api?.status().catch(() => undefined)
+      if (!disposed) setState("value", view?.state)
+    },
+  }
+}
+
 // This promise intentionally outlives the settings dialog. Only redacted views
 // are retained, so a deferred activation failure remains visible after closing.
 export async function watchLoginomApplication(
