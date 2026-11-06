@@ -180,6 +180,25 @@ jobs:
         working-directory: packages/loginom-runtime
         run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
 
+      - name: Prepare runtime Chromium dependencies
+        working-directory: packages/loginom-runtime/client
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium'
+
+      - name: Verify complete supervised runtime suite with pinned Chromium
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          # setup-loginom-inputs pins Playwright and PLAYWRIGHT_BROWSERS_PATH.
+          # Resolve its executable explicitly so browser tests cannot silently skip.
+          export LOGINOM_DOCK_TEST_BROWSER
+          LOGINOM_DOCK_TEST_BROWSER=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'process.stdout.write(require("./client/node_modules/playwright").chromium.executablePath())')
+          if [ ! -x "$LOGINOM_DOCK_TEST_BROWSER" ]; then
+            echo "::error::Pinned Chromium executable is missing: $LOGINOM_DOCK_TEST_BROWSER"
+            exit 1
+          fi
+          # Leave CPU for the real managed children on the 4-vCPU runner.
+          nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=2 test/*.test.mjs
+
       - name: Verify explicit proxy environment with real Node networking
         working-directory: packages/desktop
         run: '"$LOGINOM_AI_AGENT_TEST_NODE" test/loginom/environment-proxy.ts'
