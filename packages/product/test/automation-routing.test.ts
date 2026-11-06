@@ -9,6 +9,15 @@ test("automation entry stays below 40 KB as the node catalog grows", () => {
   expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
 })
 
+test("row filter routing includes both registered modes without growing its row", () => {
+  const row = skill.split("\n").find((line) => line.includes("`transform.filter_data`"))
+  expect(row).toContain("conditions")
+  expect(row).toContain("row_number")
+  expect(Buffer.byteLength(row!)).toBeLessThanOrEqual(
+    Buffer.byteLength("| Фильтр строк, включая условия из переменных | `transform.filter_data` / conditions | [читать](references/nodes/transform.filter_data.md) |"),
+  )
+})
+
 test("every installed node handler has one routing row and one bounded reference", async () => {
   // Ask the production registration function, without launching a browser.
   const inventory = Bun.spawnSync([

@@ -4,13 +4,15 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет. Подплан — `ready_for_development` по результатам этапа 0
-LAB-536; в v0.3.8 этапа 1 нет. Реестр runtime не менялся.
-[Живые наблюдения](discovery.md), [контракт пары](../trees-jsontotree/contract.md)
-и приёмочный комплект готовы как предложение v0.3.9. Начало реализации —
-после решения владельца по W1/tree_io, идентичности и критериям.
+Зарегистрирован `trees.to_table` / `selected_nodes`. Выбранная ветвь дерева в таблицу; поля/пути, повторение родителей on/off; типы, NULL, boolean, empty и Int64 сохраняются.
+
+Ограничения: Принят только ограниченный срез пары JSON→tree→table; расширенная матрица подплана не подтверждена; чтение дерева ≤256 узлов / depth16 / 1 MiB.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [tree-node.mjs](../../../../packages/loginom-runtime/client/lib/tree-node.mjs):1–136; [tree-parameters.mjs](../../../../packages/loginom-runtime/client/lib/tree-parameters.mjs):1–86; [trees.to_table.md](../../../../packages/product/skills/loginom-automation/references/nodes/trees.to_table.md):1–49. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
 
 ## Планируемый объём по этапам
 
@@ -21,4 +23,3 @@ LAB-536; в v0.3.8 этапа 1 нет. Реестр runtime не менялся
 
 - [Справка](https://help.loginom.ru/userguide/processors/data-trees/tree-to-table.html), `loginom-help@353e506b:data/processors/data-trees/tree-to-table.md`.
 - E2E `e2e-tests@486caef44:tests/acceptance/wizards/trees/treetodata/treeToData.ts:21,76-206; tests/toreview/acceptance/wizards/datatree/trees_links.ts:14 — :toreview` — источник требований, без переноса PASS.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; зарегистрированного обработчика нет.

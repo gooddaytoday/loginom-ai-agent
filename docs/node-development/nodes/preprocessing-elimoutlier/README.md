@@ -3,6 +3,16 @@
 Component ID: `component.preprocessing.Elimoutlier`.
 Runtime type / mode предложения: `preprocessing.elim_outlier` / `detect`.
 
+## Текущий срез v0.4.0
+
+Зарегистрирован `preprocessing.elim_outlier` / `detect`. SD/IQR с явными множителями; непрерывные числовые поля; keep/keep; Train перед Execute; три выхода 0/1/2.
+
+Ограничения: Прочие способы редактирования не поддержаны. Конвенция дробных квартилей не подтверждена; первый IQR fixture не зависит от неё.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [elim-outlier-node.mjs](../../../../packages/loginom-runtime/client/lib/elim-outlier-node.mjs):1–32; [elim-outlier-parameters.mjs](../../../../packages/loginom-runtime/client/lib/elim-outlier-parameters.mjs):1–28; [preprocessing.elim_outlier.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.elim_outlier.md):1–20. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
 [Подплан](plan.md) · [Discovery LAB-531](discovery.md) ·
 [Приёмочный комплект](acceptance/README.md) · [Схема параметров](parameter-schema.json).
 
