@@ -1,4 +1,7 @@
 export const dict = {
+  "loginom.configure": "Настроить",
+  "loginom.connectionRequired":
+    "Подключение не настроено. Откройте Loginom, укажите адрес, логин и пароль, затем повторите запрос.",
   "desktop.updater.verificationFailed":
     "Не удалось проверить обновление. Загрузка отменена. Проверьте фид и подпись в журнале.",
   "desktop.updater.deferred":

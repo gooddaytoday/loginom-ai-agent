@@ -89,6 +89,10 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'graph-large-execute':
+        src = REPO / 'docs/node-development/nodes/grouping/acceptance/graph-large-execute'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    source_package=src / 'source.lgp', input_files=['customers.csv'], expected_name='expected.json')
     if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none']:
         variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty', 'row-filter-none': 'none'}[name]
         node = REPO / 'docs/node-development/nodes/row-filter'
