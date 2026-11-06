@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `transform.calculator` / `expression`. Упорядоченные выражения Loginom; новые поля и явная замена существующих; scalar-выход.
+
+Ограничения: Язык выражений Loginom; JavaScript-режим не реализован. Типы integer/real/string/boolean/datetime; до 128 выражений, формула до 2048 символов. Поддержка выражений не доказывает правильность аналитической формулы; деление на ноль/NULL и агрегации проверяются независимо.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [calculator-node.mjs](../../../../packages/loginom-runtime/client/lib/calculator-node.mjs):1–499; [calculator-parameters.mjs](../../../../packages/loginom-runtime/client/lib/calculator-parameters.mjs):1–120; [transform.calculator.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.calculator.md):1–41. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `transform.calculator` / `expression` реализован и принят в прежнем процессе (Hermes, 45/45, Loginom 7.4.2); Desktop технически прошёл случаи B18, B27, B47, B65, V65. Приёмки текущего standalone CLI нет: после прежней приёмки изменена общая оболочка узлов. Следующий шаг — этап 0 подплана, перепроверка.
 

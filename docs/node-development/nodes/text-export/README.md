@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `exports.text` / `delimited`. delimited: UTF-8 и Windows-1251; CSV/TSV; delimiter ;/,/TAB; header none/names/labels; LF/CRLF; файловый sink. Windows-1251: BOM игнорируется, файл без BOM; символы вне CP1251 заменяются байтом 0x1A (SUB), требуется предупреждение о потере данных.
+
+Ограничения: Windows-1251 выбирается явно; рекомендуемое bom=false. Замена символов вне кодировки — потеря данных, не транслитерация. LAB-723: точные байты CP1251 и переключение того же узла на UTF-8 подтверждены; замену символов вне CP1251 отдельным модельным прогоном не проверяли, native-наблюдение сохранено в discovery.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [text-export-node.mjs](../../../../packages/loginom-runtime/client/lib/text-export-node.mjs):1–203; [text-export-parameters.mjs](../../../../packages/loginom-runtime/client/lib/text-export-parameters.mjs):1–70; [exports.text.md](../../../../packages/product/skills/loginom-automation/references/nodes/exports.text.md):1–42. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `exports.text` / `delimited` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи V65. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 

@@ -77,7 +77,7 @@ class ExecutionErrorTests(unittest.TestCase):
             self.assertEqual(instance.current['port-read'], '— (expected execution error)')
 
     def test_error_modes_keep_save_and_cleanup(self):
-        for name in ['linreg-short', 'throw1']:
+        for name in ['linreg-short', 'throw1', 'tree-parent-cycle', 'tree-parent-orphan']:
             with self.subTest(name=name): self.exercise(name=name)
         for fault in ['error state', 'inspect', 'snapshot']:
             with self.subTest(fault=fault): self.exercise(fault)

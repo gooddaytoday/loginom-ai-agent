@@ -67,9 +67,11 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const dialog=dialogs[0],native=globalThis.Ext?.getCmp?.(dialog.id);
    const normalize=s=>s.replace(/\s+/g,' ').trim();
    const question='Loginom '+task.build+' Настройка порта приведет к деактивации узла. Вы действительно хотите начать настраивать порт? Да Да, больше не спрашивать Нет';
-   if(dialogs.length!==1||native?.el?.dom!==dialog||normalize(dialog.innerText)!==question
-     ||model!==r.graph||r.graph.FCurrentPortMenu!==r.port||r.node.FLocked===true
-     ||card.Controller.Node?.data?.node!==r.workflow)fail('Port deactivation question owner changed');
+   const checks={one_dialog:dialogs.length===1,native_dialog:native?.el?.dom===dialog,question:normalize(dialog.innerText)===question,
+     graph:model===r.graph,port:r.graph.FCurrentPortMenu===r.port,unlocked:r.node.FLocked!==true,workflow:card.Controller.Node?.data?.node===r.workflow};
+   if(Object.values(checks).some(v=>!v))fail('Port deactivation question owner changed: '+JSON.stringify({checks,
+     controller:typeof model?.constructor?.name==='string'?model.constructor.name.slice(0,64):null,
+     wizard_visible:exact(b.workflow_ref.prefix+';WizrdMCF').some(visible)}));
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
    if(masks.some(e=>!ownGroupingGraphMask(e)&&!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
