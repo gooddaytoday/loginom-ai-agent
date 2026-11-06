@@ -186,7 +186,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
         } }, undefined, options);
-        return parseCapabilityResult(response);
+        try{return parseCapabilityResult(response);}
+        catch(error){
+          if(error.message==='Pinned browser capability returned no typed result'){
+            const cause=redactor.text(error.cause?.message??'');
+            await recordExecution({phase:'browser_capability_untyped',
+              cause:Buffer.from(cause).subarray(0,2048).toString().replace(/�$/, '')});
+          }
+          throw error;
+        }
       } });
     }
     const groups = selectToolGroups(config.mode ?? 'classic', {

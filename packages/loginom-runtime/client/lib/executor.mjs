@@ -1843,7 +1843,10 @@ export function parseCapabilityResult(response) {
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  const error=new Error('Pinned browser capability returned no typed result');
+  const message=(response?.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+    .map(block=>block.text.slice(0,2048)).join('\n');
+  const error=new Error('Pinned browser capability returned no typed result',
+    {cause:new Error(Buffer.from(message).subarray(0,2048).toString().replace(/�$/, ''))});
   if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
   throw error;
 }

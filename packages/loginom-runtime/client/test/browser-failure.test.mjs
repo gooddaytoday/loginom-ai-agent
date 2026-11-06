@@ -59,6 +59,19 @@ test('browser transport diagnostics retain the bounded original cause privately'
  });
 });
 
+test('untyped browser reply retains only bounded text in its private cause',()=>{
+ const text='### Modal state\n["confirm" dialog] '+ 'я'.repeat(3000);
+ assert.throws(()=>parseCapabilityResult({content:[{type:'image',data:'PRIVATE_BINARY'},
+  {type:'text',text},{type:'text',text:'OMITTED_TAIL'}]}),error=>{
+  assert.equal(error.message,'Pinned browser capability returned no typed result');
+  assert.ok(Buffer.byteLength(error.cause.message)<=2048);
+  assert.ok(error.cause.message.startsWith('### Modal state\n["confirm" dialog] '));
+  assert.ok(!error.cause.message.includes('PRIVATE_BINARY'));
+  assert.ok(!error.cause.message.includes('OMITTED_TAIL'));
+  return true;
+ });
+});
+
 test('private transport journal redacts the retained cause and keeps the public refusal fixed',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'upload-cause-'));
  try{
