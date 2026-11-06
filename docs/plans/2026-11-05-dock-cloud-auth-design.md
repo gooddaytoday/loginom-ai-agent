@@ -374,3 +374,24 @@ Runtime/сборки/production не запускались. Следующий 
 - Evidence/команды/RED→GREEN/self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-9-report.md`.
 - Ограничения: собранный Desktop first-shell-request и полный baked NodeHost cloud — gate13; installed system CA/native/site/reserve — gate15.
 - Следующий шаг: независимое ревью Task9; Task10 только после принятия. Push/PR/merge/release не выполнялись.
+
+## Ревью Task9 — 2026-11-06
+
+- SHA `2f0f279fa4`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Настоящие site/Help clients применяют explicit HTTP(S)/ALL/NO_PROXY; ошибки proxy не обходятся direct, local ACK/cleanup сохраняются.
+- Host100/476, Runtime18, local Host1/3, CLI writer1/8, Host/Desktop typecheck и proxy/NO_PROXY checks PASS.
+- Full compiled first-shell/dev tuple остаются Task13, native OS CA/site/reserve — Task15. Следующий шаг: Task10 Desktop UI; push/merge/release не выполнялись.
+
+## Checkpoint Task10 — 2026-11-06
+
+- База SHA `2f0f279fa4`; Task10 — текущий commit, ветка `dock-cloud-auth`.
+- Shared Desktop settings: cloud/custom cards, immediate cloud login/logout, isolated draft/revision guard, cancel after accepted close, no secret echo.
+- Save-before-login сохраняет `connection-required`; explicit Check проверяет browser отдельно от Help; recovery/pending activation сохранены.
+- TDD по одному поведению: App32 PASS/147 assertions; Desktop47 PASS/138 assertions; App/Desktop typecheck и diff-check PASS.
+- Current dev main/preload/renderer + unpacked Electron42.3.3 candidate: isolated IPC-stub settings-ux PASS (cards/keyboard/cancel/account/key/4close/save/pending).
+- ASAR bytes main/preload/renderer равны current out; knowledge-key отсутствует. Node24.19.0, Chromium1246, Electron42.3.3 hashes проверены; pins/dependencies не менялись.
+- Evidence, exact commands, ограничения: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-10-report.md`; GUI `$HOME/storage/tmp/loginom-settings-ux-SPtnY0`.
+- Это Linux dev IPC/UI-проверка с заглушками, не installed/live cloud acceptance. Пользовательское приложение/профили не менялись.
+- Ревью P2 исправлены: status не начинается во время cloudBusy; Check с Help connection-required не заявляет Help success; оба RED→GREEN и current GUI PASS.
+- Full baked tuple/settings-live — Task13; native Windows/macOS/site/reserve — Task15. Следующий шаг: повторное независимое ревью двух исправлений Task10.
+- Push/PR/merge/release не выполнялись; Task11 не начата.

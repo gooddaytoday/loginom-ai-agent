@@ -621,7 +621,7 @@ Desktop повторно вызывает существующий `useEnvProxy(
 
 **Interfaces:** UI использует готовые с6 preload/IPC channels `loginom-cloud-start`, `loginom-cloud-cancel`, `loginom-cloud-disconnect`; Check decoder готов с3. UI controller добавляет mode,endpoint,apiKey,apiKeyMode в draft и методы connect/cancelLogin/disconnect. Stored key не возвращается; пустая mask по hasApiKey — только placeholder.
 
-- [ ] **1. RED:** Использовать `setup(initial)`, чьи View/Validation fields и три management stubs уже обновлены в3/6. Добавить поведенческий сценарий save-before-login:
+- [x] **1. RED:** Использовать `setup(initial)`, чьи View/Validation fields и три management stubs уже обновлены в3/6. Добавить поведенческий сценарий save-before-login:
 
 ```ts
 const f = setup({ state: "connection-required", mode: "cloud", help: { state: "connection-required" } })
@@ -636,11 +636,11 @@ try {
 } finally { f.dispose() }
 ```
 
-- [ ] **2. Запустить RED:** из App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`.
-- [ ] **3. GREEN:** В submit формировать Check с mode/endpoint/SecretEdit. `verifyBrowser:false` только save+cloud+!cloud.connected; явный check всегда true. Разрешить saved `connection-required`; watchLoginomApplication завершает polling уведомлением «сохранено, требуется подключение», а не failed и не бесконечным циклом. Не путать checkedBrowser с checkedHelp; browserVerified не утверждает Help ready. В текущем контроллере сохранить dirty/conflict/pending/cleanup правила.
-- [ ] **4. Следующий RED→GREEN:** Успешный connect сохраняется немедленно, UI status обновляется без save; draft radio остаётся выбранным пользователем. Closing/Escape/overlay/discard отменяют незавершённый login после принятия существующего dirty-close guard; already completed login/logout сохраняются. `onCleanup` очищает введённые поля и запрашивает cancel, поздние async ответы не трогают disposed store. Не запрещать закрытие формы на всё время device polling.
-- [ ] **5. Следующий RED→GREEN:** cloud↔custom сохраняет обе конфигурации; смена только mode/endpoint/key считается dirty. Secret field type=password, stored value не рендерится, preserve не отправляет mask. Проверки полей/сохранение actual activation остаются штатными. Custom карточка не вызывает cloud connect автоматически.
-- [ ] **6. GREEN UI:** Вверху shared form добавить radio через `RadioGroup` из `@opencode-ai/ui/radio-group` (`options`, `current`, `label`, `onSelect`); контейнеры через Solid Show. Новые EN/RU typed keys:
+- [x] **2. Запустить RED:** из App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`.
+- [x] **3. GREEN:** В submit формировать Check с mode/endpoint/SecretEdit. `verifyBrowser:false` только save+cloud+!cloud.connected; явный check всегда true. Разрешить saved `connection-required`; watchLoginomApplication завершает polling уведомлением «сохранено, требуется подключение», а не failed и не бесконечным циклом. Не путать checkedBrowser с checkedHelp; browserVerified не утверждает Help ready. В текущем контроллере сохранить dirty/conflict/pending/cleanup правила.
+- [x] **4. Следующий RED→GREEN:** Успешный connect сохраняется немедленно, UI status обновляется без save; draft radio остаётся выбранным пользователем. Closing/Escape/overlay/discard отменяют незавершённый login после принятия существующего dirty-close guard; already completed login/logout сохраняются. `onCleanup` очищает введённые поля и запрашивает cancel, поздние async ответы не трогают disposed store. Не запрещать закрытие формы на всё время device polling.
+- [x] **5. Следующий RED→GREEN:** cloud↔custom сохраняет обе конфигурации; смена только mode/endpoint/key считается dirty. Secret field type=password, stored value не рендерится, preserve не отправляет mask. Проверки полей/сохранение actual activation остаются штатными. Custom карточка не вызывает cloud connect автоматически.
+- [x] **6. GREEN UI:** Вверху shared form добавить radio через `RadioGroup` из `@opencode-ai/ui/radio-group` (`options`, `current`, `label`, `onSelect`); контейнеры через Solid Show. Новые EN/RU typed keys:
 
 | key suffix `loginom.ai.` | RU | EN |
 | --- | --- | --- |
@@ -657,8 +657,8 @@ try {
 | revokeUnconfirmed | Локальное подключение удалено; отзыв на сайте не подтверждён | Local connection removed; server revocation was not confirmed |
 
 Код/ссылка/expiry/email берутся только из management view; link открывается через существующий platform.openExternal после Host проверки origin. Кнопки refresh connection нет. Поля Loginom URL/username/password ниже; folder input не добавлять. Pending/error строки использовать полные фразы с параметрами, без составления локализованных слов из кусков.
-- [ ] **7. Browser acceptance:** В `settings-ux.mjs` с IPC fixtures проверить две карточки, default cloud, keyboard radio navigation/labels, cancel, account, скрытый key и отсутствие refresh кнопки. Обновить тестовые API mocks новыми методами/status. Это UI-проверка с заглушками; `settings-live.mjs` с настоящим Host и cloud fixture отложен до13, шаг5, когда Desktop собран с baked tuple. Существующее onboarding условие generation сохраняет смысл «настройки сохранены», не «Help уже ready».
-- [ ] **8. Проверка/коммит:** App browser test выше и `bun typecheck`; Desktop `bun test src/main/loginom`, `bun typecheck`; isolated settings-ux штатной командой из Desktop runbook. Не перезапускать пользовательское приложение. Commit `feat(app): add Loginom AI connection settings`.
+- [x] **7. Browser acceptance:** В `settings-ux.mjs` с IPC fixtures проверить две карточки, default cloud, keyboard radio navigation/labels, cancel, account, скрытый key и отсутствие refresh кнопки. Обновить тестовые API mocks новыми методами/status. Это UI-проверка с заглушками; `settings-live.mjs` с настоящим Host и cloud fixture отложен до13, шаг5, когда Desktop собран с baked tuple. Существующее onboarding условие generation сохраняет смысл «настройки сохранены», не «Help уже ready».
+- [x] **8. Проверка/коммит:** App browser test выше и `bun typecheck`; Desktop `bun test src/main/loginom`, `bun typecheck`; isolated settings-ux штатной командой из Desktop runbook. Не перезапускать пользовательское приложение. Commit `feat(app): add Loginom AI connection settings`.
 
 ## Task 11: CLI cloud/custom и отмена длительного входа
 
@@ -747,7 +747,7 @@ stdin = json.dumps(dict(
 
 Tests: `packages/loginom-host/test/{node-host,cloud-proxy,cloud-readiness,stage-resources}.test.ts`, `packages/desktop/test/loginom/{settings-live.mjs,environment-proxy.ts}`, `packages/opencode/test/cli/{standalone-status,loginom-management}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`. Существующие custom fixtures уже перенесены в3; здесь завершаются отложенные compiled cloud проверки8–11.
 
-Docs: `packages/app/AGENTS.md`, `packages/loginom-host/AGENTS.md`, `packages/desktop/src/main/loginom/AGENTS.md`, `docs/testing/loginom-ai-agent/{standalone-cli.md,README.md,ci-release.md}`. Не править исторические отчёты так, будто прежние сборки уже работали по новой схеме.
+Docs: `packages/app/AGENTS.md`, `packages/loginom-host/AGENTS.md`, `packages/desktop/src/main/loginom/AGENTS.md`, `docs/testing/loginom-ai-agent/{standalone-cli.md,README.md,ci-release.md}`. Только абзац App про карточки и встроенный ключ уже обновлён вместе с Task10; повторять его правку не требуется. Остальные Host/Desktop/build docs остаются в Task13. Не править исторические отчёты так, будто прежние сборки уже работали по новой схеме.
 
 **Interfaces:** Удалить `stageResources.knowledgeKey` и упаковку `knowledge-key`; runtime чтения файла/withKnowledgeKey уже нет с3. Новый **build-only** `cloudBuild(environment: NodeJS.ProcessEnv): CloudEndpoints | undefined`; вход — одна JSON переменная `LOGINOM_AI_AGENT_CLOUD_BUILD` со всеми site/primary/reserve. Она используется только build scripts; compiled constant `import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD` передаётся Host из Node bundle и Electron main. Обычный runtime process.env не читается для выбора cloud endpoints.
 

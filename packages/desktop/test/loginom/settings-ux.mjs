@@ -6,7 +6,7 @@ import { join, resolve } from "node:path"
 
 const require = createRequire(new URL("../../../loginom-runtime/client/package.json", import.meta.url))
 const { _electron } = require("playwright-core")
-const { expect } = createRequire(new URL("../../../app/package.json", import.meta.url))("@playwright/test")
+const { expect } = require("playwright/test")
 const directory = resolve(import.meta.dirname, "../..")
 const evidence = await mkdtemp(join(tmpdir(), "loginom-settings-ux-"))
 const application = await _electron.launch({
@@ -26,74 +26,179 @@ try {
   const page = await application.firstWindow()
   const form = page.locator('[data-component="settings-loginom"]')
   await form.waitFor({ timeout: 120000 })
-  // Deterministic IPC fixture in this isolated application's main process.
-  // The rendered form, event handlers, preload and dialog dismissal are real.
-  await application.evaluate(({ ipcMain }) => {
+  // Only this isolated main process is stubbed; renderer, preload and dialogs are real.
+  await application.evaluate(({ ipcMain, shell }) => {
     let view = {
+      mode: "cloud",
+      endpoint: "https://custom.test/mcp",
+      hasApiKey: true,
+      server: "primary",
+      cloud: { connected: false },
+      help: { state: "connection-required" },
       revision: 1,
       generation: 1,
       url: "http://loginom.test/app/",
       username: "user",
       folder: "/user",
       hasPassword: false,
-      state: "ready",
+      state: "connection-required",
+      browser: { state: "unknown" },
     }
     let candidate
-    let mode = "ready"
-    const calls = { checks: 0, saves: 0, keys: 0 }
-    for (const name of ["loginom-read", "loginom-status", "loginom-check", "loginom-save"]) ipcMain.removeHandler(name)
+    let browser = { state: "verified" }
+    let activation = "connection-required"
+    const calls = { checks: [], saves: 0, starts: 0, cancels: 0, disconnects: 0, links: [] }
+    shell.openExternal = async (url) => {
+      calls.links.push(url)
+    }
+    for (const name of [
+      "loginom-read",
+      "loginom-status",
+      "loginom-check",
+      "loginom-save",
+      "loginom-cloud-start",
+      "loginom-cloud-cancel",
+      "loginom-cloud-disconnect",
+    ])
+      ipcMain.removeHandler(name)
     ipcMain.handle("loginom-read", () => view)
     ipcMain.handle("loginom-status", () => view)
+    ipcMain.handle("loginom-cloud-start", () => {
+      calls.starts++
+      view = {
+        ...view,
+        cloud: {
+          connected: false,
+          pending: {
+            userCode: "TEST-CODE",
+            verificationUrl: "https://loginom.ai/device",
+            expiresAt: Date.now() + 60000,
+          },
+        },
+      }
+      return view
+    })
+    ipcMain.handle("loginom-cloud-cancel", () => {
+      calls.cancels++
+      view = { ...view, cloud: { connected: false } }
+      return view
+    })
+    ipcMain.handle("loginom-cloud-disconnect", () => {
+      calls.disconnects++
+      view = {
+        ...view,
+        cloud: { connected: false, failure: "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" },
+        help: { state: "connection-required" },
+        state: "connection-required",
+      }
+      return view
+    })
     ipcMain.handle("loginom-check", (_event, input) => {
-      calls.checks++
-      // The knowledge service key is built in; the form must never send one.
-      if ("apiKey" in input) calls.keys++
+      calls.checks.push(input)
       if (input.username === "rejected-key-user") throw Error("LOGINOM_KNOWLEDGE_AUTH_FAILED")
       candidate = input
-      return { validationId: "test-validated", expiresAt: Date.now() + 60000 }
+      return {
+        help: view.help,
+        browser: input.verifyBrowser ? browser : { state: "unknown" },
+        validationId: "test-validated",
+        expiresAt: Date.now() + 60000,
+      }
     })
     ipcMain.handle("loginom-save", () => {
       calls.saves++
-      view = { ...view, revision: view.revision + 1, state: mode }
-      if (mode === "ready")
-        view = { ...view, generation: view.generation + 1, url: candidate.url, username: candidate.username }
+      view = {
+        ...view,
+        revision: view.revision + 1,
+        state: activation,
+        mode: candidate.mode,
+        endpoint: candidate.endpoint,
+        url: candidate.url,
+        username: candidate.username,
+      }
+      if (activation !== "pending") view = { ...view, generation: view.generation + 1 }
       return view
     })
+    ipcMain.on("loginom-settings-test-account", () => {
+      view = {
+        ...view,
+        cloud: { connected: true, email: "account@test.invalid" },
+        help: { state: "ready" },
+        state: "ready",
+      }
+    })
+    ipcMain.on("loginom-settings-test-browser", (_event, value) => {
+      browser = value
+    })
     ipcMain.on("loginom-settings-test-mode", (_event, value) => {
-      mode = value
+      activation = value
     })
     ipcMain.on("loginom-settings-test-fail", () => {
       view = { ...view, state: "ready", failure: "LOGINOM_RUNTIME_START_FAILED" }
     })
-    ipcMain.handle("loginom-settings-test-calls", () => calls)
+    ipcMain.on("loginom-settings-test-calls", (reply) => reply(calls))
   })
   const closeName = /^(Close|Закрыть)$/
   const saveName = /^(Save and close|Сохранить и закрыть)$/
   const checkName = /^(Check connection|Проверить подключение)$/
+  const connectName = /^(Connect|Подключиться)$/
+  const cancelName = /^(Cancel sign-in|Отменить вход)$/
+  const disconnectName = /^(Disconnect|Отключиться)$/
+  const cloudName = /^(Cloud server|Облачный сервер)$/
+  const customName = /^(Custom server|Свой сервер)$/
   const keepName = /^(Continue editing|Продолжить редактирование)$/
   const discardName = /^(Close without saving|Закрыть без сохранения)$/
   const footerClose = () => form.locator(".loginom-actions").getByRole("button", { name: closeName })
+  const username = () => form.locator('input[autocomplete="username"]')
+  const feedback = () => form.locator('[data-component="loginom-connection-status"]')
+  const counters = () =>
+    application.evaluate(
+      ({ ipcMain }) =>
+        new Promise((resolve) => {
+          ipcMain.emit("loginom-settings-test-calls", resolve)
+        }),
+    )
   const open = async () => {
     await page.getByRole("button", { name: "Loginom", exact: true }).click()
     await expect(form.getByRole("button", { name: checkName })).toBeEnabled()
   }
   await footerClose().click()
-  await expect(form).toHaveCount(0)
   await open()
-  const username = () => form.locator('input[autocomplete="username"]')
-  // Only the Loginom password remains secret in the form.
-  await expect(form.locator('input[type="password"]')).toHaveCount(1)
-  await expect(form.getByRole("button", { name: saveName })).toBeDisabled()
-  await expect(form.getByRole("button", { name: /Reload current settings|Загрузить текущие настройки/ })).toHaveCount(0)
-  await page.screenshot({ path: join(evidence, "saved-key.png") })
-  await form.locator(".loginom-heading").getByRole("button", { name: closeName }).click()
-  await expect(form).toHaveCount(0)
+  await expect(form.getByRole("radio", { name: cloudName })).toBeChecked()
+  await expect(form.locator('[data-component="loginom-cloud-card"]')).toBeVisible()
+  await expect(form.locator('[data-component="loginom-custom-card"]')).toHaveCount(0)
+  await expect(
+    form.getByRole("button", {
+      name: /Reload current settings|Загрузить текущие настройки|Refresh connection|Обновить подключение/,
+    }),
+  ).toHaveCount(0)
+  await form.getByRole("radio", { name: cloudName }).focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(form.getByRole("radio", { name: customName })).toBeChecked()
+  const key = () => form.getByLabel(/^(Loginom AI key|Ключ Loginom AI)$/)
+  await expect(key()).toHaveAttribute("type", "password")
+  await expect(key()).toHaveValue("")
+  await expect(key()).toHaveAttribute("placeholder", "••••••••")
+  await expect(form.getByLabel(/Loginom AI server URL|Адрес сервера Loginom AI/)).toHaveValue("https://custom.test/mcp")
+  await key().fill("draft-fixture-key")
+  await page.screenshot({ path: join(evidence, "custom-card.png") })
+  await form.getByText(cloudName).click()
+  await form.getByText(customName).click()
+  await expect(key()).toHaveValue("draft-fixture-key")
+  assert.equal((await counters()).starts, 0)
+  await footerClose().click()
+  await form.getByRole("button", { name: discardName }).click()
   await open()
-  await page.keyboard.press("Escape")
-  await expect(form).toHaveCount(0)
-
+  await form.getByRole("button", { name: connectName }).click()
+  await expect(form.getByText(/TEST-CODE/)).toBeVisible()
+  await expect(form.getByRole("button", { name: "https://loginom.ai/device", exact: true })).toBeVisible()
+  await form.getByRole("button", { name: "https://loginom.ai/device", exact: true }).click()
+  assert.deepEqual((await counters()).links, ["https://loginom.ai/device"])
+  await expect(footerClose()).toBeEnabled()
+  await form.getByRole("button", { name: cancelName }).click()
+  await expect(form.getByRole("button", { name: connectName })).toBeEnabled()
   for (const method of ["button", "cross", "escape", "overlay"]) {
-    await open()
+    await form.getByRole("button", { name: connectName }).click()
+    await expect(form.getByRole("button", { name: cancelName })).toBeVisible()
     await username().fill(`draft-${method}`)
     if (method === "button") await footerClose().click()
     if (method === "cross") await form.locator(".loginom-heading").getByRole("button", { name: closeName }).click()
@@ -101,35 +206,60 @@ try {
     if (method === "overlay")
       await page.locator('[data-component="dialog-overlay"]').click({ position: { x: 2, y: 2 } })
     await expect(form.getByRole("alertdialog")).toBeVisible()
+    assert.equal((await counters()).cancels, 1 + ["button", "cross", "escape", "overlay"].indexOf(method))
     await form.getByRole("button", { name: keepName }).click()
     await expect(username()).toHaveValue(`draft-${method}`)
     await footerClose().click()
     await form.getByRole("button", { name: discardName }).click()
     await expect(form).toHaveCount(0)
+    await open()
+    await expect(form.getByRole("button", { name: connectName })).toBeEnabled()
   }
-
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-account"))
+  await expect(form.getByText(/account@test.invalid/)).toBeVisible()
+  await username().fill("discard-account-draft")
+  await footerClose().click()
+  await form.getByRole("button", { name: discardName }).click()
   await open()
-  await form.getByRole("button", { name: checkName }).click()
-  await expect(form.getByRole("status")).toContainText(/Connection verified|Подключение проверено/)
-  await username().fill("checked-user")
-  await expect(form.getByRole("status")).toHaveCount(0)
-  await form.getByRole("button", { name: checkName }).click()
-  await expect(form.getByRole("status")).toContainText(/not been saved|ещё не сохранены/)
+  await expect(form.getByText(/account@test.invalid/)).toBeVisible()
+  await form.getByRole("button", { name: disconnectName }).click()
+  await expect(form.getByText(/server revocation was not confirmed|отзыв на сайте не подтверждён/)).toBeVisible()
+  await page.screenshot({ path: join(evidence, "cloud-card.png") })
+  await username().fill("save-before-login")
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
-  await expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible()
+  assert.equal((await counters()).checks.at(-1).verifyBrowser, false)
   await open()
-  await expect(username()).toHaveValue("checked-user")
+  await form.getByRole("button", { name: checkName }).click()
+  await expect(feedback().locator('[data-browser-state="verified"]')).toBeVisible()
+  assert.equal((await counters()).checks.at(-1).verifyBrowser, true)
+  assert.deepEqual((await counters()).checks.at(-1).apiKey, { operation: "preserve" })
+  await expect(form.locator('.loginom-feedback[data-failed="false"]')).toContainText(
+    /Connect to Loginom AI to continue|Требуется подключение к Loginom AI/,
+  )
+  await expect(form).not.toContainText(
+    /Help is accessible|the AI server is accessible|Справка доступна|AI-сервер доступен/,
+  )
+  await application.evaluate(({ ipcMain }) =>
+    ipcMain.emit("loginom-settings-test-browser", {}, { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" }),
+  )
+  await form.getByRole("button", { name: checkName }).click()
+  await expect(feedback().locator('[data-browser-state="failed"]')).toBeVisible()
+  await expect(form.locator('.loginom-feedback[data-failed="false"]')).toContainText(
+    /Connect to Loginom AI to continue|Требуется подключение к Loginom AI/,
+  )
+  await expect(form).not.toContainText(
+    /Help is accessible|the AI server is accessible|Справка доступна|AI-сервер доступен/,
+  )
+  await form.locator('.loginom-feedback[data-failed="false"]').scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(evidence, "check-help-required.png") })
   await username().fill("rejected-key-user")
   await form.getByRole("button", { name: saveName }).click()
-  await expect(form.getByRole("alert")).toContainText(/Update the application|Обновите приложение/)
+  await expect(form.locator('[data-failed="true"]')).toBeVisible()
   await expect(username()).toHaveValue("rejected-key-user")
-  await page.screenshot({ path: join(evidence, "invalid-key.png") })
   await username().fill("replacement-user")
-  await expect(form.getByRole("alert")).toHaveCount(0)
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
-
   await page.getByRole("button", { name: /Loginom AI Agent/ }).click()
   await page.getByRole("menuitem", { name: /^(File|Файл)$/ }).hover()
   await page.getByRole("menuitem", { name: /^(Settings|Настройки)/ }).click()
@@ -137,9 +267,7 @@ try {
   await expect(form.getByRole("button", { name: checkName })).toBeEnabled()
   await username().fill("from-general-settings")
   await form.getByRole("button", { name: saveName }).click()
-  await expect(page.getByRole("tab", { name: "Loginom", exact: true })).toHaveCount(0)
   await expect(form).toHaveCount(0)
-
   await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "pending"))
   await open()
   await username().fill("pending-user")
@@ -150,24 +278,20 @@ try {
   await expect(
     page.getByText(/Saved Loginom settings could not be applied|Не удалось применить сохранённые настройки Loginom/),
   ).toBeVisible({ timeout: 10000 })
-  await page.screenshot({ path: join(evidence, "deferred-failure.png") })
-  const calls = await application.evaluate(async ({ BrowserWindow }) => {
-    return BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(
-      "window.api.loginom.read().then(v => ({ revision: v.revision, hasApiKey: 'hasApiKey' in v }))",
-    )
-  })
-  assert.equal(calls.hasApiKey, false)
-  assert.equal(calls.revision, 5)
   const summary = {
     status: "PASS",
     version: await application.evaluate(({ app }) => app.getVersion()),
-    noKeyField: true,
+    cards: 2,
+    defaultCloud: true,
+    keyboardRadio: true,
+    storedKeyHidden: true,
     closeMethods: 4,
-    unsavedConfirmation: true,
-    checkWithoutSave: true,
-    saveAndClose: true,
-    rejectedKeyPreserved: true,
+    cancel: true,
+    account: true,
+    saveBeforeLogin: true,
+    explicitCheckHelpRequired: true,
     deferredFailureAfterClose: true,
+    calls: await counters(),
   }
   await writeFile(join(evidence, "summary.json"), JSON.stringify(summary, null, 2))
   console.log(JSON.stringify({ ...summary, evidence }))

@@ -2,6 +2,7 @@ import "./settings-loginom.css"
 import { Show, onCleanup, onMount } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { RadioGroup } from "@opencode-ai/ui/radio-group"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { usePlatform } from "@/context/platform"
@@ -19,7 +20,13 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
     const toast = showToast({
       title: language.t("loginom.saved"),
       description: language.t(
-        pending ? "loginom.savedPending" : warning ? "loginom.savedBrowserWarning" : "loginom.helpReady",
+        pending
+          ? "loginom.savedPending"
+          : view.state === "connection-required"
+            ? "loginom.ai.required"
+            : warning
+              ? "loginom.savedBrowserWarning"
+              : "loginom.helpReady",
       ),
       variant: pending || warning ? "default" : "success",
       persistent: pending || warning,
@@ -29,6 +36,7 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
         ready: language.t("loginom.helpReady"),
         failed: language.t("loginom.applyFailed"),
         unknown: language.t("loginom.statusUnavailable"),
+        "connection-required": language.t("loginom.ai.required"),
       }
       void watchLoginomApplication(platform.loginom, view, (result, current) => {
         dismissToast(toast)
@@ -38,7 +46,14 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
             result === "ready" && current?.browser?.state === "failed"
               ? language.t("loginom.savedBrowserWarning")
               : messages[result],
-          variant: result === "ready" ? (current?.browser?.state === "failed" ? "default" : "success") : "error",
+          variant:
+            result === "connection-required"
+              ? "default"
+              : result === "ready"
+                ? current?.browser?.state === "failed"
+                  ? "default"
+                  : "success"
+                : "error",
           persistent: result !== "ready" || current?.browser?.state === "failed",
         })
       })
@@ -91,6 +106,100 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                 class="flex flex-col gap-4"
               >
                 <fieldset disabled={form.disabled()} class="flex flex-col gap-4">
+                  <h3 class="text-16-medium">{language.t("loginom.ai.title")}</h3>
+                  <RadioGroup
+                    options={["cloud", "custom"]}
+                    current={form.state.mode}
+                    label={(mode) => language.t(mode === "cloud" ? "loginom.ai.cloud" : "loginom.ai.custom")}
+                    aria-label={language.t("loginom.ai.title")}
+                    onSelect={(mode) => (mode === "cloud" || mode === "custom") && form.edit({ mode })}
+                  />
+                  <Show
+                    when={form.state.mode === "cloud"}
+                    fallback={
+                      <div class="loginom-feedback" data-component="loginom-custom-card">
+                        <TextField
+                          label={language.t("loginom.ai.endpoint")}
+                          type="url"
+                          value={form.state.endpoint}
+                          onChange={(endpoint) => form.edit({ endpoint })}
+                          required
+                        />
+                        <TextField
+                          label={language.t("loginom.ai.apiKey")}
+                          type="password"
+                          value={form.state.apiKey}
+                          placeholder={form.state.baseline?.hasApiKey ? "••••••••" : undefined}
+                          autocomplete="new-password"
+                          onChange={(apiKey) =>
+                            form.edit({
+                              apiKey,
+                              apiKeyMode: apiKey ? "replace" : form.state.baseline?.hasApiKey ? "preserve" : "empty",
+                            })
+                          }
+                        />
+                      </div>
+                    }
+                  >
+                    <div class="loginom-feedback" data-component="loginom-cloud-card">
+                      <Show
+                        when={form.state.view?.cloud.connected}
+                        fallback={
+                          <Show
+                            when={form.state.view?.cloud.pending}
+                            fallback={
+                              <Button type="button" disabled={form.state.cloudBusy} onClick={() => void form.connect()}>
+                                {language.t("loginom.ai.connect")}
+                              </Button>
+                            }
+                          >
+                            {(pending) => (
+                              <>
+                                <p>
+                                  {language.t("loginom.ai.pending", {
+                                    code: pending().userCode,
+                                    expiry: new Date(pending().expiresAt).toISOString(),
+                                  })}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => platform.openExternal(pending().verificationUrl)}
+                                >
+                                  {pending().verificationUrl}
+                                </Button>
+                                <Button type="button" onClick={() => void form.cancelLogin()}>
+                                  {language.t("loginom.ai.cancel")}
+                                </Button>
+                              </>
+                            )}
+                          </Show>
+                        }
+                      >
+                        <p>{language.t("loginom.ai.account", { email: form.state.view?.cloud.email ?? "" })}</p>
+                        <Button type="button" disabled={form.state.cloudBusy} onClick={() => void form.disconnect()}>
+                          {language.t("loginom.ai.disconnect")}
+                        </Button>
+                      </Show>
+                      <Show when={form.state.view?.server === "reserve"}>
+                        <p>{language.t("loginom.ai.reserve")}</p>
+                      </Show>
+                      <Show when={form.state.view?.cloud.failure}>
+                        {(failure) => (
+                          <p role="alert">
+                            {language.t(
+                              failure() === "LOGINOM_CLOUD_REVOKE_UNCONFIRMED"
+                                ? "loginom.ai.revokeUnconfirmed"
+                                : "loginom.ai.failed",
+                            )}
+                          </p>
+                        )}
+                      </Show>
+                      <Show when={form.state.view?.help.state === "connection-required"}>
+                        <p>{language.t("loginom.ai.required")}</p>
+                      </Show>
+                    </div>
+                  </Show>
                   <TextField
                     label={language.t("loginom.url")}
                     type="url"
@@ -137,7 +246,7 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                 <div role="status" class="loginom-feedback" data-component="loginom-connection-status">
                   <p>
                     {language.t(
-                      form.state.checkedBrowser || form.state.view?.state === "ready"
+                      (form.state.checkedHelp ?? form.state.view?.help)?.state === "ready"
                         ? "loginom.helpReady"
                         : "loginom.helpNotReady",
                     )}
