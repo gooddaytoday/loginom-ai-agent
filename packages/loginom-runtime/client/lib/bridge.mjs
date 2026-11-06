@@ -430,7 +430,14 @@ export async function createBridge(config, session, { browserTransport: managedB
               ...(config.storageDirectories ? { storage_directories: config.storageDirectories } : {}),
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
-            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(result)}]},{tool:'dock_prepare'});
+            // Full transient loading/geometry diagnostics are retained above.
+            // The model needs readiness, identities and the complete knowledge
+            // bundle; raw diagnostic DOM can push a local-package reply over
+            // the existing wire budget without adding preparation authority.
+            const delivered=structuredClone(result);
+            if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);
+            if(delivered.workspace?.browser_geometry)delete delivered.workspace.browser_geometry.observed;
+            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
             if (ready && reply.isError !== true) userBundleDelivered = true;
             return reply;
           }

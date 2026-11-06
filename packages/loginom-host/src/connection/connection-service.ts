@@ -17,6 +17,8 @@ export async function connectionService(
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
 ) {
+  // Both Desktop and CLI cross this boundary before preparing any runtime.
+  await store.initialize()
   const state: {
     active?: ActiveConnection
     handle?: RuntimeHandle
