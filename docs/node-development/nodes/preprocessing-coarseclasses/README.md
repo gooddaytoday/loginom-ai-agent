@@ -3,6 +3,16 @@
 Component ID: `component.preprocessing.CoarseClasses`; slug `preprocessing-coarseclasses`.
 Предложение runtime: `preprocessing.coarse_classes`, modes `internal` / `apply`.
 
+## Текущий срез v0.4.0
+
+Зарегистрирован `preprocessing.coarse_classes` / `internal`, `apply`. Дискретный String-предиктор и бинарная String-цель; automatic-классы; internal обучает, apply существующего узла использует сохранённые классы; порты 0/1/2.
+
+Ограничения: Без непрерывных предикторов, external/manual/frozen-классов, переменных и неизвестных/NULL значений предиктора.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [coarse-classes-node.mjs](../../../../packages/loginom-runtime/client/lib/coarse-classes-node.mjs):1–46; [coarse-classes-parameters.mjs](../../../../packages/loginom-runtime/client/lib/coarse-classes-parameters.mjs):1–31; [preprocessing.coarse_classes.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.coarse_classes.md):1–34. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
 [Подплан](plan.md) · [Discovery](discovery.md) ·
 [Приёмочный комплект](acceptance/README.md) · [Реестр](../../registry.json).
 

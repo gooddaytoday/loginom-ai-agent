@@ -3,6 +3,16 @@
 Component ID `component.dataMining.AssnRules`, slug `datamining-assnrules`.
 Native fulltype `TBGAssnRulesEngine`, Loginom 7.4.2.
 
+## Текущий срез v0.4.0
+
+Зарегистрирован `datamining.assn_rules` / `fp_growth`. FP-growth: дискретные строковые ID транзакций и товары; support/confidence 0…100, max_items; Train текущего входа; порты 0/1, доли результата 0…1.
+
+Ограничения: Без рекомендаций (порт 2), второго входа, сохранённого apply и дополнительных фильтров.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [assn-rules-node.mjs](../../../../packages/loginom-runtime/client/lib/assn-rules-node.mjs):1–36; [assn-rules-parameters.mjs](../../../../packages/loginom-runtime/client/lib/assn-rules-parameters.mjs):1–17; [datamining.assn_rules.md](../../../../packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
 [Подплан](plan.md) · [Discovery LAB-777](discovery.md) · [Реестр](../../registry.json).
 
 Этап 0 подготовлен, `ready_for_development`: живое исследование,

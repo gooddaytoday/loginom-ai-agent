@@ -5,15 +5,15 @@
 [Подплан](plan.md) · [исследование](discovery.md) · [контракт](contract.md) ·
 [приёмочный комплект](acceptance/README.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; статус `discovery_required`. В LAB-771 исследована семантика
-заданных долей Loginom 7.4.2 и подготовлены контракт, fixtures и независимый
-oracle. Native FullType остаётся `not_checked`: штатное скачивание собственного
-сохранённого пакета не доставило файл. Этап 0 блокирован этим пробелом.
-После его устранения и утверждения предложенных критериев — отдельное
-назначение этапа 1. Старый W1 по допускам не нужен: база уже поддерживает
-допуск, порядок и identity порта. Реестр этой карточкой не изменяется.
+Зарегистрирован `transform.ungroup_data` / `shares`. Распределение итогов входа 0 по явно заданным долям входа 1; rounding none/precision/multiple, balance none/last/proportional/equal; выход 0.
+
+Ограничения: Без вычисляемых весов, сезонности, переменных и чтения порта 1. Один итог на группу; NULL-доли пропускаются, NULL-итоги и отсутствующие группы не дают строк.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [ungroup-node.mjs](../../../../packages/loginom-runtime/client/lib/ungroup-node.mjs):1–62; [ungroup-parameters.mjs](../../../../packages/loginom-runtime/client/lib/ungroup-parameters.mjs):1–44; [transform.ungroup_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.ungroup_data.md):1–13. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
 
 ## Планируемый объём по этапам
 
@@ -25,4 +25,3 @@ oracle. Native FullType остаётся `not_checked`: штатное скач�
 
 - [Справка](https://help.loginom.ru/userguide/processors/transformation/ungrouping.html), `loginom-help@353e506b:data/processors/transformation/ungrouping.md`.
 - E2E `e2e-tests@486caef44:tests/acceptance/wizards/ungroupdata/ungroup_settings.ts:11,20-121 — :sandbox; node_status.ts; assignment.ts` — источник требований, без переноса PASS.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; зарегистрированного обработчика нет.

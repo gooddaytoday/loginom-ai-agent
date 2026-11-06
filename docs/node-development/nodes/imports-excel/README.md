@@ -4,9 +4,18 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json) · [checkpoint discovery](discovery.md) · [fixtures/oracle](acceptance/README.md).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; статус `discovery_required`. Две последовательные карточки Multica: сначала этап 0 — живое исследование, контракт и независимые ожидания; затем этап 1 на принятом SHA той же ветки. Type/mode `imports.excel` / `xlsx` подтверждает discovery. Владелец 2026-10-07 согласовал первый срез и W1 (бинарная доставка, представление вложения для модели и полная warm/cold проверка источника/результата); W2/W3 отложены. Готовность реестра не повышалась.
+Зарегистрирован `imports.excel` / `xlsx`. xlsx: один именованный лист sheet_name (первый по умолчанию); 1–12 явных столбцов; source_switch сохраняет схему и выбор листа при пропуске sheet_name.
+
+Ограничения: Только XLSX, без named ranges и автоопределения типов; source_switch без изменения columns/mappings.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [imports-excel-node.mjs](../../../../packages/loginom-runtime/client/lib/imports-excel-node.mjs):1–157; [imports-excel-parameters.mjs](../../../../packages/loginom-runtime/client/lib/imports-excel-parameters.mjs):1–50; [imports.excel.md](../../../../packages/product/skills/loginom-automation/references/nodes/imports.excel.md):1–26. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
+
 
 Ветка `excel-import`, один новый PR в `loginom`; исходная база `ef84e68a22bd46f3f24549edd829cfb293836703` после слияния PR #36. Вторая карточка остаётся в Backlog до независимой приёмки исследования. Источник выбирается автоматически только при однозначности; иначе нужны варианты и уточнение. Это не включает автоопределение столбцов. В первую приёмку входят все ячейки малых книг и 20 789 строк большой книги, включая порядок. Desktop, merge и release не назначены.
 

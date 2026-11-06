@@ -4,9 +4,18 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; этап 0 LAB-772 — `blocked`, готовность к этапу 1 не объявлена. См. [приёмочное предложение](acceptance/README.md). Следующая карточка Multica — этап 0 отдельно: живое исследование, контракт и независимые ожидания. Type/mode `exports.lgd` / `native` — предложение. Этап 1 — после решения владельца по W1 и W2; W1; W2; W3 подробно описаны в подплане. Готовность реестра не повышалась.
+Зарегистрирован `exports.lgd` / `native`. Новый LGD: compression=lz4, checksum=compressed, overwrite=reject; output.file_artifacts, без табличного выхода.
+
+Ограничения: Без append, DDF, Variant, переменных и иных вариантов сжатия; Save пакета отдельно.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [lgd-export-node.mjs](../../../../packages/loginom-runtime/client/lib/lgd-export-node.mjs):1–158; [lgd-parameters.mjs](../../../../packages/loginom-runtime/client/lib/lgd-parameters.mjs):1–39; [exports.lgd.md](../../../../packages/product/skills/loginom-automation/references/nodes/exports.lgd.md):1–14. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
+
 
 Внешняя среда: сервер Loginom с LGD writer и собственным каталогом; заранее квалифицированный штатный LGD reader/пакет в отдельном профиле, независимый manifest; этап 2 — отдельные серверы Loginom 32/64 bit. Если среда/компонент недоступны — Blocked, документальное покрытие сохраняется.
 
