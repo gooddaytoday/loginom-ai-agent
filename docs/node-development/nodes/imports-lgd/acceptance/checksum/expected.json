@@ -1,0 +1,346 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.lgd",
+      "label": "Нет суммы"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "Сжатая сумма"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "Обе суммы"
+    }
+  ],
+  "lgd": {
+    "kind": "checksum",
+    "checksum_switch_filename": "checksum-both.lgd",
+    "imports": [
+      {
+        "label": "Нет суммы",
+        "compression": "LZ4",
+        "bitness": "64-битная система",
+        "written_checksum": "Нет",
+        "checksum": true,
+        "filename": "checksum-none.lgd",
+        "columns": [
+          {
+            "name": "RecordId",
+            "label": "Идентификатор",
+            "type": "integer",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Text",
+            "label": "Text",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Amount",
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "continuous",
+            "tolerance": {
+              "abs": 0,
+              "rel": 0
+            }
+          },
+          {
+            "name": "Occurred",
+            "label": "Occurred",
+            "type": "datetime",
+            "data_kind": "discrete"
+          }
+        ]
+      },
+      {
+        "label": "Сжатая сумма",
+        "compression": "LZ4",
+        "bitness": "64-битная система",
+        "written_checksum": "Сжатых данных",
+        "checksum": true,
+        "filename": "checksum-compressed.lgd",
+        "columns": [
+          {
+            "name": "RecordId",
+            "label": "Идентификатор",
+            "type": "integer",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Text",
+            "label": "Text",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Amount",
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "continuous",
+            "tolerance": {
+              "abs": 0,
+              "rel": 0
+            }
+          },
+          {
+            "name": "Occurred",
+            "label": "Occurred",
+            "type": "datetime",
+            "data_kind": "discrete"
+          }
+        ]
+      },
+      {
+        "label": "Обе суммы",
+        "compression": "LZ4",
+        "bitness": "64-битная система",
+        "written_checksum": "Сжатых и несжатых данных",
+        "checksum": false,
+        "filename": "checksum-both.lgd",
+        "columns": [
+          {
+            "name": "RecordId",
+            "label": "Идентификатор",
+            "type": "integer",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Text",
+            "label": "Text",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Amount",
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "continuous",
+            "tolerance": {
+              "abs": 0,
+              "rel": 0
+            }
+          },
+          {
+            "name": "Occurred",
+            "label": "Occurred",
+            "type": "datetime",
+            "data_kind": "discrete"
+          }
+        ]
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.lgd",
+      "output_node_label": "Нет суммы",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RecordId",
+          "label": "Идентификатор",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "RecordId": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null
+        },
+        {
+          "RecordId": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        }
+      ]
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_node_label": "Сжатая сумма",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RecordId",
+          "label": "Идентификатор",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "RecordId": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null
+        },
+        {
+          "RecordId": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        }
+      ]
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_node_label": "Обе суммы",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RecordId",
+          "label": "Идентификатор",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "RecordId": 1,
+          "Text": "Кириллица",
+          "Amount": 1234.56789,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 2,
+          "Text": "строка с \"кавычкой\"\nи переносом",
+          "Amount": 0.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 3,
+          "Text": null,
+          "Amount": null,
+          "Occurred": null
+        },
+        {
+          "RecordId": 4,
+          "Text": "",
+          "Amount": -2.5,
+          "Occurred": "2024-02-29T12:30:00.000"
+        },
+        {
+          "RecordId": 5,
+          "Text": "=SUM(A1:A2)",
+          "Amount": 10.0,
+          "Occurred": "2024-02-29T12:30:00.000"
+        }
+      ]
+    }
+  ]
+}
