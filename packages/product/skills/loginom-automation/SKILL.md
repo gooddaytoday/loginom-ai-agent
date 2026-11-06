@@ -151,6 +151,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
 | Соединить переменные | `variables.column_union` / append_variables | [читать](references/nodes/variables.column_union.md) |
 | Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
+| Замена переменных | `variables.replace` / exact | [читать](references/nodes/variables.replace.md) |
 | Качество таблицы | `research.quality` / `profile` | [Пять выходов](references/nodes/research.quality.md), `parameters:{}`. |
 | Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
 | Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
