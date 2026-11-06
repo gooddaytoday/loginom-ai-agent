@@ -2978,7 +2978,25 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
-        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]}));
+        const read=buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]});
+        // Save can rename the open package without replacing its workflow.
+        // Completed node receipts retain their original navigation; follow only
+        // this runtime's verified, non-reopening Save chain before a fresh read.
+        for(const save of operations.values()){
+          const outcome=save.outcome;
+          if(save.action.action_key!=='package.save_checkpoint'||outcome?.action_key!=='package.save_checkpoint'
+            ||outcome.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||save.cleanupConfirmed!==true
+            ||outcome.output?.save_completed!==true||outcome.output.workflow_preserved!==true||outcome.output.reopened!==false)continue;
+          for(const continuation of outcome.output.workflow_continuations??[]){
+            const previous=continuation.previous_workflow_ref,next=continuation.workflow_ref,current=read.workflow_ref;
+            if(continuation.document_id!==read.document_id||!previous||!next
+              ||!['workflow_id','tab_tid','prefix'].every(key=>previous[key]===current[key]&&next[key]===current[key])
+              ||previous.navigation_path?.length!==current.navigation_path.length
+              ||!previous.navigation_path.every((part,i)=>part.tid===current.navigation_path[i].tid&&part.label===current.navigation_path[i].label))continue;
+            read.workflow_ref=structuredClone(next);
+          }
+        }
+        return nodeJobs.start(read);
       }
       if(!sourceReads.has(args.operation_id)
         &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
