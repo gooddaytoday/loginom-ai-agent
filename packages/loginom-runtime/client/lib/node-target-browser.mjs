@@ -619,8 +619,10 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
       const guard=async()=>{remaining();if(!sameGraph(before,await observe()))throw Error('Graph changed during link source reveal');};
       await guard();
       const node=before.nodes.find(n=>n.ref.node_id===task.effect.parameters.edge.source);
-      await reveal({page,root,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+      const target=task.effect.parameters.edge.target;
+      const navigation=await reveal({page,root,nodeId:target===undefined?node.ref.node_id:[node.ref.node_id,target],position:node.position,prefix:task.request.workflow_ref.prefix,
         scrollNode:true,remaining,guard,readViewport,project});
+      if(target!==undefined&&!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');
       await guard();point=null;
       continue;
     }
@@ -799,19 +801,19 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
-        const edge=effect.parameters.edge,source=graph.nodes.find(n=>n.ref.node_id===edge.source);
-        if(!source||source.locked)throw Error('Exact unlocked link source required');
+        const edge=effect.parameters.edge,source=graph.nodes.find(n=>n.ref.node_id===edge.source),target=graph.nodes.find(n=>n.ref.node_id===edge.target);
+        if(!source||source.locked||!target||target.locked)throw Error('Exact unlocked link endpoints required');
         await call(`async page=>{
           const t=${JSON.stringify(t)},remaining=()=>{
             if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
             const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
           };
-          const guard=async()=>{remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,await (${readGraph.toString()})(page,t)))throw Error('Graph changed during link source navigation');};
+          const guard=async()=>{remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,await (${readGraph.toString()})(page,t)))throw Error('Graph changed during link endpoint navigation');};
           await guard();
           const navigation=await (${revealNodePlacement.toString()})({page,root:page.locator('[data-tid='+JSON.stringify(t.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']'),
-            nodeId:${JSON.stringify(source.ref.node_id)},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
+            nodeId:${JSON.stringify([source.ref.node_id,target.ref.node_id])},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
             remaining,guard,readViewport:${nodePlacementViewport.toString()},project:${nodePlacementPoint.toString()}});
-          await guard();if(!navigation.fully_visible)throw Error('Link source node and ports are not fully visible');return navigation;
+          await guard();if(!navigation.fully_visible)throw Error('Link endpoint nodes and ports are not fully visible');return navigation;
         }`,deadline);
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.

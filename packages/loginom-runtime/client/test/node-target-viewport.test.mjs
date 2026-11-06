@@ -122,9 +122,12 @@ for(const fault of ['position','label','lock','root','document','links','ports',
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
 });
 
-test('pinned connect reveals an offscreen source before one exact link without moving nodes',async()=>{
+for(const placement of ['offscreen source','distant target'])test('pinned connect reveals both ends: '+placement,async()=>{
  const page=new Page(),cache=new Map(),elements=page.elements.bind(page);page.clock=Date.now();
- page.app.Version='7.4.2';page.addNode('Sort',1056,72,['Output_Data-0']);page.addNode('Export',560,208,['Input_Data-0']);
+ page.app.Version='7.4.2';
+ page.addNode('Sort',placement==='offscreen source'?1056:144,placement==='offscreen source'?72:80,['Output_Data-0']);
+ page.addNode('Export',placement==='offscreen source'?560:2400,placement==='offscreen source'?208:1800,['Input_Data-0']);
+ // Start at the source after its reveal: the distant target is offscreen.
  page.elements=()=>{const all=elements().map(element=>{
   const old=cache.get(element.tid);if(old){Object.assign(old,element);return old;}cache.set(element.tid,element);return element;
  }).map(element=>{
@@ -178,11 +181,14 @@ test('pinned connect reveals an offscreen source before one exact link without m
  };
  const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{actions,selectors},execute:code=>page.execute(code)});
  const before=await adapter.observe(request,Date.now()+15000),effect={id:'connect',kind:'connect',before,parameters:{edge:{source:'sort-guid',output:0,target:'export-guid',input:0}}};
- assert.ok(exact(page.prefix+';Graph;Sort;Output_Data-0')[0].box.x>1280);
- assert.ok(exact(page.prefix+';Graph;Export;Input_Data-0')[0].box.x<1280);
+ const source=exact(page.prefix+';Graph;Sort;Output_Data-0')[0].box;
+ assert.ok(placement==='offscreen source'?source.x>1280:source.x>300&&source.x<1280);
+ const target=exact(page.prefix+';Graph;Export;Input_Data-0')[0].box;
+ assert.ok(placement==='offscreen source'?target.x>0&&target.x<1280&&target.y>0&&target.y<800:target.x>1280&&target.y>800);
  const result=await adapter.mutate(effect,Date.now()+15000);
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.cleanup_complete,true);
- assert.equal(zooms,1);assert.equal(page.drops,1);assert.equal(page.down,false);
+ if(placement==='offscreen source')assert.equal(zooms,1);
+ assert.equal(page.drops,1);assert.equal(page.down,false);
  const after=await adapter.observe(request,Date.now()+15000);
  assert.deepEqual(after.links,[effect.parameters.edge]);
  assert.deepEqual(after.nodes.map(({dom_epoch,...node})=>node),before.nodes.map(({dom_epoch,...node})=>node));
