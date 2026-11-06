@@ -1,7 +1,17 @@
 # Сэмплинг
 
-Component ID: `component.preprocessing.Sampling`. Runtime proposal:
-`preprocessing.sampling`. Обработчика нет; подплан `ready_for_development`.
+Component ID: `component.preprocessing.Sampling`. Runtime type:
+`preprocessing.sampling`. Зарегистрирован; текущие режимы и источники ниже.
+
+## Текущий срез v0.4.0
+
+Зарегистрирован `preprocessing.sampling` / `sequential`, `random`, `stratified`, `biased`. sequential, random, stratified, biased; явные размеры и seed для случайных методов; strata_fields для stratified, bias_field/bias_factors для biased. Сэмплинг: count; разбиение: train_count/test_count и выходы combined/train/test; allocation_order только для sequential.
+
+Ограничения: uniform не поддержан. Bias — дискретное строковое поле, факторы 0…1 для всех наблюдённых категорий; размер не задаёт точные квоты категорий.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [sampling-node.mjs](../../../../packages/loginom-runtime/client/lib/sampling-node.mjs):1–38; [sampling-parameters.mjs](../../../../packages/loginom-runtime/client/lib/sampling-parameters.mjs):1–23; [preprocessing.sampling.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.sampling.md):1–13. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
 
 [Подплан](plan.md) · [Discovery](discovery.md) · [Приёмочный комплект](acceptance/README.md).
 

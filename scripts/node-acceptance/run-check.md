@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`tree-parent-child`, `tree-parent-roots`, `tree-parent-cycle`, `tree-parent-orphan`
+use the owner-approved id/parent_id cases under `trees-datatotree/acceptance/parent-child`.
+Only one CSV and its business task reach the model. The independent Python oracle
+generates stock JSON AST expectations for CSV/cold and observed execution-error
+expectations (cycle A, B; orphan Z). All cases require Save and cleanup; negative
+cases require the exact id list, no export and no partial result, as in `throw1`.
+
 `graph-large-execute` opens a saved 72-node background graph through the existing
 source-package phase, then imports customers, executes and reconfigures one
 Grouping node. The unchanged grouping-unique table oracle checks CSV, Save, cold reexecution

@@ -1,0 +1,31 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "JSON",
+          "name_any": true,
+          "label_any": true,
+          "type": "string",
+          "comparison": "json_ast"
+        }
+      ],
+      "rows": [
+        {
+          "JSON": "{\"roots\":[{\"id\":\"001\",\"parent_id\":null,\"name\":\"Компания\",\"children\":[{\"id\":\"002\",\"parent_id\":\"001\",\"name\":\"ИТ\",\"children\":[{\"id\":\"003\",\"parent_id\":\"002\",\"name\":\"Группа данных\",\"children\":[{\"id\":\"004\",\"parent_id\":\"003\",\"name\":\"Аналитик\",\"children\":[]}]},{\"id\":\"005\",\"parent_id\":\"002\",\"name\":\"Поддержка\",\"children\":[]}]}]}]}"
+        }
+      ]
+    }
+  ]
+}

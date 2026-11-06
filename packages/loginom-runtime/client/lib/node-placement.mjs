@@ -59,10 +59,26 @@ export function nodePlacementGap(view,point,occupied){
 // A crowded viewport does not imply a crowded model. Choose a fresh row below
 // every observed drawing; the existing guarded UI navigation reveals it before
 // any creation gesture. This helper is serialized into the browser evaluator.
-export function nodePlacementOverflow(view,occupied,min,max,clearance=0) {
- if(!occupied.length)return null;
+export function nodePlacementOverflow(view,occupied,min,max,clearance=0,requested,accept) {
  if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,min,max,clearance].every(Number.isFinite)||view.scale<=0||clearance<0
   ||occupied.some(r=>![r.left,r.right,r.top,r.bottom].every(Number.isFinite)||r.left>r.right||r.top>r.bottom))throw Error('Invalid placement overflow bounds');
+ if(requested){
+  if(![requested.x,requested.y,view.width,view.height,view.viewportWidth,view.viewportHeight].every(Number.isFinite)||typeof accept!=='function')throw Error('Invalid requested placement bounds');
+  const left=Math.ceil(Math.max(min,(Math.max(view.x,0)+8-view.x+view.scroll.x)/view.scale-view.translate.x)/8)*8;
+  const right=Math.floor(Math.min(max,(Math.min(view.x+view.width,view.viewportWidth)-8-view.x+view.scroll.x)/view.scale-view.translate.x)/8)*8;
+  const top=Math.ceil(Math.max(min,(Math.max(view.y,0)+8-view.y+view.scroll.y)/view.scale-view.translate.y)/8)*8;
+  const bottom=Math.floor(Math.min(max,(Math.min(view.y+view.height,view.viewportHeight)-8-view.y+view.scroll.y)/view.scale-view.translate.y)/8)*8;
+  let best=null,distance=Infinity;
+  for(let y=top;y<=bottom;y+=8)for(let x=left;x<=right;x+=8){
+   const d=(x-requested.x)**2+(y-requested.y)**2;
+   if(d>=distance)continue;
+   const point={x:view.x+(x+view.translate.x)*view.scale-view.scroll.x,y:view.y+(y+view.translate.y)*view.scale-view.scroll.y};
+   if(!accept(point))continue;
+   best={x,y};distance=d;
+  }
+  return best;
+ }
+ if(!occupied.length)return null;
  const x=Math.round(Math.max(min,(80+view.scroll.x)/view.scale-view.translate.x)/8)*8;
  const bottom=Math.max(...occupied.map(r=>(r.bottom-view.y+view.scroll.y)/view.scale-view.translate.y));
  const y=Math.ceil(Math.max(min,bottom+128/view.scale+clearance)/8)*8;

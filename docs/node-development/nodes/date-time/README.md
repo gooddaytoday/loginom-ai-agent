@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `transform.date_time` / `calendar`. calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date. ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week.
+
+Ограничения: iso_week_end не поддержан из-за ограничения Loginom. LAB-716: minute/second на непустой таблице 3/3 PASS; отдельный date-time-minsec-empty не проверен — сценарий/fixture отсутствовал на принятом SHA.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [date-time-node.mjs](../../../../packages/loginom-runtime/client/lib/date-time-node.mjs):1–38; [date-time-parameters.mjs](../../../../packages/loginom-runtime/client/lib/date-time-parameters.mjs):1–46; [transform.date_time.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.date_time.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `transform.date_time` / `calendar` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи B02, V27. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 
@@ -18,7 +28,7 @@ Native-параметры и точные значения подтвержде�
 и [ожидания](acceptance/minsec/expected.json) подготовлены до реализации.
 Приёмочный статус определяется живыми прогонами точного SHA, не этим описанием.
 
-Ограничения: Вход уже datetime; строковый разбор и изменение часового пояса не выполняются. Нет ISO-недель и произвольных строковых форматов; несколько преобразований одного/разных полей допускаются. Явная выходная раскладка требует autosync=false; время точного чтения зависит от runtime, старые замеры не являются текущей гарантией.
+Ограничения: Вход уже datetime; строковый разбор и изменение часового пояса не выполняются. ISO: iso_year/iso_week/iso_week_start/day_of_week поддержаны, iso_week_end не поддержан; нет произвольных строковых форматов; несколько преобразований одного/разных полей допускаются. Явная выходная раскладка требует autosync=false; время точного чтения зависит от runtime, старые замеры не являются текущей гарантией.
 
 Общих изменений W в этом назначении нет; дефект общей оболочки требует отдельного решения владельца.
 

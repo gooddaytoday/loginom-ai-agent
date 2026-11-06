@@ -161,6 +161,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
 | Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
+|id/parent_id|`programming.javascript`|[рецепт](references/nodes/parent-child-recipe.md)|
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 |Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
 |Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
@@ -184,7 +185,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
 | Формулы, в том числе Var.* | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
 | Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
-| Фильтр строк, включая условия из переменных | `transform.filter_data` / conditions | [читать](references/nodes/transform.filter_data.md) |
+| Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|

@@ -4,9 +4,18 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; этап 0 LAB-772 — `blocked`, готовность к этапу 1 не объявлена. См. [приёмочное предложение](acceptance/README.md). Следующая карточка Multica — этап 0 отдельно: живое исследование, контракт и независимые ожидания. Type/mode `imports.lgd` / `native` — предложение. Этап 1 — после решения владельца по W1; W1; W2 подробно описаны в подплане. Готовность реестра не повышалась.
+Зарегистрирован `imports.lgd` / `native`. Исходный LGD через проверенную доставку либо серверный источник; checksum=verify; сохраняются порядок, типы, метки и NULL.
+
+Ограничения: Повреждённый checksum отклоняется; без DDF, Variant, переменных и отключения проверки.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [lgd-import-node.mjs](../../../../packages/loginom-runtime/client/lib/lgd-import-node.mjs):1–71; [lgd-parameters.mjs](../../../../packages/loginom-runtime/client/lib/lgd-parameters.mjs):1–39; [imports.lgd.md](../../../../packages/product/skills/loginom-automation/references/nodes/imports.lgd.md):1–17. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
+
 
 Внешняя среда: самостоятельные LGD и manifest из заранее квалифицированного stock Loginom; собственный каталог загрузки; этап 2 — отдельные 32/64-bit LGD и DDF fixtures stock Deductor, без зависимости от нового exports-lgd. Если среда/компонент недоступны — Blocked, документальное покрытие сохраняется.
 
