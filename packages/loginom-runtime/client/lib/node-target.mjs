@@ -86,6 +86,28 @@ function nativeRestServiceEdge(graph,edge){
     &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
 }
 
+// A completed drag can miss the requested grid point. Settle only that known
+// effect: no other graph change and no unknown browser cleanup may be released.
+async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,record}){
+  if(effect.kind!=='move'||receipt?.status!=='SUCCEEDED'||receipt.cleanup_complete!==true
+    ||!verifyNodeTargetEffect(effect,graph,()=>true))return false;
+  const current=node(graph,effect.parameters.ref.node_id),original=node(effect.before,current.ref.node_id);
+  if(!Number.isFinite(current.position?.x)||!Number.isFinite(current.position?.y)
+    ||adapter.positionMatches(current,effect.parameters.position)
+    ||!sameDomainGraph(effect.before,{...graph,nodes:graph.nodes.map(n=>n===current?{...n,position:original.position}:n)}))return false;
+  const mismatch={id:effect.id,requested_position:structuredClone(effect.parameters.position),observed_position:structuredClone(current.position),receipt:structuredClone(receipt)};
+  const settled={...structuredClone(state),pending:null,last_graph:structuredClone(graph),move_mismatch:mismatch,
+    result:{status:'FAILED',phase:'target_incomplete',error:'Completed node move position mismatch: requested '+JSON.stringify(mismatch.requested_position)
+      +', observed '+JSON.stringify(mismatch.observed_position)+'; gesture will not be repeated',
+      node_id:state.targetId,partial_effect:true,cleanup_complete:true,pending:null,
+      effects:state.receipts.map(({id,kind,verified})=>({id,kind,verified})),configured:false,executed:false,package_saved:false}};
+  const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:settled};
+  const ack=await record(event);
+  if(!same(ack?.target_state,event.target_state))throw Error('Node target journal acknowledgement differs');
+  Object.assign(state,settled);
+  return true;
+}
+
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
 // operation ID; adapters invoke fixed local primitives, never dock_action_run.
 // Effects are committed one at a time. A possible effect never retries a gesture.
@@ -171,6 +193,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       state.pending.receipt = structuredClone(receipt);
       await commit();
       const after = await observe();
+      if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
       if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after)) { throw new Error('Graph effect needs reconciliation'); }
       state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt) });
       state.pending = null; state.last_graph=structuredClone(after);
@@ -196,9 +219,12 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   }
   try {
     let graph = await observe();
+    if(state.move_mismatch)return structuredClone(state.result);
     if (state.pending) {
       // Adapter reads the receipt; it is never allowed to reissue the gesture.
       const recovery = await adapter.reconcile(state.pending, graph, operation.deadline, signal);
+      if(recovery?.completed===true&&recovery.cleanup_complete===true
+        &&await settleMoveMismatch({operation,state,effect:state.pending,receipt:recovery.receipt,graph,adapter,record}))return structuredClone(state.result);
       const refused=normalizeGraphRefusal(state.pending,recovery?.receipt);
       if(recovery?.completed===true&&refused?.status==='NOT_APPLIED'&&refused.native_status==='FAILED'
         &&recovery.cleanup_complete===true&&sameDomainGraph(state.pending.before,graph)){
@@ -373,6 +399,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), configured: false, executed: false, package_saved: false };
     await commit(); return structuredClone(state.result);
   } catch (error) {
+    if(state.move_mismatch)return structuredClone(state.result);
     return { status: state.effect_possible ? 'AMBIGUOUS' : 'NOT_APPLIED', phase: 'target_incomplete',
       error: String(error?.message ?? error), node_id: state.targetId, partial_effect: state.effect_possible,
       cleanup_complete: !state.pending,
@@ -389,6 +416,10 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   if(state.pending){
     const effect=state.pending;
     const recovery=await adapter.reconcile(effect,graph,deadline);
+    if(recovery.completed===true&&recovery.cleanup_complete===true
+      &&await settleMoveMismatch({operation,state,effect,receipt:recovery.receipt,graph,adapter,record})){
+      operation.targetPhase=state;return structuredClone(state.result);
+    }
     const refused=normalizeGraphRefusal(effect,recovery.receipt);
     if(recovery.completed===true&&refused?.native_status==='FAILED'&&refused.status==='NOT_APPLIED'
       &&recovery.cleanup_complete===true&&sameDomainGraph(effect.before,graph)){
@@ -406,6 +437,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};
   const ack=await record(event);if(!same(ack?.target_state,event.target_state))throw new Error('Node target journal acknowledgement differs');
   operation.targetPhase=state;
+  if(state.move_mismatch)return structuredClone(state.result);
   return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,
     resume_available:!(request?.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)&&!state.baseline&&state.last_graph)};
 }
