@@ -179,7 +179,7 @@ page = context.pages()[0]
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
-  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected});
+  if(expected.lgd&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');
@@ -239,6 +239,9 @@ page = context.pages()[0]
    if(JSON.stringify(links)!==JSON.stringify(after))throw Error('COLD_VARIABLE_LINK_CHANGED');
    state.variableInventory={outputs,links};
   }
+  // A bound LGD destination needs the saved variable source's fresh value.
+  // The existing inventory audit executes/reads it without changing settings.
+  if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
