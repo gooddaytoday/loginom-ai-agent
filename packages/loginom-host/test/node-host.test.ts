@@ -1,10 +1,16 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
+import { EventEmitter } from "node:events"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
+import { nodeManagement } from "../src/node-management"
+import { createLoginomHost } from "../src/host"
+import { loginomHostPort } from "../src/host-port"
+import { transport } from "../src/transport"
+import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
@@ -112,6 +118,118 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   expect(host.alive).toBe(false)
   expect(await host.exited).toEqual({ code: 0, signal: null })
   await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
+}, 15_000)
+
+test.each(["connection.cloud-cancel", "connection.cloud-disconnect"])(
+  "bundled Node host returns a redacted disconnected view for %s",
+  async (method) => {
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root: join(fixture.directory, method),
+      resources: join(fixture.directory, "absent-runtime"),
+      headless: true,
+      environment: {},
+    })
+    try {
+      const before = await host.request("connection.status", {})
+      for (const input of [undefined, null, [], { verifyBrowser: false }, { endpoint: "http://127.0.0.1:1" }])
+        await expect(host.request(method, input)).rejects.toThrow("LOGINOM_INPUT_INVALID")
+      expect(await host.request(method, {})).toEqual(before)
+      expect(before).toMatchObject({ state: "unconfigured", generation: 0, cloud: { connected: false } })
+      expect(before).not.toHaveProperty("cloud.pending")
+    } finally {
+      await host.close()
+    }
+    expect(await host.exited).toEqual({ code: 0, signal: null })
+  },
+  15_000,
+)
+
+test("private cloud start returns only pending login and status/cancel do not call the site", async () => {
+  const calls: string[] = []
+  const canaries = ["DEVICE-CANARY", "SESSION-CANARY", "INSTALLATION-CANARY", "PRIMARY-CANARY", "RESERVE-CANARY"]
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request): Response {
+      calls.push(new URL(request.url).pathname)
+      if (new URL(request.url).pathname !== "/api/auth/device/code") return new Response(null, { status: 500 })
+      return Response.json({
+        device_code: canaries[0], user_code: "ABCD-EFGH",
+        verification_uri_complete: `${server.url.origin}/device?user_code=ABCD-EFGH`,
+        expires_in: 600, interval: 600,
+        access_token: canaries[1], installationKey: canaries[2],
+        dock: { primary: { apiKey: canaries[3] }, reserve: { apiKey: canaries[4] } },
+      })
+    },
+  })
+  const host = await createLoginomHost({
+    root: join(fixture.directory, "cloud-management"), resources: join(fixture.directory, "absent-runtime"),
+    codec: credentials("linux"), environment: {}, headless: true,
+    cloudEndpoints: { site: server.url.origin, primary: `${server.url}primary`, reserve: `${server.url}reserve` },
+  })
+  const lifecycle = { stopped: Promise.withResolvers<void>(), closed: false }
+  const manage = (method: string, input: unknown) => nodeManagement(method, input, host, {
+    stopped: lifecycle.stopped.promise, closed: () => lifecycle.closed,
+  })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort({
+    postMessage: value => replies.emit("message", { data: value }), on: requests.on.bind(requests), start() {},
+  }, host)
+  const client = transport({
+    postMessage: value => requests.emit("message", { data: value }), on: replies.on.bind(replies), start() {},
+  })
+  try {
+    for (const method of ["connection.cloud-start", "connection.cloud-cancel", "connection.cloud-disconnect"]) {
+      for (const input of [undefined, null, [], [{}], "", 0, true, { endpoint: server.url.origin },
+        { device_code: canaries[0] }, { verifyBrowser: false }]) {
+        await expect(manage(method, input)).rejects.toThrow("LOGINOM_INPUT_INVALID")
+      }
+    }
+    expect(calls).toEqual([])
+    await expect(manage("connection.cloud-start-extra", {})).rejects.toThrow("LOGINOM_METHOD_INVALID")
+    expect(await manage("connection.check", {
+      revision: 0, url: "https://example.test/app/", username: "fixture", password: { operation: "empty" },
+      verifyBrowser: false,
+    })).toMatchObject({ help: { state: "connection-required" } })
+    expect(calls).toEqual([])
+    const before = Date.now()
+    const start = await manage("connection.cloud-start", {})
+    if (!("cloud" in start)) throw new Error("Expected connection view")
+    expect(start.cloud).toEqual({ connected: false, pending: {
+      userCode: "ABCD-EFGH", verificationUrl: `${server.url.origin}/device?user_code=ABCD-EFGH`,
+      expiresAt: expect.any(Number),
+    } })
+    expect(start.cloud.pending!.expiresAt).toBeGreaterThanOrEqual(before + 600_000)
+    expect(await manage("connection.status", {})).toEqual(start)
+    await client.request("acquire", { run: "cloud", session: "chat" })
+    expect(await client.request("tools", { run: "cloud" })).toEqual({ tools: [expect.objectContaining({ name: "dock_diagnostics" })] })
+    const diagnostic = await client.request("call", {
+      run: "cloud", name: "dock_diagnostics", args: {}, userMessage: "original",
+    }) as { structuredContent: Record<string, unknown>; content: { text: string }[] }
+    expect(Object.keys(diagnostic.structuredContent).sort()).toEqual([
+      "revision", "generation", "url", "username", "folder", "hasPassword", "state", "browser", "failure", "recoveries",
+      "mode", "server", "help",
+    ].sort())
+    expect(JSON.parse(diagnostic.content[0]!.text)).toEqual(diagnostic.structuredContent)
+    expect(JSON.stringify(diagnostic)).not.toContain("ABCD-EFGH")
+    expect(JSON.stringify(diagnostic)).not.toContain(server.url.origin)
+    expect(calls).toEqual(["/api/auth/device/code"])
+    const cancel = await manage("connection.cloud-cancel", {})
+    expect("cloud" in cancel ? cancel.cloud : undefined).toEqual({ connected: false })
+    expect(await manage("connection.cloud-disconnect", {})).toEqual(cancel)
+    expect(calls).toEqual(["/api/auth/device/code"])
+    for (const canary of canaries) expect(JSON.stringify([start, cancel])).not.toContain(canary)
+  } finally {
+    lifecycle.closed = true
+    lifecycle.stopped.resolve()
+    client.close()
+    await port.close()
+    await host.close()
+    server.stop(true)
+  }
 }, 15_000)
 
 test("host startup permits readiness after 30 seconds and still closes completely", async () => {

@@ -327,3 +327,26 @@ Runtime/сборки/production не запускались. Следующий 
 - Exact commands, RED/GREEN и covering logs: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-7-report.md`.
 - Ограничения прежние: synthetic localhost/Linux; native/site/production/installed GUI/full120с acceptance не заявлены.
 - Следующий шаг: scoped re-review `399b9e3fd9..amended HEAD`; независимое одобрение не заявляется. Push/merge/release не выполнялись.
+
+## Ревью Task7 — 2026-11-06
+
+- SHA `3f1e1f80a7`: scoped re-review Spec compliant / Quality Approved; оба Important/P2 закрыты, новых замечаний нет.
+- Concurrent catalog сохраняет успешный reserve; actual route и лимиты попыток согласованы. Fetch-граница запрещает redirect также для credential-bearing GET/SSE.
+- Host119/715, Runtime66, CLI startup/writer1/14, Host typecheck/diff-check/secret hook PASS.
+- Native/site/production/installed GUI и полный native120с worst-case остаются gates13/15; в Task7 не заявлены проверенными.
+- Следующий шаг: Task8 private Node management routes; push/merge/release не выполнялись.
+
+## Checkpoint Task8 — 2026-11-06
+
+- SHA базы: `3f1e1f80a7`; Task8 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- Private Node API принимает exact `connection.cloud-start/cloud-cancel/cloud-disconnect` только с `{}` и возвращает существующий redacted View.
+- Существующий handler/decoders перенесён в internal `node-management.ts`; production и real Host localhost fixture используют один код без bootstrap injection.
+- `connection.ready` наблюдает живой shutdown; Host.beginClose/stop-before-drain, local admission, поколения и Task7 recovery/deadline не менялись.
+- Реальные bundled cancel/disconnect и real Host pending/status/cancel подтверждены; status/cancel/disconnected-disconnect не делают HTTP.
+- Model diagnostics сохраняют прежние безопасные поля и равенство text/structuredContent; cloud/code/link/email и новые tools не добавлены.
+- RED→GREEN: неизвестные routes, start и exact empty input. Ошибка добавленного raw View decoder устранена в тесте, продукт не менялся ради проверки.
+- Schema2 PASS/13 assertions; Host48 PASS/381 assertions; все5 package typechecks и git diff --check PASS.
+- Новых общих полей/Protocol/HttpApi/dependencies/generated правок нет; parent Task7 review note сохранён.
+- Evidence/точные команды/самопроверка: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-8-report.md`.
+- Ограничения: localhost/Linux; full bundled cloud device flow с baked tuple — Task13, site/native/installed/production не проверялись.
+- Следующий шаг: независимое ревью Task8; Task9 — после принятия. Push/PR/merge/release не выполнялись.
