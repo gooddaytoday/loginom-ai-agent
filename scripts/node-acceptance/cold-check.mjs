@@ -380,11 +380,11 @@ page = context.pages()[0]
    continue;
   }
   let data;
-  if(['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns'].includes(target.type)){
+  if(['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
-    ...(['variables.to_table','transform.collapse_columns'].includes(target.type)?{typedVariants:true}:{})});
+    ...(['variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)?{typedVariants:true}:{})});
    if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }

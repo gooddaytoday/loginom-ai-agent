@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verifyLgdFields} from '../lgd-cold.mjs';
 import {readFile} from 'node:fs/promises';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
+test('native empty/Variant golden uses the complete stock cold contract',async()=>{
+ const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/empty-variant/expected.json',import.meta.url),'utf8'));
+ const {outputs}=parseExpectedOutputs({...expected,package_path:'/own/empty-variant.lgp'});
+ assert.equal(outputs.length,2);assert.equal(outputs[0].columns.length,4);assert.deepEqual(outputs[0].rows,[]);
+ assert.equal(outputs[1].rows.length,25);assert.equal(outputs[1].columns[2].type,'variant');
+ assert.deepEqual(new Set(outputs[1].rows.flatMap(r=>r.Values?[r.Values.cell_type]:[])),new Set(['integer','string','real','datetime','boolean']));
+});
 test('LGD cold audits retained source before execution and materialized output properties after full reading',async()=>{
  const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('  let coldChannelSequence=0;'),source.indexOf('  const matched=correspondence.map'));
@@ -13,7 +21,7 @@ test('LGD cold audits retained source before execution and materialized output p
   const result=run({sampling:undefined,expectedOutputs:[{output_node_type:'imports.lgd',output_port:0,rows:[{RecordId:1}]}],
    expected:{nodes:[{type:'imports.lgd'}],lgd:{columns:[field]}},graph:{nodes:[target]},saved:{path:'/own/lgd.lgp'},
    prepared:{document_id:'doc',workflow_ref:{}},origin:'https://app.loginom.ai',multiple:true,session:'cold',
-   load:async()=>({}),execute:async()=>({}),record:async()=>{},createNodeProcedure:()=>({}),withBrowserReceipt:()=>'',
+   load:async()=>({}),execute:async()=>({}),record:async()=>{},createNodeProcedure:()=>({readOutputPort:async()=>{calls.push('read');return {verified:true,cleanup_complete:true,output:{row_count:1,sample_complete:true}};}}),withBrowserReceipt:()=>'',
    createNodeExecutionProcedure:()=>({}),performColdNodeAction:async()=>{},coldProcessObservation:()=>({execute:async()=>{},observe:async()=>{}}),
    selectColdOutputReads:()=>[{node:target,ports:[{port:0}]}],
    runColdExecution:async()=>{calls.push('execute');materialized=true;return {status:'completed',verified:true,owner_verified:true};},

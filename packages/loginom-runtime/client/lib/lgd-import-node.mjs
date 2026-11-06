@@ -9,8 +9,8 @@ const need=(v,m)=>{if(!v)throw Error('LGD import: '+m);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export function verifyLgdOutputMapping(m){
  need(m.inventory_complete&&m.source_identity_verified&&m.source_fields.length>0&&m.source_fields.length===m.target_fields.length
-  &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime'].includes(f.type)
-   &&['Дискретный','Непрерывный'].includes(f.data_kind)&&!f.excluded&&f.source
+  &&m.target_fields.every((f,i)=>f.index===i&&['integer','real','string','boolean','datetime','variant'].includes(f.type)
+   &&(f.type==='variant'?f.data_kind==='Неопределенное':['Дискретный','Непрерывный'].includes(f.data_kind))&&!f.excluded&&f.source
    &&JSON.stringify(f.source)===JSON.stringify(m.source_fields[i])
    &&['name','label','type'].every(k=>f[k]===m.source_fields[i][k])),'native LGD output properties changed');
  return m;

@@ -125,6 +125,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name == 'lgd-import-empty-variant':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/empty-variant', prompt=node / 'acceptance/empty-variant/task.md',
+                    data=node / 'fixtures/empty-variant', input_files=['empty.lgd', 'variant.lgd'],
+                    expected_name='expected.json', base=None, lgd='empty_variant',
+                    oracle=node / 'acceptance/oracle.py')
     if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt']:
         export = name == 'lgd-export'
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')

@@ -1,0 +1,7 @@
+`lgd-import-empty-variant`: два файла штатного 64-bit экспорта Loginom 7.4.2 через мастер «Экспорт в Loginom Data» на стенде с `?testable=true`; LZ4, checksum сжатых данных. SHA-256 и размеры записаны в `fixtures/empty-variant/files.json`.
+
+Пустой источник — исходная таблица `properties-values.csv`/`properties-schema.json`, отфильтрованная штатным Фильтром строк по RecordId<0: 0 строк, все четыре исходных поля, включая метку Идентификатор. Variant — исходная таблица `lgd-values.csv`/`schema.json`, штатное Свёртывание столбцов всех пяти полей в исходном порядке, без информационных полей, ignore_empty=false. Получаются 25 строк Names/DisplayNames/Values/DataTypes. Values имеет Variant, вид Неопределенное; сохранены пять scalar типов, NULL и пустая строка. DataTypes — исходный код типа поля Loginom: boolean=1, datetime=2, real=3, integer=4, string=5.
+
+Ожидания записаны до модельного прогона. Oracle читает известные CSV и схемы, применяет определённую выше транспозицию, не декодирует LGD. Stock matcher проверяет нативные scalar tags, значения, порядок и полноту Variant; CSV дополнительно сверяется по значениям. Пустой набор требует schema + row_count=0 + sample_complete=true. Cold повторно выполняет сохранённые импорты, читает весь набор существующим completed-port reader и отдельно проверяет сохранённые источник и свойства полей.
+
+32-bit и DDF не доступны без соответствующих источников 32-битного Loginom и Deductor. Их прежний отказ сохраняется; эти форматы не входят в квалификацию.
