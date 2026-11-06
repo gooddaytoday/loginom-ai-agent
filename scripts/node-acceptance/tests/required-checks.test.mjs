@@ -49,12 +49,14 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['packages/loginom-runtime/client/lib/calculator-context.mjs','calculator-vars-update'],
  ['packages/loginom-runtime/client/lib/workspace-ui.mjs','s5'],
  ['packages/loginom-runtime/client/lib/observation-pages.mjs','s5'],
  ['packages/loginom-runtime/client/lib/node-procedure.mjs','s1'],
  ['packages/loginom-runtime/client/lib/node-port-output.mjs','n19'],
  ['packages/loginom-runtime/client/lib/crosstable-readback.mjs','n13'],
  ['packages/loginom-runtime/client/lib/variables-calculator-context.mjs','variables-calculator'],
+ ['packages/loginom-runtime/client/lib/variables-vartodata-node.mjs','variables-columns'],
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
  ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],

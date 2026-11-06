@@ -1,0 +1,4 @@
+cost_center;budget_item;limit_amount
+CC1;I1;100.00
+CC1;I2;80.00
+CC2;I1;30.00

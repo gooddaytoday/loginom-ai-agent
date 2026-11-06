@@ -55,7 +55,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    }
    if(input){const inputs=[...e.querySelectorAll('input,textarea')].filter(visible);need(inputs.length===1,'unique input');e=inputs[0];}
    const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
-   need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target');return {x,y};
+   need(visible(e)&&box.width>0&&box.height>0&&!e.disabled&&!e.closest('.x-item-disabled')&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit)),'enabled hit target '+JSON.stringify({tid,box:{x:box.x,y:box.y,width:box.width,height:box.height},hit:hit?.getAttribute('data-tid'),hit_class:hit?.className,ancestors:[...function*(e){for(let p=e.parentElement;p;p=p.parentElement)yield p;}(e)].filter(p=>/auto|scroll|hidden/.test(getComputedStyle(p).overflowY)).map(p=>{const b=p.getBoundingClientRect();return {tid:p.getAttribute('data-tid'),x:b.x,y:b.y,width:b.width,height:b.height,scrollTop:p.scrollTop};})}));return {x,y};
   },{tid,grid,row,dialog,input,root,base,origin:task.origin,build:task.build});
  };
  const click=async(tid,options={},double=false)=>{lastAction=tid;await owned();await reveal(page,tid,locate,remaining());const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};

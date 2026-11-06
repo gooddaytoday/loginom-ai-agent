@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
-import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
+import {activatePreparedWorkflow,needsPreparedWorkflowActivation} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
@@ -9,7 +9,12 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlace
 // proxy or call Loginom server methods. GUID + prepared document/workflow is the
 // identity; labels and native port indexes are rebound on every observation.
 export async function readGraph(page, task) {
-  return page.evaluate(({ request, types, origin, build, read_bindings=false }) => {
+  // Reuse completed browser receipts, not captions alone, to recognize a
+  // source renamed by our own wizard completion in this prepared workflow.
+  const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
+    .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
+    .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -79,6 +84,14 @@ export async function readGraph(page, task) {
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
+          &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
+          &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
+            &&context.document_id===request.document_id&&context.workflow_id===request.workflow_ref.workflow_id
+            &&context.node_id===n.FGuid&&context.tid===tid
+            &&trace?.some(e=>['wizard_finish_graph_verified','wizard_execute_graph_verified'].includes(e.event)
+              &&e.previous_owner?.tid===request.workflow_ref.navigation_path.at(-1)?.tid+'>'+previous.nodeTid.slice((request.workflow_ref.prefix+';Graph;').length)
+              &&e.node?.part==='body'&&e.node.node_label===tid.slice((request.workflow_ref.prefix+';Graph;').length)));
         // JavaScript's output AddPort is a service control, not a data port.
         // Its SVG may lack data-tid and it has no GUID; never grant it a port
         // identity or let it hide a previously bound data port or an edge.
@@ -92,15 +105,18 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
+            if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
+              ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
             const portBox=e.getBoundingClientRect();
             return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
@@ -190,7 +206,7 @@ export async function readGraph(page, task) {
     rest_connection_links.sort((a,b)=>a.tid.localeCompare(b.tid));
     return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(variable_links.length?{variable_links}:{}),...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
-  },task);
+  },{...task,finishes});
 }
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
@@ -483,18 +499,42 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
   return outcome;
 }
 
-// Moving off a selected node can replace its SVG body when hover controls
-// disappear. Settle that UI-only transition before binding the drag epochs.
-export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewport,project) {
-  const observe=async()=>{
-    for(let attempt=0;attempt<3;attempt++){
-      try{return await read(page,task);}catch(error){
-        if(attempt===2||!String(error.message).includes('Graph is blocked'))throw error;
-        const timeout=Math.min(15000,Math.max(1,task.deadline-Date.now()));
-        await page.waitForFunction(()=>![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),null,{timeout});
-      }
+// Read-only mask settling is shared by link navigation and hover preparation.
+async function observeLinkGraph(page,task,read) {
+  for(let attempt=0;attempt<3;attempt++){
+    try{return await read(page,task);}catch(error){
+      if(attempt===2||!String(error.message).includes('Graph is blocked'))throw error;
+      const timeout=Math.min(15000,Math.max(1,task.deadline-Date.now()));
+      await page.waitForFunction(()=>![...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'),null,{timeout});
     }
-  };
+  }
+}
+
+// Match link.create center-in-viewport and prepareLinkHover source hit-test.
+// Full port footprints and the placement inset do not constrain this gesture.
+async function linkPortGeometry(page,task) {
+  return page.evaluate(({source_tid,target_tid,request})=>{
+    const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+    const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+    const rect=e=>{const b=e.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};};
+    const ports=[source_tid,target_tid].map(tid=>{
+      // Match the primitive's owned-container selector, excluding outline copies.
+      const matches=exact(tid).filter(e=>roots.length===1&&roots[0].contains(e)),e=matches[0];
+      if(matches.length!==1)return null;
+      const b=rect(e),x=b.x+b.width/2,y=b.y+b.height/2;
+      const style=getComputedStyle(e),hit=document.elementFromPoint(x,y);
+      return {rect:b,visible:b.width>0&&b.height>0&&style.visibility!=='hidden'&&style.display!=='none'
+        &&x>=0&&y>=0&&x<=innerWidth&&y<=innerHeight,reachable:x<innerWidth&&y<innerHeight&&(hit===e||e.contains(hit))};
+    });
+    return {ready:ports.every(p=>p?.visible)&&ports[0].reachable,
+      scale:globalThis.bg?.app?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab()?.Controller.FController.FDiagram.FmxGraph.view.scale,
+      canvas:roots.length===1?rect(roots[0]):null,ports:ports.map(p=>p?.rect??null)};
+  },task);
+}
+
+// Settle hover redraws before binding the drag epochs.
+export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewport,project,observeGraph=observeLinkGraph,portGeometry=linkPortGeometry) {
+  const observe=()=>observeGraph(page,task,read);
   const before=await observe();
   // The prior readBindings observation already permits node SVG replacement.
   // Preserve the same complete graph contract here, then bind fresh hover epochs.
@@ -603,8 +643,10 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
       const guard=async()=>{remaining();if(!sameGraph(before,await observe()))throw Error('Graph changed during link source reveal');};
       await guard();
       const node=before.nodes.find(n=>n.ref.node_id===task.effect.parameters.edge.source);
-      await reveal({page,root,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+      const target=task.effect.parameters.edge.target;
+      const navigation=await reveal({page,root,nodeId:target===undefined?node.ref.node_id:[node.ref.node_id,target].map(node_id=>({node_id,ports_only:true})),position:node.position,prefix:task.request.workflow_ref.prefix,
         scrollNode:true,remaining,guard,readViewport,project});
+      if(target!==undefined){const geometry=await portGeometry(page,task);if(!geometry.ready)throw Error('Link endpoint ports are unreachable: '+JSON.stringify({...geometry,zoom_steps:navigation.zoom_steps}));}
       await guard();point=null;
       continue;
     }
@@ -689,6 +731,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
   const workflowOptions=(value,ctx)=>({receipt_namespace:'node-workflow:'+value.document_id,receipt_id:ctx.receipt_id,
     operation_id:ctx.receipt_id,receipt_signature:createHash('sha256').update(JSON.stringify(value)).digest('hex')});
   return {
+    async needsWorkflowActivation(value,ctx){
+      ctx.signal?.throwIfAborted();
+      return call(`async page=>(${needsPreparedWorkflowActivation.toString()})(page,${JSON.stringify({request:value,origin,build})})`,ctx.deadline);
+    },
     async readWorkflowReceipt(value,ctx){
       return call(withBrowserReceipt('null',{...workflowOptions(value,ctx),receipt_read:true}),ctx.deadline);
     },
@@ -699,7 +745,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     async activateWorkflow(value,ctx){
       request=value;ctx.signal?.throwIfAborted();
       const options=workflowOptions(value,ctx);
-      const code=withBrowserReceipt(`(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task({deadline:ctx.deadline}))})`,options);
+      const code=withBrowserReceipt(`(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task({deadline:ctx.deadline,...(ctx.waitForActive===true?{waitForActive:true}:{})}))})`,options);
       try{return await call(code,ctx.deadline);}
       catch(error){
         // Reconcile a lost transport reply by reading the original receipt only.
@@ -779,12 +825,13 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
+        const edge=effect.parameters.edge,source=graph.nodes.find(n=>n.ref.node_id===edge.source),target=graph.nodes.find(n=>n.ref.node_id===edge.target);
+        if(!source||source.locked||!target||target.locked)throw Error('Exact unlocked link endpoints required');
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});
         const {native_bindings:bindings,...observed}=bindingGraph;
         if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_binding_graph_changed'};
-        const edge=effect.parameters.edge;
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
           if(edge.kind){
@@ -800,8 +847,24 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const bound={source:resolve(edge.source,'outputs',edge.output),target:resolve(edge.target,'inputs',edge.input)};
         if(bound.source.kind!==bound.target.kind&&!(bound.source.kind==='var'&&bound.target.kind==='control_var'))throw Error('Incompatible source and target port kinds');
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        const hoverTask=task({effect,deadline,source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_'+(bound.source.kind==='var'?'Var-':bound.source.kind==='tree'?'DataTree-':'Data-')+bound.source.index});
-        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()})`,deadline);
+        const hoverTask=task({effect,deadline,target_tid:request.workflow_ref.prefix+';Graph;'+bound.target.label+';Input_'+(bound.target.kind==='control_var'?'ControlVar':(bound.target.kind==='var'?'Var-':bound.target.kind==='tree'?'DataTree-':'Data-')+bound.target.index),source_tid:request.workflow_ref.prefix+';Graph;'+bound.source.label+';Output_'+(bound.source.kind==='var'?'Var-':bound.source.kind==='tree'?'DataTree-':'Data-')+bound.source.index});
+        await call(`async page=>{
+          const t=${JSON.stringify(hoverTask)},remaining=()=>{
+            if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
+            const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
+          };
+          const guard=async()=>{remaining();const graph=await (${observeLinkGraph.toString()})(page,t,${readGraph.toString()});remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,graph))throw Error('Graph changed during link source navigation');};
+          await guard();
+          const geometry=await (${linkPortGeometry.toString()})(page,t);
+          if(geometry.ready)return {zoom_steps:0};
+          const navigation=await (${revealNodePlacement.toString()})({page,root:page.locator('[data-tid='+JSON.stringify(t.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']'),
+            nodeId:${JSON.stringify([source.ref.node_id,target.ref.node_id].map(node_id=>({node_id,ports_only:true})))},position:${JSON.stringify(source.position)},prefix:t.request.workflow_ref.prefix,
+            remaining,guard,readViewport:${nodePlacementViewport.toString()},project:${nodePlacementPoint.toString()}});
+          await guard();const after=await (${linkPortGeometry.toString()})(page,t);
+          if(!after.ready)throw Error('Link endpoint ports are unreachable: '+JSON.stringify({...after,zoom_steps:navigation.zoom_steps}));return navigation;
+        }`,deadline);
+
+        graph=await call(`async page=>(${prepareLinkHover.toString()})(page,${JSON.stringify(hoverTask)},${readGraph.toString()},${samePlacementGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${observeLinkGraph.toString()},${linkPortGeometry.toString()})`,deadline);
         if(graph?.status==='NOT_APPLIED')return graph;
         const legacy=bound=>({kind:'node',node_label:bound.label,workflow_ref:{tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix}});
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),

@@ -1781,24 +1781,26 @@ test('calculator Preview accepts only its native modal and closes with an observ
 });
 
 test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
- for(const fault of ['none','foreign_message','other_field']) {
+ for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','foreign_message','other_field','changed_owner']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
-  const message='Loginom '+build+' Настройка прервана. Ошибка разбора выражения "Twice". Неправильное выражение: "VALUE+". OK';
+  // Journal C: native preview reports the malformed quoted id expression.
+  const message='Loginom '+build+' Настройка прервана 1. Ошибка разбора выражения "id" 1.1. Некорректный символ "\\ " Технические подробности OK';
   const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
   const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
    async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
   const snapshot=(await execute({mode:'observe'})).output;
-  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'Twice'}]};
+  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'id',
+   formula:String.raw`Val(RegExMatchedSubExp("\"id\":([0-9]+)", Values, 1))`}]};
   const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);
    if(dialog){dialog.remove();return;}
-   dialog=page.add('div','msgbox','',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   dialog=page.add('div',tid,'',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
    page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
    page.add('div',null,message,undefined,dialog);
-   page.add('a','msgbox;tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
-   const box={el:{dom:dialog}};components['error-box']=box;
+   page.add('a',tid+';tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=fault==='changed_owner'?{}:box;
    page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
   };
   page.waitForTimeout=async ms=>page.clock.advance(ms);
@@ -1806,7 +1808,7 @@ test('observed Preview parse-error msgbox is read and dismissed before a typed r
   assert.equal(result.error.code,fault==='none'?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
   if(fault==='none') {
-   assert.equal(result.output.wizard.calculator_validation.field_name,'Twice');
+   assert.equal(result.output.wizard.calculator_validation.field_name,'id');
    assert.equal(result.output.wizard.calculator_validation.message,message);
    assert.equal(result.output.ui.dialogs.length,0);
   }
@@ -8115,4 +8117,30 @@ test('D2 Join long native ancestry keeps typed Close for both input roles',async
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,fault==='none',port+':'+fault);
   assert.deepEqual(page.events,[]);
  }
+});
+
+test('filter variable picker binds cached metadata without reading the RPC variable object',async()=>{
+ const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF;FilterDataWizard;FilterDataPanel';
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:20,y:50,width:900,height:700});
+ const grid=page.add('div',base,'',{x:30,y:100,width:850,height:600},wizard);grid.id='filter-grid';
+ page.add('div',base+';tbl','',{x:30,y:100,width:850,height:600},grid);
+ const editor=page.add('div',base+';tbl;celleditor','',{x:100,y:120,width:500,height:200},grid);
+ const switchButton=page.add('button',base+';VariantPropEdit;SwitchButton','',{x:100,y:120,width:30,height:20},editor);
+ const combo=page.add('div',base+';VariantPropEdit;VariableControl','',{x:140,y:120,width:200,height:20},editor);combo.id='variable-combo';
+ const picker=page.add('div',base+';VariantPropEdit;VariableControl;boundlist','',{x:140,y:160,width:200,height:80});
+ const option=page.add('div',base+';VariantPropEdit;VariableControl;boundlist;limit','limit ( 15 )',{x:140,y:160,width:200,height:20},picker);option.attrs['data-recordid']='v1';
+ const variable={Index:2,DisplayName:'limit',DataType:4};
+ const record={isModel:true,internalId:'r1',data:{Name:'Amount',RelationType:3}},rows=[record],store={$className:'Ext.data.Store',getData:()=>({items:rows})};
+ const rpc=new Proxy({},{get(){throw Error('RPC getter must never be read');}});
+ const choice={internalId:'v1',data:{Value:rpc,DisplayText:'limit ( 15 )',Metadata:variable},getFields:()=>[{},{},{getName:()=> 'Metadata'}],get:k=>choice.data[k]};
+ const nativeCombo={$className:'Ext.form.field.ComboBox',el:{dom:combo},getStore:()=>({getData:()=>({items:[choice]})})};nativeCombo.picker={pickerField:nativeCombo,el:{dom:picker}};
+ const native={el:{dom:grid},getStore:()=>store,getView:()=>({getNode:()=>null}),Controller:{FFilterItemsStore:store,FVariablesData:{FVariables:[variable]}}};
+ native.editingPlugin={editing:true,context:{record,grid:native,field:'CompareValue'},activeEditor:{el:{dom:editor}}};
+ page.context.Ext={getCmp:id=>id===grid.id?native:id===combo.id?nativeCombo:null};
+ const observed=await page.observe();assert.equal(observed.wizard.stage,'row_filter');
+ const observedOption=observed.ui.elements.find(e=>e.tid===option.attrs['data-tid']);
+ assert.equal(observedOption?.filter_cell?.part,'variable_option');assert.equal(observedOption.filter_cell.variable_name,'limit');
+ assert.ok(observedOption.allowed_actions.includes('click'));
+ assert.ok(observed.ui.elements.find(e=>e.tid===switchButton.attrs['data-tid']).allowed_actions.includes('click'));
 });

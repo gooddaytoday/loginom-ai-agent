@@ -1,0 +1,87 @@
+{
+  "task_id": "procurement-three-way-match-detailed",
+  "dataset_sha256": {
+    "invoice_lines.csv": "049d7943a70cea12ff20d117a2ec2b0ef428268754d1df2b5b5fec8e20a23d8a",
+    "po_lines.csv": "639ef7ab85d88b7a63767e083dfb77430aebe442eae1849d1ffe4db2da6667ae",
+    "receipts.csv": "80644337e0a133ac0fd63602d5b0f8bedd86ce01e3591789c72c431789149bdc"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6ae253626d03b4d2fc236252625d828f24bc1d7f78de515582e4c870110e6e9f"
+  },
+  "reference_sha256": "24048e42c95993f1e169a120a2ba33220e47503c996eb949aa61f0b84f6d3e71",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-recovery-viewport",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/po_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/receipts.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/invoice_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-29T19:44:02+03:00",
+    "duration_s": 908,
+    "tokens": {
+      "input": 127152,
+      "output": 7354,
+      "reasoning": 1408
+    },
+    "tool_calls": 48,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw PO registry, receipt quantities and per-invoice Decimal price differences; independent quantity sums, per-line price-problem count, full PO iteration and positive billed-minus-accepted excess; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Five PO lines, four receipt rows and four invoice rows prepared under the approved P02 fixture plan and frozen before oracle computation; raw quantities and unit prices, no precomputed answer columns.",
+    "limitations": "One quantity unit and one monetary unit without tax; all fact PO references exist and input fields are non-null. Not real procurement data."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

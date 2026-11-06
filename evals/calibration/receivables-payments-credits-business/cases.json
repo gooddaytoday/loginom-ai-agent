@@ -1,0 +1,267 @@
+{
+  "sources": {
+    "task.json": "fb718edb8aad04a5c9f2a7cf799ca87399e6dd32b0077df0e48ad6fe568de2e9",
+    "reference.lgp": "ebfd996db58e2dacb9163dd48f9351cbc916fcd50535f5d35a24befea51f5480",
+    "SPEC.md": "23e878b46021317345ff34d77a2e98003d4c65139dbd3d52af2b79c82d07c25d",
+    "data/invoices.csv": "ed654d8a7e7a3b37b809c5ab9b23dee4719183ad83838255ce97e40876088db8",
+    "data/payments.csv": "e54370f7a1ed41b0ffe09fc0e75b733564ca1c2e2583332b99a4f47c1749120e",
+    "data/credit_notes.csv": "2eafbe73909d250f322fd7446872d421efc9d3cd103dd92fe9d28a958eee378f",
+    "oracle.csv": "8117c863a137f8b466899bfd702e28be4208898e05b8d060362bdb87ca0a3c6b",
+    "oracle.py": "d770f88605875fb61cb3fc71018d1c35d96a0c20b77402e62b16570e6f90b416"
+  },
+  "cases": [
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"customer_id\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"customer_id\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sort.csv",
+      "expected_failed": [
+        "export-contract",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "customer_id",
+          "descending": true
+        }
+      }
+    },
+    {
+      "id": "aggregate",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"1\"/>",
+          "to": "\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdAvg\" Order=\"1\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"invoice_amount_Sum\"/>",
+          "to": "\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"invoice_amount_Avg\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "aggregate.csv",
+      "expected_failed": [
+        "invoice-universe",
+        "signed-balance",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "rows.append([customer, len(issued), invoiced, paid, credited, invoiced - paid - credited])",
+            "to": "rows.append([customer, len(issued), invoiced / len(issued), paid, credited, invoiced - paid - credited])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "column",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>",
+          "to": "\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"false\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"customer_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"customer_id\"/>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoices\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utActive\" InputColumnInfoName=\"invoices\"/>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoiced\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"invoiced\"/>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"paid\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"paid\"/>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"credited\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utActive\" InputColumnInfoName=\"credited\"/>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "column.csv",
+      "expected_failed": [
+        "export-contract",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "drop_last": true
+      }
+    },
+    {
+      "id": "payments-status",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Guid=\"579eb707-c637-4c5e-b0b0-2a6891daffc1\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtEqual\" CaseSensitive=\"true\">",
+          "to": "\t\t\t\t\t\t\t<Item Guid=\"579eb707-c637-4c5e-b0b0-2a6891daffc1\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtNotEqual\" CaseSensitive=\"true\">",
+          "count": 1
+        }
+      ],
+      "result_csv": "payments-status.csv",
+      "expected_failed": [
+        "posted-payments",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "payment[\"status\"] == \"posted\"",
+            "to": "payment[\"status\"] != \"posted\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "payments-max",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"payment_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"payment_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoice_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"invoice_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"status\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"status\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"payment_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"payment_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoice_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"invoice_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdMax\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"status\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"status\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"paid\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"amount_Sum\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Extension>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"paid\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"amount_Max\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Extension>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "payments-max.csv",
+      "expected_failed": [
+        "posted-payments",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "paid = sum((Decimal(payment[\"amount\"]) for payment in payments if payment[\"invoice_id\"] in ids and payment[\"status\"] == \"posted\"), Decimal(0))",
+            "to": "paid = sum((max((Decimal(payment[\"amount\"]) for payment in payments if payment[\"invoice_id\"] == invoice_id and payment[\"status\"] == \"posted\"), default=Decimal(0)) for invoice_id in ids), Decimal(0))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "credits-status",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Guid=\"bebad03f-c59f-41d2-b0ce-884399529350\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtEqual\" CaseSensitive=\"true\">",
+          "to": "\t\t\t\t\t\t\t<Item Guid=\"bebad03f-c59f-41d2-b0ce-884399529350\" Name=\"status\" ConcatenationType=\"ctAnd\" DataType=\"dtString\" RelationType=\"frtNotEqual\" CaseSensitive=\"true\">",
+          "count": 1
+        }
+      ],
+      "result_csv": "credits-status.csv",
+      "expected_failed": [
+        "posted-credits",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "credit[\"status\"] == \"posted\"",
+            "to": "credit[\"status\"] != \"posted\"",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "credits-max",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"credit_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"credit_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoice_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"invoice_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"status\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"status\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"credit_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"credit_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"invoice_id\" DataType=\"dtString\" DataKind=\"dkDiscrete\" UsageType=\"utGroup\" InputColumnInfoName=\"invoice_id\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"amount\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"amount\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdMax\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"status\" DataType=\"dtString\" DataKind=\"dkDiscrete\" InputColumnInfoName=\"status\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"credited\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"amount_Sum\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Extension>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "\t\t\t\t\t\t\t\t\t\t<Item Name=\"credited\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"amount_Max\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Extension>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t\t\t\t\t</Extensions>\n\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "credits-max.csv",
+      "expected_failed": [
+        "posted-credits",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "credited = sum((Decimal(credit[\"amount\"]) for credit in credits if credit[\"invoice_id\"] in ids and credit[\"status\"] == \"posted\"), Decimal(0))",
+            "to": "credited = sum((max((Decimal(credit[\"amount\"]) for credit in credits if credit[\"invoice_id\"] == invoice_id and credit[\"status\"] == \"posted\"), default=Decimal(0)) for invoice_id in ids), Decimal(0))",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "credits-sign",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"balance\" DataType=\"dtFloat\" Expression=\"invoice_amount - NVLF(paid, 0) - NVLF(credited, 0)\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"balance\" DataType=\"dtFloat\" Expression=\"invoice_amount - NVLF(paid, 0) + NVLF(credited, 0)\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "credits-sign.csv",
+      "expected_failed": [
+        "signed-balance",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "invoiced - paid - credited])",
+            "to": "invoiced - paid + credited])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "negative-clamp",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"balance\" DataType=\"dtFloat\" Expression=\"invoice_amount - NVLF(paid, 0) - NVLF(credited, 0)\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"balance\" DataType=\"dtFloat\" Expression=\"IF(invoice_amount - NVLF(paid, 0) - NVLF(credited, 0) &lt; 0, 0, invoice_amount - NVLF(paid, 0) - NVLF(credited, 0))\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "negative-clamp.csv",
+      "expected_failed": [
+        "signed-balance",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "invoiced - paid - credited])",
+            "to": "sum((max(Decimal(0), Decimal(invoice[\"invoice_amount\"]) - sum((Decimal(payment[\"amount\"]) for payment in payments if payment[\"invoice_id\"] == invoice[\"invoice_id\"] and payment[\"status\"] == \"posted\"), Decimal(0)) - sum((Decimal(credit[\"amount\"]) for credit in credits if credit[\"invoice_id\"] == invoice[\"invoice_id\"] and credit[\"status\"] == \"posted\"), Decimal(0))) for invoice in issued), Decimal(0))])",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

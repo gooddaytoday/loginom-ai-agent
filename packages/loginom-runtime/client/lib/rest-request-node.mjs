@@ -71,13 +71,31 @@ async function prepareQueryEncoder(options,ctx,config){
  return {source:result.node,output:0,input:0};
 }
 async function readRestOutputs(channel,read,ctx){
- const ports=[];
- for(const port of read.ports){
+ const ports=[],observed=new Map();
+ const readPort=async port=>{
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
   need(output.schema.every((field,index)=>field.name===outputs[port][index]?.name),'output field order differs from the native REST schema');
   const aligned=alignReadSchema(output.schema,outputs[port]);
   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
-  ports.push(output);
+  observed.set(port,output);return output;
+ };
+ for(const port of read.ports)ports.push(await readPort(port));
+ const scalar=cell=>cell?.is_null===false?(cell.decimal??cell.value):null;
+ const failed=port=>(port?.sample??[]).filter(row=>{const code=scalar(row[1]);return code!==null&&/^-?[0-9]+$/.test(String(code))&&Number(code)!==0;});
+ let body=observed.get(0),status=observed.get(1);
+ // Extra reads diagnose only a failed request or an empty body, under the same
+ // completed execution and existing preview limits. Returned ports stay requested.
+ if(body?.row_count===0&&!status)status=await readPort(1);
+ if(failed(status).length&&!body)body=await readPort(0);
+ const missing=failed(status).filter(row=>{
+  const id=scalar(row[0]);if(id===null||!body)return false;
+  const response=body.sample.find(r=>scalar(r[0])!==null&&String(scalar(r[0]))===String(id));
+  return response?response[1]?.is_null===true||scalar(response[1])==='':body.sample_complete===true;
+ });
+ if(missing.length){
+  const codes=[...new Set(missing.map(row=>String(scalar(row[1]))))].slice(0,10).join(',');
+  const message='REST_RESPONSE_BODY_MISSING: ErrorCode='+codes+'; тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)';
+  for(const port of ports)port.limitations=[...(port.limitations??[]),message];
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'outputs must have distinct native ports');
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
@@ -125,7 +143,7 @@ export function createRestRequestNodeSupport(config){
    beforeInput:(_,ctx)=>linkConnection(ctx),
    configure:async(channel,p,{request})=>{
     const ctx={document_id:request.document_id,workflow_ref:request.workflow_ref,node:options.operation.nodeApply.node,deadline:options.operation.deadline};
-    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,p,config);
+    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,{...p,new_node:request.target.kind==='new'},config);
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);

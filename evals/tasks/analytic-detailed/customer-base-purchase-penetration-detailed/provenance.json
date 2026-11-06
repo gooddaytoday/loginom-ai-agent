@@ -1,0 +1,84 @@
+{
+  "task_id": "customer-base-purchase-penetration-detailed",
+  "dataset_sha256": {
+    "customers.csv": "82cfdccc476fbb106d19e8a6df62b1acc46e9f4139c119f62f976419da606ba4",
+    "sales_lines.csv": "077dd4b526a689931dede0998c34f2140d35e1f2027a05869ff5a7afcd05c394"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "755534b1865666f13edb433338c1b11f2d86a91d96331b4878418e29e399a23f"
+  },
+  "reference_sha256": "0813bfd127713d24a8e424887f62fb3451de72338b4524a165d3fc843cf87715",
+  "cli": {
+    "binary": "loginom-ai-agent-cli",
+    "version": "0.0.0-preview-cache",
+    "profile_role": "dedicated authoring profile; identifier not published"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "private_endpoint_omitted": true,
+    "build": "7.4.2",
+    "package_omitted": "private instance storage; not published",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/customers.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      },
+      {
+        "input": "data/sales_lines.csv",
+        "storage_omitted": "private instance storage; not published",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": true,
+    "hint": "Подготовь НОВЫЙ native draft по неизменённому заданию P09 и входам customers.csv/sales_lines.csv; прежние пакеты/CSV не изменяй. Объявленный февраль2026 — область всего sales_lines, без датовых колонок; дополнительные окна/фильтры не нужны.\nШтатный путь: импорты; группировка sales_lines по customer_id с суммой amount; признак наличия покупки1 для каждого существующего клиентского агрегата независимо от суммы; LEFT join к полному customers; нули; группировка segment; доли; финальная схема; Sort; один экспорт.\nУчитывай ВСЕ sales_lines, включая amount=0.00: фильтр amount>0 нарушает определение покупателя. Не считай invoice_id/line_id людьми и не удаляй денежные строки из-за повторного invoice_id; сумму каждой строки учитывай один раз.\nLEFT join по customer_id сохраняет одну строку каждого клиента полного customers; отсутствующие признак и выручка =0. По segment считай customers по полной базе, buyers суммой клиентских признаков, revenue суммой клиентской выручки; сегмент без продаж сохрани с нулевыми показателями.\nbuyer_share=buyers/customers, revenue_per_customer=revenue/customers без промежуточного округления. ДО Sort/export заверши схему segment,customers,buyers,buyer_share,revenue,revenue_per_customer: customers/buyers — целый текст, две money-колонки — точка и ≥2 дробных цифр включая нули без разделителей тысяч, buyer_share — доля0–1 при ±0.001 без дополнительного минимума знаков. Затем segment ASC; пустых итоговых значений нет.\nExisting target передавай точным текущим target.ref БЕЗ target.position. Исполни все созданные узлы/ветви, включая импорты; считай штатными узлами без JavaScript, готовых ответов, внешнего CSV и XML-правок.\nЦели: PRIVATE_STORAGE и PRIVATE_STORAGE conflict=reject. Один CSV UTF-8, ;, точные заголовки, десятичная точка, двойная кавычка; получи actual export/file_artifacts/Save receipts.\nТолько existing inspect/recovery; неизвестный эффект не повторяй. После подтверждённых cleanup/released retry тот же owned QuickView без нового reason не повторяй вслепую: штатно сохрани доступный partial и остановись; новый конкретный cause диагностируй в бюджете.\nЧестно сообщи исполнение/пути/ограничения: наличие файла не делает FAILED/AMBIGUOUS успехом; Save/readback не заменяют независимый native audit всех ветвей и отдельный cold rerun сохранённого сценария.",
+    "skill_revision": "e15f786d2e5d090046a06c6f0431401a620b1902ab722b94b0cf04ab9f387a85",
+    "exit_code": 0,
+    "started_at": "2026-10-30T17:37:59+03:00",
+    "duration_s": 682,
+    "tokens": {
+      "input": 99715,
+      "output": 5556,
+      "reasoning": 2140
+    },
+    "tool_calls": 36,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "private_endpoint_omitted": true,
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal"
+    ],
+    "algorithm": "Independent raw buyer customer-id set and Decimal revenue per customer over the complete customer registry; per-segment full-base cardinality, distinct any-line buyers including amount0, all-line revenue and full-base ratios; manual full3x6 independently checked, no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic six-customer complete base and five sales lines prepared under approved P09 fixture plan and frozen before manual gold/oracle; raw multiple invoices/lines per customer, nonbuyers, a zero-amount sale and a segment without sales, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real CRM or a derived real-client snapshot. One monetary unit without tax or unagreed charges. Whole sales file scope is February2026 [2026-02-01,2026-03-01), civil calendar without timestamps or time conversion. Unique customer_id and line_id; invoice determines customer, valid customer foreign keys, case-sensitive ASCII keys, all cells nonempty/no NULL, nonnegative two-decimal amounts."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

@@ -13,6 +13,18 @@ function fixture(){
 test('calculator readback projects observed expressions, preserved properties and mapping without claiming persistence',()=>{
  const r=calculatorConfigurationReadback(fixture());assert.equal(r.expressions[0].formula,'A * 2');assert.equal(r.expressions[0].description,'kept');assert.equal(r.output_mapping.fields[0].source_name,'Result');assert.equal(r.package_persistence_verified,false);
 });
+test('calculator readback checks separate variable names/types against owned W1 mapping without claiming cached values',()=>{
+ const f=fixture(),input=f.phases.at(-1).value;
+ f.phases[0].value.configuration.input_variables=[{name:'Var.Amount',label:'Scenario',type:'integer'}];
+ input.variable_mappings=[{kind:'variables',direction:'input',port:0,node:f.node,source_identity_verified:true,independent_readback:true,
+  count:1,store_count:1,unique_ids:1,fields:[{name:'Amount',type:4,source:{name:'Amount',type:4}}]}];
+ assert.doesNotThrow(()=>calculatorConfigurationReadback(f));
+ for(const mutate of [v=>v.fields[0].name='Other',v=>v.fields[0].type=5,v=>v.node.node_id='foreign',
+  v=>v.count=2,v=>v.independent_readback=false,v=>v.kind='control']){
+  const bad=structuredClone(f);mutate(bad.phases.at(-1).value.variable_mappings[0]);
+  assert.throws(()=>calculatorConfigurationReadback(bad));
+ }
+});
 test('calculator readback refuses foreign, missing or unverified phase evidence',()=>{
  const mutations=[f=>f.phases.pop(),f=>f.phases.push(f.phases[0]),f=>f.phases[0].receipt_id='other:configure',
  f=>f.phases[0].value.configuration.node_context.node_id='other',f=>f.phases[0].value.syntax_validation.status='unverified',

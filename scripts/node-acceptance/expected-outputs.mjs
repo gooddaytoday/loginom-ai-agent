@@ -28,12 +28,13 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination'];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination','header'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
  need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&parseExpectedVariableInventory(expected)?.outputs.length>0),'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
+   &&(!Object.hasOwn(output,'header')||typeof output.header==='boolean')
    &&(!Object.hasOwn(output,'column_order')||['exact','any'].includes(output.column_order))
    &&(!Object.hasOwn(output,'output_port')||Number.isSafeInteger(output.output_port)&&output.output_port>=0)
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
@@ -192,7 +193,18 @@ function matchesCell(cell,column,want,coarseBound=false){
  if(nativeRequired){
   if(cell.cell_type!==type)return false;
   if(want.bytes_le!==undefined&&cell.native.bytes_le!==want.bytes_le)return false;
-  if(type==='datetime'&&(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate'||cell.native.semantic_scope!=='native_serial_only'))return false;
+  if(type==='datetime'){
+   if(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate')return false;
+   if(cell.native.semantic_scope==='browser_civil_time'){
+    if(cell.native.civil_time_verified!==true||cell.native.epoch_verified!==true||cell.representation!=='local_datetime'
+     ||typeof cell.timezone!=='string'||!cell.timezone||cell.timezone.length>128
+     ||typeof cell.value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(cell.value)
+     ||!Number.isFinite(Number(cell.decimal))||typeof cell.decimal!=='string'
+     ||!(/^[a-f0-9]{16}$/.test(cell.native.bytes_le)))return false;
+    const serial=new DataView(Uint8Array.from(cell.native.bytes_le.match(/../g),s=>parseInt(s,16)).buffer).getFloat64(0,true);
+    if(!Number.isFinite(serial)||String(serial)!==cell.decimal)return false;
+   }else if(cell.native.semantic_scope!=='native_serial_only')return false;
+  }
   if(!Object.hasOwn(want,'value'))return typeof want.bytes_le==='string';
   want=want.value;
  }
@@ -217,6 +229,11 @@ function matchesCell(cell,column,want,coarseBound=false){
   // decoder's round-trip decimal retains it; reject contradictory evidence.
   if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
    ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value)return false;
+  value=Number(cell.decimal);
+ }else if(cell.type==='real'&&cell.precision==='17_significant_digits'
+  &&cell.representation===undefined&&cell.value===undefined){
+  // Compact user-v1 receipts retain the exact decimal instead of binary64/value.
+  if(typeof cell.decimal!=='string'||!cell.decimal.trim()||!Number.isFinite(Number(cell.decimal)))return false;
   value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
@@ -243,7 +260,7 @@ export function alignFactorSigns(actual,outputs,rule){
  for(const name of rule.columns){
   const index=data.schema?.findIndex(c=>c.name===name),row=anchor.rows.findIndex(r=>typeof r[name]==='number'&&r[name]!==0);
   need(index>=0&&row>=0,'FACTOR_SIGN_ANCHOR_INVALID');
-  const cell=data.sample?.[row]?.[index],value=Number(cell?.value);
+  const cell=data.sample?.[row]?.[index],value=Number(cell?.decimal??cell?.value);
   need(cell?.type==='real'&&cell.is_null===false&&Number.isFinite(value)&&value!==0,'FACTOR_SIGN_ANCHOR_INVALID');
   signs[name]=Math.sign(value)===Math.sign(anchor.rows[row][name])?1:-1;
  }
@@ -353,18 +370,24 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&p
 export function parseExpectedVariableInventory(expected){
  if(expected.variable_inventory===undefined)return null;
  const v=expected.variable_inventory;
- need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&v.outputs.length>0&&v.outputs.length<=16
+ const tableLinkOnly=v?.outputs?.length===0&&Array.isArray(v.links)&&v.links.length>0
+  &&Array.isArray(expected.outputs)&&expected.outputs.some(o=>o.output_node_type==='variables.to_table'&&o.output_port===0)
+  &&v.links.every(l=>l?.target?.type==='variables.to_table'&&l.kind==='variables');
+ need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&(v.outputs.length>0||tableLinkOnly)&&v.outputs.length<=16
   &&(v.links===undefined||Array.isArray(v.links)&&v.links.length<=100),'EXPECTED_VARIABLE_INVENTORY_INVALID');
  const selector=s=>s&&Object.keys(s).every(k=>['type','label'].includes(k))&&typeof s.type==='string'&&s.type.length>0
   &&(s.label===undefined||typeof s.label==='string'&&s.label.length>0);
  const ordinal=p=>Number.isInteger(p)&&p>=0&&p<100;
  for(const o of v.outputs){
-  need(o&&Object.keys(o).every(k=>['node','port','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
-   &&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
-  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value',...(o.node.type==='variables.replace'?['tolerance']:[])].includes(k))
-   &&(x.tolerance===undefined||o.node.type==='variables.replace'&&x.type==='real'&&Object.keys(x.tolerance).sort().join(',')==='abs,rel'&&x.tolerance.abs===1e-12&&x.tolerance.rel===1e-12)
-   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string'].includes(x.type)
-   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'),'EXPECTED_VARIABLE_VALUE_INVALID');
+  need(o&&Object.keys(o).every(k=>['node','port','ordered','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
+   &&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
+  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value','tolerance'].includes(k))
+   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime'].includes(x.type)
+   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
+  for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
+   &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
+  for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
+   &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
   need(new Set(o.variables.map(x=>x.name)).size===o.variables.length,'EXPECTED_VARIABLE_DUPLICATE');
  }
  for(const l of v.links??[])need(l&&Object.keys(l).every(k=>['source','output','target','input','kind'].includes(k))&&selector(l.source)&&selector(l.target)
@@ -383,11 +406,12 @@ export function matchVariableInventoryOutput(output,want){
   &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
   &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
   &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');
- if(['variables.calculator','variables.replace'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(['variables.replace','variables.calculator','variables.column_union'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(want.ordered===true)need(output.variables.every((v,i)=>v.index===i&&v.name===want.variables[i].name),'COLD_VARIABLE_ORDER_MISMATCH');
  for(const x of want.variables){
   const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
   need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
-   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(want.node.type==='variables.replace'?Number.isFinite(cell.value)&&Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value)):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
+   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(x.tolerance?matchesCell(cell,x,x.value):(want.node.type==='variables.column_union'?Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value))):x.type==='datetime'?matchesCell(cell,x,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
  }
  return true;
 }

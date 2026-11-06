@@ -1,0 +1,50 @@
+{
+  "task_id": "status-code-coverage-business",
+  "source_task": "status-code-coverage-detailed",
+  "source_provenance": "../../analytic-detailed/status-code-coverage-detailed/provenance.json",
+  "reference_origin": "Shared genuine detailed CLI A1 reference verified native and cold; no separate B authoring model/session/attempt claimed",
+  "dataset_sha256": {
+    "requests.csv": "44fb4ba814864aadcb6c04c37039d3683292bc2aa78d0debe86593876103803d"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "5b5373afcdb7bfab762159075683db5bd233658abeb06b7b8bad8a84c8d21f64"
+  },
+  "reference_sha256": "263b36299dbaf26f4d6adebdc0c5f243d66e835990d49289f45676cdf535f4ea",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "Derived from actual Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; no separate deep-link visit claimed",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "file": "requests.csv",
+    "selection": "Exact14 requests frozen before independent manual/oracle/native; eight exact English/Russian aliases plus case/trailing-space/missing/literal-NULL boundaries",
+    "units": "One request; completion_pct in percent0–100; no dates/currency/weights",
+    "transformations": "UTF8 semicolon CSV only; whole? represents actual NULL, quoted empty and literal NULL remain separate; no trim/casefold"
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-only exact status dictionary, exhaustive four-category partition by source, recognized-only completion ratio; independent full manual precedes source/native"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_limits": {
+    "calibration": "NOTRUN",
+    "sole_D_B": "NOTRUN",
+    "pair_acceptance": "PENDING",
+    "native_mutants_executed": false,
+    "combined_cold_public_independent_review": "PENDING",
+    "group_gate": "Canonical campaign dependencies; no new pair-only blind-B gate"
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

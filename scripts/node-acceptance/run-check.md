@@ -80,6 +80,11 @@ python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
 ```
 
+`calculator-vars` and `calculator-vars-update` use the approved Calculator
+Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
+Only the task and `fixtures/variables.csv` reach the model. The update task
+changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
@@ -234,6 +239,23 @@ Each expected output declares its CSV `export_destination`; its basename is
 the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
+
+Each output may declare `header: false` in private `expected.json` for a CSV
+without a header (including a single JSON cell). Columns then declare CSV
+positions, and every record, including the first, is checked as data. Omitted
+or `true` keeps the existing names/labels header checks. Cold readback checks
+the saved native output and Export input mapping without treating a data cell
+as a header.
+
+For a general safe refusal, use `outputs: []` and
+`refusal: {"text":"Не могу выполнить запрос: этот тип данных не поддерживается."}`.
+The nonempty `text` is a required substring of the final answer; choose a
+phrase containing both the refusal and its explanation. `nodes` may list only
+allowed input imports (or be empty); creating result or Export nodes fails.
+CSV export instructions are not appended, and CSV/cold checks are inapplicable,
+including with `--cold`. Save, close/logout and runtime ACK remain required.
+The oracle and refusal text never reach the model. `refusal` cannot be combined
+with `rejection` or `execution_error`; the S-tamper rejection below is unchanged.
 
 For the S-tamper negative case, use `outputs: []` and
 `rejection: {"code":"LOGINOM_FILE_CHANGED","node_type":"transform.group_data"}`
@@ -510,3 +532,22 @@ of unrequested expressions. Stock W1 typed cold execution and cleanup apply.
 Only the user task reaches the model; expected values and oracle stay private.
 
 `variables-replace-exact`: точная замена переменных всех четырёх типов, исходный JSON через Калькулятор (переменные). Три полных typed-чтения по 10 переменных: initial, patch только Count, source refresh только Color без перенастройки замены. Проверяются порядок/метки/типизированный NULL, отсутствие каскада, сохранённые пары остальных переменных, Save/cold/cleanup.
+`variables-column-union` использует исходный `source.lgp` только с двумя
+Калькуляторами переменных. Штатный private package delivery загружает отдельную
+копию в каталог назначенной пары до модели; oracle/expected не передаются.
+Модель получает исходный task.md и inputs.json. Аудит проверяет два свежих
+полных упорядоченных native вывода, patch правого a0, неизменные связи и mapping.
+Cold W1 проверяет сохранённый граф, типы, значения и порядок, затем cleanup.
+
+`variables-rows` uses the authored variable Calculator package and approved r02
+rows task. Private delivery prepares a new package for each run. The native
+three-column output is checked in source order, including each Variant subtype,
+civil datetime milliseconds, NULL/empty/FALSE/zero; CSV, Save and independent
+cold execution with the same variable edge and confirmed cleanup are required.
+
+`variables-user-real-date`: builtin output 4, real threshold and civil report_date,
+typed NULL/empty/zero/false; two business reports before and after patching only
+two variables. Task and transactions.csv reach the model; independent stage-0
+oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
+check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
+cold typed variable inventory and both reports, package Close and logout apply.

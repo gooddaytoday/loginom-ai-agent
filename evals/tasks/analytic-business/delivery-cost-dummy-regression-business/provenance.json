@@ -1,0 +1,26 @@
+{
+  "task_id": "delivery-cost-dummy-regression-business",
+  "source_task": "delivery-cost-dummy-regression-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/delivery-cost-dummy-regression-detailed/provenance.json",
+  "dataset_sha256": {
+    "shipments.csv": "d644374c70640199c9166a343dc8d85017eaab440a6e9c05ef16ca299e08bb50"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a9ce9f5bd86bedc3688dc14db797c380c65cb941bc9b608bae969a7fba7c66fd"
+  },
+  "reference_sha256": "a0dd2ae8d75b81ed1736b81059b27de8e3041ad048f1c8b611448293660e8764",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "numerical_library": "Python standard library fractions.Fraction"
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

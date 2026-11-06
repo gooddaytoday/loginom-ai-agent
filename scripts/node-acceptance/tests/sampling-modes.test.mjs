@@ -95,15 +95,22 @@ test('cold graph requires direct source, own target identity and no substitute t
   const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
  }
 });
-test('saved native model-variables service is admitted only without tabular ports or links',()=>{
- const f=fixture(),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
- const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:'preprocessing.sampling',ref:{node_id:'sample'}},
-  {type:'exports.text',ref:{node_id:'out'}},{type:'bg-vendor-icon-modelvariables',ref:{node_id:'variables'},inputs:[],outputs:[]}],
-  links:[{source:'in',target:'sample',input:0,output:0},{source:'sample',target:'out',input:0,output:0}]};
+for(const partition of [false,true])for(const type of ['bg-vendor-icon-modelvariables','variables.user'])test(`${partition?'partition':'sampling'} cold admits ${type} only without tabular ports or links`,()=>{
+ const f=fixture(partition,'stratified'),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+ // LAB-915 main-extract.jsonl:1: the built-in service exists before Import,
+ // with empty tabular ports and no links; cold.stderr:5 lists it as variables.user.
+ const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:f.expected.sampling_modes.node_type,ref:{node_id:'sample'}},
+  ...f.expected.outputs.map((o,i)=>({type:'exports.text',ref:{node_id:'out-'+i}})),
+  {type,ref:{node_id:'variables'},inputs:[],outputs:[]}],
+  links:[{source:'in',target:'sample',input:0,output:0},...f.expected.outputs.map((o,i)=>({source:'sample',target:'out-'+i,input:0,output:o.output_port}))]};
+ const service=graph.nodes.at(-1);
  assert.equal(checkSamplingGraph(f.expected,graph,baseline),true);
- for(const mutate of [g=>g.nodes[3].inputs.push(0),g=>g.nodes[3].outputs.push(0),
-  g=>g.links.push({source:'variables',target:'sample',input:0,output:0}),g=>g.nodes.push({...g.nodes[3],ref:{node_id:'variables-2'}})]){
-  const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
+ for(const mutate of [g=>g.nodes.at(-1).inputs.push(0),g=>g.nodes.at(-1).outputs.push(0),
+  g=>delete g.nodes.at(-1).inputs,g=>delete g.nodes.at(-1).outputs,
+  g=>g.links.push({source:'variables',target:'sample',input:0,output:0}),
+  g=>g.links.push({source:'sample',target:'variables',input:0,output:0}),
+  ...['bg-vendor-icon-modelvariables','variables.user'].map(type=>g=>g.nodes.push({...service,type,ref:{node_id:'variables-2'}}))]){
+  const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline),/SAMPLING_GRAPH_SERVICE/);
  }
 });
 test('cold native and Table permutations require independently verified field names and types',()=>{

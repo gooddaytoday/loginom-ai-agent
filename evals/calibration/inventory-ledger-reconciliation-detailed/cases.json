@@ -1,0 +1,133 @@
+{
+  "sources": {
+    "SPEC.md": "bd0f5535ad70fd9dd64bd3e2e7bba6a65f0da6a393c3e4fad9cc3c7f56720119",
+    "acceptance.json": "350d7c05f58312f89229677d6108c87abe0c651678a489cd8740bb75f7771744",
+    "data/movements.csv": "9c33e08d9e0c62cb26830498f1166b127b26df04aee11f8dc3c29a45ebe75fea",
+    "data/opening_stock.csv": "560c0d332e515c1d1477efc0ed2b5290025f593af39120040c010010fd14ea13",
+    "data/physical_count.csv": "2a8f3e5c66ab20dab33dd0e667b5c60e1f362b8ddc6b8b219448abfb21ee5bc9",
+    "oracle.csv": "2566921fcc607c41282b3d286f52ced32578caac93aad4cf529257b58f4e055e",
+    "oracle.py": "4864d20bfc9d0d1397719b240d6e145da24468c47508b3fb5e03616464fd7056",
+    "provenance.json": "c681763e268de94811d50c58ff231dd82f842b08d672f1f21042d540f8a4f334",
+    "reference.lgp": "528b29c16b9a6859fc9adf2678db9c92f0c587df480fdcb368f5273970632725",
+    "task.json": "cadf0880412f9f716993f3d36275227bbca6cba6ddd8e5cf58638045168f6bc3"
+  },
+  "cases": [
+    {
+      "id": "out-added",
+      "kind": "column",
+      "expected_failed": [
+        "movement-balance",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"opening_qty + received_qty - issued_qty\"",
+          "to": "Expression=\"opening_qty + received_qty + issued_qty\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "out-added.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "expected = initial + received - issued",
+            "to": "expected = initial + received + issued",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "no-movement-inner",
+      "kind": "filter",
+      "expected_failed": [
+        "stock-registry",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"451f4443-a2d5-4457-b9d1-c502be5c3c82\">\n\t\t\t\t\t\t\t\t<Left Name=\"sku\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"sku\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"7702adc9-3ba6-49d2-8d96-2321e9b171f8\">\n\t\t\t\t\t\t\t\t<Left Name=\"warehouse\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"warehouse\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"451f4443-a2d5-4457-b9d1-c502be5c3c82\">\n\t\t\t\t\t\t\t\t<Left Name=\"sku\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"sku\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"7702adc9-3ba6-49d2-8d96-2321e9b171f8\">\n\t\t\t\t\t\t\t\t<Left Name=\"warehouse\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"warehouse\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "no-movement-inner.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "with (root / \"data/movements.csv\").open",
+            "to": "movement_keys = set()\nwith (root / \"data/movements.csv\").open",
+            "count": 1
+          },
+          {
+            "from": "        ledger[(row[\"sku\"], row[\"warehouse\"])][0 if row[\"direction\"] == \"in\" else 1] += Decimal(row[\"qty\"])",
+            "to": "        ledger[(row[\"sku\"], row[\"warehouse\"])][0 if row[\"direction\"] == \"in\" else 1] += Decimal(row[\"qty\"])\n        movement_keys.add((row[\"sku\"], row[\"warehouse\"]))",
+            "count": 1
+          },
+          {
+            "from": "    for key in sorted(opening):",
+            "to": "    for key in sorted(movement_keys):",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "absolute-deviation",
+      "kind": "column",
+      "expected_failed": [
+        "signed-reconciliation",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"counted_qty - expected_qty\"",
+          "to": "Expression=\"Abs(counted_qty - expected_qty)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "absolute-deviation.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "difference = counts[key] - expected",
+            "to": "difference = abs(counts[key] - expected)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "StrZero(Mod(money_cents, 100), 2)",
+          "to": "StrZero(Mod(money_cents, 100), 1)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "f\"{value:.2f}\"",
+            "to": "f'{\"-\" if value < 0 else \"\"}{int(abs(value) * 100) // 100}.{int(abs(value) * 100) % 100:01d}'",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

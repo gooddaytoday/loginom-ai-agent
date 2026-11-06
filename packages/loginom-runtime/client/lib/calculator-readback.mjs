@@ -21,6 +21,20 @@ export function calculatorConfigurationReadback({node,phases,operation_id}) {
    &&['name','label','type','description'].every(k=>typeof e[k]==='string')
    &&['replace','intermediate','cached'].every(k=>typeof e[k]==='boolean')),'incomplete expressions');
  requireValue(Array.isArray(c.input_fields)&&c.input_fields.length<=1000,'incomplete input fields');
+ // W1 owns the link/mapping receipt. Check the calculator's separate native
+ // variable inventory against it, without treating cached Value as execution.
+ const variableMappings=incoming.value.variable_mappings??[];
+ requireValue(variableMappings.length<=1,'one ordinary variable mapping required');
+ if(variableMappings.length){
+  const v=variableMappings[0],types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
+  requireValue(v.kind==='variables'&&v.direction==='input'&&v.port===0
+   &&['document_id','workflow_id','node_id'].every(k=>v.node?.[k]===node[k])
+   &&v.source_identity_verified===true&&v.independent_readback===true&&Array.isArray(v.fields)
+   &&['count','store_count','unique_ids'].every(k=>v[k]===v.fields.length)
+   &&Array.isArray(c.input_variables)&&v.fields.length===c.input_variables.length
+   &&v.fields.every((f,i)=>c.input_variables[i].name.replace(/^Var\./i,'')===f.name
+    &&c.input_variables[i].type===types[f.type]),'configured variable schema differs from owned W1 mapping');
+ }
  requireValue(m?.verified===true&&m.inventory_complete===true&&m.source_identity_verified===true&&owner(m.node_context)
   &&mapped.value.source_identity_verified===true&&typeof m.autosync==='boolean'
   &&m.node_context.output_port?.direction==='output'&&m.node_context.output_port.port===0

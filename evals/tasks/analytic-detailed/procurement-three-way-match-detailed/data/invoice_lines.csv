@@ -1,0 +1,5 @@
+invoice_line_id;po_line_id;billed_qty;billed_unit_price
+I01;P01;3;12.00
+I02;P01;3;8.00
+I03;P02;2;8.00
+I04;P03;1;4.50

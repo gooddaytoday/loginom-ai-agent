@@ -34,7 +34,14 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinne
    if(a.verb==='cancel_process') {cancelCalls++;if(fault==='unknown_receipt')throw Error('Unknown stop receipt');terminal=true;menu=false;}
    else if(a.verb==='right_click')menu=true;
    else if(a.verb==='press')menu=false;
-   else if(a.ref==='ui-ConsoleForm;btnUnpin'){if(fault==='unknown_pin')throw Error('Unknown pin receipt');pinned=true;}
+   else if(a.ref==='ui-ConsoleForm;btnUnpin'){
+    if(fault==='unknown_pin')throw Error('Unknown pin receipt');
+    // Native history polling schedules a repaint after the UI observation.
+    // LAB-830 orgchart-2/main.execution-events.jsonl:2617-2627: no pin gesture.
+    if(fault==='pin_inventory_repaint'&&reads.at(-1).readProcesses!==false)
+     throw Error('UI_EPOCH_CHANGED before pin gesture');
+    pinned=true;
+   }
    else if(a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose')opened=false;
    else if(a.ref==='ui-MF;cntMain;tlbMainToolbar;btnProgress'){
     if(fault==='running_toolbar_epoch'&&launched)throw Error('UI_EPOCH_CHANGED before progress toolbar gesture');
@@ -59,6 +66,11 @@ test('private prelaunch admission can retain the owned process console without a
 test('a retained console already pinned is not toggled again',async()=>{
  const f=await fixture(undefined,false,{keepConsoleOpen:true,initialPinned:true});
  assert.equal(f.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin'||a.ref==='ui-ConsoleForm;btnPin').length,0);
+});
+test('prelaunch pin settles controls without polling the repainting process inventory',async()=>{
+ const f=await fixture('pin_inventory_repaint',false,{keepConsoleOpen:true});
+ assert.equal(f.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin').length,1);
+ const stopped=await f.driver.stop();assert.equal(stopped.stop_verified,true);
 });
 test('prelaunch pin avoids the epoch-refused progress toolbar while HTTP is running',async()=>{
  await assert.rejects(fixture('running_toolbar_epoch'),/UI_EPOCH_CHANGED/);

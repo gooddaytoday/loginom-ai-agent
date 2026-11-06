@@ -44,12 +44,24 @@ def expected(case):
     assert sorted(r["RowID"] for r in selected + rejected) == sorted(
         r["RowID"] for r in rows)
     assert not ({r["RowID"] for r in selected} & {r["RowID"] for r in rejected})
-    return {"package_path": "{{PACKAGE_PATH}}", "null_marker": "?",
+    result = {"package_path": "{{PACKAGE_PATH}}", "null_marker": "?",
             "nodes": [{"type": "transform.filter_data"}],
             "outputs": [{"output_node_type": "transform.filter_data",
                          "output_port": port, "ordered": False,
                          "column_order": "any", "columns": COLUMNS, "rows": part}
                         for port, part in enumerate([selected, rejected])]}
+    if case in ["mixed-final", "mixed-none", "list-final", "scalar-final", "empty"]:
+        values = ({"wanted": ("string", "a")} if case == "scalar-final" else
+                  {"codes": ("string", "15")} if case == "list-final" else
+                  {"limit": ("integer", 10 if case == "empty" else 100 if case == "mixed-none" else 15),
+                   "codes": ("string", "A,B" if case == "empty" else "C")})
+        result["variable_inventory"] = {
+            "outputs": [{"node": {"type": "variables.calculator"}, "port": 0,
+                         "variables": [{"name": name, "type": kind, "value": value}
+                                       for name, (kind, value) in values.items()]}],
+            "links": [{"source": {"type": "variables.calculator"}, "output": 0,
+                       "target": {"type": "transform.filter_data"}, "input": 0, "kind": "control"}]}
+    return result
 
 
 def documents():

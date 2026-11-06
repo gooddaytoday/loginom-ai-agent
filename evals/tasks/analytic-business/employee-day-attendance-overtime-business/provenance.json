@@ -1,0 +1,32 @@
+{
+  "task_id": "employee-day-attendance-overtime-business",
+  "source_task": "employee-day-attendance-overtime-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/employee-day-attendance-overtime-detailed/provenance.json",
+  "dataset_sha256": {
+    "employee_calendar.csv": "585558c4053a89ab5a006f116a1049a07f131a035ae3d5c8936c5645d16fa873",
+    "work_logs.csv": "684bacf933b889ea1ba360e19bf35b46bb3c6e1c2dcf69efda29657da9b3b279"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6187a6112634453cb313e49a50d7eea4abb6de7b99704b6d7a421d94cc9ae4e5"
+  },
+  "reference_sha256": "c11d1376be066225aaf07a5cc01cdd76419292308fce5f1a7b872e51b294dbf6",
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib collections.defaultdict",
+      "stdlib datetime"
+    ],
+    "algorithm": "Independent source timestamp parsing to employee/day, full employee_calendar iteration, daily attendance and positive excess, then monthly integer sums; no Loginom outputs used."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true,
+    "explicit_reference_check": true
+  },
+  "private_endpoint_omitted": true,
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

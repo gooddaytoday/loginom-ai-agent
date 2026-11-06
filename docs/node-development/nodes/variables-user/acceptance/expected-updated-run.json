@@ -1,0 +1,170 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_node_label": "Отчёт за день",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "OccurredAt",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 5,
+          "OccurredAt": "2026-11-01T00:00:00.000",
+          "Share": 0.2,
+          "Amount": 50
+        },
+        {
+          "Id": 6,
+          "OccurredAt": "2026-11-01T12:00:00.000",
+          "Share": 0.25,
+          "Amount": 60
+        },
+        {
+          "Id": 9,
+          "OccurredAt": "2026-11-01T06:00:00.000",
+          "Share": 0.0,
+          "Amount": 90
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_node_label": "Выше порога",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "OccurredAt",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Share",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "OccurredAt": "2026-10-30T23:59:59.999",
+          "Share": 0.4,
+          "Amount": 10
+        },
+        {
+          "Id": 6,
+          "OccurredAt": "2026-11-01T12:00:00.000",
+          "Share": 0.25,
+          "Amount": 60
+        },
+        {
+          "Id": 7,
+          "OccurredAt": "2026-11-02T00:00:00.000",
+          "Share": 0.9,
+          "Amount": 70
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "threshold",
+            "type": "real",
+            "value": 0.2
+          },
+          {
+            "name": "report_date",
+            "type": "datetime",
+            "value": "2026-11-01T00:00:00.000"
+          },
+          {
+            "name": "missing_threshold",
+            "type": "real",
+            "value": null
+          },
+          {
+            "name": "missing_date",
+            "type": "datetime",
+            "value": null
+          },
+          {
+            "name": "sentinel",
+            "type": "string",
+            "value": "keep"
+          },
+          {
+            "name": "empty_text",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "zero",
+            "type": "integer",
+            "value": 0
+          },
+          {
+            "name": "disabled",
+            "type": "boolean",
+            "value": false
+          }
+        ]
+      }
+    ]
+  }
+}

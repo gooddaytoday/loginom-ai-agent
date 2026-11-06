@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -21,6 +22,178 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_calculator_variables_use_approved_tasks_and_only_the_input_csv(self):
+        for name, expected_name, value in [('calculator-vars', 'expected-initial.json', 7),
+                                           ('calculator-vars-update', 'expected.json', 11)]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/calculator.lgp')
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], ['variables.csv'])
+            self.assertTrue(case['oracle'].is_file())
+            self.assertTrue((case['data'] / 'variables.csv').is_file())
+            self.assertIn('Var.Amount', case['prompt'].read_text())
+            self.assertEqual(expected['package_path'], '/own/calculator.lgp')
+            self.assertEqual(expected['outputs'][0]['rows'][0]['ScenarioAmount'], value)
+            self.assertIsNone(expected['outputs'][0]['rows'][3]['Shifted'])
+
+    def test_csv_without_header_checks_the_first_json_cell(self):
+        output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
+                      rows=[dict(JSON='{"id":10,"children":[{"name":"Продажи"}]}')])
+        stream = io.StringIO()
+        csv.writer(stream).writerow(['{"children":[{"name":"Продажи"}],"id":10}'])
+        self.assertEqual(self.csv_result(output, stream.getvalue()), ',')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, stream.getvalue().replace('10', '11'))
+        with self.assertRaises((AssertionError, csv.Error)):
+            self.csv_result(output, 'JSON\n' + stream.getvalue())
+        with self.assertRaises(AssertionError):
+            self.csv_result({k: v for k, v in output.items() if k != 'header'}, stream.getvalue())
+
+    def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
+        output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
+                      rows=[dict(A=1, B=1), dict(A=2, B=3)])
+        self.csv_result(output, '1,1\n2,3\n')
+        for data, error in [('1,1\n3,2\n', 'CSV_VALUES'), ('1,1\n', 'CSV_ROW_COUNT')]:
+            with self.subTest(data=data), self.assertRaisesRegex(AssertionError, error):
+                self.csv_result(output, data)
+        for data in ['1,1,1\n2,3\n', '1,1\n2\n']:
+            with self.subTest(data=data), self.assertRaises((AssertionError, csv.Error)):
+                self.csv_result(output, data)
+        self.csv_result(dict(output, rows=[]), '')
+        with self.assertRaisesRegex(AssertionError, 'CSV_ROW_COUNT'):
+            self.csv_result(output, '')
+        with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
+            self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
+
+    def refusal_run(self, root, variant=None):
+        case = root / 'cases/safe-refusal'
+        (case / 'data').mkdir(parents=True)
+        (case / 'task.md').write_text('Обработай недоступный тип данных.')
+        expected = dict(nodes=[], outputs=[], refusal=dict(text='Не могу: этот тип данных не поддерживается.'))
+        if variant == 'import node': expected['nodes'] = [dict(type='imports.text')]
+        if variant == 'invalid oracle': expected['refusal']['text'] = ' '
+        if variant == 'conflicting oracle': expected['rejection'] = dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')
+        if variant == 'outputs': expected['outputs'] = [dict(output_node_type='transform.group_data')]
+        runner.write(case / 'expected.json', expected)
+        out = root / 'run'
+        out.mkdir()
+        (root / 'pair').mkdir()
+        runner.write(root / 'pair/worker.json', dict(package_directory='/test', loginom=dict(
+            username='test', password='test', url='https://example.test')))
+        runner.write(out / 'request.json', dict(cases=str(case.parent), pair=str(root / 'pair'), cold=True))
+        runner.write(out / 'results.json', dict(head='a' * 40, tree='b' * 40, started=time.time(),
+                     runs=[dict(scenario=case.name, status='PENDING')]))
+        instance = runner.Runner(out)
+        phases = []
+        def phase(name, command, folder, **kwargs):
+            phases.append(name)
+            instance.report['phase'] = name
+            profile = out / case.name / 'profile'
+            if name == 'setup':
+                (profile / 'data').mkdir(parents=True)
+                (profile / 'config').mkdir()
+                runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+            if name != 'model': return
+            # Honor any generated export instruction at the process boundary;
+            # the old runner then indexes outputs[0] although the list is empty.
+            for destination in re.findall(r'/test/[\w-]+\.csv', command[-1]):
+                (profile / Path(destination).name).write_text('Value\n1\n')
+            events = [dict(type='tool_use', sessionID='session', part=dict(tool='loginom_dock_action_run',
+                state=dict(status='completed', input=dict(action_key='package.save_as'), output=json.dumps(dict(
+                    status='SUCCEEDED', action_key='package.save_as', output=dict(save_completed=True))))))]
+            if variant == 'save': events.clear()
+            if variant in ['result node', 'export node', 'failed result node', 'import node']:
+                tool = 'loginom_dock_node_apply'
+                kind = ('exports.text' if variant == 'export node' else
+                        'imports.text' if variant == 'import node' else 'programming.javascript')
+                events.append(dict(type='tool_use', sessionID='session', part=dict(tool=tool, state=dict(
+                    status='error' if variant == 'failed result node' else 'completed',
+                    input=dict(target=dict(kind='new', type=kind)), output='{}'))))
+            if variant == 'legacy result node':
+                events.append(dict(type='tool_use', sessionID='session', part=dict(tool='loginom_dock_action_run',
+                    state=dict(status='completed', input=dict(action_key='node.add',
+                        parameters=dict(component_key='transform.group_data')), output='{}'))))
+            if variant == 'csv': (profile / 'unexpected.csv').write_text('result\n1\n')
+            if variant != 'answer':
+                events.append(dict(type='text', sessionID='session', part=dict(text=(
+                    'Готово.' if variant == 'explanation' else 'Не могу: этот тип данных не поддерживается.'))))
+            (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
+            runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=variant != 'cleanup', logged_out=True))
+            if variant != 'ack': runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+        with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+            instance.run()
+        result = runner.read(out / 'results.json')['runs'][0]
+        return result, phases, out / case.name / case.name
+
+    def test_private_refusal_skips_csv_and_cold_without_leaking_oracle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, phases, folder = self.refusal_run(Path(directory))
+            self.assertEqual(result['status'], 'PASS', result)
+            self.assertEqual(result['refusal'], 'PASS')
+            self.assertEqual(result['save'], 'PASS')
+            self.assertEqual(result['cleanup'], 'main PASS')
+            self.assertEqual(phases, ['setup', 'model'])
+            self.assertIn('expected refusal', result['csv'])
+            self.assertIn('expected refusal', result['cold'])
+            self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
+            self.assertNotIn('не поддерживается', (folder / 'task.md').read_text())
+
+    def test_private_refusal_allows_only_declared_input_imports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, phases, _ = self.refusal_run(Path(directory), 'import node')
+            self.assertEqual(result['status'], 'PASS', result)
+            self.assertEqual(phases, ['setup', 'model'])
+
+    def test_private_refusal_rejects_missing_explanation_effects_and_bad_oracles(self):
+        for variant, error in [('answer', 'REFUSAL_NOT_REPORTED'), ('explanation', 'REFUSAL_NOT_REPORTED'),
+                               ('result node', 'UNEXPECTED_NODE'), ('export node', 'UNEXPECTED_NODE'),
+                               ('legacy result node', 'UNEXPECTED_NODE'),
+                               ('failed result node', 'UNEXPECTED_NODE'),
+                               ('csv', 'UNEXPECTED_CSV'), ('save', 'SAVE_NOT_CONFIRMED'),
+                               ('cleanup', 'MAIN_CLEANUP_UNCONFIRMED'), ('ack', 'RUNTIME_CLOSE_ACK_MISSING'),
+                               ('invalid oracle', 'INVALID_REFUSAL_ORACLE'),
+                               ('conflicting oracle', 'INVALID_REFUSAL_ORACLE'), ('outputs', 'INVALID_REFUSAL_ORACLE')]:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.refusal_run(Path(directory), variant)
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertEqual(result['failure_class'], error)
+
+    def test_typed_variant_csv_uses_existing_scalar_rules_and_null_collision_guard(self):
+        expected = dict(columns=[dict(name='Value', type='variant')], rows=[dict(Value=v) for v in [
+            dict(cell_type='integer', value=7), dict(cell_type='boolean', value=False),
+            dict(cell_type='string', value='Привет'), dict(cell_type='datetime', value='2026-01-02T03:04:05.006'),
+            None, dict(cell_type='real', value=1.25), dict(cell_type='string', value=''), dict(cell_type='integer', value=0)]])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'rows.csv'
+            path.write_text('Value\n7\nfalse\nПривет\n2026-01-02T03:04:05.006\n?\n1.25\n""\n0\n')
+            runner.check_csv(path, expected, null_marker='?', scenario_name='variables-rows')
+            for source, replacement in [('05.006', '05.000'), ('false', '0'), ('1.25', '1.2')]:
+                original = path.read_text()
+                path.write_text(original.replace(source, replacement))
+                with self.assertRaises(AssertionError):
+                    runner.check_csv(path, expected, null_marker='?', scenario_name='variables-rows')
+                path.write_text(original)
+            with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_COLLISION'):
+                runner.check_csv(path, expected, null_marker=None,
+                                 export_events=self.export_events(marker=''), destination='/test/all.csv')
+
+    def test_datatovar_catalog_keeps_oracle_private_and_requests_ordered_variable_output(self):
+        for name, files in [('variables-datatovar', ['values.csv', 'replace.csv']),
+                            ('variables-datatovar-null', ['null.csv']), ('variables-datatovar-empty', ['values.csv'])]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/datatovar.lgp')
+            self.assertTrue(case['variable_only'])
+            self.assertEqual(case['variable_audit'], 'variables-datatovar')
+            self.assertEqual(case['input_files'], files)
+            self.assertEqual(expected['outputs'], [])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertTrue(output['ordered'])
+            self.assertEqual(output['node']['type'], 'variables.from_table')
+            self.assertEqual([v['name'] for v in output['variables']], ['X_Sum', 'X_Count', 'X_Min', 'X_Max', 'X_Avg'])
+            self.assertTrue(case['oracle'].is_file())
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
@@ -104,6 +277,30 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(rows[1]['R'], 2.5 if kind == 'mean' else 0)
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
+
+    def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
+        case = runner.scenario('variables-columns')
+        self.assertEqual(case['source'].name, 'acceptance')
+        self.assertEqual(case['source'].parent.name, 'variables-vartodata')
+        self.assertEqual(case['prompt'].name, 'task.md')
+        self.assertIsNone(case['base'])
+        self.assertEqual(case['input_files'], [])
+        expected = runner.expected_for(case, '/test/variables-columns.lgp')
+        self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
+        output = expected['outputs'][0]
+        self.assertTrue(output['ordered'])
+        self.assertEqual(output['column_order'], 'exact')
+        self.assertEqual(output['output_port'], 0)
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['A', 'B', 'Text', 'Moment', 'Missing', 'Rate', 'Empty', 'Zero'])
+        self.assertIs(output['rows'][0]['B'], False)
+        self.assertIsNone(output['rows'][0]['Missing'])
+        self.assertEqual(output['rows'][0]['Empty'], '')
+        self.assertEqual(output['rows'][0]['Zero'], 0)
+        self.assertEqual(output['rows'][0]['Moment'], '2026-01-02T03:04:05.006')
+        self.assertEqual(output['columns'][5]['tolerance'], dict(abs=0, rel=0))
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'],
+                       check=True, capture_output=True)
 
     def test_text_export_cp1251_catalog_and_same_node_switch(self):
         case = runner.scenario('text-export-cp1251')

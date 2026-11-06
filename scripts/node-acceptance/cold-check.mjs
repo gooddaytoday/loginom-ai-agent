@@ -81,7 +81,7 @@ const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
-const exportCsv=args.csv?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
+const exportCsv=args.csv&&expectedOutputs.at(-1)?.header!==false?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
  header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)
@@ -380,10 +380,11 @@ page = context.pages()[0]
    continue;
   }
   let data;
-  if(['trees.to_table','trees.to_json','research.quality'].includes(target.type)){
+  if(['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
-   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
+    ...(['variables.to_table','transform.collapse_columns'].includes(target.type)?{typedVariants:true}:{})});
    if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }
@@ -457,13 +458,22 @@ page = context.pages()[0]
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
    state.exportObservation={node_id:savedExport.node_id,input_fields:savedExport.input_fields,
     ...(exportCsv?{csv_order:exportCsv}: {})};
-   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
+   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact'&&o.header!==false)&&!exportCsv)
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
+
+  if(variableInventory?.outputs.length===0){
+   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-for-variable-links'});
+   if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_VARIABLE_LINK_RETURN_UNCONFIRMED');
+   const graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   const links=matchVariableInventoryLinks(graph,variableInventory);
+   if(JSON.stringify(links)!==JSON.stringify(state.variableInventory.links))throw Error('COLD_VARIABLE_LINK_CHANGED_AFTER_TABLE');
+   await record({phase:'cold_variable_links_after_table',links,settings_applied:false});
+  }
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
@@ -564,9 +574,10 @@ page = context.pages()[0]
         diagnosticReadOnly: readOnly,
         // Cancellation has no complete persisted-change inventory proving
         // Table-only changes. Never turn package ownership into discard proof.
+        // Failed checks also preserve their dirty state for diagnosis.
         // Clean packages close normally; dirty/unknown ones retain BLOCKED.
-        diagnosticDiscard: !readOnly && !state.cancelled,
-        diagnosticWaitForIdle: !readOnly && !state.cancelled,
+        diagnosticDiscard: !readOnly && !state.cancelled && !state.failure,
+        diagnosticWaitForIdle: !readOnly && !state.cancelled && !state.failure,
       }),
     )
       .then(async (result) => {

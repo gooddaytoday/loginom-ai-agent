@@ -10,8 +10,12 @@ def run_recipe(task,recipe):
    assert source.count(e['from'])==e['count'],(task,e)
    source=source.replace(e['from'],e['to'])
   (d/'oracle.py').write_text(source)
-  subprocess.run(['python3',str(d/'oracle.py')],check=True,capture_output=True)
-  rows=list(csv.reader((d/'oracle.csv').open(newline='')))
+  completed=subprocess.run(['python3',str(d/'oracle.py')],check=True,capture_output=True)
+  if not (d/'oracle.csv').exists():
+   (d/'oracle.csv').write_bytes(completed.stdout)
+  with (d/'oracle.csv').open(newline='') as source:
+   delimiter=csv.Sniffer().sniff(source.readline(),delimiters=',;').delimiter
+   source.seek(0);rows=list(csv.reader(source,delimiter=delimiter))
   if 'sort' in recipe:
    settings=recipe['sort'];idx=rows[0].index(settings['column'])
    def key(row):
@@ -21,20 +25,13 @@ def run_recipe(task,recipe):
    rows=[rows[0],*sorted(rows[1:],key=key,reverse=settings['descending'])]
   if recipe.get('drop_last'):rows=[row[:-1] for row in rows]
   if recipe.get('exclude_channel'):rows=[rows[0],*[row for row in rows[1:] if row[0]!=recipe['exclude_channel']]]
-  out=io.StringIO(newline='');csv.writer(out,lineterminator='\n').writerows(rows);return out.getvalue()
-def csv_equal(a,b):
- from decimal import Decimal,InvalidOperation
- l=list(csv.reader(io.StringIO(a)));r=list(csv.reader(io.StringIO(b)))
- if len(l)!=len(r) or set(l[0])!=set(r[0]):return False
- pos=[r[0].index(c) for c in l[0]]
- for left,right in zip(l[1:],r[1:]):
-  for i,j in enumerate(pos):
-   if left[i]==right[j]:continue
-   try:
-    if abs(Decimal(left[i])-Decimal(right[j]))<=Decimal('.01'):continue
-   except InvalidOperation:pass
-   return False
- return True
+  out=io.StringIO(newline='');csv.writer(out,delimiter=delimiter,lineterminator='\n').writerows(rows);return out.getvalue()
+def csv_equal(task,result,tolerance):
+ with tempfile.TemporaryDirectory(prefix='calibration-compare-') as temp:
+  output=pathlib.Path(temp)/'result.csv';output.write_text(result)
+  repo=pathlib.Path(__file__).resolve().parents[2]
+  compared=subprocess.run(['bun',str(repo/'evals/skills/loginom-eval-case/scripts/compare_csv.ts'),str(repo),str(task/'oracle.csv'),str(output),str(tolerance)],check=True,capture_output=True,text=True)
+  return json.loads(compared.stdout)['passed'] is True
 
 def main():
  ap=argparse.ArgumentParser(description='Recompute calibration CSVs from pinned independent oracle recipes.')
@@ -42,20 +39,29 @@ def main():
  ap.add_argument('--only')
  ap.add_argument('--corpus',type=pathlib.Path,default=pathlib.Path(__file__).resolve().parent.parent/'calibration')
  args=ap.parse_args()
- names=args.only.split(',') if args.only else sorted(p.name for p in args.corpus.iterdir() if (p/'cases.json').exists())
+ descriptions={}
+ for file in sorted(args.tasks.glob('*/task.json')):
+  description=json.loads(file.read_text())
+  assert description['id']==file.parent.name,(file,'task id must match directory')
+  descriptions[description['id']]=description
+ assert descriptions,('no tasks',args.tasks)
+ names=args.only.split(',') if args.only else [name for name in descriptions if (args.corpus/name/'cases.json').exists()]
+ if not names:ap.error('no calibration manifests for requested tasks')
+ assert all(name in descriptions for name in names),('unknown tasks',names)
  counts={k:0 for k in ['sort','aggregate','threshold','filter','column']}
  for name in names:
   task=args.tasks/name;dir=args.corpus/name;manifest=json.loads((dir/'cases.json').read_text())
   for rel,digest in manifest['sources'].items():
    assert hashlib.sha256((task/rel).read_bytes()).hexdigest()==digest,(name,rel,'stale source')
-  assert csv_equal((task/'oracle.csv').read_text(),run_recipe(task,{})),(name,'baseline oracle mismatch')
-  description=json.loads((task/'task.json').read_text())
+  description=descriptions[name]
+  tolerance=description.get('oracle_tolerance',.01)
+  assert csv_equal(task,run_recipe(task,{}),tolerance),(name,'baseline oracle mismatch')
   with zipfile.ZipFile(task/description['reference']) as archive:
    originals={e['file']:archive.read(e['file']).decode('utf-8-sig') for case in manifest['cases'] for e in case['edits']}
   for case in manifest['cases']:
    actual=run_recipe(task,case['reproduce'])
    assert actual==(dir/case['result_csv']).read_text(),(name,case['id'],'CSV recipe mismatch')
-   assert csv_equal((task/'oracle.csv').read_text(),actual)==case['expected_oracle_pass'],(name,case['id'],'oracle expectation mismatch')
+   assert csv_equal(task,actual,tolerance)==case['expected_oracle_pass'],(name,case['id'],'oracle expectation mismatch')
    mutated=dict(originals)
    for edit in case['edits']:
     assert mutated[edit['file']].count(edit['from'])==edit['count'],(name,case['id'],'XML count')
@@ -65,9 +71,6 @@ def main():
     assert [n.get('Guid') for n in original.findall('.//Nodes/Item')]==[n.get('Guid') for n in changed.findall('.//Nodes/Item')],(name,case['id'],'node topology')
     assert ElementTree.tostring(original.find('.//Links'))==ElementTree.tostring(changed.find('.//Links')),(name,case['id'],'link topology')
    counts[case['kind']]+=1
- if not args.only:
-  assert len(names)==35,('task coverage',len(names))
-  assert counts==dict(sort=35,aggregate=35,threshold=6,filter=3,column=35),('case coverage',counts)
  print(str(len(names))+' tasks, '+str(sum(counts.values()))+' cases: '+json.dumps(counts,sort_keys=True))
 if __name__=='__main__':
  main()

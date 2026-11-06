@@ -1,0 +1,5 @@
+supplier;tariff_keys;consistent_keys;conflicting_keys;rows_in_conflicting_keys
+Aster;11;2;2;7
+Birch;10;2;1;6
+Cedar;5;3;0;0
+Delta;7;1;2;6

@@ -1,4 +1,5 @@
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
+import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
@@ -34,6 +35,7 @@ export function validateNodeApplyRequest(request, handlers) {
   requireValue(handler.modes.includes(request.mode), 'Unsupported node configuration mode');
   requireValue(['done','execute','close'].includes(request.finish), 'Choose Done, Execute or Close explicitly');
   requireValue(Array.isArray(request.mappings) && request.mappings.length <= 16, 'Bounded port mappings required');
+  if(request.target.type==='variables.column_union')requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
@@ -408,6 +410,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
       return null;
   };
   try {
+    // Builtin variables prove their source by reading the prepared graph. An
+    // upload may have selected Files; activate only its still-owned inactive tab
+    // in the existing workflow phase before that read, never inside readGraph.
+    if(!state.phases.length&&drivers.activateWorkflow&&drivers.needsWorkflowActivation
+      &&await drivers.needsWorkflowActivation(context()))
+      await phase('workflow',ctx=>drivers.activateWorkflow({...ctx,waitForActive:true}));
     // File verification does not infer identity from the displayed path. The
     // driver checks an already completed upload/inspect/verify receipt chain.
     await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
@@ -524,6 +532,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    if(calculatorVariableMappingRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
+      ||variablesCalculatorDeactivationRefusal(operation,error.receipt)){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
+        failure:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}});}
+      catch { /* Foreign owners/masks and unknown cleanup retain the original phase. */ }
+    }
     if(error.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'&&state.node&&state.pending&&!operation.transportUncertain) {
       try {return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.nodeExecutionFailure});}
       catch { /* A native error never promotes an unconfirmed cleanup to PASS. */ }

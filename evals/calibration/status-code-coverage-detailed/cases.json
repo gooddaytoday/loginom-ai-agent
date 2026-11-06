@@ -1,0 +1,119 @@
+{
+  "sources": {
+    "SPEC.md": "e5645be623fe7e88d0d4e4b1d72c07ddea0914ed85202463308ca8d9051fe7a2",
+    "acceptance.json": "59c96edf51ac7b19b4fbde03ca8cd7a7f0230834c5d58000b43539ce7c846a4e",
+    "data/requests.csv": "44fb4ba814864aadcb6c04c37039d3683292bc2aa78d0debe86593876103803d",
+    "oracle.csv": "5b5373afcdb7bfab762159075683db5bd233658abeb06b7b8bad8a84c8d21f64",
+    "oracle.py": "5a21255945e5c4ee23fe827e103fa2605d79bf3f42e09c9f9d0cbb7dcdfe38db",
+    "provenance.json": "a8e82fd64c0dea8f8d9e28cb53e086cc26c9aba98c3347506a666e8882a18c2d",
+    "reference.lgp": "263b36299dbaf26f4d6adebdc0c5f243d66e835990d49289f45676cdf535f4ea",
+    "task.json": "3963243cea8ae8a67ba117f198245d60826fd02c2f42ced8dfea1657bcceb1bf"
+  },
+  "cases": [
+    {
+      "id": "completed-as-total-requests",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"requests\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"requests_Sum\"/>",
+          "to": "<Item Name=\"requests\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" OriginType=\"iotCustom\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"936daf67-3d6e-474b-982f-98133c27a35b\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGColumnDefMappingExtension\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t<Mapping Source=\"completed_Sum\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "exhaustive-status-partition",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "writer.writerow([source, completed + opened + missing + unmapped,",
+            "to": "writer.writerow([source, completed,",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "completed-as-total-requests.csv"
+    },
+    {
+      "id": "open-only-completion-denominator",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(completed + open &gt; 0, 100.0 * completed / (completed + open), Null)\"",
+          "to": "Expression=\"IF(completed + open &gt; 0, 100.0 * completed / open, Null)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "recognized-completion-rate",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "percentage = Decimal(100) * completed / recognized if recognized else \"\"",
+            "to": "percentage = Decimal(100) * completed / opened if recognized else \"\"",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "open-only-completion-denominator.csv"
+    },
+    {
+      "id": "unanchored-completed-suffix",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"completed\" DataType=\"dtInteger\" Expression=\"IFF(RegExMatch(&quot;\\A(?:done|closed|Готово|Завершено)\\z&quot;, NVL(status, &quot;&quot;)), 1, 0)\"/>",
+          "to": "<Item Name=\"completed\" DataType=\"dtInteger\" Expression=\"IFF(RegExMatch(&quot;\\A(?:done|closed|Готово|Завершено)&quot;, NVL(status, &quot;&quot;)), 1, 0)\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "exact-status-dictionary",
+        "result-table"
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "0 if status in completed_codes else",
+            "to": "0 if status is not None and status.startswith(tuple(completed_codes)) else",
+            "count": 1
+          }
+        ]
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "unanchored-completed-suffix.csv"
+    },
+    {
+      "id": "reverse-source-order",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"source\"/>",
+          "to": "<Item Name=\"source\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "exhaustive-status-partition",
+        "result-table"
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "source",
+          "descending": true
+        }
+      },
+      "expected_oracle_pass": false,
+      "result_csv": "reverse-source-order.csv"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ function setup(input?: {
   workState?: () => Promise<{ activeWork: boolean; unsettledWork: boolean; dispatching?: boolean }>
   backend?: UpdaterBackend
   supportStatus?: () => boolean | undefined
+  log?: (message: string, data?: object) => void
 }) {
   const calls: string[] = []
   const backend: UpdaterBackend = {
@@ -38,6 +39,7 @@ function setup(input?: {
     backend: input?.backend ?? backend,
     mode: input?.mode,
     supportStatus: input?.supportStatus,
+    log: input?.log,
     workState: input?.workState ?? (async () => ({ activeWork: false, unsettledWork: false })),
     persistence: {
       get: () => ready,
@@ -56,6 +58,29 @@ function setup(input?: {
 }
 
 describe("updater controller", () => {
+  test("presigned credentials are redacted from error state and controller logs", async () => {
+    const logs: string[] = []
+    const app = setup({
+      log: (message, data) => logs.push(message + JSON.stringify(data)),
+      backend: {
+        async checkForUpdates() {
+          throw Error(
+            'Cannot download "https://private.test/asset?X-Amz-Credential=tenant%3Aread-key&X-Amz-Signature=local-signature", status 403',
+          )
+        },
+        async downloadUpdate() {
+          throw Error("unexpected download")
+        },
+        quitAndInstall() {},
+      },
+    })
+    expect(await app.controller.check()).toEqual({
+      status: "error",
+      message: 'Cannot download "https://private.test/asset?[REDACTED]", status 403',
+    })
+    expect(logs.join(" ")).not.toContain("read-key")
+    expect(logs.join(" ")).not.toContain("local-signature")
+  })
   test("notification-only mode never downloads or installs, including a persisted ready update", async () => {
     const app = setup({ mode: "notify", unsupported: true, ready: { version: "2.0.0" } })
     expect(await app.controller.start()).toEqual({
@@ -134,11 +159,18 @@ describe("updater controller", () => {
     const app = setup({
       supportStatus: () => true,
       backend: {
-        async checkForUpdates() { throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH") },
-        async downloadUpdate() {}, quitAndInstall() {},
+        async checkForUpdates() {
+          throw Error("LOGINOM_UPDATE_MANIFEST_MISMATCH")
+        },
+        async downloadUpdate() {},
+        quitAndInstall() {},
       },
     })
-    expect(await app.controller.check()).toEqual({ status: "error", message: "LOGINOM_UPDATE_MANIFEST_MISMATCH", unsupported: true })
+    expect(await app.controller.check()).toEqual({
+      status: "error",
+      message: "LOGINOM_UPDATE_MANIFEST_MISMATCH",
+      unsupported: true,
+    })
   })
 
   test("channel reconfiguration waits for in-flight download and rechecks without stale readiness", async () => {

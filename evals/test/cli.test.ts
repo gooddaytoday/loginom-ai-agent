@@ -296,8 +296,13 @@ test("agentCommand: real slots preserve credential-free proxy routing", () => {
   const routing = { HTTP_PROXY: "http://127.0.0.1:10808", https_proxy: "http://127.0.0.1:10808",
     ALL_PROXY: "socks5://127.0.0.1:10808", NO_PROXY: "localhost,127.0.0.1", no_proxy: "localhost,127.0.0.1" }
   const command = agentCommand(config, { ...routing, HTTPS_PROXY: "http://user:proxy-private@127.0.0.1:10808",
-    all_proxy: "http://127.0.0.1:10808?token=proxy-private", OPENAI_API_KEY: "openai-private" })
+    all_proxy: "http://127.0.0.1:10808?token=proxy-private", OPENAI_API_KEY: "openai-private", NODE_USE_ENV_PROXY: "0" })
   expect(command.env).toMatchObject(routing)
+  expect(command.env.NODE_USE_ENV_PROXY).toBe("1")
+  expect(agentCommand(config, { NODE_USE_ENV_PROXY: "1" }).env.NODE_USE_ENV_PROXY).toBeUndefined()
+  expect(agentCommand(config, { HTTP_PROXY: "http://user:proxy-private@127.0.0.1:10808",
+    https_proxy: "http://127.0.0.1:10808/proxy-private", ALL_PROXY: "http://127.0.0.1:10808?token=proxy-private",
+    NODE_USE_ENV_PROXY: "1" }).env.NODE_USE_ENV_PROXY).toBeUndefined()
   expect(command.env.HTTPS_PROXY).toBeUndefined()
   expect(command.env.all_proxy).toBeUndefined()
   expect(agentCommand(config, { HTTP_PROXY: "http://127.0.0.1:10808/proxy-private" }).env.HTTP_PROXY).toBeUndefined()

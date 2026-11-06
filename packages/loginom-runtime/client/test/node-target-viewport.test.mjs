@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
-import {mutateGraph} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
+import {Page,actions,selectors} from './support/executor-fixture.mjs';
 
 function fixture(kind,fault) {
  const prefix='MF;TF',tid=prefix+';Graph;Sort',ref={document_id:'doc',workflow_id:'flow',node_id:'node'};
@@ -119,4 +120,123 @@ test('late deselection redraw permits exactly one move',async()=>{
 for(const fault of ['position','label','lock','root','document','links','ports','type','workflow','node_id','readiness','native_links'])test('late deselection refuses changed '+fault+' before drag',async()=>{
  const f=fixture('move','deselect_late_'+fault),r=await f.run();
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
+});
+
+for(const placement of ['offscreen source','distant target','minimum zoom','LAB-932 recorded','LAB-934 recorded','LAB-938 outside duplicate','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
+ const recorded=placement.startsWith('LAB-');
+ const masked=placement.includes('mask');
+ const page=new Page(),cache=new Map(),elements=page.elements.bind(page);page.clock=Date.now();
+ page.app.Version='7.4.2';
+ page.addNode('Sort',placement==='offscreen source'||masked?1056:144,placement==='offscreen source'||masked?72:80,['Output_Data-0']);
+ page.addNode('Export',placement==='offscreen source'||masked?560:2400,placement==='offscreen source'||masked?208:1800,['Input_Data-0']);
+ // Start at the source after its reveal: the distant target is offscreen.
+ const minimum=.3855432894295314;
+ if(placement==='minimum zoom'||recorded){
+  // LAB-929: target rename is visible at minimum zoom with scroll (18,42).
+  // Revealing the clipped source alone then scrolls the target out of view.
+  page.viewScale=minimum;let left=18,top=42;
+  Object.defineProperties(page.graph,{
+   scrollLeft:{get:()=>left,set:value=>{left=Math.max(0,value);}},
+   scrollTop:{get:()=>top,set:value=>{top=Math.max(0,value);}},
+  });
+ }
+ page.elements=()=>{const all=elements().map(element=>{
+  const old=cache.get(element.tid);if(old){Object.assign(old,element);return old;}cache.set(element.tid,element);return element;
+ }).map(element=>{
+ // LAB-932 main:2818 drag centers; rename receipt records canvas and
+ // minimum scale/scroll. LAB-934 r1:2583-2585 has the same endpoint layout.
+ if(recorded){
+  if(element.symbol==='workflow.graph')element.box={x:324,y:100,width:950,height:694};
+  if(element.kind==='port')element.box={x:element.port.startsWith('Output')?383:1225,y:element.port.startsWith('Output')?100:758,width:6,height:7};
+ }
+ element.classList={contains:name=>element.classes?.includes(name)===true};
+ element.contains=child=>child===element||element.children?.some(e=>e===child||e.contains?.(child))===true;
+ element.closest=selector=>element.classList.contains(selector.slice(1))?element:element.parentElement?.closest(selector)??null;
+  return element;
+ });const canvas=all.find(e=>e.symbol==='workflow.graph');canvas.children=all.filter(e=>e.tid.includes(';Graph;'));for(const e of canvas.children)e.parentElement=canvas;return all;};
+ const exact=tid=>page.elements().filter(e=>e.tid===tid),root=exact(page.prefix+';ModelForm;cmpDiagram')[0];
+ const native=page.nodes.map((node,index)=>{
+  const n={FGuid:['sort-guid','export-guid'][index],FIconCls:NODE_TYPES[index?'exports.text':'transform.sorting'].icon_class,FCell:{geometry:{x:node.x,y:node.y}}};
+  n.FLabel={parent:n,FCell:{parent:n.FCell,visible:true},FRawValue:node.label};
+  n.FPorts=[{FCollection:[{FGuid:'port-'+index,parent:n,FType:index?0:1,FSubType:1,FCell:{id:n.FGuid,parent:n.FCell,visible:true}}]}];return n;
+ });
+ const graph=page.model.FDiagram.FmxGraph;
+ graph.container=root;graph.view.getState=cell=>{
+  for(const [index,node] of native.entries()){
+   const tid=page.prefix+';Graph;'+page.nodes[index].label;
+   if(cell===node.FCell)return {shape:{node:exact(tid)[0]}};
+   if(cell===node.FLabel.FCell)return {text:{node:exact(tid+';Label;Label')[0]}};
+   if(cell===node.FPorts[0].FCollection[0].FCell)return {shape:{node:exact(tid+';'+page.nodes[index].ports[0])[0]}};
+  }
+ };
+ Object.assign(page.model,{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false});
+ Object.assign(page.model.FDiagram,{FNodes:{FCollection:native},FHandlers:{FConnectionHandler:{FDelegationHandler:{get FMouseDown(){return page.down;}}}},FValidatedConnectionsCache:{FCache:{'sort-guid':{'export-guid':true}}}});
+ Object.defineProperty(graph,'isMouseDown',{get:()=>page.down});
+ graph.connectionHandler={first:{},previous:{cell:native[0].FPorts[0].FCollection[0].FCell},marker:{validState:{cell:native[1].FPorts[0].FCollection[0].FCell}},error:null};
+ const packageNode=new page.app.PackageTreeNode(),workspace=page.app.Application.FInstance.FMainForm.Items.Workspace;
+ workspace.getActiveTab=()=>({Controller:{FController:page.model,Node:{data:{node:{ParentNode:packageNode}}}}});
+ const request={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:page.prefix,tab_tid:page.tabTid,navigation_path:[]}};
+ let mask=false,waits=0;
+ const blocker={visible:true,getBoundingClientRect:()=>({width:100,height:100})};
+ const document={querySelectorAll:selector=>{const matches=selector==='[role="dialog"],.bg-mask-message,.x-mask-msg'&&mask?[blocker]:selector.startsWith('[data-tid')?page.match(selector):[];return placement==='LAB-938 outside duplicate'&&selector.includes('Sort;Output_Data-0')?[...matches,{...matches[0]}]:matches;},elementFromPoint:(x,y)=>{
+  if(x<0||x>=1280||y<0||y>=800)return null;
+  return page.elements().filter(e=>e.kind==='port').find(e=>page.contains(e.box,{x,y}))??root;
+ }};
+ const preparation={id:'doc',document,receipts:new Map([['prepare',{phase:'verified',workflowId:'flow',packageNode,tab:exact(page.tabTid)[0]}]])};
+ await page.execute('async page=>true');
+ Object.assign(page.context,{document,location:{origin:'http://loginom.test'},innerWidth:1280,innerHeight:800,__loginomDockPreparationV1:preparation,setTimeout,clearTimeout,requestAnimationFrame:callback=>callback(0)});
+ page.viewportSize=()=>({width:1280,height:800});
+ page.waitForFunction=async(fn,arg,options)=>{
+  waits++;
+  assert.equal(page.drops,0);assert.equal(page.down,false);
+  assert.ok(options.timeout>0&&options.timeout<=15000);
+  assert.equal(await page.evaluate(fn,arg),false);
+  if(placement==='persistent mask'){
+   page.clock+=options.timeout;
+   throw Error('Timeout waiting for loading mask');
+  }
+  mask=false;
+  assert.equal(await page.evaluate(fn,arg),true);
+  if(placement==='changed after mask')native[1].FCell.geometry.x+=8;
+  if(placement==='recurring mask')mask=true;
+  if(placement==='deadline after mask')page.clock=Date.now()+15001;
+ };
+ // Use the existing capability DOM model, evaluating real hit tests for the
+ // adapter/reveal instead of its capability-only interaction shortcut.
+ const locator=page.locator.bind(page),direct=loc=>{
+  loc.evaluate=async(fn,arg)=>fn(loc.all()[0],arg);
+  for(const name of ['locator','nth']){const next=loc[name].bind(loc);loc[name]=(...args)=>direct(next(...args));}return loc;
+ };
+ let zooms=0;
+ page.locator=selector=>{
+  if(selector.includes(';ModelForm;cntDiagram'))return {count:async()=>1,isVisible:async()=>true,locator:()=>({count:async()=>1,isVisible:async()=>true,getAttribute:async()=> 'Уменьшить масштаб',click:async()=>{
+   zooms++;page.viewScale=placement==='minimum zoom'?Math.max(minimum,page.viewScale*.75):page.viewScale*.75;
+   for(const key of cache.keys())if(key.includes(';Graph;'))cache.delete(key);
+   if(masked)mask=true;
+  }})};
+  return direct(locator(selector));
+ };
+ const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{actions,selectors},execute:code=>page.execute(code)});
+ const before=await adapter.observe(request,Date.now()+15000),effect={id:'connect',kind:'connect',before,parameters:{edge:{source:'sort-guid',output:0,target:'export-guid',input:0}}};
+ const source=exact(page.prefix+';Graph;Sort;Output_Data-0')[0].box;
+ assert.ok(placement==='offscreen source'||masked?source.x>1280:source.x>300&&source.x<1280);
+ const target=exact(page.prefix+';Graph;Export;Input_Data-0')[0].box;
+ assert.ok(placement==='distant target'?target.x>1280&&target.y>800:target.x>0&&target.x<1280&&target.y>0&&target.y<800);
+ if(placement==='minimum zoom')assert.ok(source.y<100);
+ if(masked&&placement!=='transient mask'){
+  await assert.rejects(adapter.mutate(effect,Date.now()+15000),placement==='persistent mask'?/Timeout waiting for loading mask/:placement==='changed after mask'?/Graph changed during link source navigation/:placement==='deadline after mask'?/Connect deadline elapsed/:/Graph is blocked/);
+  assert.equal(waits,placement==='recurring mask'?2:1);
+  assert.equal(page.drops,0);assert.equal(page.down,false);assert.deepEqual(page.edges,[]);
+  return;
+ }
+ const result=await adapter.mutate(effect,Date.now()+15000);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ if(placement==='offscreen source')assert.equal(zooms,1);
+ if(recorded){assert.equal(zooms,0);assert.equal(page.graph.scrollLeft,18);assert.equal(page.graph.scrollTop,42);}
+ if(masked)assert.equal(waits,1);
+ assert.equal(page.drops,1);assert.equal(page.down,false);
+ const after=await adapter.observe(request,Date.now()+15000);
+ assert.deepEqual(after.links,[effect.parameters.edge]);
+ assert.deepEqual(after.nodes.map(({dom_epoch,...node})=>node),before.nodes.map(({dom_epoch,...node})=>node));
+ assert.equal((await adapter.reconcile(effect,after,Date.now()+15000)).completed,true);
 });

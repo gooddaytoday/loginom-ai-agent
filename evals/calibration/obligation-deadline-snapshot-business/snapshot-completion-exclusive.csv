@@ -1,0 +1,4 @@
+team;deadline_month;obligations;on_time;late;open_overdue;open_not_due;violation_share
+T_A;2026-03;6;1;1;2;2;0.6
+T_B;2026-03;1;0;0;1;0;1
+T_B;2026-04;1;0;0;0;1;

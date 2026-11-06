@@ -1,0 +1,8 @@
+shipment_id;route;tariff_code
+S04;R2;UNK
+S01;R1;STD
+S07;R3;UNK
+S03;R2;STD
+S06;R1;STD
+S02;R1;EXP
+S05;R3;FREE

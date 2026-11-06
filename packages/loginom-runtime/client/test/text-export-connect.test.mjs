@@ -17,6 +17,7 @@ async function fixture(mode,targetType='exports.text'){
    if(mode==='hover_refusal')return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:'MODELFORM_MASK_CONTEXT_CHANGED: model_form'};
    return structuredClone(graph);
   }
+  if(code.includes('Graph changed during link source navigation'))return {fully_visible:true};
   if(code.includes('page.waitForFunction')){waits++;if(mode==='cancel')controller.abort();if(mode==='deadline')await new Promise(r=>setTimeout(r,30));return true;}
   if(code.includes('async function readGraph')){
    if(code.includes('\"read_bindings\":true')){if(mode==='cancel_rebind')controller.abort();return {...structuredClone(graph),native_bindings:[{node_id:'source',label:'Source',outputs:[0]},{node_id:'target',label:'Export',inputs:[1]}]};}

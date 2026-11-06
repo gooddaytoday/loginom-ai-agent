@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
-import {releasePendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
+import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
 import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
@@ -19,16 +19,16 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false,views=false}={}) {
+function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,views=false,variableMapping=false,context=node}={}) {
  let open=wizard,visualizers=views;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
- const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'views'},
+ const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'views'},
   workflow_navigation:{status:'observed',control_ref:'ui-nav',control_tid:'MF;TF-1;path',path},
   ui:{elements:[{tid:'MF;TF-1;path',ref:'ui-nav',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
-  prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard'},
+  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:variableMapping?'input_mapping':'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
+  prepared_node_context:{...context,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard',...(variableMapping?{input_port:{direction:'input',port:0,native_index:1,port_guid:'variables',opening_operation_id:'apply:n7:port',node_icon_class:'bg-vendor-icon-calcdata'}}:{})},
   ui:{elements:[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
-   ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:[]}};
+  :{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
+   ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:mask?[{ref:'ui-mask'}]:[]}};
  return {gestures,channel:{
   observe:async({ready})=>{const s=state();if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
   perform:async({resolve,initialObservation})=>{gestures.push(resolve(initialObservation));open=false;visualizers=false;}}};
@@ -38,6 +38,48 @@ const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_comple
  nodeApply:{pending:{phase:'configure'},node,request:{document_id:'doc',workflow_ref:workflow}},
  nodeTargetAdapter:{observe:async()=>graph()},receipt});
 const release=(operation,channel,restoreRead)=>releasePendingNode({operation,channel,restoreRead,readReceipt:async()=>operation.receipt});
+
+for(const fault of [null,'loading','foreign','stage','transport','receipt','gesture','graph','foreign-toast','foreign-mask'])test('stopped union opening settles only its own newly appeared wizard before cancellation: '+fault,async()=>{
+ const operation=stopped();let clock=1,closed=false,lastAction;const gestures=[];
+ operation.id='apply';operation.action={action_key:'node.apply',revision:'1'};operation.deadline=10000;
+ operation.nodeApply.pending={phase:'open'};operation.nodeApply.request.target={type:'variables.column_union'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};operation.transportUncertain=fault==='transport';
+ const graphContext={...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Union',locked:false};
+ operation.receipt={state:'completed',receipt:{operation_id:fault==='receipt'?'other':'apply:n7',action_key:'ui.act',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+  output:{prepared_node_context:{...graphContext,pending_wizard_node:{label:'Union'}},wizard:{status:'absent'}},error:{code:'WIZARD_CONTEXT_CHANGED'},
+  trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:fault==='gesture'?'execute_wizard':'begin_wizard'}]}};
+ const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',authenticated:true,workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},navigation_context:{status:'observed',path:workflow.navigation_path},
+  prepared_node_context:closed?graphContext:{...node,verified:true,node_id:fault==='foreign'?'other':node.node_id,surface:'wizard',tid:'MF;TF-1;WizrdMCF'},
+  wizard:closed?{status:'absent'}:{status:'observed',root_ref:'ui-w',root_tid:'MF;TF-1;WizrdMCF',stage:fault==='stage'?'calculator':'variables_column_union',owner_context:{status:'observed',node:{tid:'owner'}}},
+  ui:{elements:closed?[]:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[],truncated:{elements:false,dialogs:false,masks:false}}});
+ let graphReads=0;operation.nodeTargetAdapter.observe=async()=>{const graph=graphOf();graph.nodes[0].type='variables.column_union';if(fault==='graph'&&++graphReads>1)graph.links.push({source:'foreign'});return graph;};
+ const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms;},
+  record:async e=>{if(e.phase==='node_step_prepared')lastAction=e.action;return structuredClone(e);},wrapMutation:(code,ref)=>({code,ref}),execute:async code=>{
+   if(typeof code==='string'){
+    const s=state();
+    if(!closed&&fault==='loading'&&clock<400){s.prepared_node_context=graphContext;s.wizard={status:'absent'};s.ui.dialogs=[{identity:{anchor_tid:'toast'},title:'Информация',text:'Информация Мастера настройки для "Union" не существует. Будут отображены страницы настройки полей и/ или описания узла.'}];s.ui.masks=[{kind:'modal_background',target_tid:workflow.prefix,dialog_ref:null}];}
+    else if(!closed&&fault==='loading'&&clock<1000)s.ui.masks=[{kind:'busy',ref:'ui-w',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}];
+    if(fault==='foreign-toast')s.ui.dialogs=[{identity:{anchor_tid:'toast'},title:'Информация',text:'Other node'}];
+    if(fault==='foreign-mask')s.ui.masks=[{kind:'busy',ref:'other',target_tid:'Other'}];
+    return {status:'SUCCEEDED',output:s};
+   }
+   gestures.push(lastAction);assert.deepEqual(lastAction,{verb:'click',ref:'ui-close'});closed=true;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.ref.id,cleanup_complete:true,output:state(),effect_possible:true};
+  }});
+ if(fault&&fault!=='loading'){await assert.rejects(release(operation,channel));if(fault!=='graph')assert.deepEqual(gestures,[]);}
+ else {const proof=await release(operation,channel);assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(gestures,[{verb:'click',ref:'ui-close'}]);}
+});
+
+for(const fault of [null,'pending','transport','identity','action','phase','type','foreign','unknown','port-owner','mask'])test('Calculator variable mapping refusal cleanup retains exact receipt/native ownership: '+fault,async()=>{
+ const s=surface({wizard:true,variableMapping:true,foreign:fault==='foreign'}),operation=stopped();
+ operation.nodeApply.pending.phase=fault==='phase'?'configure':'input_mapping';operation.nodeApply.request.target={type:fault==='type'?'transform.filter_data':'transform.calculator'};
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'node.variables.variable_mapping.internal'};
+ operation.transportUncertain=fault==='transport';
+ operation.receipt={state:fault==='pending'?'pending':'completed',receipt:{operation_id:fault==='identity'?'other':'apply:n7',action_key:fault==='action'?'ui.act':'node.variables.variable_mapping.internal',phase:'variable_mapping',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:fault==='unknown'?'page.mouse.click: connection closed':'Unique connected variable source required: missing'}}};
+ if(['port-owner','mask'].includes(fault)){const observe=s.channel.observe;s.channel.observe=async options=>{const state=await observe(options);if(fault==='mask')state.ui.masks=[{kind:'busy',ref:'foreign'}];else state.prepared_node_context.input_port.opening_operation_id='other:port';return state;};}
+ if(fault){await assert.rejects(release(operation,s.channel));assert.deepEqual(s.gestures,[]);}
+ else {const proof=await release(operation,s.channel);assert.equal(proof.cleanup_complete,true);assert.equal(proof.cleanup.wizard_closed,true);assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);}
+});
 
 test('release proves a quiet unchanged graph without a gesture',async()=>{
  const s=surface(),proof=await release(stopped(),s.channel);
@@ -219,6 +261,50 @@ test('an unobservable release surface asks the user to cancel the open wizard fi
 test('release refuses a graph that changes between quiet reads',async()=>{
  let reads=0;const graph=()=>{const g=graphOf();if(reads++)g.links.push({source:'other',target:'new',input:0});return g;};
  await assert.rejects(release(stopped({graph}),surface().channel),/graph changed/);
+});
+test('browser recovery proves an already quiet graph without claiming a cleanup effect',async()=>{
+ const s=surface(),operation=stopped();
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+ const proof=await verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt});
+ assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
+ assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});
+ assert.equal(operation.receipt.receipt.cleanup_complete,false);assert.deepEqual(s.gestures,[]);
+});
+test('browser recovery refuses an unsafe native surface without a cleanup gesture',async()=>{
+ for(const options of [{wizard:true},{views:true},{locked:true},{dialog:true},{mask:true},
+  ...['document_id','workflow_id','node_id'].map(k=>({context:{...node,[k]:'foreign'}}))]) {
+  const s=surface(options),operation=stopped();let reads=0;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+  operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+  operation.nodeTargetAdapter.observe=async()=>{reads++;return graphOf();};
+  await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}),
+   /not on a quiet unlocked graph/,JSON.stringify(options));
+  assert.equal(reads,0);assert.deepEqual(s.gestures,[]);
+ }
+});
+test('browser recovery rechecks receipt, transport and port cleanup before observing the node',async()=>{
+ for(const fault of ['receipt','identity','transport','port','expired']) {
+  const operation=stopped(),s=surface();let reads=0;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+  operation.receipt={state:fault==='receipt'?'running':'completed',receipt:{operation_id:'apply:n7',
+   action_key:fault==='identity'?'foreign':'ui.act',cleanup_complete:false}};
+  operation.transportUncertain=fault==='transport';
+  if(fault==='port')operation.portReadCleanupComplete=false;
+  if(fault==='expired')operation.deadline=0;
+  s.channel.observe=async()=>{reads++;assert.fail('Unsettled work cannot authorize native reads');};
+  await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}));
+  assert.equal(reads,0);assert.deepEqual(s.gestures,[]);
+ }
+});
+test('browser recovery refuses a graph that changes after manual cleanup',async()=>{
+ let reads=0;
+ const operation=stopped({graph:()=>{const g=graphOf();if(reads++)g.links.push({source:'other',target:'new',input:0});return g;}});
+ operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:'ui.act'};
+ operation.receipt={state:'completed',receipt:{operation_id:'apply:n7',action_key:'ui.act',cleanup_complete:false}};
+ const s=surface();
+ await assert.rejects(verifyRecoveredPendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt}),/graph changed/);
+ assert.equal(reads,2);assert.deepEqual(s.gestures,[]);
 });
 
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,

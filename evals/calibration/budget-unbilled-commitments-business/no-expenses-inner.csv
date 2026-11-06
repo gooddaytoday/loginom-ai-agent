@@ -1,0 +1,3 @@
+cost_center;budget_item;limit_amount;spent;open_commitments;available
+CC1;I1;100.00;40.00;40.00;20.00
+CC1;I2;80.00;35.00;70.00;-25.00

@@ -43,7 +43,12 @@ export function validateCalculatorParameters(parameters,mode,request) {
     'Invalid parameters.parameters.order: list every calculated expression name exactly once; inherited input fields do not belong in expression order');
   requireValue(request.inputs.length<=1&&request.inputs.every(i=>i.input===0),'Calculator accepts one table input');
   requireValue(request.read.ports.every(p=>p===0),'Calculator has one table output');
-  requireValue(request.mappings.length<=2&&request.mappings.every(m=>m.port===0),'Calculator has one input and output mapping');
+  const variableMappings=request.mappings.filter(m=>m.kind!==undefined),tableMappings=request.mappings.filter(m=>m.kind===undefined);
+  requireValue(tableMappings.length<=2&&tableMappings.every(m=>m.port===0),'Calculator has one input and output mapping');
+  requireValue(variableMappings.length<=1&&variableMappings.every(m=>m.kind==='variables'&&m.direction==='input'&&m.port===0),
+    'Calculator accepts one ordinary variable input mapping at port 0');
+  requireValue((request.variable_inputs??[]).length<=1&&(request.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),
+    'Calculator accepts one ordinary variable input at port 0');
   requireValue(request.finish!=='close'||request.mappings.every(m=>m.direction!=='input'),
     'Close cannot combine a calculator draft with input mappings: Loginom commits the input in a separate wizard; use Done/Execute or omit input mappings');
 }

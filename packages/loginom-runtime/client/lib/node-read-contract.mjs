@@ -12,7 +12,8 @@ export function isUnchangedTransformExecution(request){
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0
   &&p&&typeof p==='object'&&!Array.isArray(p)
-  &&(type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
+  &&(type==='variables.from_table'&&request.mode==='aggregate'&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
+   ||type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
    ||type==='variables.replace'&&request.mode==='exact'&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
    ||type==='transform.enrich_data'&&request.mode==='left'&&Object.keys(p).length===0
    ||type==='transform.col_union_data'&&request.mode==='positional'&&Object.keys(p).length===0

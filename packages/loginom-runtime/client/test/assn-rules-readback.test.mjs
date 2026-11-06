@@ -12,6 +12,12 @@ test('readback distinguishes native training from subsequent execution and names
  assert.equal(result.training.status,'trained');assert.equal(result.training.source[0].node.node_id,'import');
  assert.equal(result.training.execution_id,'train-1');assert.equal(result.min_lift,0);assert.equal(result.max_items,2);
 });
+test('readback preserves the observed item technical name independently of its label',()=>{
+ for(const name of ['Item','Category','Товар категории']){
+  const input=candidate();input.phases[1].value.configuration.fields[1]={name,label:'Товар',usage_type:7};
+  assert.equal(assnRulesConfigurationReadback(input).item_field,name);
+ }
+});
 test('ordinary execution alone cannot claim a trained model',()=>{
  for(const alter of [v=>delete v.training,v=>v.training.execution_id=v.execution_id,v=>v.training.source=[]]){
   const input=candidate();alter(input.phases.at(-1).value);

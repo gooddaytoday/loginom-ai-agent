@@ -58,9 +58,15 @@ export function validateUserVariablesParameters(parameters,mode,request){
  const need=(ok,message)=>{if(!ok)throw Error('User variables: '+message);};
  need(parameters&&Object.keys(parameters).join(',')==='variables'&&Array.isArray(parameters.variables)&&parameters.variables.length<=128,'bounded variables patch required');
  need(new Set(parameters.variables.map(v=>v?.name)).size===parameters.variables.length,'duplicate variable name');
+ const civil=value=>{
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.000)?$/.test(value))return false;
+  const date=new Date(value.slice(0,19)+'.000Z');
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,19)===value.slice(0,19);
+ };
  for(const v of parameters.variables)need(v&&Object.keys(v).sort().join(',')==='name,type,value'&&typeof v.name==='string'&&/^[_A-Za-z][_A-Za-z0-9]{0,127}$/.test(v.name)
-  &&['integer','boolean','string'].includes(v.type)&&(v.value===null||v.type==='integer'&&Number.isSafeInteger(v.value)||v.type==='boolean'&&typeof v.value==='boolean'
-   ||v.type==='string'&&typeof v.value==='string'&&v.value.length<=4096),'exact safe integer, Boolean, string or explicit NULL required');
+  &&['integer','boolean','string','real','datetime'].includes(v.type)&&(v.value===null||v.type==='integer'&&Number.isSafeInteger(v.value)||v.type==='boolean'&&typeof v.value==='boolean'
+   ||v.type==='string'&&typeof v.value==='string'&&v.value.length<=4096||v.type==='real'&&typeof v.value==='number'&&Number.isFinite(v.value)
+   ||v.type==='datetime'&&civil(v.value)),'safe integer, finite real, Boolean, string, civil whole-second datetime (optional .000, no timezone), or explicit NULL required');
  if(request)need(mode==='values'&&request.target.kind==='existing'&&request.target.label===undefined&&request.target.position===undefined
   &&request.inputs.length===0&&!(request.variable_inputs?.length)&&request.mappings.length===0&&['done','close'].includes(request.finish)
   &&request.read.ports.length===0&&!(request.read.variable_ports?.length),'existing root builtin only; Done/Close, no links/mappings or preview. Save then dock_node_read for a snapshot');
@@ -71,6 +77,7 @@ export function makeUserVariablesConfigureCode(binding,options){
  return `async page=>{
   const run=${readUserVariablesSnapshot.toString()},readNode=${readPreparedNodeContext.toString()},openPort=${openPreparedOutputPort.toString()},records=${readVariableRecords.toString()},decode=${decodePortCell.toString()};
   const task=${JSON.stringify({binding,...options})};
+  ${options.variables.flatMap((v,i)=>Object.is(v.value,-0)?['task.variables['+i+'].value=-0;']:[]).join('')}
   const configured=await run(page,task,readNode,openPort,records,decode);
   if(configured.status!=='SUCCEEDED')return configured;
   const observed=await run(page,{...task,variables:[],finish:'close',operation_id:task.operation_id+':readback'},readNode,openPort,records,decode);
@@ -91,7 +98,8 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   const b=task.binding,p=globalThis.__loginomDockPreparationV1,a=bg.app,card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
   const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
-  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode)
    ||!(r.nodeTargetWorkflowNode.ParentNode instanceof a.ModelUnitItemTreeNode))throw Error('Root user snapshot owner changed');
   const tabs=exact(b.workflow_ref.tab_tid);if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active'))throw Error('User snapshot tab changed');
   if(mode==='dirty'){
@@ -126,7 +134,7 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
    ||extra.variable!==undefined&&cmp('edtName')?.getValue()!==extra.variable||extra.type!==undefined&&cmp('cbxDataType')?.getValue()!==extra.type)throw Error('Owned user variable editor required');
   if(mode==='dialog')return true;
   if(mode==='type'){
-   const combo=cmp('cbxDataType'),picker=combo?.picker,matches=combo?.getStore().getData().items.filter(v=>v.data.Value===extra.value&&v.data.DisplayText===({1:'Логический',4:'Целый',5:'Строковый'})[extra.value]);
+   const combo=cmp('cbxDataType'),picker=combo?.picker,matches=combo?.getStore().getData().items.filter(v=>v.data.Value===extra.value&&v.data.DisplayText===({1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'})[extra.value]);
    if(matches?.length!==1||!picker?.el.dom||!visible(picker.el.dom))throw Error('Owned user variable type picker required');const el=picker.getNode(matches[0]);if(!el||picker.getRecord(el)!==matches[0])throw Error('Bound variable type required');return point(el);
   }
   if(mode==='null'){const c=cmp('cbxNullValue');if(typeof c?.getValue()!=='boolean')throw Error('Native NULL checkbox required');return c.getValue();}
@@ -151,9 +159,10 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   baseline=inventory.variables;
   if(writing){
    for(const v of task.variables){const old=baseline.find(x=>x.name===v.name);if(old&&old.type!==v.type)throw Error('Existing user variable type differs; no edits applied');}
-   const equal=(v,a)=>a&&a.type===v.type&&a.cell.is_null===(v.value===null)&&(v.value===null?a.cell.value===null:a.cell.value===(v.type==='integer'?String(v.value):v.value));
+   const equal=(v,a)=>a&&a.type===v.type&&a.cell.is_null===(v.value===null)&&(v.value===null?a.cell.value===null:
+    Object.is(a.cell.value,v.type==='integer'?String(v.value):v.type==='datetime'?v.value.slice(0,19)+'.000':v.value));
    for(const v of task.variables){
-    const old=inventory.variables.find(x=>x.name===v.name),type={integer:4,boolean:1,string:5}[v.type];if(equal(v,old))continue;
+    const old=inventory.variables.find(x=>x.name===v.name),type={integer:4,boolean:1,string:5,real:3,datetime:2}[v.type];if(equal(v,old))continue;
     if(old){const point=await inspect('row',{id:old.id,name:old.name});await page.mouse.click(point.x,point.y);}
     const button=await inspect('button',{name:old?'btnEditMappingColumn':'btnAddMappingColumn'});await page.mouse.click(button.x,button.y);
     await at('EditVariableForm').waitFor({state:'visible',timeout:remaining()});await inspect('dialog',old?{variable:v.name,type}:{});
@@ -162,10 +171,19 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
     if(!old){await fill('edtName',v.name);await fill('edtDisplayName',v.name);}
     const isNull=v.value===null;if(await inspect('null',{variable:v.name,type})!==isNull)await at('EditVariableForm;cbxNullValue;DisplayEl').click({timeout:remaining()});
     if(await inspect('null',{variable:v.name,type})!==isNull)throw Error('User NULL checkbox readback differs');
-    if(!isNull){if(type===1){const point=await inspect('boolean',{variable:v.name,type,value:v.value});await page.mouse.click(point.x,point.y);}else await fill(type===4?'pgcValue;Int64Field':'pgcValue;txt',String(v.value));}
+    if(!isNull){
+     if(type===1){const point=await inspect('boolean',{variable:v.name,type,value:v.value});await page.mouse.click(point.x,point.y);}
+     else {
+      // The observed native number field uses '.', and the date editor drops milliseconds.
+      // Expand scientific notation without changing the binary64 round-trip decimal.
+      const text=Object.is(v.value,-0)?'-0':String(v.value),parts=text.toLowerCase().split('e');
+      const number=type!==3||parts.length===1?text:(()=>{const sign=parts[0].startsWith('-')?'-':'',digits=parts[0].replace('-','').replace('.',''),point=parts[0].replace('-','').split('.')[0].length+Number(parts[1]);return sign+(point<=0?'0.'+'0'.repeat(-point)+digits:point>=digits.length?digits+'0'.repeat(point-digits.length):digits.slice(0,point)+'.'+digits.slice(point));})();
+      await fill(type===4?'pgcValue;Int64Field':type===3?'pgcValue;num':type===2?'pgcValue;datetimefield':'pgcValue;txt',type===2?v.value.slice(0,19):type===3?number:text);
+     }
+    }
     await inspect('dialog',{variable:v.name,type});await at('EditVariableForm;btnApply').click({timeout:remaining()});await page.locator('[data-tid="EditVariableForm"]').waitFor({state:'hidden',timeout:remaining()});
     await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t)+']'),grid=e&&Ext.getCmp(e.id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false;},root+';VariablesEditValuesWizard;grdTargetColumns',{timeout:remaining()});
-    inventory=await inspect('inventory');const now=inventory.variables.find(a=>a.name===v.name);if(!equal(v,now)||old&&old.id!==now.id)throw Error('User variable exact value/ID readback differs');changed.push(v.name);
+    inventory=await inspect('inventory');const now=inventory.variables.find(a=>a.name===v.name);if(!equal(v,now)||old&&(old.id!==now.id||old.label!==now.label||old.index!==now.index))throw Error('User variable exact value/ID/label/order readback differs');changed.push(v.name);
    }
    for(const old of baseline.filter(v=>!task.variables.some(x=>x.name===v.name)))if(JSON.stringify(inventory.variables.find(v=>v.id===old.id))!==JSON.stringify(old))throw Error('Unrequested user variable changed');
   }
@@ -252,7 +270,8 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   const fail=s=>{throw Error('CrossTable variables: '+s);},visible=e=>e.checkVisibility({checkVisibilityCSS:true}),exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
   const cmp=t=>{const es=exact(t);return es.length===1&&Ext.getCmp(es[0].id)?.el.dom===es[0]?Ext.getCmp(es[0].id):null;};
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode);
-  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1)fail('document/workflow');
+  if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(r=>r.tab!==rs[0].tab||r.packageNode!==rs[0].packageNode||r.nodeTargetWorkflowNode!==rs[0].nodeTargetWorkflowNode))fail('document/workflow');
   const wf=rs[0].nodeTargetWorkflowNode,root=b.workflow_ref.prefix+';WizrdMCF',gridTid=root+';TuneVariablesMappingWizard;grdTargetColumns';
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||box.width<=0||box.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))fail('rendered hit');return {x,y};};
   if(['graph','menu','graph_finished','leave_hover'].includes(mode)){

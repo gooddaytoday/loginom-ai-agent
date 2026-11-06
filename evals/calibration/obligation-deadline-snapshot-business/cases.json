@@ -1,0 +1,129 @@
+{
+  "sources": {
+    "SPEC.md": "b090a695acb309a8469a09f9dc374d1427495b274bc09bf7242d55915acf1d00",
+    "acceptance.json": "81a02798591a92421b0ca3e084662107159fa38fea50419b24cff2a75a3c9f25",
+    "data/obligations.csv": "660621379042700bb7ada585a1daf5ce695701c2b5a6e63e67dda60c0366b5da",
+    "oracle.csv": "b78be299377017f68532378d38f6ad7a5979ba01b182088ad340d85c7bdf460d",
+    "oracle.py": "7b4429f0d265655fae1bf9f93ef59fb6ecf9063c435918f6a605f9639a293aeb",
+    "provenance.json": "d9f5223914f0861ebd7c9e8e5775511914e59426ae195e2ba673d2ace73ed025",
+    "reference.lgp": "10ae3c3cb1bdeb8d70aef4e2bfa20cb7695808e258b429f5c51e3d7f201042c9",
+    "task.json": "d46c16cda16a289ef94e5922e7bd62da043c91d1a35fc0395d2beb06ab02c673"
+  },
+  "cases": [
+    {
+      "id": "snapshot-completion-exclusive",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(IsNull(completed_at), 0, IFF(completed_at &lt;= EncodeDateTime(2026, 3, 15, 12, 0, 0), 1, 0))\"",
+          "to": "Expression=\"IFF(IsNull(completed_at), 0, IFF(completed_at &lt; EncodeDateTime(2026, 3, 15, 12, 0, 0), 1, 0))\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "snapshot-four-class-partition",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "snapshot-completion-exclusive.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "completed <= snapshot",
+            "to": "completed < snapshot",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "future-completion-observed",
+      "kind": "filter",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(IsNull(completed_at), 0, IFF(completed_at &lt;= EncodeDateTime(2026, 3, 15, 12, 0, 0), 1, 0))\"",
+          "to": "Expression=\"IFF(IsNull(completed_at), 0, 1)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "snapshot-four-class-partition",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "future-completion-observed.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "observed = completed is not None and completed <= snapshot",
+            "to": "observed = completed is not None",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "all-obligations-denominator",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(due_count = 0, Null(), (late + open_overdue) / due_count)\"",
+          "to": "Expression=\"IFF(obligations = 0, Null(), (late + open_overdue) / obligations)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "due-denominator-violation-share",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "all-obligations-denominator.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "counts[\"due\"] += int(deadline <= snapshot)",
+            "to": "counts[\"due\"] += 1",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "all-open-overdue",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(observed = 0 AND deadline &lt; EncodeDateTime(2026, 3, 15, 12, 0, 0), 1, 0)\"",
+          "to": "Expression=\"IFF(observed = 0, 1, 0)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(observed = 0 AND deadline &gt;= EncodeDateTime(2026, 3, 15, 12, 0, 0), 1, 0)\"",
+          "to": "Expression=\"0\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "snapshot-four-class-partition",
+        "complete-team-month-registry",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "all-open-overdue.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "else \"open_overdue\" if deadline < snapshot else \"open_not_due\"",
+            "to": "else \"open_overdue\"",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

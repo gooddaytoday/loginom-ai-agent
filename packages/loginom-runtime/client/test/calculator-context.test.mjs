@@ -24,6 +24,31 @@ test('calculator uses selected editor text and retains other cached expressions 
  const r=fixture().read();assert.equal(r.verified,true);assert.equal(r.expressions[0].formula,'A + 1');assert.equal(r.expressions[1].formula,'A + 2');
  assert.equal(r.expressions[1].cached,true);assert.equal(r.input_fields[0].name,'A');assert.equal(r.syntax_validity,'unverified');assert.equal(r.settings_applied,false);
 });
+test('calculator reads complete Fields and Variables behind either native group filter',()=>{
+ for(const group of ['Fields','Variables','all']){
+  const f=fixture(),variable={isModel:true,internalId:'v1',data:{Name:'Var.A',DisplayName:'Scenario',DataType:4,GroupType:'Variables',Value:null}};
+  const source=[...f.fields,variable],visible=group==='all'?source:source.filter(r=>r.data.GroupType===group);
+  f.fieldStore.getData=()=>({items:visible,getSource:()=>({items:source})});
+  f.fieldStore.getCount=()=>visible.length;
+  const r=f.read();assert.equal(r.verified,true,group);
+  assert.equal(r.input_fields.length,1);assert.equal(r.input_fields[0].name,'A');
+  assert.equal(r.input_variables.length,1);assert.equal(r.input_variables[0].name,'Var.A');
+  assert.equal(r.input_variables[0].type,'integer');assert.equal(Object.hasOwn(r.input_variables[0],'value'),false);
+ }
+});
+test('calculator refuses partial groups, unknown groups and duplicate source identities',()=>{
+ for(const mutate of [
+  (source)=>source.push({...source[0],internalId:'f2',data:{...source[0].data,Name:'B'}}),
+  (source)=>source.push(source[1]),
+  (source)=>{source[1].internalId=source[0].internalId;},
+  (source)=>{source[1].data.GroupType='Other';},
+  (source)=>{source[1].data.DataType=999;},
+ ]){
+  const f=fixture(),source=[...f.fields,{isModel:true,internalId:'v1',data:{Name:'Var.A',DisplayName:'Scenario',DataType:4,GroupType:'Variables'}}];
+  mutate(source);f.fieldStore.getData=()=>({items:f.fields,getSource:()=>({items:source})});
+  assert.equal(f.read().verified,false);
+ }
+});
 test('calculator refuses incomplete stores, changed identities, foreign selection and unsupported mode',()=>{
  const mutations=[f=>f.expressionStore.isLoading=()=>true,f=>f.expressionStore.getCount=()=>4,
   f=>f.expressionStore.getData=()=>({items:f.records,getSource:()=>({items:[...f.records,{}]})}),
@@ -31,7 +56,7 @@ test('calculator refuses incomplete stores, changed identities, foreign selectio
   f=>f.expressionStore.getData=()=>({items:f.records,getSource:()=>({items:[f.records[0],f.records[0]]})}),
   f=>f.fields[0].internalId=undefined,f=>f.records[1].data.Name='x',f=>f.records[1].data.Index=0,
   f=>f.selection[0]={...f.records[0]},f=>f.mode.querySelector=()=>null,f=>f.doc.getLine=()=> 'a\r',
-  f=>f.doc.lineCount=()=>129,f=>f.fields[0].data.GroupType='Variables',f=>f.fields[0].data.DataType=999,
+  f=>f.doc.lineCount=()=>129,f=>f.fields[0].data.GroupType='Other',f=>f.fields[0].data.DataType=999,
   f=>f.fieldStore.getData=()=>({items:f.fields,getSource:()=>({items:[...f.fields,{}]})}),f=>f.root.mask=true,
   f=>f.components[f.grid.id].el.dom=f.input];
  for(const [i,mutate] of mutations.entries()){const f=fixture();mutate(f);assert.equal(f.read().verified,false,'mutation '+i);}

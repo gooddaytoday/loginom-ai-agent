@@ -58,3 +58,29 @@ test("the bundle bakes the feed parameter and defaults to disabled", async () =>
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test("the bundle bakes immutable GitHub endpoints and runtime environment cannot replace them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-github-bundle-"))
+  try {
+    const api = "https://api.example.test/repos/owner/repo/releases/"
+    const download = "https://github.example.test/owner/repo/releases/download/"
+    const bundle = await Bun.build({
+      entrypoints: [new URL("../src/index.ts", import.meta.url).pathname],
+      target: "bun",
+      define: {
+        LOGINOM_AI_AGENT_UPDATE_FEED: "null",
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_API: JSON.stringify(api),
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: JSON.stringify(download),
+      },
+    })
+    expect(bundle.success).toBe(true)
+    const file = join(root, "github.mjs")
+    await writeFile(file, await bundle.outputs[0].text())
+    const built = await import(pathToFileURL(file).href)
+    expect(built.Product.updateGithub).toEqual({ api, download })
+    expect(Object.isFrozen(built.Product.updateGithub)).toBe(true)
+    expect(Product.updateGithub).toBeNull()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

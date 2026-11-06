@@ -1,0 +1,6 @@
+invoice_id;customer_id;line_id;amount
+V01;U01;N01;10.00
+V01;U01;N02;5.00
+V02;U01;N03;20.00
+V03;U02;N04;7.00
+V04;U04;N05;0.00

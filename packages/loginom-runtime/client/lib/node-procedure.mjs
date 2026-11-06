@@ -1,4 +1,5 @@
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
+import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
 import {makeVariablesCalculatorContextCode} from './variables-calculator-context.mjs';
 import {makeVariablesCalculatorConfigureCode} from './variables-calculator-procedure.mjs';
 import {makeVariablePortMappingCode} from './variable-port-mapping.mjs';
@@ -33,6 +34,7 @@ import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
+import {makeVariablesToTableContextCode} from './variables-vartodata-context.mjs';
 import {makeSortingContextCode} from './sorting-context.mjs';
 import {makeEnrichContextCode} from './enrich-context.mjs';
 import {makeUnionContextCode} from './union-context.mjs';
@@ -42,6 +44,7 @@ import {makeFilterContextCode} from './filter-context.mjs';
 import {makeDuplicatesContextCode} from './duplicates-context.mjs';
 import {makeReformContextCode} from './reform-context.mjs';
 import {makeGroupingContextCode} from './grouping-context.mjs';
+import {makeDataToVarContextCode} from './variables-datatovar-context.mjs';
 import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
@@ -136,6 +139,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.wizard.factor_editor.selected_field?.status==='rendered_selected'
     &&dialog.ref===state.wizard.factor_editor.dialog_ref
     &&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  const allowedDataToVarFactorEditor=(dialog,state)=>{
+    const native=state.node_datatovar,editor=state.wizard?.factor_editor,selected=native?.selections?.selected;
+    return state.wizard?.stage==='datatovar'&&native?.verified===true&&native.inventory_complete===true
+      &&native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===state.prepared_node_context?.[k])
+      &&editor?.status==='rendered_factor_options'&&editor.selected_field?.status==='rendered_selected'
+      &&selected?.length===1&&native.fields?.filter(f=>f.record_id===selected[0]&&f.name===editor.selected_field.field_key&&f.role==='selected').length===1
+      &&dialog.ref===editor.dialog_ref&&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
+  };
   const allowedSamplingFactorEditor=(dialog,state)=>{
     const n=state.node_sampling,field=n?.bias_fields?.rows?.filter(r=>r.selected),category=n?.bias?.rows?.filter(r=>r.selected);
     return ['sampling','data_partition'].includes(state.wizard?.stage)&&n?.kind===state.wizard.stage
@@ -193,7 +204,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
   const allowedTreeConversionEditor=(dialog,state)=>{const c=state.node_tree,portal=c?.editor??c?.delete_confirmation;return state.wizard?.stage==='table_tree'&&c?.verified===true&&portal&&c.selected.length===1&&c.selected[0]===portal.selected_record_id&&(portal.root_tid==='msgbox'?state.ui.elements.some(e=>e.tid==='msgbox;tlb;yes'&&e.signature?.dialog_ref===dialog.ref):dialog.identity?.anchor_tid===portal.root_tid);};
-  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedDataToVarFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -249,6 +260,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     now,
     async readOutputPort(request) {
       checkBudget();
+      if((operation.nodeApply?.request??operation.parameters)?.target?.type==='variables.to_table')request={...request,typedVariants:true};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
@@ -428,7 +440,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesCalculator = false, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -446,10 +458,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
       if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
         ||!settleWizard.root_ref&&settleWizard.graph_only!==true||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
+      if(settleWizard?.union_opening&&(operation.nodeApply?.request?.target?.type!=='variables.column_union'
+        ||operation.nodeApply.pending?.phase!=='open'))throw Error('Union opening release requires its stopped phase');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readVariablesCalculator || readCalculator || readJavascript || readGrouping || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readVariablesColumnUnion || readVariablesCalculator || readCalculator || readJavascript || readGrouping || readDataToVar || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readVariablesToTable || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -466,6 +480,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const started = now(), monotonicStarted = settleOutputPort||settleProcessConsole?.quiet?undefined:monotonicNow();
       const observationNow = settleOutputPort||settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
       let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort||settleProcessConsole?.quiet?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
+      // Journal latency must not reclassify a timely UI sample. ACKs still
+      // consume the original operation/receipt budget and cannot authorize late work.
+      const acknowledge = async (phase, details) => {
+        const ackDeadline = Math.min(operation.deadline, settleWizard?.deadline ?? Infinity);
+        const remaining = ackDeadline - now();
+        const expired = () => new Error('Node observation journal acknowledgement exceeded the original operation deadline: '+phase);
+        if (remaining <= 0) throw expired();
+        let timer;
+        try {
+          const saved = await Promise.race([entry(phase, details), new Promise((_, reject) => {
+            timer = setTimeout(() => reject(expired()), remaining);
+          })]);
+          if (now() >= ackDeadline) throw expired();
+          signal?.throwIfAborted();
+          return saved;
+        } finally { clearTimeout(timer); }
+      };
       const readTimeout = () => Math.min(35000, Math.max(settleWizard||settleProcessConsole?.quiet?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
       const read = async (code,options,readDeadline=deadline) => {
         const limit=settleOutputPort?Math.min(readDeadline,deadline,now()+OUTPUT_SETTLEMENT_READ_MS):deadline;
@@ -487,13 +518,29 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const assertSettlement = state => {
         if(!settleWizard)return;
         const n=state.prepared_node_context,w=state.wizard;
+        if(settleWizard.union_opening){
+          // A stopped begin_wizard may paint its owned wizard after the
+          // refusal. Bind that one root once, retaining all native ID checks.
+          const prefix=preparedNodeContext.workflow_ref.prefix;
+          if(state.ui?.dialogs?.some(d=>d.identity?.anchor_tid!=='toast'||d.title!=='Информация'||!settleWizard.opening_label
+            ||d.text!=='Информация Мастера настройки для "'+settleWizard.opening_label+'" не существует. Будут отображены страницы настройки полей и/ или описания узла.')
+            ||state.ui?.dialogs?.length>1||state.ui?.masks?.some(m=>!['busy','modal_background'].includes(m.kind)||m.dialog_ref
+              ||!(n?.surface==='graph'&&(m.target_tid===prefix||m.target_tid===prefix+';ModelForm'&&m.graph_loading_owner_ref)
+                ||n?.surface==='wizard'&&(m.ref===w?.root_ref&&m.target_tid===prefix+';WizrdMCF'||m.wizard_loading_owner_ref===w?.root_ref))))
+            throw Error('Union opening release has a foreign blocker');
+          if(n?.surface==='wizard'){
+            if(w?.status!=='observed'||w.stage!=='variables_column_union'||w.root_tid!==prefix+';WizrdMCF'
+              ||settleWizard.root_ref&&settleWizard.root_ref!==w.root_ref)throw Error('Union opening release wizard changed');
+            settleWizard.root_ref=w.root_ref;settleWizard.graph_only=false;
+          }
+        }
         if(n?.verified!==true||!['document_id','workflow_id','node_id','input_port','output_port'].every(k=>
           JSON.stringify(n[k])===JSON.stringify(settleWizard.node[k]))
           ||!(n.surface==='graph'&&w?.status==='absent'
             ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
           throw Error('Original wizard receipt context changed');
       };
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
+      let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -557,7 +604,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readNavigation&&!navigationRoot)throw Error('Prepared workflow navigation region unavailable');
         const outputEditors=['output_mapping','input_mapping'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===(wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm')):[];
         if(outputEditors.length>1)throw Error('Output field editor is ambiguous');
-        const editorSuffix=wizard?.stage==='calculator'?';ExprDataEditForm':wizard?.stage==='grouping'?';FactorEditDialog':null;
+        const editorSuffix=wizard?.stage==='calculator'?';ExprDataEditForm':['grouping','datatovar'].includes(wizard?.stage)?';FactorEditDialog':null;
         const expressionEditors=editorSuffix?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+editorSuffix):wizard?.stage==='field_parameters'?(roots.output.ui?.elements??[]).filter(e=>['EditReformColumnDefForm',wizard.root_tid+';EditReformColumnDefForm'].includes(e.tid)):[];
         if(expressionEditors.length>1)throw Error('Calculator expression editor is ambiguous');
         // This is read-only root selection. The subsequent full read must prove
@@ -698,6 +745,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           result.output.node_tree=await read(makeTreeWizardContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_tree.node_context&&JSON.stringify(canonical(result.output.node_tree.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Tree conversion native owner changed during observation');
         }
+        if(readDataToVar&&result.output.wizard?.stage==='datatovar'
+          &&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid===result.output.wizard.root_tid+';FactorEditDialog')){
+          result.output.node_datatovar=await read(makeDataToVarContextCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=result.output.node_datatovar;
+          if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
+            throw Error('Table-to-variables factor native owner changed during observation');
+        }
         if(readSampling&&['sampling','data_partition'].includes(result.output.wizard?.stage)
           &&result.output.ui.dialogs.some(d=>d.identity?.anchor_tid===result.output.wizard.root_tid+';FactorEditDialog')){
           result.output.node_sampling=await read(makeSamplingContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -785,7 +839,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // prepared node before and after. Preserve them in the same journal
         // observation; they are not an execution or data-freshness claim.
         for (const [requested,key,makeCode] of [[readOutputs,'node_outputs',makeNodeOutputContextCode], [readMappings,'node_mapping',makeNodeMappingContextCode],
-          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readVariablesCalculator,'node_variables_calculator',makeVariablesCalculatorContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
+          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readVariablesColumnUnion,'node_variables_column_union',makeVariablesColumnUnionContextCode], [readVariablesCalculator,'node_variables_calculator',makeVariablesCalculatorContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readDataToVar,'node_datatovar',makeDataToVarContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readVariablesToTable,'node_variables_to_table',makeVariablesToTableContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
           const native=await read(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1029,29 +1083,30 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           || result.output.ui.masks.every(m=>result.output.ui.dialogs.length===1&&allowedNodeEditor(result.output.ui.dialogs[0],result.output)
             &&m.kind==='modal_background'&&m.target_tid===result.output.wizard.root_tid&&m.ref===result.output.wizard.root_ref)
             &&result.output.ui.dialogs.every(d=>allowedDialog(d,tableDialog)||allowedOutputEditor(d,result.output)||allowedNodeEditor(d,result.output)))
-          && ready(result.output) === true && observationNow() < deadline;
+          && ready(result.output) === true;
+        observedAt = observationNow();
+        satisfied &&= observedAt < deadline;
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
-        await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started },
+        await acknowledge('node_observation_sample', { step, sample, internal_operation_id: id,
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started },
           outcome: structuredClone(result) });
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
         if (satisfied && confirmations >= (confirmIdentity ? 2 : 1)) break;
       }
-      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
+      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1)) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
       }
-      const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
-        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
+      const persisted = await acknowledge('node_observation_completed', { step, internal_operation_id: id,
+        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observedAt - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
-      if((settleOutputPort||settleWizard)&&observationNow()>=Math.min(deadline,settleWizard?.deadline??Infinity))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;
@@ -1214,6 +1269,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,
+          readDataToVar:initialObservation?.node_datatovar!==undefined,
           readCrossTable:initialObservation?.node_crosstable!==undefined,
           readSmoothing:initialObservation?.node_smoothing!==undefined,readSampling:initialObservation?.node_sampling!==undefined,readTrees:initialObservation?.node_tree!==undefined,
           readSlidingWindow:initialObservation?.node_sliding_window!==undefined,
@@ -1222,6 +1278,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readCoarseClasses:initialObservation?.node_coarse_classes!==undefined,
           readBinning:initialObservation?.node_binning!==undefined,
           readCollapse:initialObservation?.node_collapse!==undefined,
+          readVariablesToTable:initialObservation?.node_variables_to_table!==undefined,
           readSorting:initialObservation?.node_sorting!==undefined,
           readReplacement:initialObservation?.node_replacement!==undefined,
           readMissingValues:initialObservation?.node_missing_values!==undefined,
@@ -1233,6 +1290,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readEnrich:initialObservation?.node_enrich!==undefined,
           readUnion:initialObservation?.node_union!==undefined,
           readColUnion:initialObservation?.node_col_union!==undefined,
+          readVariablesColumnUnion:initialObservation?.node_variables_column_union!==undefined,
           readPreview:initialObservation?.node_preview_schema!==undefined,
           readProcessControls:initialObservation?.node_process_controls_read===true,
           readProcesses:initialObservation?.node_processes!==undefined,readOutputs:initialObservation?.node_outputs!==undefined,tableDialog:initialObservation?.node_table_dialog,

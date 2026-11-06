@@ -1,0 +1,42 @@
+{
+  "task_id": "licensed-seats-billing-audit-business",
+  "source_task": "licensed-seats-billing-audit-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/licensed-seats-billing-audit-detailed/provenance.json",
+  "dataset_sha256": {
+    "accounts.csv": "8b52775ac31ddc32a20385559057eebed13cdc08330b290b6945ae863ebbf15f",
+    "bills.csv": "4913bc031330a40a7f9559f9e9fd74138d3b9702dd9954ede2cb9005b59ccf3f",
+    "plans.csv": "89af794710cd18ab8367d561d348a2974b88c2b2da0db886f9d626f792453b9f",
+    "seats.csv": "b0ea799d2bb213fbd1c200903bd4f5761fa195e76a645a8b804b01ff7e94db43"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "3498b0302abd3c33ace5dc8557224d71bd43f63c21c72804b225d938d9383f8d"
+  },
+  "reference_sha256": "a55f1bd62e7024d12a39b6d495a1de4255a9e04c6338cb19ed415e2bc33618c0",
+  "private_endpoint_omitted": true,
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal.Decimal",
+      "builtin set"
+    ],
+    "algorithm": "Independent raw per-account seat_id sets with enabled=1 AND billable=1, max with own minimum, own-plan Decimal prices and separate complete Decimal bill ledger; full accounts registry and sorted account_id; independently checked full manual 4x7 table and separate fresh ONLY-B result; no Loginom outputs used."
+  },
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic four accounts, six seats, two plans and three bills prepared under the approved P06 fixture plan and frozen before manual gold/oracle; raw flags, contractual minimum, plan prices and invoice amounts, no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not real customers or invoices. Full February 2026, one monetary unit without tax or prorating; unique complete account/plan registries, valid non-null foreign keys, nonnegative money/minimum and integer 0/1 flags. No within-month license history."
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

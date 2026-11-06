@@ -1,0 +1,42 @@
+{
+  "task_id": "order-discount-category-revenue-business",
+  "source_task": "order-discount-category-revenue-detailed",
+  "reference_origin": "shared accepted detailed reference; no separate business authoring attempt",
+  "source_provenance": "../../analytic-detailed/order-discount-category-revenue-detailed/provenance.json",
+  "dataset_sha256": {
+    "lines.csv": "a776d2bb6fe08cf9e719f5fbc15f61626068670cd51336ca32db324097bd6886",
+    "orders.csv": "f25b18bd229679d58802c25d9df577ebc7a827e75f18cb95d203c03bc48454b5"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "ecd71ab17d5d40b253a138603d2c161393b6893c36fcf5962cb4fddbc5a1b489"
+  },
+  "reference_sha256": "bd913ccdb018b5a57427c71891073ee6f59737239ce4af045f4f9986d730bf4d",
+  "private_endpoint_omitted": true,
+  "scenario_url_origin": "derived from Authoring endpoint, saved package and Unit_0/Info.xml Name=Unit1; not separately visited as a deep link",
+  "dataset_origin": {
+    "kind": "synthetic",
+    "author": "eval author",
+    "description": "Original synthetic 3-order/7-line dataset frozen before manual gold and independent oracle under approved P14 fixture plan; no precomputed answer columns.",
+    "external_sources": [],
+    "external_license": null,
+    "repository_license": "MIT",
+    "limitations": "Not UCI, real sales data or a derived real-data snapshot. Case-sensitive ASCII keys/categories; orders.order_id and lines.line_id unique; every lines.order_id exists in orders. All cells nonempty/no NULL; qty positive integer, unit_price/order_discount nonnegative, each order gross positive. Repeated category within an order and multi-category orders intentional. No time window or date transformation."
+  },
+  "oracle_runtime": {
+    "implementation": "CPython",
+    "version": "3.12.3",
+    "libraries": [
+      "stdlib csv",
+      "stdlib decimal",
+      "stdlib collections",
+      "stdlib pathlib"
+    ],
+    "algorithm": "Independent raw-CSV Decimal qty*unit_price by line_id and totals by order_id; allocate discounts proportionally without intermediate rounding, aggregate category gross/discount, count distinct order_id with sets, net=gross-discount, ASCII sorting. Full manual 3×5 independently checked before native; no Loginom outputs used."
+  },
+  "checks": {
+    "shared_inputs_identical": true,
+    "shared_detailed_cli_check": true,
+    "cold_rerun_shared_reference": true
+  },
+  "publication_note": "Local machine paths, instance addresses and session/storage identifiers are omitted. Verification statements describe the original run; private evidence is not included. Public datasets, versions and content hashes are retained."
+}

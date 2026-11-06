@@ -2,6 +2,7 @@ import {decodePortCell,makeNodeVariableOutputCode} from '../lib/node-port-output
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {chromium} from 'playwright-core';
 import {readVariableRecords,readOutputContext,makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
 const portGuid='11111111-1111-1111-1111-111111111111',viewGuid='22222222-2222-2222-2222-222222222222';
 function fixture(surface='graph') {
@@ -108,10 +109,25 @@ test('W1 executable variable reader refuses a fabricated execution before any br
  assert.throws(()=>makeNodeVariableOutputCode({document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]},node:{document_id:'doc',workflow_id:'wf',node_id:'n'}},{port:0,execution:{execution_id:'fake'}}));
 });
 
-test('W1 observed DataToVar real output uses the existing finite binary64 decoder, without admitting real writes',()=>{
+test('W1 real values and preview use the existing finite binary64 decoder',()=>{
  const s=variableStore();s.items[1].data.DataType=3;s.items[1].data.ValueVariant=3.5;
  assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.value,3.5);
- assert.throws(()=>readVariableRecords(s,'values',decodePortCell));
+ s.items[1].data.DisplayValue=3.5;assert.equal(readVariableRecords(s,'values',decodePortCell).variables[1].cell.value,3.5);
  s.items[1].data.ValueVariant=Infinity;assert.throws(()=>readVariableRecords(s,'preview',decodePortCell));
  for(const patch of [{complete:false},{loadCount:0},{getTotalCount:()=>8}])assert.throws(()=>readVariableRecords({...variableStore(),...patch},'preview',decodePortCell));
+});
+test('W1 local datetime values retain civil milliseconds and typed NULL through W2 decoder',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
+},async t=>{
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
+ for(const timezoneId of ['UTC','Europe/Moscow']){
+  const context=await browser.newContext({timezoneId});t.after(()=>context.close());const page=await context.newPage();
+  const results=await page.evaluate(({storeCode,readCode,decodeCode})=>{
+   const store=eval('('+storeCode+')')(),read=eval('('+readCode+')'),decode=eval('('+decodeCode+')');
+   store.items[1].data.DataType=2;store.items[1].data.DisplayValue=new Date(2026,10,5,5,47,52,160);
+   const value=read(store,'values',decode).variables[1];store.items[1].data.ValueIsNull=true;
+   return [value,read(store,'values',decode).variables[1]];
+  },{storeCode:variableStore.toString(),readCode:readVariableRecords.toString(),decodeCode:decodePortCell.toString()});
+  assert.equal(results[0].type,'datetime');assert.equal(results[0].cell.value,'2026-11-05T05:47:52.160');assert.equal(results[0].cell.precision,'millisecond');assert.equal(results[1].cell.is_null,true);
+ }
 });

@@ -1,0 +1,142 @@
+{
+  "sources": {
+    "task.json": "fd969af864fd1b6e09f6c0e88772ddf1aac28a4295a06a890ab9b19bdca41fe3",
+    "reference.lgp": "e9fac621f33360047f6742d6b4ade615bc3fc0634f4d3df7c83bcc2513b235e9",
+    "SPEC.md": "67f8eda0633f0e7258f079e9d9f1d71d30b56729670ff7604f3701403898ecf9",
+    "oracle.py": "9a4381b19c7b2917eb18657466c5cfc36439a141088e5b446621c9795db08fff",
+    "oracle.csv": "974658bdcad4ab9c789e3a35200ef7fd7c8dc5e691fb5bf40e435b234adb45da",
+    "acceptance.json": "02ecc5ba2855165380d87d98f27d4afe55ea9c4ce01139dc993761ace1fe5654",
+    "provenance.json": "9058148d13bcbd7c0ca5718203f2cbd4b8e13e9708830001ba738fbe475f1dc9",
+    "data/shipments.csv": "36854a4c6aad28a016be595556d7179b16550e519d08aa7bd898926df9c6bc8f",
+    "data/packages.csv": "7f11045cefc2564487f5239441dd309e4342e0ba4b77353682dc507e22151dcf",
+    "data/tariffs.csv": "ed074d85a876b66252b9e98ae1bdcd6c7aabd0020a07b34be22ab350dd667fd5",
+    "data/carrier_bills.csv": "215175d6c69e7e05036d7586283b46153c7c97e053d4b9716322554cbb6e55ce"
+  },
+  "cases": [
+    {
+      "id": "fee-twice",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "fixed_fee + weight_kg * price_per_kg",
+          "to": "2 * fixed_fee + weight_kg * price_per_kg",
+          "count": 2
+        }
+      ],
+      "result_csv": "fee-twice.csv",
+      "expected_failed": [
+        "tariff-key-once",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Decimal(tariff[\"fixed_fee\"]) + weight[shipment_id] * Decimal(tariff[\"price_per_kg\"])",
+            "to": "2 * Decimal(tariff[\"fixed_fee\"]) + weight[shipment_id] * Decimal(tariff[\"price_per_kg\"])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "positive-price-as-presence",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"tariff_marker\" DataType=\"dtInteger\" Expression=\"1\"/>",
+          "to": "<Item Name=\"tariff_marker\" DataType=\"dtInteger\" Expression=\"IFF(price_per_kg &gt; 0, 1, Null)\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "positive-price-as-presence.csv",
+      "expected_failed": [
+        "unknown-tariff",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "tariff = tariffs.get((shipment[\"route\"], shipment[\"tariff_code\"]))",
+            "to": "tariff = tariffs.get((shipment[\"route\"], shipment[\"tariff_code\"]))\n        if tariff is not None and Decimal(tariff[\"price_per_kg\"]) <= 0:\n            tariff = None",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "null-zero-export",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(IsNull(expected_cost), Null,",
+          "to": "IF(IsNull(expected_cost), &quot;0.00&quot;,",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(IsNull(deviation), Null,",
+          "to": "IF(IsNull(deviation), &quot;0.00&quot;,",
+          "count": 1
+        }
+      ],
+      "result_csv": "null-zero-export.csv",
+      "expected_failed": [
+        "unknown-tariff",
+        "result-full"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "\"\" if expected is None else money(",
+            "to": "\"0.00\" if expected is None else money(",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "one-decimal-money",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"expected_cost\" DataType=\"dtString\" Expression=\"IF(IsNull(expected_cost), Null, Concat(IF(expected_cost &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(expected_cost) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(expected_cost) * 100) - 100 * Int(Round(Abs(expected_cost) * 100) / 100), 2)))\" Replaced=\"true\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"expected_cost\" DataType=\"dtString\" Expression=\"IF(IsNull(expected_cost), Null, Concat(IF(expected_cost &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(expected_cost) * 10) / 10)), &quot;.&quot;, StrZero(Round(Abs(expected_cost) * 10) - 10 * Int(Round(Abs(expected_cost) * 10) / 10), 1)))\" Replaced=\"true\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"actual_bill\" DataType=\"dtString\" Expression=\"IF(IsNull(actual_bill), Null, Concat(IF(actual_bill &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(actual_bill) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(actual_bill) * 100) - 100 * Int(Round(Abs(actual_bill) * 100) / 100), 2)))\" Replaced=\"true\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"actual_bill\" DataType=\"dtString\" Expression=\"IF(IsNull(actual_bill), Null, Concat(IF(actual_bill &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(actual_bill) * 10) / 10)), &quot;.&quot;, StrZero(Round(Abs(actual_bill) * 10) - 10 * Int(Round(Abs(actual_bill) * 10) / 10), 1)))\" Replaced=\"true\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "\t\t\t\t\t\t\t<Item Name=\"deviation\" DataType=\"dtString\" Expression=\"IF(IsNull(deviation), Null, Concat(IF(deviation &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(deviation) * 100) / 100)), &quot;.&quot;, StrZero(Round(Abs(deviation) * 100) - 100 * Int(Round(Abs(deviation) * 100) / 100), 2)))\" Replaced=\"true\"/>",
+          "to": "\t\t\t\t\t\t\t<Item Name=\"deviation\" DataType=\"dtString\" Expression=\"IF(IsNull(deviation), Null, Concat(IF(deviation &lt; 0, &quot;-&quot;, &quot;&quot;), Str(Int(Round(Abs(deviation) * 10) / 10)), &quot;.&quot;, StrZero(Round(Abs(deviation) * 10) - 10 * Int(Round(Abs(deviation) * 10) / 10), 1)))\" Replaced=\"true\"/>",
+          "count": 1
+        }
+      ],
+      "result_csv": "one-decimal-money.csv",
+      "expected_failed": [
+        "result-full"
+      ],
+      "expected_oracle_pass": true,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    text = format(value, \"f\")\n    return text + (\".00\" if \".\" not in text else \"0\" * max(0, 2 - len(text.split(\".\")[1])))",
+            "to": "    return format(value, \".1f\")",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

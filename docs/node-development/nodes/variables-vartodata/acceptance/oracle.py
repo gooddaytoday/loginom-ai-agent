@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proposed columns oracle, independent of Loginom/runtime; Python stdlib only."""
+"""Independent columns/rows oracle, independent of Loginom/runtime; Python stdlib only."""
 import argparse
 import csv
 import json
@@ -74,31 +74,44 @@ def expected(mode='columns'):
              'Value': None if v['value'] is None else {'cell_type': v['type'], 'value': v['value']}}
             for v in variables
         ]
-    return {
+    result = {
         'package_path': '{{PACKAGE_PATH}}',
         'nodes': [{'type': 'variables.to_table'}],
         'outputs': [output],
     }
+    if mode in ('columns', 'rows'):
+        # The source is the authored variable Calculator, not the unused user
+        # variables builtin. W1 audits its reciprocal edge; the complete table
+        # oracle independently proves all eight typed values and field metadata.
+        result['variable_inventory'] = {
+            'outputs': [],
+            'links': [{'source': {'type': 'variables.calculator'}, 'output': 0,
+                       'target': {'type': 'variables.to_table'}, 'input': 0, 'kind': 'variables'}],
+        }
+    return result
 
 
 def check_csv(path, result):
     with Path(path).open(encoding='utf-8-sig', newline='') as stream:
         rows = list(csv.reader(stream, delimiter=','))
     columns = result['outputs'][0]['columns']
-    assert len(rows) == 2 and rows[0] == [c['name'] for c in columns], 'CSV shape/order'
-    assert len(rows[1]) == len(columns), 'CSV width'
-    for column, cell in zip(columns, rows[1]):
-        value = result['outputs'][0]['rows'][0][column['name']]
-        if value is None:
-            assert cell == '?', 'NULL marker'
-        elif column['type'] in ('integer', 'real'):
-            assert Decimal(cell) == Decimal(str(value)), 'Numeric value'
-        elif column['type'] == 'boolean':
-            assert cell == ('True' if value else 'False'), 'Boolean value'
-        elif column['type'] == 'datetime':
-            assert datetime.fromisoformat(cell) == datetime.fromisoformat(value), 'Datetime precision'
-        else:
-            assert cell == value, 'String value'
+    assert len(rows) == len(result['outputs'][0]['rows']) + 1 and rows[0] == [c['name'] for c in columns], 'CSV shape/order'
+    for cells, expected_row in zip(rows[1:], result['outputs'][0]['rows']):
+        assert len(cells) == len(columns), 'CSV width'
+        for column, cell in zip(columns, cells):
+            value, kind = expected_row[column['name']], column['type']
+            if kind == 'variant' and value is not None:
+                kind, value = value['cell_type'], value['value']
+            if value is None:
+                assert cell == '?', 'NULL marker'
+            elif kind in ('integer', 'real'):
+                assert Decimal(cell) == Decimal(str(value)), 'Numeric value'
+            elif kind == 'boolean':
+                assert cell == ('True' if value else 'False'), 'Boolean value'
+            elif kind == 'datetime':
+                assert datetime.fromisoformat(cell) == datetime.fromisoformat(value), 'Datetime precision'
+            else:
+                assert cell == value, 'String value'
 
 
 if __name__ == '__main__':
@@ -109,9 +122,8 @@ if __name__ == '__main__':
     parser.add_argument('--mode', choices=('columns', 'rows'), default='columns')
     args = parser.parse_args()
     result = expected(args.mode)
-    path = ROOT / ('expected.json' if args.mode == 'columns' else 'expected-rows.proposal.json')
+    path = ROOT / ('expected.json' if args.mode == 'columns' else 'expected-rows.json')
     if args.csv:
-        assert args.mode == 'columns', 'Rows CSV/subtypes require approved W2; no stringification oracle'
         check_csv(args.csv, result)
         print('PASS: complete CSV matches authored typed variables')
     elif args.write:

@@ -89,6 +89,15 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none']:
+        variant = {'row-filter-variables': 'mixed', 'row-filter-list': 'list', 'row-filter-scalar': 'scalar', 'row-filter-empty': 'empty', 'row-filter-none': 'none'}[name]
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-variable-' + variant + '.md'),
+                    data=node / 'fixtures', base=None,
+                    input_files=['variables-empty.csv' if variant == 'empty' else 'variables.csv'],
+                    export_count=2 if variant == 'empty' else 4,
+                    expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
+                    filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'
@@ -97,6 +106,14 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='composite/expected.json' if composite else 'expected.json',
                     input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
                     ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
+    if name == 'variables-rows':
+        src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
+        return dict(source=src, prompt=src / 'task-rows.md', data=src / 'data', base=None,
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected-rows.json')
+    if name == 'variables-columns':
+        src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    input_files=[], expected_name='expected.json')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -312,15 +329,40 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
+    if name == 'variables-column-union':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',
+                    source_package=src.parent / 'fixtures/source.lgp', variable_only=True, variable_audit='variables-column-union', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-column-union.mjs')
+    if name in ['variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        variant = name.removeprefix('variables-datatovar').lstrip('-')
+        expected = 'expected-' + variant + '-run.json' if variant else 'expected-run.json'
+        return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'), data=src.parent / 'fixtures',
+                    input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
+                    expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
+                    variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-user-real-date':
+        src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
+        # mas3 R2: 1803s minus 26s upload recovery still exceeds 1500s.
+        # setup 180 + model 2400 + cold 1800 = 4380s, within the 85-minute batch.
+        return dict(source=src, prompt=src / 'task-real-datetime.md', data=src.parent / 'fixtures', input_files=['transactions.csv'], base=None,
+                    expected_name='expected-updated-run.json', variables_real_date=True, export_count=2, model_timeout=2400)
     if name == 'variables-user':
         src = REPO / 'docs/node-development/variables/acceptance'
         return dict(source=src, prompt=src / 'task-user.md', data=src.parent / 'fixtures', base=None, expected_name='expected-user.json',
                     variable_only=True, oracle=REPO / 'scripts/node-acceptance/expected-outputs.mjs')
+    if name in ['calculator-vars', 'calculator-vars-update']:
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        update = name == 'calculator-vars-update'
+        return dict(source=src, prompt=src / ('task-variables-update.md' if update else 'task-variables.md'),
+                    data=src.parent / 'fixtures', input_files=['variables.csv'], base=None,
+                    expected_name='expected.json' if update else 'expected-initial.json', oracle=src / 'oracle-variables.py')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -592,13 +634,17 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
     if infer_marker:
         null_marker = export_null_marker(export_events, destination)
-        assert not any(row[col['name']] is not None and str(row[col['name']]) == null_marker
+        assert not any(row[col['name']] is not None and str(row[col['name']].get('value') if col['type'] == 'variant' and isinstance(row[col['name']], dict) else row[col['name']]) == null_marker
                        for row in expected['rows'] for col in columns), 'CSV_NULL_MARKER_COLLISION'
     elif null_marker is None:
         null_marker = ''
-    assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
-    assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
-    assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
+    has_header = expected.get('header', True)
+    assert isinstance(has_header, bool), 'INVALID_CSV_HEADER'
+    if has_header:
+        assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
+    data_rows = rows[1:] if has_header else rows
+    assert all(len(row) == len(columns) for row in data_rows), 'CSV_ROW_WIDTH'
+    assert len(data_rows) == len(expected['rows']), 'CSV_ROW_COUNT'
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned and only apply to types300.
@@ -629,7 +675,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
-        if scenario_name in ['quality-default', 'quality-spikes'] and col['type'] == 'variant':
+        if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())
         if col['type'] in ['integer', 'real']:
@@ -671,17 +717,20 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     def fits(name, col):
         return (col.get('label_any') if header == 'labels' else col.get('name_any')) or name == (col.get('label', col['name']) if header == 'labels' else col['name'])
 
-    if (column_order or expected.get('column_order')) == 'exact':
+    if not has_header:
+        # Without names/labels, expected columns declare CSV positions.
+        indices = list(range(len(columns)))
+    elif (column_order or expected.get('column_order')) == 'exact':
         assert all(fits(name, col) for name, col in zip(rows[0], columns)), 'CSV_COLUMN_ORDER'
         indices = list(range(len(columns)))
     else:
         flexible = any(c.get('label_any') if header == 'labels' else c.get('name_any') for c in columns)
         indices = matching([[i for i, name in enumerate(rows[0]) if fits(name, col)
-                             and (not flexible or matching([[j for j, row in enumerate(rows[1:])
+                             and (not flexible or matching([[j for j, row in enumerate(data_rows)
                                   if equal(row[i], col, want[col['name']])] for want in expected['rows']]) is not None)]
                             for col in columns], unique=flexible)
         assert indices is not None, 'CSV_COLUMN_ORDER'
-    options = [[j for j, row in enumerate(rows[1:]) if all(equal(row[indices[i]], col, want[col['name']])
+    options = [[j for j, row in enumerate(data_rows) if all(equal(row[indices[i]], col, want[col['name']])
                 for i, col in enumerate(columns))] for want in expected['rows']]
     categories = [i for i, col in enumerate(columns) if col.get('category_labels_any')]
     pairs = matching(options, unique=bool(categories)) if not expected.get('ordered') else (
@@ -690,14 +739,14 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     for i in categories:
         forward, reverse = {}, {}
         for want, actual in enumerate(pairs):
-            key, value = expected['rows'][want][columns[i]['name']], rows[actual + 1][indices[i]]
+            key, value = expected['rows'][want][columns[i]['name']], data_rows[actual][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
     if scenario_name == 'types300' and d76 is not None:
         counts = dict(negative_zero=0, midnight_date=0)
         for want, actual in enumerate(pairs):
             for i, col in enumerate(columns):
-                kind = limitation(rows[actual + 1][indices[i]], col, expected['rows'][want][col['name']])
+                kind = limitation(data_rows[actual][indices[i]], col, expected['rows'][want][col['name']])
                 if kind: counts[kind] += 1
         d76.update(counts)
     return delimiter
@@ -1050,8 +1099,15 @@ class Runner:
             labels = [n['label'] for n in expected['nodes'] if n.get('label')]
             prompt += '\nНазови узел дерева «' + labels[0] + '», узел JSON «' + labels[1] + '».'
         rejection = expected.get('rejection')
+        refusal = expected.get('refusal')
         execution_error = expected.get('execution_error')
         lgd_corrupt = spec.get('lgd') == 'corrupt'
+        if refusal is not None:
+            assert (isinstance(refusal, dict) and set(refusal) == {'text'}
+                    and isinstance(refusal['text'], str) and refusal['text'].strip()
+                    and expected['outputs'] == [] and not rejection and not execution_error
+                    and not spec.get('upload_only') and not lgd_corrupt
+                    and all(n['type'].startswith('imports.') for n in expected['nodes'])), 'INVALID_REFUSAL_ORACLE'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -1067,11 +1123,12 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('variable_only') or spec.get('upload_only') or rejection or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('variable_only') and not spec.get('upload_only') and not rejection and not execution_error and not lgd_corrupt:
+        if spec.get('variable_only') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not spec.get('variable_only') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+            if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
@@ -1079,7 +1136,7 @@ class Runner:
             prompt = prompt.replace(name, destination)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not rejection and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
@@ -1128,6 +1185,12 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if spec.get('variables_real_date'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'variable-events.json', evidence)
+            self.phase('user-real-date-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-user-real-date.mjs',
+                src / 'expected-initial-run.json', folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
         if spec.get('upload_only'):
             calls = [event.get('part', {}) for _, event in records(folder / 'model.stdout')
                      if event.get('type') == 'tool_use']
@@ -1163,6 +1226,25 @@ class Runner:
             return session, expected, None, None
         assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
+        if refusal:
+            allowed = {n['type'] for n in expected['nodes']}
+            for _, event in events:
+                part = event.get('part', {})
+                if event.get('type') != 'tool_use': continue
+                request = part.get('state', {}).get('input', {})
+                if part.get('tool') == 'loginom_dock_node_apply':
+                    assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
+                if part.get('tool') == 'loginom_dock_action_run' and request.get('action_key') == 'node.add':
+                    assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
+            answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
+                           if event.get('type') == 'text'), (None, ''))
+            assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
+            assert not any(p.is_file() and not any(
+                re.fullmatch(r'[0-9a-f]{64}-\d+-' + re.escape(name), p.name)
+                and hashlib.sha256(p.read_bytes()).digest() == digest
+                for name, digest in inputs.items()) for p in profile.rglob('*.csv')), 'UNEXPECTED_CSV'
+            self.current.update(refusal='PASS', refusal_location=str(folder / 'model.stdout') + ':' + str(answer[0]))
         if lgd_corrupt:
             for _, event in events:
                 part = event.get('part', {})
@@ -1282,7 +1364,7 @@ class Runner:
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
         invalid = (port_failure(replies, folder / 'model.stdout')
-                   if not spec.get('variable_only') and (not (rejection or execution_error or lgd_corrupt) or delivered) else None)
+                   if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
@@ -1314,8 +1396,11 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
-                src / spec.get('variable_initial', 'expected-user-initial.json'), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace'] else 'snapshot'})
+                src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union'] else 'snapshot')})
+            return session, expected, None, None
+        if refusal:
+            self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
             return session, expected, None, None
         if lgd_corrupt:
             self.current.update(csv='— (checksum refusal)', cold='— (negative case)')
@@ -1388,7 +1473,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            delimiter = check_csv(actual, expected['outputs'][index], header,
+            csv_expected = (read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
+                            else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
+            delimiter = check_csv(actual, csv_expected, header,
                                   column_order='any' if isinstance(case, Path) else None,
                                   null_marker=expected.get('null_marker'), scenario_name=case, d76=counts,
                                   export_events=events, destination=destination)
@@ -1435,6 +1522,9 @@ class Runner:
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    if spec.get('source_package'):
+                        write(folder / 'source-config.json', dict(login=login, package=r['package']))
+                        self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     base = spec['base']
                     session = None
                     for step in ([base, case] if base else [case]):
@@ -1443,7 +1533,7 @@ class Runner:
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
+                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)

@@ -70,5 +70,21 @@
         }
       ]
     }
-  ]
+  ],
+  "variable_inventory": {
+    "outputs": [],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.to_table"
+        },
+        "input": 0,
+        "kind": "variables"
+      }
+    ]
+  }
 }

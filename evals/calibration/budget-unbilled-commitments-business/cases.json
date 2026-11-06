@@ -1,0 +1,128 @@
+{
+  "sources": {
+    "SPEC.md": "28072c03ec81d232c282cb6926638ac763fd56eb86a7bd9f74763ebf39391860",
+    "acceptance.json": "505ae55d87f5e5ac7019db62c5f529d74d01eee85753d54d831e878da342a50b",
+    "data/budgets.csv": "29e00227845dcd34e6792ac931639b4b97af95203abac55dda38a9fa3d801459",
+    "data/expenses.csv": "472133d8f8e44db35592f22604f8bfce5bc92601911962c7cea8b230fcf6f2c9",
+    "data/orders.csv": "8e0c77429e654ab48e4cb9310ec12ee391eff4e19b2e0bcacacf3e08f6ef1c18",
+    "oracle.csv": "d29ae43f36bcda6e1a4328e27994dc176cd0b56049d5bd7ea61cae6dcab7c8dd",
+    "oracle.py": "bae4fff725334e4893490e3ec86b4a272de8080ee193e831d3aa873a7e1553f6",
+    "provenance.json": "e8b847a53026d01cbf9d37d2698fc65183a5b872e57e101cdf2ece7f249858a3",
+    "reference.lgp": "01fc4be161f6efc50054d233e746f0f807a00d434b234f3ef10934958eb9a0fb",
+    "task.json": "fd6950fae9324a92cb038b4a05a5377e8acb77c9b67b2825d455ff5ad028d85b"
+  },
+  "cases": [
+    {
+      "id": "full-orders-double-counted",
+      "kind": "column",
+      "expected_failed": [
+        "remaining-order-commitments",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(status = &quot;active&quot;, IF(committed_amount &gt; NVLF(order_spent, 0), committed_amount - NVLF(order_spent, 0), 0), 0)\"",
+          "to": "Expression=\"IF(status = &quot;active&quot;, committed_amount, 0)\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "full-orders-double-counted.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "max(Decimal(row[\"committed_amount\"]) - order_spent[row[\"order_id\"]], Decimal(0))",
+            "to": "Decimal(row[\"committed_amount\"])",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "direct-expense-lost",
+      "kind": "filter",
+      "expected_failed": [
+        "all-posted-expenses",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"7eb3c9e4-56fb-49d6-bef5-6b4df17b38eb\">\n\t\t\t\t<SourcePort NodeGuid=\"e9191d7a-98d9-46d9-9a11-3df403520ee6\" PortGuid=\"58f7e6c3-511e-39d7-8853-036e0a1a7612\"/>\n\t\t\t\t<TargetPort NodeGuid=\"484481a9-4662-4b1c-9807-5cdfe8c63408\" PortGuid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\"/>\n\t\t\t</Item>",
+          "to": "<Item Guid=\"7eb3c9e4-56fb-49d6-bef5-6b4df17b38eb\">\n\t\t\t\t<SourcePort NodeGuid=\"69dcbf56-5fce-45f8-97f0-cbf91c85c7d1\" PortGuid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\"/>\n\t\t\t\t<TargetPort NodeGuid=\"484481a9-4662-4b1c-9807-5cdfe8c63408\" PortGuid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\"/>\n\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "direct-expense-lost.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        spent[row[\"cost_center\"], row[\"budget_item\"]] += amount",
+            "to": "        if row[\"order_id\"]:\n            spent[row[\"cost_center\"], row[\"budget_item\"]] += amount",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "no-expenses-inner",
+      "kind": "filter",
+      "expected_failed": [
+        "budget-registry",
+        "result-table"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"5f5c3e4e-dbad-4865-ba38-e2e01a00d727\">\n\t\t\t\t\t\t\t\t<Left Name=\"cost_center\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"cost_center\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"c229fcc4-391f-4d31-868d-7c9b21873e76\">\n\t\t\t\t\t\t\t\t<Left Name=\"budget_item\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"budget_item\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">\n\t\t\t\t\t\t<Links>\n\t\t\t\t\t\t\t<Item Guid=\"5f5c3e4e-dbad-4865-ba38-e2e01a00d727\">\n\t\t\t\t\t\t\t\t<Left Name=\"cost_center\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"cost_center\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t\t<Item Guid=\"c229fcc4-391f-4d31-868d-7c9b21873e76\">\n\t\t\t\t\t\t\t\t<Left Name=\"budget_item\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"budget_item\"/>\n\t\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t</Links>\n\t\t\t\t\t</Engine>",
+          "count": 1
+        }
+      ],
+      "result_csv": "no-expenses-inner.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "with (root / \"oracle.csv\").open(\"w\", newline=\"\", encoding=\"utf-8\") as result:",
+            "to": "with (root / \"data/expenses.csv\").open(newline=\"\", encoding=\"utf-8\") as source:\n    expense_keys = {(row[\"cost_center\"], row[\"budget_item\"]) for row in csv.DictReader(source, delimiter=\";\")}\nwith (root / \"oracle.csv\").open(\"w\", newline=\"\", encoding=\"utf-8\") as result:",
+            "count": 1
+          },
+          {
+            "from": "    for key in sorted(budgets):",
+            "to": "    for key in sorted(expense_keys):",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "money-min-padding-one",
+      "kind": "column",
+      "expected_failed": [
+        "result-table"
+      ],
+      "expected_oracle_pass": true,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "StrZero(Round(Frac(Abs(limit_amount)) * 100), 2)",
+          "to": "StrZero(Round(Frac(Abs(limit_amount)) * 100), 1)",
+          "count": 1
+        }
+      ],
+      "result_csv": "money-min-padding-one.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "*(f\"{value:.2f}\" for value in [budgets[key], spent[key], open_commitments[key], budgets[key] - spent[key] - open_commitments[key]])",
+            "to": "f\"{int(budgets[key])}.{int((budgets[key] % 1) * 100):01d}\", *(f\"{value:.2f}\" for value in [spent[key], open_commitments[key], budgets[key] - spent[key] - open_commitments[key]])",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
