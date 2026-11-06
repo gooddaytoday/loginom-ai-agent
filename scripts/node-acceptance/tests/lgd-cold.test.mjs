@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verifyLgdFields} from '../lgd-cold.mjs';
 import {readFile} from 'node:fs/promises';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
+test('LGD checksum fixture uses the stock cold expected contract',async()=>{
+ const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/checksum/expected.json',import.meta.url),'utf8'));
+ assert.equal(parseExpectedOutputs({...expected,package_path:'/own/checksum.lgp'}).outputs.length,3);
+});
 test('LGD cold audits retained source before execution and materialized output properties after full reading',async()=>{
  const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('  let coldChannelSequence=0;'),source.indexOf('  const matched=correspondence.map'));
