@@ -60,33 +60,34 @@ test('browser transport diagnostics retain the bounded original cause privately'
 });
 
 test('untyped browser reply retains only bounded text in its private cause',()=>{
- const text='### Modal state\n["confirm" dialog] '+ 'я'.repeat(3000);
+ const text='### Ran Playwright code\n```js\n'+ 'GENERATED_CODE'.repeat(500)+'\n```\n### Modal state\n["confirm" dialog] '+ 'я'.repeat(3000);
  assert.throws(()=>parseCapabilityResult({content:[{type:'image',data:'PRIVATE_BINARY'},
   {type:'text',text},{type:'text',text:'OMITTED_TAIL'}]}),error=>{
   assert.equal(error.message,'Pinned browser capability returned no typed result');
   assert.ok(Buffer.byteLength(error.cause.message)<=2048);
-  assert.ok(error.cause.message.startsWith('### Modal state\n["confirm" dialog] '));
+  assert.ok(error.cause.message.trimStart().startsWith('### Modal state\n["confirm" dialog] '));
+  assert.ok(!error.cause.message.includes('GENERATED_CODE'));
   assert.ok(!error.cause.message.includes('PRIVATE_BINARY'));
   assert.ok(!error.cause.message.includes('OMITTED_TAIL'));
   return true;
  });
 });
 
-test('private transport journal redacts the retained cause and keeps the public refusal fixed',async()=>{
+for(const isError of [true,false])test('private transport journal redacts the retained cause and keeps the public refusal fixed: '+isError,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'upload-cause-'));
  try{
   const record=createExecutionJournal({directory,metadata:{sessionId:'test'},knownSecrets:['PRIVATE']});
   let failure;
-  try{parseCapabilityResult({isError:true,content:[{type:'text',text:'Error: peer reset password=PRIVATE'}]});}
+  try{parseCapabilityResult({isError,content:[{type:'text',text:'Error: peer reset password=PRIVATE'}]});}
   catch(error){failure=error;}
   await record({phase:'artifact_upload_transport_failed',cause:operationFailureDiagnostic(failure,{uploadCause:true})});
   const text=await readFile(join(directory,'execution-events.jsonl'),'utf8');
   assert.ok(!text.includes('PRIVATE'));
   const cause=JSON.parse(text).cause;
   assert.equal(cause.name,'Error');
-  assert.equal(cause.code,'UNCLASSIFIED_BROWSER_ERROR');
+  assert.equal(cause.code,isError?'UNCLASSIFIED_BROWSER_ERROR':'UNCLASSIFIED_ERROR');
   assert.equal(cause.detail,null);
   assert.match(cause.original_message,/^Error: peer reset password=\s*\[redacted\]$/);
-  assert.equal(failure.message,'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]');
+  assert.equal(failure.message,isError?'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]':'Pinned browser capability returned no typed result');
  }finally{await rm(directory,{recursive:true,force:true});}
 });
