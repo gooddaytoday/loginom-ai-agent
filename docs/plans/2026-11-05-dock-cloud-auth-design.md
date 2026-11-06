@@ -71,3 +71,36 @@ verifyApiKey, updateApiKey, signOut/revokeSession и deviceAuthorization.
 Сайт и reserve ещё не реализованы. Неизвестны текущие production ACL,
 allow_private_networks и внешняя доступность admin API; это условия развёртывания,
 не уже доказанные свойства. Макет остаётся иллюстрацией во временной папке.
+
+## План уточнений 2026-11-06
+
+- [x] Сверить proxy с канонической system proxy v2, диагностику с текущим View,
+      условие revokeSession с официальным исходником Better Auth v1.7.17.
+- [x] Независимо проверить минимальный план правок до изменения спецификации.
+      Approved; условие revokeSession сверено также независимым reviewer.
+- [x] Уточнить §3–6 и проверки §11: proxy-вариант А, совместимая диагностика,
+      raw token той же device-сессии, ротация пары при отзыве пользователя;
+      отдельно определить browser check при сохранении до облачного входа.
+- [x] Сохранить точки интеграции connection-required для будущего плана.
+- [x] Проверить изменённые формулировки независимо, выполнить документальные
+      проверки и зафиксировать только документацию.
+      Diff получил Approved; `git diff --check` пройден. Проверка без runtime.
+
+Для будущего плана: `connection-required` требует изменить обработку успешного
+сохранения и завершения polling в
+`packages/app/src/components/settings-loginom-state.ts`, убрать безусловное
+`help: ready` из `packages/opencode/src/cli/loginom-management.ts` и распознавать
+новый профиль в `evals/src/profile.ts`. Это точки интеграции нового состояния,
+а не дефекты существующего кода до начала реализации функции.
+В `packages/app/src/components/settings-loginom.tsx` отдельно проверить подписи
+после browser check и toast сохранения: browser verified не означает Help ready.
+Onboarding сохраняет критерий наличия настроек; CLI automation preflight вправе
+требовать фактический Help ready перед работой.
+
+Уточнения подтверждены чтением исходников. Proxy-вариант А не переносит системный
+resolver в Host/Help и не меняет system proxy v2. Передача explicit env в Help
+не признана доказательством её применения транспортом; эта проверка остаётся
+в реализации. Diagnostics сохраняет прежний View в обоих форматах ответа.
+Для revokeSession явно требуется raw token той же authenticated device-сессии.
+Отзыв пользователя явно ротирует обе Dock credentials. Сохранение до входа
+не запускает browser check автоматически; явный Check проверяет его отдельно.
