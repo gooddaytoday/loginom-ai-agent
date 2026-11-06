@@ -54,6 +54,11 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  mock.module('../../lib/node-api.mjs',{namedExports:{...nodeApi,
   dispatchNodeApi:async(runtime,name,args,options)=>['dock_node_wait','dock_node_status'].includes(name)
    ?worker:nodeApi.dispatchNodeApi(runtime,name,args,options)}});
+ const inspection={operation_id:worker.operation_id,status:'SUCCEEDED',action_key:'operation.inspect',effect_possible:false,
+  output:{state:'resolved',cleanup_confirmed:true,effect_state:'verified',outcome:worker.outcome}};
+ const executor=await import('../../lib/executor.mjs');
+ mock.module('../../lib/executor.mjs',{namedExports:{...executor,createActionRuntime:options=>({
+  ...executor.createActionRuntime(options),inspect:async()=>inspection})}});
  mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
  mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
  mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
@@ -127,7 +132,26 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const logged=(await readFile(diagnosticPath,'utf8')).trim().split('\n').map(JSON.parse)
    .find(event=>event.tool_name==='dock_node_wait');
   assert.deepEqual(logged.result,worker);
-  assert.equal((await call('dock_node_status',{operation_id:worker.operation_id})).isError,true);
+  const status=await call('dock_node_status',{operation_id:worker.operation_id});
+  assert.notEqual(status.isError,true);assert.ok(size(status)<=46000);
+  assert.equal(parse(status).status,'SUCCEEDED');assert.equal(parse(status).output.ports[0].sample_rows,0);
+  const retainedInspection=JSON.stringify(inspection);
+  const inspected=await call('dock_operation_inspect',{operation_id:worker.operation_id});
+  assert.notEqual(inspected.isError,true);assert.ok(size(inspected)<=46000);
+  const original=parse(inspected).output;
+  assert.equal(original.state,'resolved');assert.equal(original.cleanup_confirmed,true);assert.equal(original.outcome.status,'SUCCEEDED');
+  assert.equal(original.outcome.output.output.ports[0].sample_rows,1);
+  // Now both status and inspection must shrink a cell larger than a single-copy envelope.
+  worker.outcome.output.output.ports[0].sample[0][0].value='"'.repeat(24000);
+  const oversizedWorker=JSON.stringify(worker),oversizedInspection=JSON.stringify(inspection);
+  for(const tool of ['dock_node_wait','dock_node_status','dock_operation_inspect']){
+   const bounded=await call(tool,{operation_id:worker.operation_id});assert.notEqual(bounded.isError,true);assert.ok(size(bounded)<=46000);
+   const output=tool==='dock_operation_inspect'?parse(bounded).output.outcome.output:parse(bounded);
+   assert.equal(output.output.ports[0].sample_rows,0);assert.equal(output.output.ports[0].sample_complete,false);
+   assert.deepEqual(output.configuration,worker.outcome.output.configuration);
+  }
+  assert.equal(JSON.stringify(worker),oversizedWorker);assert.equal(JSON.stringify(inspection),oversizedInspection);
+  assert.notEqual(retainedInspection,oversizedInspection);
   const all=await call('dock_action_describe',{node_types:[...parse(inventory).available_node_types.filter(t=>t!=='programming.javascript').slice(0,31),'programming.javascript']});
   assert.equal(all.isError,true);assert.equal(parse(all).error.scope,'whole_response');assert.ok(size(all)<2000);
   const pair=await call('dock_action_describe',{node_types:['imports.text','programming.javascript']});
