@@ -14,6 +14,9 @@ if (!executable || !resources || !credentialProfile) throw Error("INSTALLED_DESK
 const xiaomi = Boolean(process.env.XIAOMI_API_KEY)
 const record = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
 const secret = await cliCredentials("win32").decode(record.secrets)
+if (!secret || typeof secret !== "object" || !("apiKey" in secret) || !("password" in secret) ||
+  typeof secret.apiKey !== "string" || typeof secret.password !== "string")
+  throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
 if (secret.password !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 const directory = await mkdtemp(join(tmpdir(), "loginom-installed-oauth-"))
 const requests: Array<{ pathname: string; authorized: boolean }> = []

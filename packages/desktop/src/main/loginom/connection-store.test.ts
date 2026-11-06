@@ -61,3 +61,30 @@ test("legacy records default to cloud and discard the old Dock key without rewri
     expect(await readFile(file, "utf8")).toBe(record)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test("safeStorage keeps legacy metadata envelopes readable and writes only the secret pair", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-store-"))
+  const payloads: string[] = []
+  const codec = credentials("darwin", {
+    isEncryptionAvailable: () => true,
+    encryptString(value) { payloads.push(value); return Buffer.from(String(payloads.length - 1)) },
+    decryptString(value) { return payloads[Number(value.toString())] },
+  })
+  try {
+    const store = connectionStore(directory, codec)
+    await writeFile(join(directory, "connection.json"), JSON.stringify({ ...initial, mode: undefined, secrets: codec.encode(initial) }), { mode: 0o600 })
+    expect(await store.read()).toMatchObject({ mode: "cloud", apiKey: "", password: initial.password, username: initial.username })
+    await store.stage(initial)
+    await store.savePending(initial)
+    expect(payloads.slice(1).map((payload) => JSON.parse(payload))).toEqual([
+      { apiKey: initial.apiKey, password: initial.password },
+      { apiKey: initial.apiKey, password: initial.password },
+    ])
+    await store.activate(1)
+    expect(await store.read()).toEqual(initial)
+    expect(await store.pending()).toEqual(initial)
+    const bad = { ...initial, secrets: codec.encode({ kind: "loginom-cloud-v1", installationKey: "private-canary" }) }
+    await writeFile(join(directory, "connection.json"), JSON.stringify(bad), { mode: 0o600 })
+    await expect(store.read()).rejects.toThrow(/^LOGINOM_STORE_INVALID$/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

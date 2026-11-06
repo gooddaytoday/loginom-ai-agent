@@ -17,6 +17,9 @@ const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
 if (credentialProfile) {
   const record = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
   const secret = await cliCredentials("win32").decode(record.secrets)
+  if (!secret || typeof secret !== "object" || !("apiKey" in secret) || !("password" in secret) ||
+    typeof secret.apiKey !== "string" || typeof secret.password !== "string")
+    throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
   config.api_key = secret.apiKey
   config.loginom_url = record.url
   config.workflow_profile = { passwordless_login: secret.password === "", loginom_user: record.username }

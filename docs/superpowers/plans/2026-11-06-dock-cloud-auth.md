@@ -302,7 +302,7 @@ Task3 evidence: `docs/plans/2026-11-05-dock-cloud-auth-design.md`, checkpoint Ta
 
 **Interfaces:** `cloudStore` и `CloudCredentials` — общая карта. `CredentialCodec.encode(value: Record<string, unknown>): unknown | Promise<unknown>`; `decode(value: unknown): unknown | Promise<unknown>`. Платформенный codec защищает JSON object, соответствующий store проверяет собственную schema. Формат envelope и Keychain AAD остаются v1; не менять алгоритм/identity/ограничения payload.
 
-- [ ] **1. RED:** Сначала roundtrip cloud record через Linux codec и существующий store-подобный API:
+- [x] **1. RED:** Сначала roundtrip cloud record через Linux codec и существующий store-подобный API:
 
 ```ts
 import { expect, test } from "bun:test"
@@ -329,8 +329,8 @@ test("cloud credentials survive reopening and are removed by logout", async () =
 })
 ```
 
-- [ ] **2. Запустить RED:** из Host `bun test test/cloud-store.test.ts`; отсутствует новый store.
-- [ ] **3. GREEN:** `cloud.json` с явным kind/schema; методы read/write/clear повторяют необходимые гарантии connection-store: проверка владельца/прав/NOFOLLOW, temp0600, fsync, atomic rename и fsync каталога, unlink+fsync при clear. Не заводить журнал поколений для cloud. Общую файловую утилиту выделять только если она действительно убирает одинаковый уже написанный код двух store.
+- [x] **2. Запустить RED:** из Host `bun test test/cloud-store.test.ts`; отсутствует новый store.
+- [x] **3. GREEN:** `cloud.json` с явным kind/schema; методы read/write/clear повторяют необходимые гарантии connection-store: проверка владельца/прав/NOFOLLOW, temp0600, fsync, atomic rename и fsync каталога, unlink+fsync при clear. Не заводить журнал поколений для cloud. Общую файловую утилиту выделять только если она действительно убирает одинаковый уже написанный код двух store.
 
 При обобщении codec исправить обе записи connection-store, где сейчас передаётся весь ActiveConnection:
 
@@ -339,8 +339,8 @@ const protectedValue = await codec.encode({ apiKey: value.apiKey, password: valu
 ```
 
 Linux и CLI codecs сейчас выбирают только пару секретов; Desktop safeStorage уже шифрует весь переданный ActiveConnection. Явный payload делает новое поведение одинаковым и не записывает metadata в secrets. Старые envelopes с metadata продолжают читаться: после decode connection-store проверяет свою пару; cloud-store — CloudCredentials, включая непустые строки полной пары. В тестах использовать tmpdir(); локально он направлен через TMPDIR в разрешённую временную папку, CI задаёт свой каталог.
-- [ ] **4. Следующие RED→GREEN:** неправильный kind, неполная пара и повреждённый payload не заменяют старую запись; Ошибка до rename оставляет прежний файл; ошибка directory fsync после rename не обещает rollback: сообщить ошибку и перечитать фактическую запись, согласовав память с диском. Повреждённое read-back не делает новую пару действующей. Тест read-back не раскрывает ключи через status. Legacy connection records читаются прежними Linux/safeStorage/CLI envelopes. Existing Keychain tests проверяют неверный profile/AAD и tamper после переноса JSON-validation из envelope в store.
-- [ ] **5. Проверка/коммит:** Host `bun test test/cloud-store.test.ts test/cli-credentials.test.ts test/keychain-envelope.test.ts`, `bun typecheck`; Desktop `bun test src/main/loginom/credentials.test.ts src/main/loginom/connection-store.test.ts`, `bun typecheck`. На Linux эти тесты не доказывают native safeStorage/DPAPI/Keychain; native gate в15. Commit `feat(loginom): persist cloud credentials outside generations`.
+- [x] **4. Следующие RED→GREEN:** неправильный kind, неполная пара и повреждённый payload не заменяют старую запись; Ошибка до rename оставляет прежний файл; ошибка directory fsync после rename не обещает rollback: store сообщает ошибку, последующий read возвращает фактическую запись; повреждённый read-back отклоняется до rename. Controller ещё не существует: согласование памяти с диском и отсутствие ключей в status проверяются обязательным regression Task5. Legacy connection records читаются прежними Linux/safeStorage/CLI envelopes. Existing Keychain tests проверяют неверный profile/AAD и tamper после переноса JSON-validation из envelope в store.
+- [x] **5. Проверка/коммит:** Host `bun test test/cloud-store.test.ts test/cli-credentials.test.ts test/keychain-envelope.test.ts`, `bun typecheck`; Desktop `bun test src/main/loginom/credentials.test.ts src/main/loginom/connection-store.test.ts`, `bun typecheck`. На Linux эти тесты не доказывают native safeStorage/DPAPI/Keychain; native gate в15. Commit `feat(loginom): persist cloud credentials outside generations`.
 
 ## Task 5: Device Authorization и HTTP-контракт сайта
 
@@ -388,6 +388,9 @@ Device/code ограничен15с собственным AbortSignal; кажд�
 - [ ] **4. По одному RED→GREEN для polling:** authorization_pending соблюдает interval; slow_down увеличивает интервал на5с; access_denied/expired_token завершает попытку; HTTP429 ждёт max(interval, Retry-After); временная ошибка не крутит busy-loop и не продлевает device expiry. Неуспех первичного exchange завершает попытку, без бесконечного повторного создания установки.
 - [ ] **5. По одному RED→GREEN для отмены:** cancel/close прекращают polling; ответ старой попытки после cancel/start не пишет файл. Если bootstrap уже получен, bounded запрос `POST /api/auth/revoke-session` с `{token: rawBootstrap}` и `Authorization: Bearer rawBootstrap`; status:true признаётся только с этой привязкой. После успешного/терминального exchange сайт обязан погасить сессию; при неясном результате клиент также делает best-effort revoke. Сессия никогда не хранится на диске. В finally client прекращает ожидание в пределах cleanup budget, недоступность сайта не блокирует shutdown навсегда.
 - [ ] **6. По одному RED→GREEN для доверия:** 302 не достигает второго listener; неполная пара/HTML/невалидный JSON при первичном exchange не создают подключение; verification URL чужого origin не открывается. Generic 401/403/429/5xx не удаляют credentials; подтверждённый access_revoked удаляет текущую запись только если запрос был аутентифицирован её installationKey и его epoch/identity ещё актуальны. POST connections с bootstrap и OAuth device access_denied завершают только текущую попытку. Regression: после успешного входа повторный start отвергается, счётчики device/code и connections не растут, cloud.json/Help остаются прежними; после disconnect новый start допустим. Защиту от запоздалых ответов отменённой попытки сохранить.
+
+Обязательный regression из Task4: после post-rename directory fsync failure controller перечитывает фактический durable record и согласует credentials/revision; corrupt read-back не активирует новую пару, status не раскрывает canaries. Store остаётся stateless.
+
 - [ ] **7. Проверка/коммит:** Host `bun test test/cloud-auth.test.ts test/cloud-store.test.ts`, `bun typecheck`; Product `bun test`, `bun typecheck`. Commit `feat(loginom): implement cloud device authorization client`.
 
 ## Task 6: Сохранение до входа и изменяемая готовность прежнего поколения

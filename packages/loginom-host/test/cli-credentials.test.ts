@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { cliCredentials } from "../src/connection/cli-credentials"
@@ -103,3 +103,23 @@ test.skipIf(process.platform !== "win32")(
   },
   30000,
 )
+
+test("CLI plaintext codec preserves cloud payload independently of connection secrets", async () => {
+  const value = { kind: "loginom-cloud-v1", installationKey: "site-canary", email: "user@example.test", dock: { primary: { apiKey: "primary-canary" }, reserve: { apiKey: "reserve-canary" } } }
+  const codec = cliCredentials("linux")
+  expect(await codec.decode(await codec.encode(value))).toEqual(value)
+})
+
+test("CLI connection store reads legacy metadata envelopes and rejects payloads without a secret pair", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-cli-codec-"))
+  try {
+    const record = { generation: 1, revision: 1, url: "http://stand.test/app/", username: "user", secrets: {
+      format: "loginom-cli-secrets-v1", protection: "plaintext", payload: JSON.stringify({ apiKey: "legacy-canary", password: "password-canary", generation: 1, username: "user" }),
+    } }
+    await writeFile(join(root, "connection.json"), JSON.stringify(record), { mode: 0o600 })
+    const store = connectionStore(root, cliCredentials("linux"))
+    expect(await store.read()).toMatchObject({ mode: "cloud", apiKey: "", password: "password-canary" })
+    await writeFile(join(root, "connection.json"), JSON.stringify({ ...record, secrets: { ...record.secrets, payload: JSON.stringify({ password: "password-canary" }) } }), { mode: 0o600 })
+    await expect(store.read()).rejects.toThrow(/^LOGINOM_STORE_INVALID$/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

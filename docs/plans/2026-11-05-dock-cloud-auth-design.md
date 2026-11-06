@@ -202,4 +202,22 @@ Runtime/сборки/production не запускались. Следующий 
 - Native shutdown/oracle/oauth NOT_RUN: нужен fresh isolated Desktop artifact и private inputs; source syntax PASS.
 - PTY --prompt старый provider зовёт недоступный loginom_probe; свой loop завершён, исправление fixture — Task11.
 - Cloud без credentials намеренно не запускает Help; save-before-login и cloud API — Task6. Production/site/native ОС не проверены.
-- Следующий шаг: Task4, отдельное хранение cloud credentials; независимое ревью Task3 организует parent.
+- Независимое ревью `f2cfcfe12b`: Spec compliant, Quality Approved; обязательных замечаний нет.
+- Minor (deferred): неверный custom endpoint/key на Node IPC даёт общий безопасный код; корректный отказ сохранён.
+- Следующий шаг: Task4, отдельное хранение cloud credentials.
+
+## Checkpoint Task 4 — 2026-11-06
+
+- SHA базы: `f2cfcfe12b`; результат — `feat(loginom): persist cloud credentials outside generations`.
+- Отдельный stateless cloud.json: полный kind/schema, private permissions/owner/NOFOLLOW, temp0600, fsync/rename/directory fsync и durable clear.
+- До rename выполняется decoded read-back; invalid kind/неполная пара/corrupt payload не заменяют прежнюю запись.
+- После directory fsync failure новая запись остаётся фактической; rollback не обещан.
+- Codec обобщён на JSON object; v1 envelope, Keychain AAD/crypto/limits сохранены; connection-store пишет только apiKey/password.
+- Legacy Linux/safeStorage/CLI metadata envelopes читаются; secret pair проверяется store; четыре native script callers сузили unknown.
+- TDD: roundtrip, CLI/Keychain/cloud payload, schema, permissions, read-back, fsync write/clear, fixed corrupt errors — RED→GREEN.
+- Дополнительно повторены RED→GREEN safeStorage generic decode и оба connection encode payload, затем Desktop 13 PASS.
+- Host mandatory 20 PASS/2 native SKIP; с adjacent migration/keychain-platform 39 PASS/2 SKIP; Desktop13 PASS.
+- Host/Desktop `bun typecheck` и `git diff --check` PASS; schema/Protocol/HttpApi не менялись.
+- Поправка порядка: memory/status regression требует controller; перенесён в Task5 явно, store durable semantics проверены здесь.
+- Ограничения: native safeStorage/DPAPI/Keychain, installed GUI, сайт и production не проверены; используются fixtures на Linux.
+- Следующий шаг: независимое ревью Task4, затем Task5 с обязательным memory/status reconciliation regression.

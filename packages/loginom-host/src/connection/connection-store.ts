@@ -14,15 +14,7 @@ const RecordSchema = Schema.Struct({
   url: Schema.String,
   urlSource: Schema.optional(Schema.Literal("explicit")),
   username: Schema.String,
-  secrets: Schema.Union([
-    Schema.Struct({ apiKey: Schema.String, password: Schema.String }),
-    Schema.Struct({ encrypted: Schema.String }),
-    Schema.Struct({
-      format: Schema.Literal("loginom-cli-secrets-v1"),
-      protection: Schema.Literals(["plaintext", "dpapi", "keychain"]),
-      payload: Schema.String,
-    }),
-  ]),
+  secrets: Schema.Unknown,
 })
 export type ConnectionRecord = typeof RecordSchema.Type
 export type ActiveConnection = Omit<ConnectionRecord, "secrets" | "mode"> & {
@@ -30,6 +22,7 @@ export type ActiveConnection = Omit<ConnectionRecord, "secrets" | "mode"> & {
   apiKey: string
   password: string
 }
+const decodeSecrets = Schema.decodeUnknownOption(Schema.Struct({ apiKey: Schema.String, password: Schema.String }))
 const decode = Schema.decodeUnknownOption(Schema.fromJsonString(RecordSchema))
 
 // Only the owning host accesses this directory; it is outside renderer stores.
@@ -124,7 +117,9 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     return join(directory, "generations", `${generation}.json`)
   }
   async function decodeRecord(record: ConnectionRecord): Promise<ActiveConnection> {
-    const secrets = await codec.decode(record.secrets)
+    const decoded = decodeSecrets(await codec.decode(record.secrets))
+    if (Option.isNone(decoded)) throw new Error("LOGINOM_STORE_INVALID")
+    const secrets = decoded.value
     const legacy = record.mode === undefined
     return {
       mode: record.mode ?? "cloud",
@@ -154,7 +149,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
           url: value.url,
           ...(value.urlSource ? { urlSource: value.urlSource } : {}),
           username: value.username,
-          secrets: await codec.encode(value),
+          secrets: await codec.encode({ apiKey: value.apiKey, password: value.password }),
         },
         true,
       )
@@ -199,7 +194,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         url: value.url,
         ...(value.urlSource ? { urlSource: value.urlSource } : {}),
         username: value.username,
-        secrets: await codec.encode(value),
+        secrets: await codec.encode({ apiKey: value.apiKey, password: value.password }),
       }
       await write(generationPath(value.generation), record, false)
     },
