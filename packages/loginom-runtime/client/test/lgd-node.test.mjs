@@ -13,6 +13,26 @@ import {readLgdExportBrowser} from '../lib/lgd-export-context.mjs';
 import {LGD_EXPORT_FIELDS} from '../lib/lgd-parameters.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
 import {verifyLgdOutputMapping,validateLgdChecksumChange} from '../lib/lgd-import-node.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
+test('native LGD preserves Variant with its observed undefined data kind',()=>{
+ const source={record_id:'native-source',index:0,name:'Values',label:'Значения',type:'variant'};
+ const mapping={inventory_complete:true,source_identity_verified:true,source_fields:[source],target_fields:[{...source,record_id:'native-target',data_kind:'Неопределенное',excluded:false,source}]};
+ assert.equal(verifyLgdOutputMapping(mapping),mapping);
+ for(const kind of ['Дискретный','Непрерывный','unknown']){
+  const changed=structuredClone(mapping);changed.target_fields[0].data_kind=kind;assert.throws(()=>verifyLgdOutputMapping(changed));
+ }
+});
+test('LGD reads native Variant tags through the existing completed-port reader',async()=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'node'},binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node};
+ const operation={id:'lgd-read',deadline:10000,action:{action_key:'node.apply',revision:'1'},parameters:{target:{type:'imports.lgd'},mode:'native'}};
+ let calls=0;
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2',now:()=>1,
+  record:async r=>structuredClone(r),wrapMutation:()=>assert.fail('read cannot mutate'),execute:async code=>{
+   calls++;assert.match(code,/"typedVariants":true/);return {verified:true,cleanup_complete:true,node_context:{...node,verified:true},output:{port:0,fresh:true,execution_id:'execution',freshness_basis:'completed_execution_port_source'}};
+  }});
+ await channel.readOutputPort({port:0,sampleRows:100,requireExactNumbers:true,execution:{verified:true,owner_verified:true,status:'completed',execution_id:'execution',process_id:'1',process_record_id:'process'}});
+ assert.equal(calls,1);assert.equal(operation.cleanupConfirmed,true);
+});
 test('explicit checksum opt-out cannot bypass a known native checksum refusal for the same bytes or node',()=>{
  const source={sha256:'a'.repeat(64),bytes:359},node={node_id:'failed-node'};
  const history=[{source,outcome:{status:'FAILED',error:{message:'LGD import: Ошибка контрольной суммы'},output:{node}}}];
@@ -36,6 +56,14 @@ test('LGD native source inventory omits kind while target retains observed kind 
  }
 });
 const request=type=>({target:{kind:'new',type},inputs:type==='exports.lgd'?[{}]:[],mappings:[],read:{ports:type==='exports.lgd'?[]:[0],sample_rows:0,require_exact_numbers:false}});
+test('LGD source binding requires a verified file and the native ordinary variable input',()=>{
+ const source={artifact_id:'fixture',upload_operation_id:'delivery'};
+ const r={...request('imports.lgd'),variable_inputs:[{kind:'variables',input:0,output:0}]};
+ const p={source,lgd_import:{checksum:'verify',bindings:{source_path:{variable:'SourceFile'}}}};
+ assert.doesNotThrow(()=>validateLgdImportParameters(p,'native',r));
+ for(const changed of [{...p,source:undefined},{...p,lgd_import:{checksum:'verify',bindings:{source_path:{variable:'bad name'}}}}])assert.throws(()=>validateLgdImportParameters(changed,'native',r));
+ assert.throws(()=>validateLgdImportParameters(p,'native',{...r,variable_inputs:[{kind:'control',input:0,output:0}]}));
+});
 test('LGD checksum refusal releases only a proven discarded own wizard and never executes',async()=>{
  for(const foreign of [false,true]){
   const node={document_id:'doc',workflow_id:'workflow',node_id:'node'},operation={id:'lgd-corrupt'},phases=[];
