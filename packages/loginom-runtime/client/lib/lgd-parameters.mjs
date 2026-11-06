@@ -6,8 +6,8 @@ export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['veri
 export const lgdImportParametersSchema=object({source:importSourceSchema,lgd_import:lgdImportSettingsSchema});
 export const lgdExportSettingsSchema=object({
  destination:{type:'string',minLength:1,maxLength:512,description:'New absolute .lgd file in the selected own export directory.'},
- compression:{type:'string',enum:['lz4'],description:'Native LZ4 compression.'},
- checksum:{type:'string',enum:['compressed'],description:'Checksum of compressed data.'},
+ compression:{type:'string',enum:['none','lzo','lz4'],description:'Native compression. none and lzo require checksum none.'},
+ checksum:{type:'string',enum:['none','compressed','all'],description:'LZ4: no checksum, compressed data, or compressed and uncompressed data. Other compression requires none.'},
  overwrite:{type:'string',enum:['reject'],description:'Never overwrite an existing file.'},
 });
 export const lgdExportParametersSchema=object({lgd_export:lgdExportSettingsSchema});
@@ -29,11 +29,13 @@ export function validateLgdExportParameters(p,mode,r,directories=null){
  need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>Object.hasOwn(lgdExportSettingsSchema.properties,k)),'unknown export setting');
  if(r.target.kind==='new')for(const k of Object.keys(lgdExportSettingsSchema.properties))need(Object.hasOwn(s,k),'new export requires '+k);
  if('destination'in s)validateLgdExportDestination(s.destination,directories);
- for(const [k,v]of Object.entries({compression:'lz4',checksum:'compressed',overwrite:'reject'}))need(!(k in s)||s[k]===v,'unsupported '+k);
+ for(const k of ['compression','checksum','overwrite'])need(!(k in s)||lgdExportSettingsSchema.properties[k].enum.includes(s[k]),'unsupported '+k);
+ if(s.compression!==undefined&&s.compression!=='lz4'&&s.checksum!==undefined)need(s.checksum==='none','only LZ4 supports checksums');
  need(r.read.ports.length===0&&(r.read.sample_rows??0)===0&&(r.read.require_exact_numbers??false)===false,'sink requires read ports [], sample_rows 0, require_exact_numbers false');
  need(r.mappings.length===0&&r.inputs.length<=1&&(r.target.kind==='existing'||r.inputs.length===1),'new export needs one table; no requested mappings');
 }
 export function validateNativeLgdExport(values,directories=null){
  validateLgdExportDestination(values.destination?.value,directories);
- need(values.compression?.value===2&&values.checksum?.value===1&&values.string_cache_max_size?.value===131072,'unsupported retained native LGD format');
+ const compression=values.compression?.value,checksum=values.checksum?.value;
+ need([0,1,2].includes(compression)&&[0,1,2].includes(checksum)&&(compression===2||checksum===0)&&values.string_cache_max_size?.value===131072,'unsupported retained native LGD format');
 }

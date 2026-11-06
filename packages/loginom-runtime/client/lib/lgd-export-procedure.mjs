@@ -12,9 +12,13 @@ export async function configureLgdExport(channel,p,ctx,options){
  const one=xs=>{need(xs.length===1,'Unique LGD export control required');return xs[0];};
  let current=await native();const initial=current;
  const settings=options.operation.nodeApply.request.target.kind==='new'?{compression:'lz4',checksum:'compressed',...p}:p;
- for(const [key,value]of Object.entries(settings)){
+ // Checksum is editable only for LZ4. Clear it before disabling compression;
+ // enable LZ4 before applying its requested checksum on an existing node.
+ const keys=settings.compression!==undefined&&settings.compression!=='lz4'?['checksum','compression','destination']:['compression','checksum','destination'];
+ for(const key of keys.filter(key=>Object.hasOwn(settings,key))){
+  const value=settings[key];
   if(key==='overwrite')continue;
-  const expected=key==='compression'?2:key==='checksum'?1:value;
+  const expected=key==='compression'?{none:0,lzo:1,lz4:2}[value]:key==='checksum'?{none:0,compressed:1,all:2}[value]:value;
   if(current.values[key].value===expected)continue;
   const tid=current.values[key].tid,s=await readUi();
   if(key==='destination'){
@@ -24,7 +28,7 @@ export async function configureLgdExport(channel,p,ctx,options){
    const picker=s=>one(s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click')));
    await channel.perform({condition:'LGD export options '+key,initialObservation:s,refreshWizardBusy:false,ready:s=>s.wizard?.stage==='lgd_export',identity:s=>({node:ctx.node,field:tid,value:picker(s).wizard_combo?.field?.value}),resolve:s=>({verb:'click',ref:picker(s).ref})});
    const opened=await channel.observe({condition:'LGD export option '+key,ready:s=>s.wizard?.stage==='lgd_export'&&s.ui.elements.some(e=>e.allowed_actions.includes('select_wizard_option'))});
-   const label=key==='compression'?'LZ4':'Сжатых данных';
+   const label=key==='compression'?{none:'Без сжатия',lzo:'LZO',lz4:'LZ4'}[value]:{none:'Нет',compressed:'Сжатых данных',all:'Сжатых и несжатых данных'}[value];
    const choice=one(opened.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));
    await channel.perform({condition:'choose LGD export '+key,initialObservation:opened,ready:s=>s.wizard?.stage==='lgd_export',identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
   }
