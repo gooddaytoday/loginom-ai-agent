@@ -6,6 +6,25 @@ from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
+    def test_checksum_switch_requires_two_fresh_full_reads_on_same_node(self):
+        def result(checksum, execution, node='same'):
+            return {'status': 'SUCCEEDED', 'cleanup_complete': True, 'node': {'node_id': node},
+                    'configuration': {'readback': {'kind': 'lgd_import', 'source': {
+                        'source_path': '/own/hash-checksum-both.lgd', 'checksum': checksum}}},
+                    'execution': {'status': 'completed', 'execution_id': execution},
+                    'output': {'ports': [{'port': 0, 'sample_complete': True, 'schema': [{'name': 'Id', 'type': 'integer'}],
+                                          'sample': [{'Id': {'type': 'integer', 'value': 1}}],
+                                          'freshness_basis': 'completed_execution_port_source'}]}}
+        first, second = result(True, 'one'), result(False, 'two')
+        runner.check_lgd_checksum_switch([(1, first), (2, second)], 'checksum-both.lgd')
+        for replies in [[(1, second)], [(1, first), (2, result(False, 'one'))],
+                        [(1, first), (2, result(False, 'two', 'foreign'))]]:
+            with self.assertRaisesRegex(AssertionError, 'SAME_NODE_MISSING'):
+                runner.check_lgd_checksum_switch(replies, 'checksum-both.lgd')
+        second['output']['ports'][0]['sample'][0]['Id']['value'] = 2
+        with self.assertRaisesRegex(AssertionError, 'VALUES_CHANGED'):
+            runner.check_lgd_checksum_switch([(1, first), (2, second)], 'checksum-both.lgd')
+
     def test_source_csv_cannot_substitute_for_a_failed_lgd_roundtrip(self):
         reply = {'status': 'SUCCEEDED', 'cleanup_complete': True,
                  'configuration': {'readback': {'kind': 'lgd_import'}},
@@ -24,7 +43,7 @@ class LgdTests(unittest.TestCase):
 
     def test_binary_source_is_a_user_path_without_provider_file_parts(self):
         class Captured(Exception): pass
-        for name in ['lgd-import', 'lgd-properties', 'lgd-corrupt']:
+        for name in ['lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-import-compression']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 stage, workspace, profile = [root / n for n in ['stage', 'workspace', 'profile']]
@@ -32,12 +51,13 @@ class LgdTests(unittest.TestCase):
                 instance = object.__new__(runner.Runner)
                 instance.out, instance.env, instance.current, instance.options = root, {}, {}, {}
                 case = runner.scenario(name)
-                source = case['data'] / case['input_files'][0]
+                sources = [case['data'] / name for name in case['input_files']]
                 def phase(phase, command, *args, **kwargs):
                     self.assertEqual(phase, 'model')
                     self.assertNotIn('--file', command)
-                    self.assertIn(str(workspace / source.name), command[-1])
-                    self.assertEqual((workspace / source.name).read_bytes(), source.read_bytes())
+                    for source in sources:
+                        self.assertIn(str(workspace / source.name), command[-1])
+                        self.assertEqual((workspace / source.name).read_bytes(), source.read_bytes())
                     self.assertNotIn(str(case['oracle']), command[-1])
                     raise Captured()
                 instance.phase = phase

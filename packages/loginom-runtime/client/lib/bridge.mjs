@@ -430,7 +430,14 @@ export async function createBridge(config, session, { browserTransport: managedB
               ...(config.storageDirectories ? { storage_directories: config.storageDirectories } : {}),
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
-            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(result)}]},{tool:'dock_prepare'});
+            // Full transient loading/geometry diagnostics are retained above.
+            // The model needs readiness, identities and the complete knowledge
+            // bundle; raw diagnostic DOM can push a local-package reply over
+            // the existing wire budget without adding preparation authority.
+            const delivered=structuredClone(result);
+            if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);
+            if(delivered.workspace?.browser_geometry)delete delivered.workspace.browser_geometry.observed;
+            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
             if (ready && reply.isError !== true) userBundleDelivered = true;
             return reply;
           }
@@ -534,7 +541,9 @@ export async function createBridge(config, session, { browserTransport: managedB
             }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
-            const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
+            const reply = actionReply(userProfile?compactActionResult(outcome,{
+              wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
+            }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
             if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,

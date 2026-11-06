@@ -1,5 +1,5 @@
 import {nodeOutputPortSchema} from './node-result-schema.mjs';
-import {budgetUserPreview,previewWireSize} from './user-preview-budget.mjs';
+import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
@@ -109,10 +109,11 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
     limitations,
     ...(next?{next_step:next}:{}),
   };
-  // JS readback carries the complete observed mappings and schema. Refuse an
-  // oversized final reply instead of converting these facts into a summary.
-  if(!['javascript','user_variables'].includes(node?.configuration?.readback?.kind)&&!node?.configuration?.variable_mappings?.length&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply,
-    {wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
+  // JS configuration/source bindings remain complete; only ordinary analytical
+  // rows may be omitted. Native full-table evidence keeps its strict contract.
+  if(node?.configuration?.readback?.kind!=='user_variables'&&!node?.configuration?.variable_mappings?.length)budgetUserPreview(reply,
+    {preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||data?.javascript_source?.policy==='javascript-module-v1',
+      wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;
 }
@@ -134,11 +135,20 @@ function previewLimitations(output) {
   return limitations;
 }
 
-export function compactActionResult(result) {
+export function compactActionResult(result,{wireSize=previewWireSize}={}) {
   // Keep continuation references and observed UI controls: removing these would
   // force another observation, or tempt clients to reuse stale references.
   const copy = structuredClone(result);
   delete copy.trace;
+  // Inspection must reconcile the same retained operation even when its table
+  // could not be delivered. Preserve every effect/phase/configuration receipt.
+  const node=copy.action_key==='operation.inspect'&&copy.output?.outcome?.action_key==='node.apply'
+    ?copy.output.outcome.output:null;
+  if(node?.output?.ports&&wireSize({...copy,result_version:'user-v1'})>USER_PREVIEW_WIRE_BUDGET){
+    const preview={output:node.output,limitations:node.warnings??[]};
+    node.warnings=preview.limitations;
+    budgetUserPreview(preview,{preserveConfiguration:true,wireSize:()=>wireSize({...copy,result_version:'user-v1'})});
+  }
   if (copy.status === 'SUCCEEDED' && ['package.save_as', 'package.save_checkpoint'].includes(copy.action_key)) {
     copy.output = pick(copy.output, ['package_ref', 'reopened', 'workflow_preserved', 'save_completed', 'persisted_content_verified', 'workflow_continuations']);
     const arrangement = result.trace?.findLast(item => item.event === 'package_arrangement');

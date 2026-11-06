@@ -105,7 +105,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    const r=await roots(),prefix=r.workflow_ref?.prefix;
    const bars=r.ui.elements.filter(e=>e.tid===prefix+';NavigationBar;NavigationPanel');
    requireValue(bars.length<=1,'Storage navigation is ambiguous');
-   return bars.length?detail(r,bars[0]):null;
+   // Native Files opening can temporarily expose Home's navigation panel.
+   // Wait for the same form's actual storage root before binding its detail.
+   const storage=r.ui.elements.some(e=>e.tid===prefix+';FileStorageForm;pnlFileStorage;tbl');
+   return storage&&bars.length?detail(r,bars[0]):null;
   },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
   const readRow=async(name,parent)=>{
    const owner=JSON.stringify({document:parent.dom_epoch?.document,workflow:parent.workflow_ref});
@@ -158,6 +161,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      requireValue(sameOwner(root),'Delivery toolbar owner changed');
      const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
      const full=await detail(root,toolbar);
+     // Initial roots can precede creation of the first native tab. Confirm
+     // its newly observed owner with fresh roots before authorizing Files.
+     if(r.workflow_ref===null&&full.workflow_ref!=null){
+      const fresh=await roots();
+      requireValue(fresh.dom_epoch?.document===r.dom_epoch.document
+        &&JSON.stringify(fresh.workflow_ref)===JSON.stringify(full.workflow_ref),'Delivery toolbar owner changed');
+      r=fresh;
+     }
      requireValue(sameOwner(full),'Delivery toolbar owner changed');
      // An empty workspace has no tab, even when Files is already reachable.
      // Only detail reads issue tab refs; pin the first one and refuse its loss.
@@ -169,12 +180,17 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     };
     const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
       &&e.enabled===true&&e.visible===true&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed').length===1;
-    let full=await readToolbar(r);
-    // Preparation can return while the toolbar is still outside the viewport.
-    // Wait for a fresh owned hit point; never send the known offscreen click.
-    if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
-    const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
-    await click(full,files);
+    for(let attempt=0;;attempt++){
+     let full=await readToolbar(attempt===0?r:await roots());
+     // Preparation can return while the toolbar is still outside the viewport.
+     // Wait for a fresh owned hit point; never send the known offscreen click.
+     if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
+     const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
+     // Reuse folder navigation's matched, no-effect stale-epoch proof.
+     // An uncertain click never reaches a second attempt.
+     if(await click(full,files,'click',{},true))break;
+     requireValue(attempt<2,'Delivery toolbar navigation remained stale; inspection required');
+    }
    }
    let s=await directory();
    requireValue(s.file_storage?.status==='observed','Storage path is not observed');

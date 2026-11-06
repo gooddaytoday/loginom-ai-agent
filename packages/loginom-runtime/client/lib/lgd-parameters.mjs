@@ -2,7 +2,7 @@ import {importSourceSchema,validateImportSource,requireExportDestination} from '
 const need=(v,m)=>{if(!v)throw Error('LGD: '+m);};
 const object=properties=>({type:'object',properties,required:[],additionalProperties:false});
 export const LGD_EXPORT_FIELDS=Object.freeze(Object.fromEntries(Object.entries({destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum',string_cache_max_size:'edtStringCacheMaxSize'}).map(([key,id])=>[key,['ExportNativeParamsWizard',id]])));
-export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['verify'],description:'Verify the stored checksum; never disable after corruption.'}});
+export const lgdImportSettingsSchema=object({checksum:{type:'string',enum:['verify','ignore'],description:'Use verify by default. ignore requires an explicit user request before any checksum failure; never disable after corruption.'}});
 export const lgdImportParametersSchema=object({source:importSourceSchema,lgd_import:lgdImportSettingsSchema});
 export const lgdExportSettingsSchema=object({
  destination:{type:'string',minLength:1,maxLength:512,description:'New absolute .lgd file in the selected own export directory.'},
@@ -15,8 +15,8 @@ export function validateLgdImportParameters(p,mode,r){
  need(mode==='native'&&p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['source','lgd_import'].includes(k)),'use source and lgd_import, mode native');
  if(p.source!==undefined)validateImportSource(p.source);
  const s=p.lgd_import??{};
- need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>k==='checksum')&&(s.checksum===undefined||s.checksum==='verify'),'checksum must be verify');
- if(r.target.kind==='new')need(p.source&&s.checksum==='verify','new import requires verified source and checksum verify');
+ need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>k==='checksum')&&(s.checksum===undefined||['verify','ignore'].includes(s.checksum)),'checksum must be verify or explicit ignore');
+ if(r.target.kind==='new')need(p.source&&['verify','ignore'].includes(s.checksum),'new import requires verified source and an explicit checksum policy (default verify)');
  need(r.inputs.length===0&&r.mappings.length===0&&r.read.ports.every(p=>p===0)&&r.read.ports.length<=1,'import has no table inputs or requested mappings; output 0 only');
 }
 export function validateLgdExportDestination(path,directories=null){

@@ -125,13 +125,25 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=case / 'task.md', data=case / 'data', base=None,
                     export_count=5, expected_name=prefix + 'expected-update.json',
                     quality_initial_name=prefix + 'expected.json')
+    if name == 'lgd-import-compression':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/compression', prompt=node / 'acceptance/compression/task.md',
+                    data=node / 'fixtures/64bit', input_files=['compression-none.lgd', 'compression-lzo.lgd', 'compression-lz4.lgd'],
+                    expected_name='expected.json', base=None, lgd='compression',
+                    oracle=node / 'acceptance/oracle.py')
+    if name == 'lgd-import-checksum':
+        node = REPO / 'docs/node-development/nodes/imports-lgd'
+        return dict(source=node / 'acceptance/checksum', prompt=node / 'acceptance/checksum/task.md',
+                    data=node / 'fixtures/64bit', input_files=['checksum-none.lgd', 'checksum-compressed.lgd', 'checksum-both.lgd'],
+                    expected_name='expected.json', base=None, lgd='checksum',
+                    oracle=node / 'acceptance/oracle.py')
     if name in ['lgd-import', 'lgd-properties', 'lgd-export', 'lgd-corrupt', 'lgd-export-compression']:
         export = name in ['lgd-export', 'lgd-export-compression']
         node = REPO / 'docs/node-development/nodes' / ('exports-lgd' if export else 'imports-lgd')
         variant = {'lgd-import': 'standalone', 'lgd-properties': 'properties', 'lgd-export': 'roundtrip', 'lgd-corrupt': 'corrupt', 'lgd-export-compression': 'compression'}[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task.md' if name in ['lgd-import', 'lgd-export'] else 'task-' + variant + '.md'),
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
-                    expected_name='expected-' + variant + '-run.json', base=None, lgd=variant,
+                    expected_name='expected-' + variant + '-run.json', base=None, lgd=variant, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
@@ -822,6 +834,26 @@ def check_lgd_import_result(replies, row_count):
                        for owner, p in ports(o)) for _, o in replies), 'LGD_IMPORT_FULL_RESULT_MISSING'
 
 
+def check_lgd_checksum_switch(replies, filename):
+    reads, seen = [], set()
+    for _, reply in replies:
+        for owner, port in ports(reply):
+            readback = owner.get('configuration', {}).get('readback', {})
+            source = readback.get('source', {})
+            execution = owner.get('execution', {}).get('execution_id')
+            if (owner.get('status') == 'SUCCEEDED' and owner.get('cleanup_complete') is True
+                    and readback.get('kind') == 'lgd_import' and source.get('source_path', '').endswith('-' + filename)
+                    and owner.get('execution', {}).get('status') == 'completed' and execution and execution not in seen
+                    and port.get('port') == 0 and port.get('sample_complete') is True and port_path(owner, port) == 'port'):
+                reads.append((owner, port, source))
+                seen.add(execution)
+    first = next((r for r in reads if r[2].get('checksum') is True), None)
+    second = next((r for r in reads[reads.index(first) + 1:] if r[2].get('checksum') is False
+                   and r[0].get('node') == first[0].get('node')), None) if first else None
+    assert first and second, 'LGD_CHECKSUM_SWITCH_SAME_NODE_MISSING'
+    assert first[1]['sample'] == second[1]['sample'] and first[1]['schema'] == second[1]['schema'], 'LGD_CHECKSUM_SWITCH_VALUES_CHANGED'
+
+
 def check_tree(port, expected):
     tree = port.get('tree', {})
     assert port.get('port_kind') == 'tree' and port.get('sample_complete') is True and tree.get('complete') is True, 'TREE_INCOMPLETE'
@@ -1107,7 +1139,7 @@ class Runner:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         expected = expected_for(spec, package)
-        if spec.get('lgd') == 'compression':
+        if spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 fmt['destination'] = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + fmt['name'] + '.lgd'
                 prompt = prompt.replace('{{EXPORT_DIRECTORY}}/' + fmt['name'] + '.lgd', fmt['destination'])
@@ -1423,6 +1455,8 @@ class Runner:
             return session, expected, None, None
         if spec.get('lgd'):
             check_lgd_import_result(replies, len(expected['outputs'][0]['rows']))
+        if expected.get('lgd', {}).get('checksum_switch_filename'):
+            check_lgd_checksum_switch(replies, expected['lgd']['checksum_switch_filename'])
         if execution_error:
             self.current.update(csv='— (expected execution error)', cold='— (expected execution error)')
             return session, expected, None, None
@@ -1441,7 +1475,7 @@ class Runner:
             binary = lgd_file.read_bytes()
             assert len(binary) > 20 and binary[:6] == b'BGDATA' and binary[16:20] == bytes.fromhex('04224d18'), 'LGD_LZ4_HEADER'
             shutil.copyfile(lgd_file, folder / 'roundtrip.lgd')
-        if spec.get('lgd') == 'compression':
+        if spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 destination = fmt['destination']
                 assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
