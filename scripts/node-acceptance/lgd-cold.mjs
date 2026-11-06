@@ -12,10 +12,12 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
  const {readPreparedNodeContext}=await load('client/lib/node-context.mjs');
  const imports=graph.nodes.filter(n=>n.type==='imports.lgd');
  const formats=expected.lgd.kind==='edges'?expected.lgd.formats:null;
- if(imports.length!==(formats?.length??1))throw Error('LGD_COLD_IMPORT_COUNT');
+ const cases=expected.lgd.imports??(formats?formats.map(f=>({label:f.import_label,columns:f.columns,compression:f.compression_display,written_checksum:f.checksum_display,checksum:true,destination:f.destination})):[{...expected.lgd,compression:'LZ4',written_checksum:'Сжатых данных',checksum:true}]);
+ if(imports.length!==cases.length)throw Error('LGD_COLD_IMPORT_COUNT');
  for(const target of imports){
-  const format=formats?.find(f=>f.import_label===target.label);
-  if(formats&&!format)throw Error('LGD_COLD_IMPORT_IDENTITY');
+  const matches=cases.filter(c=>c.label===undefined||c.label===target.label);
+  if(matches.length!==1)throw Error('LGD_COLD_IMPORT_IDENTITY');
+  const wanted=matches[0];
   const channel=channelFor(target.ref,outputProperties?'lgd-saved-output':'lgd-saved-settings');
   await channel.revealGraphNode({target:'body'});
   const graphState=await channel.observe({condition:'LGD cold own source',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
@@ -29,18 +31,19 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
    if(!before.verified||before.surface!=='wizard')throw Error('LGD_COLD_OWNER');
    const r=await page.evaluate(base=>{
     const read=id=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(base+id)+']'),c=es.length===1&&Ext.getCmp(es[0].id);if(c?.el?.dom!==es[0])throw Error('LGD_COLD_CONTROL');return c.getValue();};
-    return {path:read('edtFileName;ValueControl'),checksum:read('edtUseChecksum;ValueControl'),compression:read('edtCompression'),written_checksum:read('edtWrittenChecksum')};
+    return {path:read('edtFileName;ValueControl'),checksum:read('edtUseChecksum;ValueControl'),compression:read('edtCompression'),bitness:read('edtDDFSystem'),written_checksum:read('edtWrittenChecksum')};
    },b.workflow_ref.prefix+';WizrdMCF;ImportNativePreviewWizard;');
    const after=await (${readPreparedNodeContext.toString()})(page,b);
    if(JSON.stringify(before)!==JSON.stringify(after))throw Error('LGD_COLD_OWNER_CHANGED');return r;
   }`);
-  if(values.checksum!==true||values.compression!==(format?.compression_display??'LZ4')||values.written_checksum!==(format?.checksum_display??'Сжатых данных')||!/\.lgd$/i.test(values.path)
-   ||(format?.destination??expected.lgd.destination)&&values.path!==(format?.destination??expected.lgd.destination))throw Error('LGD_COLD_SOURCE_SETTINGS');
+  if(values.checksum!==wanted.checksum||values.compression!==wanted.compression||values.written_checksum!==wanted.written_checksum||!/\.lgd$/i.test(values.path)
+   ||wanted.bitness&&values.bitness!==wanted.bitness||wanted.filename&&!values.path.endsWith('-'+wanted.filename)
+   ||(wanted.destination??expected.lgd.destination)&&values.path!==(wanted.destination??expected.lgd.destination))throw Error('LGD_COLD_SOURCE_SETTINGS');
   const closed=await closePreparedWizard(channel);if(!closed.verified||closed.settings_applied!==false)throw Error('LGD_COLD_CANCEL');
   }else{
   await channel.openOutputPort(0);
   const mapping=await channel.observe({condition:'LGD cold saved output properties',readMappings:true,ready:s=>s.node_mapping?.verified&&s.node_mapping.inventory_complete});
-  verifyLgdFields(mapping.node_mapping.target_fields,format?.columns??expected.lgd.columns);
+  verifyLgdFields(mapping.node_mapping.target_fields,wanted.columns);
   const done=await closePreparedWizard(channel);if(!done.verified||done.settings_applied!==false)throw Error('LGD_COLD_MAPPING_CANCEL');
   }
  }
