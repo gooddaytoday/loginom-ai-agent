@@ -54,7 +54,14 @@ export async function configureLgdExport(channel,p,ctx,options){
    await channel.perform({condition:'choose LGD export '+key,initialObservation:opened,ready:s=>s.wizard?.stage==='lgd_export',identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
   }
   const after=await native();need(after.values[key].value===expected,'LGD export setting differs: '+key);
-  for(const other of Object.keys(current.values))if(other!==key)need(same(current.values[other],after.values[other]),'Unrequested LGD export setting changed: '+other);
+  for(const other of Object.keys(current.values))if(other!==key){
+   // A compression change enables/disables checksum and its effective value.
+   // Its retained native enum, caption, owner and binding must stay identical.
+   const retained=v=>{const {disabled,native_value,...setting}=v;return {...setting,value:native_value??v.value};};
+   const beforeValue=key==='compression'&&other==='checksum'?retained(current.values[other]):current.values[other];
+   const afterValue=key==='compression'&&other==='checksum'?retained(after.values[other]):after.values[other];
+   need(same(beforeValue,afterValue),'Unrequested LGD export setting changed: '+other);
+  }
   current=after;
  }
  const configured={lgd_export:current};

@@ -1212,8 +1212,10 @@ class Runner:
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
-        for name, destination in zip(exports, destinations):
-            prompt = prompt.replace(name, destination)
+        if exports:
+            routes = dict(zip(exports, destinations))
+            names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
+            prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
             if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
