@@ -1,0 +1,357 @@
+{
+  "package_path": "/acceptance/graph-large-execute.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 01"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 02"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 03"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 04"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 05"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 06"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 07"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 08"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 09"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 10"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 11"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 12"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 13"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 14"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 15"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 16"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 17"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 18"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 19"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 20"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 21"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 22"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 23"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 24"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 25"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 26"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 27"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 28"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 29"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 30"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 31"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 32"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 33"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 34"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 35"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 36"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 37"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 38"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 39"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 40"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 41"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 42"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 43"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 44"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 45"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 46"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 47"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 48"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 49"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 50"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 51"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 52"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 53"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 54"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 55"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 56"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 57"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 58"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 59"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 60"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 61"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 62"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 63"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 64"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 65"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 66"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 67"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 68"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 69"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 70"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 71"
+    },
+    {
+      "type": "variables.calculator",
+      "label": "Фон 72"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "customers-summary.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rows",
+          "type": "integer",
+          "label": "Строки"
+        },
+        {
+          "name": "UniqueCustomers",
+          "type": "integer",
+          "label": "Уникальные клиенты"
+        },
+        {
+          "name": "UniqueIds",
+          "type": "integer",
+          "label": "Уникальные номера"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Rows": 6,
+          "UniqueCustomers": 3,
+          "UniqueIds": 2
+        },
+        {
+          "Region": "South",
+          "Rows": 4,
+          "UniqueCustomers": 2,
+          "UniqueIds": 1
+        },
+        {
+          "Region": "NullOnly",
+          "Rows": 2,
+          "UniqueCustomers": 0,
+          "UniqueIds": 0
+        },
+        {
+          "Region": "EmptyOnly",
+          "Rows": 2,
+          "UniqueCustomers": 1,
+          "UniqueIds": 0
+        }
+      ]
+    }
+  ]
+}
