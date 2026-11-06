@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Effect Schema, Bun tests/build, pinned Node 24.19.0, Electron, SolidJS, существующий MCP SDK; Python/pytest для проверок Dock. Новые production-зависимости не нужны; Better Auth устанавливается в будущем репозитории сайта, не здесь.
 
-**Spec:** [Каноническая спецификация](../specs/2026-11-05-dock-cloud-auth-design.md), редакция `3683948bf4`.
+**Spec:** [Каноническая спецификация](../specs/2026-11-05-dock-cloud-auth-design.md), актуальная редакция этой ветки.
 
 ## Global Constraints
 
@@ -16,6 +16,7 @@
 - «Новые сборки не содержат общего ключа Dock.» Старый ключ временно остаётся серверным доступом для 0.3.9; дату отключения этот план не назначает.
 - «Вход сохраняет cloud credentials сразу, но не применяет черновой выбор режима.»
 - «Переключение режимов не стирает credentials другого режима.»
+- Повторный cloud-start при сохранённом подключении отклоняется до обращения к сайту; для смены аккаунта сначала выполнить обычный выход.
 - «Настройки Loginom можно сохранить до облачного входа.» Browser verification остаётся отдельным состоянием `unknown/verified/failed`.
 - «Все семь удалённых чтений продукта проходят через Help child.» Browser-действия не повторяются.
 - «После успешного перехода оставаться на резерве до следующего запуска приложения.»
@@ -30,16 +31,19 @@
 - Тесты из package directories, typecheck — `bun typecheck`. Если фактически изменится публичный Protocol/HttpApi, выполнить `bun run generate` из `packages/client`; запланированный private Loginom API этого не требует.
 - Временные данные только в `$HOME/storage/tmp/`. Существующие пользовательские профили/процессы не трогать. Исторические generations не переписывать.
 - Применять TDD по одному поведению: RED → GREEN → REFACTOR. Следующая строка сценариев начинается только после зелёной предыдущей. Каждый Task заканчивается проверяемым результатом и отдельным conventional commit.
+- Обязательные поля общей schema, все её реализации/fixtures и decoders обновляются в одной задаче. После изменения общего контракта запускать `bun typecheck` из schema, loginom-host, app, desktop и opencode; связанные поведенческие тесты — в той же задаче, без ожидания UI/CLI этапа.
 
 ---
 
 ## Порядок, границы и подготовка
 
-Рабочая ветка `dock-cloud-auth`; план проверен относительно `3683948bf4`. Перед исполнением прочитать актуальный diff и применимые `AGENTS.md`; уже внесённые другим исполнителем изменения сохранять. Не создавать новую ветку поверх этой без причины.
+Рабочая ветка `dock-cloud-auth`; исходная проверка по `3683948bf4`, замечания к плану проверены по `64983e8b76`. Перед исполнением прочитать актуальный diff и применимые `AGENTS.md`; уже внесённые другим исполнителем изменения сохранять. Не создавать новую ветку поверх этой без причины.
 
 Это один план клиентской функции. Задачи 1–13 дают проверяемый Agent с локальными fixtures. Задача14 проверяет существующие возможности Dock и готовит его эксплуатационные требования; отдельного нового сервиса или replication framework нет. Задача15 — внешняя приёмка после реализации сайта и reserve. Она не является планом разработки сайта и не позволяет объявить облачный вход готовым по локальным fixtures.
 
-Зависимости: `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9`; затем `10` (Desktop/UI), `11` (CLI), `12` (harness) и `13` (упаковка). 10 и11 можно поручить разным исполнителям после фиксации интерфейсов8 и сетевой границы9; они не редактируют schema/Host. 14 независимо готовится после2. 15 требует всех остальных и внешних сервисов. Последовательность при одном исполнителе — по номерам. Проверка private Node cloud flow из8 завершается после13, когда есть тестовый bundle с baked tuple.
+Зависимости: `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9`; затем `10` (Desktop/UI), `11` (CLI), `12` (harness) и `13` (упаковка). 10 и11 можно поручить разным исполнителям после фиксации интерфейсов8 и сетевой границы9; они не редактируют schema/Host. 14 независимо готовится после2. 15 требует всех остальных и внешних сервисов. Последовательность при одном исполнителе — по номерам. Task3 сразу переводит существующие Help fixtures и минимальный CLI custom setup на явные credentials; переходного legacy fallback нет. Task6 атомарно добавляет cloud API, Host composition, Desktop preload/IPC и typed stubs; Task8 добавляет Node routes и model projection. Живые облачные проверки через собранные Node Host/Desktop/CLI из8–11 выполняются в13, когда есть baked tuple; раньше используются программная Host injection или узкий management stub.
+
+Одноразовая проба Better Auth до5–8 могла бы проверить device Bearer, raw-token revokeSession и disabledPaths/configId. Это отдельное необязательное предложение вне согласованного объёма: текущий план её не запускает и не добавляет как условие начала клиентских задач. Настоящие серверные гарантии проверяются в15.
 
 Перед первой проверкой задать `TMPDIR=$HOME/storage/tmp/`, `TMP` и `TEMP` тем же значением. Для Node-процессных тестов `LOGINOM_AI_AGENT_TEST_NODE` указывает на реально существующий pinned Node, а не `node` из PATH. Найти имеющийся input через существующий resource manifest/настройку сборки; отсутствие binary — ограничение среды, не причина пропустить тест и назвать его зелёным. Во всех приведённых ниже командах runtime `node --test` использовать именно `$LOGINOM_AI_AGENT_TEST_NODE --test`. Версии/pins в этом плане не обновляются.
 
@@ -63,12 +67,12 @@
 | **Новый** `packages/loginom-host/src/knowledge-session.ts`; `host.ts` | Один Help на поколение, каталог/readiness, deadline, замена child и retry; 6,7 |
 | `packages/loginom-host/src/{supervisor,errors,host-port,node-entry,node-client,transport}.ts` | Классифицированные ошибки, private management, admission и отмена; 6–8,11 |
 | `packages/product/src/index.ts`; `packages/loginom-host/script/{build-node-host,build-cli,stage-resources}.ts`; `packages/desktop/{electron.vite.config.ts,scripts/bundle-loginom.ts}` | Fixed cloud tuple и единая нерелизная build injection, отсутствие shared key; 5,13 |
-| `packages/desktop/src/main/loginom/{desktop-service,ipc}.ts`, `packages/desktop/src/preload/index.ts` | Существующая безопасная граница renderer/main; 10 |
+| `packages/desktop/src/main/loginom/{desktop-service,ipc}.ts`, `packages/desktop/src/preload/index.ts` | Check decoder3, атомарное подключение cloud API6, сеть9; UI использует готовую границу в10 |
 | `packages/app/src/components/{settings-loginom-state.ts,settings-loginom.tsx,settings-loginom.css}`, `packages/app/src/i18n/{en,ru}.ts` | Карточки, вход, отдельные Help/browser статусы; 10 |
-| `packages/opencode/src/cli/{loginom-management,standalone-command,standalone,standalone-cancellation,standalone-run}.ts` | CLI cloud/custom, короткие calls, Ctrl+C, preflight; 11 |
+| `packages/opencode/src/cli/{loginom-management,standalone-command,standalone,standalone-cancellation,standalone-run}.ts` | Минимальный custom setup3; cloud calls, Ctrl+C, preflight и TUI11 |
 | `evals/src/profile.ts`, `scripts/node-acceptance/run-check.py` + их тесты | Custom credentials по stdin, независимость сборки от секрета; 12 |
 | `.github/workflows/release.yml`, fixtures, module AGENTS и runbooks | Все потребители embedded key и release validation; 13 |
-| `services/loginom-ai/tests/server/conftest.py`, новый `tests/server/test_agent_cloud_access.py`; `deploy/loginom-dock` | Реальная ACL проверка, независимые registry и повторная публикация; 14 |
+| `services/loginom-ai/tests/server/conftest.py`, новый `tests/server/test_agent_cloud_access.py`; `deploy/loginom-dock` | Один реальный Dock для ACL/Help scope; runbook двух независимых развёртываний14, внешняя проверка15 |
 
 Новые runtime-модули всего четыре: scope, cloud-store, cloud-auth, knowledge-session. Scope нужен для одной проверяемой границы всех семи инструментов; остальные отделяют долговечное хранение, жизненный цикл авторизации и заменяемый Help. Общий build-only helper cloud-build.ts используется обоими сборщиками и не входит в runtime policy. Не вводить event bus, общий auth framework, новое направление IPC, платформенный vault или новый формат репликации.
 
@@ -227,9 +231,11 @@ if (!inside || ambiguous || traversal) throw Error("LOGINOM_KNOWLEDGE_SCOPE_DENI
 
 ## Task 3: Custom-конфигурация и безопасное чтение старых настроек
 
-**Files:** Modify `packages/schema/src/loginom.ts`, `packages/loginom-host/src/connection/{connection-store,connection-service}.ts`, `packages/loginom-host/src/host.ts`; Test `packages/desktop/src/main/loginom/connection-store.test.ts`, `packages/loginom-host/test/connection-validation.test.ts`, `packages/loginom-host/test/knowledge.test.ts`. Временные build fallback полностью удаляются в13; рабочий выбор custom начинает использовать его явные endpoint/key здесь.
+**Files:** Modify `packages/schema/src/loginom.ts`, `packages/loginom-host/src/connection/{connection-store,connection-service}.ts`, `packages/loginom-host/src/{host,node-entry}.ts`, `packages/desktop/src/main/loginom/ipc.ts`, `packages/opencode/src/cli/loginom-management.ts`. Test/fixtures: `packages/schema/test/loginom.test.ts`, `packages/app/test-browser/settings-loginom.test.ts`, `packages/desktop/src/main/loginom/{connection-store,connection-service}.test.ts`, `packages/desktop/test/loginom/shutdown-validation.mjs`, `packages/loginom-host/test/{node-host,host,connection-validation,knowledge,prepare-startup}.test.ts`, `packages/opencode/test/fixture/standalone.ts`, `packages/opencode/test/cli/{loginom-management,standalone-status,standalone-preflight,standalone-startup}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`. Остальные stage/candidate fixtures, найденные поиском ниже, обновить здесь же. Runtime fallback удаляется здесь; упаковка файла ключа — в13.
 
 **Interfaces:** `Candidate.mode?: "cloud"|"custom"`, `Candidate.endpoint?: string`; `ConnectionRecord` читает optional mode/endpoint, новые записи всегда пишут mode. `ActiveConnection` содержит mode и сохранённые custom endpoint/apiKey. `Check` расширяет Candidate полем `verifyBrowser?: boolean`, `API.check(Check)`; `Validation.help` отдельно от browser. `View` получает поля общей карты; `State` допускает connection-required. Cloud методы API вводятся вместе с Host composition в6; до него не объявлять неработающие методы.
+
+`connection.check` в node-entry и `loginom-check` в Desktop декодируют новый `Loginom.Check` уже здесь. Все View/Validation fixtures, включая overrides в settings-loginom.test.ts, получают честные mode/server/help/cloud/hasApiKey; не делать обязательные поля optional ради старых тестов. CLI setupSchema/setupCandidate и interactiveSetup получают custom-поля здесь, поскольку существующие subprocess/PTY проверки используют настоящий setup. Облачные команды и обработка connection-required в CLI остаются11.
 
 - [ ] **1. RED:** Добавить store тест миграции на реальном файле, используя существующий temp fixture и codec. Старый plaintext record сохраняется без нового поля:
 
@@ -262,7 +268,31 @@ return {
 `secrets` получается существующим codec decode и проверкой schema, а не чтением необработанного JSON. При stage/save выбирать поля явно, включая mode/endpoint. Сохранить revision conflict, pending, generation immutability, urlSource и testable-normalization.
 - [ ] **4. Следующие RED→GREEN:** cloud→custom с явно введёнными credentials вызывает локальный MCP fixture; custom→cloud→custom сохраняет custom key/endpoint. `new URL(endpoint)` принимает только http/https, без username/password; пустой endpoint/key в выбранном custom отклоняется. Host не применяет cloud fallback при ошибке custom. В тесте использовать `knowledgeServer` из Task2 и явный `mode:"custom"` в stage/candidate.
 - [ ] **5. Следующий RED→GREEN:** `apiKey` без `mode` в входящем legacy candidate не превращает запись в custom. Для текущего custom кандидат с отсутствующим mode сохраняет режим и key; replacement key разрешён только при явном custom. Поле `endpoint` без custom не создаёт новую custom конфигурацию. `hasApiKey` true только когда сохранён непустой custom key.
-- [ ] **6. Проверка/коммит:** из Host `bun test test/connection-validation.test.ts test/knowledge.test.ts`, `bun typecheck`; из Desktop `bun test src/main/loginom/connection-store.test.ts src/main/loginom/connection-service.test.ts`; из Schema `bun typecheck`. Обновить fixtures новых обязательных status полей с честной готовностью. Commit `feat(loginom): add explicit custom Dock configuration`.
+- [ ] **6. RED→GREEN — минимальный CLI custom setup:** перенести сюда custom-часть CLI, иначе ранние fixture setup будут отклонять новые поля. Добавить в setupSchema mode/endpoint и проверить настоящий setupCandidate:
+
+```ts
+expect(setupCandidate(JSON.stringify({
+  mode: "custom", endpoint: "https://stand.test/mcp", apiKey: "custom-canary",
+}), current)).toMatchObject({
+  mode: "custom", endpoint: "https://stand.test/mcp",
+  apiKey: { operation: "replace", value: "custom-canary" },
+})
+expect(setupCandidate('{"apiKey":"legacy-canary"}', current)).not.toHaveProperty("apiKey")
+```
+
+Отсутствующий key сохраняет текущий custom key; пустой при явном custom становится empty и не проходит обязательную проверку. Interactive setup добавляет выбор cloud/custom, endpoint и hidden key prompt; отмена сохраняет существующий CLI_CANCELLED. PTY сценарий `--setup` выбирает custom и передаёт fixture key скрытым вводом; остальные setup JSON получают mode/endpoint/apiKey. Secret argv options не вводить.
+- [ ] **7. Миграция fixtures и удаление runtime fallback:** `rg -n 'knowledge-key|knowledgeKey|endpoint:|store.stage|connection.check' packages/loginom-host/test packages/desktop/test/loginom packages/opencode/test/cli packages/opencode/test/fixture` — все fixtures, ожидающие работающий Help, используют явные custom credentials. Пример записи:
+
+```ts
+await store.stage({
+  generation: 1, revision: 1, mode: "custom", endpoint: help.endpoint,
+  url: "http://stand.test/app/", username: "user", apiKey: "UNIT-NONSECRET", password: "",
+})
+await store.activate(1)
+```
+
+Удалить `withKnowledgeKey` и выбор `environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint` из Host. Endpoint/key берутся только из выбранной конфигурации; до cloud controller отсутствие cloud credentials даёт явную ошибку подключения без запуска Help, исключение save-before-login добавляет6. Не использовать наличие knowledge-key или отсутствие cloud.json как разрешение на legacy fallback. Старые записи без mode оставить только в migration tests с ожидаемым cloud без ключа. В startup tests сохранить проверки cleanup/guard, а не заменить их быстрым отсутствием credentials. Shutdown-validation передаёт custom endpoint/key в check; файл embedded key и manifest.endpoint не направляют Host. Stage-resources тест пока проверяет прежнюю упаковку, её удаляет13; остальные fixture key files удалить здесь.
+- [ ] **8. Проверка/коммит:** Host `bun test test/connection-validation.test.ts test/knowledge.test.ts test/node-host.test.ts test/host.test.ts test/prepare-startup.test.ts`; Desktop `bun test src/main/loginom/connection-store.test.ts src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App `bun test --conditions=browser --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./test-browser/settings-loginom.test.ts`; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts test/cli/standalone-preflight.test.ts test/cli/standalone-startup.test.ts`. Из каждого schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Обновлённые native shutdown/PTY сценарии выполнить штатными командами при наличии inputs, иначе явно записать ограничение. Commit `feat(loginom): add explicit custom Dock configuration`.
 
 ## Task 4: Отдельное хранение облачных credentials
 
@@ -276,11 +306,12 @@ return {
 import { expect, test } from "bun:test"
 import { mkdtemp, rm, readdir } from "node:fs/promises"
 import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { cloudStore } from "../src/connection/cloud-store"
 import { credentials } from "../src/connection/credentials"
 
 test("cloud credentials survive reopening and are removed by logout", async () => {
-  const root = await mkdtemp("$HOME/storage/tmp/cloud-store-")
+  const root = await mkdtemp(join(tmpdir(), "cloud-store-"))
   const value = {
     kind: "loginom-cloud-v1" as const, installationKey: "site-canary", email: "user@example.test",
     dock: { primary: { apiKey: "primary-canary" }, reserve: { apiKey: "reserve-canary" } },
@@ -305,7 +336,7 @@ test("cloud credentials survive reopening and are removed by logout", async () =
 const protectedValue = await codec.encode({ apiKey: value.apiKey, password: value.password })
 ```
 
-Иначе старый codec раньше отбрасывал metadata, а новый начнёт их шифровать вместе с секретами. После decode connection-store проверяет только свою пару; cloud-store — CloudCredentials, включая непустые строки полной пары.
+Linux и CLI codecs сейчас выбирают только пару секретов; Desktop safeStorage уже шифрует весь переданный ActiveConnection. Явный payload делает новое поведение одинаковым и не записывает metadata в secrets. Старые envelopes с metadata продолжают читаться: после decode connection-store проверяет свою пару; cloud-store — CloudCredentials, включая непустые строки полной пары. В тестах использовать tmpdir(); локально он направлен через TMPDIR в разрешённую временную папку, CI задаёт свой каталог.
 - [ ] **4. Следующие RED→GREEN:** неправильный kind, неполная пара и повреждённый payload не заменяют старую запись; Ошибка до rename оставляет прежний файл; ошибка directory fsync после rename не обещает rollback: сообщить ошибку и перечитать фактическую запись, согласовав память с диском. Повреждённое read-back не делает новую пару действующей. Тест read-back не раскрывает ключи через status. Legacy connection records читаются прежними Linux/safeStorage/CLI envelopes. Existing Keychain tests проверяют неверный profile/AAD и tamper после переноса JSON-validation из envelope в store.
 - [ ] **5. Проверка/коммит:** Host `bun test test/cloud-store.test.ts test/cli-credentials.test.ts test/keychain-envelope.test.ts`, `bun typecheck`; Desktop `bun test src/main/loginom/credentials.test.ts src/main/loginom/connection-store.test.ts`, `bun typecheck`. На Linux эти тесты не доказывают native safeStorage/DPAPI/Keychain; native gate в15. Commit `feat(loginom): persist cloud credentials outside generations`.
 
@@ -351,15 +382,15 @@ Device/code ограничен15с собственным AbortSignal; кажд�
 
 Ссылка только HTTP(S) fixture / HTTPS release того же site origin, без credentials; брать полную verification_uri_complete. Polling interval в секундах преобразовать в ms один раз; expiry — абсолютный timestamp. Device success — `access_token`, не выдуманный `{session,user}`. Эти wire поля сверены по [Better Auth v1.7.17 routes](https://github.com/better-auth/better-auth/blob/v1.7.17/packages/better-auth/src/plugins/device-authorization/routes.ts); финальная версия сайта требует повторной интеграционной сверки.
 
-`POST /api/agent/connections` получает Bearer bootstrap, GET pair/DELETE current — только `X-API-Key` установки. Никаких Dock ключей в site headers. Все fetch с `redirect:"error"`; ошибки наружу — безопасные коды `LOGINOM_CLOUD_CONNECTION_REQUIRED`, `LOGINOM_CLOUD_UNAVAILABLE`, `LOGINOM_CLOUD_PROTOCOL_INVALID`, `LOGINOM_CLOUD_ACCESS_DENIED`, `LOGINOM_CLOUD_EXPIRED`, `LOGINOM_CLOUD_REVOKE_UNCONFIRMED` в `errors.ts`, без тела сервера. `LOGINOM_KNOWLEDGE_SCOPE_DENIED` из2 и `LOGINOM_PROXY_UNAVAILABLE` из9 также включить в private allowlist, если пересекают IPC. Полная пара валидируется до записи. После durable write и проверки актуальности попытки вызвать changed. Повтор start отменяет прежнюю незавершённую попытку; действующее подключение не удаляет.
+`POST /api/agent/connections` получает Bearer bootstrap, GET pair/DELETE current — только `X-API-Key` установки. Никаких Dock ключей в site headers. Все fetch с `redirect:"error"`; ошибки наружу — безопасные коды `LOGINOM_CLOUD_CONNECTION_REQUIRED`, `LOGINOM_CLOUD_ALREADY_CONNECTED`, `LOGINOM_CLOUD_UNAVAILABLE`, `LOGINOM_CLOUD_PROTOCOL_INVALID`, `LOGINOM_CLOUD_ACCESS_DENIED`, `LOGINOM_CLOUD_EXPIRED`, `LOGINOM_CLOUD_REVOKE_UNCONFIRMED` в `errors.ts`, без тела сервера. `LOGINOM_KNOWLEDGE_SCOPE_DENIED` из2 и `LOGINOM_PROXY_UNAVAILABLE` из9 также включить в private allowlist, если пересекают IPC. Полная пара валидируется до записи. После durable write и проверки актуальности попытки вызвать changed. Повтор start отменяет прежнюю незавершённую попытку только при отсутствии подключения. При сохранённых cloud credentials start отклоняется с `LOGINOM_CLOUD_ALREADY_CONNECTED` до HTTP, также в custom режиме: сначала обычный disconnect, затем новый вход. Нового ключа установки поверх действующего не выдаётся.
 - [ ] **4. По одному RED→GREEN для polling:** authorization_pending соблюдает interval; slow_down увеличивает интервал на5с; access_denied/expired_token завершает попытку; HTTP429 ждёт max(interval, Retry-After); временная ошибка не крутит busy-loop и не продлевает device expiry. Неуспех первичного exchange завершает попытку, без бесконечного повторного создания установки.
 - [ ] **5. По одному RED→GREEN для отмены:** cancel/close прекращают polling; ответ старой попытки после cancel/start не пишет файл. Если bootstrap уже получен, bounded запрос `POST /api/auth/revoke-session` с `{token: rawBootstrap}` и `Authorization: Bearer rawBootstrap`; status:true признаётся только с этой привязкой. После успешного/терминального exchange сайт обязан погасить сессию; при неясном результате клиент также делает best-effort revoke. Сессия никогда не хранится на диске. В finally client прекращает ожидание в пределах cleanup budget, недоступность сайта не блокирует shutdown навсегда.
-- [ ] **6. По одному RED→GREEN для доверия:** 302 не достигает второго listener; неполная пара/HTML/невалидный JSON не заменяют существующее подключение; verification URL чужого origin не открывается. Generic 401/403/429/5xx не удаляют credentials; подтверждённый access_revoked удаляет текущую запись только если запрос был аутентифицирован её installationKey и его epoch/identity ещё актуальны. Ошибка POST connections в новой device-попытке не доказывает отзыв прежней установки и завершает только эту попытку. Добавить regression: replacement login получил access_revoked, старые credentials/Help сохранились. OAuth device access_denied — отказ попытке, не отзыв старой установки.
+- [ ] **6. По одному RED→GREEN для доверия:** 302 не достигает второго listener; неполная пара/HTML/невалидный JSON при первичном exchange не создают подключение; verification URL чужого origin не открывается. Generic 401/403/429/5xx не удаляют credentials; подтверждённый access_revoked удаляет текущую запись только если запрос был аутентифицирован её installationKey и его epoch/identity ещё актуальны. POST connections с bootstrap и OAuth device access_denied завершают только текущую попытку. Regression: после успешного входа повторный start отвергается, счётчики device/code и connections не растут, cloud.json/Help остаются прежними; после disconnect новый start допустим. Защиту от запоздалых ответов отменённой попытки сохранить.
 - [ ] **7. Проверка/коммит:** Host `bun test test/cloud-auth.test.ts test/cloud-store.test.ts`, `bun typecheck`; Product `bun test`, `bun typecheck`. Commit `feat(loginom): implement cloud device authorization client`.
 
 ## Task 6: Сохранение до входа и изменяемая готовность прежнего поколения
 
-**Files:** Create `packages/loginom-host/src/knowledge-session.ts`, `packages/loginom-host/test/cloud-readiness.test.ts`. Modify `packages/schema/src/loginom.ts`, `packages/loginom-host/src/{host,host-port,node-entry}.ts`, `packages/loginom-host/src/connection/connection-service.ts`; Test `test/{connection-readiness,connection-validation,knowledge,host,host-port}.test.ts`.
+**Files:** Create `packages/loginom-host/src/knowledge-session.ts`, `packages/loginom-host/test/cloud-readiness.test.ts`. Modify `packages/schema/src/loginom.ts`, `packages/loginom-host/src/{host,host-port}.ts`, `packages/loginom-host/src/connection/connection-service.ts`, `packages/desktop/src/main/loginom/ipc.ts`, `packages/desktop/src/preload/index.ts`; Test `packages/loginom-host/test/{connection-readiness,connection-validation,knowledge,host,host-port}.test.ts`, `packages/schema/test/loginom.test.ts`, `packages/app/test-browser/settings-loginom.test.ts`, `packages/desktop/src/main/loginom/connection-service.test.ts`; обновить остальные typed API/View/Validation stubs потребителей в этой же задаче.
 
 **Interfaces:**
 
@@ -423,7 +454,7 @@ await expect(access(forbiddenHelpMarker)).rejects.toMatchObject({ code: "ENOENT"
 - [ ] **3. GREEN:** Host определяет отсутствие cloud credentials; check проверяет Loginom поля и выдаёт обычный validation token без Help. `verifyBrowser:false` пропускает только браузер; при явном check с default true browser проверяется через Task1, без Dock. Для custom/connected cloud Help обязателен независимо от флага. Не убирать validationId/revision/expiry, cleanup guard и безопасное применение pending.
 
 Обновить `ConnectionRuntime.check`, `validations` и `Validation` вместе. Runtime prepare создаёт локальную generation с KnowledgeSession, но при отсутствующих credentials не запускает Help. Начальный RuntimeHandle больше не имеет независимого rejected promise, навсегда определяющего phase. Host/session сохраняет текущий HelpStatus. После установки state.active/state.handle service вызывает handle.observeHelp(callback), который синхронно выдаёт последний снимок и далее сообщает изменения. Callback проверяет state.handle === handle и closing. Так публикация до завершения prepare не теряется, а старый handle игнорируется; отдельный service.helpStatus не вводить.
-- [ ] **4. Следующий RED→GREEN:** Скопировать существующую реалистичную network fixture из `knowledge.test.ts` в новый тест; site responses Task5 и один `knowledgeServer` с `apiKey:"p-secret"`. На этом шаге добавить три cloud метода в schema API и Host composition; завершить вход через `host.api.cloudStart()`. Task8 лишь проводит уже работающие методы через transport. Assert:
+- [ ] **4. Следующий RED→GREEN:** Скопировать существующую реалистичную network fixture из `knowledge.test.ts` в новый тест; site responses Task5 и один `knowledgeServer` с `apiKey:"p-secret"`. На этом шаге атомарно добавить три cloud метода в schema API, Host composition, Desktop preload/IPC и typed API stubs App. Generation service владеет только прежними методами: его тип сузить до `Pick<Loginom.API, "read" | "status" | "check" | "save" | "cancelPending" | "acknowledgeRecovery">`; cloud методы добавляет Host, а не service-заглушки. Desktop уже использует Host напрямую, поэтому три канала должны работать в этой же задаче; откладывать их до8 или10 нельзя. Task8 добавляет Node router. Assert через `host.api.cloudStart()`:
 
 ```ts
 const before = await host.api.status()
@@ -438,6 +469,8 @@ expect(await store.read()).toEqual(savedRecord)
 ```
 
 Не добавлять IPC «записать credentials». Полную management transport проверку выполнить в8/13. Saved legacy record без mode должен дать тот же переход без пересохранения.
+
+В preload добавить `cloudStart: () => ipcRenderer.invoke("loginom-cloud-start")`, `cloudCancel`/`cloudDisconnect` с одноимёнными kebab-case каналами. Каждый main handler сначала вызывает существующий `sender(event)`, затем соответствующий `api.cloudStart/cloudCancel/cloudDisconnect()`. Не добавлять optional API methods/throwing stubs ради компиляции. App test API stub возвращает полную View; schema/consumer fixtures включают help во всех Validation overrides. UI кнопки добавляет10. Полный Desktop dispatch проверяет settings-live в13; здесь Host behavioral tests и обязательные typechecks потребителей.
 - [ ] **5. Следующие RED→GREEN:** initial каталог недоступен → HTTP fixture становится доступным → новый tools/call/connection.ready восстанавливает то же поколение. Запускать retry **до** ready gate в connectionLease и tools; для первичного локального acquire/diagnostics не требовать сети. `tools` без creds возвращает разрешённые local descriptors/diagnostics, не выдуманный Help catalog. Если temporary startup failed, tools инициирует одну bounded загрузку; подтверждённая ошибка не скрывается как успешный полный каталог.
 - [ ] **6. Следующие RED→GREEN:** два одновременных retry ждут один child/catalog; поздний ответ первой попытки не меняет новую readiness; отмена/close не начинает новую. Очистка Help failure не стирает store/cleanup failure или browser warning. Pending остаётся pending, а его Help readiness отдельно. Existing run leases и browser PID не меняются при invalidate Help.
 - [ ] **7. GREEN-схема состояния:** Каждая новая Help попытка получает локальный порядковый номер. В finally очищать текущий promise только если он всё ещё тот же. Публикация результата проверяет generation/attempt/credentials revision. Ошибку Help хранить отдельно от fatal store/cleanup error; callback observeHelp не присваивает общий failure=undefined без проверки владельца ошибки.
@@ -449,7 +482,7 @@ const current = () => !state.closed && attempt === state.attempt && revision ===
 // После каждого await результат меняет current/catalog/readiness только при current().
 ```
 
-- [ ] **8. Проверка/коммит:** Host `bun test test/cloud-readiness.test.ts test/connection-readiness.test.ts test/connection-validation.test.ts test/knowledge.test.ts test/host.test.ts test/host-port.test.ts`, `bun typecheck`; Desktop `bun test src/main/loginom/connection-service.test.ts`. Commit `feat(loginom): recover Help readiness within a generation`.
+- [ ] **8. Проверка/коммит:** Host `bun test test/cloud-readiness.test.ts test/connection-readiness.test.ts test/connection-validation.test.ts test/knowledge.test.ts test/host.test.ts test/host-port.test.ts`; Desktop `bun test src/main/loginom/connection-service.test.ts`; Schema `bun test test/loginom.test.ts`; App browser settings test командой Task3; Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts`. Из schema/loginom-host/app/desktop/opencode выполнить `bun typecheck`. Commit `feat(loginom): recover Help readiness within a generation`.
 
 ## Task 7: Общий deadline, failover, refresh и выход
 
@@ -468,7 +501,9 @@ expect(reserve.requests.every(item => item.authorization === "Bearer r-secret"))
 Затем новое поколение custom→cloud использует reserve; новый Host с тем же cloud.json начинает с primary. Сначала реализовать только первый503 сценарий, следующие добавлять отдельно.
 - [ ] **2. Запустить RED:** Host `bun test test/cloud-recovery.test.ts -t 'reserve'`; сейчас fallback отсутствует.
 - [ ] **3. GREEN:** В KnowledgeSession recovery обрабатывать только Help reads. primary network/timeout/502503504 разрешает один reserve try; commit выбора только после успешного каталога/запроса reserve. Неуспех обоих оставляет primary; уже успешно выбранный reserve не возвращается на primary. TLS trust failure — безопасная ошибка без отключения проверки сертификата. 401 идёт в refresh,403/429/tool error не идут в reserve. Custom не вызывает cloud controller ни при одном отказе.
-- [ ] **4. Следующий RED→GREEN — классификация:** одинаково для startup и call fixture отдаёт401/403/429/503 и MCP `isError:true`. Проверить фактические HTTP codes у pinned SDK; не считать любой `-32603` сетевым отказом. Разрешённые transport errors классифицировать при catch в knowledge-client, передавать через knowledge-entry и supervisor. `catalog.mjs` внутренний transient retry отключить только для managed Help, иначе он умножит Host попытки; classic bridge оставляет прежний retry.
+- [ ] **4. Следующий RED→GREEN — классификация:** по одному сценарию для initialize/tools-list/tools-call: HTTP401/403 с настоящим Dock JSON-RPC body `code:-32001`, HTTP429/503, HTTP200 с корректным JSON-RPC error `code:-32001`, MCP `isError:true`, локальное истечение deadline и parent abort. Dock использует `-32001` и для auth, а SDK — для RequestTimeout/отмены: число само по себе не доказывает timeout. Pinned SDK сохраняет non-2xx как transport HTTP status; совпадение чисел не доказывает уже существующую ошибку обработки401.
+
+Сначала проверять родительскую отмену, затем HTTP status из подтверждённой transport/fetch-причины (пройти cause до HTTP, не остановиться на внешнем числовом RPC code). Только при отсутствии HTTP причины классифицировать сетевой отказ/локальный timeout. HTTP401 → unauthorized/refresh без failover;403 → forbidden; серверный JSON-RPC `-32001` или `-32603` сам по себе → other; локальный timeout → unavailable; parent abort → отмена без recovery. Не извлекать HTTP status из message/JSON-RPC body, не хранить общий mutable lastStatus для конкурентных запросов. Передавать безопасную классификацию через knowledge-entry/supervisor. `catalog.mjs` внутренний transient retry отключить только для managed Help, иначе он умножит Host попытки; classic bridge оставляет прежний retry.
 - [ ] **5. Следующий RED→GREEN — бюджет:** через короткий **реальный** CallBudget (например600мс) и управляемые HTTP gates проверить startup/refresh/retry в исходном сроке и abort дочернего запроса. Не переводить только now CloudAuth: у Node child/supervisor другие реальные часы. Отдельная проверка вычисления min(60_000,remaining) подтверждает cap60с; native acceptance подтверждает полный worst-case120с. Сначала определить бюджет в HostPort до connectionLease:
 
 ```ts
@@ -504,7 +539,7 @@ await enqueueWrite(() => store.clear())
 
 **Files:** Modify `packages/schema/src/loginom.ts`, `packages/loginom-host/src/{node-entry,host-port,host,errors}.ts`. Test `packages/schema/test/loginom.test.ts`, `packages/loginom-host/test/{node-host,host-port}.test.ts`.
 
-**Interfaces:** Завершить `Loginom.API.cloudStart/cloudCancel/cloudDisconnect(): Promise<View>`. Node entry принимает exact `connection.cloud-start`, `connection.cloud-cancel`, `connection.cloud-disconnect` с пустым input; `connection.status` — всё ещё короткий read. `connection.check` декодирует `Loginom.Check`, не прежний Candidate. Никаких cloud management tools для модели.
+**Interfaces:** Уже реализованные в6 `Loginom.API.cloudStart/cloudCancel/cloudDisconnect(): Promise<View>` провести через Node router. Node entry принимает exact `connection.cloud-start`, `connection.cloud-cancel`, `connection.cloud-disconnect` с пустым input; `connection.status` — всё ещё короткий read. `connection.check` уже декодирует `Loginom.Check` с3. Никаких cloud management tools для модели.
 
 - [ ] **1. RED:** В существующем node-host fixture вызвать `connection.cloud-cancel` и `connection.cloud-disconnect` на неподключённом профиле; они возвращают redacted View без обращения к site. Для cloud-start здесь проверить router/decoder через Host композицию Task6 и его программную injection. Полный сетевой device flow через launchNodeHost выполнить в13 **только** с собранным dev Node Host с baked tuple: startup handshake не получает endpoint overrides. Assertions start/status/cancel: status.pending имеет userCode/verificationUrl/expiresAt, whole replies не содержат device/session/installation/Dock canaries; локальный тест не обращается к loginom.ai.
 - [ ] **2. Запустить:** Host `bun test test/node-host.test.ts test/host-port.test.ts`; новая management operation пока неизвестна.
@@ -521,11 +556,11 @@ expect(JSON.parse(result.content[0].text)).toEqual(status)
 ```
 
 Проекцию собрать явно в host-port: `revision,generation,url,username,folder,hasPassword,state,browser,failure,recoveries,mode,server,help`. Одно значение использовать для content и structuredContent. Не распространять весь View и затем удалять несколько секретных полей.
-- [ ] **5. Проверка/коммит:** Schema `bun test test/loginom.test.ts`, `bun typecheck`; Host `bun test test/node-host.test.ts test/host-port.test.ts test/transport.test.ts`, `bun typecheck`. Commit `feat(loginom): expose cloud management through private Host API`.
+- [ ] **5. Проверка/коммит:** Schema `bun test test/loginom.test.ts`; Host `bun test test/node-host.test.ts test/host-port.test.ts test/transport.test.ts`; из schema/loginom-host/app/desktop/opencode `bun typecheck`. Если правка потребовала нового общего поля, все его fixtures и поведенческие проверки обновить здесь, не ждать10–11. Commit `feat(loginom): expose cloud management through private Host API`.
 
 ## Task 9: Site и Help используют явный proxy и системные CA
 
-**Files:** Modify `packages/loginom-host/src/node-entry.ts`, `packages/loginom-runtime/src/knowledge-entry.mjs`, `packages/desktop/src/main/loginom/desktop-service.ts`; при необходимости точечно `packages/desktop/src/main/index.ts`. Extend `packages/desktop/test/loginom/environment-proxy.ts`, `packages/loginom-host/test/environment.test.ts`; Create `packages/loginom-host/test/cloud-proxy.test.ts`.
+**Files:** Modify `packages/loginom-host/src/node-entry.ts`, `packages/loginom-runtime/src/knowledge-entry.mjs`, `packages/desktop/src/main/index.ts`; при необходимости точечно `packages/desktop/src/main/loginom/desktop-service.ts`. Extend `packages/desktop/test/loginom/environment-proxy.ts`, `packages/loginom-host/test/environment.test.ts`; Create `packages/loginom-host/test/cloud-proxy.test.ts`.
 
 **Interfaces:** Используется существующая native Node `http.setGlobalProxyFromEnv()` в pinned runtime, без OS/PAC resolver. System CA CLI Host/Help уже передаются через `--use-system-ca`; Desktop main имеет `setDefaultCACertificates`. Запросы cloud-auth и MCP идут через native fetch; тесты должны подтвердить именно оба реальных клиента.
 
@@ -548,16 +583,18 @@ native.setGlobalProxyFromEnv()
 ```
 
 Для runtime `.mjs` type assertion не нужен. Это существующий подход Desktop, а не новый HTTP wrapper. Передать только существующий фильтр explicit proxy/NO_PROXY, сохранить uppercase/lowercase Windows правила. Не брать proxyResult системного resolver и не добавлять его в shared options.environment. Если инициализация для явно указанного proxy не удалась, запросы cloud/Help должны завершаться безопасной ошибкой, без прямого fallback; не менять модельный sidecar контракт.
+
+Desktop повторно вызывает существующий `useEnvProxy()` **сразу после** `const shellEnv = preferAppEnv(app.getPath("userData"))`, до `desktopLoginom()` и первого запроса Host. Нынешний ранний вызов не видит proxy из login-shell, а вызов при загрузке sidecar происходит уже после Host. Regression запускает main с proxy только из fixture login-shell: самый первый site request и Help проходят через него, direct target count0; эту часть с собранным Desktop выполнить в13. Не подмешивать OS/PAC результат и не откладывать настройку до sidecar.
 - [ ] **4. По одному RED→GREEN:** `NO_PROXY` разрешает прямой loopback; недоступный explicit proxy → target count0 и временная ошибка; отсутствие explicit env → прямой запрос несмотря на настроенный OS/PAC fixture; redirect error не достигает второго origin. Node child не наследует model/provider credentials. Установленный системный CA проверяется native в15; локальный сертификат через тестовую CA доказывает только TLS transport, не OS trust store.
 - [ ] **5. Проверка/коммит:** Host `bun test test/cloud-proxy.test.ts test/environment.test.ts test/system-proxy.test.ts`, `bun typecheck`; Desktop existing environment proxy check + `bun typecheck`; проверить `--no-proxy-server` в существующем `test/loginom/no-proxy-contract.mjs`. Commit `fix(loginom): apply explicit proxy to cloud and Help requests`.
 
-## Task 10: Desktop IPC и две карточки настроек
+## Task 10: Две карточки настроек Desktop
 
-**Files:** Modify `packages/desktop/src/main/loginom/ipc.ts`, `packages/desktop/src/preload/index.ts`; `packages/app/src/components/{settings-loginom-state.ts,settings-loginom.tsx,settings-loginom.css}`, `packages/app/src/i18n/{en,ru}.ts`. Test `packages/app/test-browser/settings-loginom.test.ts`, `packages/desktop/test/loginom/{settings-ux,settings-live}.mjs`.
+**Files:** Modify `packages/app/src/components/{settings-loginom-state.ts,settings-loginom.tsx,settings-loginom.css}`, `packages/app/src/i18n/{en,ru}.ts`. Test `packages/app/test-browser/settings-loginom.test.ts`, `packages/desktop/test/loginom/settings-ux.mjs`. Живой cloud сценарий `settings-live.mjs` добавляется/выполняется в13.
 
-**Interfaces:** Preload реализует API Task8: channels `loginom-cloud-start`, `loginom-cloud-cancel`, `loginom-cloud-disconnect`; каждый IPC handler проверяет текущий sender так же, как read/save. `loginom-check` декодирует Check. UI controller добавляет mode,endpoint,apiKey,apiKeyMode в draft и методы connect/cancelLogin/disconnect. Stored key не возвращается; пустая mask по hasApiKey — только placeholder.
+**Interfaces:** UI использует готовые с6 preload/IPC channels `loginom-cloud-start`, `loginom-cloud-cancel`, `loginom-cloud-disconnect`; Check decoder готов с3. UI controller добавляет mode,endpoint,apiKey,apiKeyMode в draft и методы connect/cancelLogin/disconnect. Stored key не возвращается; пустая mask по hasApiKey — только placeholder.
 
-- [ ] **1. RED:** В существующем `setup(initial)` settings fixture добавить честные View fields и stub трёх management методов. Проверить save-before-login:
+- [ ] **1. RED:** Использовать `setup(initial)`, чьи View/Validation fields и три management stubs уже обновлены в3/6. Добавить поведенческий сценарий save-before-login:
 
 ```ts
 const f = setup({ state: "connection-required", mode: "cloud", help: { state: "connection-required" } })
@@ -593,34 +630,41 @@ try {
 | revokeUnconfirmed | Локальное подключение удалено; отзыв на сайте не подтверждён | Local connection removed; server revocation was not confirmed |
 
 Код/ссылка/expiry/email берутся только из management view; link открывается через существующий platform.openExternal после Host проверки origin. Кнопки refresh connection нет. Поля Loginom URL/username/password ниже; folder input не добавлять. Pending/error строки использовать полные фразы с параметрами, без составления локализованных слов из кусков.
-- [ ] **7. Browser acceptance:** В `settings-ux.mjs` проверить две карточки, default cloud, keyboard radio navigation/labels, cancel, account, скрытый key и отсутствие refresh кнопки. Обновить тестовые API mocks новыми методами/status. `settings-live.mjs` на отдельном профиле проверяет настоящий Host happy path с fixture/staging, не только renderer mock. Существующее onboarding условие generation сохраняет смысл «настройки сохранены», не «Help уже ready».
+- [ ] **7. Browser acceptance:** В `settings-ux.mjs` с IPC fixtures проверить две карточки, default cloud, keyboard radio navigation/labels, cancel, account, скрытый key и отсутствие refresh кнопки. Обновить тестовые API mocks новыми методами/status. Это UI-проверка с заглушками; `settings-live.mjs` с настоящим Host и cloud fixture отложен до13, шаг5, когда Desktop собран с baked tuple. Существующее onboarding условие generation сохраняет смысл «настройки сохранены», не «Help уже ready».
 - [ ] **8. Проверка/коммит:** App browser test выше и `bun typecheck`; Desktop `bun test src/main/loginom`, `bun typecheck`; isolated settings-ux штатной командой из Desktop runbook. Не перезапускать пользовательское приложение. Commit `feat(app): add Loginom AI connection settings`.
 
 ## Task 11: CLI cloud/custom и отмена длительного входа
 
 **Files:** Modify `packages/opencode/src/cli/{loginom-management,standalone-command,standalone,standalone-cancellation,standalone-run}.ts`; Test `packages/opencode/test/cli/{loginom-management,standalone-status,standalone-preflight,standalone-startup,profile}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`.
 
-**Interfaces:** Команды `loginom connect` и `loginom disconnect`; существующие setup/check/status сохраняются. `connect` делает start/status/cancel короткими запросами, не новый180с await всей авторизации. Для setup stdin поля `mode`, `endpoint`, `apiKey`, `url`, `username`, `password`. JSON final stdout — ровно result; pending code/link выводятся пользователю в stderr, не в transcript.
+**Interfaces:** Команды `loginom connect` и `loginom disconnect`; существующие setup/check/status сохраняются. `connect` делает start/status/cancel короткими запросами, не новый180с await всей авторизации. Для setup stdin поля `mode`, `endpoint`, `apiKey`, `url`, `username`, `password`. JSON final stdout — ровно result; pending code/link выводятся пользователю в stderr, не в transcript. В существующем standalone-cancellation добавить `handoffStandaloneCancellation(): void`: идемпотентно снимает startup SIGINT-handler и очищает общий signal, не отменяя controller и не освобождая профиль; его же cleanup использует finally wrapper.
 
-- [ ] **1. RED:** Дополнить существующий setupCandidate test:
+- [ ] **1. RED:** Custom setupCandidate/interactiveSetup уже реализованы в3. В `loginom-management.test.ts` добавить проверку реального `loginomManagement` через узкий stub `host.request`: текущий View — cloud без credentials, ответ check — `help:connection-required`, browser unknown; save возвращает тот же безопасный статус. Ожидаемые запросы/результат:
 
 ```ts
-expect(setupCandidate(JSON.stringify({
-  mode: "custom", endpoint: "https://stand.test/mcp", apiKey: "custom-canary",
-}), current)).toMatchObject({
-  mode: "custom", endpoint: "https://stand.test/mcp",
-  apiKey: { operation: "replace", value: "custom-canary" },
+expect(calls.find(call => call.operation === "connection.check")?.input).toMatchObject({
+  mode: "cloud", verifyBrowser: false,
 })
-expect(setupCandidate('{"apiKey":"legacy-canary"}', current)).not.toHaveProperty("apiKey")
+expect(calls.filter(call => call.operation === "connection.save")).toHaveLength(1)
+expect(result).toMatchObject({ state: "connection-required", help: { state: "connection-required" } })
 ```
 
 - [ ] **2. Запустить RED:** Opencode `bun test test/cli/loginom-management.test.ts`.
-- [ ] **3. GREEN:** setupSchema принимает новые поля, setupCandidate выбирает `mode` из явного ввода/текущего View; key replacement только если JSON содержит mode custom. Interactive setup добавляет cloud/custom choice и hidden key prompt. stdin отсутствующий key сохраняет custom key, пустой key при custom не маскируется как preserve. Не добавлять secret argv options. check возвращает actual `checked.help`, а не literal ready; setup без входа сохраняет connection-required с exit0. Перед setup-check явно задать verifyBrowser:false только для cloud без credentials (с учётом выбранного кандидатом режима); явная команда check оставляет true. Отдельный regression fixture-маркер подтверждает отсутствие запуска браузера в CLI setup до входа.
-- [ ] **4. Следующий RED→GREEN:** connect: real management Host + controlled polling fixture остаётся активным дольше180с по injected clock; каждый request короткий. В `loginomManagement` добавить узкую dependency `wait(ms,signal)` при необходимости таймерного теста, не менять global timers. После cloud-start вывести status.pending и открыть verificationUrl `openUrl` из `@opencode-ai/core/open`; если browser launch недоступен, код и ссылка остаются рабочим результатом. Не ждать успеха браузерного процесса для продолжения polling.
-- [ ] **5. GREEN loop:** Использовать `standaloneCancellation()` в management, подключить `loginom connect` к существующему `withStandaloneCancellation`. Цикл ограничен returned expiresAt:
+- [ ] **3. GREEN:** Сохранить custom parser/prompts из3 и их regression tests. check возвращает actual `checked.help`, а не literal ready; setup без входа сохраняет connection-required с exit0. Перед setup-check явно задать verifyBrowser:false только для cloud без credentials (с учётом выбранного кандидатом режима); явная команда check оставляет true. Отдельный regression fixture-маркер подтверждает отсутствие запуска браузера в CLI setup до входа: этот путь реального Host не требует обращения к site и доступен до13.
+- [ ] **4. Следующий RED→GREEN:** connect проверяется вызовом настоящего `loginomManagement` с узкой заглушкой `host.request`, возвращающей start/pending/status/success; записывать порядок запросов и безопасные outputs. Сузить его аргумент до `Pick<Awaited<ReturnType<typeof launchNodeHost>>, "request">`, поскольку management сам не владеет shutdown. Управляемые `wait(ms,signal)` и `now()` в options позволяют пройти срок больше180с без global timers и без запуска настоящего Node Host; каждый management request остаётся коротким. Начало и status fixture задают согласованные expiresAt/clock. Реальный CLI/PTY cloud flow выполняется в13, шаг5, с compiled Host и baked tuple. После cloud-start вывести status.pending и открыть verificationUrl `openUrl` из `@opencode-ai/core/open`; если browser launch недоступен, код и ссылка остаются рабочим результатом. Не ждать успеха браузерного процесса для продолжения polling. При подключённом профиле connect сообщает `LOGINOM_CLOUD_ALREADY_CONNECTED` с подсказкой сначала выйти, не создаёт новую установку.
+- [ ] **5. GREEN loop:** Использовать `standaloneCancellation()` в management. В standalone.ts включить существующий `withStandaloneCancellation(() => executeProfile(...))` для `loginom connect` и TUI entry, а в standaloneRun получать `standaloneCancellation()` также при mode=tui (убрать нынешнее условие только mode=run). При отмене startup handler удерживается внешним invocation до Host cleanup и освобождения profile, не снимается при завершении отдельного prompt. После нормального завершения prompts/connect и перед запуском обычного TUI вернуть штатную обработку клавиш:
 
 ```ts
-while (current.cloud.pending && !signal.aborted) {
+if (mode === "tui") {
+  if (signal?.aborted) throw Error("CLI_CANCELLED")
+  handoffStandaloneCancellation()
+}
+```
+
+В существующем модуле хранить одну функцию снятия handler рядом с signal; handoff/finally вызывают её идемпотентно. При отмене handoff недостижим, второго controller или самостоятельного signal handler не создавать. Цикл connect ограничен returned expiresAt:
+
+```ts
+while (current.cloud.pending && now() < current.cloud.pending.expiresAt && !signal.aborted) {
   await wait(1000, signal)
   const decoded = view(await host.request("connection.status", {}))
   if (Option.isNone(decoded)) throw Error("LOGINOM_REPLY_INVALID")
@@ -628,9 +672,12 @@ while (current.cloud.pending && !signal.aborted) {
 }
 ```
 
-`view` — существующий Schema.decodeUnknownOption(Loginom.View) в loginom-management. В finally при незавершённом входе запросить cloud-cancel; затем existing host.close. Profile guard отпускает только внешний executeProfile после подтверждённых ACK+exit. Ctrl+C exit130, повторный SIGINT не принуждает exit до cleanup. Shutdown error сохраняет guard и имеет приоритет над красивым cancel result.
-- [ ] **6. Следующие RED→GREEN:** отказ/expiry; pending код без browser; SIGINT во время start/poll/exchange; cleanup failure оставляет guard; disconnect offline удаляет только local cloud credentials и сообщает remote unconfirmed. CLI run/preflight на connection-required возвращает понятный безопасный код и подсказку `loginom connect`, не запускает модель без Help. Custom не пытается loginom.ai. Help check и browser check отчёт раздельные.
-- [ ] **7. Проверка/коммит:** Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts test/cli/standalone-preflight.test.ts test/cli/standalone-startup.test.ts test/cli/profile.test.ts`, `bun typecheck`; существующий isolated PTY сценарий расширить connect/cancel. Commit `feat(cli): add cloud sign-in and custom Dock setup`.
+`view` — существующий Schema.decodeUnknownOption(Loginom.View) в loginom-management; `now` default Date.now, `wait` default cancellable ожидание. В finally при незавершённом входе запросить cloud-cancel; `host.close()` остаётся во внешнем владельце (standalone-command или standaloneRun), не внутри loginomManagement. Profile guard отпускает только внешний executeProfile после подтверждённых ACK+exit. Ctrl+C exit130, повторный SIGINT не принуждает exit до cleanup. Shutdown error сохраняет guard и имеет приоритет над красивым cancel result.
+- [ ] **6. Следующие RED→GREEN:** отказ/expiry; pending код без browser; SIGINT во время start/poll/exchange; cleanup failure оставляет guard; disconnect offline удаляет только local cloud credentials и сообщает remote unconfirmed. Для headless run и automation preflight на connection-required — безопасная ошибка с подсказкой `loginom connect` до запуска модели; не переносить этот запрет на обычный чат TUI. Custom не пытается loginom.ai. Help check и browser check отчёт раздельные.
+
+TUI после существующего setup-предложения повторно читает status; если cloud Help в connection-required, предлагает «Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения». По согласию вызывает `loginomManagement(host, "connect", ...)` с **тем же Host** и существующим profile guard; отдельный CLI subprocess не запускает. Отказ продолжает обычный чат, Loginom actions по-прежнему требуют готового Help. После prompt/management восстановить stdin.resume(). Ctrl+C отменяет текущий запуск с cleanup. Во время открытого TUI другой `loginom connect` получит PROFILE_BUSY, поэтому подсказка для позднего входа: выйти из TUI, выполнить connect, открыть TUI снова; новых механизмов общего профиля не вводить. Проверить TUI: сохранённое поколение без входа тоже предлагает connect, отказ доходит до обычного чата, согласие использует один Host/guard. Существующие ordinary-chat/unconfigured tests сохранить.
+Отдельно проверить повторный SIGINT во время TUI startup connect: signal определён, polling отменён, guard остаётся до ACK+exit, второй сигнал не делает ранний exit. До13 unit test проверяет invocation wrapper/отмену; настоящий PTY cloud flow с теми же утверждениями входит в13.
+- [ ] **7. Проверка/коммит:** Opencode `bun test test/cli/loginom-management.test.ts test/cli/standalone-status.test.ts test/cli/standalone-preflight.test.ts test/cli/standalone-startup.test.ts test/cli/profile.test.ts`, `bun typecheck`; existing isolated PTY проверяет отказ от входа/обычный чат уже здесь. Реальные connect/cancel через site fixture —13. Commit `feat(cli): add cloud sign-in and custom Dock setup`.
 
 ## Task 12: Evals и node acceptance получают custom credentials через stdin
 
@@ -663,21 +710,23 @@ stdin = json.dumps(dict(
 ```
 
 Использовать stdin в existing setup phase; helper error говорит «required for setup», не «required to build». Удалить key из build env и assert наличия knowledge-key. Подготовка `--prepare-only` должна собирать без ключа.
+
+В run-check.md и evals runbook записать эксплуатационную зависимость: **до отключения общего legacy key** администратор выдаёт отдельный USER key для evals/node acceptance с чтением официальной KB; секрет стенда обновляется и проверяется реальным setup + чтением KB. Текущий private-файл можно сохранить, но его значение не должно зависеть от общего ключа0.3.9. По исходникам нельзя установить, кому принадлежит уже лежащий в нём ключ; секрет ради проверки не выводить. ADMIN/ROOT harness не выдавать. В canary test подтвердить stdin-only передачу, отсутствие key в build env/artifact/evidence. Production provisioning и отключение legacy key этой задачей не выполнять.
 - [ ] **5. Проверка/коммит:** evals `bun test test/profile.test.ts`, `bun typecheck`; из `scripts/node-acceptance` `python3 -m unittest discover -s tests -p 'test_run_check_build.py'`, с TMPDIR. Это проверка настройки harness, не запуск всех live node evals. Commit `fix(evals): configure custom Dock without embedded credentials`.
 
 ## Task 13: Удаление встроенного ключа, staging tuple и документация
 
-**Files:** Modify `packages/loginom-host/script/{stage-resources,build-cli,build-node-host}.ts`, Create `packages/loginom-host/script/cloud-build.ts`, `packages/loginom-host/test/cloud-build.test.ts`; Modify `packages/desktop/{scripts/bundle-loginom.ts,electron.vite.config.ts}`, `.github/workflows/release.yml`, `packages/loginom-host/src/host.ts`.
+**Files:** Modify `packages/loginom-host/script/{stage-resources,build-cli,build-node-host}.ts`, Create `packages/loginom-host/script/cloud-build.ts`, `packages/loginom-host/test/cloud-build.test.ts`; Modify `packages/desktop/{scripts/bundle-loginom.ts,electron.vite.config.ts}`, `.github/workflows/release.yml`. Runtime fallback в host.ts удалён в3.
 
-Fixtures: `packages/loginom-host/test/{node-host,host,connection-validation,knowledge,prepare-startup,stage-resources}.test.ts`, `packages/desktop/test/loginom/shutdown-validation.mjs`, `packages/opencode/test/fixture/standalone.ts`, `packages/opencode/test/cli/{standalone-status,standalone-preflight}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`.
+Tests: `packages/loginom-host/test/{node-host,cloud-proxy,cloud-readiness,stage-resources}.test.ts`, `packages/desktop/test/loginom/{settings-live.mjs,environment-proxy.ts}`, `packages/opencode/test/cli/{standalone-status,loginom-management}.test.ts`, `packages/opencode/test/cli/tui/standalone-pty.py`. Существующие custom fixtures уже перенесены в3; здесь завершаются отложенные compiled cloud проверки8–11.
 
 Docs: `packages/app/AGENTS.md`, `packages/loginom-host/AGENTS.md`, `packages/desktop/src/main/loginom/AGENTS.md`, `docs/testing/loginom-ai-agent/{standalone-cli.md,README.md,ci-release.md}`. Не править исторические отчёты так, будто прежние сборки уже работали по новой схеме.
 
-**Interfaces:** Удалить `stageResources.knowledgeKey`, создание/чтение `knowledge-key`, Host `withKnowledgeKey`. Новый **build-only** `cloudBuild(environment: NodeJS.ProcessEnv): CloudEndpoints | undefined`; вход — одна JSON переменная `LOGINOM_AI_AGENT_CLOUD_BUILD` со всеми site/primary/reserve. Она используется только build scripts; compiled constant `import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD` передаётся Host из Node bundle и Electron main. Обычный runtime process.env не читается для выбора cloud endpoints.
+**Interfaces:** Удалить `stageResources.knowledgeKey` и упаковку `knowledge-key`; runtime чтения файла/withKnowledgeKey уже нет с3. Новый **build-only** `cloudBuild(environment: NodeJS.ProcessEnv): CloudEndpoints | undefined`; вход — одна JSON переменная `LOGINOM_AI_AGENT_CLOUD_BUILD` со всеми site/primary/reserve. Она используется только build scripts; compiled constant `import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD` передаётся Host из Node bundle и Electron main. Обычный runtime process.env не читается для выбора cloud endpoints.
 
 - [ ] **1. RED:** В stage-resources тесте проверить успешный bundle без key, отсутствие файла; в Host test поставить runtime `LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT` и manifest.endpoint на listener-сборщик, а cloud tuple инъекцией на свои три fixtures. Ни одного запроса с cloud key на collector. Существующие custom fixtures использовать через сохранённый endpoint, не legacy env override.
 - [ ] **2. Запустить RED:** Host `bun test test/stage-resources.test.ts test/cloud-build.test.ts test/cloud-readiness.test.ts`. Для полноценных staging tests нужны pinned Node/Browser inputs, иначе этот пункт не объявлять пройденным.
-- [ ] **3. GREEN:** Удалить embedded key из staging, обоих build callers и release secret checks/env. Удалить чтение manifest.endpoint/env из cloud пути; при custom адрес только из явной конфигурации. Shared manifest endpoint при необходимости остаётся историческим metadata, но не источником персонального адресата. Никакого fallback к legacy key. Миграция без mode из3 сохраняется.
+- [ ] **3. GREEN:** Удалить embedded key из staging, обоих build callers и release secret checks/env. Проверить, что раннее удаление runtime fallback в3 сохранилось: manifest.endpoint/env не выбирает адресата, custom использует явный endpoint. Shared manifest endpoint при необходимости остаётся историческим metadata. Миграция без mode из3 сохраняется.
 - [ ] **4. RED→GREEN — build tuple:** Создать cloud-build тест:
 
 ```ts
@@ -691,12 +740,29 @@ expect(cloudBuild({ LOGINOM_AI_AGENT_CHANNEL: "prod" })).toBeUndefined()
 ```
 
 `cloudBuild` разрешает override только для явного channel `dev`; beta/prod/latest/пустой channel с override отклоняет. JSON содержит ровно три непустых HTTPS URL без credentials; частичный tuple отклонить. Этот один helper реально используется обоими сборщиками, без второго env набора. `Bun.build.define` и Vite main.define встраивают literal, default — fixed Product.cloud. CLI Host bundle и Desktop main получают один tuple из одного вызова helper. Staging запускается только в отдельном dev профиле; примеры команд в runbook явно задают temp profile, а не рабочий Desktop root.
-- [ ] **5. Следующий RED→GREEN:** В запущенном compiled release Host runtime env CLOUD_BUILD/KNOWLEDGE_ENDPOINT не меняет адрес. Проверка release build с запрещённой override падает до создания artifact. Проверить compiled dev Host с tuple на трёх локальных HTTPS endpoints; здесь завершить отложенные реальные Node management start/status/cancel из8 и site+Help proxy checks из9; программная unit injection не является public handshake method.
-- [ ] **6. Обновить все потребители:** `rg -n 'knowledge-key|knowledgeKey|LOGINOM_MCP_API_KEY|LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT|hasApiKey' packages scripts evals .github` и классифицировать совпадения. Runtime/build fallback убрать; negative tests/исторические документы могут упоминать имя. Обновить выше перечисленные fixtures на custom stdin/records и проверку actual Help state. UI-01 находится в `docs/testing/loginom-ai-agent/README.md`.
-- [ ] **7. Docs вместе с поведением:** заменить module правила про встроенный ключ. Зафиксировать API/setup примеры, сохранение до входа, независимость профилей, logout/revoke границу, KB-root ограничение custom, proxy variant A. Добавить в runbook отдельную секцию stage14/15 с ограничениями native/site. Системный proxy v2 не менять.
-- [ ] **8. Проверка/коммит:** затронутые Host/CLI/Desktop tests, package typechecks; реальный shared staging и оба build callers штатными runbook командами при наличии inputs. Проверить inventory: `knowledge-key` отсутствует, fixture secret canaries отсутствуют в payload, User profile не включён. `git diff --check`. Commit `build(loginom): remove embedded Dock key and pin cloud endpoints`.
 
-## Task 14: Проверка ACL Dock и независимой публикации KB
+Release workflow может собирать `dev` при ручном запуске. Поэтому `.github/workflows/release.yml` до build steps отвергает **любую заданную** LOGINOM_AI_AGENT_CLOUD_BUILD независимо от канала (в том числе пустую). Guard выполнить в каждом окружении сборки, не только в отдельном preflight job; канал dev остаётся допустимым только для локальной нерелизной сборки с tuple. Пример shell guard для bash build steps:
+
+```bash
+if [ "${LOGINOM_AI_AGENT_CLOUD_BUILD+x}" = x ]; then
+  echo "::error::LOGINOM_AI_AGENT_CLOUD_BUILD is forbidden in release CI"
+  exit 1
+fi
+```
+
+Не печатать значение tuple. Проверить exact guard с unset / empty / tuple при channel prod и dev: unset проходит, заданная переменная всегда завершает шаг до сборки. Helper channel-check и CI guard решают разные границы; второй не заменяется первым.
+- [ ] **5. Следующий RED→GREEN:** В запущенном compiled release Host runtime env CLOUD_BUILD/KNOWLEDGE_ENDPOINT не меняет адрес. Проверки release build/CI с запрещённой override падают до создания artifact, включая CI channel dev. Compiled dev Host и Desktop собраны с одним tuple трёх локальных HTTPS endpoints; отдельные test profiles и доверенная тестовая CA. Здесь завершить отложенные проверки:
+  - Node management start/status/cancel из8: настоящие short calls, без endpoint override в handshake и без утечки canaries.
+  - Site+Help proxy из9, включая первый Desktop request после login-shell env, direct count0, NO_PROXY и отказ недоступного proxy.
+  - `settings-live.mjs` из10: настоящий preload → IPC → Host → fixture, save-before-login → connect → ready в том же поколении, cancel/disconnect; renderer handlers не подменяются.
+  - CLI management/PTY из11: настоящий compiled Host, connect/cancel/Ctrl+C, профиль удерживается до cleanup; TUI startup connect использует один Host, отказ сохраняет обычный чат. Unit проверка ожидания больше180с остаётся в11, здесь подтверждается настоящий transport/lifecycle.
+
+Программная unit injection не является public handshake method. До появления этой сборки перечисленные cloud integration checks не отмечать выполненными.
+- [ ] **6. Проверить всех потребителей:** `rg -n 'knowledge-key|knowledgeKey|LOGINOM_MCP_API_KEY|LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT|hasApiKey' packages scripts evals .github` и классифицировать совпадения. Runtime/build fallback отсутствует; negative tests/исторические документы могут упоминать имя. Fixtures с3 используют custom stdin/records и actual Help state, а не ждут этой задачи для миграции. UI-01 находится в `docs/testing/loginom-ai-agent/README.md`.
+- [ ] **7. Docs вместе с поведением:** заменить module правила про встроенный ключ. Зафиксировать API/setup примеры, сохранение до входа, независимость профилей, logout/revoke границу, KB-root ограничение custom, proxy variant A. Добавить в runbook отдельную секцию stage14/15 с ограничениями native/site. Системный proxy v2 не менять.
+- [ ] **8. Проверка/коммит:** затронутые Host/CLI/Desktop tests, package typechecks; реальный shared staging и оба build callers штатными runbook командами при наличии inputs. Проверить inventory: `knowledge-key` отсутствует, fixture secret canaries отсутствуют в payload, User profile не включён. `git diff --check`. Commit `chore(loginom): remove embedded Dock key and pin cloud endpoints`.
+
+## Task 14: Проверка ACL/Help на одном Dock и runbook развёртывания
 
 **Files:** Create `services/loginom-ai/tests/server/test_agent_cloud_access.py`, `services/loginom-ai/tests/server/agent_cloud_server.py`, `packages/loginom-runtime/test/support/dock-scope-probe.mjs`; Modify `services/loginom-ai/tests/server/conftest.py`; документация `services/loginom-ai/deploy/loginom-dock/README.md`, `docs/testing/loginom-ai-agent/README.md`. Существующие реализации auth/ACL не переписывать, если нужные гарантии уже проходят. Bootstrap/import/backup остаются существующими средствами.
 
@@ -731,7 +797,7 @@ with pytest.raises(PermissionDeniedError):
 Этот тест может сразу быть зелёным: он проверяет уже существующую серверную гарантию. Не вносить искусственный production change ради RED. Если наблюдаемая гарантия не выполняется, фиксировать её минимальным отдельным RED→GREEN в соответствующей ACL операции, без глобального запрета USER namespaces.
 - [ ] **3. Дополнить проверки по одному:** USER не удаляет/не меняет ACL KB и получает403 на admin API; ADMIN повторно публикует ту же KB без выдачи USER более широких direct grants. A может записать чужой текст вне KB; после этого managed Help B все семь чтений направляет только внутрь root. Для настоящего MCP прогона запускать Python Dock отдельным процессом и Node client Task2; in-process MCP function tests не выдавать за сетевой прогон managed клиента.
 - [ ] **4. Проверить auth без нового сайта:** existing `test_register_user`, `test_regenerate_key`, `test_user_role_cannot_access_admin_api` подтверждают нужный API. Повтор bootstrap существующего legacy USER не ротирует его ключ (сейчас ранний return). Новая ACL процедура запускается после публикации KB независимо от этого return. Legacy key должен продолжить чтение официальной KB после включения ACL.
-- [ ] **5. Проверить независимость до production reserve:** два отдельных loopback Dock процесса, разные workspaces/volumes и auth registry, одинаковые account/user ID, разные ключи. Тестовые secrets генерировать в private temp files/stdin. Сохранить до/после только hashes/identity результата, не ключи. Первичный key не проходит на reserve; ротация primary не меняет reserve; повторная публикация общей KB сохраняет оба ключа. Не запускать два приложения в одном Python-процессе: global `_service`/FS/config создадут ложную независимость.
+- [ ] **5. Настоящая сетевая проверка Help scope:** один loopback Dock процесс с отдельным workspace/auth registry и USER A/B. A записывает текст вне KB, реальный managed client B читает все семь инструментов и не получает его. Ротация B отклоняет старый key и допускает новый; повторная публикация KB сохраняет действующие ключи и legacy USER. Второй локальный Dock не нужен: он проверял бы независимость каталогов по построению. Failover/разные ключи клиента проверяет Task7 двумя MCP fixtures; фактическую топологию двух развёртываний — runbook ниже и15. Тестовые secrets только private temp files/stdin; в evidence только результат, не ключи.
 **Конкретная test-only обвязка шага5.** `running_server` в existing conftest отключает mcp_lifespan, поэтому его нельзя переиспользовать для этого сценария. Child `agent_cloud_server.py` читает один JSON из stdin `{workspace,port,root_key}`. Импорты singleton взять из `openviking_cli.utils.config.open_viking_config`; fake model helpers — `tests.server.conftest`. Обработчики auth/ACL/FS/MCP не подменять:
 
 ```python
@@ -753,7 +819,7 @@ with pytest.MonkeyPatch.context() as patch:
 
 Родитель `test_agent_cloud_access.py` запускает `[sys.executable,"-m","tests.server.agent_cloud_server"]` с cwd `services/loginom-ai`, PIPE stdin и private temp log; port выбрать loopback bind0 по существующему conftest. Ready — `/health` и authenticated `GET /api/v1/admin/accounts`, с deadline30с и проверкой child exit. Cleanup только своих процессов: terminate, wait5с, kill/wait при необходимости. Root secrets передаются только stdin.
 
-Provisioning обоих child выполняет HTTP запросами:
+Provisioning единственного child выполняет HTTP запросами:
 
 | Кто / метод / path | Body или результат |
 | --- | --- |
@@ -764,7 +830,7 @@ Provisioning обоих child выполняет HTTP запросами:
 | ADMIN POST `/api/v1/content/write` | `{uri,content,mode:"create",wait:true}`; повтор — mode replace |
 | ADMIN PUT `/api/v1/acl` | `{uri:root,entries:[{principal:"user:*",level:"read"}]}` |
 | ADMIN GET `/api/v1/acl?uri=...` | проверить effective descendants |
-| ADMIN POST `/api/v1/admin/accounts/loginom-dock/users/B/key` | сменить ключ только на primary |
+| ADMIN POST `/api/v1/admin/accounts/loginom-dock/users/B/key` | сменить ключ B; старый отклоняется, новый работает |
 
 A пишет `hostile-marker` через content API в `viking://resources/hostile-marker.md` и `viking://agent/skills/hostile-marker.md`. ADMIN публикует `trusted-marker` только в KB. ROOT не используется для MCP data plane. JS probe получает `{endpoint,apiKey}` через stdin и импортирует настоящий client:
 
@@ -795,18 +861,20 @@ try {
 } finally { await knowledge.close(); }
 ```
 
-В positive read assertion также требовать `trusted-marker` в content; отсутствие hostile само по себе не доказывает работающий read. Indexing дождаться штатным `wait:true`; fake embedder нужен лишь для автономности теста, не для оценки качества поиска. Родитель запускает `[os.environ["LOGINOM_AI_AGENT_TEST_NODE"], probe_path]` с input JSON, timeout120с, check=True; stdout проверяется только как `{ok:true,tools:7}`. В evidence не копировать server responses с user_key. Каждый процесс получает собственный workspace; после ротации/повторной публикации повторить probe обоих.
+В positive read assertion также требовать `trusted-marker` в content; отсутствие hostile само по себе не доказывает работающий read. Indexing дождаться штатным `wait:true`; fake embedder нужен лишь для автономности теста, не для оценки качества поиска. Родитель запускает `[os.environ["LOGINOM_AI_AGENT_TEST_NODE"], probe_path]` с input JSON, timeout120с, check=True; stdout проверяется только как `{ok:true,tools:7}`. В evidence не копировать server responses с user_key. После ротации повторить probe B с новым ключом; после повторной публикации проверить B и legacy USER. Эта проверка не подтверждает production topology.
 
 - [ ] **6. Deployment runbook:** точная последовательность для каждого инстанса: bootstrap своего account → публикация одинаковой source revision через existing Assets/catalog/import с собственным State → включение account ACL → root read grant → аудит **эффективных** descendant grants → USER read/write/admin negative checks. `import-sources.sh` сейчас привязан к `/opt/loginom-dock` и container `loginom-dock-openviking-1`: запускать локально на каждом отдельном сервере с его собственной установкой; не объявлять скрипт общей удалённой репликацией.
 
 В runbook явно записать: `backup-server.sh` включает `/local/_system/accounts.json` и `/local/{account}/_system/users.json`; полный primary restore поверх reserve запрещён для обновления KB. Restore собственного backup может откатить отзыв — сверить состояние ключей до возобновления доступа. Проверить фактические admin exposure, `allow_private_networks` и USER URL-import перед deployment; здесь production настройки не менять и не объявлять безопасными без проверки. ADMIN сайта управляет всей KB/account, ROOT ему для выдачи пользователей не нужен.
+
+При вводе reserve проверить два действительно независимых реестра: одинаковые account/user ID получают разные ключи; primary key не проходит на reserve; ротация primary не меняет reserve; публикация одной source revision KB сохраняет оба ключа. Это внешний gate15, не результат локального однопроцессного теста.
 - [ ] **7. Проверка/коммит:** из `services/loginom-ai`:
 
 ```bash
 uv run pytest tests/server/test_agent_cloud_access.py tests/server/test_admin_api.py::test_register_user tests/server/test_admin_api.py::test_regenerate_key tests/server/test_admin_api.py::test_user_role_cannot_access_admin_api tests/server/test_content_write_service.py::test_shared_resource_creation_inherits_acl_and_preserves_plain_append
 ```
 
-Эта же pytest команда запускает двухпроцессный сценарий ниже и настоящий managed MCP probe; простой in-process ACL тест не подменяет их. При недоступном native storage или pinned Node вернуть явный failure/prerequisite report, не permissive mock и не фиктивный PASS. Commit `test(dock): verify cloud user access and independent registries`.
+Эта же pytest команда запускает один настоящий Dock из шага5 и managed MCP probe; простой in-process ACL тест не подменяет сетевой прогон. При недоступном native storage или pinned Node вернуть явный failure/prerequisite report, не permissive mock и не фиктивный PASS. Commit `test(dock): verify cloud user access and Help scope`.
 
 ## Task 15: Сквозная приёмка и готовность к выпуску
 
@@ -871,3 +939,9 @@ uv run pytest tests/server/test_agent_cloud_access.py tests/server/test_admin_ap
 Независимое общее ревью — Approved; отдельные проверки Host и Dock/runtime — Approved.
 Замечания исправлены в тексте. Это проверка документа по исходникам; команды,
 тестовые скелеты, сборки и внешние сервисы на стадии написания плана не запускались.
+
+Повторная проверка замечаний к `64983e8b76`: общее ревью, Host/CLI и Dock — Approved.
+Исправлены промежуточная совместимость consumers, порядок fixture/live проверок,
+TUI startup/cancellation, release guard, proxy initialization и лишний второй
+локальный Dock. Повторный вход ограничен также в спецификации. Документальные
+проверки структуры, ссылок и `git diff --check` пройдены; runtime не проверялся.
