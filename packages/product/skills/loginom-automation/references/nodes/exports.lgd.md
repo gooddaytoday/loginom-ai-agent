@@ -2,7 +2,10 @@
 
 Получай parameter_schema через dock_action_describe(node_types:["exports.lgd"]).
 Один табличный input 0, режим native. lgd_export: destination — абсолютный .lgd
-в собственном каталоге; compression="lz4", checksum="compressed", overwrite="reject".
+в собственном каталоге; compression="none"/"lzo"/"lz4", overwrite="reject".
+checksum="none"/"compressed"/"all" для LZ4; для none/lzo только "none".
+После reopen Loginom может показать прежний checksum в disabled-поле:
+для none/lzo он не используется, эффективный checksum остаётся "none".
 При создании обязательны compression, checksum, overwrite и один источник пути:
 destination ИЛИ bindings:{destination:{variable:"LgdPath"}}. {} сохраняет настройки.
 У экспорта нет табличного выхода: read.ports=[], результат output.file_artifacts.

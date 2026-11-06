@@ -21,6 +21,26 @@ class LgdTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'SAME_NODE_MISSING'):
                 runner.check_lgd_variable_switch([(1, first), (2, second)], switch)
 
+    def test_export_csv_names_are_routed_once_without_suffix_collisions(self):
+        class Captured(Exception): pass
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            stage, workspace, profile = [root / n for n in ['stage', 'workspace', 'profile']]
+            for p in [stage, workspace, profile]: p.mkdir()
+            instance = object.__new__(runner.Runner)
+            instance.out, instance.env, instance.current, instance.options = root, {}, {}, {}
+            def phase(phase, command, *args, **kwargs):
+                self.assertEqual(phase, 'model')
+                prompt = command[-1]
+                for name in ['None', 'Lzo', 'Lz4None', 'Lz4Compressed', 'Lz4All']:
+                    destination = '/own/' + root.name + '-' + root.name + '-' + name + '.csv'
+                    self.assertEqual(prompt.count(destination), 1, name)
+                self.assertNotIn('Lz4/own/', prompt)
+                raise Captured()
+            instance.phase = phase
+            with self.assertRaises(Captured):
+                instance.model('lgd-export-compression', stage, profile, workspace, '/own/run.lgp', {'package_directory': '/own'}, root / 'build')
+
     def test_export_cases_require_real_same_node_transitions(self):
         path, first = '/own/final.lgd', '/own/first.lgd'
         def exported(destination, sha, existed=False, binding=None):
@@ -94,7 +114,7 @@ class LgdTests(unittest.TestCase):
 
     def test_binary_source_is_a_user_path_without_provider_file_parts(self):
         class Captured(Exception): pass
-        for name in ['lgd-import', 'lgd-properties', 'lgd-corrupt']:
+        for name in ['lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-import-compression']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 stage, workspace, profile = [root / n for n in ['stage', 'workspace', 'profile']]
@@ -102,12 +122,13 @@ class LgdTests(unittest.TestCase):
                 instance = object.__new__(runner.Runner)
                 instance.out, instance.env, instance.current, instance.options = root, {}, {}, {}
                 case = runner.scenario(name)
-                source = case['data'] / case['input_files'][0]
+                sources = [case['data'] / name for name in case['input_files']]
                 def phase(phase, command, *args, **kwargs):
                     self.assertEqual(phase, 'model')
                     self.assertNotIn('--file', command)
-                    self.assertIn(str(workspace / source.name), command[-1])
-                    self.assertEqual((workspace / source.name).read_bytes(), source.read_bytes())
+                    for source in sources:
+                        self.assertIn(str(workspace / source.name), command[-1])
+                        self.assertEqual((workspace / source.name).read_bytes(), source.read_bytes())
                     self.assertNotIn(str(case['oracle']), command[-1])
                     raise Captured()
                 instance.phase = phase

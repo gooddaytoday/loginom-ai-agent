@@ -124,7 +124,7 @@ test('LGD preflight rejects disabled checksums, foreign format options and synth
  assert.doesNotThrow(()=>validateLgdImportParameters({},'native',{...request('imports.lgd'),target:{kind:'existing'}}));
  const p={lgd_export:{destination:'/test-2/out.lgd',compression:'lz4',checksum:'compressed',overwrite:'reject'}};
  assert.doesNotThrow(()=>validateLgdExportParameters(p,'native',request('exports.lgd')));
- for(const change of [{compression:'lzo'},{checksum:'none'},{overwrite:'append'},{destination:'/test-2/out.xlsx'}])assert.throws(()=>validateLgdExportParameters({lgd_export:{...p.lgd_export,...change}},'native',request('exports.lgd')));
+ for(const change of [{compression:'lzo'},{checksum:'ignore'},{overwrite:'append'},{destination:'/test-2/out.xlsx'}])assert.throws(()=>validateLgdExportParameters({lgd_export:{...p.lgd_export,...change}},'native',request('exports.lgd')));
  assert.throws(()=>validateLgdExportParameters(p,'native',{...request('exports.lgd'),read:{ports:[0]}}));
 });
 test('LGD replacement requires an explicitly authorized own destination in every request',()=>{

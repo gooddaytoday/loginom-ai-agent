@@ -11,8 +11,10 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,or
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {readPreparedNodeContext}=await load('client/lib/node-context.mjs');
  const imports=graph.nodes.filter(n=>n.type==='imports.lgd');
- const formats=expected.lgd.kind==='edges'?expected.lgd.formats:null;
- const cases=expected.lgd.imports??(formats?formats.map(f=>({label:f.import_label,columns:f.columns,compression:f.compression_display,written_checksum:f.checksum_display,checksum:true,destination:f.destination})):[{...expected.lgd,compression:'LZ4',written_checksum:'Сжатых данных',checksum:true}]);
+ const formats=['compression','edges'].includes(expected.lgd.kind)?(expected.lgd.formats??null):null;
+ const cases=expected.lgd.imports??(formats?formats.map(f=>({label:f.import_label,columns:f.columns??expected.lgd.columns,
+  compression:f.compression_display,written_checksum:f.checksum_display,checksum:true,destination:f.destination})):
+  [{...expected.lgd,compression:'LZ4',written_checksum:'Сжатых данных',checksum:true}]);
  if(imports.length!==cases.length)throw Error('LGD_COLD_IMPORT_COUNT');
  for(const target of imports){
   const matches=cases.filter(c=>c.label===undefined||c.label===target.label);
