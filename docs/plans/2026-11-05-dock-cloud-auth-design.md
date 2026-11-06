@@ -471,3 +471,21 @@ Runtime/сборки/production не запускались. Следующий 
 - Это own Linux dev fixtures, не installed/native Windows/macOS/production site/reserve/authentic0.3.9 приёмка; эти gates — Task15.
 - Профили пользователя, production и pins/dependencies не менялись; push/PR/merge/release не выполнялись.
 - Следующий шаг: независимое ревью Task13 родителем, затем Task14 local Dock/USER ACL.
+
+Независимое ревью Task13 (`39d1fce83f`): Spec compliant / Quality Approved; обязательных замечаний нет. Minor: в standalone-cli stage-примере отсутствует запуск fixture; перенесён в документацию Task15, продуктовый результат не блокирует. Следующий этап — Task14: настоящий локальный Dock/ACL/managed Help.
+
+## Checkpoint Task14 — 2026-11-06
+
+- База `39d1fce83f`; Task14 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Настоящие RagFS/vector x86_avx2 и отдельный loopback Dock с собственными workspace/auth registry; только внешние модели fake.
+- ADMIN публикует KB, USER читает и получает отказ write/delete/ACL/admin; effective grants остаются read-only после republication.
+- Реальный managed client: семь чтений, точный trusted content, отсутствие hostile вне KB и mixed-read refusal; ротация/old401/new/legacy bootstrap PASS.
+- Mandatory existing ACL test выявил потерю request ID при disabled telemetry: write(wait:true) завершался до creator MANAGE. Минимальный bind fix сохраняет ID без включения metrics/global wait; неизменённый тест RED→GREEN.
+- Обязательная команда — 6 PASS; финальные native/network — повторные 2 PASS; tracker/processor — 15 PASS, request-wait — 4 PASS после исправления устаревшего unit stub.
+- Промежуточные mandatory5/1 и affected19/2 failures сохранены и объяснены; исходные ACL ожидания и forbid-global-wait не ослаблены.
+- Private official uv0.10.9/Python3.13.1/Rust1.91.1: native build PASS; pinned Node24.19.0 версия/SHA проверены, locks/build inputs неизменны.
+- Ruff/Node syntax/diff-check PASS. Только собственные private temp/processes; retired secrets удалены, initial own-fixture diagnostic repr заменён явным sanitized summary.
+- Runbook: свой bootstrap/State/source revision/ACL audit на каждом Dock, широкие ADMIN права, backup identities/rollback revoke; primary restore не копируется на reserve ради KB.
+- Evidence/команды/пределы: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-14-report.md`.
+- Production, сайт, реальный reserve, installed/native платформы и authentic0.3.9 не проверялись; это внешние gates15. Task15 не выполнялся.
+- Следующий шаг: независимое ревью Task14 родителем. Push/PR/merge/release не выполнялись.

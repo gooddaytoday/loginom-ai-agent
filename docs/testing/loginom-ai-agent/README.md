@@ -179,3 +179,31 @@ Linux bundler пока намеренно отклоняет `win32` и `darwin`
 Source и собственные HTTPS fixtures не являются native/production/site приёмкой.
 Точные Task13 артефакты/команды/ограничения отражаются в canonical checkpoint;
 Windows/macOS, настоящий сайт/reserve и authentic0.3.9 остаются отдельными gate15.
+
+Локальная проверка Dock/Help находится в
+`services/loginom-ai/tests/server/test_agent_cloud_access.py`. Она требует настоящих
+RagFS и vector engine, отдельного временного workspace и закреплённого Node из
+release manifest (`LOGINOM_AI_AGENT_TEST_NODE`, проверенные версия и SHA256).
+Задать `TMPDIR`, `TMP`, `TEMP` в `$HOME/storage/tmp/`. Окружение uv и
+`OPENVIKING_CONFIG_FILE` для существующих admin-тестов должны быть отдельными
+тестовыми, с local storage и синтетическими model settings; личный
+`~/.openviking` не использовать. Затем из
+`services/loginom-ai` выполнить:
+
+```bash
+uv run pytest tests/server/test_agent_cloud_access.py tests/server/test_admin_api.py::test_register_user tests/server/test_admin_api.py::test_regenerate_key tests/server/test_admin_api.py::test_user_role_cannot_access_admin_api tests/server/test_content_write_service.py::test_shared_resource_creation_inherits_acl_and_preserves_plain_append
+```
+
+Тест поднимает один loopback Dock с собственным auth registry и проверяет семь
+чтений настоящим managed client, права USER, ротацию ключа и повторную публикацию.
+Подменяются только внешние embedding/VLM. Отсутствие native storage или Node —
+ошибка prerequisite, а не пропуск с результатом PASS. Команды сборки и конкретный
+результат запуска фиксируются отдельно от приёмки установленного приложения.
+
+[Runbook публикации и ACL](../../../services/loginom-ai/deploy/loginom-dock/README.md#облачный-доступ-agent-отдельная-процедура-для-каждого-dock)
+задаёт независимую подготовку каждого сервера. Сайт, production ACL/admin exposure,
+URL-import и резервный Dock требуют внешней приёмки. На двух реальных серверах
+проверить разные keys при одинаковых IDs, отказ primary key на reserve,
+независимую ротацию и сохранение keys после публикации одной source revision.
+Полный backup содержит реестр identities/keys; его перенос с primary на reserve
+не является синхронизацией знаний.
