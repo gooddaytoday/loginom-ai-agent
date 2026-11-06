@@ -77,10 +77,15 @@ const pendingDeepLinks: string[] = []
 
 function useEnvProxy() {
   try {
-    // Electron 41.2 runs Node 24.14.1; latest @types/node@24 is 24.12.2.
-    ;(http as any).setGlobalProxyFromEnv()
-  } catch (error) {
-    logger.warn("failed to load proxy environment", error)
+    const native = http as typeof http & { setGlobalProxyFromEnv(environment: NodeJS.ProcessEnv): void }
+    const proxy = process.env.all_proxy || process.env.ALL_PROXY
+    native.setGlobalProxyFromEnv({
+      ...process.env,
+      HTTP_PROXY: process.env.http_proxy || process.env.HTTP_PROXY || proxy,
+      HTTPS_PROXY: process.env.https_proxy || process.env.HTTPS_PROXY || proxy,
+    })
+  } catch {
+    logger.warn("failed to load proxy environment")
   }
 }
 
@@ -217,6 +222,7 @@ const main = Effect.gen(function* () {
   startSession()
   // Явный прокси из login shell должен быть известен до запуска читателей ОС.
   const shellEnv = preferAppEnv(app.getPath("userData"))
+  useEnvProxy()
   systemProxy = startSystemProxyDetection({
     environment: process.env,
     enabled: systemProxyEnabled(),

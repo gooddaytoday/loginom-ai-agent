@@ -1,8 +1,9 @@
+import http from 'node:http';
 import { createKnowledgeClient, knowledgeFailure, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
 import { startupDiagnostic } from '../client/lib/catalog.mjs';
 
 process.umask(0o077);
-const state = { client: undefined, closing: undefined, controller: new AbortController(), startupDiagnostics: [], apiKey: undefined };
+const state = { client: undefined, closing: undefined, controller: new AbortController(), startupDiagnostics: [], apiKey: undefined, proxyFailed: false };
 const requests = new Set();
 const calls = new Map();
 const send = (message, disconnect = false) => {
@@ -52,9 +53,22 @@ async function handle(message) {
       if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash)
         throw Error('LOGINOM_START_INVALID');
       state.apiKey = input.apiKey;
-      state.client = createKnowledgeClient(input, state.controller.signal, {
-        deadline: input.deadline, managed: true,
-        onFailure: (error, detail) => state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error, [input.apiKey]) }),
+      state.client = Promise.resolve().then(() => {
+        try {
+          const proxy = process.env.all_proxy || process.env.ALL_PROXY;
+          http.setGlobalProxyFromEnv({ ...process.env,
+            HTTP_PROXY: process.env.http_proxy || process.env.HTTP_PROXY || proxy,
+            HTTPS_PROXY: process.env.https_proxy || process.env.HTTPS_PROXY || proxy,
+          });
+        }
+        catch {
+          state.proxyFailed = true;
+          throw Error('LOGINOM_KNOWLEDGE_UNAVAILABLE');
+        }
+        return createKnowledgeClient(input, state.controller.signal, {
+          deadline: input.deadline, managed: true,
+          onFailure: (error, detail) => state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error, [input.apiKey]) }),
+        });
       });
       // Readiness is observed through list; admission of start does not wait for the network.
       void state.client.catch(() => {});
@@ -90,7 +104,8 @@ async function handle(message) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
     if (['start', 'list'].includes(message.operation) && !state.startupDiagnostics.length)
       state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error, [state.apiKey]) });
-    send({ id: message.id, error: code, knowledgeFailure: knowledgeFailure(error), startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
+    send({ id: message.id, error: code, knowledgeFailure: state.proxyFailed && code === 'LOGINOM_KNOWLEDGE_UNAVAILABLE'
+      ? { kind: 'unavailable' } : knowledgeFailure(error), startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
       ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === 'close');
   }
 }

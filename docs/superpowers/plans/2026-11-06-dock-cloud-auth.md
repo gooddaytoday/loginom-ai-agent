@@ -578,11 +578,11 @@ await enqueueWrite(() => store.clear())
 
 ## Task 9: Site и Help используют явный proxy и системные CA
 
-**Files:** Modify `packages/loginom-host/src/node-entry.ts`, `packages/loginom-runtime/src/knowledge-entry.mjs`, `packages/desktop/src/main/index.ts`; при необходимости точечно `packages/desktop/src/main/loginom/desktop-service.ts`. Extend `packages/desktop/test/loginom/environment-proxy.ts`, `packages/loginom-host/test/environment.test.ts`; Create `packages/loginom-host/test/cloud-proxy.test.ts`.
+**Files:** Modify `packages/loginom-host/src/cloud-auth.ts`, `packages/loginom-runtime/src/knowledge-entry.mjs`, `packages/desktop/src/main/index.ts`; при необходимости точечно `packages/desktop/src/main/loginom/desktop-service.ts`. Extend `packages/desktop/test/loginom/environment-proxy.ts`, `packages/loginom-host/test/environment.test.ts`; Create `packages/loginom-host/test/cloud-proxy.test.ts`.
 
 **Interfaces:** Используется существующая native Node `http.setGlobalProxyFromEnv()` в pinned runtime, без OS/PAC resolver. System CA CLI Host/Help уже передаются через `--use-system-ca`; Desktop main имеет `setDefaultCACertificates`. Запросы cloud-auth и MCP идут через native fetch; тесты должны подтвердить именно оба реальных клиента.
 
-- [ ] **1. RED:** Расширить существующий loopback HTTP/CONNECT fixture `environment-proxy.ts` до запуска настоящего Help. Site/cloud-auth отдельно проверить в тестовом Node caller с программной зависимостью endpoints; **полный** device/code через bundled Node Host выполняется в13 после появления dev tuple, вместе с отложенным тестом8. Не вводить endpoint поля в product handshake ради этого теста. Один HTTP listener — proxy, второй — target; все target requests считаются. Выполнить device/code и MCP initialize/list через proxy env. Assertions:
+- [x] **1. RED:** Расширить существующий loopback HTTP/CONNECT fixture `environment-proxy.ts` до запуска настоящего Help. Site/cloud-auth отдельно проверить в тестовом Node caller с программной зависимостью endpoints; **полный** device/code через bundled Node Host выполняется в13 после появления dev tuple, вместе с отложенным тестом8. Не вводить endpoint поля в product handshake ради этого теста. Один HTTP listener — proxy, второй — target; все target requests считаются. Выполнить device/code и MCP initialize/list через proxy env. Assertions:
 
 ```ts
 expect(proxyRequests).toContain("/api/auth/device/code")
@@ -591,20 +591,29 @@ expect(directTargetRequests).toBe(0)
 ```
 
 Для CONNECT считать host/path на соответствующей стороне туннеля; имена counters создать локально возле listeners. Не считать передачу `HTTP_PROXY` доказательством применения. Каждый из двух потоков проверять последовательно и отдельно.
-- [ ] **2. Запустить RED:** Host `bun test test/cloud-proxy.test.ts` с pinned Node; Desktop `bun test/loginom/environment-proxy.ts`. Сначала подтвердить фактический пробел; если существующая инициализация уже даёт нужное поведение, production участок не менять.
-- [ ] **3. GREEN:** До первого site/MCP request инициализировать native explicit-env proxy в Node entrypoints:
+- [x] **2. Запустить RED:** Host `bun test test/cloud-proxy.test.ts` с pinned Node; Desktop `bun test/loginom/environment-proxy.ts`. Сначала подтвердить фактический пробел; если существующая инициализация уже даёт нужное поведение, production участок не менять.
+- [x] **3. GREEN:** До первого site/MCP request инициализировать native explicit-env proxy на границах клиентов:
 
 ```ts
 import http from "node:http"
-const native = http as typeof http & { setGlobalProxyFromEnv(): void }
-native.setGlobalProxyFromEnv()
+const native = http as typeof http & { setGlobalProxyFromEnv(environment: NodeJS.ProcessEnv): void }
+const proxy = process.env.all_proxy || process.env.ALL_PROXY
+native.setGlobalProxyFromEnv({
+  ...process.env,
+  HTTP_PROXY: process.env.http_proxy || process.env.HTTP_PROXY || proxy,
+  HTTPS_PROXY: process.env.https_proxy || process.env.HTTPS_PROXY || proxy,
+})
 ```
+
+Уточнение по реальным RED и независимому техническому ревью Task9: strict init в `node-entry.ts` убрана, поскольку malformed proxy завершал весь Host и ломал local admission. Default request в `createCloudAuth` один раз инициализирует native transport и запоминает безопасный отказ для всех site requests, включая refresh/DELETE; injected fetch владеет своим транспортом. Help инициализирует native proxy внутри remote startup promise после local ACK; list получает безопасный unavailable, close подтверждает cleanup. Native error/URL не логируется.
+
+Pinned native API игнорирует ALL; snapshot даёт fallback отсутствующим effective HTTP/HTTPS из `all_proxy || ALL_PROXY`, сохраняя native lowercase/uppercase precedence и NO_PROXY. Тот же snapshot применяется во всех Desktop `useEnvProxy`; `process.env` не меняется. Реально проверены HTTP(S) proxy; собственный SOCKS transport не добавляется.
 
 Для runtime `.mjs` type assertion не нужен. Это существующий подход Desktop, а не новый HTTP wrapper. Передать только существующий фильтр explicit proxy/NO_PROXY, сохранить uppercase/lowercase Windows правила. Не брать proxyResult системного resolver и не добавлять его в shared options.environment. Если инициализация для явно указанного proxy не удалась, запросы cloud/Help должны завершаться безопасной ошибкой, без прямого fallback; не менять модельный sidecar контракт.
 
 Desktop повторно вызывает существующий `useEnvProxy()` **сразу после** `const shellEnv = preferAppEnv(app.getPath("userData"))`, до `desktopLoginom()` и первого запроса Host. Нынешний ранний вызов не видит proxy из login-shell, а вызов при загрузке sidecar происходит уже после Host. Regression запускает main с proxy только из fixture login-shell: самый первый site request и Help проходят через него, direct target count0; эту часть с собранным Desktop выполнить в13. Не подмешивать OS/PAC результат и не откладывать настройку до sidecar.
-- [ ] **4. По одному RED→GREEN:** `NO_PROXY` разрешает прямой loopback; недоступный explicit proxy → target count0 и временная ошибка; отсутствие explicit env → прямой запрос несмотря на настроенный OS/PAC fixture; redirect error не достигает второго origin. Node child не наследует model/provider credentials. Установленный системный CA проверяется native в15; локальный сертификат через тестовую CA доказывает только TLS transport, не OS trust store.
-- [ ] **5. Проверка/коммит:** Host `bun test test/cloud-proxy.test.ts test/environment.test.ts test/system-proxy.test.ts`, `bun typecheck`; Desktop existing environment proxy check + `bun typecheck`; проверить `--no-proxy-server` в существующем `test/loginom/no-proxy-contract.mjs`. Commit `fix(loginom): apply explicit proxy to cloud and Help requests`.
+- [x] **4. По одному RED→GREEN:** `NO_PROXY` разрешает прямой loopback; недоступный explicit proxy → target count0 и временная ошибка; отсутствие explicit env → прямой запрос несмотря на настроенный OS/PAC fixture; redirect error не достигает второго origin. Node child не наследует model/provider credentials. Установленный системный CA проверяется native в15; локальный сертификат через тестовую CA доказывает только TLS transport, не OS trust store.
+- [x] **5. Проверка/коммит:** Host `bun test test/cloud-proxy.test.ts test/environment.test.ts test/system-proxy.test.ts`, `bun typecheck`; Desktop existing environment proxy check + `bun typecheck`; проверить `--no-proxy-server` в существующем `test/loginom/no-proxy-contract.mjs`. Commit `fix(loginom): apply explicit proxy to cloud and Help requests`.
 
 ## Task 10: Две карточки настроек Desktop
 

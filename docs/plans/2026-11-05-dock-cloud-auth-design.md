@@ -350,3 +350,27 @@ Runtime/сборки/production не запускались. Следующий 
 - Evidence/точные команды/самопроверка: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-8-report.md`.
 - Ограничения: localhost/Linux; full bundled cloud device flow с baked tuple — Task13, site/native/installed/production не проверялись.
 - Следующий шаг: независимое ревью Task8; Task9 — после принятия. Push/PR/merge/release не выполнялись.
+
+## Ревью Task8 — 2026-11-06
+
+- SHA `f3249af43f`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Реальный Node routing использует общий handler, exact empty input и живое состояние shutdown; модель получает только безопасную проекцию.
+- Host48/381, Schema2/13 и все5 package typechecks PASS; full compiled cloud flow остаётся Task13, native/site — Task15.
+- Следующий шаг: Task9 explicit proxy/CA; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task9 — 2026-11-06
+
+- База SHA `f3249af43f24`; Task9 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- Реальные native Node CloudAuth device/code и Help initialize/list используют explicit HTTP(S)/ALL proxy без opt-in flag; direct target0.
+- Native env snapshot сохраняет per-scheme lowercase/uppercase precedence/NO_PROXY, добавляет ALL fallback без изменения process.env/OS resolver.
+- По реальному malformed RED и независимому technical review init находится в default CloudAuth request и remote Help promise, не в strict Node bootstrap.
+- Local Host admission и Help start ACK сохранены; init failure даёт безопасный unavailable, refresh/DELETE не идут direct, close ACK+exit подтверждены.
+- Desktop повторяет тот же native init сразу после preferAppEnv; warning больше не содержит raw native error/proxy URL; sidecar контракт сохранён.
+- Реальные regression: NO_PROXY direct, dead/unsupported proxy target0, отсутствие explicit env при OS/PAC fixture, redirect second-origin0, child credentials filter.
+- Local test CA доказала TLS CONNECT для обоих клиентов; существующие system-CA настройки и Chromium --no-proxy-server сохранены.
+- Host100 PASS/476 assertions; Runtime18 PASS; local Host1/3 и CLI startup writer1/8 PASS; Host/Desktop typecheck и diff-check PASS.
+- Desktop environment-proxy и pinned Node no-proxy-contract PASS; source guard проверяет shell-init порядок и Chromium flags.
+- Общие Schema/Protocol/HttpApi, dependencies/pins/handshake/generated код не менялись; parent Task8 review note сохранён.
+- Evidence/команды/RED→GREEN/self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-9-report.md`.
+- Ограничения: собранный Desktop first-shell-request и полный baked NodeHost cloud — gate13; installed system CA/native/site/reserve — gate15.
+- Следующий шаг: независимое ревью Task9; Task10 только после принятия. Push/PR/merge/release не выполнялись.

@@ -1,3 +1,4 @@
+import http from "node:http"
 import { Loginom } from "@opencode-ai/schema/loginom"
 import { Option, Schema } from "effect"
 import { hostError } from "./errors"
@@ -40,7 +41,7 @@ const Connection = Schema.Struct({
 
 export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudAuth> {
   const now = options.now ?? Date.now
-  const request = options.fetch ?? fetch
+  const request = options.fetch ?? nativeRequest()
   const wait =
     options.wait ??
     ((ms: number, signal: AbortSignal) =>
@@ -403,4 +404,29 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
 function safeError(value: unknown) {
   const code = hostError(value)
   return Error(code === "LOGINOM_HOST_REQUEST_FAILED" ? "LOGINOM_CLOUD_UNAVAILABLE" : code)
+}
+
+function nativeRequest() {
+  try {
+    const native = http as typeof http & { setGlobalProxyFromEnv?: (environment: NodeJS.ProcessEnv) => void }
+    if (!native.setGlobalProxyFromEnv) {
+      if (
+        ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].some((key) => process.env[key]?.trim())
+      )
+        throw Error("LOGINOM_CLOUD_UNAVAILABLE")
+      return fetch
+    }
+    const proxy = process.env.all_proxy || process.env.ALL_PROXY
+    native.setGlobalProxyFromEnv({
+      ...process.env,
+      HTTP_PROXY: process.env.http_proxy || process.env.HTTP_PROXY || proxy,
+      HTTPS_PROXY: process.env.https_proxy || process.env.HTTPS_PROXY || proxy,
+    })
+    return fetch
+  } catch {
+    // Native errors can contain proxy credentials. Preserve local Host admission.
+    return async () => {
+      throw Error("LOGINOM_CLOUD_UNAVAILABLE")
+    }
+  }
 }
