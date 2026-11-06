@@ -1,5 +1,15 @@
 # JavaScript
 
+## Текущий срез v0.4.0
+
+Зарегистрирован `programming.javascript` / `script`. Loginom 7.4.2: синхронное табличное ядро, один вход/выход, схемы code/declared, source/context и управляемый жизненный цикл.
+
+Ограничения: Ограниченное ядро Loginom 7.4.2; дополнительные таблицы, variables, внешние модули и async не сертифицированы этим scope. Исторические результаты относятся к собственным SHA; новая живая CLI/установленная Desktop-приёмка после rebase не выполнялась.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [javascript-code-node.mjs](../../../../packages/loginom-runtime/client/lib/javascript-code-node.mjs):1–442; [javascript-parameters.mjs](../../../../packages/loginom-runtime/client/lib/javascript-parameters.mjs):1–63; [programming.javascript.md](../../../../packages/product/skills/loginom-automation/references/nodes/programming.javascript.md):1–18. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
 ## Аудит общего runtime 2026-10-15
 
 [Заключение по 36 случаям](shared-runtime-review-2026-10-15.md) ·
@@ -41,7 +51,7 @@ source-read без исполнения и отдельное declared-зада�
 [исследовании](research.md); подготовка проверенной runtime-редакции и её
 доставка модели предусмотрены фазой 1B подплана.
 
-## Состояние после rebase 2026-10-12
+### Прежнее состояние после rebase 2026-10-12
 
 Ветка `node-javascript` перенесена на `loginom@a3d8e2947`. В исходниках
 зарегистрировано ограниченное синхронное табличное ядро: один вход/выход,

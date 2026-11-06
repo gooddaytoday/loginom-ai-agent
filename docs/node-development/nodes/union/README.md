@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `transform.union_data` / `append_all`. Конкатенация 2–15 таблиц с сохранением дублей, полной картой полей и явными префиксами.
+
+Ограничения: Главный вход 0 и присоединённые 1–14; tables обязаны идти последовательно и покрывать каждое поле входов. Типы сопоставляемых полей должны совпадать; отдельное поле задаётся main:null. DISTINCT не поддержан. Контракт 15 входов шире исторически проверенных live8; предел не повышает подтверждённое покрытие.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [union-node.mjs](../../../../packages/loginom-runtime/client/lib/union-node.mjs):1–34; [union-parameters.mjs](../../../../packages/loginom-runtime/client/lib/union-parameters.mjs):1–74; [transform.union_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.union_data.md):1–18. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `transform.union_data` / `append_all` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи V27. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 

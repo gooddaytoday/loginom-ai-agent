@@ -4,10 +4,15 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
 
-Обработчика нет; `discovery_required`. Следующая карточка Multica — этап 0 (живое исследование), отдельно от реализации. Назначение этапа 1 требует закреплённого контракта и решения владельца по общим изменениям: W1/W2/W3/W4.
-Живые наблюдения, CLI и численная приёмка не выполнялись; готовность реестра не менялась.
+Зарегистрирован `datamining.lin_regression` / `enter`, `apply`. Простой закон на чистых самостоятельных данных: роли полей, обучение, коэффициенты и прогноз новых строк.
+
+Ограничения: Enter с константой без нормализации; непрерывные числовые предикторы и цель, один вход; выходы 0 (прогнозы) и 1 (коэффициенты), без переопределения mappings. apply сохранённой модели (D27, LAB-421, PR #499) реализован без зафиксированной живой приёмки; выпущен только в v0.3.7. Варианты переобучения, валидация, полная статистика и W4 — этапы 2+.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [linregression-node.mjs](../../../../packages/loginom-runtime/client/lib/linregression-node.mjs):1–48; [linregression-parameters.mjs](../../../../packages/loginom-runtime/client/lib/linregression-parameters.mjs):1–23; [datamining.lin_regression.md](../../../../packages/product/skills/loginom-automation/references/nodes/datamining.lin_regression.md):1–9. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
 
 ## Планируемый объём по этапам
 
@@ -27,4 +32,3 @@
 - [Нормализация дискретных данных](https://help.loginom.ru/userguide/processors/normalization/normalization-discrete.html) — `loginom-help@353e506b:data/processors/normalization/normalization-discrete.md`.
 - [Валидация моделей](https://help.loginom.ru/userguide/processors/validation.html) — `loginom-help@353e506b:data/processors/validation.md`.
 - `e2e-tests@486caef44:bg/labels.ts:163-183 — метки Data Mining; tests/toreview/acceptance/workflow/teach/teach_node.ts:27-49 — список обучаемых компонентов, :toreview` — прочитанные исходники, не результат выполнения.
-- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; обработчика нет.

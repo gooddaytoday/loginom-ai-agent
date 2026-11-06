@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `imports.text` / `delimited`. CSV/TSV: проверенный исходный файл, source/format/columns, выходная схема и свежий результат.
+
+Ограничения: Новый узел требует полных source/format/columns и проверенной доставки файла. Технические имена новых колонок — ASCII; source_name и label допускают Unicode. Не угадывать транслитерацию. Другие режимы текста, XLSX и автоматическое распознавание произвольных форматов не входят в этот handler.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [text-import-node.mjs](../../../../packages/loginom-runtime/client/lib/text-import-node.mjs):1–547; [text-import-procedure.mjs](../../../../packages/loginom-runtime/client/lib/text-import-procedure.mjs):1–740; [imports.text.md](../../../../packages/product/skills/loginom-automation/references/nodes/imports.text.md):1–42. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `imports.text` / `delimited` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи B02, B18, B27, B37, B47, B65, REFORM, V02, V27, V37, V65. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 
