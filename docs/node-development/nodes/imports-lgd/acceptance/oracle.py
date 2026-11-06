@@ -106,10 +106,16 @@ def fixtures():
     assert len(a) == len(b)
     assert [i for i, pair in enumerate(zip(a,b)) if pair[0] != pair[1]] == [320]
     assert a[320] ^ b[320] == 1
-    compression = ROOT / "fixtures/64bit/files.json"
-    if compression.exists():
-        for entry in json.loads(compression.read_text())["files"]:
-            data = (compression.parent / entry["name"]).read_bytes()
+    manifest = ROOT / "fixtures/empty-variant/files.json"
+    for entry in json.loads(manifest.read_text())["files"]:
+        data = (manifest.parent / entry["name"]).read_bytes()
+        assert len(data) == entry["bytes"] and hashlib.sha256(data).hexdigest() == entry["sha256"]
+
+
+    manifest = ROOT / "fixtures/64bit/files.json"
+    if manifest.exists():
+        for entry in json.loads(manifest.read_text())["files"]:
+            data = (manifest.parent / entry["name"]).read_bytes()
             assert len(data) == entry["bytes"]
             assert hashlib.sha256(data).hexdigest() == entry["sha256"]
     manifest = ROOT / "fixtures/variable/files.json"
@@ -137,6 +143,30 @@ def variable_expectations(final):
                          "source_switch": {"before": "variable-a.lgd", "after": "variable-b.lgd", "variable": "SourceFile"}}
     return result
 
+
+
+def empty_variant_expectations():
+    scalar = table(ROOT, "lgd-values.csv")
+    empty = table(ROOT, "properties-values.csv", "properties-schema.json")
+    for spec in [scalar, empty]:
+        for column in spec["columns"]:
+            if column["type"] != "real":
+                column.pop("tolerance", None)
+    columns = [{"name": "Names", "label": "Имена", "type": "string", "data_kind": "discrete"},
+               {"name": "DisplayNames", "label": "Метки", "type": "string", "data_kind": "discrete"},
+               {"name": "Values", "label": "Значения", "type": "variant", "data_kind": "Неопределенное"},
+               {"name": "DataTypes", "label": "Типы данных", "type": "integer", "data_kind": "discrete"}]
+    codes = {"boolean": 1, "datetime": 2, "real": 3, "integer": 4, "string": 5}
+    rows = [{"Names": c["name"], "DisplayNames": c["label"],
+             "Values": None if value is None else {"cell_type": c["type"], "value": value},
+             "DataTypes": codes[c["type"]]} for row in scalar["rows"] for c, value in zip(scalar["columns"], row)]
+    outputs = [{"output_node_type": "imports.lgd", "output_node_label": label, "output_port": 0,
+                "ordered": True, "column_order": "exact", "columns": fields, "rows": values}
+               for label, fields, values in [("Пустой", empty["columns"], []), ("Variant", columns, rows)]]
+    imports = [{"label": o["output_node_label"], "filename": name, "compression": "LZ4", "written_checksum": "Сжатых данных", "checksum": True, "columns": o["columns"]}
+               for name, o in zip(["empty.lgd", "variant.lgd"], outputs)]
+    return {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.lgd", "label": label} for label in ["Пустой", "Variant"]],
+            "outputs": outputs, "lgd": {"kind": "empty_variant", "imports": imports}}
 
 def compression_expectations():
     spec = table(ROOT, "properties-values.csv", "properties-schema.json")
@@ -187,8 +217,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     fixtures()
     imported, exported = expectations()
-    for path, value in [(ROOT / "acceptance/expected.json", imported),
-                        (EXPORT / "acceptance/expected.json", exported),
+    for path, value in [(ROOT / "acceptance/expected.json", imported), (EXPORT / "acceptance/expected.json", exported),
+                        (ROOT / "acceptance/empty-variant/expected.json", empty_variant_expectations()),
                         (ROOT / "acceptance/variable/expected.json", variable_expectations(True)),
                         (ROOT / "acceptance/variable/expected-initial.json", variable_expectations(False)),
                         (ROOT / "acceptance/compression/expected.json", compression_expectations()),
