@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
+import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
@@ -33,7 +34,20 @@ const state = {
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
+  timers: new Map(),
+  exiting: false,
 }
+// In-memory MCP shares this process with Playwright, whose completed operations
+// can leave referenced Promise.race timeout losers. Retain them during resource
+// cleanup; after checked close they must not postpone normal isolate disposal.
+createHook({
+  init(id, type, _trigger, resource) {
+    if (type !== "Timeout") return
+    if (state.exiting) { resource.unref(); return }
+    state.timers.set(id, resource)
+  },
+  destroy(id) { state.timers.delete(id) },
+}).enable()
 const requests = new Set()
 const terminalTrace = (stage) => {
   if (!state.session?.directory) return
@@ -48,7 +62,12 @@ const send = (message, disconnect = false) => {
     process.send(message, (error) => {
       if (!disconnect) return
       terminalTrace(error ? "reply_failed" : "reply_flushed")
-      if (!error && process.connected) process.disconnect()
+      if (!error && process.connected) {
+        // disconnect() clears process.channel even when an incomplete frame
+        // keeps the underlying pipe open. Release its event-loop reference first.
+        process.channel?.unref()
+        process.disconnect()
+      }
       terminalTrace("disconnect_returned")
       // Node may postpone 'disconnect' while an incomplete later IPC frame is
       // buffered. The reply is flushed and admitted work/resources are already
@@ -74,7 +93,23 @@ const stop = (exitCode = 0) => {
     void Promise.resolve().then(() => state.browser?.close()).finally(() => process.exit(1))
   }, 30000)
   void close().then(
-    () => { clearTimeout(timer); terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => {
+      clearTimeout(timer)
+      terminalTrace("exit_requested")
+      // Let Node dispose the isolate before joining V8 workers. process.exit()
+      // can deadlock after 'exit' when a worker needs foreground GC (#66171).
+      // The owner still requires the close ACK and actual clean process exit.
+      process.channel?.unref()
+      if (process.connected) process.disconnect()
+      process.exitCode = exitCode
+      state.exiting = true
+      state.timers.forEach(timer => timer.unref())
+      state.timers.clear()
+      setTimeout(() => {
+        terminalTrace("exit_fallback")
+        process.exit(exitCode)
+      }, 3000).unref()
+    },
     () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
 }

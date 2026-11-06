@@ -4,6 +4,7 @@ import { Product } from "@loginom-ai-agent/product"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 import {
   createLoginomSettings,
+  createLoginomConnectionStatus,
   loginomBrowserMessage,
   watchLoginomApplication,
 } from "../src/components/settings-loginom-state"
@@ -58,6 +59,43 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("connection notice follows actual configuration, including saving and resetting a passwordless connection", async () => {
+    const f = setup({ state: "unconfigured", generation: 0 })
+    const notice = createRoot((dispose) => ({ dispose, connection: createLoginomConnectionStatus(f.api) }))
+    try {
+      expect(notice.connection.required()).toBe(false)
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(true)
+      f.update({ state: "ready", generation: 1, hasPassword: false })
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(false)
+      f.update({ state: "unconfigured", generation: 0 })
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(true)
+      f.api.status = async () => {
+        throw new Error("offline")
+      }
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(false)
+    } finally {
+      notice.dispose()
+      f.dispose()
+    }
+  })
+
+  test("connection status ignores a bridge response after the button is disposed", async () => {
+    const f = setup()
+    const pending = Promise.withResolvers<Loginom.View>()
+    f.api.status = () => pending.promise
+    const notice = createRoot((dispose) => ({ dispose, connection: createLoginomConnectionStatus(f.api) }))
+    const refresh = notice.connection.refresh()
+    notice.dispose()
+    pending.resolve({ ...(await f.api.read()), state: "unconfigured" })
+    await refresh
+    expect(notice.connection.required()).toBe(false)
+    f.dispose()
+  })
+
   test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {
     expect(loginomBrowserMessage()).toBe("loginom.browserUnknown")
     expect(loginomBrowserMessage({ state: "unknown" })).toBe("loginom.browserUnknown")

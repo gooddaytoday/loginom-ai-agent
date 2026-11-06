@@ -20,14 +20,18 @@ test("every installed node handler has one routing row and one bounded reference
   ])
   expect(inventory.exitCode, inventory.stderr.toString()).toBe(0)
   const { handlers, registered }: { handlers: string[]; registered: string[] } = JSON.parse(inventory.stdout.toString())
-  const rows = [...skill.matchAll(/^\|.*\[([^\]]+)\]\((references\/nodes\/([\w.]+)\.md)\).*\|$/gm)]
+  const references = [...skill.matchAll(/^\|.*\[([^\]]+)\]\((references\/nodes\/([\w.-]+)\.md)\).*\|$/gm)]
+  // A recipe uses existing handlers; it does not add a node type or handler.
+  const rows = references.filter((row) => row[1] !== "рецепт")
   expect(rows.map((row) => row[3]).toSorted()).toEqual(handlers.toSorted())
   expect((await readdir(new URL("references/nodes/", root))).toSorted()).toEqual(
-    handlers.map((type) => `${type}.md`).toSorted(),
+    references.map((row) => `${row[3]}.md`).toSorted(),
   )
   for (const row of rows) {
     expect(registered).toContain(row[3])
     expect(row[0]).toContain(`\`${row[3]}\``)
+  }
+  for (const row of references) {
     const node = Bun.file(new URL(row[2], root))
     expect(await node.exists(), fileURLToPath(new URL(row[2], root))).toBe(true)
     expect(node.size, row[3]).toBeLessThanOrEqual(6_000)

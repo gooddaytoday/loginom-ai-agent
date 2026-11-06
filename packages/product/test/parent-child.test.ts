@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { runInNewContext } from "node:vm"
 
-const recipe = new URL("../skills/loginom-automation/references/recipes/parent-child.md", import.meta.url)
+const recipe = new URL("../skills/loginom-automation/references/nodes/parent-child-recipe.md", import.meta.url)
 const fixtures = new URL("../../../docs/node-development/nodes/trees-datatotree/acceptance/parent-child/expected.json", import.meta.url)
 
 function execute(rows: { id: string; parent_id: string | null | undefined; name: string }[]) {

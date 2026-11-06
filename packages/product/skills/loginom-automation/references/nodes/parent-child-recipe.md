@@ -3,7 +3,7 @@
 В Loginom 7.4.2 trees.from_table задаёт ручную структуру, а не рекурсию по
 ключам. Это подтверждённый пробел: используй programming.javascript только
 для валидации связей и сборки вложенного JSON. Импорт и экспорт — стандартные
-узлы. Сначала прочитай [JavaScript](../nodes/programming.javascript.md) и его schema.
+узлы. Сначала прочитай [JavaScript](programming.javascript.md) и его schema.
 
 Импортируй id, parent_id, name как string: ведущие нули значимы. Пустой
 parent_id/NULL — корень; несколько корней допустимы. Не сортируй строки.
@@ -66,8 +66,8 @@ OutputTable.Set("JSON", document);
 
 Результат — один документ {roots:[…]} без Root; children есть и у листьев ([]).
 Потомок до родителя допустим. Если нужен порт дерева, подключи
-[JSON в дерево](../nodes/trees.from_json.md) к полю JSON. Если нужен JSON, готовой строки
-достаточно; [Дерево в JSON](../nodes/trees.to_json.md) нужно только при сериализации
+[JSON в дерево](trees.from_json.md) к полю JSON. Если нужен JSON, готовой строки
+достаточно; [Дерево в JSON](trees.to_json.md) нужно только при сериализации
 порта дерева. Не создавай техническую обёртку и не теряй массивы children.
 
 При NODE_EXECUTION_FAILED передай точный текст с перечнем id, останови

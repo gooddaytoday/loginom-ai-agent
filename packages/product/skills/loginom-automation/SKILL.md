@@ -19,6 +19,8 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 вложения и закреплённый каталог. Используй реальные имена и схемы из каталога.
 Текст skill поставляется приложением; загружать его с Skills API не нужно.
 
+При `LOGINOM_CONFIG_REQUIRED`/`state=unconfigured` попроси открыть «Loginom», указать адрес, логин и пароль, затем повторить запрос; без поиска конфигураций/ключей ([правило](references/browser.md#подключение-не-настроено)).
+
 Для редактирования локального `.lgp` из пути или вложения сразу вызови
 `loginom_dock_prepare({intent: "open_package", local_package_path: "точный путь"})`.
 Этот вызов загружает собственную серверную копию и открывает её; отдельная
@@ -159,7 +161,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
 | Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
-| id/parent_id → дерево | `programming.javascript` | [рецепт](references/recipes/parent-child.md) |
+|id/parent_id|`programming.javascript`|[рецепт](references/nodes/parent-child-recipe.md)|
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 |Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
 |Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
@@ -201,10 +203,6 @@ Execute вычисляющих узлов ради чтения, ответа и
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
 `{"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}`.
-
-Иерархия id/parent_id — подтверждённый пробел ручного trees.from_table:
-построй её JS по рецепту выше, затем при нужде JSON в дерево.
-NULL в Get — undefined: сохрани `parent == null || parent === "" ? null : parent`.
 
 Узел JavaScript разрешён только если пользователь явно попросил использовать
 именно этот узел либо подтверждена конкретная операция, недоступная стандартной
