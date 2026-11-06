@@ -2,7 +2,7 @@ import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
-import { hostError, hostException } from "./errors"
+import { hostError, hostException, knowledgeFailure } from "./errors"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -30,8 +30,8 @@ export type Launch = {
   startupDeadline?: number
 }
 
-type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
-export type KnowledgeLaunch = ProcessLaunch & { endpoint: string; apiKey: string }
+type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[]; knowledge?: boolean }
+export type KnowledgeLaunch = ProcessLaunch & { endpoint: string; apiKey: string; deadline?: number }
 
 export class RuntimeStartupError extends Error {
   constructor(
@@ -145,15 +145,17 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
 }
 
 export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  const deadline = input.deadline ?? Date.now() + 120_000
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.apiKey] },
+    { ...input, diagnosticSecrets: [input.apiKey], knowledge: true },
     {
       protocol: 1,
       generation: input.generation,
       endpoint: input.endpoint,
       apiKey: input.apiKey,
+      deadline,
     },
-    120_000,
+    Math.max(1, deadline - Date.now()),
     signal,
   )
   const ready = runtime.ready
@@ -230,7 +232,8 @@ async function superviseProcess(
     }
     if ("error" in message) {
       startupFailure.value ??= knowledgeStartupFailure("startupFailure" in message ? message.startupFailure : undefined)
-      request.reject(
+      const failure = knowledgeFailure(message)
+      request.reject(Object.assign(
         hostError(message) !== "LOGINOM_HOST_REQUEST_FAILED"
           ? hostException(message)
           : new Error(
@@ -238,25 +241,37 @@ async function superviseProcess(
                 ? message.error
                 : "LOGINOM_RUNTIME_FAILED",
             ),
-      )
+        failure ? { knowledgeFailure: failure } : {},
+      ))
       return
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function request(operation: string, value?: unknown, timeout = 120_000, signal?: AbortSignal) {
+    if (signal?.aborted) return Promise.reject(signal.reason)
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
+    if (timeout <= 0) return Promise.reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
-      }, timeout)
-      pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
-        if (error) fail()
-      })
+      const stop = (error: Error) => {
+        if (!pending.delete(id)) return
+        cleanup()
+        if (input.knowledge && operation === "call" && value && typeof value === "object" && "run" in value && "id" in value)
+          child.send({ id: randomUUID(), operation: "interrupt", input: { run: value.run, id: value.id } }, () => {})
+        reject(error)
+      }
+      const abort = () => stop(signal?.reason instanceof Error ? signal.reason : Error("LOGINOM_KNOWLEDGE_INTERRUPTED"))
+      const timer = setTimeout(() => stop(Error("LOGINOM_RUNTIME_TIMEOUT")), timeout)
+      const cleanup = () => {
+        clearTimeout(timer)
+        signal?.removeEventListener("abort", abort)
+      }
+      pending.set(id, { timer, resolve(value) { cleanup(); resolve(value) }, reject(error) { cleanup(); reject(error) } })
+      signal?.addEventListener("abort", abort, { once: true })
+      child.send({ id, operation, input: value }, (error) => { if (error) fail() })
     })
   }
+
   const closing: { promise?: Promise<void> } = {}
   function close() {
     if (closing.promise) return closing.promise

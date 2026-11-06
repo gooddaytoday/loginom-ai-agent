@@ -55,7 +55,8 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
         }, ms)
         signal.addEventListener("abort", abort, { once: true })
       }))
-  const refreshes = new Set<AbortController>()
+  let refreshing: { promise: Promise<void>; controller: AbortController; deadline: number } | undefined
+  let cooldown = 0
   let writes = Promise.resolve()
   function enqueueWrite(operation: () => Promise<void>) {
     const result = writes.then(operation)
@@ -150,6 +151,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
           JSON.stringify(actual) !== JSON.stringify(saved)
         ) {
           saved = actual
+          cooldown = 0
           revision++
         }
         options.changed()
@@ -157,6 +159,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       }
       if (attempt !== epoch) return
       saved = record
+      cooldown = 0
       revision++
     })
   }
@@ -173,7 +176,8 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       const discard = !saved && loginWrite === epoch
       const cancellation = ++epoch
       login?.abort()
-      refreshes.forEach((controller) => controller.abort())
+      refreshing?.controller.abort(Error("LOGINOM_CLOUD_UNAVAILABLE"))
+      refreshing = undefined
       await polling
       if (cancellation !== epoch) return
       pending = undefined
@@ -186,6 +190,23 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
     })
     return cancelling
   }
+  async function waitRefresh(flight: NonNullable<typeof refreshing>, input: CallBudget) {
+    const signal = AbortSignal.any([input.signal, flight.controller.signal])
+    signal.throwIfAborted()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let abort: (() => void) | undefined
+    try {
+      await Promise.race([flight.promise, new Promise<never>((_, reject) => {
+        abort = () => reject(signal.reason)
+        signal.addEventListener("abort", abort, { once: true })
+        timer = setTimeout(() => reject(Error("LOGINOM_CLOUD_UNAVAILABLE")), Math.max(0, Math.min(input.deadline, flight.deadline) - now()))
+      })])
+    } finally {
+      clearTimeout(timer)
+      if (abort) signal.removeEventListener("abort", abort)
+    }
+  }
+
   return {
     status,
     cancel,
@@ -299,54 +320,59 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       })
     },
     async refresh(input: CallBudget) {
+      input.signal.throwIfAborted()
       if (closing) throw Error("LOGINOM_HOST_CLOSED")
       if (!saved) throw Error("LOGINOM_CLOUD_CONNECTION_REQUIRED")
+      if (input.deadline <= now() || now() < cooldown) throw Error("LOGINOM_CLOUD_UNAVAILABLE")
+      if (refreshing) return waitRefresh(refreshing, input)
       const attempt = epoch
       const previous = saved
       const controller = new AbortController()
-      refreshes.add(controller)
-      try {
+      const operation = (async () => {
         const value = await json(
           "/api/agent/dock-credentials",
           undefined,
           Schema.Struct({ dock: Connection.fields.dock }),
-          AbortSignal.any([input.signal, controller.signal]),
+          controller.signal,
           { "X-API-Key": previous.installationKey },
           input.deadline,
           "GET",
         ).catch(async (error: unknown) => {
-          if (
-            error instanceof Error &&
-            error.message === "access_revoked" &&
-            attempt === epoch &&
-            saved?.installationKey === previous.installationKey
-          ) {
+          if (error instanceof Error && error.message === "access_revoked" && attempt === epoch && saved?.installationKey === previous.installationKey) {
             epoch++
-            refreshes.forEach((controller) => controller.abort())
             saved = undefined
             revision++
             await clear()
             options.changed()
             throw Error("LOGINOM_CLOUD_CONNECTION_REQUIRED")
           }
+          if (attempt === epoch) cooldown = now() + Math.max(30_000,
+            error instanceof Error && "retryAfter" in error && typeof error.retryAfter === "number" ? error.retryAfter : 0)
           throw safeError(error)
         })
         if (attempt !== epoch || saved?.installationKey !== previous.installationKey) return
-        const record = { ...previous, dock: value.dock }
-        await persist(record, attempt)
-        options.changed()
-      } finally {
-        refreshes.delete(controller)
-      }
+        if (value.dock.primary.apiKey === previous.dock.primary.apiKey && value.dock.reserve.apiKey === previous.dock.reserve.apiKey) {
+          cooldown = now() + 30_000
+          return
+        }
+        await persist({ ...previous, dock: value.dock }, attempt)
+        if (attempt === epoch) options.changed()
+      })()
+      const flight = { promise: operation, controller, deadline: input.deadline }
+      refreshing = flight
+      void operation.finally(() => { if (refreshing === flight) refreshing = undefined }).catch(() => {})
+      return waitRefresh(flight, input)
     },
     async disconnect() {
       const previous = saved
-      await cancel()
+      const cancelled = cancel()
       const attempt = epoch
       saved = undefined
       revision++
-      await clear()
+      pending = undefined
       options.changed()
+      await cancelled
+      await clear()
       if (previous)
         await request(new URL("/api/agent/connections/current", options.endpoints.site).href, {
           method: "DELETE",

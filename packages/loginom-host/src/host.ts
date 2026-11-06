@@ -48,12 +48,16 @@ export async function createLoginomHost(options: {
   const endpoints = options.cloudEndpoints ?? Product.cloud
   const selection = { server: "primary" as "primary" | "reserve" }
   let cloudRevision = 0
+  let cloudConnected = false
   const cloud = await createCloudAuth({
     store: cloudStore(join(root, "connection"), options.codec),
     endpoints,
     changed() {
       if (lifetime.signal.aborted || cloud.revision() === cloudRevision) return
       cloudRevision = cloud.revision()
+      const connected = !!cloud.credentials()
+      if (connected && cloudConnected) return
+      cloudConnected = connected
       for (const generation of generations.values()) {
         if (generation.connection.mode !== "cloud") continue
         void generation.knowledge
@@ -63,6 +67,7 @@ export async function createLoginomHost(options: {
       }
     },
   })
+  cloudConnected = !!cloud.credentials()
   function budget(): CallBudget {
     return { deadline: Date.now() + 120_000, signal: lifetime.signal }
   }

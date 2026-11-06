@@ -93,6 +93,8 @@ async function networkFixture(
       return new Response(null, { status: 404 })
     },
   })
+  // These readiness cases recover primary; reserve is independently unavailable.
+  const reserve = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(null, { status: 503 }) })
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
   await mkdir(join(resources, "bin"), { recursive: true })
@@ -147,7 +149,7 @@ async function networkFixture(
     resources,
     codec: credentials("linux"),
     environment: {},
-    cloudEndpoints: { site: site.url.origin, primary: server.endpoint, reserve: server.endpoint },
+    cloudEndpoints: { site: site.url.origin, primary: server.endpoint, reserve: reserve.url.origin },
   })
   const requests = new EventEmitter()
   const replies = new EventEmitter()
@@ -177,6 +179,7 @@ async function networkFixture(
         await host.close()
       } finally {
         site.stop(true)
+        reserve.stop(true)
         for (const callback of cleanup) await callback()
         await rm(directory, { recursive: true, force: true })
       }

@@ -124,3 +124,13 @@ export function fileError(value: unknown) {
           : value,
   )
 }
+
+export function knowledgeFailure(value: unknown) {
+  if (!value || typeof value !== "object" || !("knowledgeFailure" in value)) return undefined
+  const failure = value.knowledgeFailure
+  if (!failure || typeof failure !== "object" || Array.isArray(failure) || !("kind" in failure)
+    || typeof failure.kind !== "string" || !["unauthorized", "unavailable", "forbidden", "rate-limited", "other"].includes(failure.kind)
+    || Object.keys(failure).some(key => !["kind", "retryAfterMs"].includes(key))
+    || ("retryAfterMs" in failure && (typeof failure.retryAfterMs !== "number" || !Number.isFinite(failure.retryAfterMs) || failure.retryAfterMs < 0))) return undefined
+  return { kind: failure.kind, ...("retryAfterMs" in failure ? { retryAfterMs: failure.retryAfterMs as number } : {}) }
+}

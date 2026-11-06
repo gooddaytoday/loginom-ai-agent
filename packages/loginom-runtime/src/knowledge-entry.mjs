@@ -1,4 +1,4 @@
-import { createKnowledgeClient, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
+import { createKnowledgeClient, knowledgeFailure, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
 import { startupDiagnostic } from '../client/lib/catalog.mjs';
 
 process.umask(0o077);
@@ -45,14 +45,15 @@ async function handle(message) {
       const input = message.input;
       if (!input || input.protocol !== 1 || !Number.isSafeInteger(input.generation) || input.generation < 1
         || typeof input.endpoint !== 'string' || !URL.canParse(input.endpoint) || typeof input.apiKey !== 'string'
-        || Object.keys(input).some(key => !['protocol', 'generation', 'endpoint', 'apiKey'].includes(key)))
+        || !Number.isFinite(input.deadline)
+        || Object.keys(input).some(key => !['protocol', 'generation', 'endpoint', 'apiKey', 'deadline'].includes(key)))
         throw Error('LOGINOM_START_INVALID');
       const endpoint = new URL(input.endpoint);
       if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash)
         throw Error('LOGINOM_START_INVALID');
       state.apiKey = input.apiKey;
       state.client = createKnowledgeClient(input, state.controller.signal, {
-        deadline: Date.now() + 120000,
+        deadline: input.deadline, managed: true,
         onFailure: (error, detail) => state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error, [input.apiKey]) }),
       });
       // Readiness is observed through list; admission of start does not wait for the network.
@@ -89,13 +90,14 @@ async function handle(message) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
     if (['start', 'list'].includes(message.operation) && !state.startupDiagnostics.length)
       state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error, [state.apiKey]) });
-    send({ id: message.id, error: code, startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
+    send({ id: message.id, error: code, knowledgeFailure: knowledgeFailure(error), startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
       ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === 'close');
   }
 }
 
 async function call(input) {
   const key = knowledgeRequestKey(input);
+  if (!Number.isFinite(input.deadline)) throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
   if (calls.has(key)) throw Error('LOGINOM_KNOWLEDGE_REQUEST_BUSY');
   const entry = { input, controller: new AbortController() };
   const aborted = Promise.withResolvers();

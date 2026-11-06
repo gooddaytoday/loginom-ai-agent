@@ -22,7 +22,7 @@ test("knowledge supervision sends only its own private payload and filters provi
       entry,
       `process.on('message', message => {
       if (message.operation === 'start') {
-        const valid = Object.keys(message.input).sort().join(',') === 'apiKey,endpoint,generation,protocol'
+        const valid = Object.keys(message.input).sort().join(',') === 'apiKey,deadline,endpoint,generation,protocol'
           && message.input.apiKey === 'PRIVATE-NONSECRET-KEY'
           && !process.argv.join(' ').includes('PRIVATE-NONSECRET')
           && !Object.values(process.env).some(value => value.includes('PRIVATE-NONSECRET'))
@@ -31,6 +31,7 @@ test("knowledge supervision sends only its own private payload and filters provi
           started:message.input.endpoint !== 'https://example.test/no-start'}});
       }
       if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+      if (message.operation === 'failure-marker') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_FAILED', knowledgeFailure:message.input});
       if (message.operation === 'malformed-diagnostic') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE',
         startupFailure:{stage:['catalog'],error_class:'Error',code:null,cause_codes:[],aborted:false,timeout:false,
           elapsed_ms:1,body:'PRIVATE-NONSECRET-DIAGNOSTIC'}});
@@ -54,6 +55,15 @@ test("knowledge supervision sends only its own private payload and filters provi
       expect(runtime.ready).toEqual({ protocol: 1, generation: 17, started: true })
       expect(await runtime.request("list")).toEqual({ tools: [] })
       await expect(runtime.request("malformed-diagnostic")).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      for (const kind of ["unauthorized", "unavailable", "forbidden", "rate-limited", "other"])
+        await expect(runtime.request("failure-marker", { kind, retryAfterMs: 12 })).rejects.toMatchObject({ knowledgeFailure: { kind, retryAfterMs: 12 } })
+      for (const marker of [{ kind: "unknown" }, { kind: "unavailable", retryAfterMs: -1 }, { kind: "other", retryAfterMs: Infinity },
+        { kind: "unauthorized", body: "PRIVATE-CANARY" }, { kind: "forbidden", retryAfterMs: "3" }]) {
+        const error = await runtime.request("failure-marker", marker).catch(error => error)
+        expect(error).toBeInstanceOf(Error)
+        expect(error && typeof error === "object" && "knowledgeFailure" in error).toBe(false)
+        expect(JSON.stringify(error)).not.toContain("PRIVATE-CANARY")
+      }
     } finally {
       await runtime.close()
     }
@@ -286,7 +296,7 @@ test("supervised real knowledge entry acknowledges before the server catalog is 
         ]),
       })
       expect(
-        await runtime.request("call", { run: "run", id: "request", name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }),
+        await runtime.request("call", { deadline: Date.now() + 120_000, run: "run", id: "request", name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }),
       ).toEqual({
         content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }) }],
       })
@@ -303,3 +313,28 @@ test("supervised real knowledge entry acknowledges before the server catalog is 
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test("knowledge start carries the original deadline into the real child HTTP request", async () => {
+  const cleanup: (() => void | Promise<void>)[] = []
+  const server = await knowledgeServer({ after: callback => cleanup.push(callback) }, { async request(body, _request, response) {
+    if ((!body || typeof body !== "object" || !("method" in body) || body.method !== "initialize")) return false
+    return true
+  } })
+  const directory = await mkdtemp(join(tmpdir(), "knowledge-deadline-"))
+  const started = Date.now()
+  const runtime = await superviseKnowledge({ node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+    entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)), stateDir: directory,
+    generation: 1, endpoint: server.endpoint, apiKey: "UNIT-NONSECRET", environment: {}, deadline: started + 600 })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await expect(Promise.race([runtime.request("list"), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error("CHILD_DEADLINE_IGNORED")), 1300)
+    })])).rejects.toMatchObject({ knowledgeFailure: { kind: "unavailable" } })
+    expect(Date.now() - started).toBeLessThan(1200)
+  } finally {
+    clearTimeout(timer)
+    await runtime.close()
+    for (const close of cleanup) await close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 30000)

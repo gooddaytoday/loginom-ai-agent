@@ -285,4 +285,45 @@ Runtime/сборки/production не запускались. Следующий 
 - Публичные schema/IPC/API, remote catalog recovery и product deadlines не менялись; дополнительных status flags/caches/dependencies нет.
 - Exact RED/GREEN/covering outputs и self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-6-report.md`.
 - Ограничения прежние: synthetic localhost/Linux, без installed GUI/native/site; независимое одобрение ещё не заявлено.
-- Следующий шаг: scoped re-review `d2abf2a4ae..amended HEAD` у исходного reviewer; затем решение владельца о Task7.
+- Следующий шаг: scoped re-review `d2abf2a4ae..amended HEAD` у исходного reviewer; затем Task7 по утверждённому goal.
+
+## Ревью Task6 — 2026-11-06
+
+- SHA `3cbcc83f17`: scoped re-review Spec compliant / Quality Approved; оба Important исправлены, новых обязательных замечаний нет.
+- Local admission сохраняет terminal outcome; failed apply оставляет рабочее поколение, failed retirement завершает ожидание с сохранением cleanup failure.
+- Host70/487, cloud16/73, CLI startup/writer1/14 и Host typecheck PASS; прочие неизменённые проверки подтверждены отчётом.
+- Native/site/reserve/installed GUI и полный bundled management dispatch — gates13/15; Node cloud router — Task8, в Task6 не заявлялись.
+- Следующий шаг: автономно Task7 по принятому плану; push/merge/release не выполнялись.
+
+## Checkpoint Task7 — 2026-11-06
+
+- База SHA `3cbcc83f170`; результат — `feat(loginom): recover cloud Help with bounded failover`.
+- Help использует исходный120с deadline до lease и сквозь startup/refresh/retirement/retry; remote read≤60с, managed initialize≤15с.
+- Настоящий fetch отменяется по сигналу своего SDK-запроса; private IPC передаёт только проверенную классификацию HTTP/сети/timeout.
+- На вызов один refresh и один primary→reserve; успешный reserve сохраняется в Host между поколениями, новый Host начинает с primary.
+- Cloud refresh singleflight удерживается до durable write/changed; cooldown30с/Retry-After demand-only, новая пара и actual-diskB снимают паузу.
+- Поздние401 старого child используют его завершённый refresh outcome; новый child/demand не наследует результат, у каждого waiter свой budget.
+- Logout сразу отключает память, отменяет refresh, очищает файл после начатых writes; ошибка удаления не скрывается, remote DELETE bounded.
+- Local admission/cleanup outcome, epoch/attempt/revision guards, browser leases и отдельная browser timeout policy сохранены.
+- Принятое уточнение старого revoke/write теста: GET1 и оба waiter ждут fsync, затем допустимый следующий revoke удаляет запись/reopenfalse; logout/write с новой парой сохранён.
+- В read-only review подтверждена недостижимость параллельного revoke GET при strict singleflight; новый hook/раннее освобождение flight не вводились.
+- Host117 PASS/703 assertions; Runtime65 PASS; scoped CLI startup/writer1 PASS/14; Host typecheck и diff-check PASS.
+- Сохранены реальные RED позднего401, actual-diskB cooldown и задержанного cleanup; исправлены первые неверные границы, не ожидания тестов.
+- Публичные Schema/Protocol/HttpApi и зависимости не менялись; SDK patch/generation и Task8+ отсутствуют.
+- Evidence/точные команды/ограничения: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-7-report.md`.
+- Ограничения: synthetic localhost/Linux; site/production reserve/native stores/installed GUI и полный120с worst-case остаются gates13/15.
+- Следующий шаг: независимое ревью Task7; после принятия Task8. Push/merge/release не выполнялись.
+
+## Checkpoint Task7, fix round1 — 2026-11-06
+
+- Fix base SHA `399b9e3fd9`; независимое ревью нашло два Important/P2, исправления входят через amend в тот же Task7 commit.
+- Concurrent catalog после общего reserve startup больше не использует stale primary: route caller обновляется после await, действующий reserve сохраняется.
+- Recovery видит target общей попытки; failed reserve не получает дополнительный failover, explicit reserve intent не понижается до primary.
+- SDK GET/SSE, как и POST, получает redirect:error в текущей fetch boundary; same-origin302 не вызывает target и не передаёт ему Bearer.
+- Оба замечания закреплены постоянными настоящими HTTP/MCP RED→GREEN; concurrent failed reserve отдельно проверен без нового retry.
+- Общий deadline, local admission/retirement/cleanup, refresh singleflight/cooldown и browser leases не изменены.
+- Host119 PASS/715 assertions; Runtime66 PASS; scoped CLI startup/writer1 PASS/14; Host typecheck и diff-check PASS.
+- Новых dependencies/framework/SDK patches/public contracts нет; heavy CLI и Task8+ не запускались.
+- Exact commands, RED/GREEN и covering logs: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-7-report.md`.
+- Ограничения прежние: synthetic localhost/Linux; native/site/production/installed GUI/full120с acceptance не заявлены.
+- Следующий шаг: scoped re-review `399b9e3fd9..amended HEAD`; независимое одобрение не заявляется. Push/merge/release не выполнялись.

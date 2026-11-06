@@ -37,6 +37,7 @@ function entry(t) {
     child, exited,
     request(operation, input, timeout = 2000) {
       if (!child.connected) return Promise.reject(Error('ENTRY_DISCONNECTED'));
+      if (['start', 'call'].includes(operation) && input) input = { deadline: Date.now() + 120000, ...input };
       const id = randomUUID();
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { requests.delete(id); reject(Error('ENTRY_TIMEOUT')); }, timeout);
@@ -234,4 +235,29 @@ test('interrupting a call waiting for startup leaves other runs and initializati
   release.resolve();
   assert.equal(JSON.parse((await other).content[0].text).arguments.uris[0], 'viking://resources/loginom-dock/survives');
   assert.equal(server.calls.length, 1);
+});
+
+test('private absolute deadline aborts the child initialize HTTP socket', async t => {
+  const disconnected = Promise.withResolvers();
+  const server = await knowledgeServer(t, { request(body, _request, response) {
+    if (body?.method !== 'initialize') return false;
+    response.on('close', () => disconnected.resolve()); return true;
+  } });
+  const runtime = entry(t);
+  const started = Date.now();
+  await runtime.request('start', { protocol: 1, generation: 1, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET', deadline: started + 600 });
+  await assert.rejects(runtime.request('list'), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+  assert.ok(Date.now() - started < 1200);
+  await Promise.race([disconnected.promise, new Promise((_, reject) => setTimeout(() => reject(Error('HTTP_NOT_ABORTED')), 500))]);
+});
+
+test('private calls require a finite absolute deadline before remote dispatch', async t => {
+  const server = await knowledgeServer(t);
+  const runtime = entry(t);
+  await runtime.request('start', { protocol: 1, generation: 1, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  await runtime.request('list');
+  for (const deadline of [undefined, NaN, Infinity, '600'])
+    await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', deadline,
+      arguments: { uris: ['viking://resources/loginom-dock/help'] } }), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
+  assert.equal(server.calls.length, 0);
 });
