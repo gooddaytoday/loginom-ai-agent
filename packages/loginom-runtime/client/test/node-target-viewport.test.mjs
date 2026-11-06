@@ -122,7 +122,8 @@ for(const fault of ['position','label','lock','root','document','links','ports',
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
 });
 
-for(const placement of ['offscreen source','distant target','minimum zoom','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
+for(const placement of ['offscreen source','distant target','minimum zoom','LAB-932 recorded','LAB-934 recorded','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
+ const recorded=placement.startsWith('LAB-');
  const masked=placement.includes('mask');
  const page=new Page(),cache=new Map(),elements=page.elements.bind(page);page.clock=Date.now();
  page.app.Version='7.4.2';
@@ -130,7 +131,7 @@ for(const placement of ['offscreen source','distant target','minimum zoom','tran
  page.addNode('Export',placement==='offscreen source'||masked?560:2400,placement==='offscreen source'||masked?208:1800,['Input_Data-0']);
  // Start at the source after its reveal: the distant target is offscreen.
  const minimum=.3855432894295314;
- if(placement==='minimum zoom'){
+ if(placement==='minimum zoom'||recorded){
   // LAB-929: target rename is visible at minimum zoom with scroll (18,42).
   // Revealing the clipped source alone then scrolls the target out of view.
   page.viewScale=minimum;let left=18,top=42;
@@ -142,6 +143,12 @@ for(const placement of ['offscreen source','distant target','minimum zoom','tran
  page.elements=()=>{const all=elements().map(element=>{
   const old=cache.get(element.tid);if(old){Object.assign(old,element);return old;}cache.set(element.tid,element);return element;
  }).map(element=>{
+ // LAB-932 main:2818 drag centers; rename receipt records canvas and
+ // minimum scale/scroll. LAB-934 r1:2583-2585 has the same endpoint layout.
+ if(recorded){
+  if(element.symbol==='workflow.graph')element.box={x:324,y:100,width:950,height:694};
+  if(element.kind==='port')element.box={x:element.port.startsWith('Output')?383:1225,y:element.port.startsWith('Output')?100:758,width:6,height:7};
+ }
  element.classList={contains:name=>element.classes?.includes(name)===true};
  element.contains=child=>child===element||element.children?.some(e=>e===child||e.contains?.(child))===true;
  element.closest=selector=>element.classList.contains(selector.slice(1))?element:element.parentElement?.closest(selector)??null;
@@ -225,6 +232,7 @@ for(const placement of ['offscreen source','distant target','minimum zoom','tran
  const result=await adapter.mutate(effect,Date.now()+15000);
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.cleanup_complete,true);
  if(placement==='offscreen source')assert.equal(zooms,1);
+ if(recorded){assert.equal(zooms,0);assert.equal(page.graph.scrollLeft,18);assert.equal(page.graph.scrollTop,42);}
  if(masked)assert.equal(waits,1);
  assert.equal(page.drops,1);assert.equal(page.down,false);
  const after=await adapter.observe(request,Date.now()+15000);
