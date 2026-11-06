@@ -42,6 +42,51 @@ async function fixture(primaryOptions: Parameters<typeof knowledgeServer>[1] = {
   } }
 }
 
+test("one HostPort read shares its refresh allowance across catalog recovery and the read", async () => {
+  let boot = true
+  let refreshes = 0
+  let reads = 0
+  const f = await fixture({ async request(body, _request, response) {
+    if (boot) { response.writeHead(503); response.end(); return true }
+    if (!body || typeof body !== "object" || !("method" in body)) return false
+    if ((body.method === "initialize" && !refreshes) || (body.method === "tools/call" && ++reads === 1)) {
+      response.writeHead(401); response.end(); return true
+    }
+    return false
+  } }, { async request(_body, _request, response) {
+    response.writeHead(503); response.end(); return true
+  } }, (request) => {
+    if (request.method !== "GET" || new URL(request.url).pathname !== "/api/agent/dock-credentials")
+      return new Response(null, { status: 404 })
+    refreshes++
+    return Response.json({ dock: { primary: { apiKey: "p-secret" }, reserve: { apiKey: `rotated-reserve-${refreshes}` } } })
+  })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort({ postMessage: value => replies.emit("message", { data: value }), on: requests.on.bind(requests), start() {} }, f.host)
+  const client = transport({ postMessage: value => requests.emit("message", { data: value }), on: replies.on.bind(replies), start() {} })
+  try {
+    await f.host.settled()
+    await expect(f.host.catalog(1)).rejects.toThrow()
+    expect((await f.host.api.status()).help.state).toBe("recoverable-error")
+    boot = false
+    await client.request("acquire", { run: "first", session: "first" })
+    await expect(client.request("call", { run: "first", name: "read", userMessage: "first",
+      args: { uris: ["viking://resources/loginom-dock/help"] } })).rejects.toThrow("LOGINOM_KNOWLEDGE_FAILED")
+    expect(refreshes).toBe(1)
+    expect(reads).toBe(1)
+    expect((await f.host.api.status()).cloud.connected).toBe(true)
+    await client.request("release", { run: "first" })
+    // A new operation has its own allowance, even on the same Host/generation.
+    reads = 0
+    await client.request("acquire", { run: "second", session: "second" })
+    expect(await client.request("call", { run: "second", name: "read", userMessage: "second",
+      args: { uris: ["viking://resources/loginom-dock/help"] } })).toMatchObject({ content: expect.any(Array) })
+    expect(refreshes).toBe(2)
+    expect(reads).toBe(2)
+  } finally { client.close(); await port.close(); await f.close() }
+}, 240000)
+
 test("reserve recovers primary initialize HTTP 503 with its distinct key", async () => {
   const f = await fixture({ async request(body, _request, response) {
     if ((!body || typeof body !== "object" || !("method" in body) || body.method !== "initialize")) return false

@@ -59,13 +59,15 @@ try {
   const connect = form.getByRole("button", { name: /^(Connect|Подключиться)$/ })
   await connect.click()
   await expect(form.getByText(/TASK13-CODE/)).toBeVisible({ timeout: 30000 })
-  await form.getByRole("button", { name: input.cloud.endpoints.site + "/device", exact: true }).click()
-  assert.deepEqual(await application.evaluate(() => globalThis.openedFixtureLinks), [input.cloud.endpoints.site + "/device"])
+  const verificationUrl = (await page.evaluate(() => window.api.loginom.read())).cloud.pending.verificationUrl
+  await expect.poll(() => application.evaluate(() => globalThis.openedFixtureLinks)).toEqual([verificationUrl])
+  await expect(form.getByRole("button", { name: verificationUrl, exact: true })).toBeVisible()
   await form.getByRole("button", { name: /^(Cancel sign-in|Отменить вход)$/ }).click()
   await expect(connect).toBeVisible()
   assert.equal((await page.evaluate(() => window.api.loginom.read())).cloud.pending, undefined)
   await connect.click()
   await expect(form.getByText(/TASK13-CODE/)).toBeVisible()
+  await expect.poll(() => application.evaluate(() => globalThis.openedFixtureLinks)).toEqual([verificationUrl, verificationUrl])
   await fetch(input.cloud.control + "/approve")
   await expect.poll(async () => (await page.evaluate(() => window.api.loginom.status())).state, { timeout: 30000 }).toBe("ready")
   const connected = await page.evaluate(() => window.api.loginom.read())
@@ -89,7 +91,7 @@ try {
   const summary = { status: "PASS", version: await application.evaluate(({ app }) => app.getVersion()),
     localFixtures: true, realPreloadIpcHost: true, saveBeforeLogin: true, sameGenerationReady: true,
     cancelAndDisconnect: true, firstRequestViaLoginShellProxy: true, siteAndHelpDirect: 0,
-    osBrowserOpens: 0, browserVerification: "unknown", generation: saved.generation }
+    automaticOpenRequests: 2, manualLinkClicks: 0, osBrowserOpens: 0, browserVerification: "unknown", generation: saved.generation }
   await writeFile(join(evidence, "summary.json"), JSON.stringify(summary, null, 2))
   console.log(JSON.stringify({ ...summary, evidence }))
 } finally {

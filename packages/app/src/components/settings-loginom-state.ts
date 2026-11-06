@@ -261,14 +261,19 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (!disposed) setState("phase", "idle")
     }
   }
-  async function connect() {
+  async function connect(openExternal: (url: string) => void | Promise<void>) {
     if (!api || busy() || state.cloudBusy || state.view?.cloud.connected || state.view?.cloud.pending) return
     const version = ++management
     loginStarting = true
     setState("cloudBusy", true)
     try {
       const current = await api.cloudStart()
-      if (!disposed && version === management) updateView(current)
+      if (disposed || version !== management) return
+      updateView(current)
+      const pending = current.cloud.pending
+      if (pending) void Promise.resolve().then(() => {
+        if (!disposed && version === management) return openExternal(pending.verificationUrl)
+      }).catch(() => {})
     } catch (value) {
       if (version === management) error(value)
     } finally {

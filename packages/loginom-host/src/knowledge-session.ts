@@ -174,8 +174,8 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
   }
   async function recover<T>(budget: CallBudget, operation: (route: { server: "primary" | "reserve" }) => Promise<T>, failed?: () => typeof child): Promise<T> {
     const route = { server: options.selected() }
-    let refreshed = false
-    let switched = false
+    // Lease/catalog recovery and the read consume the same original operation allowance.
+    const recovery = budget.recovery ?? { refreshed: false, switched: false }
     for (;;) {
       budget.signal.throwIfAborted()
       if (closed || options.signal.aborted) throw Error("LOGINOM_HOST_CLOSED")
@@ -189,8 +189,8 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
           if (failedChild && child === failedChild) await withinBudget(invalidate(), budget)
         }
         const kind = knowledgeFailure(error)?.kind
-        if (kind === "unauthorized" && !refreshed && error instanceof Error) {
-          refreshed = true
+        if (kind === "unauthorized" && !recovery.refreshed && error instanceof Error) {
+          recovery.refreshed = true
           const source = failedChild ?? error
           const refresh = refreshes.get(source) ?? options.cloud.refresh({ deadline: budget.deadline, signal: options.signal })
           refreshes.set(source, refresh)
@@ -204,8 +204,8 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
           await retire()
           continue
         }
-        if (kind === "unavailable" && route.server === "primary" && !switched) {
-          switched = true
+        if (kind === "unavailable" && route.server === "primary" && !recovery.switched) {
+          recovery.switched = true
           await retire()
           route.server = "reserve"
           continue

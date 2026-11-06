@@ -148,7 +148,7 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                           <Show
                             when={form.state.view?.cloud.pending}
                             fallback={
-                              <Button type="button" disabled={form.state.cloudBusy} onClick={() => void form.connect()}>
+                              <Button type="button" disabled={form.state.cloudBusy} onClick={() => void form.connect(platform.openExternal)}>
                                 {language.t("loginom.ai.connect")}
                               </Button>
                             }

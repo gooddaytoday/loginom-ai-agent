@@ -5,9 +5,21 @@ import { knowledgeServer } from "../../../loginom-runtime/client/test/support/kn
 // Shared loopback-only website/Dock fixture for the compiled Node, Desktop and CLI gates.
 async function cloudFixture() {
   const cleanup: (() => void | Promise<void>)[] = []
-  const primary = await knowledgeServer({ after: (close) => cleanup.push(close) }, { apiKey: "TASK13-PRIMARY-CANARY" })
-  const reserve = await knowledgeServer({ after: (close) => cleanup.push(close) }, { apiKey: "TASK13-RESERVE-CANARY" })
-  const state = { approved: false, starts: 0, tokens: 0, exchanges: 0, revokes: 0 }
+  const state = { approved: false, starts: 0, tokens: 0, exchanges: 0, revokes: 0,
+    recovery: "off", refreshes: 0, recoveryReads: 0 }
+  const primary = await knowledgeServer({ after: (close) => cleanup.push(close) }, { apiKey: "TASK13-PRIMARY-CANARY", async request(body, _request, response) {
+    if (state.recovery === "off") return false
+    if (state.recovery === "boot") { response.writeHead(503); response.end(); return true }
+    if (!body || typeof body !== "object" || !("method" in body)) return false
+    if ((body.method === "initialize" && !state.refreshes) || (body.method === "tools/call" && ++state.recoveryReads === 1)) {
+      response.writeHead(401); response.end(); return true
+    }
+    return false
+  } })
+  const reserve = await knowledgeServer({ after: (close) => cleanup.push(close) }, { apiKey: "TASK13-RESERVE-CANARY", async request(_body, _request, response) {
+    if (state.recovery === "off") return false
+    response.writeHead(503); response.end(); return true
+  } })
   const route = await environmentProxy((req, res) => {
     if (req.url?.startsWith("/primary/") || req.url?.startsWith("/reserve/")) {
       const endpoint = new URL(req.url.startsWith("/primary/") ? primary.endpoint : reserve.endpoint)
@@ -39,6 +51,12 @@ async function cloudFixture() {
         dock: { primary: { apiKey: "TASK13-PRIMARY-CANARY" }, reserve: { apiKey: "TASK13-RESERVE-CANARY" } } }))
       return
     }
+    if (req.url === "/api/agent/dock-credentials" && req.method === "GET") {
+      state.refreshes++
+      res.end(JSON.stringify({ dock: { primary: { apiKey: "TASK13-PRIMARY-CANARY" },
+        reserve: { apiKey: `TASK13-RESERVE-CANARY-${state.refreshes}` } } }))
+      return
+    }
     if (req.url === "/api/agent/connections/current" && req.method === "DELETE") {
       state.revokes++; res.writeHead(204); res.end(); return
     }
@@ -49,6 +67,9 @@ async function cloudFixture() {
   const control = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(req) {
     const path = new URL(req.url).pathname
     if (path === "/approve") state.approved = true
+    if (path === "/recovery/boot") { state.recovery = "boot"; state.refreshes = 0; state.recoveryReads = 0 }
+    if (path === "/recovery/read") state.recovery = "read"
+    if (path === "/recovery/off") state.recovery = "off"
     return Response.json({ ...state, direct: route.directTargetRequests, proxied: route.proxyRequests.length,
       requests: [...route.targetRequests], tunnels: [...route.tunnels], primaryCalls: primary.calls.length, reserveCalls: reserve.calls.length })
   } })

@@ -5,7 +5,11 @@ import { hostError } from "./errors"
 import { cloudStore, type CloudCredentials } from "./connection/cloud-store"
 
 export type CloudEndpoints = { site: string; primary: string; reserve: string }
-export type CallBudget = { deadline: number; signal: AbortSignal }
+export type CallBudget = {
+  deadline: number
+  signal: AbortSignal
+  recovery?: { refreshed: boolean; switched: boolean }
+}
 export type CloudAuth = {
   status(): Loginom.CloudStatus
   credentials(): CloudCredentials | undefined

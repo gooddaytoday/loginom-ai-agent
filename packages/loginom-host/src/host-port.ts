@@ -399,7 +399,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         ? new AbortController() : undefined
       if (knowledge) run.knowledge.set(data.id, knowledge)
       const knowledgeTimer = knowledge ? setTimeout(() => knowledge.abort(Error("LOGINOM_RUNTIME_TIMEOUT")), Math.max(0, started + 120_000 - Date.now())) : undefined
-      const knowledgeBudget = { deadline: started + 120_000, signal: knowledge?.signal ?? new AbortController().signal }
+      const knowledgeBudget = { deadline: started + 120_000, signal: knowledge?.signal ?? new AbortController().signal,
+        recovery: { refreshed: false, switched: false } }
       if (browserCall || referenceCall) run.browserDispatching = true
       run.calls++
       try {

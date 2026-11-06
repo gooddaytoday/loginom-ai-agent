@@ -676,6 +676,20 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE || !process.env.LOG
         tree: { uri: "viking://resources/loginom-dock" } }))
         results.push(await host.request("call", { run: "compiled", name, args, userMessage: "Read fixture documentation" }))
       await host.request("release", { run: "compiled" })
+      await fetch(cloud.control + "/recovery/boot")
+      await host.request("acquire", { run: "outage", session: "outage" })
+      await expect(host.request("call", { run: "outage", name: "read", userMessage: "fixture",
+        args: { uris: ["viking://resources/loginom-dock/test"] } })).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      await host.request("release", { run: "outage" })
+      expect(await host.request("connection.status", {})).toMatchObject({ help: { state: "recoverable-error" } })
+      await fetch(cloud.control + "/recovery/read")
+      await host.request("acquire", { run: "recovery", session: "recovery" })
+      await expect(host.request("call", { run: "recovery", name: "read", userMessage: "fixture",
+        args: { uris: ["viking://resources/loginom-dock/test"] } })).rejects.toThrow("LOGINOM_KNOWLEDGE_FAILED")
+      expect(await (await fetch(cloud.control)).json()).toMatchObject({ refreshes: 1, recoveryReads: 1 })
+      expect(await host.request("connection.status", {})).toMatchObject({ cloud: { connected: true } })
+      await host.request("release", { run: "recovery" })
+      await fetch(cloud.control + "/recovery/off")
       results.push(await host.request("connection.cloud-disconnect", {}))
       expect(JSON.stringify(results)).not.toContain("CANARY")
       const after = await (await fetch(cloud.control)).json()
@@ -683,7 +697,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE || !process.env.LOG
       expect(after.direct - before.direct).toBe(0)
       expect(after.primaryCalls - before.primaryCalls).toBe(7)
       expect(after.requests.slice(before.requests.length)).toContain("/primary/mcp")
-    } finally { await host.close() }
+    } finally { await fetch(cloud.control + "/recovery/off").catch(() => {}); await host.close() }
     expect(await host.exited).toEqual({ code: 0, signal: null })
     for (const bypass of [true, false]) {
       const before = await (await fetch(cloud.control)).json()
