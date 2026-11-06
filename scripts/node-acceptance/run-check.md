@@ -36,6 +36,10 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 владельца не применяется. Corrupt требует исходную ошибку checksum, сообщение
 пользователю и Save без успешного импорта; холодное выполнение отрицательного
 случая не запускается. Stock-проверки остальных сценариев сохранены.
+`lgd-export-overwrite` проверяет сохранённый default reject, явный replace того
+же файла с изменёнными данными и cold-настройки. `lgd-export-variable` проверяет
+два актуальных пути одной привязки LgdPath и сохранение bindings после reopen.
+Оба используют штатные LGD reverse-import/CSV oracle, Save и cleanup.
 
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,

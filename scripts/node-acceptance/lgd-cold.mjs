@@ -45,6 +45,7 @@ export async function inspectSavedLgd({load,graph,channelFor,execute,expected,ou
   const {observeExportDestinations}=await import('./static-source-proof.mjs');
   const ds=await observeExportDestinations({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='exports.lgd')},channelFor,execute});
   if(ds.length!==1||ds[0].destination!==expected.lgd.destination||ds[0].lgd_settings?.compression!==2||ds[0].lgd_settings?.checksum!==1)throw Error('LGD_COLD_EXPORT_SETTINGS');
+  if(expected.lgd.binding&&ds[0].lgd_binding!==expected.lgd.binding)throw Error('LGD_COLD_DESTINATION_BINDING');
  }
  return true;
 }

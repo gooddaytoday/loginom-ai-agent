@@ -124,13 +124,13 @@ test('LGD bound path reads the independently mapped string without dereferencing
   add(tid+';SwitchButton',{pressed:key==='destination'});add(tid+';ValueControl',{getValue:()=>value});
  }
  add(base+'ExportNativeParamsWizard;edtConnection',{getValue:()=>'Локальное'});
- add(base+'ExportNativeParamsWizard;edtFileName;VariableControl',{getValue:()=>proxy,getStore:()=>({getData:()=>({items:[{data:{field1:proxy,field2:'LgdPath'}}]})})});
+ add(base+'ExportNativeParamsWizard;edtFileName;VariableControl',{getValue:()=>proxy,getStore:()=>({getData:()=>({items:[{data:{field1:proxy,field2:'LgdPath ( /test-2/current.lgd )'}}]})})});
  globalThis.document={querySelectorAll:selector=>{const tid=JSON.parse(selector.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};
  globalThis.Ext={getCmp:id=>components.get(id)};
  const variableMapping={kind:'variables',direction:'input',port:0,fields:[{name:'LgdPath',type:5,value:'/test-2/current.lgd',is_null:false,source:{name:'SourcePath'}}]};
  try{
   const result=readLgdExportBrowser({prefix,fields:LGD_EXPORT_FIELDS,variableMapping});
-  assert.equal(result.verified,true);assert.deepEqual(result.values.destination,{value:'/test-2/current.lgd',display:'LgdPath',tid:base+'ExportNativeParamsWizard;edtFileName;VariableControl',variable:true,variable_name:'LgdPath'});
+  assert.equal(result.verified,true);assert.deepEqual(result.values.destination,{value:'/test-2/current.lgd',display:'LgdPath ( /test-2/current.lgd )',tid:base+'ExportNativeParamsWizard;edtFileName;VariableControl',variable:true,variable_name:'LgdPath'});
   for(const change of [null,{...variableMapping,fields:[]},{...variableMapping,fields:[{...variableMapping.fields[0],is_null:true}]},{...variableMapping,fields:[{...variableMapping.fields[0],type:1}]},{...variableMapping,fields:variableMapping.fields.concat(variableMapping.fields)}])
    assert.equal(readLgdExportBrowser({prefix,fields:LGD_EXPORT_FIELDS,variableMapping:change}).reason,'lgd_export_destination_variable');
  }finally{globalThis.document=oldDocument;globalThis.Ext=oldExt;}
