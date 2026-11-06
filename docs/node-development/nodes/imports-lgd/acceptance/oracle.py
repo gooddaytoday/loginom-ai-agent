@@ -116,6 +116,9 @@ def fixtures():
 
 def compression_expectations():
     spec = table(ROOT, "properties-values.csv", "properties-schema.json")
+    for column in spec["columns"]:
+        if column["type"] != "real":
+            column.pop("tolerance", None)
     rows = [dict(zip([c["name"] for c in spec["columns"]], row)) for row in spec["rows"]]
     cases = [("Без сжатия", "Без сжатия", "Нет", "compression-none.lgd"),
              ("LZO", "LZO", "Нет", "compression-lzo.lgd"),

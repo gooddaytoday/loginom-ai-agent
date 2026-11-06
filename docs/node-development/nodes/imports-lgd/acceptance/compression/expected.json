@@ -51,10 +51,7 @@
             "name": "Occurred",
             "label": "Occurred",
             "type": "datetime",
-            "data_kind": "discrete",
-            "tolerance": {
-              "abs_ms": 1
-            }
+            "data_kind": "discrete"
           }
         ]
       },
@@ -92,10 +89,7 @@
             "name": "Occurred",
             "label": "Occurred",
             "type": "datetime",
-            "data_kind": "discrete",
-            "tolerance": {
-              "abs_ms": 1
-            }
+            "data_kind": "discrete"
           }
         ]
       },
@@ -133,10 +127,7 @@
             "name": "Occurred",
             "label": "Occurred",
             "type": "datetime",
-            "data_kind": "discrete",
-            "tolerance": {
-              "abs_ms": 1
-            }
+            "data_kind": "discrete"
           }
         ]
       }
@@ -176,10 +167,7 @@
           "name": "Occurred",
           "label": "Occurred",
           "type": "datetime",
-          "data_kind": "discrete",
-          "tolerance": {
-            "abs_ms": 1
-          }
+          "data_kind": "discrete"
         }
       ],
       "rows": [
@@ -248,10 +236,7 @@
           "name": "Occurred",
           "label": "Occurred",
           "type": "datetime",
-          "data_kind": "discrete",
-          "tolerance": {
-            "abs_ms": 1
-          }
+          "data_kind": "discrete"
         }
       ],
       "rows": [
@@ -320,10 +305,7 @@
           "name": "Occurred",
           "label": "Occurred",
           "type": "datetime",
-          "data_kind": "discrete",
-          "tolerance": {
-            "abs_ms": 1
-          }
+          "data_kind": "discrete"
         }
       ],
       "rows": [
