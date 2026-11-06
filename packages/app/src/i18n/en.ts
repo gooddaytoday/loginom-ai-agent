@@ -3,6 +3,9 @@ import { DESKTOP_NATIVE_ENGLISH, DESKTOP_UPDATER_ENGLISH } from "./desktop-nativ
 // English is the designer-written source. Missing locales reuse these strings
 // byte-for-byte as the established fallback; do not invent translations.
 export const LOGINOM_ENGLISH = {
+  "loginom.configure": "Set up",
+  "loginom.connectionRequired":
+    "Connection is not configured. Open Loginom, enter the URL, username and password, then retry your request.",
   ...DESKTOP_UPDATER_ENGLISH,
   "session.file.unavailable": "File not found",
   "settings.updates.channel": "Updates",

@@ -3,6 +3,20 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
+  const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
+  expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
+  expect(browser).toContain("LOGINOM_CONFIG_REQUIRED")
+  expect(browser).toContain("state=unconfigured")
+  expect(browser).toContain("открыть «Loginom»")
+  expect(browser).toContain("адрес, логин и пароль")
+  expect(browser).toContain("повторить запрос")
+  expect(browser).toContain("Не ищи причину в файлах")
+  expect(browser).toContain("bash/PowerShell")
+  expect(browser).toContain("чужие конфигурации и ключи")
+  expect(browser).toContain("Не проси присылать пароль или API-ключ в чат")
+})
+
 test("sampling selects native modes through node-specific guidance", async () => {
   for (const type of ["preprocessing.sampling", "preprocessing.data_partition"]) {
     const settings = await Bun.file(new URL(`../skills/loginom-automation/references/nodes/${type}.md`, import.meta.url)).text()
