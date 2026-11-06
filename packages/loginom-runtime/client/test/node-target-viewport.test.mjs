@@ -122,7 +122,7 @@ for(const fault of ['position','label','lock','root','document','links','ports',
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
 });
 
-for(const placement of ['offscreen source','distant target','minimum zoom','LAB-932 recorded','LAB-934 recorded','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
+for(const placement of ['offscreen source','distant target','minimum zoom','LAB-932 recorded','LAB-934 recorded','LAB-938 outside duplicate','transient mask','persistent mask','changed after mask','recurring mask','deadline after mask'])test('pinned connect reveals both ends: '+placement,async()=>{
  const recorded=placement.startsWith('LAB-');
  const masked=placement.includes('mask');
  const page=new Page(),cache=new Map(),elements=page.elements.bind(page);page.clock=Date.now();
@@ -178,7 +178,7 @@ for(const placement of ['offscreen source','distant target','minimum zoom','LAB-
  const request={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:page.prefix,tab_tid:page.tabTid,navigation_path:[]}};
  let mask=false,waits=0;
  const blocker={visible:true,getBoundingClientRect:()=>({width:100,height:100})};
- const document={querySelectorAll:selector=>selector==='[role="dialog"],.bg-mask-message,.x-mask-msg'&&mask?[blocker]:selector.startsWith('[data-tid')?page.match(selector):[],elementFromPoint:(x,y)=>{
+ const document={querySelectorAll:selector=>{const matches=selector==='[role="dialog"],.bg-mask-message,.x-mask-msg'&&mask?[blocker]:selector.startsWith('[data-tid')?page.match(selector):[];return placement==='LAB-938 outside duplicate'&&selector.includes('Sort;Output_Data-0')?[...matches,{...matches[0]}]:matches;},elementFromPoint:(x,y)=>{
   if(x<0||x>=1280||y<0||y>=800)return null;
   return page.elements().filter(e=>e.kind==='port').find(e=>page.contains(e.box,{x,y}))??root;
  }};

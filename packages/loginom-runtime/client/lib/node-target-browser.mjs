@@ -518,8 +518,9 @@ async function linkPortGeometry(page,task) {
     const roots=exact(request.workflow_ref.prefix+';ModelForm;cmpDiagram');
     const rect=e=>{const b=e.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};};
     const ports=[source_tid,target_tid].map(tid=>{
-      const matches=exact(tid),e=matches[0];
-      if(roots.length!==1||matches.length!==1||!roots[0].contains(e))return null;
+      // Match the primitive's owned-container selector, excluding outline copies.
+      const matches=exact(tid).filter(e=>roots.length===1&&roots[0].contains(e)),e=matches[0];
+      if(matches.length!==1)return null;
       const b=rect(e),x=b.x+b.width/2,y=b.y+b.height/2;
       const style=getComputedStyle(e),hit=document.elementFromPoint(x,y);
       return {rect:b,visible:b.width>0&&b.height>0&&style.visibility!=='hidden'&&style.display!=='none'
