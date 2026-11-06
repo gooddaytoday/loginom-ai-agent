@@ -540,9 +540,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
           throw Error('Original wizard receipt context changed');
       };
-      let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingErrorToast, sampleStarted = observationNow();
+      let result, lastGeometry, observedAt, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, settlingDefinition, settlingErrorToast, sampleStarted = observationNow();
       try {
-      for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || settlingDefinition || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Pending reads already spend time polling. Keep a 200 ms start-to-start
@@ -862,6 +862,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
         const ws=result.output,w=ws.wizard,n=ws.prepared_node_context;
+        // An owned input wizard can expose its controls before its addressed
+        // definition is ready, without a loading mask. Rediscover read-only
+        // under the original node deadline, retaining the exact page and owner.
+        if(settlingDefinition || outputColumnPage && preparedNodeContext && n?.verified===true
+          &&n.surface==='wizard'&&w?.status==='observed'&&w.stage==='input_mapping'&&n.tid===w.root_tid
+          &&w.output_columns?.page?.status==='unverified_definition_page'&&!ws.ui.dialogs.length&&!ws.ui.masks.length) {
+          const expected=settlingDefinition??{root_ref:w.root_ref,root_tid:w.root_tid,stage:w.stage,node:structuredClone(n)};
+          const page=w?.output_columns?.page;
+          if(w?.status!=='observed'||w.root_ref!==expected.root_ref||w.root_tid!==expected.root_tid||w.stage!==expected.stage
+            ||n?.verified!==true||n.surface!=='wizard'||n.tid!==expected.node.tid
+            ||!['document_id','workflow_id','node_id','input_port','output_port'].every(k=>JSON.stringify(n[k])===JSON.stringify(expected.node[k]))
+            ||ws.ui.dialogs.length||page?.offset!==outputColumnPage.offset||page.limit!==outputColumnPage.limit
+            ||!['unverified_definition_page','complete_definition_page','rendered_definition_window'].includes(page.status))
+            throw Error('Input definition loading context changed');
+          settlingDefinition=expected;
+          deadline=operation.deadline;
+        }
         const ownWizardMask=preparedNodeContext&&n?.verified===true&&n.surface==='wizard'&&w?.status==='observed'
           &&n.tid===w.root_tid&&ws.ui.dialogs.length===0&&ws.ui.masks.length>0
           &&ws.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref&&(m.ref===w.root_ref&&m.target_tid===w.root_tid

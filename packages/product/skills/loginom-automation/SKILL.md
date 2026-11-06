@@ -161,6 +161,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
 | Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
 | Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
+|id/parent_id|`programming.javascript`|[рецепт](references/nodes/parent-child-recipe.md)|
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 |Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
 |Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
