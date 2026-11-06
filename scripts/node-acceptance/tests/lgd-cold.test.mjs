@@ -7,6 +7,10 @@ test('LGD compression fixture uses the stock cold expected contract',async()=>{
  const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/compression/expected.json',import.meta.url),'utf8'));
  assert.equal(parseExpectedOutputs({...expected,package_path:'/own/compression.lgp'}).outputs.length,3);
 });
+test('LGD checksum fixture uses the stock cold expected contract',async()=>{
+ const expected=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/imports-lgd/acceptance/checksum/expected.json',import.meta.url),'utf8'));
+ assert.equal(parseExpectedOutputs({...expected,package_path:'/own/checksum.lgp'}).outputs.length,3);
+});
 test('LGD cold audits retained source before execution and materialized output properties after full reading',async()=>{
  const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('  let coldChannelSequence=0;'),source.indexOf('  const matched=correspondence.map'));

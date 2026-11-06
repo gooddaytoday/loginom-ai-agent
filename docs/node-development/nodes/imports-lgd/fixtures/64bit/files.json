@@ -31,6 +31,27 @@
       "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
       "compression": "LZ4",
       "written_checksum": "Сжатых данных"
+    },
+    {
+      "name": "checksum-none.lgd",
+      "bytes": 355,
+      "sha256": "810c46b3f770a0bf1d50aeb13867440015aa12d86843e09848c21c4783129763",
+      "compression": "LZ4",
+      "written_checksum": "Нет"
+    },
+    {
+      "name": "checksum-compressed.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
+      "compression": "LZ4",
+      "written_checksum": "Сжатых данных"
+    },
+    {
+      "name": "checksum-both.lgd",
+      "bytes": 363,
+      "sha256": "bbe4fd238ad62856a96a30bc077c4fc6cfac270f28a7e24891113d7be4c5c8d4",
+      "compression": "LZ4",
+      "written_checksum": "Сжатых и несжатых данных"
     }
   ]
 }

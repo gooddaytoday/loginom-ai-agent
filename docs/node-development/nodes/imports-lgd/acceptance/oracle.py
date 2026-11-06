@@ -134,6 +134,26 @@ def compression_expectations():
                          "columns": spec["columns"], "rows": rows} for label, _, _, _ in cases]}
 
 
+def checksum_expectations():
+    spec = table(ROOT, "properties-values.csv", "properties-schema.json")
+    for column in spec["columns"]:
+        if column["type"] != "real":
+            column.pop("tolerance", None)
+    rows = [dict(zip([c["name"] for c in spec["columns"]], row)) for row in spec["rows"]]
+    cases = [("Нет суммы", "Нет", True, "checksum-none.lgd"),
+             ("Сжатая сумма", "Сжатых данных", True, "checksum-compressed.lgd"),
+             ("Обе суммы", "Сжатых и несжатых данных", False, "checksum-both.lgd")]
+    return {"package_path": "{{PACKAGE_PATH}}",
+            "nodes": [{"type": "imports.lgd", "label": label} for label, _, _, _ in cases],
+            "lgd": {"kind": "checksum", "checksum_switch_filename": "checksum-both.lgd", "imports": [
+                {"label": label, "compression": "LZ4", "bitness": "64-битная система", "written_checksum": written,
+                 "checksum": verify, "filename": filename, "columns": spec["columns"]}
+                for label, written, verify, filename in cases]},
+            "outputs": [{"output_node_type": "imports.lgd", "output_node_label": label,
+                         "output_port": 0, "ordered": True, "column_order": "exact", "columns": spec["columns"], "rows": rows}
+                        for label, _, _, _ in cases]}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
@@ -145,7 +165,8 @@ if __name__ == "__main__":
     imported, exported = expectations()
     for path, value in [(ROOT / "acceptance/expected.json", imported),
                         (EXPORT / "acceptance/expected.json", exported),
-                        (ROOT / "acceptance/compression/expected.json", compression_expectations())]:
+                        (ROOT / "acceptance/compression/expected.json", compression_expectations()),
+                        (ROOT / "acceptance/checksum/expected.json", checksum_expectations())]:
         if args.write:
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
         if args.check:
