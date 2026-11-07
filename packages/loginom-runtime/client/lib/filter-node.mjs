@@ -1,3 +1,4 @@
+import {isUnchangedTransformExecution} from './node-read-contract.mjs';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {resolveFilterBindings,filterBindingSchema,preserveFilterBindings,configureSavedFilterBindings} from './filter-bindings.mjs';
 import {readFilterBindings,filterBindingVariables} from './variable-binding-readback.mjs';
@@ -34,7 +35,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
  preflight:preflightFilterSource,
  beforeInput:prepareFilterInput,
  async afterDone(channel,request,configured,{readGraph,options,ctx}){
-  if(!Object.hasOwn(request,'bindings'))return;
+  if(!request.bindings?.length)return;
   const graph=await readGraph(),links=(graph.variable_links??[]).filter(l=>l.target===ctx.node.node_id&&l.kind==='control'&&l.input===0);
   const source=links.length===1?graph.nodes.find(n=>n.ref.node_id===links[0].source):null;
   const sourceProof=source?.type==='variables.user'?await preflightBuiltinBindings(options,ctx,config,source.ref):undefined;
@@ -47,7 +48,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
    return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_filter,draft_edits_skipped:true};
   }
   let changed,controlVariables;
-  if(Object.hasOwn(request,'bindings')){
+  if(request.bindings?.length){
    const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
    preserveFilterBindings(s.node_filter,p,request.bindings);
    if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
@@ -66,15 +67,15 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
 
 export async function preflightFilterSource(options,ctx,config){
  const request=options.operation.parameters;
- if(request.finish!=='close'&&(request.target.kind==='existing'||request.variable_inputs?.some(i=>i.kind==='control'))){
+ if(!isUnchangedTransformExecution(request)&&request.finish!=='close'&&(request.target.kind==='existing'||request.variable_inputs?.some(i=>i.kind==='control'))){
   const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
   need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'Complete filter control source graph required');
   const sources=request.target.kind==='new'||request.bindings?.length&&request.variable_inputs?.some(i=>i.kind==='control')?request.variable_inputs.filter(i=>i.kind==='control').map(i=>i.source.node_id)
-   :(Object.hasOwn(request,'bindings')?graph.variable_links??[]:graph.links).filter(l=>l.kind==='control'&&l.target===request.target.ref.node_id).map(l=>l.source);
+   :(graph.variable_links??graph.links??[]).filter(l=>l.kind==='control'&&l.target===request.target.ref.node_id).map(l=>l.source);
   if(request.bindings?.length)need(sources.length===1,'BINDING_PORT_MISMATCH: control input 0 requires one source');
   for(const id of sources){
    const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
-   if(nodes[0].type==='variables.user'&&!Object.hasOwn(request,'bindings')){
+   if(nodes[0].type==='variables.user'&&(!request.bindings?.length||request.parameters.groups?.flat().some(c=>isFilterVariable(c.value??c.values)))){
     const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values.');
     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }
