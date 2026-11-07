@@ -1,0 +1,232 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "null_marker": "?",
+  "header": true,
+  "generator": "Cartesian product {-1,1}^4; Y=3+2X1+0.5X2+0.25E",
+  "dependencies": {
+    "python": "3.14.4",
+    "external_packages": []
+  },
+  "files": {
+    "categorical.csv": {
+      "bytes": 218,
+      "rows": 18,
+      "sha256": "c6d5615cccb0299af5d9b6c9d2d1f726db319eb78936bbd0bdc9b1331cce3673"
+    },
+    "design.csv": {
+      "bytes": 359,
+      "rows": 16,
+      "sha256": "872c360d20220d498f518a00fc562570172b1411a6c279dafce282b3d2b00a9a"
+    },
+    "holdout.csv": {
+      "bytes": 58,
+      "rows": 2,
+      "sha256": "1922cef0ea32002e8bfc6dea6c4a8385c67789958719cb64d16376326b4d820d"
+    },
+    "null.csv": {
+      "bytes": 358,
+      "rows": 16,
+      "sha256": "d7d0593db7a1230eae053c0a9221d5872666cefb6e6d08072067aa569f785321"
+    },
+    "partition.csv": {
+      "bytes": 398,
+      "rows": 18,
+      "sha256": "172e9e51e1cb26685eb4fa68091e076d51fd202208aef6c29b45c87139f90d13"
+    },
+    "rank-deficient.csv": {
+      "bytes": 359,
+      "rows": 16,
+      "sha256": "418221c04f9a2066ab130d2f4a306f45136bfe933da876ccbf5629b42e496bb6"
+    },
+    "regularization.csv": {
+      "bytes": 367,
+      "rows": 16,
+      "sha256": "36d3f7cd4571438d7ec8190ffd66c118886e6fcb066bc40e2b11ff434d9efb61"
+    },
+    "selection.csv": {
+      "bytes": 359,
+      "rows": 16,
+      "sha256": "f4cb98487bd02da67709bd9c9fddf4362aaa1a37201dee1ec72965523255086b"
+    },
+    "zero.csv": {
+      "bytes": 343,
+      "rows": 16,
+      "sha256": "1b1e53213e7b753351a0c7e00208288c7b8850bd97ad3b3702e9ba117e09114c"
+    }
+  },
+  "schemas": {
+    "categorical.csv": {
+      "column_order": [
+        "RowID",
+        "X",
+        "Category",
+        "Y"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X": "integer/continuous",
+        "Category": "string/discrete",
+        "Y": "real/continuous"
+      },
+      "nullable": []
+    },
+    "design.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    },
+    "holdout.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": [
+        "Y"
+      ]
+    },
+    "null.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": [
+        "X1"
+      ]
+    },
+    "partition.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    },
+    "rank-deficient.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    },
+    "regularization.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    },
+    "selection.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    },
+    "zero.csv": {
+      "column_order": [
+        "RowID",
+        "X1",
+        "X2",
+        "X3",
+        "Y",
+        "IsTest"
+      ],
+      "types": {
+        "RowID": "integer",
+        "X1": "integer/continuous",
+        "X2": "integer/continuous",
+        "X3": "integer/continuous",
+        "Y": "real/continuous (explicit import)",
+        "IsTest": "boolean"
+      },
+      "nullable": []
+    }
+  }
+}
