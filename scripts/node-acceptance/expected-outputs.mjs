@@ -93,7 +93,8 @@ export function selectColdOutputReads(graph,outputs,{exportInput,savedNode}={}){
  // can establish both presence and uniqueness. Read failures remain failures.
  const content=outputs.some(o=>o.output_node_type==='table_content');
  const types=new Set(outputs.filter(o=>o.output_node_type!=='table_content').map(o=>o.output_node_type));
- const nodes=graph.nodes.filter(n=>types.has(n.type)&&(!savedNode||n.ref.node_id===savedNode)
+ const labelled=n=>outputs.some(o=>o.output_node_type===n.type&&(o.output_node_label===undefined||o.output_node_label===n.label));
+ const nodes=graph.nodes.filter(n=>types.has(n.type)&&labelled(n)&&(!savedNode||n.ref.node_id===savedNode)
   ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id||content&&n.outputs.length>0);
  need(nodes.length>0&&(content||nodes.length<=outputs.length),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  return nodes.map(node=>{

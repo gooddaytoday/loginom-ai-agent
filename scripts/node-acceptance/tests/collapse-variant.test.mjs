@@ -19,3 +19,11 @@ for name,task,rows in [('collapse-mixed','task-mixed.md',15),('collapse-variant'
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+import {selectColdOutputReads} from '../expected-outputs.mjs';
+test('cold selector reads only the labelled Collapse when two Collapse nodes exist',()=>{
+ const node=(id,label)=>({type:'transform.collapse_columns',label,ref:{node_id:id},outputs:[0]});
+ const graph={nodes:[node('a','Свёртка столбцов'),node('b','Повторная свёртка')]};
+ const reads=selectColdOutputReads(graph,[{output_node_type:'transform.collapse_columns',output_node_label:'Повторная свёртка',output_port:0}]);
+ assert.deepEqual(reads.map(r=>r.node.ref.node_id),['b']);
+ assert.throws(()=>selectColdOutputReads(graph,[{output_node_type:'transform.collapse_columns',output_port:0}]),/COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+});
