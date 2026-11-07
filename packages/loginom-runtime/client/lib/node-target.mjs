@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import {createRedactor} from './redact.mjs';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
@@ -86,6 +87,14 @@ function nativeRestServiceEdge(graph,edge){
     &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
 }
 
+// The journal stores a redacted copy (preserveJsonText, canonical URLs). Compare
+// its ACK with the same copy; the live state keeps the original refs and receipts.
+function journalCopy(event){
+  const cleaned=createRedactor().redact(event,{preserveJsonText:true});
+  if(cleaned?.type==='redaction_failure')throw Error('Node target evidence could not be redacted');
+  return cleaned;
+}
+
 // A completed drag can miss the requested grid point. Settle only that known
 // effect: no other graph change and no unknown browser cleanup may be released.
 async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,record}){
@@ -103,7 +112,7 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
       effects:state.receipts.map(({id,kind,verified})=>({id,kind,verified})),configured:false,executed:false,package_saved:false}};
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:settled};
   const ack=await record(event);
-  if(!same(ack?.target_state,event.target_state))throw Error('Node target journal acknowledgement differs');
+  if(!same(ack?.target_state,journalCopy(event).target_state))throw Error('Node target journal acknowledgement differs');
   Object.assign(state,settled);
   return true;
 }
@@ -125,7 +134,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   const save = async (phase, detail) => {
     const event = { operation_id: operation.id, phase, internal_provenance: 'node_target_v1', ...structuredClone(detail) };
     const ack = await record(event);
-    if (!ack || !same(ack[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'], event[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'])) throw new Error('Node target journal acknowledgement differs');
+    const expected = journalCopy(event);
+    if (!ack || !same(ack[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'], expected[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'])) throw new Error('Node target journal acknowledgement differs');
   };
   const observe = async () => {
     budget();
@@ -279,7 +289,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
           if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
             &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
-            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. For a different source or output, use a NEW exports.text target with target.kind:"new", complete export settings and a NEW operation_id; preserve the existing export and its link. To keep the same source and only reconfigure the existing export, use inputs:[].':''));
+            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. Keep this Export and its link: correct the existing upstream chain, or complete final formatting before the Export is first connected. Then reconfigure the same Export with inputs:[] and a NEW operation_id. Do not create a second Export for the same destination. If the required result cannot use the existing source, report the connection limitation.':''));
         }
         state.targetId = existing.ref.node_id;
       }
@@ -435,7 +445,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   }else if(!same(state.completed?state.final_graph:(state.last_graph??state.baseline),graph))throw new Error('Partial node target graph changed');
   if(state.completed && !same(state.final_graph,graph))throw new Error('Completed node target changed');
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};
-  const ack=await record(event);if(!same(ack?.target_state,event.target_state))throw new Error('Node target journal acknowledgement differs');
+  const ack=await record(event);if(!same(ack?.target_state,journalCopy(event).target_state))throw new Error('Node target journal acknowledgement differs');
   operation.targetPhase=state;
   if(state.move_mismatch)return structuredClone(state.result);
   return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,

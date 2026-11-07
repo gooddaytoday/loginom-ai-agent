@@ -4,13 +4,13 @@ import vm from 'node:vm';
 import {restRequestCapability} from '../lib/rest-request.mjs';
 
 function fixture(foreign=null,manual=false,duplicate=null,options={}){
- const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
+ const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;'+(options.nestedParam?'MessageBody;':'')+'ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
  const advanced=root+';AdditionalParamsWizard',values={pedTimeout:options.timeout??-1,pedFailedRequestRepeat:options.retries??0},writes=[];
  const inputs=Object.fromEntries(Object.keys(values).map(k=>[k,{id:k,value:String(values[k]),readOnly:false,disabled:false}]));
  const advancedElement={contains:e=>Object.values(inputs).includes(e)};
  const fields=Object.fromEntries(Object.keys(values).map(k=>[k,{el:{dom:inputs[k]},inputEl:{dom:inputs[k]},getXType:()=>"numberfield",getValue:()=>values[k]}]));
- const names=options.empty?[]:['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
+ const names=options.empty?[]:['RequestId','Key'],columnRows=[...names,...(options.method?['Body']:[])].map((Name,i)=>({id:Name,data:{Index:[17,0,3][i],Name,DataType:options.bodyType??5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=options.inputPage?-1:0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
  const store=rows=>({loading:false,getRange:()=>rows});
@@ -20,23 +20,27 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const owner={id:'columnheader-1032',getAttribute:()=>columnTid};
  const mask={parentElement:owner,matches:s=>s==='.x-mask',getBoundingClientRect:()=>({x:1214,y:168,width:30,height:27})};
  const loading={matches:()=>false};
- const rootElement={contains:e=>e===owner},paramElement={},card={contains:e=>e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
+ const rootElement={contains:e=>e===owner},paramElement={getAttribute:()=>base},card={contains:e=>e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
  const component={disabled:options.mask!=='enabled',getXType:()=>options.mask==='wrong-type'?'gridcolumn':'actioncolumn',el:{dom:options.mask==='foreign-dom'?{}:owner}};
  const grid={},draw={FOwner:grid,FLinks:{}};grid.FLinkDrawContainer=draw;
  const p={FView:{el:{dom:paramElement}},FColumnsStore:columns,FParamStore:parameters,FGrdParamStore:parameters,FRequestParamLinks:saved,
   FItems:{grdFields:{getStore:()=>columns},grdParams:{getStore:()=>parameters},pnlLinkGrid:grid}};
- class RESTRequestWizard{constructor(){this.FRequestConfig=p;this.FVerb=0;}}
+ const sourceColumns={Store:columns};
+ class RESTRequestWizard{constructor(){this.FColumns=sourceColumns;this.FVerb=['GET','POST','PUT','DELETE','PATCH'].indexOf(options.method??'GET');
+  this.FRequestConfig=[1,2,4].includes(this.FVerb)?{FColumns:sourceColumns,FParamLinks:p}:p;}}
  const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:stage===2?advancedElement:card}})}};
  const element={getBoundingClientRect:()=>({x:10,y:10,width:100,height:20}),contains:()=>false,closest:()=>null};
  const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(advanced)+']'?[advancedElement]:Object.keys(values).some(k=>s==='[data-tid='+JSON.stringify(advanced+';'+k+';ValueControl')+']')?[inputs[Object.keys(values).find(k=>s.includes(k))]]:s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
  const Workspace={getActiveTab:()=>({Controller:{FController:controller}})};
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
- const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},Ext:{getCmp:id=>fields[id]??component}});
+ const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app,TBGHTTPVerb:{httpGET:0,httpPOST:1,httpPUT:2,httpDELETE:3,httpPATCH:4}},Ext:{getCmp:id=>fields[id]??component}});
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
  const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
+ let body='',bodyPickerOpen=false;
  const page={evaluate,waitForTimeout:async ms=>options.tick?.(ms),locator:selector=>({
-  locator:()=>({fill:async value=>{const k=Object.keys(values).find(k=>selector.includes(k));assert.ok(k);values[k]=Number(value);inputs[k].value=value;writes.push([k,Number(value)]);},press:async()=>{}}),
+  locator:()=>({inputValue:async()=>body,fill:async value=>{const k=Object.keys(values).find(k=>selector.includes(k));assert.ok(k);values[k]=Number(value);inputs[k].value=value;writes.push([k,Number(value)]);},press:async()=>{}}),
   count:async()=>{
+   if(selector.includes(';edtMessageBodyColumn;boundlist;Body'))return bodyPickerOpen?1:0;
    if(selector.startsWith('.x-mask'))return options.stall==='loading'||stage===-1?1:0;
    if(selector.includes(';btnError'))return 0;
    if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']')?(duplicate==='column'?2:1):0;
@@ -44,20 +48,43 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
    return 1;
   },
   evaluateAll:async(fn,arg)=>vm.runInContext('('+fn.toString()+')',scope)(options.stall==='loading'?[loading]:stage===-1?(options.mask==='real-loading'?[mask,loading]:[mask]):[],arg),
-  isVisible:async()=>stage>=0,innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
+  isVisible:async()=>stage>=0&&!(options.hiddenQuery&&selector.includes(';ParamLinks')),innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
   evaluate:async fn=>{lastSelector=selector;points.push(selector);return evaluate(fn,element);},
  }),mouse:{click:async()=>{
   if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;if(options.stall!=='bindings')draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
-  }else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
+  }else if(lastSelector.includes(';edtMessageBodyColumn;trg_picker')){bodyPickerOpen=true;}
+  else if(lastSelector.includes(';boundlist;Body')){body='Body';bodyPickerOpen=false;}
+  else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
  },move:async()=>{},down:async()=>{drags++;},up:async()=>{
   const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
   assert.ok(column&&parameter,'the drag must use the owned native records');
   draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
  return {values,writes,saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
-  new_node:options.new_node===true,query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
+  new_node:options.new_node===true,...(options.method?{connection:{method:options.method},...(['POST','PUT','PATCH'].includes(options.method)?{body_field:'Body'}:{})}:{}),query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
 }
+
+for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 configures native '+method+' and reads body binding',async()=>{
+ const f=fixture(null,false,null,{method,empty:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);
+ assert.equal(r.configuration.method,method);
+ assert.equal(r.configuration.body_field,method==='DELETE'?undefined:'Body');
+});
+test('C1 recognizes the owned request page when the empty query panel is hidden',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true,hiddenQuery:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(r.configuration.body_field,'Body');
+});
+test('C1 uses the owned nested MessageBody query data-tid for manual bindings',async()=>{
+ const f=fixture(null,true,null,{method:'POST',nestedParam:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(f.drags(),2);
+ assert.deepEqual(r.configuration.query_parameters,[{name:'requestid',field:'RequestId'},{name:'key',field:'Key'}]);
+});
+test('C1 rejects a non-string body column before a body gesture',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true,bodyType:1}),r=await f.run();
+ assert.equal(r.verified,false);assert.equal(r.effect_possible,false);
+ assert.match(r.error,/string input field/);
+});
 
 test('plain GET commits an empty parameter inventory without AutoLink or a data table',async()=>{
  const f=fixture(null,false,null,{empty:true}),result=await f.run();

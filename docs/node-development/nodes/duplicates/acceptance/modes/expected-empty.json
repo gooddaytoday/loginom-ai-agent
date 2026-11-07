@@ -1,0 +1,80 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.duplicates"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.duplicates",
+      "output_node_label": "Типизированные ключи",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Duplicate",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "DuplicateGroup",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Contradiction",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "ContradictionGroup",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "D",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

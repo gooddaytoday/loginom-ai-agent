@@ -1,0 +1,99 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.smoothing"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.smoothing",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0,
+          "Tag": "a",
+          "X_S": 1.0
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "Tag": "b",
+          "X_S": 1.0
+        },
+        {
+          "RowID": 3,
+          "X": 2,
+          "Tag": "c",
+          "X_S": 4.0
+        },
+        {
+          "RowID": 4,
+          "X": 6,
+          "Tag": "d",
+          "X_S": 4.0
+        },
+        {
+          "RowID": 5,
+          "X": 8,
+          "Tag": "e",
+          "X_S": 9.0
+        },
+        {
+          "RowID": 6,
+          "X": 10,
+          "Tag": "f",
+          "X_S": 9.0
+        },
+        {
+          "RowID": 7,
+          "X": null,
+          "Tag": "g",
+          "X_S": 13.0
+        },
+        {
+          "RowID": 8,
+          "X": 14,
+          "Tag": "h",
+          "X_S": 13.0
+        }
+      ]
+    }
+  ]
+}

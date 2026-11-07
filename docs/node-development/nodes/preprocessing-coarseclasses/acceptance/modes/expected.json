@@ -1,0 +1,376 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.coarse_classes"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.coarse_classes",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_ClassNum",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_ClassMark",
+          "type": "string",
+          "label_any": true,
+          "category_labels_any": true
+        },
+        {
+          "name": "X_ClassSignificant",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0,
+          "Target": "yes",
+          "X_ClassNum": 0,
+          "X_ClassMark": "Low",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "Target": "yes",
+          "X_ClassNum": 0,
+          "X_ClassMark": "Low",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 3,
+          "X": 4,
+          "Target": "yes",
+          "X_ClassNum": 0,
+          "X_ClassMark": "Low",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 4,
+          "X": 6,
+          "Target": "no",
+          "X_ClassNum": 0,
+          "X_ClassMark": "Low",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 5,
+          "X": 8,
+          "Target": "yes",
+          "X_ClassNum": 1,
+          "X_ClassMark": "High",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 6,
+          "X": 10,
+          "Target": "no",
+          "X_ClassNum": 1,
+          "X_ClassMark": "High",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 7,
+          "X": 12,
+          "Target": "no",
+          "X_ClassNum": 1,
+          "X_ClassMark": "High",
+          "X_ClassSignificant": 0.5493061443340549
+        },
+        {
+          "RowID": 8,
+          "X": 14,
+          "Target": "no",
+          "X_ClassNum": 1,
+          "X_ClassMark": "High",
+          "X_ClassSignificant": 0.5493061443340549
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.coarse_classes",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Group",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ColumnName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ColumnDisplayName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ClassNumber",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "UniqueValue",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ClassMark",
+          "type": "string",
+          "label_any": true,
+          "category_labels_any": true
+        },
+        {
+          "name": "EventsCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "NonEventsCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "EventRate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "NonEventRate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "LowerBound",
+          "type": "variant",
+          "label_any": true
+        },
+        {
+          "name": "UpperBound",
+          "type": "variant",
+          "label_any": true
+        },
+        {
+          "name": "WoE",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "IV",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Weight",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "IncludeUpperBound",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "PreQuantingApplied",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Group": 0,
+          "ColumnName": "X",
+          "ColumnDisplayName": "X",
+          "ClassNumber": 0,
+          "UniqueValue": null,
+          "ClassMark": "Low",
+          "EventsCount": 3,
+          "NonEventsCount": 1,
+          "EventRate": 0.75,
+          "NonEventRate": 0.25,
+          "LowerBound": {
+            "cell_type": "integer",
+            "value": 0
+          },
+          "UpperBound": {
+            "cell_type": "integer",
+            "value": 7
+          },
+          "WoE": -1.0986122886681098,
+          "IV": 0.5493061443340549,
+          "Weight": 0.5,
+          "IncludeUpperBound": true,
+          "PreQuantingApplied": false
+        },
+        {
+          "Group": 0,
+          "ColumnName": "X",
+          "ColumnDisplayName": "X",
+          "ClassNumber": 1,
+          "UniqueValue": null,
+          "ClassMark": "High",
+          "EventsCount": 1,
+          "NonEventsCount": 3,
+          "EventRate": 0.25,
+          "NonEventRate": 0.75,
+          "LowerBound": {
+            "cell_type": "integer",
+            "value": 7
+          },
+          "UpperBound": {
+            "cell_type": "integer",
+            "value": 14
+          },
+          "WoE": 1.0986122886681098,
+          "IV": 0.5493061443340549,
+          "Weight": 0.5,
+          "IncludeUpperBound": true,
+          "PreQuantingApplied": false
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.coarse_classes",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ColumnName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ColumnDisplayName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "EventsCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "NonEventsCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "EventRate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "NonEventRate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "TotalEventsCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IV",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Significance",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ColumnName": "X",
+          "ColumnDisplayName": "X",
+          "EventsCount": 4,
+          "NonEventsCount": 4,
+          "EventRate": 0.5,
+          "NonEventRate": 0.5,
+          "TotalEventsCount": 8,
+          "IV": 1.0986122886681098,
+          "Significance": "Высокая"
+        }
+      ]
+    }
+  ]
+}

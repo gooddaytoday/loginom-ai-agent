@@ -22,6 +22,68 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_c1_single_method_scenarios(self):
+        for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
+                             ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['input_files'], ['requests.csv'])
+            expected = runner.expected_for(case, '/own/single.lgp')
+            response, status = expected['outputs']
+            self.assertEqual([c['name'] for c in response['columns']], ['RequestID', 'Response'])
+            self.assertEqual(response['columns'][1]['comparison'], 'rest_echo')
+            self.assertEqual(status['output_node_type'], 'integration.rest_request')
+            self.assertEqual(status['output_port'], 1)
+            self.assertEqual(len(response['rows']), 2)
+            self.assertEqual([r['RequestID'] for r in response['rows']], [0, 1])
+            with (case['data'] / 'requests.csv').open() as stream:
+                source = list(csv.DictReader(stream))
+            for index, row in enumerate(response['rows']):
+                echo = json.loads(row['Response'])
+                self.assertEqual(echo, {'method': method, 'data': source[index]['Body'] if method != 'DELETE' else ''})
+            self.assertTrue(all(r['HttpStatusCode'] == 200 for r in status['rows']))
+            self.assertIn('один REST', case['prompt'].read_text())
+
+    def test_rest_methods_body_uses_frozen_c1_task_and_only_requests(self):
+        with self.assertRaisesRegex(ValueError, 'Unknown scenario'):
+            runner.scenario('rest-methods-body')
+        src = runner.REPO / 'docs/node-development/nodes/integration-restrequest'
+        case = dict(source=src / 'acceptance/modes/methods-body',
+                    prompt=src / 'acceptance/task-methods-body.md',
+                    data=src / 'fixtures/modes', input_files=['requests-c1.csv'], expected_name='expected.json')
+        self.assertEqual(case['input_files'], ['requests-c1.csv'])
+        self.assertEqual(case['prompt'].name, 'task-methods-body.md')
+        self.assertTrue((case['data'] / 'requests-c1.csv').is_file())
+        with (case['data'] / 'requests.csv').open() as stream:
+            original = list(csv.DictReader(stream))
+        with (case['data'] / 'requests-c1.csv').open() as stream:
+            raw = list(csv.DictReader(stream))
+        self.assertEqual([r['Body'] for r in raw], [r['Body'] for r in original])
+        self.assertEqual([r['RowID'] for r in raw], ['0', '1'])
+        self.assertTrue(all(row['Method' + method] == method for row in raw
+                            for method in ['POST', 'PUT', 'PATCH', 'DELETE']))
+        expected = runner.expected_for(case, '/own/rest.lgp')
+        self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+        self.assertEqual({row['Method'] for row in expected['outputs'][0]['rows']},
+                         {'POST', 'PUT', 'PATCH', 'DELETE'})
+        output = expected['outputs'][0]
+        self.assertEqual(output['columns'][-1]['comparison'], 'rest_echo')
+        def render(rows):
+            stream = io.StringIO()
+            writer = csv.writer(stream)
+            writer.writerow([c['name'] for c in output['columns']])
+            writer.writerows([[r[c['name']] for c in output['columns']] for r in rows])
+            return stream.getvalue()
+        rows = copy.deepcopy(output['rows'])
+        for row in rows:
+            row['Response'] = json.dumps(dict(json.loads(row['Response']), origin='variable', headers={'X': 'random'}))
+        self.csv_result(output, render(rows))
+        for value in ['null', '{}', '{"method":"POST","data":null}',
+                      '{"method":"POST","data":"wrong"}', '{"method":"POST","method":"POST","data":"wrong"}']:
+            bad = copy.deepcopy(rows)
+            bad[0]['Response'] = value
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, render(bad))
+
     def test_calculator_variables_use_approved_tasks_and_only_the_input_csv(self):
         for name, expected_name, value in [('calculator-vars', 'expected-initial.json', 7),
                                            ('calculator-vars-update', 'expected.json', 11)]:
@@ -359,6 +421,19 @@ class RunCheckTests(unittest.TestCase):
             if row['DateText'] is not None:
                 self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+
+    def test_grouping_median_uses_modes_task_csv_and_independent_oracle(self):
+        case = runner.scenario('grouping-median')
+        self.assertEqual(case['prompt'].name, 'task-median.md')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertIn('{{PACKAGE_PATH}}', case['prompt'].read_text())
+        expected = runner.expected_for(case, '/test/median.lgp')
+        self.assertEqual(expected['package_path'], '/test/median.lgp')
+        self.assertEqual([n['type'] for n in expected['nodes']], ['imports.text', 'transform.group_data', 'exports.text'])
+        self.assertEqual([(c['name'], c['type']) for c in expected['outputs'][0]['columns']], [('Region', 'string'), ('Metric', 'real')])
+        self.assertEqual({r['Region']: r['Metric'] for r in expected['outputs'][0]['rows']}, {'B': 3, 'A': 4, 'C': 7, 'D': None, 'E': 2})
+        self.assertIn('grouping-median', runner.scenario_names('grouping-median'))
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')
@@ -807,6 +882,25 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(len(output['columns']), columns)
                 self.assertEqual(len(output['rows']), rows)
                 self.assertEqual(output['export_destination'], '/' + mode + '-result.csv')
+
+    def test_join_cartesian_resolves_approved_tasks_inputs_and_exact_expectations(self):
+        for mode in ['full-no-keys', 'cross']:
+            with self.subTest(mode=mode):
+                case = runner.scenario('join-' + mode)
+                root = runner.REPO / 'docs/node-development/nodes/join'
+                self.assertIsNone(case['base'])
+                self.assertEqual(case['prompt'], root / 'acceptance' / ('task-' + mode + '.md'))
+                self.assertEqual(case['data'], root / 'fixtures/v040')
+                self.assertEqual(case['input_files'], ['left.csv', 'right.csv'])
+                self.assertEqual(case['oracle'], root / 'acceptance/oracle-v040.py')
+                expected = runner.expected_for(case, '/test/cartesian.lgp')
+                self.assertEqual(expected['package_path'], '/test/cartesian.lgp')
+                output = expected['outputs'][0]
+                self.assertFalse(output['ordered'])
+                self.assertEqual([c['type'] for c in output['columns']], ['string', 'integer', 'string', 'integer'])
+                self.assertEqual(len(output['rows']), 6)
+                self.assertEqual({(r['LeftID'], r['RightID']) for r in output['rows']},
+                                 {(left, right) for left in ['L1', 'L2', 'L3'] for right in ['R1', 'R2']})
 
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1387,6 +1481,15 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n22', 'q11', 's9', '../n1', 'clustering']:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
+
+    def test_reform_rename_lossy_resolves_task_data_and_expected(self):
+        case = runner.scenario('reform-rename-lossy')
+        self.assertEqual(case['prompt'].name, 'task-rename-lossy.md')
+        self.assertTrue((case['data'] / 'reform.csv').is_file())
+        expected = runner.expected_for(case, '/test/reform.lgp')
+        self.assertEqual(expected['package_path'], '/test/reform.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'B', 'A', 'R', 'S'])
+        self.assertEqual([r['R'] for r in expected['outputs'][0]['rows']], [2, -3, 0])
 
     def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
         case = runner.scenario('rest-get-plain')

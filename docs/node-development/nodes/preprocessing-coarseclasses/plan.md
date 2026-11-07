@@ -130,3 +130,73 @@ readback с реальными pins на этапе 1. Измеритель acce
 
 Прежняя широкая матрица не является назначением этапа 1 этого среза.
 Каждый новый критерий и oracle фиксируются до соответствующих прогонов.
+
+## 7. LAB-1046: непрерывные/внешние/ручные классы, checkpoint этапа 0
+
+07.11.2026, mas2, worker назначенной пары `01a124e5-1623-7a32-93c7-a3754c7dbdd7`,
+только `https://app.loginom.ai/app/?testable=true`, Loginom 7.4.2.
+База текущей v040 по регламенту: `9ec18ee987bc16d953f985a173d85e8b08a93020`
+(назначенная точка afaa1f3). Runtime не менялся, CLI не собирался, run-check нет.
+**Checkpoint:** исследование остановлено после двух восстановлений сеанса;
+критерии не утверждены, continuous/external/manual/frozen не объявлены принятыми.
+
+### Наблюдение и границы доказательства
+
+В UI узел называется «Конечные классы», а не «Крупные классы».
+`Graph;Конечные_классы` содержит Input_Data-0, Input_Add и три Output_Data-0/1/2.
+Связь с исходным смешанным источником не зафиксировалась; отдельный источник
+continuous.csv с тремя проверенными полями также не дал подтверждённой связи.
+Причина не установлена. Не считать это отказом будущего обработчика или модели.
+Данные/схемы чужих аккаунтов не использовались.
+
+Для осмотра настроек в собственном draft вручную объявлены X Integer/continuous
+и Target String/discrete через `TuneDataSourceInputPortWizard;btnAddMappingColumn`
+и `EditTuneColumnDefForm`. Это **объявленная схема без подключённых данных**.
+На `CoarseClassesWizard-1` назначены X=input, Target=target, event=yes.
+У numeric поля меню роли предлагает unused/input; у дискретной цели дополнительно target.
+Переход на `CoarseClassesWizard-2` возможен без вычисления классов.
+
+В `CoarseClassesWizard-1;CoarseClassesSettingsFrame` подтверждены:
+
+| TID | Наблюдение |
+|---|---|
+| chkPreQuanting;ValueControl | Предварительное квантование, default=false |
+| edtPreQuantingCount;ValueControl | default=0, UI 0…9007199254740991 |
+| chkIncludeHighBounds;ValueControl | Включение верхней границы, default=false |
+| edtMinimalClassRate;ValueControl | default=5, UI 0…50 |
+| edtDesiredClassCount;ValueControl | default=5, UI 1…1000 |
+| edtUniformityCoefficient;ValueControl | default=0, UI 0…100 |
+
+На странице классов `CoarseClassesEditor;btnAllowClassModifying` имеет tooltip
+«Редактировать разбиение», рядом btnMergeWithLeft/Right, btnCalculateIV,
+таблица с границами и WoE/IV. Наличие кнопок при пустых классах **не доказывает**
+успешную ручную правку, freeze, подключение внешних диапазонов или сохранение модели.
+Они, новые/NULL-категории и нулевые частоты остаются следующим шагом исследования.
+Второй разрыв произошёл до завершения этого мастера; draft закрыт без коммита.
+
+### Приёмочное предложение и оценка
+
+[Статусы и математические допущения](acceptance/modes/README.md),
+[oracle](acceptance/modes/oracle.py), [схема](acceptance/modes/parameter-schema.proposal.json),
+[карточка](acceptance/modes/node-card.proposal.json).
+Continuous/manual: явные границы 0/7/14, независимые частоты 3/1 и 1/3,
+WoE ±ln(3), общий IV=ln(3), три полных выхода, исходный порядок.
+Unknown→NULL и additive alpha=0.5 — карантинные гипотезы, не native-факты.
+Задания позволяют сообщить нативный отказ; ожидаемый JSON этих гипотез пока
+не является обязательным результатом. Матрица external/frozen ещё не подготовлена.
+
+Оценка — **3 цикла** после завершения этапа 0: continuous + external mapping;
+manual/frozen и saved-model lifecycle; unknown/NULL/zero-frequency с подтверждённой
+формулой. Собственные модули packages/loginom-runtime/client/lib:
+`coarse-classes-{parameters,context,procedure,node,output,readback}.mjs`.
+Текущий validator допускает только discrete String и automatic partition;
+context не читает continuous-controls, output/readback рассчитаны на прежний срез.
+
+Численные LowerBound/UpperBound отчёта остаются Variant. Для них уже существует
+`typedVariants:true` в makeNodePortOutputCode; его можно передать из собственного
+coarse-classes-output, channel не запрещает флаг. Не требуется копировать private
+Collapse-guard или менять общий reader. Это оценка по production-коду, ещё не живой PASS.
+Допустимая общая работа — аддитивная регистрация схем/метаданных типа, включая
+дополнительный табличный вход. Иная общая необходимость пока не доказана.
+Размеры карточки, справки и оглавления воспроизводятся общим measure-modes.mjs;
+сводная таблица находится в новом разделе [smoothing-подплана](../preprocessing-smoothing/plan.md).

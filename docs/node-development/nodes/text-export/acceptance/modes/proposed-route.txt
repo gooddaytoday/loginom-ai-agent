@@ -1,0 +1,1 @@
+| Экспорт CSV/TXT | `exports.text` / delimited, fixed_width | [читать](references/nodes/exports.text.md) |
