@@ -22,8 +22,34 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_c1_single_method_scenarios(self):
+        for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
+                             ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['input_files'], ['requests.csv'])
+            expected = runner.expected_for(case, '/own/single.lgp')
+            response, status = expected['outputs']
+            self.assertEqual([c['name'] for c in response['columns']], ['RequestID', 'Response'])
+            self.assertEqual(response['columns'][1]['comparison'], 'rest_echo')
+            self.assertEqual(status['output_node_type'], 'integration.rest_request')
+            self.assertEqual(status['output_port'], 1)
+            self.assertEqual(len(response['rows']), 2)
+            self.assertEqual([r['RequestID'] for r in response['rows']], [0, 1])
+            with (case['data'] / 'requests.csv').open() as stream:
+                source = list(csv.DictReader(stream))
+            for index, row in enumerate(response['rows']):
+                echo = json.loads(row['Response'])
+                self.assertEqual(echo, {'method': method, 'data': source[index]['Body'] if method != 'DELETE' else ''})
+            self.assertTrue(all(r['HttpStatusCode'] == 200 for r in status['rows']))
+            self.assertIn('один REST', case['prompt'].read_text())
+
     def test_rest_methods_body_uses_frozen_c1_task_and_only_requests(self):
-        case = runner.scenario('rest-methods-body')
+        with self.assertRaisesRegex(ValueError, 'Unknown scenario'):
+            runner.scenario('rest-methods-body')
+        src = runner.REPO / 'docs/node-development/nodes/integration-restrequest'
+        case = dict(source=src / 'acceptance/modes/methods-body',
+                    prompt=src / 'acceptance/task-methods-body.md',
+                    data=src / 'fixtures/modes', input_files=['requests-c1.csv'], expected_name='expected.json')
         self.assertEqual(case['input_files'], ['requests-c1.csv'])
         self.assertEqual(case['prompt'].name, 'task-methods-body.md')
         self.assertTrue((case['data'] / 'requests-c1.csv').is_file())

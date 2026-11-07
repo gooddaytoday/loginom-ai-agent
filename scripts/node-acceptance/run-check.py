@@ -405,11 +405,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name == 'rest-methods-body':
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
-        return dict(source=src / 'acceptance/modes/methods-body',
-                    prompt=src / 'acceptance/task-methods-body.md',
-                    data=src / 'fixtures/modes', input_files=['requests-c1.csv'], base=None,
+        case = name.removeprefix('rest-')
+        return dict(source=src / 'acceptance/modes' / case,
+                    prompt=src / 'acceptance' / ('task-' + case + '.md'),
+                    data=src / 'fixtures/modes', input_files=['requests.csv'], base=None,
                     expected_name='expected.json', oracle=src / 'acceptance/modes/oracle.py')
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'

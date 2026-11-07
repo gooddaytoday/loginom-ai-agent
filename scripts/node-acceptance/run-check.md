@@ -573,10 +573,14 @@ oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
 
-`rest-methods-body`: C1 POST/PUT/PATCH с исходным UTF-8 Body и DELETE без тела.
-Только task-methods-body.md и requests-c1.csv передаются модели. Модель выгружает
-RowID/Method/HttpStatusCode/Response без разбора JSON. Независимый oracle и cold
-matcher rest_echo извлекают method/data из Response, сверяют метод и точные
-UTF-8 байты Body; прочие echo-метаданные свободны. Восемь строк, типы и NULL
-проверяет штатный табличный matcher. DELETE требует data="", не NULL.
-Штатные CSV, Save, cold и cleanup обязательны.
+`rest-post-body`, `rest-put-body`, `rest-patch-body`, `rest-delete`: C1 разделён
+на импорт → один REST → экспорт, две исходные строки requests.csv на сценарий.
+Модель выгружает RequestID/Response с порта 0 без Слияний и JSON-разбора;
+HTTP-коды читает отдельно на порту 1. Python oracle и cold matcher rest_echo
+сверяют фактический method и точные UTF-8 байты data; DELETE требует data="",
+не NULL. Cold проверяет также native port 1: ErrorCode=0, ErrorDesc=OK, HTTP=200.
+Только task-<метод>.md и requests.csv передаются модели. CSV/Save/cold/cleanup
+обязательны. POST — ≥2 PASS из 3 на одном SHA, PUT/PATCH/DELETE — по одному
+PASS с cold; затем n11/r5/r6 по одному на том же SHA (решение LAB-985).
+Прежний восьмистрочный methods-body оставлен только как неактивный пример:
+в каталоге run-check и required-checks его нет.
