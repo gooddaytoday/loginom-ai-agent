@@ -10,7 +10,7 @@ export function groupingOutputDefinitions(configuration){
   const functions=Object.entries(GROUPING_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0);
   need(supportedGroupingMeasure(f),'Unsupported grouping functions');
   for(const [fn,v] of functions)fields.push({name:f.name+(functions.length>1?'_'+v.suffix:''),label:f.label+'|'+v.label,
-   type:fn==='sum'||fn==='avg'?'real':['count','unique_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
+   type:['sum','avg','median'].includes(fn)?'real':['count','unique_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
  }
  return fields;
 }

@@ -201,6 +201,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'grouping-median':
+        root = REPO / 'docs/node-development/nodes/grouping'
+        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance/modes/task-median.md',
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode='median')
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -523,6 +527,11 @@ def expected_for(case, package, cold=False):
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
             'expected', str(src / 'modes/expected.json'), case['sampling_mode'], package]))
+    # Grouping mode cycles take their stage from the independent modes oracle.
+    if case.get('grouping_mode'):
+        cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
+        return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
+                    outputs=cases[case['grouping_mode']]['stages'])
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
