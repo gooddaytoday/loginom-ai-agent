@@ -8,7 +8,7 @@
 
 | Приоритет / цикл | Пользовательское задание (в `acceptance/`) | Вход модели из `fixtures/modes/` | Oracle / предложение |
 |---|---|---|---|
-| 1 — методы и тело | `task-methods-body.md` | `requests.csv` | `methods-body/expected.json`: 8 строк, фактический Method, неизменённый Body; DELETE без тела |
+| 1 — методы и тело | `task-post-body.md`, `task-put-body.md`, `task-patch-body.md`, `task-delete.md` | `requests.csv` | `post-body/`, `put-body/`, `patch-body/`, `delete/expected.json`: по 2 сырых ответа одного REST, независимый rest_echo сверяет method и точные байты data |
 | 2 — заголовки | `task-headers.md` | `requests.csv` | `headers/expected.json`: окончательный second, прежние тела и HTTP-коды |
 | 3 — сохранённая авторизация/TLS | `task-auth-tls.md` | нет; приватная подготовка LabBasic/LabBearer оператором | `auth-tls/expected.json`: authenticated=true от проверочного сервиса |
 | 4 — переменные | `task-variables.md` | `requests.csv` | `variables/expected.json`: second после изменения только источника Cycle |
@@ -50,6 +50,18 @@ python3 docs/node-development/nodes/integration-restrequest/acceptance/modes/ora
 выбрать `--case methods-body`. `--write` не запускает модель и не утверждает
 полученные ожидания. Все десять гидратированных документов проверяются существующим
 `parseExpectedOutputs` из `scripts/node-acceptance/expected-outputs.mjs`.
+Для C1 последнее решение оркестратора LAB-985 разделяет методы на маленькие
+сценарии: импорт → один REST → экспорт порта 0 (RequestID integer, Response
+string), без Слияний и JSON-разбора. В каждом по две прежние строки requests.csv.
+Python oracle генерирует ожидаемые method/data, CSV и cold сравнивают эту
+проекцию, не меняя типы/NULL и не нормализуя текст Body. Native port 1 проверяется
+в cold отдельно (ErrorCode=0, ErrorDesc=OK, HttpStatusCode=200), без экспорта
+второй таблицы. Нестабильные headers/origin/url не сравниваются. Expected/oracle
+модели не передаются. POST: ≥2 PASS из 3 с cold; PUT/PATCH/DELETE: по одному
+PASS с cold, затем n11/r5/r6 по одному; всё на одном SHA.
+Прежние task-methods-body.md, requests-c1.csv и methods-body/expected.json
+сохранены только как неактивный восьмистрочный пример: регистрация run-check
+удалена, required-checks его не требует.
 Для error-descriptions внешний сценарий штатно убирает routing hint
 export_destination перед stock parser. Проверяется непосредственно REST port 1,
 поэтому удаление ErrorDesc только после REST не сможет подменить native критерий.

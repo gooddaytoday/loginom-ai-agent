@@ -577,6 +577,19 @@ oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
 
+`rest-post-body`, `rest-put-body`, `rest-patch-body`, `rest-delete`: C1 разделён
+на импорт → один REST → экспорт, две исходные строки requests.csv на сценарий.
+Модель выгружает RequestID/Response с порта 0 без Слияний и JSON-разбора;
+HTTP-коды читает отдельно на порту 1. Python oracle и cold matcher rest_echo
+сверяют фактический method и точные UTF-8 байты data; DELETE требует data="",
+не NULL. Cold проверяет также native port 1: ErrorCode=0, ErrorDesc=OK, HTTP=200.
+Только task-<метод>.md и requests.csv передаются модели. CSV/Save/cold/cleanup
+обязательны. POST — ≥2 PASS из 3 на одном SHA, PUT/PATCH/DELETE — по одному
+PASS с cold; затем n11/r5/r6 по одному на том же SHA (решение LAB-985).
+Прежний восьмистрочный methods-body оставлен только как неактивный пример:
+в каталоге run-check и required-checks его нет.
+
+
 `linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
 Forward task. Independent mode oracle expectations remain private. Both typed
 outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
