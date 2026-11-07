@@ -225,6 +225,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
+    if name in ['excel-export-xls', 'excel-export-numeric', 'excel-export-replace']:
+        src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
+        mode = name.removeprefix('excel-export-')
+        return dict(source=src, prompt=src / {'xls':'task-xls.md', 'numeric':'task-numeric-cells.md', 'replace':'task-replace-workbook.md'}[mode],
+                    data=src.parent / 'fixtures', input_files=['modes.csv'], base=None, excel_mode=mode)
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
@@ -503,6 +508,15 @@ def scenario(name, case_root=None, *, cases=None):
 
 def expected_for(case, package):
     src = case['source']
+    if case.get('excel_mode'):
+        approved = read(src / 'modes/expected.json')
+        formats = ['xls'] if case['excel_mode'] == 'xls' else approved['formats']
+        stems = {'xls':'legacy', 'numeric':'numeric', 'replace':'existing'}
+        books = [dict(output_node_type='exports.excel', output_port=None, format=ext, filename=stems[case['excel_mode']]+'.'+ext,
+            sheet_name='Данные', header='names', number_format=1 if case['excel_mode']=='numeric' else 0, decimal_count=2, divide_thousands=case['excel_mode']=='numeric',
+            columns=[dict(c,label_any=True) for c in approved['input_columns']], rows=approved['input_rows']) for ext in formats]
+        return dict(package_path=package, nodes=[dict(type='imports.text',label_any=True), *approved['nodes']], outputs=books, excel_books=books,
+                    excel_case={'xls':'new', 'numeric':'numeric', 'replace':'replace-workbook'}[case['excel_mode']])
     # The owner-approved sampling envelope is separate from stock exact rows.
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
@@ -1261,6 +1275,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
@@ -1280,15 +1295,19 @@ class Runner:
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
-        for output in expected['outputs']:
-            if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
+        for index, output in enumerate(expected['outputs']):
+            if spec.get('excel_mode'): output['export_destination'] = destinations[index]
+            elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
+        if spec.get('excel_mode') == 'replace':
+            write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
+            self.phase('excel-seeds', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs', build / 'resources/loginom', folder / 'seed-config.json', folder / 'seeds'], folder, timeout=300)
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -1605,6 +1624,21 @@ class Runner:
                 if spec.get('lgd_empty_variant'):
                     assert binary[16:20] == bytes.fromhex('04224d18'), 'LGD_EDGE_HEADER:' + fmt['name']
                 shutil.copyfile(lgd_file, folder / (fmt['name'] + '.lgd'))
+        if spec.get('excel_mode'):
+            manifest = []
+            for book in expected['excel_books']:
+                destination = book['export_destination']
+                assert any(o.get('status')=='SUCCEEDED' and o.get('configuration',{}).get('readback',{}).get('kind')=='excel_export'
+                    and o['configuration']['readback'].get('destination')==destination
+                    and any(f.get('destination')==destination and f.get('bytes',0)>0 for f in o.get('output',{}).get('file_artifacts',[])) for _,o in replies), 'EXCEL_SINK_FILE_EVIDENCE_MISSING'
+                actual = folder / Path(destination).name
+                shutil.copyfile(downloaded_csv(profile,destination),actual)
+                self.phase('oracle', [sys.executable, '-B', src / 'modes/oracle.py', '--case', expected['excel_case'], '--file', actual], folder, timeout=60)
+                manifest.append(dict(file=str(actual), case=expected['excel_case']))
+            actual = folder / 'excel-books.json'
+            write(actual,manifest)
+            self.current['csv'] = 'PASS (Excel)'
+            return session, expected, actual, ','
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
             actual = folder / Path(destinations[0]).name
@@ -1718,7 +1752,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

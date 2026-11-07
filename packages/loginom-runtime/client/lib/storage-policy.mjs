@@ -29,7 +29,7 @@ export function requireStorageDestination(path, directories, purpose, { director
     throw Error('Destination is outside the selected Loginom directory');
   }
   if (!directory && purpose === 'packages' && !/\.lgp$/i.test(path)) throw Error('A Loginom package filename is required');
-  if (!directory && purpose === 'exports' && !/\.(csv|tsv|xlsx|lgd)$/i.test(path)) throw Error('A CSV, TSV, XLSX or LGD filename is required');
+  if (!directory && purpose === 'exports' && !/\.(csv|tsv|xls|xlsx|lgd)$/i.test(path)) throw Error('A CSV, TSV, XLS, XLSX or LGD filename is required');
   return path;
 }
 
@@ -66,8 +66,8 @@ export function withStorageIdentity(code, binding, storageSession) {
 export function requireExportDestination(value, directories = null) {
   if (directories) return requireStorageDestination(value, directories, 'exports');
   // Unchanged scope for legacy acceptance profiles and catalog revisions.
-  if (typeof value !== 'string' || !/^\/test-2\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9][A-Za-z0-9_.-]*\.(csv|tsv|xlsx|lgd)$/.test(value)
-      || value.length > 512 || value.includes('..')) throw Error('Export requires an explicitly assigned CSV/TSV/XLSX/LGD in /test-2');
+  if (typeof value !== 'string' || !/^\/test-2\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9][A-Za-z0-9_.-]*\.(csv|tsv|xls|xlsx|lgd)$/.test(value)
+      || value.length > 512 || value.includes('..')) throw Error('Export requires an explicitly assigned CSV/TSV/XLS/XLSX/LGD in /test-2');
   return value;
 }
 
@@ -201,7 +201,7 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           job.deadline=job.started+serverDownloadBudget(job.source.bytes);
           if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
           job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
-          if(!/\.(csv|tsv|txt|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
+          if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
           await mkdir(directory,{recursive:true,mode:0o700});
           const root=await lstat(directory);
           if(root.isSymbolicLink()||!root.isDirectory()||(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');

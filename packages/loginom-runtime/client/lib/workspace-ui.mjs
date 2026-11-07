@@ -2193,7 +2193,7 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && ['text_export_params','text_export_format','excel_export','lgd_export'].includes(wizard.stage)) {
       const lgd=wizard.stage==='lgd_export',excel=wizard.stage==='excel_export',first=wizard.stage==='text_export_params',base=wizard.root_tid+';'+(lgd?'ExportNativeParamsWizard':excel?'ExportExcelFilePreviewWizard':first?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard')+';';
-      const fields=lgd?{destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum'}:excel?{destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat'}:first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
+      const fields=lgd?{destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum'}:excel?{destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat',decimal_count:'pedDecimalCount'}:first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
         :{delimiter:'edtDelimiterChar',encoding:'edtCodePage',line_ending:'edtLineEnding',header:'edtCaptionType'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const ownerTid=base+key+';ValueControl',owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
@@ -2202,8 +2202,8 @@ function readRenderedInputMapping(observation) {
         if(owners.length!==1||inputs.length!==1||sw?.pressed!==false)return [name,{status:'unobserved_or_variable'}];
         const input=inputs[0],value=String(input.value??''),limit=name==='destination'?512:256;
         if(value.length<=limit&&enabled(input)) {
-          if(!['destination','sheet_name'].includes(name))wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
-          if(['destination','sheet_name','time_format'].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
+          if(!['destination','sheet_name',...(excel?['decimal_count']:[])].includes(name))wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
+          if(['destination','sheet_name','time_format',...(excel?['decimal_count']:[])].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
         }
         return [name,{status:'observed',value:value.slice(0,limit),value_length_utf16:value.length,truncated:value.length>limit,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text'}];

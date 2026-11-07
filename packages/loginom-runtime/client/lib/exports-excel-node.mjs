@@ -23,7 +23,7 @@ export function excelExportReadback({node,phases}){
 }
 export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
  let storageContinuation=null;
- const nodeApplyHandlers=new Map([['exports.excel',{revision:'excel-export-v1-candidate',fileOutput:true,modes:['xlsx'],parameter_schema:excelExportParametersSchema,
+ const nodeApplyHandlers=new Map([['exports.excel',{revision:'excel-export-v2-candidate',fileOutput:true,modes:['xlsx','xls'],parameter_schema:excelExportParametersSchema,
   validate:(p,m,r)=>validateExcelExportParameters(p,m,r,storageDirectories),configurationReadback:excelExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p.excel_export??{})}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
