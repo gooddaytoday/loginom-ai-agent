@@ -578,3 +578,8 @@ cold typed variable inventory and both reports, package Close and logout apply.
 импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
 `datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
 3×8 ячеек, NULL Target/ActualEvent, точные типы и порядок, CSV/Save/cold.
+
+`logreg-coefficients`: Enter на train.csv, полная таблица коэффициентов порта 1,
+2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
+`modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
+точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.

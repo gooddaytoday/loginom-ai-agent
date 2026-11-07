@@ -11,7 +11,7 @@
 `input_fields` содержит только числовые факторы; идентификаторы и комментарии
 сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для этого
 поддерживаемого обучения выбирай Логистическую регрессию; Калькулятор и
-JavaScript не нужны. Для отбора факторов вызывай `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`, `mode:"forward"`, `"backward"` или `"stepwise"`. Пользовательский критерий задавай в `parameters.logistic.selection.criterion`: `"deviance"`, `"aic"`, `"aicc"`, `"bic"` или `"hqic"`. При Deviance Forward требует только `entry_significance`, Backward — только `removal_significance`, Stepwise — оба; значения строго между 0 и 1, для Stepwise entry < removal. При информационных критериях пороги отбора запрещены. Без `selection` сохраняются стандартные Deviance 0.05/0.1. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Для отбора также выбирай Логистическую регрессию. Веса, валидация, коэффициенты и
+JavaScript не нужны. Для отбора факторов вызывай `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`, `mode:"forward"`, `"backward"` или `"stepwise"`. Пользовательский критерий задавай в `parameters.logistic.selection.criterion`: `"deviance"`, `"aic"`, `"aicc"`, `"bic"` или `"hqic"`. При Deviance Forward требует только `entry_significance`, Backward — только `removal_significance`, Stepwise — оба; значения строго между 0 и 1, для Stepwise entry < removal. При информационных критериях пороги отбора запрещены. Без `selection` сохраняются стандартные Deviance 0.05/0.1. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Для отбора также выбирай Логистическую регрессию. Веса, валидация и
 выход переменных пока недоступны. Сначала запроси `parameter_schema` узла.
 
 
@@ -30,3 +30,19 @@ JavaScript не нужны. Для отбора факторов вызывай 
 будет NULL. Используй этот режим для применения модели; Калькулятор и JavaScript
 не нужны. Save выполни отдельно; после открытия пакета снова используй apply
 на прежнем узле, без настройки и обучения.
+
+## Таблица коэффициентов
+
+Для полной таблицы коэффициентов выбирай `datamining.log_regression`,
+`mode:"enter"`, прежние `parameters.logistic` и `finish:"execute"`.
+Укажи `read.ports:[1]` (или `[0,1]` вместе с прогнозом),
+`read.require_exact_numbers:true`. Порт 1 содержит константу и факторы:
+`Name`, `DisplayName`, `UniqueValues`, затем поля с префиксом технического
+имени цели: `_coefficients`, `_stdError`, `_wald`, `_waldPValue`,
+`_oddsRatio`, `_lowerBound`, `_upperBound`. Последние границы — 95%.
+Сохраняй native NULL, точность и порядок всех десяти полей. Экспортируй
+через `exports.text` со связью `output:1` от этого узла и техническими
+именами CSV. После Save и открытия пакета используй `mode:"apply"` на
+прежнем узле, `inputs:[]`, `mappings:[]`, прежние параметры и `read.ports:[1]`:
+сохранённая модель выполняется без перенастройки и Teach.
+Для коэффициентов используй этот узел; Калькулятор и JavaScript не нужны.
