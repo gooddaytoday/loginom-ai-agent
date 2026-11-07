@@ -13,6 +13,15 @@
 области тоже включай в `columns`: мастер прокручивает сетку при настройке.
 NULL сохраняются; преобразование XLSX в CSV до импорта не требуется.
 
+Именованный диапазон: тот же `dock_node_apply`, `mode:"xlsx"`,
+`parameters.excel.named_range:"SalesRange"` — точное имя, без `sheet_name`.
+`extend_range:false` (default) — строго его границы; `true` — только его
+столбцы до последней заполненной строки. Задай `header_rows` и `columns`
+этого диапазона. Затем `target.kind:"existing"`, прежний `node_id`, те же
+source/настройки и другое `extend_range`: выполни тот же узел. Первый CSV
+выгрузи до изменения. Читай свежий выход: скан листа не доказывает N диапазона.
+Не заменяй диапазон листом, Калькулятором или JavaScript.
+
 Логическое поле импортируй тем же `dock_node_apply`, `target.type:"imports.excel"`,
 `mode:"xlsx"`: в `parameters.excel.columns` укажи `type:"boolean"` и
 `data_kind:"Дискретный"` (также выбирается по умолчанию). Это нативный тип

@@ -87,7 +87,7 @@ RULES = (
     ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat')),
-    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
       'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),

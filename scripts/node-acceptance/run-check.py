@@ -197,6 +197,9 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name == 'excel-import-named':
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-named'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, excel_named_initial='expected-initial.json')
     if name in ['excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean']:
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
@@ -1399,6 +1402,12 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if spec.get('excel_named_initial'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'excel-named-events.json', evidence)
+            self.phase('excel-named-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-named.mjs',
+                src / spec['excel_named_initial'], folder / 'expected.json', folder / 'excel-named-events.json'], folder, timeout=60)
         if spec.get('variables_real_date'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1712,7 +1721,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
+            csv_expected = (read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('excel_named_initial')
+                            else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
                             else expected['outputs'][0] if spec.get('lgd_initial')
                             else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
                             else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
