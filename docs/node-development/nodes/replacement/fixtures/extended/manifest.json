@@ -1,0 +1,47 @@
+{
+  "status": "stage-0 proposal",
+  "encoding": "UTF-8",
+  "bom": false,
+  "line_ending": "LF",
+  "null_marker": "?",
+  "empty_string": "",
+  "files": [
+    {
+      "file": "input.csv",
+      "bytes": 129,
+      "records": 8,
+      "delimiter": ";",
+      "header": true,
+      "columns": [
+        "Id",
+        "Code",
+        "Status",
+        "Keep"
+      ]
+    },
+    {
+      "file": "rules.csv",
+      "bytes": 124,
+      "records": 4,
+      "delimiter": ";",
+      "header": true,
+      "columns": [
+        "Value",
+        "Replacement",
+        "Info",
+        "Ignored"
+      ]
+    },
+    {
+      "file": "rules.tsv",
+      "bytes": 37,
+      "records": 3,
+      "delimiter": "\t",
+      "header": false,
+      "columns": [
+        "Value",
+        "Replacement"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Code_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "CodeInfo",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Code": "FIRST",
+          "Status": "yes",
+          "Keep": "a",
+          "Code_Replaced": true,
+          "CodeInfo": "primary"
+        },
+        {
+          "Id": 2,
+          "Code": "AB-00",
+          "Status": "no",
+          "Keep": "b",
+          "Code_Replaced": false,
+          "CodeInfo": null
+        },
+        {
+          "Id": 3,
+          "Code": "XAB-34Y",
+          "Status": "unknown",
+          "Keep": "c",
+          "Code_Replaced": false,
+          "CodeInfo": null
+        },
+        {
+          "Id": 4,
+          "Code": "ab-56",
+          "Status": null,
+          "Keep": "d",
+          "Code_Replaced": false,
+          "CodeInfo": null
+        },
+        {
+          "Id": 5,
+          "Code": "",
+          "Status": "yes",
+          "Keep": "e",
+          "Code_Replaced": false,
+          "CodeInfo": null
+        },
+        {
+          "Id": 6,
+          "Code": "MISSING",
+          "Status": "no",
+          "Keep": "f",
+          "Code_Replaced": true,
+          "CodeInfo": "null-key"
+        },
+        {
+          "Id": 7,
+          "Code": "OTHER",
+          "Status": "unknown",
+          "Keep": "g",
+          "Code_Replaced": false,
+          "CodeInfo": null
+        },
+        {
+          "Id": 8,
+          "Code": "EXTERNAL",
+          "Status": "yes",
+          "Keep": "h",
+          "Code_Replaced": true,
+          "CodeInfo": "literal"
+        }
+      ]
+    }
+  ]
+}
