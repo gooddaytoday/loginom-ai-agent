@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import {createRedactor} from './redact.mjs';
+import {nodeOutputForJournal} from './node-support.mjs';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
@@ -103,7 +105,7 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
       effects:state.receipts.map(({id,kind,verified})=>({id,kind,verified})),configured:false,executed:false,package_saved:false}};
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:settled};
   const ack=await record(event);
-  if(!same(ack?.target_state,event.target_state))throw Error('Node target journal acknowledgement differs');
+  if(!same(ack?.target_state,nodeOutputForJournal(event,createRedactor()).target_state))throw Error('Node target journal acknowledgement differs');
   Object.assign(state,settled);
   return true;
 }
@@ -123,9 +125,12 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   if (state.signature !== signature) throw new Error('Operation ID reused with a different node target');
   const budget = () => { signal?.throwIfAborted(); if (!(now() < operation.deadline)) throw new Error('Node target deadline exceeded'); };
   const save = async (phase, detail) => {
+    // Compare the evidence copy in the journal's redacted URL representation;
+    // retain original graph refs and receipts in the live target state.
     const event = { operation_id: operation.id, phase, internal_provenance: 'node_target_v1', ...structuredClone(detail) };
     const ack = await record(event);
-    if (!ack || !same(ack[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'], event[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'])) throw new Error('Node target journal acknowledgement differs');
+    const expected = nodeOutputForJournal(event,createRedactor());
+    if (!ack || !same(ack[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'], expected[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'])) throw new Error('Node target journal acknowledgement differs');
   };
   const observe = async () => {
     budget();
