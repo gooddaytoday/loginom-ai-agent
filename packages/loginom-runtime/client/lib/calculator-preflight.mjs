@@ -24,7 +24,8 @@ export function predictNewCalculatorOutput(parameters,inputFields,mappings=[]) {
    &&parameters.order.every(n=>expressions.some(e=>e.name===n)),'Explicit order must include every resulting expression exactly once');
   ordered.sort((a,b)=>parameters.order.indexOf(a.name)-parameters.order.indexOf(b.name));
  }
- const fields=[...ordered,...inputFields.filter(f=>!replaced.has(f.name.toLowerCase()))].map(({name,label,type})=>({name,label,type,used:true}));
+ // An intermediate expression feeds later formulas but is not an output source.
+ const fields=[...ordered.filter(e=>!e.intermediate),...inputFields.filter(f=>!replaced.has(f.name.toLowerCase()))].map(({name,label,type})=>({name,label,type,used:true}));
  for(let mapping of mappings.filter(m=>m.direction==='output'&&(m.fields!==undefined||m.changes!==undefined))){
   mapping=expandOutputChanges(mapping,fields.map(f=>({source:{kind:'configured_field',name:f.name},name:f.name,label:f.label,excluded:false})));
   need(mapping.fields.length===fields.length,'Invalid mappings.fields: full output list must include every configured source field');
