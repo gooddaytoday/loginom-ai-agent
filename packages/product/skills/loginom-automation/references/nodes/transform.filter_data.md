@@ -40,11 +40,8 @@ mapped control input 0; сначала подтверди тип/связь че
 сохрани пакет и прочитай переменные отдельным `dock_node_read`. Builtin не Execute.
 Поддержаны точные integer/string scalar-сравнения, без NULL и преобразований;
 для string явно `case_sensitive`. Проверь `configuration.bindings` после Done.
-При создании Фильтра фиксируй порядок полей обоих outputs 0/1: в первом apply
-задай для каждого `mappings` с `direction:"output"`, его `port`, `autosync:false`
-и полным `fields` в порядке источника или пользователя; каждый source —
-`{kind:"configured_field",name:<имя>}`. Native autosync=true после Save/reopen
-может переставить поля по алфавиту. Не исправляй это перенастройкой после reopen.
+Привязка не меняет автосинхронизацию выхода: без output mappings сохраняй
+штатные настройки Фильтра. Явные настройки выхода задаются через `mappings`.
 Для привязки существующего условия используй `parameters:{}` и `bindings`;
 pointer относится к сохранённым groups. Остальные условия и их строки сохраняются.
 После изменения только Limit выполни тот же Фильтр: `parameters:{}`, `bindings:[]`,
