@@ -59,3 +59,18 @@ test('cold Excel mode checks each saved format and numeric display without chang
  assert.equal(verifyExcelColdSettings([{destination:sink.export_destination,excel_settings:settings}],sink),true);
  for(const [key,value]of Object.entries({file_type:1,number_format:0,decimal_count:3,divide_thousands:false}))assert.throws(()=>verifyExcelColdSettings([{destination:sink.export_destination,excel_settings:{...settings,[key]:value}}],sink));
 });
+
+test('XLS refusal audit accepts the observed lowercase XLSX alternative and still requires a limitation',()=>{
+ const r=spawnSync('python3',['-c',`import ast,re
+from pathlib import Path
+tree=ast.parse(Path('scripts/node-acceptance/run-check.py').read_text())
+check=next(n for n in ast.walk(tree) if isinstance(n,ast.Assert) and isinstance(n.msg,ast.Constant) and n.msg.value=='XLS_LIMITATION_NOT_REPORTED')
+code=compile(ast.Expression(check.test),'run-check XLS refusal audit','eval')
+def matches(text): return bool(eval(code,{'answer':(25,text),'re':re}))
+assert matches('В этой версии Loginom 7.4.2 экспорт в XLS недоступен. Доступная альтернатива — legacy.xlsx.')
+assert matches('XLS недоступен, используй XLSX.')
+assert not matches('Выгружен файл legacy.xlsx.')
+assert not matches('XLS недоступен.')
+`],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
+ assert.equal(r.status,0,r.stderr);
+});

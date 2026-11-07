@@ -1424,7 +1424,7 @@ class Runner:
                            if event.get('type') == 'text'), (None, ''))
             assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
             if spec.get('excel_xls_refusal'):
-                assert 'XLSX' in answer[1] and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
+                assert re.search('xlsx',answer[1],re.I) and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
                 assert not any(p.is_file() for ext in ['*.xls','*.xlsx'] for p in profile.rglob(ext)), 'XLS_REFUSAL_CREATED_WORKBOOK'
             inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
             assert not any(p.is_file() and not any(
