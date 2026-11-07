@@ -1,0 +1,17 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "first_line_as_title": true,
+  "null_marker": "NULL",
+  "files": {
+    "left.csv": {
+      "rows": 3,
+      "columns": [{"name": "LeftID", "type": "string"}, {"name": "LeftKey", "type": "integer"}]
+    },
+    "right.csv": {
+      "rows": 2,
+      "columns": [{"name": "RightID", "type": "string"}, {"name": "RightKey", "type": "integer"}],
+      "key-coercion_override": {"RightKey": "real"}
+    }
+  }
+}

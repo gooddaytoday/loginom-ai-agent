@@ -1,12 +1,12 @@
 const need=(value,message)=>{if(!value)throw Error('Linear regression: '+message);};
 export function validateLinRegressionParameters(p,mode,r){
- need(['enter','apply','forward'].includes(mode),'only Enter (enter), Forward (forward) and apply with an intercept and no normalization are supported');
+ need(['enter','apply','forward','backward'].includes(mode),'only Enter (enter), Forward (forward), Backward (backward) and apply with an intercept and no normalization are supported');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','linear_regression'].includes(k)),'use input_fields and target_field');
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(n=>typeof n==='string'&&n.length>0&&n.length<=128),'input_fields must list continuous numeric predictors by their technical names');
  need(typeof p.target_field==='string'&&p.target_field.length>0&&p.target_field.length<=128,'target_field must name one continuous numeric response');
  if(p.linear_regression!==undefined){
   const settings=p.linear_regression;
-  need(mode==='forward'&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward');
+  need(['forward','backward'].includes(mode)&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward/backward');
   const selection=settings.selection;
   if(selection!==undefined){
    need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','add_significance','remove_significance'].includes(k)),'invalid selection settings');

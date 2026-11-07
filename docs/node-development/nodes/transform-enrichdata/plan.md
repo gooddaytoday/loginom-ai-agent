@@ -131,3 +131,56 @@ required-checks.py list --base origin/v040 и verify по итоговому о�
 ## 6. Точка перепроверки
 
 Прежние задания, oracle и критерии выше сохраняются для своих ревизий. Новая приёмка выполняется по назначению на точном SHA; статическая синхронизация документации не утверждает новые критерии и не переносит прежний PASS. Текущая регистрация и ограничения — в [карточке](README.md).
+
+## 7. LAB-1003 — расширения, этап 0 от 07.11.2026
+
+База `v040@35e83289792225b153ce2ffd6f62f708c16800b4`, mas2, назначенная пара
+worker/reviewer из карточки. [Живые наблюдения и предложенная приёмка](acceptance/extended/README.md).
+Статус расширений: **предложение, требуется решение владельца**; прежняя
+реализация и ранее утверждённые критерии не изменены.
+
+В нативном UI настроены четыре справочника одного узла: по Id=Id,
+один собственный импорт на всех входах. Execute дал 8×16, все 128 DOM-ячеек
+сверены с независимым расчётом CSV. Для будущей приёмки подготовлены другие
+малые fixtures с NULL/empty/дубликатами: три справочника → 7×6,
+добавление четвёртого тому же узлу → 7×7. Задания, stdlib oracle и expected
+готовы до модельных прогонов; на модели комплект не выполнялся.
+
+Другие соединения, вычисление/конверсия ключа в EnrichDataWizard не найдены;
+обход через другой узел не считается этим режимом. Coverage full требует
+изменения общего gate в node-api.mjs / node-apply.mjs, а не только enrich-*.mjs.
+Эти пункты — стоп для реализации до ответа владельца, циклы не назначаются.
+Для ≥3 справочников оценка 1–2 цикла; собственные файлы и условия — README.
+Удобства UI и общий механизм переменных не расширяются.
+
+Бюджеты — UTF-8, JSON compact, измеренный полный model tool включает
+name/description/inputSchema. Файлы proposal не загружаются продуктом.
+
+| Что видит модель | База | После предложенного среза | Лимит |
+|---|---:|---:|---:|
+| dock_node_apply: model_tool_bytes | 14539 | 14547 | 20000 |
+| full_input_schema_bytes (не отправляется модели) | 63339 | 65657 | нет |
+| Карточка Дополнения с session pins | 4906 | 4546 | 12000 |
+| SKILL.md (без изменений) | 39961 | 39961 | 40000 |
+| Строка маршрутизации Дополнения, с LF | 131 | 131 | ~200 |
+| references/nodes/transform.enrich_data.md | 4539 | 4028 | 6000 |
+
+Проекция apply учитывает также совместное предложение Замены, включая +8 Б
+за enum mixed. Существующая ветвь variables.replace в rules.anyOf сохранена;
+общие бюджеты не повышаются. Предложенная карточка хранится в
+acceptance/extended/node-type.proposal.json, все hash-поля — 64 нуля.
+Новый текст файла узла — acceptance/extended/skill-node.proposal.md.
+
+Воспроизведение: pinned Node 24.19.0, в packages/loginom-runtime/client
+`node --test test/model-schema-budget.test.mjs` (51/51 PASS, exit 0).
+Для карточки — тот же createActionRuntime/runtime.describe({node_types:[type]})
+с pins и skill fixture из этого теста, затем userActionInventory и
+Buffer.byteLength(JSON.stringify(card),'utf8'). Proposal измеряется тем же
+JSON compact; тексты — длиной UTF-8 байтов. Full projection — clone исходного
+tool, замена только enrichment и rules.anyOf[0] схемами proposal, добавление
+mixed к mode.enum, затем штатный userNodeTool. Рабочий код не меняется.
+
+Проверки комплекта: `python3 docs/node-development/nodes/transform-enrichdata/acceptance/extended/oracle.py --check`;
+expected проходит существующий parseExpectedOutputs после подстановки пути
+пакета вместо {{PACKAGE_PATH}}. Live UI не равен CLI-приёмке: build/run-check,
+Save/cold и ≥2/3 двух аккаунтов остаются для отдельной утверждённой карточки.
