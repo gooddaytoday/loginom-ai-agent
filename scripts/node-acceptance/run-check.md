@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`join-full-no-keys` and `join-cross` use the approved full-without-keys and
+Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
+from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the
+independent `oracle-v040.py`. Each checks all six combinations, four columns
+in exact order and native types, CSV, Save, cold reexecution and cleanup.
+Only the selected task and the two inputs reach the model.
+
 `tree-parent-child`, `tree-parent-roots`, `tree-parent-cycle`, `tree-parent-orphan`
 use the owner-approved id/parent_id cases under `trees-datatotree/acceptance/parent-child`.
 Only one CSV and its business task reach the model. The independent Python oracle
@@ -69,6 +76,13 @@ all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
 and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
+`excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
+затем продолжение до последней заполненной строки на том же узле (3 строки).
+Два CSV проверяются отдельно; внутренние typed-checkpoints подтверждают оба
+состояния и неизменный узел. Cold читает сохранённые имя/продолжение диапазона,
+отменяет мастер без применения настроек и штатно проверяет конечную таблицу.
+Модель получает только исходный task-named-range и named.xlsx.
 
 `missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
 use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
@@ -334,6 +348,11 @@ large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
+`grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
+`fixtures/modes.csv` модели; ожидания берутся из независимого
+`acceptance/modes/oracle.py` (case median), Amount integer, выход Metric real,
+all-NULL группа D → NULL. CSV, Save, cold и cleanup — штатная оснастка.
+
 `grouping-unique`: повторяющиеся клиенты по регионам, integer/string,
 NULL и пустая строка; count одновременно с unique_count. Одна Группировка
 перенастраивается и переименовывается. Task, независимый set/count oracle
@@ -444,6 +463,12 @@ cold сверяет каждый output_port того же узла с отде�
 только `data/train.csv` передаётся модели. CSV проверяет независимый
 `oracle.py`; холодный порт 0 — отдельный `expected.json` с допуском
 вероятности abs=1e-8/rel=1e-10 и точным порядком полей.
+
+`reform-rename-lossy`: Параметры полей, обмен технических имён и меток A/B и
+real→integer с потерей дроби в одном узле. Источник —
+`docs/node-development/nodes/field-parameters/acceptance/v040/task-rename-lossy.md`,
+модели передаётся только `fixtures/reform.csv`; точный порядок полей RowID/B/A/R/S,
+типы, значения, метки A/B, CSV/Save/cold. Кэш — отдельным циклом.
 
 `types300` (через `--cases`) требует `--cold`. Только для этого сценария
 runner допускает два ограничения нативного CSV writer D76: текст `0` вместо
@@ -577,6 +602,19 @@ oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
 
+`rest-post-body`, `rest-put-body`, `rest-patch-body`, `rest-delete`: C1 разделён
+на импорт → один REST → экспорт, две исходные строки requests.csv на сценарий.
+Модель выгружает RequestID/Response с порта 0 без Слияний и JSON-разбора;
+HTTP-коды читает отдельно на порту 1. Python oracle и cold matcher rest_echo
+сверяют фактический method и точные UTF-8 байты data; DELETE требует data="",
+не NULL. Cold проверяет также native port 1: ErrorCode=0, ErrorDesc=OK, HTTP=200.
+Только task-<метод>.md и requests.csv передаются модели. CSV/Save/cold/cleanup
+обязательны. POST — ≥2 PASS из 3 на одном SHA, PUT/PATCH/DELETE — по одному
+PASS с cold; затем n11/r5/r6 по одному на том же SHA (решение LAB-985).
+Прежний восьмистрочный methods-body оставлен только как неактивный пример:
+в каталоге run-check и required-checks его нет.
+
+
 `linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
 Forward task. Independent mode oracle expectations remain private. Both typed
 outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
@@ -591,6 +629,11 @@ Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
 Its catalog cases remain historical reproductions for the diagnostic SHA;
 current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 
+`linreg-stepwise-f`: C3, исходный task-stepwise.md и только selection.csv.
+Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.json, оба typed
+порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
+
+
 
 
 `logreg-apply`: обучение Enter на train.csv, затем замена источника того же
@@ -602,3 +645,9 @@ current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`sorting-locale`: импорт modes.csv, сортировка Word и RowID без учёта регистра;
+на одном узле сначала compare_with_locale=false, затем true (русская локаль
+пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
+независимый `oracle.py`: два CSV (первый — бинарный порядок, второй — итоговый
+и сохранённый), точные типы, NULL/пустая строка и порядок полей, Save/cold.

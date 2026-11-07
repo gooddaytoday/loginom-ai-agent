@@ -43,6 +43,11 @@
           "label_any": true
         },
         {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
           "name": "X",
           "type": "real",
           "label_any": true,
@@ -54,11 +59,6 @@
         {
           "name": "Target",
           "type": "string",
-          "label_any": true
-        },
-        {
-          "name": "RowID",
-          "type": "integer",
           "label_any": true
         },
         {
@@ -387,6 +387,118 @@
           "Target": "no",
           "RowID": 32,
           "Note": "synthetic"
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "DisplayName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "UniqueValues",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Target_coefficients",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_stdError",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_wald",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 4.811099424628651e-06,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_waldPValue",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_oddsRatio",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 6.366142765136663e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_lowerBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 6.150952079772769e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_upperBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 5.772757878078453e-06,
+            "rel": 1e-08
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "DisplayName": null,
+          "UniqueValues": null,
+          "Target_coefficients": 0.0,
+          "Target_stdError": 0.4822428221704122,
+          "Target_wald": 0.0,
+          "Target_waldPValue": 1.0,
+          "Target_oddsRatio": null,
+          "Target_lowerBound": null,
+          "Target_upperBound": null
+        },
+        {
+          "Name": "X",
+          "DisplayName": "X",
+          "UniqueValues": null,
+          "Target_coefficients": 1.8509937048001848,
+          "Target_stdError": 0.5712166565051232,
+          "Target_wald": 10.500455959069456,
+          "Target_waldPValue": 0.0011934509070803878,
+          "Target_oddsRatio": 6.366142446829531,
+          "Target_lowerBound": 2.0780493281572054,
+          "Target_upperBound": 19.502794810585335
         }
       ]
     }
