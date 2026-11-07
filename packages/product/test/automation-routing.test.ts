@@ -54,3 +54,7 @@ test("node paths are usable beyond the sampled SkillTool resource list", () => {
   expect(skill).toContain("буквально")
   expect(skill).toContain("references/nodes/")
 })
+
+test('node selection preserves the standard-node restriction', () => {
+  expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
+})
