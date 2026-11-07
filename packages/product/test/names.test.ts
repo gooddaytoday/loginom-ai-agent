@@ -45,6 +45,7 @@ describe("package names", () => {
     expect(names.find(({ name }) => name === "opencode")?.path).toBe("packages/opencode/package.json")
   })
 
+  // This repository-wide scan reads thousands of files, including on cold macOS runners.
   test("no import or dependency uses the fork scope for an upstream package", () => {
     const offenders = tracked
       .filter((path) => /\.(ts|tsx|js|mjs|json|ya?ml)$/.test(path))
@@ -52,7 +53,7 @@ describe("package names", () => {
       .filter((path) => path !== "bun.lock" && !/(^|\/)(reports|history)\//.test(path))
       .filter((path) => usesForkScopeForUpstream(pluginInstallFiles.has(path) ? withoutPluginInstallName(read(path)) : read(path)))
     expect(offenders).toEqual([])
-  })
+  }, 30_000)
 
   test("the install seam may name only the public plugin package, not a longer name that starts with it", () => {
     const named = (...names: string[]) => usesForkScopeForUpstream(withoutPluginInstallName(names.join("\n")))
