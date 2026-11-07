@@ -510,7 +510,7 @@ def expected_for(case, package):
     src = case['source']
     if case.get('excel_mode'):
         approved = read(src / 'modes/expected.json')
-        formats = ['xls'] if case['excel_mode'] == 'xls' else approved['formats']
+        formats = approved['formats'] if case['excel_mode'] == 'numeric' else ['xls' if case['excel_mode'] == 'xls' else 'xlsx']
         stems = {'xls':'legacy', 'numeric':'numeric', 'replace':'existing'}
         books = [dict(output_node_type='exports.excel', output_port=None, format=ext, filename=stems[case['excel_mode']]+'.'+ext,
             sheet_name='Данные', header='names', number_format=1 if case['excel_mode']=='numeric' else 0, decimal_count=2, divide_thousands=case['excel_mode']=='numeric',
@@ -1236,6 +1236,7 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('excel_mode') == 'replace': prompt = prompt.replace('existing.xlsx либо\nexisting.xls', 'existing.xlsx')
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
             prompt = prompt.replace('{{EXPORT_DIRECTORY}}/roundtrip.lgd', lgd_destination)

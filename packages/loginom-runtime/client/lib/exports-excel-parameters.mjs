@@ -41,3 +41,8 @@ export function validateNativeExcelExport(values,directories=null,mode='xlsx'){
  need(values.file_type?.value==={xls:0,xlsx:1}[mode]&&values.destination.value.toLowerCase().endsWith('.'+mode)&&[0,1].includes(values.number_format?.value)&&typeof values.divide_thousands?.value==='boolean'&&[0,1,2].includes(values.header?.value),'Unsupported retained Excel export format');
  if(values.number_format.value===1)need(Number.isInteger(values.decimal_count?.value)&&values.decimal_count.value>=0&&values.decimal_count.value<=30,'Unsupported retained Excel decimal count');
 }
+
+export function validateExcelWorkbookArtifact(artifact){
+ need(Number.isSafeInteger(artifact?.bytes)&&artifact.bytes>0,'Native Excel exporter returned an empty workbook; the file is not a valid XLS/XLSX workbook');
+ return artifact;
+}

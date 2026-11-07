@@ -49,3 +49,24 @@ test('Excel numeric decimal field is exposed only as a literal owned text editor
   assert.equal(fields.length,variable?0:1);
  }
 });
+
+test('XLS file artifacts use the same bound download identity as XLSX',async()=>{
+ const {makeNativeOutputDownloadCode}=await import('../lib/executor.mjs');
+ const name='numeric.xls',directory='/operator/exports',directories={inputs:'/operator/inputs',packages:'/operator/packages',exports:directory};
+ const code=makeNativeOutputDownloadCode({output_binding:{execution_id:'execution',node_id:'node',session_id:'session',directory,destination:directory+'/'+name},artifact:{name},file_ref:'ui-file',expected_bytes:5632,storage_directories:directories,
+  snapshot:{workflow_ref:{prefix:'MF;TF-1'},file_storage:{directory},ui:{elements:[{ref:'ui-file',allowed_actions:['double_click'],label:name,tid:'MF;TF-1;FileStorageForm;colName_'+name,storage_entry:{bytes:5632}}]}}});
+ assert.equal(typeof code,'string');
+});
+
+test('independent XLS replacement seeds can use native uploaded-copy verification',async()=>{
+ const {makeArtifactDownloadCode}=await import('../lib/executor.mjs');
+ const name='existing.xls',artifact={name,upload:{destination:'/operator/exports/'+name}},file_ref='ui-seed';
+ assert.equal(typeof makeArtifactDownloadCode({artifact,file_ref,snapshot:{workflow_ref:{prefix:'MF;TF-1'},ui:{elements:[{ref:file_ref,label:name,allowed_actions:['double_click'],tid:'MF;TF-1;FileStorageForm;colName_'+name}]}}}),'string');
+});
+
+test('a zero-byte native Excel download cannot be reported as a workbook',async()=>{
+ const {validateExcelWorkbookArtifact}=await import('../lib/exports-excel-parameters.mjs');
+ assert.throws(()=>validateExcelWorkbookArtifact({bytes:0,destination:'/test-2/empty.xls'}),/empty workbook/);
+ const artifact={bytes:5632,destination:'/test-2/book.xls'};
+ assert.equal(validateExcelWorkbookArtifact(artifact),artifact);
+});
