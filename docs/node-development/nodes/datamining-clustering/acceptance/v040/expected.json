@@ -1,0 +1,89 @@
+{
+  "status": "proposal_not_stock_expected",
+  "cluster_ids": "unbound labels, not ranks",
+  "numeric_features": [
+    "X",
+    "Y"
+  ],
+  "retained_fields": [
+    "RowID",
+    "Category"
+  ],
+  "seed": 42,
+  "separated_centers": {
+    "A": [
+      2.0,
+      2.0
+    ],
+    "B": [
+      20.0,
+      2.0
+    ],
+    "C": [
+      2.0,
+      20.0
+    ]
+  },
+  "training_distance": 1.4142135623730951,
+  "raw_holdout": [
+    {
+      "RowID": 101,
+      "center": [
+        2.0,
+        2.0
+      ],
+      "distance": 2.0
+    },
+    {
+      "RowID": 102,
+      "center": [
+        20.0,
+        2.0
+      ],
+      "distance": 2.0
+    },
+    {
+      "RowID": 103,
+      "center": [
+        2.0,
+        20.0
+      ],
+      "distance": 2.0
+    },
+    {
+      "RowID": 104,
+      "center": [
+        20.0,
+        2.0
+      ],
+      "distance": 80.0
+    }
+  ],
+  "tolerance": {
+    "abs": 1e-08,
+    "rel": 1e-08
+  },
+  "g_means": {
+    "min_clusters": 2,
+    "max_clusters": 4,
+    "threshold": 1,
+    "exact_cluster_count": null,
+    "checks": [
+      "count within configured bounds",
+      "each input row exactly once",
+      "centers are means of assigned features",
+      "distance independently recomputed from assigned center"
+    ]
+  },
+  "apply": {
+    "retrain": false,
+    "expected_centers": "unchanged saved training centers",
+    "sensitivity": "holdout includes X=100, so retraining changes center B"
+  },
+  "unresolved": [
+    "g-means output not observed",
+    "manual range and control not observed",
+    "ratio normalizer absent in continuous and discrete UI; blocked",
+    "saved-model apply and native column ordering not observed"
+  ]
+}
