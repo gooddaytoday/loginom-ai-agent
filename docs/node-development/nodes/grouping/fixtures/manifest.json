@@ -1,0 +1,39 @@
+{
+  "status": "proposal",
+  "files": [
+    {
+      "file": "modes.csv",
+      "bytes": 168,
+      "sha256": "b1ef0720f0821b5898789de96a22dc71f2b5639dce979b61b322d3249cdd9c03",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input",
+      "rows": 13,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ]
+    }
+  ]
+}
