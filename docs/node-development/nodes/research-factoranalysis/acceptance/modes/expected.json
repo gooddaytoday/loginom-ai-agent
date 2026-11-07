@@ -1,0 +1,2427 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "eigenvalues": [
+    1.7999999999999998,
+    1.0,
+    0.20000000000000007
+  ],
+  "eigenvalue_selected": {
+    "0.95": 2,
+    "1.1": 1
+  },
+  "variance_selected": {
+    "50": 1,
+    "90": 2,
+    "99": 3
+  },
+  "unrotated_scores_all": [
+    [
+      -1.0,
+      -1.0,
+      -1.0
+    ],
+    [
+      -1.0,
+      1.0,
+      -1.0
+    ],
+    [
+      -1.0,
+      -1.0,
+      0.9999999999999996
+    ],
+    [
+      -1.0,
+      1.0,
+      0.9999999999999996
+    ],
+    [
+      1.0,
+      -1.0,
+      -0.9999999999999996
+    ],
+    [
+      1.0,
+      1.0,
+      -0.9999999999999996
+    ],
+    [
+      1.0,
+      -1.0,
+      1.0
+    ],
+    [
+      1.0,
+      1.0,
+      1.0
+    ]
+  ],
+  "unrotated_loadings_all": [
+    [
+      0.9486832980505138,
+      0.0,
+      0.31622776601683805
+    ],
+    [
+      0.9486832980505139,
+      0.0,
+      -0.316227766016838
+    ],
+    [
+      0.0,
+      1.0,
+      0.0
+    ]
+  ],
+  "apply_old_fit_scores": [
+    [
+      -1.7692937623650001e-16,
+      -3.0
+    ],
+    [
+      -1.7692937623650001e-16,
+      3.0
+    ],
+    [
+      -1.7692937623650001e-16,
+      -3.0
+    ],
+    [
+      -1.7692937623650001e-16,
+      3.0
+    ],
+    [
+      2.0,
+      -3.0
+    ],
+    [
+      2.0,
+      3.0
+    ],
+    [
+      1.9999999999999998,
+      -3.0
+    ],
+    [
+      1.9999999999999998,
+      3.0
+    ]
+  ],
+  "apply_loadings": [
+    [
+      0.9486832980505138,
+      0.0
+    ],
+    [
+      0.9486832980505139,
+      0.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "rotations": {
+    "varimax": {
+      "none": {
+        "angle": 0.5461122723720795,
+        "loadings": [
+          [
+            0.9709315863728931,
+            -0.09921193531731198
+          ],
+          [
+            0.8864289889820528,
+            -0.38590046178819015
+          ],
+          [
+            0.1913490954153183,
+            -0.9783599244113225
+          ]
+        ],
+        "scores": [
+          [
+            -1.2888347263796038,
+            1.0752204212319914
+          ],
+          [
+            -1.4520697547535075,
+            -0.9102584929668325
+          ],
+          [
+            -0.24783326981878295,
+            1.1415132155102596
+          ],
+          [
+            -0.41106829819268664,
+            -0.8439656986885641
+          ],
+          [
+            0.41106829819268664,
+            0.8439656986885641
+          ],
+          [
+            0.24783326981878295,
+            -1.1415132155102596
+          ],
+          [
+            1.4520697547535075,
+            0.9102584929668325
+          ],
+          [
+            1.2888347263796038,
+            -1.0752204212319914
+          ]
+        ]
+      },
+      "kaiser": {
+        "angle": 0.53923923298757,
+        "loadings": [
+          [
+            0.9715905358748685,
+            -0.09253639351290316
+          ],
+          [
+            0.8890603403915527,
+            -0.3797989337253846
+          ],
+          [
+            0.19806882924630165,
+            -0.9770216767766151
+          ]
+        ],
+        "scores": [
+          [
+            -1.2961942591997744,
+            1.0663368832474274
+          ],
+          [
+            -1.4457792647499959,
+            -0.9202170473899741
+          ],
+          [
+            -0.2556730197032415,
+            1.1397828994196517
+          ],
+          [
+            -0.4052580252534632,
+            -0.8467710312177495
+          ],
+          [
+            0.4052580252534632,
+            0.8467710312177495
+          ],
+          [
+            0.2556730197032415,
+            -1.1397828994196517
+          ],
+          [
+            1.4457792647499959,
+            0.9202170473899741
+          ],
+          [
+            1.2961942591997744,
+            -1.0663368832474274
+          ]
+        ]
+      }
+    },
+    "quartimax": {
+      "none": {
+        "angle": 0.4583146421263205,
+        "loadings": [
+          [
+            0.975891199827826,
+            -0.013693780507779918
+          ],
+          [
+            0.9168523323262466,
+            -0.30668765808881876
+          ],
+          [
+            0.27639943853068283,
+            -0.9578131176750047
+          ]
+        ],
+        "scores": [
+          [
+            -1.3781510444906204,
+            0.9580676409970756
+          ],
+          [
+            -1.3666608604856219,
+            -1.0340769744583136
+          ],
+          [
+            -0.3469721269967082,
+            1.1153851773719345
+          ],
+          [
+            -0.3354819429917099,
+            -0.8767594380834545
+          ],
+          [
+            0.3354819429917099,
+            0.8767594380834545
+          ],
+          [
+            0.3469721269967082,
+            -1.1153851773719345
+          ],
+          [
+            1.3666608604856219,
+            1.0340769744583136
+          ],
+          [
+            1.3781510444906204,
+            -0.9580676409970756
+          ]
+        ]
+      },
+      "kaiser": {
+        "angle": 0.4414173960500348,
+        "loadings": [
+          [
+            0.9759832625836176,
+            0.002797263417458451
+          ],
+          [
+            0.9219033772421118,
+            -0.29115233460453477
+          ],
+          [
+            0.2925436149125368,
+            -0.9530062179148122
+          ]
+        ],
+        "scores": [
+          [
+            -1.394142240787967,
+            0.9346450227797696
+          ],
+          [
+            -1.3489935410887735,
+            -1.0570210607120996
+          ],
+          [
+            -0.36576863593928066,
+            1.1093633560636298
+          ],
+          [
+            -0.32061993624008744,
+            -0.8823027274282393
+          ],
+          [
+            0.32061993624008744,
+            0.8823027274282393
+          ],
+          [
+            0.36576863593928066,
+            -1.1093633560636298
+          ],
+          [
+            1.3489935410887735,
+            1.0570210607120996
+          ],
+          [
+            1.394142240787967,
+            -0.9346450227797696
+          ]
+        ]
+      }
+    }
+  },
+  "null_training": {
+    "means": [
+      0.0,
+      0.5714285714285714,
+      0.0
+    ],
+    "population_sd": [
+      3.1622776601683795,
+      2.9692299558323607,
+      2.0
+    ],
+    "correlation": [
+      [
+        0.9999999999999998,
+        0.8520128672302585,
+        0.0
+      ],
+      [
+        0.8520128672302585,
+        1.0000000000000002,
+        -0.19245008972987526
+      ],
+      [
+        0.0,
+        -0.19245008972987526,
+        1.0
+      ]
+    ],
+    "eigenvalues": [
+      1.8734775114237134,
+      1,
+      0.12652248857628667
+    ]
+  },
+  "cases": {
+    "eigenvalue": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": -2.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 2.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": -2.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 2.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": -2.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 2.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": -2.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 2.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9486832980505138,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9486832980505139,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.0,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "variance": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": -2.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 2.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": -2.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 2.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": -2.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 2.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": -2.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 2.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9486832980505138,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9486832980505139,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.0,
+              "Factor2": 1.0,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "cap": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.0,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": -2.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.0,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 2.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": -1.0,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": -2.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.0,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 2.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 1.0,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": -2.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 1.0,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 2.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 1.0,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": -2.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 1.0,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 2.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9486832980505138
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9486832980505139
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "apply": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.7692937623650001e-16,
+              "Factor2": -3.0,
+              "Factor3": null,
+              "RowID": 1,
+              "X": 6.0,
+              "Y": -6.0,
+              "Z": -6.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.7692937623650001e-16,
+              "Factor2": 3.0,
+              "Factor3": null,
+              "RowID": 2,
+              "X": 6.0,
+              "Y": -6.0,
+              "Z": 6.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": -1.7692937623650001e-16,
+              "Factor2": -3.0,
+              "Factor3": null,
+              "RowID": 3,
+              "X": 8.0,
+              "Y": -8.0,
+              "Z": -6.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.7692937623650001e-16,
+              "Factor2": 3.0,
+              "Factor3": null,
+              "RowID": 4,
+              "X": 8.0,
+              "Y": -8.0,
+              "Z": 6.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 2.0,
+              "Factor2": -3.0,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 12.0,
+              "Y": 0.0,
+              "Z": -6.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 2.0,
+              "Factor2": 3.0,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 12.0,
+              "Y": 0.0,
+              "Z": 6.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 1.9999999999999998,
+              "Factor2": -3.0,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 14.0,
+              "Y": -2.0,
+              "Z": -6.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 1.9999999999999998,
+              "Factor2": 3.0,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 14.0,
+              "Y": -2.0,
+              "Z": 6.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9486832980505138,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9486832980505139,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.0,
+              "Factor2": 1.0,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "constant": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 0.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 0.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 0.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 0.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 0.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": -1.0,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 0.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 0.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 1.0,
+              "Factor2": 1.0,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 0.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9486832980505138,
+              "Factor2": 0.31622776601683794,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9486832980505139,
+              "Factor2": -0.31622776601683794,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.0,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "rank": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.2649110640673518,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -8.0,
+              "Z": 4.0,
+              "Tag": "a"
+            },
+            {
+              "Factor1": -0.6324555320336759,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 2.0,
+              "Tag": "b"
+            },
+            {
+              "Factor1": 0.6324555320336759,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 3,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": -2.0,
+              "Tag": "c"
+            },
+            {
+              "Factor1": 1.2649110640673518,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 4,
+              "X": 4.0,
+              "Y": 8.0,
+              "Z": -4.0,
+              "Tag": "d"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 1.0,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 1.0,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": -1.0,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "null": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -0.9709776035759237,
+              "Factor2": -1.2541194257249115,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": -2.0,
+              "Tag": "r1"
+            },
+            {
+              "Factor1": -1.1986220949106996,
+              "Factor2": 0.6967330142916176,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -2.0,
+              "Z": 2.0,
+              "Tag": "r2"
+            },
+            {
+              "Factor1": null,
+              "Factor2": null,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": null,
+              "Z": -2.0,
+              "Tag": "r3"
+            },
+            {
+              "Factor1": -1.2278939086577434,
+              "Factor2": 0.8360796171499412,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": -4.0,
+              "Z": 2.0,
+              "Tag": "r4"
+            },
+            {
+              "Factor1": 1.0290515648773262,
+              "Factor2": -0.8360796171499412,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": -2.0,
+              "Tag": "r5"
+            },
+            {
+              "Factor1": 0.8014070735425501,
+              "Factor2": 1.114772822866588,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 4.0,
+              "Z": 2.0,
+              "Tag": "r6"
+            },
+            {
+              "Factor1": 0.9997797511302824,
+              "Factor2": -0.6967330142916176,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": -2.0,
+              "Tag": "r7"
+            },
+            {
+              "Factor1": 0.7721352597955065,
+              "Factor2": 1.2541194257249115,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 2.0,
+              "Z": 2.0,
+              "Tag": "r8"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9440688537284837,
+              "Factor2": 0.22032632461961585,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9678526518597016,
+              "Factor2": 0.0,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": -0.21324341755759665,
+              "Factor2": 0.9754262200082646,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "varimax": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.2961942591997744,
+              "Factor2": 1.0663368832474274,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -5.0,
+              "Z": -4.0,
+              "Tag": "a"
+            },
+            {
+              "Factor1": -1.4457792647499959,
+              "Factor2": -0.9202170473899741,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -3.0,
+              "Z": 2.0,
+              "Tag": "b"
+            },
+            {
+              "Factor1": -0.2556730197032415,
+              "Factor2": 1.1397828994196517,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -1.0,
+              "Z": -4.0,
+              "Tag": "c"
+            },
+            {
+              "Factor1": -0.4052580252534632,
+              "Factor2": -0.8467710312177495,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": 1.0,
+              "Z": 2.0,
+              "Tag": "d"
+            },
+            {
+              "Factor1": 0.4052580252534632,
+              "Factor2": 0.8467710312177495,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": -1.0,
+              "Z": -2.0,
+              "Tag": "e"
+            },
+            {
+              "Factor1": 0.2556730197032415,
+              "Factor2": -1.1397828994196517,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 1.0,
+              "Z": 4.0,
+              "Tag": "f"
+            },
+            {
+              "Factor1": 1.4457792647499959,
+              "Factor2": 0.9202170473899741,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 3.0,
+              "Z": -2.0,
+              "Tag": "g"
+            },
+            {
+              "Factor1": 1.2961942591997744,
+              "Factor2": -1.0663368832474274,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 5.0,
+              "Z": 4.0,
+              "Tag": "h"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9715905358748685,
+              "Factor2": -0.09253639351290316,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.8890603403915527,
+              "Factor2": -0.3797989337253846,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.19806882924630165,
+              "Factor2": -0.9770216767766151,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "quartimax": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.factor_analysis"
+        },
+        {
+          "type": "exports.text"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "factor_signs": {
+        "columns": [
+          "Factor1",
+          "Factor2"
+        ],
+        "ports": [
+          0,
+          1
+        ]
+      },
+      "outputs": [
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "X",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Y",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Z",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "Tag",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Factor1": -1.394142240787967,
+              "Factor2": 0.9346450227797696,
+              "Factor3": null,
+              "RowID": 1,
+              "X": -4.0,
+              "Y": -5.0,
+              "Z": -4.0,
+              "Tag": "a"
+            },
+            {
+              "Factor1": -1.3489935410887735,
+              "Factor2": -1.0570210607120996,
+              "Factor3": null,
+              "RowID": 2,
+              "X": -4.0,
+              "Y": -3.0,
+              "Z": 2.0,
+              "Tag": "b"
+            },
+            {
+              "Factor1": -0.36576863593928066,
+              "Factor2": 1.1093633560636298,
+              "Factor3": null,
+              "RowID": 3,
+              "X": -2.0,
+              "Y": -1.0,
+              "Z": -4.0,
+              "Tag": "c"
+            },
+            {
+              "Factor1": -0.32061993624008744,
+              "Factor2": -0.8823027274282393,
+              "Factor3": null,
+              "RowID": 4,
+              "X": -2.0,
+              "Y": 1.0,
+              "Z": 2.0,
+              "Tag": "d"
+            },
+            {
+              "Factor1": 0.32061993624008744,
+              "Factor2": 0.8823027274282393,
+              "Factor3": null,
+              "RowID": 5,
+              "X": 2.0,
+              "Y": -1.0,
+              "Z": -2.0,
+              "Tag": "e"
+            },
+            {
+              "Factor1": 0.36576863593928066,
+              "Factor2": -1.1093633560636298,
+              "Factor3": null,
+              "RowID": 6,
+              "X": 2.0,
+              "Y": 1.0,
+              "Z": 4.0,
+              "Tag": "f"
+            },
+            {
+              "Factor1": 1.3489935410887735,
+              "Factor2": 1.0570210607120996,
+              "Factor3": null,
+              "RowID": 7,
+              "X": 4.0,
+              "Y": 3.0,
+              "Z": -2.0,
+              "Tag": "g"
+            },
+            {
+              "Factor1": 1.394142240787967,
+              "Factor2": -0.9346450227797696,
+              "Factor3": null,
+              "RowID": 8,
+              "X": 4.0,
+              "Y": 5.0,
+              "Z": 4.0,
+              "Tag": "h"
+            }
+          ]
+        },
+        {
+          "output_node_type": "research.factor_analysis",
+          "output_port": 1,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColumnName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColumnDisplayName",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Factor1",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor2",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Factor3",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColumnName": "X",
+              "ColumnDisplayName": "X",
+              "Factor1": 0.9759832625836176,
+              "Factor2": 0.002797263417458451,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Y",
+              "ColumnDisplayName": "Y",
+              "Factor1": 0.9219033772421118,
+              "Factor2": -0.29115233460453477,
+              "Factor3": 0.0
+            },
+            {
+              "ColumnName": "Z",
+              "ColumnDisplayName": "Z",
+              "Factor1": 0.2925436149125368,
+              "Factor2": -0.9530062179148122,
+              "Factor3": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "unresolved": [
+    "native strict eigenvalue equality"
+  ],
+  "tolerance": {
+    "abs": 1e-08,
+    "rel": 1e-10
+  }
+}
