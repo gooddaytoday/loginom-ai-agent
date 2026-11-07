@@ -44,11 +44,13 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   return description.node_types[0];
  });
  const sizes=cards.map(card=>({type:card.type,bytes:bytes(card)})).sort((a,b)=>b.bytes-a.bytes);
+ t.diagnostic(JSON.stringify({rest_request_card_bytes:sizes.find(card=>card.type==='integration.rest_request')?.bytes}));
  t.diagnostic(JSON.stringify({registered_types:types.length,largest_five:sizes.slice(0,5)}));
  for(const card of cards)await t.test(card.type,()=>{
   assert.equal(card.candidate_node_apply_available,true,card.type);
   assert.ok(card.parameter_schema,`${card.type}: missing parameter_schema`);
   const size=bytes(card),budget=NODE_CARD_BUDGET_EXCEPTIONS[card.type]??12000;
+  if(card.type==='datamining.lin_regression')t.diagnostic(JSON.stringify({lin_regression_card_bytes:size}));
   if(card.type==='datamining.log_regression')t.diagnostic(JSON.stringify({log_regression_card_bytes:size}));
   assert.ok(size<=budget,`${card.type}: ${size} bytes; budget ${budget} bytes; headroom ${budget-size} bytes`);
  });

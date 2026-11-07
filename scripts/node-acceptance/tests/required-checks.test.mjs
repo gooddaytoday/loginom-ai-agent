@@ -72,6 +72,11 @@ for(const [path,scenario] of [
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });
 
+test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
+ for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
+ assert.ok(!text.includes('rest-methods-body'));
+});
 test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t=>{
  const r=repo(t);assert.deepEqual(ids(r.list()),[]);
  r.commit('unrelated file.md');const head=r.git('rev-parse','HEAD');

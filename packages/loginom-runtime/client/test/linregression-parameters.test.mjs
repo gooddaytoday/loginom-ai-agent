@@ -24,7 +24,7 @@ test('overlap, ambiguous names and later-stage model options refuse before brows
  assert.throws(()=>validateLinRegressionParameters({...p,target_field:'x'},'enter'),/distinct/);
  assert.throws(()=>resolveLinRegressionRoles(p,[...fields,{...fields[1],name:'x'}]),/unique/);
  assert.throws(()=>validateLinRegressionParameters({...p,holdout:'holdout.csv'},'enter'),/use input_fields/);
- assert.throws(()=>validateLinRegressionParameters(p,'ridge'),/only Enter/);
+ assert.throws(()=>validateLinRegressionParameters(p,'ridge'),/ridge requires/);
  const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0,1]}};
  validateLinRegressionParameters(p,'enter',request);
  assert.throws(()=>validateLinRegressionParameters(p,'enter',{...request,read:{ports:[2]}}),/output 1/);
