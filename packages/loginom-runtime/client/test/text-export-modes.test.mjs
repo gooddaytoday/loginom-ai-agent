@@ -41,23 +41,25 @@ test('actual export readback validates for both representations and every regist
   delete readback.format;assert.equal(validate(result).valid,true,'legacy readbacks remain valid');
  }
 });
-function fixture({initial='delimited',mode='fixed_width',encoding,wrong=false,unrelated=false}={}){
- let stage='text_export_params',format=initial,code=65001,opened=false;
+function fixture({initial='delimited',mode='fixed_width',encoding,bomRequested,initialBom=false,wrong=false,unrelated=false}={}){
+ let stage='text_export_params',format=initial,code=65001,opened=false,bom=initialBom;
  const actions=[];
  const tid=base+'edtCodePage;ValueControl';
  const snapshot=()=>({wizard:{stage,root_tid:root,root_ref:'wizard'},ui:{elements:[
+  {ref:'bom',tid:base+'edtWriteBOM;ValueControl;DisplayEl',allowed_actions:['set_checked']},
   ...['delimited','fixed_width'].map((mode,i)=>({ref:mode,tid:base+'edtFormatType;ValueControl;radiofield'+(i?'-1':'')+';DisplayEl',allowed_actions:['set_checked'],check_state:{kind:'radio',checked:format===mode}})),
   {ref:'picker',tid:tid+';trg_picker',allowed_actions:['click'],interaction:{state:'point_observed'},wizard_combo:{field:{name:'encoding',value:code}}},
   ...(opened?encodings.map(([name,value,label])=>({ref:name,tid:tid+';boundlist;'+value,label,allowed_actions:['select_wizard_option']})):[])
  ]}});
- const native=()=>({verified:true,stage,format,values:stage==='text_export_params'?{destination:{value:'/test-2/fixed.txt'}}:{encoding:{value:code,tid},delimiter:{value:unrelated&&actions.length?',':';'}}});
+ const native=()=>({verified:true,stage,format,values:stage==='text_export_params'?{destination:{value:'/test-2/fixed.txt'}}:{encoding:{value:code,tid},bom:{value:bom,tid:base+'edtWriteBOM;ValueControl'},delimiter:{value:unrelated&&actions.length?',':';'}}});
  const channel={observe:async o=>{const s=snapshot();assert.ok(o.ready(s));return s;},perform:async o=>{
   const s=snapshot();assert.ok(o.ready(s));const a=o.resolve(s);actions.push(a);
-  if(a.verb==='set_checked'){assert.equal(a.checked,true);if(!wrong)format=a.ref;}
+  if(a.verb==='set_checked'&&a.ref==='bom')bom=a.checked;
+  else if(a.verb==='set_checked'){assert.equal(a.checked,true);if(!wrong)format=a.ref;}
   if(a.verb==='click')opened=true;
-  if(a.verb==='select_wizard_option'&&!wrong)code=encodings.find(e=>e[0]===a.ref)[1];
+  if(a.verb==='select_wizard_option'&&!wrong){code=encodings.find(e=>e[0]===a.ref)[1];if([1200,1201].includes(code))bom=true;}
  }};
- return {actions,run:()=>configureTextExport(channel,{...(encoding?{encoding}:{}),delimiter:';'},{...binding,mode,finish:'close',deadline:Date.now()+60000},{operation:{id:'mode'},onRecord:async e=>e,receiptOptions:()=>({}),execute:async source=>{
+ return {actions,run:()=>configureTextExport(channel,{...(bomRequested!==undefined?{bom:bomRequested}:{}),...(encoding?{encoding}:{}),delimiter:';'},{...binding,mode,finish:'close',deadline:Date.now()+60000},{operation:{id:'mode'},onRecord:async e=>e,receiptOptions:()=>({}),execute:async source=>{
   if(source.includes('function exportNext')){stage='text_export_format';return {status:'SUCCEEDED',cleanup_complete:true,output:{existed:false}};}
   return native();
  }})};
@@ -74,12 +76,14 @@ test('production writer chooses all three observed encoding labels',async()=>{
  for(const [encoding,code] of encodings){
   const f=fixture({encoding}),result=await f.run();
   assert.equal(result.configuration.configured.text_export_format.values.encoding.value,code);
-  assert.equal(f.actions.at(-1).ref,encoding);
+  assert.ok(f.actions.some(a=>a.verb==='select_wizard_option'&&a.ref===encoding));
+  assert.equal(result.configuration.configured.text_export_format.values.bom.value,false);
  }
 });
 test('mode selection refuses wrong or collateral native changes',async()=>{
  await assert.rejects(fixture({wrong:true}).run(),/format differs/);
  await assert.rejects(fixture({unrelated:true}).run(),/Unrequested export setting changed: delimiter/);
+ await assert.rejects(fixture({mode:'delimited',encoding:'UTF-16 LE',unrelated:true}).run(),/Unrequested export setting changed: delimiter/);
 });
 
 test('native DOM reader distinguishes both format radios and refuses variable/unknown formats',async t=>{
@@ -90,5 +94,13 @@ test('native DOM reader distinguishes both format radios and refuses variable/un
   await page.evaluate(({value,pressed})=>{globalThis.Ext={getCmp:id=>({el:{dom:document.getElementById(id)},getValue:()=>value,pressed})};},{value,pressed});
   const result=await page.evaluate(readTextExportBrowser,{prefix:'MF;TF-1',fields:{}});
   assert.equal(result.verified,format!==null);if(format)assert.equal(result.format,format);
+ }
+});
+
+test('native UTF-16 BOM default honors true/false and preserves omitted patch BOM',async()=>{
+ for(const encoding of ['UTF-16 LE','UTF-16 BE'])for(const initialBom of [false,true])for(const bomRequested of [undefined,false,true]){
+  const f=fixture({mode:'delimited',encoding,initialBom,bomRequested}),r=await f.run();
+  assert.equal(r.configuration.configured.text_export_format.values.bom.value,bomRequested??initialBom);
+  assert.equal(f.actions.filter(a=>a.ref==='bom').length,(bomRequested??initialBom)?0:1);
  }
 });

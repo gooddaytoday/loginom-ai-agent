@@ -99,7 +99,11 @@ export async function configureTextExport(channel,p,ctx,options){
    for(const key of Object.keys(current.values))need(same(current.values[key],after.values[key]),'Unrequested export setting changed: '+key);
    current=after;
   }
-  for(const [key,value]of Object.entries(p)){
+  // Selecting native UTF-16 enables BOM itself. Resolve that observed default
+  // before applying the requested BOM, or restoring the omitted patch value.
+  const settings=stage==='text_export_format'&&['UTF-16 LE','UTF-16 BE'].includes(p.encoding)
+   ?[...Object.entries(p).filter(([key])=>key!=='bom'),['bom',p.bom??current.values.bom.value]]:Object.entries(p);
+  for(const [key,value]of settings){
    if(key==='delimiter'&&(ctx.mode??current.format)==='fixed_width')continue;
    if(key==='overwrite'||EXPORT_FIELDS[key]?.[0]!== (stage==='text_export_params'?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard'))continue;
    const expected=nativeExportValue(key,value);if(current.values[key].value===expected)continue;
@@ -128,7 +132,11 @@ export async function configureTextExport(channel,p,ctx,options){
     await channel.perform({condition:'choose export '+key,initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
    }
    const after=await native();need(after.values[key].value===expected,'Export setting differs: '+key);
-   for(const other of Object.keys(current.values))if(other!==key)need(same(current.values[other],after.values[other]),'Unrequested export setting changed: '+other);
+   for(const other of Object.keys(current.values))if(other!==key){
+    const nativeBom=key==='encoding'&&[1200,1201].includes(expected)&&other==='bom'
+     &&current.values[other].value===false&&after.values[other].value===true;
+    need(same(nativeBom?{...current.values[other],value:true,display:after.values[other].display}:current.values[other],after.values[other]),'Unrequested export setting changed: '+other);
+   }
    current=after;
   }
   configured[stage]=current;
