@@ -59,5 +59,19 @@ test('C3 production capability selects the exact range, toggles extension and in
    assert.deepEqual(result.configuration.columns.map(c=>c.name),['Id','Amount']);
    if(inspect)assert.equal(result.configuration.source.sheet_method,'Именованный диапазон');
   }
+  const missing=file+'cbbTableName;ValueContainer;cbx;trg_picker';
+  await page.evaluate(({file,missing})=>{
+   window.reopen();
+   document.querySelector('[data-tid='+JSON.stringify(file+'cbbTableNamingMethod;ValueControl')+'] input').value='По номеру';
+   document.querySelector('[data-tid='+JSON.stringify(file+'cbbTableName;ValueContainer;cbx')+'] input').value='1';
+   document.querySelector('[data-tid='+JSON.stringify(missing)+']').remove();
+  },{file,missing});
+  const failed=await excelConfigureCapability(page,{deadline:Date.now()+2000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},
+   excel:{source_path:'/worker/named.xlsx',named_range:'SalesRange',extend_range:false,header_rows:1,columns:[]},origin:'null',build:'test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
+  assert.equal(failed.verified,false);assert.ok(failed.error.includes(missing),failed.error);
+  assert.equal(failed.diagnostic.status,'observed');
+  assert.ok(failed.diagnostic.visible_panels.includes(file.slice(0,-1)));
+  assert.ok(failed.diagnostic.controls.some(c=>c.tid===file+'cbbTableName;ValueContainer;cbx'));
+  assert.equal(failed.diagnostic.controls.some(c=>c.tid===missing),false);
  }finally{await browser.close();}
 });

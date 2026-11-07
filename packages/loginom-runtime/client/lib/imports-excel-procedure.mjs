@@ -9,13 +9,15 @@ export async function excelConfigureCapability(page,t,readContext){
  const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node};
  const root=t.workflow_ref.prefix+';WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
- let effect=false;
+ let effect=false,waitingFor=null;
  try{
   const guard=async()=>{remaining();const b=await readContext(page,binding);need(b.verified&&b.surface==='wizard'&&b.node_id===t.node.node_id,'owned wizard changed');
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
   const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
-  const point=locator=>wait('Excel control reachable: '+locator,async()=>{
+  const point=locator=>{
+   waitingFor=String(locator);
+   return wait('Excel control reachable: '+locator,async()=>{
    await quiet();await guard();const count=await locator.count();
    // Choosing a named object remounts dependent controls after the native mask
    // has gone. Wait before a gesture; multiple owners still refuse immediately.
@@ -23,7 +25,8 @@ export async function excelConfigureCapability(page,t,readContext){
    need(count===1,'control missing or ambiguous: '+locator);
    return locator.evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
     if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))return null;return{x,y};});
-  });
+   }).then(p=>{waitingFor=null;return p;});
+  };
   const click=async(locator,double=false)=>{await quiet();await guard();const p=await point(locator);effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
   const fill=async(locator,value)=>{await quiet();await guard();await point(locator);effect=true;await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
   const choose=async(owner,value,optionTid)=>{
@@ -126,5 +129,29 @@ export async function excelConfigureCapability(page,t,readContext){
   await advance();await wait('Excel completion page',()=>find(root+';DoneWizard').isVisible());
   const reverse=Object.fromEntries(Object.entries(types).map(([k,v])=>[v,k]));
   return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source,auto_detect:'Нет',columns:current.map(f=>({...f,type:reverse[f.type]}))}};
- }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
+ }catch(error){
+  // Private failure evidence, journaled by node_step_completed. No gestures or
+  // arbitrary field values: capture only this still-owned wizard's DOM controls.
+  let diagnostic;
+  if(waitingFor&&t.excel.named_range!==undefined)try{
+   const before=await readContext(page,binding);
+   need(before.verified&&before.surface==='wizard'&&before.node_id===t.node.node_id,'diagnostic owner changed');
+   need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'diagnostic target changed');
+   const dom=await page.evaluate(({root})=>{
+    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+    if(exact(root).length!==1)throw Error('diagnostic wizard ambiguous');
+    const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';};
+    const all=[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid').startsWith(root+';'));
+    return {wizard_tid:root,visible_panels:['ImportExcelFilePreviewWizard','ImportExcelColumnDefsWizard','ColumnsMappingEngineOutputPortWizard','DoneWizard']
+     .map(p=>root+';'+p).filter(tid=>exact(tid).length===1&&visible(exact(tid)[0])),total_controls:all.length,truncated:all.length>256,
+     controls:all.slice(0,256).map(e=>{const r=e.getBoundingClientRect();return {tid:e.getAttribute('data-tid'),tag:e.tagName.toLowerCase(),role:e.getAttribute('role'),
+      class_name:String(e.className).slice(0,256),visible:visible(e),disabled:e.matches(':disabled')||Boolean(e.closest('.x-item-disabled,.x-btn-disabled')),
+      input_type:e.getAttribute('type'),rect:{x:r.x,y:r.y,width:r.width,height:r.height}};})};
+   },{root});
+   const after=await readContext(page,binding);
+   need(JSON.stringify(before)===JSON.stringify(after),'diagnostic owner changed');
+   diagnostic={status:'observed',waiting_for:waitingFor,...dom};
+  }catch{diagnostic={status:'unavailable',waiting_for:waitingFor};}
+  return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message+(waitingFor?' ['+waitingFor+']':'')).slice(0,1000),...(diagnostic?{diagnostic}:{})};
+ }
 }
