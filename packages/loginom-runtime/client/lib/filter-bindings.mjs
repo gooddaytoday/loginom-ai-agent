@@ -57,3 +57,15 @@ export async function configureSavedFilterBindings(channel,parameters,bindings,b
  need(JSON.stringify(s.node_filter.rows.map(r=>r.record_id))===JSON.stringify(baseline.rows.map(r=>r.record_id)),'BINDING_CONFLICT','row identity changed');
  return {verified:true,cleanup_complete:true,effect_possible:true,baseline,configuration:s.node_filter,groups};
 }
+
+export function validateFilterBindingValues(parameters,bindings,native,variables=native.control_variables){
+ const groups=[[]];for(const row of native.rows){if(row.kind==='or')groups.push([]);else groups.at(-1).push(row);}
+ for(const b of bindings){
+  const [,,g,c]=b.parameter.split('/'),condition=parameters.groups?.[Number(g)]?.[Number(c)]??groups[Number(g)]?.[Number(c)];
+  need(condition,'BINDING_PARAMETER_UNSUPPORTED',b.parameter);
+  const matches=variables.filter(v=>v.name===b.variable.name);need(matches.length===1,'BINDING_VARIABLE_MISSING',b.parameter);
+  const v=matches[0];need(v.type===condition.type,'BINDING_TYPE_MISMATCH',b.parameter);
+  need(v.is_null===false,'BINDING_NULL_UNSUPPORTED',b.parameter);
+  need(v.type==='integer'?Number.isSafeInteger(v.value):v.type==='string'&&typeof v.value==='string','BINDING_TYPE_MISMATCH',b.parameter);
+ }
+}

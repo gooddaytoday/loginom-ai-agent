@@ -1,14 +1,14 @@
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
-const need=(ok,message)=>{if(!ok)throw Error('Binding readback: '+message);};
+const need=(ok,message)=>{if(!ok)throw Error(message.startsWith('BINDING_')?message:'Binding readback: '+message);};
 export function filterBindingVariables(native,mapping,proof,names){
  need(proof?.verified===true&&proof.independent_readback===true&&Array.isArray(proof.variables),'independent source');
  return native.control_variables.map(v=>{
   if(!names.includes(v.name))return v;
   const fields=mapping?.fields?.filter(f=>f.name===v.name&&f.index===v.index)??[];need(fields.length===1&&fields[0].source,'mapped connected identity');
   const f=fields[0],sources=proof.variables.filter(x=>x.id===f.source.id&&x.name===f.source.name);need(sources.length===1,'source variable identity');
-  const source=sources[0],cell=source.cell;need(source.type===v.type&&cell?.type===v.type&&({integer:4,string:5})[v.type]===f.type,'source scalar type');
-  need(cell.is_null===false,'NULL is unsupported');
+  const source=sources[0],cell=source.cell;need(source.type===v.type&&cell?.type===v.type&&({integer:4,string:5})[v.type]===f.type,'BINDING_TYPE_MISMATCH: source scalar type');
+  need(cell.is_null===false,'BINDING_NULL_UNSUPPORTED: NULL is unsupported');
   const value=v.type==='integer'?Number(cell.value):cell.value;
   need(v.type==='integer'?cell.precision==='exact_integer'&&Number.isSafeInteger(value)&&String(value)===cell.value:typeof value==='string','exact source scalar');
   need(v.is_null===true||v.is_null===false&&v.value===value,'source/cache race');
@@ -30,8 +30,8 @@ export function filterBindingInventory(native,mapping,graph,node,sourceProof){
   const variables=controlVariables.filter(v=>v.name===row.value.name),fields=mapping.fields.filter(f=>f.name===row.value.name);
   need(variables.length===1&&fields.length===1,'unique mapped name');
   const v=variables[0],f=fields[0],types={4:'integer',5:'string'};
-  need(v.index===f.index&&v.type===row.type&&types[f.type]===v.type,'mapped type/index');
-  need(v.is_null===false&&(f.is_null===false||sourceProof),'NULL is unsupported');
+  need(v.index===f.index&&v.type===row.type&&types[f.type]===v.type,'BINDING_TYPE_MISMATCH: mapped type/index');
+  need(v.is_null===false&&(f.is_null===false||sourceProof),'BINDING_NULL_UNSUPPORTED: NULL is unsupported');
   need(Number.isSafeInteger(f.id)&&f.source&&Number.isSafeInteger(f.source.id)&&f.source.type===f.type&&links.length===1&&links[0].target_port_guid===mapping.port_guid,'connected source identity');
   const sources=graph.nodes.filter(n=>n.ref.node_id===links[0].source);need(sources.length===1,'source owner');
   inventory.push({parameter,mode:'variable',row_id:row.record_id,variable:{kind:'control',input:0,id:f.id,name:f.name,type:v.type,is_null:false},

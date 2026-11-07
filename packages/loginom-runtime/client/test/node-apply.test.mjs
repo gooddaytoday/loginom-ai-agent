@@ -831,3 +831,7 @@ for(const owned of [false,true])test('W1 variable output requires an owned compl
  f.drivers.readOutput=async()=>{f.calls.push('read');return {verified:true,cleanup_complete:true,status:'complete',execution_id:'execution1',evidence_ref:'e',ports:[{port:0,fresh:true}],variable_ports:[{port:0,kind:'variables',source:'execution',native_source:'VariablesForm',execution_id:'execution1',fresh:true,complete:true,read_id:'new-read',count:0,variables:[],completeness:{count:0,store_count:0,unique_ids:0}}]};};
  const result=await f.run(r);assert.equal(result.status,owned?'SUCCEEDED':'AMBIGUOUS');assert.equal(f.calls.includes('read'),owned);
 });
+for(const code of ['BINDING_TYPE_MISMATCH','BINDING_NULL_UNSUPPORTED'])test('binding refusal keeps its public reason '+code,async()=>{
+ const f=fixture();f.drivers.prepareTarget=async()=>{throw Object.assign(Error(code+': /groups/0/0/value'),{nodePhaseRefusal:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}});};
+ const r=await f.run();assert.equal(r.error.code,code);assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);
+});

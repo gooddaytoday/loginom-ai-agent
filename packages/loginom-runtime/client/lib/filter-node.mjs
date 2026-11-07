@@ -1,6 +1,6 @@
 import {isUnchangedTransformExecution} from './node-read-contract.mjs';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
-import {resolveFilterBindings,filterBindingSchema,preserveFilterBindings,configureSavedFilterBindings} from './filter-bindings.mjs';
+import {validateFilterBindingValues,resolveFilterBindings,filterBindingSchema,preserveFilterBindings,configureSavedFilterBindings} from './filter-bindings.mjs';
 import {readFilterBindings,filterBindingVariables} from './variable-binding-readback.mjs';
 import {preflightBuiltinBindings} from './variable-binding-source.mjs';
 import {validateFilterConditions,resolveFilterConditions,isFilterVariable} from './filter-parameters.mjs';
@@ -55,6 +55,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
    preserveFilterBindings(s.node_filter,p,request.bindings);
    if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
     [...request.bindings.map(b=>b.variable.name),...s.node_filter.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
+   validateFilterBindingValues(p,request.bindings,s.node_filter,controlVariables);
    if(request.bindings.length&&p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,s.node_filter,{controlVariables});
    else p=resolveFilterBindings(p,request.bindings);
   }

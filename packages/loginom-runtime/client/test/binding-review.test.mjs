@@ -30,3 +30,8 @@ test('builtin source validation follows saved mapped names and IDs rather than t
  const bad=structuredClone(mapping);bad.fields[0].source.id=8;
  assert.throws(()=>validateBuiltinBindingSource(source,r,bad),/BINDING_VARIABLE_MISSING/);
 });
+import {validateFilterBindingValues} from '../lib/filter-bindings.mjs';
+for(const existing of [false,true])for(const fault of ['type','NULL'])test('bound '+(existing?'saved':'calculator-source')+' operand uses a typed '+fault+' refusal',()=>{
+ const p=existing?{}:{groups:[[scalar]]},native={rows:[{kind:'condition',type:'integer'}],control_variables:[{name:'Limit',type:fault==='type'?'string':'integer',is_null:fault==='NULL',value:5}]};
+ assert.throws(()=>validateFilterBindingValues(p,[binding],native),fault==='type'?/BINDING_TYPE_MISMATCH/:/BINDING_NULL_UNSUPPORTED/);
+});
