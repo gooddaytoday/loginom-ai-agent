@@ -1,0 +1,5 @@
+Value;Replacement;Info;Ignored
+AB-12;FIRST;primary;x
+AB-12;SECOND;duplicate;y
+EXACT;EXTERNAL;literal;z
+?;MISSING;null-key;w

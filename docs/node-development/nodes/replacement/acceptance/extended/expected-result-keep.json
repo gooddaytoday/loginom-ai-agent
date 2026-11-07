@@ -1,0 +1,126 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "variant",
+          "label_any": true
+        },
+        {
+          "name": "Status_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Code": "AB-12",
+          "Status": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Keep": "a",
+          "Status_Replaced": true
+        },
+        {
+          "Id": 2,
+          "Code": "AB-00",
+          "Status": {
+            "cell_type": "string",
+            "value": "no"
+          },
+          "Keep": "b",
+          "Status_Replaced": false
+        },
+        {
+          "Id": 3,
+          "Code": "XAB-34Y",
+          "Status": {
+            "cell_type": "string",
+            "value": "unknown"
+          },
+          "Keep": "c",
+          "Status_Replaced": false
+        },
+        {
+          "Id": 4,
+          "Code": "ab-56",
+          "Status": null,
+          "Keep": "d",
+          "Status_Replaced": false
+        },
+        {
+          "Id": 5,
+          "Code": "",
+          "Status": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Keep": "e",
+          "Status_Replaced": true
+        },
+        {
+          "Id": 6,
+          "Code": null,
+          "Status": {
+            "cell_type": "string",
+            "value": "no"
+          },
+          "Keep": "f",
+          "Status_Replaced": false
+        },
+        {
+          "Id": 7,
+          "Code": "OTHER",
+          "Status": {
+            "cell_type": "string",
+            "value": "unknown"
+          },
+          "Keep": "g",
+          "Status_Replaced": false
+        },
+        {
+          "Id": 8,
+          "Code": "EXACT",
+          "Status": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Keep": "h",
+          "Status_Replaced": true
+        }
+      ]
+    }
+  ]
+}

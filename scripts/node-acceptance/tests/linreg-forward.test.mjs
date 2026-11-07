@@ -24,3 +24,12 @@ s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-c
 c=m.scenario('linreg-forward-r2-cutoffs');print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
  assert.deepEqual(value,{task:'task-forward-r2-cutoffs.md',expected:'expected/forward-r2.json',files:['selection.csv']});
 });
+
+test('C2 Backward delivers the original business task and only selection.csv with C1 F oracle',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-backward-f');f=m.scenario('linreg-forward-f');e=m.expected_for(c,'/worker/c2.lgp')
+assert e==m.expected_for(f,'/worker/c2.lgp')
+print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
+ assert.deepEqual(value,{task:'task-backward.md',expected:'expected/forward-f.json',files:['selection.csv']});
+});

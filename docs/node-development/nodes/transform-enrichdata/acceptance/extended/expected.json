@@ -1,0 +1,110 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.enrich_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.enrich_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Key",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "A",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "C",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Key": 1,
+          "Note": "one",
+          "A": "a1",
+          "B": "b1",
+          "C": "c1"
+        },
+        {
+          "RowID": 1,
+          "Key": 1,
+          "Note": "one",
+          "A": "a1",
+          "B": "b1",
+          "C": "c1copy"
+        },
+        {
+          "RowID": 1,
+          "Key": 1,
+          "Note": "one",
+          "A": "a1copy",
+          "B": "b1",
+          "C": "c1"
+        },
+        {
+          "RowID": 1,
+          "Key": 1,
+          "Note": "one",
+          "A": "a1copy",
+          "B": "b1",
+          "C": "c1copy"
+        },
+        {
+          "RowID": 2,
+          "Key": 2,
+          "Note": "",
+          "A": "a2",
+          "B": null,
+          "C": "c2"
+        },
+        {
+          "RowID": 3,
+          "Key": null,
+          "Note": null,
+          "A": "a-null",
+          "B": "b-null",
+          "C": "c-null"
+        },
+        {
+          "RowID": 4,
+          "Key": 4,
+          "Note": "unmatched",
+          "A": null,
+          "B": null,
+          "C": null
+        }
+      ]
+    }
+  ]
+}
