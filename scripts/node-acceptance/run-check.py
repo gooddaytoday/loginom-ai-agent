@@ -200,6 +200,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name in ['text-auto-types', 'text-auto-update']:
+        node = REPO / 'docs/node-development/nodes/text-import'
+        update = name == 'text-auto-update'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
+                    data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=2 if update else 1)
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

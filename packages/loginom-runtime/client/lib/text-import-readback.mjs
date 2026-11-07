@@ -23,7 +23,7 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     return [name,f.value];
   }));
   const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title']);
-  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
+  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','date_format','date_separator','auto_detect_columns','analysis_rows'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
   requireValue(typeof source.first_line_as_title==='boolean'
     &&Object.entries(source).every(([k,v])=>k==='first_line_as_title'||typeof v==='string')
     &&Object.entries(format).every(([k,v])=>typeof v===(k==='multiple_delimiters'?'boolean':'string')),'invalid observed field types');
