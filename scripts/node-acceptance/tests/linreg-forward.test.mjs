@@ -17,3 +17,10 @@ print(json.dumps(out))`],{encoding:'utf8'}));
  for(const c of result){assert.equal(c.expected.package_path,'/worker/c1.lgp');assert.equal(c.expected.outputs.length,2);assert.equal(c.expected.outputs[0].rows.length,16);assert.equal(c.expected.outputs[0].columns[0].label,'Y|Регрессия');assert.equal(c.expected.outputs[1].columns[0].label,'Имена входных полей');assert.equal(c.expected.outputs[1].columns[1].label,'Y|Коэффициенты');assert.deepEqual(c.expected.outputs[0].columns.filter(f=>/^X/.test(f.name)).map(f=>f.type),['integer','integer','integer']);}
  assert.deepEqual(result.map(c=>c.expected.outputs[1].rows.map(r=>r.Name)),[['<Константа>','X1','X2'],['<Константа>','X1','X2','X3']]);
 });
+
+test('R2 0/1 diagnostic retains the approved independent expected file',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-forward-r2-cutoffs');print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
+ assert.deepEqual(value,{task:'task-forward-r2-cutoffs.md',expected:'expected/forward-r2.json',files:['selection.csv']});
+});

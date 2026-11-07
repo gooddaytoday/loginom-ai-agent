@@ -57,7 +57,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const preserve=request.mode==='apply',forward=request.mode==='forward',method=forward?1:0,methodLabel=forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
+ const preserve=request.mode==='apply',forward=request.mode==='forward',r2=p.linear_regression?.selection?.criterion==='r2',stageRemoval=forward&&r2&&p.linear_regression.selection.remove_significance!==undefined,method=stageRemoval?3:forward?1:0,methodLabel=stageRemoval?'Stepwise (Пошаговое включение/исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -114,9 +114,18 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    state=await observe('details','linear criterion readback');
   }
   need(state.node_linregression.values.pedRegSelQuality===criterion,'selection criterion readback differs');
-  need((criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected Forward cutoff availability');
-  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[['pedAddSignificance',wanted.add_significance??0.05]]:[])]){
+  need((criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===!stageRemoval,'unexpected Forward cutoff availability');
+  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[['pedAddSignificance',wanted.add_significance??0.05]]:criterion===1&&wanted.add_significance!==undefined?[['pedAddSignificance',wanted.add_significance]]:[]),...(stageRemoval?[['pedRemoveSignificance',wanted.remove_significance]]:[])]){
    if(state.node_linregression.values[key]!==value){
+    need(state.node_linregression.disabled[key]!==true,'requested cutoff must be natively editable: '+key);
+    const field=control(state,key+';ValueControl','fill'),scroll=field.scroll;
+    if(key!=='pedEpsilon'&&scroll&&scroll.top<scroll.max_top){
+     await channel.perform({condition:'reveal linear cutoff in its native detail pane',initialObservation:state,ready:ready('details'),identity:s=>s.prepared_node_context,
+      resolve:s=>{const target=control(s,key+';ValueControl','fill'),base=s.wizard.root_tid+';LinRegressionWizard-1;';
+       const anchor=s.ui.elements.find(e=>e.scroll?.ref===target.scroll.ref&&e.enabled===true&&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll')&&(e.tid?.startsWith(base)||e.identity?.anchor_tid?.startsWith(base)));
+       need(anchor,'visible linear detail scroll anchor unavailable');return {verb:'scroll',ref:anchor.ref,delta_y:Math.min(1000,target.scroll.max_top-target.scroll.top)};}});
+     state=await observe('details','linear cutoff revealed');
+    }
     const [coefficient,exponent]=String(value).split('e-');
     const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
     await act(state,'fill linear '+key,key+';ValueControl',{verb:'fill',text});state=await observe('details','linear numeric input');
@@ -124,8 +133,22 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    }
    need(state.node_linregression.values[key]===value,'numeric readback differs: '+key);
   }
+  if(stageRemoval){
+   await channel.perform({condition:'return to native regression method',ready:s=>s.wizard?.stage==='lin_regression_details',identity:s=>s.prepared_node_context,
+    resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step'),'Previous unavailable').ref,expected_stage:'lin_regression'})});
+   state=await observe('parameters','staged R2 method settings');
+   await act(state,'restore Forward after cutoff staging','pedRegressionMethod;ValueControl;trg_picker',{verb:'click'});
+   state=await channel.observe({condition:'native Forward option after staging',readLinRegression:true,ready:s=>ready('parameters')(s)&&s.ui.elements.some(e=>e.label==='Forward (Пошаговое включение)'&&e.allowed_actions.includes('click'))});
+   await channel.perform({condition:'restore native Forward method',initialObservation:state,ready:ready('parameters'),identity:s=>s.prepared_node_context,
+    resolve:s=>({verb:'click',ref:one(s,e=>e.label==='Forward (Пошаговое включение)'&&e.allowed_actions.includes('click'),'Unique Forward option unavailable').ref})});
+   state=await observe('parameters','restored Forward readback');
+   need(state.node_linregression.values.pedRegressionMethod===1&&state.node_linregression.values.pedAutoMethod===false&&state.node_linregression.values.pedUseDetailedSettings===true,'Forward was not restored after native cutoff staging');
+   await next('lin_regression','lin_regression_details');state=await observe('details','restored R2 cutoffs readback');
+   need(state.node_linregression.values.pedRegSelQuality===criterion&&state.node_linregression.values.pedEpsilon===1e-10&&state.node_linregression.disabled.pedRemoveSignificance===true,'R2 settings changed when restoring Forward');
+   need(wanted.add_significance===undefined||state.node_linregression.values.pedAddSignificance===wanted.add_significance,'R2 entry cutoff changed when restoring Forward');
+  }
   need(wanted.remove_significance===undefined||state.node_linregression.values.pedRemoveSignificance===wanted.remove_significance,'disabled removal cutoff differs from requested assertion');
-  selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...(criterion===0?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
+  selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...([0,1].includes(criterion)?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
  }
  const details=state.node_linregression;
  await next('lin_regression_details','done');

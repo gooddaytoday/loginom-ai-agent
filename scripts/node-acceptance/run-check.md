@@ -579,3 +579,6 @@ outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
 The C1 adapter supplies the three intrinsic labels already defined by the
 production coefficient/prediction output contract. Oracle numeric types, IDs,
 values and tolerances remain exact; integer predictors are never relaxed to real.
+
+`linreg-forward-r2-cutoffs`: owner-authorized R² diagnostic with explicit native
+entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
