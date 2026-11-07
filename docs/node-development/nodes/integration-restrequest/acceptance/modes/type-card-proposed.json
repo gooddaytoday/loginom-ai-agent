@@ -1,0 +1,289 @@
+{
+  "type": "integration.rest_request",
+  "title": "REST-запрос",
+  "palette_group": "Интеграция",
+  "icon_class": "bg-vendor-icon-restclient",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "request"
+  ],
+  "semantics": "Native REST through a separate module connection. HTTP method/body/media types, URL parameters and custom headers are independently configured. Output 0 RequestID/Response text; output 1 RequestID/ErrorCode/ErrorDesc/HttpStatusCode. Read actual status and join by RequestID. Omitted existing settings are preserved; native retry only. Saved auth credentials never enter readback. Stage-0 proposal; capabilities require owner approval and per-cycle implementation.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "rest-request-modes-proposed",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/integration/rest-request.html"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "request"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "connection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Module label; reuse only with same URL/ordered query names; else NEW name/base_url."
+          },
+          "base_url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "New native connection absolute HTTP(S) URL, without embedded credentials. URL definitions and template handling follow the approved URL cycle."
+          },
+          "response_content_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Allowed response media type or explicit */*. Independent of request media type."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "New default GET; omit on existing to preserve. Body field only for POST/PUT/PATCH."
+          },
+          "request_content_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Native request media type; default text/plain. Sent UTF-8; charset may be appended."
+          },
+          "url_mode": {
+            "type": "string",
+            "enum": [
+              "query",
+              "segments",
+              "replacement"
+            ],
+            "description": "Native placement of ordered URL parameters; raw string input, exactly one encoding pass."
+          },
+          "connect_timeout_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "description": "Connection timeout in milliseconds; distinct from overall timeout_seconds."
+          },
+          "verify_server_certificate": {
+            "type": "boolean",
+            "description": "Default true; false needs explicit user instruction and separately approved acceptance."
+          },
+          "authentication": {
+            "type": "string",
+            "enum": [
+              "none",
+              "saved_basic",
+              "saved_bearer"
+            ],
+            "description": "Reuse operator-prepared named native connection. No credential values in model input or readback. New credential creation deferred."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "query_parameters": {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Service query name."
+            },
+            "field": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Observed string field, input0. Raw values only; handler adds URL encoding. No pre-encoding/codec node."
+            }
+          },
+          "required": [
+            "name",
+            "field"
+          ]
+        },
+        "description": "All query bindings in order, to raw input fields. Handler URL-encodes once before native REST; preserves source table."
+      },
+      "body_field": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "String table-input field sent unchanged as UTF-8 for POST/PUT/PATCH. Never URL-encode body."
+      },
+      "headers": {
+        "type": "array",
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "variable": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "variable"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ]
+        },
+        "description": "Explicit complete custom list; [] clears. Omit preserves. Unique case-insensitive names, no CR/LF or credentials. Variables require separate native variables input."
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 300,
+        "description": "Overall native request timeout in seconds. Does not change agent deadlines."
+      },
+      "retries": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10,
+        "description": "Native repeats after error. No extra recovery retries. Exact attempt acceptance deferred."
+      },
+      "retry_delay_ms": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 60000,
+        "description": "Native delay between failed attempts; only active when retries>0."
+      },
+      "request_delay_ms": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 60000,
+        "description": "Delay between input-row requests in milliseconds."
+      },
+      "simulation": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "response_file": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            },
+            "required": [
+              "response_file"
+            ]
+          }
+        ],
+        "description": "Use delivered server-side response file instead of transport; null disables. Omit preserves."
+      },
+      "request_dump": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "directory": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            },
+            "required": [
+              "directory"
+            ]
+          }
+        ],
+        "description": "Save native requests only to an operator-prepared empty private folder. null disables; omission preserves. No credentials in dumps. File acceptance needs owner approval; CSV alone is insufficient."
+      },
+      "produce_error_descriptions": {
+        "type": "boolean",
+        "description": "New default true; omit on existing to preserve. false removes ErrorDesc from native output 1, leaving RequestID/ErrorCode/HttpStatusCode. Read actual field layout."
+      }
+    },
+    "description": "Stage-0 additive proposal for mode request. Explicit table settings use finish=execute. Preserve unspecified saved settings. Reuse connection only when its URL, method, ordered URL definitions, auth and TLS match; otherwise use a new name. Body/header source fields survive query encoding. Variable input is distinct from table input. Secret entry, certificate fixtures, exact retry proof and scopes beyond observed UI require owner decisions. Existing parameters:{} preserves settings."
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  },
+  "variable_inputs": 1
+}

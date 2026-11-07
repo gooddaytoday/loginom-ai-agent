@@ -1,0 +1,66 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "media-types.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Case",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ContentType",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Body",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Case": "plain",
+          "ContentType": "text/plain",
+          "Body": "plain & + / я",
+          "HttpStatusCode": 200
+        },
+        {
+          "Case": "xml",
+          "ContentType": "application/xml",
+          "Body": "<order amount=\"17\">Привет</order>",
+          "HttpStatusCode": 200
+        },
+        {
+          "Case": "response-plain",
+          "ContentType": "text/plain",
+          "Body": "LAB-976",
+          "HttpStatusCode": 200
+        },
+        {
+          "Case": "response-any",
+          "ContentType": "text/plain",
+          "Body": "LAB-976",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}
