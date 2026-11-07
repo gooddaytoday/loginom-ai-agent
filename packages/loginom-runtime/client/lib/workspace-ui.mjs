@@ -287,6 +287,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     charge();
     if (discoverRoots) for (const element of regionElements) include(element);
     const omittedRegions=new Set();
+    const logisticCards=preparedNodeWizard&&definitionPrefix
+      ? document.querySelectorAll('[data-tid='+JSON.stringify(definitionPrefix+';WizrdMCF;LogRegressionWizard')+']'):[];
+    charge();
     const importGrid=definitionPrefix?definitionPrefix+';WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1':null;
     const importFieldBase=importGrid?importGrid+';normalHeaderCt;':null;
     const addressedImportField=element=>{
@@ -299,6 +302,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     };
     const definitionFilter=definitionPrefix?{acceptNode:element=>{
       charge();const tid=element.getAttribute('data-tid')??'',base=definitionPrefix+';WizrdMCF;';
+      // Reopened logistic wizards retain thousands of nodes in prior cards.
+      // Keep the active page and fixed global guards within the same budget.
+      if(logisticCards.length===1&&['TuneDataSourceInputPortWizard','NormTuneWizard','LearnPartitionWizard','LogRegressionWizard','LogRegressionWizard-1','DerivedDataSourceMappingEngineOutputPortWizard']
+        .some(name=>tid===base+name)&&element.classList.contains('x-hidden-offsets')) {
+        omittedRegions.add('inactive_logregression_cards');return 2;
+      }
       if(new RegExp('^'+definitionPrefix+';ViewsForm;BrowseView(?:-[0-9]+)?$').test(tid)
         &&element.classList.contains('x-hidden-offsets')) {
         omittedRegions.add('inactive_table_views');return 2;

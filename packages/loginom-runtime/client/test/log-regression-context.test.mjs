@@ -2,6 +2,38 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readLogRegressionBrowser,readLogRegressionContext} from '../lib/log-regression-context.mjs';
+import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
+import {Page,build,origin,clone} from './support/workspace-ui-fixture.mjs';
+
+test('prepared logistic wizard scans its active card without the cached inactive training pages',async t=>{
+ for(const active of ['NormTuneWizard','LearnPartitionWizard','LogRegressionWizard','LogRegressionWizard-1']){
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+  const markers={TuneDataSourceInputPortWizard:'grdTargetColumns',NormTuneWizard:'txtActivationPortStatus',LearnPartitionWizard:'SizeGridForm;grdDataSet',LogRegressionWizard:'pedRegressionMethod', 'LogRegressionWizard-1':'pedEpsilon'};
+  for(const [name,marker] of Object.entries(markers)){
+   const card=page.add('div',base+';'+name,'',undefined,form);
+   if(name!==active){card.attrs.class='x-hidden-offsets';card.style.display='none';}
+   page.add('div',base+';'+name+';'+marker,'',undefined,card);
+   for(let i=0;i<200;i++)page.add('span',null,'',undefined,card);
+  }
+  page.add('button',base+';btnNext','Далее',undefined,form);
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:base})));
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.ok(result.output.scan.detail_elements<250,active+': '+result.output.scan.detail_elements);
+  assert.equal(result.output.scan.max_ms,500);assert.equal(result.output.scan.max_elements,6000);
+  assert.ok(result.output.ui.elements.some(e=>e.tid===base+';btnNext'&&e.allowed_actions.includes('wizard_step')));
+  assert.equal(result.output.wizard.stage,{NormTuneWizard:'normalization',LearnPartitionWizard:'learn_partition',LogRegressionWizard:'lin_regression','LogRegressionWizard-1':'lin_regression_details'}[active]);
+  t.diagnostic(active+': '+result.output.scan.detail_elements+' detail elements');
+  const unbound=await page.execute({mode:'observe'});
+  assert.equal(unbound.status,'SUCCEEDED');assert.ok(unbound.output.scan.detail_elements>1000);
+  const dialog=page.add('div',null,'Остановка');dialog.attrs.role='dialog';
+  const blocked=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:base})));
+  assert.equal(blocked.status,'SUCCEEDED');assert.equal(blocked.output.ui.dialogs.length,1);
+ }
+});
 
 function fixture(count=5) {
  const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard;',elements=[],components={};
