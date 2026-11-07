@@ -1,0 +1,52 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.collapse_columns"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.collapse_columns",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Field",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FieldLabel",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Cell",
+          "type": "variant",
+          "label_any": false,
+          "label": "Значение"
+        },
+        {
+          "name": "Kind",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}
