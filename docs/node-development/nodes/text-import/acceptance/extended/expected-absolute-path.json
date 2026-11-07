@@ -1,0 +1,80 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SaleID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Month",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FileName",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SaleID": 1,
+          "Month": "2026-01",
+          "Amount": 10.25,
+          "Note": "январь",
+          "FileName": "{{SOURCE_DIR}}/sales_2026-01.csv"
+        },
+        {
+          "SaleID": 2,
+          "Month": "2026-01",
+          "Amount": 0.0,
+          "Note": "",
+          "FileName": "{{SOURCE_DIR}}/sales_2026-01.csv"
+        },
+        {
+          "SaleID": 3,
+          "Month": "2026-01",
+          "Amount": null,
+          "Note": "повтор",
+          "FileName": "{{SOURCE_DIR}}/sales_2026-01.csv"
+        },
+        {
+          "SaleID": 4,
+          "Month": "2026-02",
+          "Amount": -2.5,
+          "Note": "февраль;акция",
+          "FileName": "{{SOURCE_DIR}}/sales_2026-02.csv"
+        },
+        {
+          "SaleID": 3,
+          "Month": "2026-01",
+          "Amount": null,
+          "Note": "повтор",
+          "FileName": "{{SOURCE_DIR}}/sales_2026-02.csv"
+        }
+      ]
+    }
+  ]
+}

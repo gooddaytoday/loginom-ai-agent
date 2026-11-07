@@ -1,0 +1,66 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Active",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "EventAt",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Amount": 12.5,
+          "Active": true,
+          "EventAt": "2026-11-07T09:30:45.000",
+          "Note": "first"
+        },
+        {
+          "Id": 2,
+          "Amount": 0.0,
+          "Active": false,
+          "EventAt": "2026-11-08T00:00:00.000",
+          "Note": "second"
+        },
+        {
+          "Id": 3,
+          "Amount": -2.75,
+          "Active": true,
+          "EventAt": "2026-11-09T23:59:59.000",
+          "Note": "third"
+        }
+      ]
+    }
+  ]
+}
