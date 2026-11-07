@@ -582,3 +582,7 @@ values and tolerances remain exact; integer predictors are never relaxed to real
 
 `linreg-forward-r2-cutoffs`: owner-authorized R² diagnostic with explicit native
 entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
+
+Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
+Its catalog cases remain historical reproductions for the diagnostic SHA;
+current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.

@@ -10,8 +10,9 @@ export function validateLinRegressionParameters(p,mode,r){
   const selection=settings.selection;
   if(selection!==undefined){
    need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','add_significance','remove_significance'].includes(k)),'invalid selection settings');
+   need(selection.criterion!=='r2','R² пока недоступен: критерий не прошёл native-приёмку. Запрос отклонён до изменений Loginom.');
    need(['f','r2','adjusted_r2','aic','aicc','bic','hqc'].includes(selection.criterion),'unknown selection criterion');
-   for(const key of ['add_significance','remove_significance'])if(selection[key]!==undefined)need(Number.isFinite(selection[key])&&(selection.criterion==='r2'?selection[key]>=0&&selection[key]<=1:selection.criterion==='f'&&selection[key]>0&&selection[key]<1),'invalid or inapplicable '+key);
+   for(const key of ['add_significance','remove_significance'])if(selection[key]!==undefined)need(selection.criterion==='f'&&Number.isFinite(selection[key])&&selection[key]>0&&selection[key]<1,'invalid or inapplicable '+key);
   }
  }
  const names=[...p.input_fields,p.target_field];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors must be distinct from each other and from the target');
