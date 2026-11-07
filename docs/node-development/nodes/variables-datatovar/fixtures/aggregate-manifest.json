@@ -1,0 +1,23 @@
+{
+  "status": "input_fixture_proposal",
+  "loginom_version": "7.4.2",
+  "files": [
+    {
+      "path": "aggregate-source.lgp",
+      "bytes": 6658,
+      "sha256": "8067c76f7acef98c656b7fa5c2ddca8861e11a53241c68839e6cf6a72d3b6cfe"
+    },
+    {
+      "path": "aggregate-types.json",
+      "bytes": 714,
+      "sha256": "d5e1e8117bd0d77a77ac95349cb151d79f61d35e3ee2a1b73c66b0088b089c27"
+    },
+    {
+      "path": "aggregate-numeric.csv",
+      "bytes": 24,
+      "sha256": "58e951001e42b03349d44925a11573e6a15c54d7f48b96df4413330022a552da"
+    }
+  ],
+  "source": "One JavaScript input source plus builtin scenario variables; no DataToVar or exported result",
+  "variant_subtypes": "not_checked; numeric JS scalar subtype is not established"
+}

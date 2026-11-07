@@ -11,6 +11,11 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 # Построение сценария Loginom
 
+Файлы задания ищи только в рабочем каталоге и по точным путям из задания.
+В CLI `glob`, `read`, `list` вне рабочего каталога отклоняются и обрывают прогон.
+Подтверждённый серверный `destination` экспорта не является локальным путём:
+не ищи выгруженный CSV в родительских каталогах workspace.
+
 Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки по [большим файлам](references/large-files.md); не загружай этот полный файл ещё раз.
 
 Работай через управляемые инструменты текущей сессии. Активация этого skill
@@ -178,7 +183,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Импорт Loginom Data|`imports.lgd` / native|[читать](references/nodes/imports.lgd.md)|
 |Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
 | Формулы, в том числе Var.* | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
-| Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
+| Параметры полей: переименование и обмен имён, метка, смена типа | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|

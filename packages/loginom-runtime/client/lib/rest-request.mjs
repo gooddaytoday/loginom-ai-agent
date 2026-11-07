@@ -44,7 +44,7 @@ export async function restLinkCapability(page,t,readValidation){
 export async function restRequestCapability(page,t,readContext){
  const need=(v,m)=>{if(!v)throw Error('REST request: '+m);};
  const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
- const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',base=root+';RESTRequestWizard;ParamLinks;';
+ const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',defaultBase=root+';RESTRequestWizard;ParamLinks;';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  let effect=false,step='owned wizard',control=root;
  try{
@@ -77,18 +77,28 @@ export async function restRequestCapability(page,t,readContext){
    return await panel()!==before;
   });await quiet();};
   let inputPages=0;
-  while(!await find(root+';RESTRequestWizard;ParamLinks').isVisible()){
+  // With no URL parameters, POST/PUT/PATCH renders only MessageBody and hides
+  // ParamLinks. The owned page caption identifies the request step in both modes.
+  while((await title()).trim()!=='Настройка запроса'){
    need(inputPages++<3,'input wizard page bound exceeded');
    need((await title()).trim()==='Настройка входных столбцов','unexpected page before request');await advance();
   }
   const read=async()=>{
    await guard();return page.evaluate(({root,base})=>{
-    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard'),p=w?.FRequestConfig;
+    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard');
+    // POST/PUT/PATCH owns MessageBody. Bind its ParamLinks child through that
+    // native controller and the unique DOM of its own view.
+    const v=bg.TBGHTTPVerb,method=Object.entries({GET:v.httpGET,POST:v.httpPOST,PUT:v.httpPUT,DELETE:v.httpDELETE,PATCH:v.httpPATCH}).find(([,value])=>value===w?.FVerb)?.[0];
+    const body=['POST','PUT','PATCH'].includes(method),p=body?w.FRequestConfig?.FParamLinks:w?.FRequestConfig;
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-    if(!p||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(base.slice(0,-1)).length!==1||p.FView.el.dom!==exact(base.slice(0,-1))[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
+    const tid=body?p?.FView?.el?.dom?.getAttribute('data-tid'):base.slice(0,-1);
+    if(!p||typeof tid!=='string'||!tid.startsWith(root+';RESTRequestWizard;')||!tid.endsWith(';ParamLinks')||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(tid).length!==1||p.FView.el.dom!==exact(tid)[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
      ||p.FItems.grdFields.getStore()!==p.FColumnsStore||p.FItems.grdParams.getStore()!==p.FGrdParamStore||p.FColumnsStore.loading||p.FGrdParamStore.loading||p.FRequestParamLinks.loading||p.FRequestParamLinks.complete!==true)throw Error('Native REST binding inventories are unavailable');
     const columnRows=p.FColumnsStore.getRange(),parameterRows=p.FParamStore.getRange();
-    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
+    if(body&&(!w.FColumns?.Store||w.FColumns.Store.loading||w.FRequestConfig.FColumns!==w.FColumns))throw Error('Native REST body columns are unavailable');
+    // Body selection filters that column out of ParamLinks. Read the owned
+    // source inventory so reconfiguring the same saved body remains valid.
+    const columns=(body?w.FColumns.Store.getRange():columnRows).map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
     const parameters=parameterRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
     // AutoLink changes the rendered draft; FRequestParamLinks still contains
     // the saved bindings until the wizard commits its page.
@@ -101,10 +111,30 @@ export async function restRequestCapability(page,t,readContext){
      return {name:pair[1].data.Name,field:pair[0].data.Name};
     });
     if(columns.length>1000||parameters.length>32||links.length>32)throw Error('REST binding inventory exceeds bound');
-    return {method:w.FVerb,columns,parameters,links};
-   },{root,base});
+    return {method,columns,parameters,links,binding_tid:tid};
+   },{root,base:defaultBase});
   };
-  let current=await read();need(current.method===0,'only GET is supported');
+  let current=await read();
+  const base=current.binding_tid+';';
+  const method=current.method;
+  need(method,'unsupported native HTTP method');
+  need(!t.connection?.method||method===t.connection.method,'native method differs from requested connection');
+  const bodyMethod=['POST','PUT','PATCH'].includes(method);
+  let body_field;
+  if(bodyMethod){
+   const tid=root+';RESTRequestWizard;MessageBody;edtMessageBodyColumn';
+   need(t.body_field===undefined||current.columns.some(c=>c.name===t.body_field&&c.type===5),'body_field requires an observed string input field');
+   await quiet();await guard();await point(tid);
+   const value=()=>find(tid).locator('input').inputValue();
+   if(t.body_field!==undefined&&await value()!==t.body_field){
+    await click(tid+';trg_picker');
+    await wait('request body options',async()=>await find(tid+';boundlist;'+t.body_field).count()===1);
+    await click(tid+';boundlist;'+t.body_field);
+    await wait('request body binding',async()=>await value()===t.body_field);
+   }
+   body_field=await value();
+   need(t.body_field===undefined||body_field===t.body_field,'request body readback differs');
+  }else need(t.body_field===undefined,'GET/DELETE does not support a body');
   if(t.query_parameters){
    need(JSON.stringify(current.parameters.map(p=>p.name))===JSON.stringify(t.query_parameters.map(p=>p.name))&&current.parameters.every(p=>p.type===5),'query parameter definitions differ');
    need(t.query_parameters.every(q=>current.columns.some(c=>c.name===q.field&&c.type===5)),'each query parameter requires an existing string input field');
@@ -122,7 +152,7 @@ export async function restRequestCapability(page,t,readContext){
     control=base+'pnlLinkGrid';current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});
    }
   }
-  const configuration={verified:true,node_context:{...t.node,verified:true},method:'GET',query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
+  const configuration={verified:true,node_context:{...t.node,verified:true},method,...(body_field!==undefined?{body_field}:{}),query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
   await advance();
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){

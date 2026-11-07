@@ -1,0 +1,159 @@
+{
+  "status": "proposal_not_stock_expected",
+  "node_type": "preprocessing.data_partition",
+  "mode": "uniform",
+  "seed": 42,
+  "train_count": 6,
+  "test_count": 4,
+  "group_size_rows": {
+    "train": 1,
+    "test": 1
+  },
+  "source": [
+    {
+      "RowID": 1,
+      "Class": "A",
+      "Value": 10
+    },
+    {
+      "RowID": 2,
+      "Class": "A",
+      "Value": 20
+    },
+    {
+      "RowID": 3,
+      "Class": "A",
+      "Value": 30
+    },
+    {
+      "RowID": 4,
+      "Class": "A",
+      "Value": 40
+    },
+    {
+      "RowID": 5,
+      "Class": "A",
+      "Value": 50
+    },
+    {
+      "RowID": 6,
+      "Class": "A",
+      "Value": 60
+    },
+    {
+      "RowID": 7,
+      "Class": "B",
+      "Value": 70
+    },
+    {
+      "RowID": 8,
+      "Class": "B",
+      "Value": 80
+    },
+    {
+      "RowID": 9,
+      "Class": "B",
+      "Value": 90
+    },
+    {
+      "RowID": 10,
+      "Class": "B",
+      "Value": 100
+    },
+    {
+      "RowID": 11,
+      "Class": "B",
+      "Value": 110
+    },
+    {
+      "RowID": 12,
+      "Class": "B",
+      "Value": 120
+    }
+  ],
+  "ports": [
+    0,
+    1,
+    2
+  ],
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "label_any": true
+    },
+    {
+      "name": "Class",
+      "type": "string",
+      "label_any": true
+    },
+    {
+      "name": "Value",
+      "type": "integer",
+      "label_any": true
+    }
+  ],
+  "combined_extra_column": {
+    "name": "IsTestSet",
+    "type": "boolean",
+    "position": 0
+  },
+  "priority_proposal": {
+    "beginning": [
+      {
+        "RowID": 1,
+        "Class": "A",
+        "Value": 10
+      },
+      {
+        "RowID": 2,
+        "Class": "A",
+        "Value": 20
+      },
+      {
+        "RowID": 3,
+        "Class": "A",
+        "Value": 30
+      },
+      {
+        "RowID": 4,
+        "Class": "A",
+        "Value": 40
+      }
+    ],
+    "end": [
+      {
+        "RowID": 9,
+        "Class": "B",
+        "Value": 90
+      },
+      {
+        "RowID": 10,
+        "Class": "B",
+        "Value": 100
+      },
+      {
+        "RowID": 11,
+        "Class": "B",
+        "Value": 110
+      },
+      {
+        "RowID": 12,
+        "Class": "B",
+        "Value": 120
+      }
+    ],
+    "algorithm": null
+  },
+  "exact_train_rows": null,
+  "checks": [
+    "complete typed source membership; no duplicate RowID per subset",
+    "train and test are disjoint; train never uses priority test rows",
+    "combined is train then test with false/true IsTestSet",
+    "two identical executions and cold preserve settings and results",
+    "three CSVs equal full native outputs; Save and cleanup"
+  ],
+  "unresolved": [
+    "end/algorithm priority and cold repeat need confirmation"
+  ]
+}

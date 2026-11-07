@@ -9,9 +9,7 @@
 `finish:"execute"` обучает на всех строках текущего входа и выполняет модель;
 `read.ports:[0]` возвращает класс, вероятность и исходные поля.
 `input_fields` содержит только числовые факторы; идентификаторы и комментарии
-сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для этого
-поддерживаемого обучения выбирай Логистическую регрессию; Калькулятор и
-JavaScript не нужны. Для отбора факторов вызывай `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`, `mode:"forward"`, `"backward"` или `"stepwise"`. Пользовательский критерий задавай в `parameters.logistic.selection.criterion`: `"deviance"`, `"aic"`, `"aicc"`, `"bic"` или `"hqic"`. При Deviance Forward требует только `entry_significance`, Backward — только `removal_significance`, Stepwise — оба; значения строго между 0 и 1, для Stepwise entry < removal. При информационных критериях пороги отбора запрещены. Без `selection` сохраняются стандартные Deviance 0.05/0.1. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Для отбора также выбирай Логистическую регрессию. Веса, валидация и
+сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для отбора факторов вызывай `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`, `mode:"forward"`, `"backward"` или `"stepwise"`. Пользовательский критерий задавай в `parameters.logistic.selection.criterion`: `"deviance"`, `"aic"`, `"aicc"`, `"bic"` или `"hqic"`. При Deviance Forward требует только `entry_significance`, Backward — только `removal_significance`, Stepwise — оба; значения строго между 0 и 1, для Stepwise entry < removal. При информационных критериях пороги отбора запрещены. Без `selection` сохраняются стандартные Deviance 0.05/0.1. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Веса, валидация и
 выход переменных пока недоступны. Сначала запроси `parameter_schema` узла.
 
 
@@ -24,7 +22,7 @@ JavaScript не нужны. Для отбора факторов вызывай 
 `inputs:[]`, `mappings:[]`, `finish:"execute"`, `read.ports:[0]` и прежние
 `parameters.logistic.input_fields`, `target_field`, `event`, `threshold`.
 Мастер только сверяется и закрывается без сохранения настроек; Teach не
-вызывается. Поддерживается сохранённая Enter-модель без нормализации.
+вызывается. Поддерживается сохранённая Enter-модель с none или standardize.
 При несовпадении параметров запрос отклоняется. Для нового обучения используй
 `enter`. NULL в целевом поле новых строк допустим: прогноз остаётся, ActualEvent
 будет NULL. Используй этот режим для применения модели; Калькулятор и JavaScript
@@ -45,4 +43,15 @@ JavaScript не нужны. Для отбора факторов вызывай 
 именами CSV. После Save и открытия пакета используй `mode:"apply"` на
 прежнем узле, `inputs:[]`, `mappings:[]`, прежние параметры и `read.ports:[1]`:
 сохранённая модель выполняется без перенастройки и Teach.
-Для коэффициентов используй этот узел; Калькулятор и JavaScript не нужны.
+
+
+## Нормализация
+
+Для стандартизации факторов используй этот узел через `loginom_dock_node_apply`,
+`parameters.logistic.normalization:"standardize"`; `"none"` отключает её.
+Сначала `mode:"enter"`, normalization none, `finish:"execute"`, `read.ports:[0]`;
+затем на том же `target.kind:"existing"` и `target.ref` — standardize, Execute и `read.ports:[0,1]`.
+Прочие logistic-параметры и кодирование цели сохраняй. Коэффициенты нормализованной модели выдаются в шкале нормализованных факторов. Пропуск normalization
+на существующем узле сохраняет её. После Save/reopen `mode:"apply"` с прежними
+параметрами сверяет нормализатор без Teach. Для этой задачи выбирай
+Логистическую регрессию вместо Калькулятора или JavaScript.

@@ -6,7 +6,7 @@ import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {nodeApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
 import {compactNodeRequestFailure} from '../lib/user-results.mjs';
 
-for(const mode of ['forward','backward'])for(const kind of ['new','existing'])for(const explicit of [false,true])test(mode+' R2 refuses '+kind+' '+(explicit?'0/1':'default')+' before a job or browser effect and reaches the model as NOT_APPLIED',async()=>{
+for(const mode of ['forward','backward','stepwise'])for(const kind of ['new','existing'])for(const explicit of [false,true])test(mode+' R2 refuses '+kind+' '+(explicit?'0/1':'default')+' before a job or browser effect and reaches the model as NOT_APPLIED',async()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
  let effects=0;
  const runner=createNodeOperationRunner({validate:r=>validateNodeApplyRequest(r,support.nodeApplyHandlers).handler.revision,progress:()=>null,

@@ -117,12 +117,13 @@ test('compact Save retains optional arrangement warnings after dropping its inte
     assert.equal(validate(result).valid, true);
   }
 });
-test('initial knowledge bundle omits per-type schemas while retaining revision pins', () => {
+test('initial knowledge bundle omits per-type schemas and cache hashes while retaining revision pins', () => {
   const schema = { type: 'object', required: ['keys'] };
   const result = compactKnowledgeBundle({ session_manifest: { digest: 'pin' }, actions: [{ action_key: 'save', input_schema: schema, revision: '2' }],
-    node_types: [{ type: 'transform.sorting', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references' }] });
+    node_types: [{ type: 'transform.sorting', contract_revision: '1.0.0', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references' }] });
   assert.equal(result.session_manifest.digest, 'pin');assert.equal(result.node_types[0].parameter_schema, undefined);
-  assert.equal(result.node_types[0].cache_key, 'cache');assert.equal(result.node_types[0].source, undefined);
+  assert.equal(result.node_types[0].contract_revision, '1.0.0');
+  assert.equal(result.node_types[0].cache_key, undefined);assert.equal(result.node_types[0].source, undefined);
 });
 
 test('user-v1 retains exact scalar representation and an explicitly unverified variant without type guessing',()=>{
