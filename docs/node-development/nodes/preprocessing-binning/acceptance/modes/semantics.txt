@@ -1,0 +1,1 @@
+DateTime/manual intervals; optional automatic limits; population SD; rounding/open tails; frequency tie policies and sums. Train generated bins before manual edits; execute/apply must preserve edited bounds and labels. Random ties are not an admitted acceptance case.

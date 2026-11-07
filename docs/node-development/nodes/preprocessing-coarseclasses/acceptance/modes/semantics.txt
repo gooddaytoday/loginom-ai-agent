@@ -1,0 +1,1 @@
+Continuous predictor and native external/manual/frozen partition proposals. Keep three outputs. Use existing typedVariants opt-in for numeric class bounds. Unknown/NULL category handling and zero-frequency smoothing remain quarantined until native evidence.
