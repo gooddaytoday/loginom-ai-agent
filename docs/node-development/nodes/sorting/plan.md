@@ -92,6 +92,19 @@ Component ID: `component.transform.Sorting`, slug `sorting`. Runtime type и р�
 
 ### Этап 1 и далее — непокрытые режимы Help 7.4 (отдельные карточки владельца)
 
+#### Предложение LAB-998: кэш, потоки, сравнение и Variant, этап 0
+
+База `v040@bc63453453e22e1369809a7d36d2fee7719b7c7d`, mas2, 07.11.2026.
+[Живые наблюдения и оценка](modes-discovery.md), [комплект предложения](acceptance/modes/README.md),
+[карточка типа](modes-card.proposal.json), [дополнение навыка](modes-skill.proposal.json).
+Это docs-предложение до утверждения владельцем, без runtime и изменения
+прежних результатов. Переменные исключены; mode остаётся keys, вход/выход 0.
+
+Шесть циклов: cache_all, явный max_threads, max_threads=0 (авто), locale,
+non-ASCII case, Variant. compare_with_locale и case_sensitive уже есть в
+публичных параметрах; эти два цикла расширяют проверенное покрытие.
+Задания и independent expected не дают приёмку по одному наличию параметра.
+
 - Кэшировать все данные, максимальное число потоков и автоопределение.
 - Добавить/убрать/переставить/очистить ключи; binary/locale comparison и non-ASCII регистр.
 - Сортировка всех документированных типов, в том числе variable с явным регистром.

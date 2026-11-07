@@ -1,0 +1,119 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "variables.user"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "Amount": 7
+        },
+        {
+          "RowID": 4,
+          "Amount": 9
+        },
+        {
+          "RowID": 8,
+          "Amount": 8
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Amount": 0
+        },
+        {
+          "RowID": 2,
+          "Amount": 4
+        },
+        {
+          "RowID": 5,
+          "Amount": null
+        },
+        {
+          "RowID": 6,
+          "Amount": -2
+        },
+        {
+          "RowID": 7,
+          "Amount": 5
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "Limit",
+            "type": "integer",
+            "value": 5
+          },
+          {
+            "name": "Sentinel",
+            "type": "string",
+            "value": "keep"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
+}
