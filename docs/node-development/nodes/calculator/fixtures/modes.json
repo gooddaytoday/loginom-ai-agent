@@ -45,7 +45,7 @@
   },
   "limitations": [
     "One syntax for the entire node; switching it does not translate formulas.",
-    "JavaScript JsTotal matches arithmetic in wizard preview but is NULL in three native output trials. Cause unresolved; never change the oracle to NULL.",
+    "JavaScript criteria: ждёт решения по расхождению. Three earlier native outputs had NULL JsTotal; after five one-formula trials the original formula matched arithmetic. Cause unresolved; never change the oracle to NULL.",
     "Loginom Field/Expr numerical behavior and native error recovery remain to be investigated.",
     "Caching criterion covers observed flag persistence and deterministic arithmetic, not evaluation counts or performance.",
     "No scenario variables, Variant, require, asynchronous code or recursive Data() in this proposal."

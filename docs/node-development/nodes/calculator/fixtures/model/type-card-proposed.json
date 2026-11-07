@@ -10,7 +10,7 @@
   "modes": [
     "expression"
   ],
-  "semantics": "Calculator with one node-wide syntax: Loginom expression or JavaScript function bodies with return. One table input and output 0; intermediate expressions are omitted from output. Preserve omitted settings and expression identities when reordering. Loginom uses Field.Name/Expr.Name; JavaScript uses input names/this.Expr.Name, not this.Field. Cached is a per-expression setting, not proof of evaluation counts. No automatic formula translation. Proposed only: native dependent JavaScript output has an unresolved preview/output mismatch in LAB-990; do not claim acceptance.",
+  "semantics": "Calculator with one node-wide syntax: Loginom expression or JavaScript function bodies with return. One table input and output 0; intermediate expressions are omitted from output. Preserve omitted settings and expression identities when reordering. Loginom uses Field.Name/Expr.Name; JavaScript uses field/expression names and this.Expr.Name for collisions, not this.Field. Cached is a per-expression setting, not proof of evaluation counts. No automatic formula translation. Proposal only: JS criteria await owner decision on the native preview/output discrepancy. The original formula later matched arithmetic; five trials did not establish the earlier NULL cause.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "calculator-v3-internal-2",
@@ -117,7 +117,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 2048,
-              "description": "Formula in the node-wide syntax. Loginom: Field.Name/Expr.Name distinguish fields and expressions. JavaScript: body with return; input names and this.Expr.Name, not this.Field. Preserve text; never auto-translate."
+              "description": "Formula in the node-wide syntax. Loginom: Field.Name/Expr.Name distinguish fields and expressions. JavaScript: body with return; field/expression names, this.Expr.Name for collisions, not this.Field. Preserve text; never auto-translate."
             },
             "replace": {
               "type": "boolean",
