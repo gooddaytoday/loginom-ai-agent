@@ -37,7 +37,7 @@ test("every installed node handler has one routing row and one bounded reference
   // A recipe uses existing handlers; it does not add a node type or handler.
   const rows = references.filter((row) => row[1] !== "рецепт")
   expect(rows.map((row) => row[3]).toSorted()).toEqual(handlers.toSorted())
-  expect((await readdir(new URL("references/nodes/", root))).toSorted()).toEqual(
+  expect((await readdir(new URL("references/nodes/", root))).filter(name => name !== "README.md").toSorted()).toEqual(
     references.map((row) => `${row[3]}.md`).toSorted(),
   )
   for (const row of rows) {
@@ -57,4 +57,8 @@ test("node paths are usable beyond the sampled SkillTool resource list", () => {
   expect(skill).toContain("Список ресурсов")
   expect(skill).toContain("буквально")
   expect(skill).toContain("references/nodes/")
+})
+
+test('node selection preserves the standard-node restriction', () => {
+  expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
 })

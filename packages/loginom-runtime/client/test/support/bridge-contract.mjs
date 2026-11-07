@@ -25,6 +25,7 @@ test('MCP application refusals remain typed normal content and the same connecti
   const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0, preparationPath=[];
   const sourceCalls=[];
+  let browserPause;
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
   const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
@@ -52,6 +53,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       }
       assert.equal(this.browser, true);
       assert.equal(request.name, 'browser_run_code_unsafe');
+      if(browserPause){const pause=browserPause;browserPause=null;pause.enter();await pause.wait;}
       browserCalls++;
       const code = request.arguments.code;
       if (code.includes('async function prepareWorkspace(')) preparedDrafts++;
@@ -145,6 +147,9 @@ test('MCP application refusals remain typed normal content and the same connecti
       observation_id:'o',operation_id:'u',destination:'/other'}});
     assert.equal(JSON.parse(rejectedUpload.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls,0);
+    const unpreparedCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
+    assert.notEqual(unpreparedCards.isError,true,JSON.stringify(unpreparedCards));
+    assert.equal(JSON.parse(unpreparedCards.content[0].text).node_types.length,2);
     const available = await client.callTool({ name: 'dock_action_describe', arguments: {} });
     assert.notEqual(available.isError, true);
     assert.deepEqual(JSON.parse(available.content[0].text).available_actions, ['node.add', 'link.create', 'package.save_as', 'node.configure_text_import', 'package.save_checkpoint']);
@@ -152,7 +157,19 @@ test('MCP application refusals remain typed normal content and the same connecti
 
     // Bootstrap starts from a known blank browser page, before mocked preparation.
     page.url = () => 'about:blank';
-    const bootstrap = await client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    let releaseBrowser,enteredBrowser,timer;
+    const entered=new Promise(resolve=>{enteredBrowser=resolve;});
+    browserPause={enter:enteredBrowser,wait:new Promise(resolve=>{releaseBrowser=resolve;})};
+    const bootstrapPending=client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    await entered;
+    const describePending=client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text']}});
+    let descriptionAvailable;
+    try{
+      descriptionAvailable=await Promise.race([describePending.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),2000);})]);
+    }finally{clearTimeout(timer);releaseBrowser();}
+    const bootstrap=await bootstrapPending;
+    assert.notEqual((await describePending).isError,true);
+    assert.equal(descriptionAvailable,true,'diagnostic describe must not queue behind browser work');
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');
     assert.equal(initial.output.bootstrap, true);
@@ -208,6 +225,15 @@ test('MCP application refusals remain typed normal content and the same connecti
     const replay=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
     assert.deepEqual(replay.structuredContent,sourceReceipt);
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
+    const undescribed=await client.callTool({name:'dock_node_apply',arguments:{operation_id:'without-card',target:{kind:'new',type:'imports.text'}}});
+    assert.equal(undescribed.isError,true);
+    assert.equal(JSON.parse(undescribed.content[0].text).error.code,'REQUEST_REJECTED');
+    assert.equal(browserCalls,beforeSource);
+    const diagnosticTypes=metadata.executor.available_node_types;
+    const largeCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:diagnosticTypes}});
+    assert.notEqual(largeCards.isError,true);
+    assert.ok(Buffer.byteLength(JSON.stringify(largeCards))>46000);
+    assert.equal(JSON.parse(largeCards.content[0].text).node_types.length,diagnosticTypes.length);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);

@@ -1,5 +1,6 @@
 # Таблица в переменные
 
+<!-- mode: aggregate -->
 Для суммы, количества, минимума, максимума и среднего текущей таблицы
 используй `dock_node_apply` с `type:"variables.from_table"`, `mode:"aggregate"`.
 Узел получает таблицу через `inputs:[{source:NodeRef,output:0,input:0}]`
@@ -30,3 +31,4 @@
 
 Калькулятор таблицы вычисляет поля строк, JavaScript задаёт код; запрос
 агрегированных переменных направляй в `variables.from_table`.
+<!-- /mode -->
