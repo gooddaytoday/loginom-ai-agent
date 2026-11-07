@@ -808,6 +808,25 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(len(output['rows']), rows)
                 self.assertEqual(output['export_destination'], '/' + mode + '-result.csv')
 
+    def test_join_cartesian_resolves_approved_tasks_inputs_and_exact_expectations(self):
+        for mode in ['full-no-keys', 'cross']:
+            with self.subTest(mode=mode):
+                case = runner.scenario('join-' + mode)
+                root = runner.REPO / 'docs/node-development/nodes/join'
+                self.assertIsNone(case['base'])
+                self.assertEqual(case['prompt'], root / 'acceptance' / ('task-' + mode + '.md'))
+                self.assertEqual(case['data'], root / 'fixtures/v040')
+                self.assertEqual(case['input_files'], ['left.csv', 'right.csv'])
+                self.assertEqual(case['oracle'], root / 'acceptance/oracle-v040.py')
+                expected = runner.expected_for(case, '/test/cartesian.lgp')
+                self.assertEqual(expected['package_path'], '/test/cartesian.lgp')
+                output = expected['outputs'][0]
+                self.assertFalse(output['ordered'])
+                self.assertEqual([c['type'] for c in output['columns']], ['string', 'integer', 'string', 'integer'])
+                self.assertEqual(len(output['rows']), 6)
+                self.assertEqual({(r['LeftID'], r['RightID']) for r in output['rows']},
+                                 {(left, right) for left in ['L1', 'L2', 'L3'] for right in ['R1', 'R2']})
+
     def test_model_phase_budget_comes_from_scenario_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

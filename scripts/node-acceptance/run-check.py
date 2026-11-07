@@ -470,6 +470,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-' + variant + '.md' if variant else 'task.md'),
                     data=src / ('data-' + variant if variant else 'data'), base=None,
                     expected_name='expected-' + variant + '.json' if variant else 'expected.json')
+    if name in ['join-full-no-keys', 'join-cross']:
+        src = REPO / 'docs/node-development/nodes/join/acceptance'
+        mode = name.removeprefix('join-')
+        return dict(source=src, prompt=src / ('task-' + mode + '.md'),
+                    data=src.parent / 'fixtures/v040', input_files=['left.csv', 'right.csv'],
+                    expected_name='v040/' + mode + '/expected.json', oracle=src / 'oracle-v040.py', base=None)
     if name in ['join-right', 'join-full', 'join-difference']:
         src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
