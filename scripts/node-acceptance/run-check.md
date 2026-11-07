@@ -583,3 +583,9 @@ cold typed variable inventory and both reports, package Close and logout apply.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`sorting-locale`: импорт modes.csv, сортировка Word и RowID без учёта регистра;
+на одном узле сначала compare_with_locale=false, затем true (русская локаль
+пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
+независимый `oracle.py`: два CSV (первый — бинарный порядок, второй — итоговый
+и сохранённый), точные типы, NULL/пустая строка и порядок полей, Save/cold.
