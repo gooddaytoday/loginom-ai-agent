@@ -575,6 +575,21 @@ oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
 
+`linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
+Forward task. Independent mode oracle expectations remain private. Both typed
+outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
+The C1 adapter supplies the three intrinsic labels already defined by the
+production coefficient/prediction output contract. Oracle numeric types, IDs,
+values and tolerances remain exact; integer predictors are never relaxed to real.
+
+`linreg-forward-r2-cutoffs`: owner-authorized R² diagnostic with explicit native
+entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
+
+Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
+Its catalog cases remain historical reproductions for the diagnostic SHA;
+current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
+
+
 
 `logreg-apply`: обучение Enter на train.csv, затем замена источника того же
 импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый

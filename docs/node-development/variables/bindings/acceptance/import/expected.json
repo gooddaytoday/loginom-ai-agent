@@ -1,0 +1,80 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Amount": 20
+        },
+        {
+          "RowID": 2,
+          "Amount": -4
+        },
+        {
+          "RowID": 3,
+          "Amount": 7
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "CsvPath",
+            "type": "string",
+            "value": "{{SOURCE_B}}"
+          },
+          {
+            "name": "Sentinel",
+            "type": "string",
+            "value": "keep"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "imports.text"
+        },
+        "input": 0,
+        "kind": "variables"
+      }
+    ]
+  }
+}

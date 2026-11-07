@@ -7,7 +7,7 @@ import {linRegressionParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('LinRegression: '+message);};
 export function createLinRegressionNodeSupport(config){const support=createTabularTransformNodeSupport(config,{
- type:'datamining.lin_regression',modes:['enter','apply'],revision:'linregression-v1-internal-2',parameterSchema:linRegressionParametersSchema,
+ type:'datamining.lin_regression',modes:['enter','apply','forward'],revision:'linregression-v1-internal-2',parameterSchema:linRegressionParametersSchema,
  validate:validateLinRegressionParameters,validateInput:(p,resolved,native)=>resolveLinRegressionRoles(p,resolved.fields??native.target_fields),readback:linRegressionConfigurationReadback,
  configurationObservation:{condition:'linregression feature roles',readLinRegression:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_linregression?.verified===true},
  async configure(channel,p,context){
