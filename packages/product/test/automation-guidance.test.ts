@@ -81,3 +81,16 @@ test("REST JSON tables use the tabular path instead of the blanket tree instruct
   expect(details).toContain("не останавливай")
   expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
 })
+
+test("relocated large-file and JavaScript rules stay reachable from the entry", async () => {
+  const references = new URL("../skills/loginom-automation/references/", import.meta.url)
+  const large = await Bun.file(new URL("large-files.md", references)).text()
+  const javascript = await Bun.file(new URL("nodes/programming.javascript.md", references)).text()
+  expect(skill).toMatch(/XLSX любого размера[\s\S]*?16 МиБ[\s\S]*?10 МиБ[\s\S]*?неизвестного размера[\s\S]*?\(references\/large-files.md\)/)
+  expect(skill).toContain("полный расчёт будет после загрузки полного файла")
+  expect(large).toContain("число `expected_records` передавать запрещено")
+  expect(large).toContain("(workflow.md#серверный-источник-и-cache)")
+  expect(skill).toMatch(/Узел JavaScript разрешён только[\s\S]*?\(references\/nodes\/programming.javascript.md\)/)
+  expect(skill).toContain("Существующие JS-узлы не удаляй автоматически")
+  expect(javascript).toContain("не являются таким пробелом")
+})
