@@ -1,0 +1,5 @@
+{
+  "status": "proposal_requires_owner_approval",
+  "routing_line": "| Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |",
+  "reference_append": "\nПредлагаемое расширение (до утверждения не вызывать): aggregate остаётся тем же режимом. median/stddev — числовые агрегаты с real-выходом; mode/first/last/only сохраняют тип, null_count даёт integer, concat — string. First/last берут крайние строки вместе с NULL. Only возвращает общее значение всех строк, иначе NULL; повтор одинакового значения разрешён. Мода игнорирует NULL; для полностью NULL Integer наблюдён 0, для String — пустая строка. В concat передай separator, wrapper, unique и order:none/ASC/DESC; NULL исключаются, пустой текст сохраняется. При order:none сохраняется порядок входных строк. cache_groups меняет кэш значений групп, sort_result сортирует по ключам группировки. Пропущенные настройки существующего узла сохраняй. Прочитай актуальную карточку типа и полную схему результата; суффиксы Std и Null отличаются от CrossTable. Переменные в это расширение не входят.\n"
+}

@@ -22,7 +22,21 @@ test('Excel accepts twelve explicit fields on a named sheet and preserves the fi
  const fixture=excelReadbackFixture();
  fixture.phases[0].value.configuration.columns=excelColumns({columns});
  assert.equal(excelSchemaSnapshot(fixture.phases[0].value.configuration,fixture.phases[2].value.native_mapping).columns.length,12);
- assert.equal(excelParametersSchema.properties.excel.properties.columns.maxItems,12);
+ assert.equal(excelParametersSchema.properties.excel.properties.columns.maxItems,64);
+});
+test('Excel admits 16/64 fields and 11/1000 header rows, rejects 65/1001 before mutation',()=>{
+ const columns=n=>Array.from({length:n},(_,i)=>({name:'C'+i,label:'C'+i,type:'integer'}));
+ for(const width of [16,64])for(const header_rows of [11,1000]){
+  assert.doesNotThrow(()=>validateExcelParameters({...parameters,excel:{...parameters.excel,header_rows,columns:columns(width)}},'xlsx',request));
+  const fixture=excelReadbackFixture();
+  fixture.phases[0].value.configuration.columns=excelColumns({columns:columns(width)});
+  assert.equal(excelSchemaSnapshot(fixture.phases[0].value.configuration,fixture.phases[2].value.native_mapping).columns.length,width);
+ }
+ for(const patch of [{columns:columns(65)},{header_rows:1001}])
+  assert.throws(()=>validateExcelParameters({...parameters,excel:{...parameters.excel,...patch}},'xlsx',request),/Excel import:/);
+ const fixture=excelReadbackFixture();fixture.phases[0].value.configuration.columns=excelColumns({columns:columns(65)});
+ assert.throws(()=>excelSchemaSnapshot(fixture.phases[0].value.configuration,fixture.phases[2].value.native_mapping),/LOGINOM_IMPORT_SCHEMA_CHANGED/);
+ assert.equal(excelParametersSchema.properties.excel.properties.header_rows.maximum,1000);
 });
 test('existing Excel source switch admits only file/sheet and backend scan/save IDs',()=>{
  const p={source:parameters.source,excel:{source_path:'/worker/full.xlsx',sheet_name:'Sales'},source_switch:{profile_id:'profile',save_operation_id:'save'}};
