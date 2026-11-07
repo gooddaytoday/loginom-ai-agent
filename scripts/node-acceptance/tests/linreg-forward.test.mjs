@@ -42,3 +42,15 @@ assert m.expected_for(c,'/worker/c3.lgp')==m.expected_for(f,'/worker/c3.lgp')
 print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
  assert.deepEqual(value,{task:'task-stepwise.md',expected:'expected/forward-f.json',files:['selection.csv']});
 });
+
+test('C4 Ridge delivers only the approved task and regularization.csv with the independent oracle',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-ridge');e=m.expected_for(c,'/worker/c4.lgp')
+print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'],outputs=e['outputs'])))`],{encoding:'utf8'}));
+ assert.equal(value.task,'task-ridge.md');assert.equal(value.expected,'expected/ridge.json');
+ assert.deepEqual(value.files,['regularization.csv']);assert.equal(value.outputs.length,2);
+ assert.equal(value.outputs[0].rows.length,16);
+ assert.deepEqual(value.outputs[1].rows.map(r=>r.Name),['<Константа>','X1','X2','X3']);
+ assert.equal(value.outputs[1].rows[1].Y_coefficients,32/17);
+});
