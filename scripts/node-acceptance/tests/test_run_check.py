@@ -360,6 +360,19 @@ class RunCheckTests(unittest.TestCase):
                 self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_grouping_median_uses_modes_task_csv_and_independent_oracle(self):
+        case = runner.scenario('grouping-median')
+        self.assertEqual(case['prompt'].name, 'task-median.md')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertIn('{{PACKAGE_PATH}}', case['prompt'].read_text())
+        expected = runner.expected_for(case, '/test/median.lgp')
+        self.assertEqual(expected['package_path'], '/test/median.lgp')
+        self.assertEqual([n['type'] for n in expected['nodes']], ['imports.text', 'transform.group_data', 'exports.text'])
+        self.assertEqual([(c['name'], c['type']) for c in expected['outputs'][0]['columns']], [('Region', 'string'), ('Metric', 'real')])
+        self.assertEqual({r['Region']: r['Metric'] for r in expected['outputs'][0]['rows']}, {'B': 3, 'A': 4, 'C': 7, 'D': None, 'E': 2})
+        self.assertIn('grouping-median', runner.scenario_names('grouping-median'))
+
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')
         self.assertEqual(case['prompt'].name, 'task.md')
