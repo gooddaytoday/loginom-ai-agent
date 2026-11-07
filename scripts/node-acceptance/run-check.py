@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import signal
 import socket
@@ -421,6 +422,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete']:
+        src = REPO / 'docs/node-development/nodes/integration-restrequest'
+        case = name.removeprefix('rest-')
+        return dict(source=src / 'acceptance/modes' / case,
+                    prompt=src / 'acceptance' / ('task-' + case + '.md'),
+                    data=src / 'fixtures/modes', input_files=['requests.csv'], base=None,
+                    expected_name='expected.json', oracle=src / 'acceptance/modes/oracle.py')
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task-exact.md', data=src / 'data', base=None, expected_name='expected-exact.json')
@@ -733,6 +741,9 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
         if col.get('comparison') == 'json_ast':
             try: return json_ast(value) == json_ast(target)
             except (ValueError, TypeError): return False
+        if col.get('comparison') == 'rest_echo':
+            oracle = runpy.run_path(str(REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/modes/oracle.py'))
+            return oracle['matches_echo'](value, target)
         if limitation(value, col, target): return True
         if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
             try:
