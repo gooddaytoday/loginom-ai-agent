@@ -117,7 +117,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
     const kind={string:'txt',real:'num',integer:'Int64Field',datetime:'datetimefield',boolean:'cbx'}[value.type],suffix=side+';fldVariant;ValueContainer;'+kind;
     if(value.value===null)await act(suffix+';trg_SetNullTrigger');
     else if(value.type==='boolean'){
-     await act(suffix+';trg_picker');
+     await act(suffix,'press',{key:'ArrowDown'});
      await act(suffix+';boundlist;'+String(value.value));
     }else{
      const s=await observe('typed replacement editor');const es=s.ui.elements.filter(e=>e.allowed_actions.includes('fill')&&(e.identity?.anchor_tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid?.startsWith(s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix+';')));
