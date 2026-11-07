@@ -25,6 +25,7 @@ test('MCP application refusals remain typed normal content and the same connecti
   const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0, preparationPath=[];
   const sourceCalls=[];
+  let browserPause;
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
   const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
@@ -52,6 +53,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       }
       assert.equal(this.browser, true);
       assert.equal(request.name, 'browser_run_code_unsafe');
+      if(browserPause){const pause=browserPause;browserPause=null;pause.enter();await pause.wait;}
       browserCalls++;
       const code = request.arguments.code;
       if (code.includes('async function prepareWorkspace(')) preparedDrafts++;
@@ -155,7 +157,18 @@ test('MCP application refusals remain typed normal content and the same connecti
 
     // Bootstrap starts from a known blank browser page, before mocked preparation.
     page.url = () => 'about:blank';
-    const bootstrap = await client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    let releaseBrowser,enteredBrowser,timer;
+    const entered=new Promise(resolve=>{enteredBrowser=resolve;});
+    browserPause={enter:enteredBrowser,wait:new Promise(resolve=>{releaseBrowser=resolve;})};
+    const bootstrapPending=client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    await entered;
+    const describePending=client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text']}});
+    try{
+      assert.equal(await Promise.race([describePending.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),2000);})]),true,
+        'diagnostic describe must not queue behind browser work');
+    }finally{clearTimeout(timer);releaseBrowser();}
+    const bootstrap=await bootstrapPending;
+    assert.notEqual((await describePending).isError,true);
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');
     assert.equal(initial.output.bootstrap, true);

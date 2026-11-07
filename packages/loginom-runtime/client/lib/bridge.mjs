@@ -496,7 +496,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             return await (local?invoke():dockGate(request.params.name,invoke));
           }
           if (request.params.name === 'dock_action_describe') {
-            return await dockGate(request.params.name,async()=>{
+            const invoke=async()=>{
             if(userProfile){
               const args=request.params.arguments??{},keys=args.action_keys??(args.action_key?[args.action_key]:[]);
               if(keys.some(key=>!['package.save_as','package.save_checkpoint'].includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
@@ -518,7 +518,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
             if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
             return reply;
-            });
+            };
+            return await (userProfile?dockGate(request.params.name,invoke):invoke());
           }
           return await dockGate(request.params.name, async () => {
             extra.signal.throwIfAborted();
