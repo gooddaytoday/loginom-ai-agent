@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import {browserLaunch} from '../lib/browser-launch.mjs';
 
 test('browser launch normalizes headed DPI without incompatible viewport emulation', () => {
-  assert.deepEqual(browserLaunch(false, 'linux'), {
+  assert.deepEqual(browserLaunch(false, 'linux', {}), {
     args:['--start-maximized','--window-size=1280,800','--force-device-scale-factor=1'], viewport:null, windowMode:'maximized',
   });
-  // macOS ignores --start-maximized, so a fixed size would pin Desktop users to a small window (0.3.8–0.3.9).
-  for (const platform of ['darwin','win32'])
-    assert.deepEqual(browserLaunch(false, platform), {
+  // A fixed size overrides maximization, so desktops must not get it (0.3.8–0.3.9 opened 1280×800).
+  for (const [platform, env] of [['darwin',{}],['win32',{}],['linux',{XDG_CURRENT_DESKTOP:'GNOME'}],['linux',{DESKTOP_SESSION:'plasma'}],['linux',{WAYLAND_DISPLAY:'wayland-0'}]])
+    assert.deepEqual(browserLaunch(false, platform, env), {
       args:['--start-maximized','--force-device-scale-factor=1'], viewport:null, windowMode:'maximized',
-    });
+    }, platform + ' ' + JSON.stringify(env));
   assert.deepEqual(browserLaunch(true), {args:[],viewport:{width:1280,height:800},windowMode:'headless'});
-  browserLaunch(false, 'linux').args.push('--invalid');
-  assert.equal(browserLaunch(false, 'linux').args.length,3);
+  browserLaunch(false, 'linux', {}).args.push('--invalid');
+  assert.equal(browserLaunch(false, 'linux', {}).args.length,3);
 });
 
 test('headed launch keeps the Files refresh control visible without a window manager', {
@@ -21,7 +21,7 @@ test('headed launch keeps the Files refresh control visible without a window man
   timeout: 30000,
 }, async () => {
   const {chromium} = await import('playwright-core');
-  const launch = browserLaunch(false, 'linux');
+  const launch = browserLaunch(false, 'linux', {});
   const browser = await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,
     headless:false, chromiumSandbox:true, args:launch.args});
   try {
