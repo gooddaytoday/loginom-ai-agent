@@ -594,6 +594,8 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+
+
 `logreg-apply`: обучение Enter на train.csv, затем замена источника того же
 импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
 `datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
