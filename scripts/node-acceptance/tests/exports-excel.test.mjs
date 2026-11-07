@@ -39,11 +39,15 @@ e=m.expected_for(c,'/worker/import.lgp');assert all(x['label_any'] for x in e['o
 test('Excel mode catalog uses approved isolated tasks, numeric bytes and a private replacement book',()=>{
  const r=spawnSync('python3',['-c',`import importlib.util
 s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-for mode, task, formats in [('xls','task-xls.md',['xls']),('numeric','task-numeric-cells.md',['xls','xlsx']),('replace','task-replace-workbook.md',['xlsx'])]:
+for mode, task, formats in [('numeric','task-numeric-cells.md',['xlsx']),('replace','task-replace-workbook.md',['xlsx'])]:
  c=m.scenario('excel-export-'+mode); assert c['prompt'].name==task; assert c['input_files']==['modes.csv']; assert c['base'] is None
  e=m.expected_for(c,'/worker/saved.lgp'); assert [b['format'] for b in e['excel_books']]==formats
  assert all(b['output_port'] is None and b['rows'][0][1]==1234.56789 for b in e['excel_books'])
  assert all(b['number_format']==(1 if mode=='numeric' else 0) for b in e['excel_books'])
+c=m.scenario('excel-export-xls');e=m.expected_for(c,'/worker/refusal.lgp')
+assert c['excel_xls_refusal'] is True and c['excel_mode'] is None
+assert c['prompt'].name=='task-xls.md' and c['input_files']==['modes.csv']
+assert e['outputs']==[] and e['refusal']=={'text':'XLS'}
 `],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
  assert.equal(r.status,0,r.stderr);
 });

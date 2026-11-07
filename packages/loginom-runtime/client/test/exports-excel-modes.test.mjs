@@ -6,18 +6,18 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {nodeApplyInputSchema} from '../lib/node-api.mjs';
 import {requireExportDestination} from '../lib/storage-policy.mjs';
 const request={target:{kind:'new'},inputs:[{}],mappings:[],read:{ports:[]}};
-const settings={destination:'/test-2/numeric.xls',sheet_name:'Данные',header:'names',overwrite:'replace',number_format:'numeric',decimal_count:2,divide_thousands:true};
-test('XLS numeric style and explicit whole-workbook replace pass production preflight',()=>{
- assert.doesNotThrow(()=>validateExcelExportParameters({excel_export:settings},'xls',request));
+const settings={destination:'/test-2/numeric.xlsx',sheet_name:'Данные',header:'names',overwrite:'replace',number_format:'numeric',decimal_count:2,divide_thousands:true};
+test('XLSX numeric style and explicit whole-workbook replace pass production preflight',()=>{
+ assert.doesNotThrow(()=>validateExcelExportParameters({excel_export:settings},'xlsx',request));
  assert.equal(requireExportDestination(settings.destination),settings.destination);
  const modes=createCandidateNodeSupport({}).nodeApplyHandlers.get('exports.excel').modes;
  assert.deepEqual(modes,['xlsx','xls']);assert.deepEqual(NODE_TYPES['exports.excel'].modes,modes);
  assert.ok(nodeApplyInputSchema.properties.mode.enum.includes('xls'));
- for(const change of [{destination:'/test-2/bad.xlsx'},{decimal_count:-1},{decimal_count:31},{decimal_count:1.5},{divide_thousands:'yes'},{number_format:'text'},{overwrite:'append'}])
-  assert.throws(()=>validateExcelExportParameters({excel_export:{...settings,...change}},'xls',request));
+ for(const change of [{destination:'/test-2/bad.csv'},{decimal_count:-1},{decimal_count:31},{decimal_count:1.5},{divide_thousands:'yes'},{number_format:'text'},{overwrite:'append'}])
+  assert.throws(()=>validateExcelExportParameters({excel_export:{...settings,...change}},'xlsx',request));
 });
-test('retained XLS numeric settings are supported without changing stored precision',()=>{
- const values=Object.fromEntries(Object.entries({destination:settings.destination,sheet_name:'Данные',header:1,file_type:0,number_format:1,decimal_count:2,divide_thousands:true}).map(([k,value])=>[k,{value}]));
+test('read-only retained XLS observations remain inspectable',()=>{
+ const values=Object.fromEntries(Object.entries({destination:'/test-2/numeric.xls',sheet_name:'Данные',header:1,file_type:0,number_format:1,decimal_count:2,divide_thousands:true}).map(([k,value])=>[k,{value}]));
  assert.doesNotThrow(()=>validateNativeExcelExport(values,null,'xls'));
  assert.throws(()=>validateNativeExcelExport({...values,file_type:{value:1}},null,'xls'));
  for(const value of [-1,31,1.5])assert.throws(()=>validateNativeExcelExport({...values,decimal_count:{value}},null,'xls'));

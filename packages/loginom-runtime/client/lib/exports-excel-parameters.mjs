@@ -1,8 +1,8 @@
 import {requireExportDestination} from './storage-policy.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 export const EXCEL_EXPORT_FIELDS=Object.freeze(Object.fromEntries(Object.entries({destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat',decimal_count:'pedDecimalCount',divide_thousands:'chkDivideThousands'}).map(([key,id])=>[key,['ExportExcelFilePreviewWizard',id]])));
-export const excelExportSettingsSchema={type:'object',description:'XLS/XLSX workbook. New: destination, sheet_name, header, overwrite required. Existing: preserve omissions.',properties:{
- destination:{type:'string',minLength:1,maxLength:512,description:'.xls for mode xls; .xlsx for mode xlsx, in selected exports directory.'},
+export const excelExportSettingsSchema={type:'object',description:'XLSX workbook. XLS is unavailable in Loginom 7.4.2 and refused before changes; use XLSX. New: destination, sheet_name, header, overwrite required. Existing: preserve omissions.',properties:{
+ destination:{type:'string',minLength:1,maxLength:512,description:'.xlsx in selected exports directory. XLS paths are unavailable and refused before changes.'},
  sheet_name:{type:'string',minLength:1,maxLength:31,description:'One worksheet; no []:*?/\\ or edge apostrophes.'},
  header:{type:'string',enum:['none','names','labels'],description:'No header, names or labels.'},
  overwrite:{type:'string',enum:['reject','replace'],description:'reject preserves an existing file; replace explicitly authorizes replacing the ENTIRE workbook, deleting all old sheets.'},
@@ -20,6 +20,7 @@ export function validateExcelSheetName(value){
  return value;
 }
 export function validateExcelExportParameters(p,mode,r,directories=null){
+ need(!(mode==='xls'||typeof p?.excel_export?.destination==='string'&&/\.xls$/i.test(p.excel_export.destination)),'формат XLS в этой версии Loginom не выгружает данные. Используй XLSX.');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='excel_export'),'Invalid parameters: use excel_export');
  const s=p.excel_export??{};
  need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>Object.hasOwn(excelExportSettingsSchema.properties,k)),'Invalid parameters.excel_export: unknown setting');

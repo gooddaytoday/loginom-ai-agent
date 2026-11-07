@@ -229,7 +229,8 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         mode = name.removeprefix('excel-export-')
         return dict(source=src, prompt=src / {'xls':'task-xls.md', 'numeric':'task-numeric-cells.md', 'replace':'task-replace-workbook.md'}[mode],
-                    data=src.parent / 'fixtures', input_files=['modes.csv'], base=None, excel_mode=mode)
+                    data=src.parent / 'fixtures', input_files=['modes.csv'], base=None,
+                    excel_mode=mode if mode!='xls' else None, excel_xls_refusal=mode=='xls')
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
@@ -508,9 +509,11 @@ def scenario(name, case_root=None, *, cases=None):
 
 def expected_for(case, package):
     src = case['source']
+    if case.get('excel_xls_refusal'):
+        return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
     if case.get('excel_mode'):
         approved = read(src / 'modes/expected.json')
-        formats = approved['formats'] if case['excel_mode'] == 'numeric' else ['xls' if case['excel_mode'] == 'xls' else 'xlsx']
+        formats = ['xlsx']  # LAB-1057: XLS is a pre-mutation platform refusal, not a workbook case.
         stems = {'xls':'legacy', 'numeric':'numeric', 'replace':'existing'}
         books = [dict(output_node_type='exports.excel', output_port=None, format=ext, filename=stems[case['excel_mode']]+'.'+ext,
             sheet_name='Данные', header='names', number_format=1 if case['excel_mode']=='numeric' else 0, decimal_count=2, divide_thousands=case['excel_mode']=='numeric',
@@ -1408,12 +1411,21 @@ class Runner:
                 if event.get('type') != 'tool_use': continue
                 request = part.get('state', {}).get('input', {})
                 if part.get('tool') == 'loginom_dock_node_apply':
-                    assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
+                    if spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
+                        state=part.get('state',{})
+                        reply=json.JSONDecoder().raw_decode(state.get('output') or state.get('error',''))[0]
+                        assert reply.get('status')=='NOT_APPLIED' and reply.get('request_rejected') is True and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True, 'XLS_REFUSAL_EFFECT'
+                        assert 'формат XLS в этой версии Loginom не выгружает данные' in reply.get('error',{}).get('message','') and 'XLSX' in reply.get('error',{}).get('message',''), 'XLS_REFUSAL_REASON'
+                    else:
+                        assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
                 if part.get('tool') == 'loginom_dock_action_run' and request.get('action_key') == 'node.add':
                     assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
             answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
                            if event.get('type') == 'text'), (None, ''))
             assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            if spec.get('excel_xls_refusal'):
+                assert 'XLSX' in answer[1] and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
+                assert not any(p.is_file() for ext in ['*.xls','*.xlsx'] for p in profile.rglob(ext)), 'XLS_REFUSAL_CREATED_WORKBOOK'
             inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
             assert not any(p.is_file() and not any(
                 re.fullmatch(r'[0-9a-f]{64}-\d+-' + re.escape(name), p.name)
