@@ -1,0 +1,76 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.reform_columns"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.reform_columns",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "A": 10,
+          "B": 100,
+          "R": 1.75,
+          "S": "alpha"
+        },
+        {
+          "RowID": 2,
+          "A": 20,
+          "B": 200,
+          "R": -2.75,
+          "S": "beta"
+        },
+        {
+          "RowID": 3,
+          "A": 30,
+          "B": 300,
+          "R": 0.25,
+          "S": "gamma"
+        }
+      ]
+    }
+  ]
+}
