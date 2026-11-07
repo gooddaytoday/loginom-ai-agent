@@ -26,13 +26,13 @@ export async function excelConfigureCapability(page,t,readContext){
   });
   const click=async(locator,double=false)=>{await quiet();await guard();const p=await point(locator);effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
   const fill=async(locator,value)=>{await quiet();await guard();await point(locator);effect=true;await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
-  const choose=async(owner,value)=>{
+  const choose=async(owner,value,optionTid)=>{
    const input=find(owner).locator('input:not([type="hidden"])');
    if(await input.inputValue()===value)return;
    const picker=find(owner+';trg_picker');await click(picker);
    const portal=find(owner+';boundlist');
    await wait('owned dropdown',()=>portal.isVisible());
-   const option=portal.getByRole('option',{name:value,exact:true});
+   const option=optionTid?find(optionTid):portal.getByRole('option',{name:value,exact:true});
    await click(option);await wait('selected dropdown value',()=>input.inputValue().then(v=>v===value));
   };
   const panel=()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().id);
@@ -45,7 +45,7 @@ export async function excelConfigureCapability(page,t,readContext){
   if(await pathInput.inputValue()!==t.excel.source_path)await fill(pathInput,t.excel.source_path);
   if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
-  if(t.excel.named_range!==undefined)await choose(file+'cbbTableName;ValueContainer;cbx',t.excel.named_range);
+  if(t.excel.named_range!==undefined)await choose(file+'cbbTableName;ValueContainer;cbx',t.excel.named_range,file+'cbbTableName;ValueContainer;cbx;boundlist;'+t.excel.named_range);
   else{
    const sheet=find(file+'cbbTableName;ValueContainer;cbx').locator('input');
    await fill(sheet,t.excel.sheet_name??'1');

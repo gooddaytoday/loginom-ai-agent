@@ -19,7 +19,7 @@ test('C3 production capability selects the exact range, toggles extension and in
    const combo=(tid,value,options)=>{
     const e=input(tid,value),picker=add('button',tid+';trg_picker',e);picker.textContent='Choose';
     picker.onclick=()=>{const portal=add('div',tid+';boundlist',e);
-     for(const value of options){const option=add('div',tid+';boundlist;'+value,portal);option.setAttribute('role','option');option.textContent=value;
+     for(const value of options){const option=add('div',tid+';boundlist;'+value,portal);option.setAttribute('role','option');option.textContent=value+(value.startsWith('SalesRange')?' Data':'');
       option.onclick=()=>{e.querySelector('input').value=value;portal.remove();};}
     };
    };
@@ -51,7 +51,7 @@ test('C3 production capability selects the exact range, toggles extension and in
   },{root,file,defs,grid});
   for(const [extend_range,inspect] of [[false,false],[true,false],[true,true],[false,false]]){
    await page.evaluate(()=>window.reopen());
-   const result=await excelConfigureCapability(page,{deadline:Date.now()+30000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},inspect,
+   const result=await excelConfigureCapability(page,{deadline:Date.now()+5000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},inspect,
     excel:{source_path:'/worker/named.xlsx',named_range:'SalesRange',extend_range,header_rows:1,columns:['Id','Amount'].map(name=>({name,label:name,type:'integer'}))},origin:'null',build:'test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
    assert.equal(result.verified,true,result.error);
    assert.equal(result.configuration.source.named_range,'SalesRange');assert.equal(result.configuration.source.extend_range,extend_range);
