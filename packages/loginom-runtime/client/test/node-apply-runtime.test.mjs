@@ -93,7 +93,7 @@ test('read-only target refusal is NOT_APPLIED with confirmed cleanup and no grap
  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.phase==='target'&&e.receipt.effect_possible===false));
  const count=f.calls.length;await f.runtime.runNodeApply(request());assert.equal(f.calls.length,count);
 });
-test('occupied existing export explains the safe new-target path without replacing its input',async()=>{
+test('occupied existing export explains upstream recovery without duplicating the export or replacing its input',async()=>{
  for(const variant of ['different source','different output','same connection','preserve input']){
   const f=fixture(),ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
   f.handlers.set('exports.text',f.handler);
@@ -112,8 +112,10 @@ test('occupied existing export explains the safe new-target path without replaci
    assert.equal(reply.error.code,'NODE_APPLY_STOPPED');
    assert.match(reply.error.message,/Requested input is occupied by an unowned link/);
    assert.match(reply.error.message,/does not replace existing connections/);
-   assert.match(reply.error.message,/target.kind:"new".*NEW operation_id/);
-   assert.match(reply.error.message,/same source.*inputs:\[\]/);
+   assert.match(reply.error.message,/correct the existing upstream chain/);
+   assert.match(reply.error.message,/same Export with inputs:\[\].*NEW operation_id/);
+   assert.match(reply.error.message,/Do not create a second Export/);
+   assert.ok(!reply.error.message.includes('target.kind:"new"'));
    assert.match(reply.next_step.instruction,/No node mutation or browser recovery is required/);
    assert.deepEqual(f.calls,['source']);
    assert.equal((await f.runtime.runNodeApply(r)).error.message,outcome.error.message);
