@@ -67,7 +67,7 @@ export async function excelConfigureCapability(page,t,readContext){
    const cmp=Ext.getCmp(elements[0].id),store=cmp?.getStore();
    if(cmp?.el?.dom!==elements[0]||!store||store.loading||store.getCount()!==5)throw Error('Excel column grid is not ready');
    const base=grid+';normalHeaderCt;',headers=[...document.querySelectorAll('[data-tid^='+JSON.stringify(base)+']')].filter(e=>/^\d+$/.test(e.getAttribute('data-tid').slice(base.length)));
-   if(headers.length<1||headers.length>12)throw Error('Excel supports 1..12 columns');
+   if(headers.length<1||headers.length>64)throw Error('Excel supports 1..64 columns');
    return headers.map((h,i)=>{if(h.getAttribute('data-tid')!==base+i)throw Error('Excel source column order differs');
     const cells=[0,1,2,3,4].map(row=>{const es=exact(base+i+'_'+row);if(es.length!==1||!elements[0].contains(es[0]))throw Error('Excel column cell ambiguous');return es[0];});
     const checks=cells[4].querySelectorAll('.x-grid-checkcolumn');if(checks.length!==1)throw Error('Excel used flag unavailable');

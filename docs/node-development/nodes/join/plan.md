@@ -312,3 +312,62 @@ after.properties.mode.enum.push('right', 'full', 'difference');
 console.log(Buffer.byteLength(JSON.stringify(nodeApplyInputSchema)), Buffer.byteLength(JSON.stringify(after)));
 JS
 ```
+
+## 8. v0.4.0: полное без ключей и приведение — предложение LAB-1002
+
+База `bc63453453e22e1369809a7d36d2fee7719b7c7d`, mas2,
+07.11.2026, Loginom 7.4.2; только `https://app.loginom.ai/app/?testable=true`,
+назначенная в карточке пара. Это исследование и предложение критериев;
+изменений runtime и принятого покрытия нет.
+
+Живой мастер `MF;TF-1;WizrdMCF;JoinDataWizard`:
+
+| Случай | Наблюдение | Решение для предложения |
+|---|---|---|
+| Выбор операции | `pedJoinType;ValueControl;boundlist`: внутреннее, левое, правое, полное, разность. Cross отдельным пунктом отсутствует. | Не добавлять фиктивный нативный селектор cross. |
+| Полное без ключей | После выбора `…;Полное_соединение` и пустых связей мастер принял Next/Execute. В `MF;TF-1;ViewsForm;BrowseView;grdData;grd-1` шесть строк: L1/L2/L3 × R1/R2; поля LeftID/LeftKey/RightID/RightKey. | Декартово произведение = `full`, `keys:[]`. Два входа 0/1, выход 0 прежние. |
+| Внутреннее без ключей | На тех же непустых входах таблица имела count=total=0, loading=false. | Пустые ключи разрешать только для full, а не сразу для всех операций. |
+| Integer/real | LeftKey — integer, RightKey — real: два жеста `colSourceName_LeftKey` → `colDisplayName_RightKey` не создали связи. Контрольный жест LeftID → RightID (оба string) создал взаимную связь в тех же локальных UI stores. | Неявное приведение этой пары не установлено. Сохранить equal-type отказ; отложить реализацию до указания штатного UI-пути. Не подменять её изменением типа во входном mapping. |
+
+Диагностические входы: `fixtures/v040/left.csv` (3 строки), `right.csv`
+(2 строки); LeftKey integer, RightKey real. Полное сохранило все значения,
+включая повтор ключа 2 у L2/L3. Приведение не меняет объявленный тип результата
+по предположению oracle, но этого поведения живой мастер не подтвердил.
+Пустые стороны, прочие пары типов, NULL/некорректный числовой текст и операция
+из переменной в предлагаемый принятый объём не входят.
+
+Комплект предложений: `fixtures/v040/schema.json`,
+`acceptance/task-cross.md`, `task-full-no-keys.md`, `task-key-coercion.md`,
+`acceptance/oracle-v040.py` и `acceptance/v040/<случай>/expected.json`.
+Oracle использует Python csv, itertools.product и Decimal, не Loginom:
+cross/full-no-keys — шесть полных строк, key-coercion — две строки (L2/R1,
+L3/R1). Последний случай **отложен**, наличие expected не означает доступность
+режима. В двух первых заданиях RightKey явно импортируется как integer;
+диагностический просмотр с real не является приёмкой этих заданий.
+
+Предлагаемые критерии для full без ключей: полный Cartesian multiset без
+схлопывания повторов, четыре исходных поля и их типы, один выход; после
+Save/cold те же ячейки и схема без повторной настройки. Затем стандартные CSV,
+cleanup и 2/3 на точном SHA обеими ролями. Нового механизма проверки нет.
+Модели передаются только выбранный task и оба CSV; oracle/expected — нет.
+
+Причина отказа базы: `join-parameters.mjs` требует nonempty keys,
+`join-procedure.mjs` запрещает сохранённые пустые ключи, `join-readback.mjs`
+требует c.keys.length. `join-context.mjs` уже читает пустые связи; менять его
+для full не нужно. Оценка **1 цикл / отдельный PR** для full без ключей:
+`join-parameters.mjs`, `join-procedure.mjs`, `join-readback.mjs`, адресные тесты;
+аддитивные изменения карточки/схемы — `node-api.mjs`, `node-contracts.mjs`,
+минимум keys в join-ветке `node-result-schema.mjs`, существующий reference.
+Ослабление публичного readback minItems:1→0 требует решения владельца до кода.
+Общая оболочка, Agent, deadline и бюджет не меняются. Для приведения **0 циклов
+до решения владельца**, поскольку работающего UI-пути не установлено.
+
+Полная предложенная карточка `acceptance/proposed-v040-type-card.json` —
+**2815 Б** в сжатом JSON, полный reference (включая прежний текст)
+`acceptance/proposed-v040-reference.md` — **4407 Б**. Предлагаемая строка в
+`acceptance/proposed-v040-skill-row.md` — **139 Б** (было 157); основной
+SKILL.md после этой замены **39943 Б** (было 39961). Все лимиты соблюдены.
+Базовые `model_tool_bytes=14539`, `full_input_schema_bytes=63337`;
+для карточки с пустыми ключами длина minItems не меняется. Это замер
+предложения, не сертификация будущего runtime. Сборка CLI и модельные прогоны
+run-check не выполнялись: назначен облегчённый этап 0 до утверждения критериев.

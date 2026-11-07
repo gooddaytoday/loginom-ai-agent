@@ -655,11 +655,12 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
       shared_strings_complete: book.sstComplete,
       coverage: { bytes_read: 0, observed_records: 0, elapsed_ms: 0, eof: false },
     }
-    if (!Number.isInteger(p.header_rows) || p.header_rows < 0 || p.header_rows > 10)
-      invalid("header_rows must be 0..10")
+    if (!Number.isInteger(p.header_rows) || p.header_rows < 0 || p.header_rows > 1000)
+      invalid("header_rows must be 0..1000")
     let previous = 0,
       width = 0
     const technicalNames = new Set<string>()
+    const headers = new Map<number, string>()
     const eof = await book.rows(
       sheet,
       async (r) => {
@@ -702,6 +703,12 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
           })
         }
         const headerEnd = p.first_row + p.header_rows
+        if (p.header_rows > 1 && r.number < headerEnd)
+          for (const [col, cell] of values) {
+            const before = headers.get(col)
+            // Keep enough to refuse overlong names without retaining every header cell.
+            headers.set(col, (before ? before + "_" + cell.value : cell.value).slice(0, 121))
+          }
         if (r.number >= headerEnd) {
           const blanks = p.blank_rows === "import" ? Math.max(0, r.number - Math.max(previous + 1, headerEnd)) : 0
           const count = p.blank_rows === "import" || values.size ? 1 : 0
@@ -725,6 +732,17 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
         p.declared_dimension = ref ?? ""
       },
     )
+    if (p.header_rows > 1) {
+      technicalNames.clear()
+      for (const [i, col] of p.columns.entries()) {
+        col.name = col.label = headers.get(i + 1) ?? `Column${i + 1}`
+        const base = /^[A-Za-z_][A-Za-z0-9_]{0,119}$/.test(col.name) ? col.name : `Column${i + 1}`
+        let technical = base
+        for (let suffix = i + 1; technicalNames.has(technical); suffix++) technical = `${base}_${suffix}`
+        technicalNames.add(technical)
+        col.technical_name = technical
+      }
+    }
     p.observed_dimension = dimension(p.first_row, p.last_row, width)
     p.coverage = {
       bytes_read: budget.bytes,
@@ -743,8 +761,8 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
 
 function xlsxReply(p: Stored, cursor = 0) {
   const reasons = [
-    ...(p.columns.length < 1 || p.columns.length > 12 ? ["Excel runtime supports 1–12 columns"] : []),
-    ...(p.header_rows < 1 ? ["Excel runtime requires 1–10 header rows"] : []),
+    ...(p.columns.length < 1 || p.columns.length > 64 ? ["Excel runtime supports 1–64 columns"] : []),
+    ...(p.header_rows < 1 ? ["Excel runtime requires 1–1000 header rows"] : []),
     ...(p.blank_rows !== "import" ? ["Excel runtime imports blank rows; blank_rows=skip cannot be applied"] : []),
     ...(!p.shared_strings_complete ? ["Shared strings quick budget reached; exact scan required"] : []),
     ...((p.scan?.missing_cached_values ?? p.missing_cached_values)
