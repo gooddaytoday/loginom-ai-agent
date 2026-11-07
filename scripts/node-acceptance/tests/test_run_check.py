@@ -379,6 +379,23 @@ class RunCheckTests(unittest.TestCase):
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'],
                        check=True, capture_output=True)
 
+    def test_text_export_modes_catalog_uses_original_tasks_and_typed_cold(self):
+        for name, cases, fields in [
+                ('text-export-fixed-width', ['fixed-width'], [('Code', 'string'), ('Amount', 'real'), ('Money', 'real')]),
+                ('text-export-encodings', ['windows-1252', 'utf16-le', 'utf16-be'], [('Code', 'string'), ('Text', 'string')])]:
+            case = runner.scenario(name)
+            self.assertEqual(case['text_export_cases'], cases)
+            self.assertEqual(case['prompt'].name, 'task-' + ('fixed-width' if len(cases) == 1 else 'encodings') + '.md')
+            self.assertTrue(all((case['data'] / f).is_file() for f in case['input_files']))
+            expected = runner.expected_for(case, '/test/modes.lgp')
+            output = expected['outputs'][0]
+            self.assertEqual(output['output_node_type'], 'export_input')
+            self.assertEqual(output['column_order'], 'exact')
+            self.assertEqual([(c['name'], c['type']) for c in output['columns']], fields)
+            self.assertEqual(output.get('header', True), len(cases) != 1)
+            self.assertNotIn('expected', case['input_files'])
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--self-check'], check=True, capture_output=True)
+
     def test_text_export_cp1251_catalog_and_same_node_switch(self):
         case = runner.scenario('text-export-cp1251')
         self.assertEqual(case['text_export_encodings'], ['cp1251', 'utf-8'])

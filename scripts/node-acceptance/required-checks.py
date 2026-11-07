@@ -22,7 +22,7 @@ RULES = (
     ((C + '*read*.mjs', C + '*output*.mjs', C + '*context*.mjs', C + 'node-*.mjs',
       C + 'workspace*.mjs', C + 'ui*.mjs', C + 'observ*.mjs', C + 'native*.mjs',
       C + 'bridge.mjs', 'packages/loginom-runtime/src/connection-check.mjs'), ('live-ui',), ()),
-    ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8')),
+    ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8', 'text-export-cp1251', 'text-export-fixed-width', 'text-export-encodings')),
     ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1', 'sorting-locale')),
     ((C + 'variables-datatovar-*.mjs', 'docs/node-development/nodes/variables-datatovar/acceptance/**', 'scripts/node-acceptance/variables-datatovar.mjs'), ('live-ui',), ('variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty')),
     ((C + 'calculator-*.mjs', 'docs/node-development/nodes/calculator/acceptance/**'),

@@ -654,3 +654,12 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
 независимый `oracle.py`: два CSV (первый — бинарный порядок, второй — итоговый
 и сохранённый), точные типы, NULL/пустая строка и порядок полей, Save/cold.
+
+
+`text-export-fixed-width` uses the approved task-fixed-width.md/formats.csv;
+`text-export-encodings` uses task-encodings.md/encodings.csv. The unchanged
+stage-0 modes/oracle.py compares every downloaded byte, including BOM and final
+CRLF. Stock cold reads the saved export input with exact types, values and field
+order; fixed width supplies the real .txt file without treating it as CSV,
+while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
+the byte oracle for the file passed through --csv. No oracle reaches the model.
