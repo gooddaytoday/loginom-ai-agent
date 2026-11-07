@@ -108,6 +108,9 @@ Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
 Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 
+`calculator-expression-options` uses the approved Loginom-syntax task and `modes/expected.json`
+(intermediate Helper, cached flag, reorder, same-node rerun); only the task and `fixtures/modes.csv` reach the model.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2

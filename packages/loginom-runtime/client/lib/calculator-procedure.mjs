@@ -85,12 +85,12 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
   const patch=change.after;
   if(change.before) {
    requireValue(same(semantic(row(s,recordId)),semantic(change.before)),'Expression changed since patch planning');
-   if(['name','label','type'].some(k=>patch[k]!==change.before[k])) {
+   if(['name','label','type','intermediate','cached'].some(k=>patch[k]!==change.before[k])) {
     await channel.perform({condition:'edit retained calculator parameters',initialObservation:s,ready,
      identity:()=>({record_id:recordId}),resolve:s=>({verb:'double_click',ref:control(s,';CalcDataWizard;colExpressionName_'+row(s,recordId).name,'double_click').ref})});
    }
   }
-  if(!change.before||['name','label','type'].some(k=>patch[k]!==change.before[k])) {
+  if(!change.before||['name','label','type','intermediate','cached'].some(k=>patch[k]!==change.before[k])) {
    for(const [key,value] of Object.entries({name:patch.name,label:patch.label,type_label:types[patch.type]})) {
     s=await channel.observe({condition:'calculator parameter '+key,ready:s=>s.wizard?.stage==='calculator'&&s.wizard.expression_parameters?.fields[key]?.status==='observed'});
     const field=s.wizard.expression_parameters.fields[key];if(field.value===value)continue;
@@ -105,6 +105,21 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
     } else await channel.perform({condition:'set calculator '+key,initialObservation:s,ready:s=>s.wizard.expression_parameters?.fields[key]?.status==='observed',
      identity:s=>({editor:s.wizard.expression_parameters.root_ref,expression:s.wizard.expression_parameters.selected_expression,key}),
      resolve:s=>({verb:'set_wizard_field',ref:s.wizard.expression_parameters.fields[key].input_ref,text:value})});
+   }
+   // A new expression opens unchecked (default-expression check in the patch plan).
+   for(const key of ['intermediate','cached'].filter(k=>patch[k]!==(change.before?change.before[k]:false))) {
+    const option=state=>state.wizard?.expression_parameters?.options?.[key];
+    s=await channel.observe({condition:'calculator option '+key,ready:s=>s.wizard?.stage==='calculator'&&option(s)?.status==='observed'});
+    requireValue(option(s).enabled===true,'Calculator option unavailable: '+key);
+    if(option(s).value!==patch[key]) {
+     await channel.perform({condition:'set calculator '+key,initialObservation:s,ready:s=>option(s)?.status==='observed',
+      identity:s=>({editor:s.wizard.expression_parameters.root_ref,expression:s.wizard.expression_parameters.selected_expression,key}),
+      resolve:s=>{const refs=[option(s).input_ref,option(s).display_ref];
+       const box=s.ui.elements.find(e=>refs.includes(e.ref)&&e.allowed_actions.includes('set_checked')&&e.interaction?.state==='point_observed');
+       requireValue(box,'Calculator option checkbox is not painted: '+key);return {verb:'set_checked',checked:patch[key],ref:box.ref};}});
+     s=await channel.observe({condition:'calculator option '+key+' read back',ready:s=>option(s)?.status==='observed'});
+    }
+    requireValue(option(s).value===patch[key],'Calculator option '+key+' was not set');
    }
    s=await channel.observe({condition:'calculator parameters ready to apply',ready:s=>s.wizard.expression_parameters?.status==='observed'});
    await channel.perform({condition:'apply calculator expression parameters',initialObservation:s,ready:s=>s.wizard.expression_parameters?.status==='observed',

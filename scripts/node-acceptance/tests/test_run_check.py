@@ -36,6 +36,19 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(expected['outputs'][0]['rows'][0]['ScenarioAmount'], value)
             self.assertIsNone(expected['outputs'][0]['rows'][3]['Shifted'])
 
+    def test_calculator_expression_options_sends_only_task_and_csv(self):
+        case = runner.scenario('calculator-expression-options')
+        expected = runner.expected_for(case, '/own/calculator.lgp')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertEqual(case['prompt'].name, 'task-expression-options.md')
+        self.assertEqual(expected['package_path'], '/own/calculator.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Bare', 'FromField', 'JsTotal', 'FromExpr'])
+        self.assertNotIn('Helper', [c['name'] for c in output['columns']])
+        self.assertIsNone(output['rows'][3]['Amount'])
+
     def test_csv_without_header_checks_the_first_json_cell(self):
         output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
                       rows=[dict(JSON='{"id":10,"children":[{"name":"Продажи"}]}')])
