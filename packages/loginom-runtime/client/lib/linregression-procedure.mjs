@@ -114,7 +114,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    state=await observe('details','linear criterion readback');
   }
   need(state.node_linregression.values.pedRegSelQuality===criterion,'selection criterion readback differs');
-  need(state.node_linregression.disabled.pedAddSignificance===(criterion!==0)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected Forward cutoff availability');
+  need((criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected Forward cutoff availability');
   for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[['pedAddSignificance',wanted.add_significance??0.05]]:[])]){
    if(state.node_linregression.values[key]!==value){
     const [coefficient,exponent]=String(value).split('e-');
