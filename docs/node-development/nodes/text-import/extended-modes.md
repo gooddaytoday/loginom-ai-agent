@@ -42,7 +42,7 @@ prefix собственного workflow, не константа будущег
 | Автометка | W;DoneWizard;cbxNodeTitleMode;trg_picker; варианты Автоматическая_метка и Пользовательская_метка; W;DoneWizard;edtDisplayName | 18-label.json, 19-label-options.json |
 | Смена источника и метка | Автометка typed.csv после Execute; замена источника на variant.csv в том же узле обновила поле метки до variant.csv | 20-executed.json, 26-auto-label-source-change.json |
 | Пользовательская метка | Worker: LAB975 import после Execute. Reviewer: «Ежедневные продажи» сохранилась после замены typed-update.csv на typed.csv | 27-variant-output.json; 51-custom-title.json → 52-custom-title-after-source.json |
-| HTTP | Обычный URL в P;edtFileName;ValueControl допускает переход на F, но чтение остаётся под bg-mask-message/«Загрузка», таблица не получена; Back/Close не выполнились | 28-http-input.json, 29-http-next.json, 30-http-settled.json, 31-http-result.json |
+| HTTP | URL допускает переход на F, чтение под загрузкой. Итог в C;PreviewPanel;cntErrorInfo: «Ошибка при выполнении HTTP запроса. TCP/IP Socket error 110: Connection timed out»; данных нет | 28–31-http-*.json, итог 54-http-final.json и http-final.png |
 | Basic | В наблюдённой странице P нет полей HTTP username/password/auth; edtConnection — readonly «Хранилище файлов». Подключение другого типа не исследовано. Basic-успеха/отказа credentials нет | 11-connection.json, 28-http-input.json; это не доказательство отсутствия Basic в продукте |
 | Имя из переменной | P;edtFileName;SwitchButton → VariableControl;trg_picker, FileName binding и прежний cold; порт Input_Var-1, не новый output | LAB-886: file-variable.md и acceptance/file-variable/; повтор не делался |
 
@@ -81,7 +81,12 @@ HTTP-опыт использовал только адрес того же ра�
 `https://app.loginom.ai/lab975-unavailable.csv`; это **не CSV endpoint** и не
 положительный/отрицательный тест HTTP-контракта. Во время наблюдения не было
 btnError, чтение оставалось под loading mask; нельзя из этого заключить, что
-сервер не поддерживает HTTP, или обещать точный код отказа. Контролируемый
+сервер не поддерживает HTTP. В окончательном снимке 54-http-final.json
+прочитана точная причина из C;PreviewPanel;cntErrorInfo: «Ошибка при выполнении
+HTTP запроса. TCP/IP Socket error 110: Connection timed out». Одновременно
+появился диалог восстановления сессии без data-tid; обычный logout стал
+недоступен. Это наблюдённый сетевой отказ серверного HTTP, не проверка Basic.
+Контролируемый
 CSV endpoint с Basic в назначении отсутствует. Локальный HTTP-сервер,
 проброс порта, credential-in-URL и клиентское скачивание не применялись.
 
@@ -222,3 +227,14 @@ handler. На реализованном SHA замер повторить.
 новые строки туда не предлагаются. Это пункт решения архитектуры выдачи,
 не стоп этапа 0 и не разрешение повысить предел/потерять прежние инструкции.
 Карточке хватает 11 240 Б, запас 760 Б; HTTP/Basic schema в неё не выдумана.
+
+## Завершение ручных сессий
+
+Reviewer: сохранён отдельный lab975-auto-research.lgp с пользовательской меткой;
+последний опыт смены источника для проверки сохранности метки отменён штатным
+закрытием мастера. Пакет закрыт, logout подтверждён LoginForm
+(53-final-reviewer-cleanup.json). Исходный mask-пакет сохранён отдельно.
+Worker HTTP: попытка обычного logout недоступна из-за диалога разрыва связи
+без data-tid. Нет подтверждения Save HTTP-конфигурации или server logout;
+сохранены DOM/ошибка и снимок, browser context закрыт без восстановления
+сессии. Не выдавать browser close за package_closed/logged_out.
