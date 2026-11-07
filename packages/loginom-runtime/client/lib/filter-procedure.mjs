@@ -43,7 +43,7 @@ export function filterInputText(value,type,decimalSeparator='.',datetimeCombo=fa
 
 // Complete replacement with observed, identity-bound gestures. A lost reply
 // escapes through the common receipt/reconciliation mechanism; never re-add.
-export async function configureFilter(channel,parameters,{newNode=false}={}){
+export async function configureFilter(channel,parameters,{newNode=false,controlVariables}={}){
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
  let s=await observe('complete filter baseline');
@@ -54,7 +54,7 @@ export async function configureFilter(channel,parameters,{newNode=false}={}){
   return {verified:true,cleanup_complete:true,effect_possible:false,baseline,configuration:baseline,groups,preserved:true};
  }
  validateFilterConditions(parameters);
- if(newNode){
+ if(newNode&&!controlVariables){
   const references=parameters.groups.flat().flatMap(c=>isFilterVariable(c.value??c.values)?[{name:(c.value??c.values).name,type:c.values?'string':c.type}]:[]);
   if(references.length){
    resolveFilterConditions(parameters,baseline.input_fields);
@@ -85,7 +85,7 @@ export async function configureFilter(channel,parameters,{newNode=false}={}){
    }
   }
  }
- const groups=resolveFilterConditions(parameters,baseline.input_fields,baseline.control_variables),expected=[];
+ const groups=resolveFilterConditions(parameters,baseline.input_fields,controlVariables??baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
   if(values.some(v=>v.length>19&&!v.endsWith('.000'))){

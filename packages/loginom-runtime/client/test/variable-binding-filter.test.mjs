@@ -61,13 +61,22 @@ function inventory(){
  return {node,native:{verified:true,inventory_complete:true,node_context:node,
   rows:[{kind:'condition',record_id:'native-row',variable_mode:1,type:'integer',value:{kind:'variable',name:'Limit'}}],
   control_variables:[{name:'Limit',index:0,type:'integer',is_null:false}]},
-  mapping:{kind:'control',port:0,port_guid:'port',fields:[{id:42,index:0,name:'Limit',type:4,is_null:false,source:{id:9,type:4}}]},
-  graph:{links:[{source:'vars',target:'filter',input:0,output:4,kind:'control'}],nodes:[{ref:{...node,node_id:'vars'},type:'variables.user'}]}};
+  mapping:{kind:'control',port:0,port_guid:'port',fields:[{id:42,index:0,name:'Limit',type:4,is_null:false,source:{id:9,type:4,name:'Limit'}}]},
+  graph:{links:[],variable_links:[{source:'vars',target:'filter',input:0,output:4,kind:'control',source_port_guid:'source-port',target_port_guid:'port'}],nodes:[{ref:{...node,node_id:'vars'},type:'variables.user'}]}};
 }
 test('independent native variable mode resolves the connected ID, row and port rather than echoing a request',()=>{
  const f=inventory(),b=filterBindingInventory(f.native,f.mapping,f.graph,f.node)[0];
  assert.equal(b.parameter,binding.parameter);assert.equal(b.row_id,'native-row');assert.equal(b.variable.id,42);
  assert.equal(b.source.variable_id,9);assert.equal(b.source.output,4);assert.equal(b.input_port_guid,'port');
+});
+test('pending native values use a fresh independently read builtin source with exact connected IDs',()=>{
+ const f=inventory();f.native.control_variables[0].is_null=true;f.mapping.fields[0].is_null=true;
+ const proof={verified:true,independent_readback:true,source:f.graph.nodes[0].ref,variables:[{id:9,name:'Limit',type:'integer',cell:{type:'integer',is_null:false,value:'5',precision:'exact_integer'}}]};
+ assert.equal(filterBindingInventory(f.native,f.mapping,f.graph,f.node,proof)[0].variable.is_null,false);
+ for(const change of [{id:10},{type:'string'},{cell:{type:'integer',is_null:true,value:null}}]){
+  const bad=structuredClone(proof);Object.assign(bad.variables[0],change);
+  assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node,bad));
+ }
 });
 for(const fault of ['NULL','type','index','owner','source','duplicate','mode'])test('binding inventory refuses '+fault,()=>{
  const f=inventory();

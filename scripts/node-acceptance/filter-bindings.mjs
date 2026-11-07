@@ -39,7 +39,10 @@ export async function observeFilterBindingInventory({load,graph,channelFor,expec
   assert.equal(want.node.type,'transform.filter_data');
   const targets=graph.nodes.filter(n=>n.type===want.node.type&&(want.node.label===undefined||n.label===want.node.label));
   assert.equal(targets.length,1,'COLD_BINDING_NODE_UNIQUE');
-  const node=targets[0].ref,bindings=await readFilterBindings(channelFor(node,'cold-bindings'),{readGraph:async()=>graph});
+  const node=targets[0].ref,links=(graph.variable_links??[]).filter(l=>l.target===node.node_id&&l.kind==='control'&&l.input===0);
+  const source=links.length===1?graph.nodes.find(n=>n.ref.node_id===links[0].source):null;
+  const sourceProof=source?.type==='variables.user'?{...await channelFor(source.ref,'cold-binding-source').configureUserVariables([],'close'),source:source.ref}:undefined;
+  const bindings=await readFilterBindings(channelFor(node,'cold-bindings'),{readGraph:async()=>graph,sourceProof});
   assert.equal(bindings.length,expected.binding_inventory.filter(w=>w.node.type===want.node.type&&w.node.label===want.node.label).length,'COLD_BINDING_COMPLETE');
   const matches=bindings.filter(b=>b.parameter===want.parameter);assert.equal(matches.length,1,'COLD_BINDING_PARAMETER');
   const b=matches[0];assert.equal(b.mode,want.mode);assert.equal(b.verified,true);

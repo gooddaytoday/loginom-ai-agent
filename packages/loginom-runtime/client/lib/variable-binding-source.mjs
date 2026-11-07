@@ -17,5 +17,5 @@ export async function preflightBuiltinBindings(options,ctx,config,source){
   if(condition&&v.type!==condition.type)throw Error('BINDING_TYPE_MISMATCH: '+b.parameter);
   if(v.cell?.is_null!==false)throw Error('BINDING_NULL_UNSUPPORTED: '+b.parameter);
  }
- return result;
+ return {...result,source};
 }
