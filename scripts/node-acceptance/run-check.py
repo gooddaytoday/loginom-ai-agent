@@ -327,6 +327,12 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name=('matrix/' + kind + '.json') if matrix else 'expected-repeat.json' if variant == 'repeat' else 'expected.json',
                     export_count=len(indices) if indices is not None else 12 if matrix else 1,
                     colunion_output_indices=indices)
+    if name in ['union-two-stage', 'union-auto-label']:
+        src = REPO / 'docs/node-development/nodes/union/acceptance'
+        variant = name.removeprefix('union-')
+        return dict(source=src / 'v040' / variant, prompt=src / ('task-' + variant + '.md'),
+                    data=src.parent / 'fixtures/v040', input_files=['main.csv', 'second.csv'],
+                    oracle=src / 'oracle-v040.py', expected_name='expected.json', base=None)
     if name == 'union-auto-match':
         src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
