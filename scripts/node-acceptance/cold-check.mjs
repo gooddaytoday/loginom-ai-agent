@@ -1,3 +1,4 @@
+import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
@@ -260,6 +261,12 @@ page = context.pages()[0]
     if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
+  }
+  if(expected.logreg_normalization){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
+   if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
+   const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved')});
+   await record({phase:'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.clustering_normalized){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');

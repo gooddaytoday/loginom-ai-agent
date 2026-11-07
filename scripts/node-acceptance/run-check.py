@@ -359,6 +359,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-normalization':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization'
+        return dict(source=src, prompt=src / 'task-normalization.md', data=src / 'data', base=None,
+                    input_files=['normalization.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py', logreg_normalization=True)
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -514,6 +519,8 @@ def expected_for(case, package):
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
+    if case.get('logreg_normalization'):
+        expected['logreg_normalization'] = True
     expected['package_path'] = package
     return expected
 
@@ -1652,6 +1659,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('logreg_normalization'):
+            write(folder / 'logreg-replies.json', [o for _, o in replies])
+            self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
+                folder / 'expected.json', folder / 'logreg-replies.json', folder / 'logreg-normalization-proof.json'], folder, timeout=60)
         if expected.get('clustering_normalized'):
             write(folder / 'clustering-replies.json', [o for _, o in replies])
             self.phase('clustering-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-normalized.mjs',
