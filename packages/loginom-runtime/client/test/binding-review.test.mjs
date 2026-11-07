@@ -21,3 +21,12 @@ test('common variable gesture retains the caller row_filter and verified Filter 
  const channel={perform:async o=>{assert.equal(o.ready({...s,wizard:{...s.wizard,stage:'foreign'}}),false);assert.equal(o.ready({...s,node_filter:{verified:false}}),false);throw Error('OWNED_STAGE_REFUSAL');}};
  await assert.rejects(configureVariableBinding({channel,state:s,base:'B',ready}),/OWNED_STAGE_REFUSAL/);
 });
+import {validateBuiltinBindingSource} from '../lib/variable-binding-source.mjs';
+test('builtin source validation follows saved mapped names and IDs rather than target alias',()=>{
+ const r={target:{kind:'existing'},bindings:[{...binding,variable:{...binding.variable,name:'Threshold'}}],mappings:[],parameters:{}};
+ const source={variables:[{id:7,name:'Limit',type:'integer',cell:{is_null:false,value:'5'}}]};
+ const mapping={fields:[{name:'Threshold',id:2,source:{id:7,name:'Limit'}}]};
+ assert.doesNotThrow(()=>validateBuiltinBindingSource(source,r,mapping));
+ const bad=structuredClone(mapping);bad.fields[0].source.id=8;
+ assert.throws(()=>validateBuiltinBindingSource(source,r,bad),/BINDING_VARIABLE_MISSING/);
+});
