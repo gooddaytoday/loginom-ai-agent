@@ -1,0 +1,16 @@
+{
+  "api_type": "transform.calculator",
+  "api_mode": "expression",
+  "input": "modes.csv",
+  "note": "Manifest for calculator-expression-options. Never sent to the model; the oracle does not read it.",
+  "initial_order": ["Amount", "Helper", "Doubled", "Tail"],
+  "final_order": ["Amount", "Helper", "Tail", "Doubled"],
+  "output_order": ["RowID", "Quantity", "UnitPrice", "Amount", "Tail", "Doubled"],
+  "expressions": [
+    {"name": "Amount", "type": "integer", "replace": true, "intermediate": false, "cached": false, "expression": "Quantity * UnitPrice"},
+    {"name": "Helper", "type": "integer", "replace": false, "intermediate": true, "cached": true, "expression": "Quantity + 1"},
+    {"name": "Doubled", "type": "integer", "replace": false, "intermediate": false, "cached": false, "expression": "Helper + Helper"},
+    {"name": "Tail", "type": "integer", "replace": false, "intermediate": false, "cached": false, "expression": "UnitPrice * 2"}
+  ],
+  "second_execution": "Helper cached=false only; same node executed again; values and output columns unchanged"
+}

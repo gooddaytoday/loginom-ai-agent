@@ -1,0 +1,85 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.calculator",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Quantity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "UnitPrice",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Tail",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Doubled",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Quantity": 2,
+          "UnitPrice": 5,
+          "Amount": 10,
+          "Tail": 10,
+          "Doubled": 6
+        },
+        {
+          "RowID": 2,
+          "Quantity": 0,
+          "UnitPrice": 3,
+          "Amount": 0,
+          "Tail": 6,
+          "Doubled": 2
+        },
+        {
+          "RowID": 3,
+          "Quantity": -2,
+          "UnitPrice": 4,
+          "Amount": -8,
+          "Tail": 8,
+          "Doubled": -2
+        },
+        {
+          "RowID": 4,
+          "Quantity": null,
+          "UnitPrice": 8,
+          "Amount": null,
+          "Tail": 16,
+          "Doubled": null
+        }
+      ]
+    }
+  ]
+}

@@ -45,9 +45,11 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(expected['package_path'], '/own/calculator.lgp')
         output = expected['outputs'][0]
         self.assertEqual([c['name'] for c in output['columns']],
-                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Bare', 'FromField', 'JsTotal', 'FromExpr'])
+                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Tail', 'Doubled'])
         self.assertNotIn('Helper', [c['name'] for c in output['columns']])
         self.assertIsNone(output['rows'][3]['Amount'])
+        self.assertEqual([output['rows'][0][k] for k in ['Tail', 'Doubled']], [10, 6])
+        self.assertNotRegex(case['prompt'].read_text(), r'Field\.|Expr\.')
 
     def test_csv_without_header_checks_the_first_json_cell(self):
         output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
