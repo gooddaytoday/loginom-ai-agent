@@ -1,0 +1,43 @@
+{
+  "type": "research.quality",
+  "title": "Качество данных",
+  "palette_group": "Исследование",
+  "icon_class": "bg-vendor-icon-quality",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 5,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "profile"
+  ],
+  "semantics": "Profile continuous integer/real and discrete string fields with native Quality defaults and parameters:{}. Read all five outputs: 0 OutData, 1 OutDataOut, 2 OutDataExtr, 3 OutDataNull, 4 SummaryTable. Native default ports 0/3 preserve the input; 1/2 can be empty despite positive summary counts. Summary N, DisplayName, DataType, DataKind, Null, Out, Extr, Avg, Moda, Median follows input field order. Median is the upper middle observation; continuous Moda is a histogram bin center, discrete Moda a frequency mode. NULL differs from empty string. No correction thresholds, hidden action settings, training or saved-model apply mode. Exact Moda subtype/value is read through the bounded native decoder. PROPOSAL SCOPE ONLY: boolean/datetime and discrete numeric inputs, hidden MaxNullsPercent/actions and saved-model apply require live discovery. No additional mode or hidden-settings schema is proposed without observing its UI. This card estimates profile metadata size only, not the complete future extension.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "quality-v1-internal-1",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/scrutiny/README.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "profile"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false,
+    "description": "profile requires {}. Native default settings only; no thresholds, correction actions, training or saved-model apply parameters. Continuous integer/real and discrete string input fields. Read outputs 0,1,2,3,4."
+  },
+  "session_manifest": {}
+}

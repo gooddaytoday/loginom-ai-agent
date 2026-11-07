@@ -8,10 +8,17 @@
 Если параметр опущен, новый импорт берёт первый лист; `source_switch` сохраняет
 прежний выбор листа. `header_rows` — 1–1000, `columns` — полный список из 1–64
 полей в исходном порядке с явными `name`, `label`, `type`.
-Типы: `string`, `integer`, `real`, `datetime`; техническое имя — ASCII identifier,
+Типы: `string`, `integer`, `real`, `datetime`, `boolean`; техническое имя — ASCII identifier,
 для другого исходного заголовка укажи `source_name`. Поля справа от видимой
 области тоже включай в `columns`: мастер прокручивает сетку при настройке.
 NULL сохраняются; преобразование XLSX в CSV до импорта не требуется.
+
+Логическое поле импортируй тем же `dock_node_apply`, `target.type:"imports.excel"`,
+`mode:"xlsx"`: в `parameters.excel.columns` укажи `type:"boolean"` и
+`data_kind:"Дискретный"` (также выбирается по умолчанию). Это нативный тип
+«Логический»: сохрани `false`, `true` и `NULL` раздельно. Для логического поля
+не добавляй Калькулятор или JavaScript. В `exports.text` задай `null_marker:"NULL"`,
+чтобы незаполненное значение в CSV отличалось от ложного.
 
 Для XLSX профиль показывает листы и видимость, declared и наблюдённую размерность,
 систему дат, формулы и cached values. Выбери нужный `sheet_name`; declared dimension
