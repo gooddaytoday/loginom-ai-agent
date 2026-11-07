@@ -274,14 +274,14 @@ export interface DuplicatesConfigurationReadback {
 }
 
 export interface MissingValuesParameters {
-  fields: Array<{field:{kind:'input_field';name:string};method:'mean'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
-  max_nulls_percent:number; ordered:false;
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  max_nulls_percent:number; ordered:boolean;
 }
 export interface MissingValuesConfigurationReadback {
   kind:'missing_values';scope:'observed_before_verified_finish';node:NodeRef;
   receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;
-  mode:'impute';ordered:false;max_nulls_percent:number;
-  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'constant';value?:string}>;
+  mode:'impute';ordered:boolean;max_nulls_percent:number;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete';value?:string}>;
   options:Record<string,{value:boolean|number|string;switch_pressed:boolean}>;
   input_mapping:SortingConfigurationReadback['input_mapping'];
   output_mapping:SortingConfigurationReadback['output_mapping'];

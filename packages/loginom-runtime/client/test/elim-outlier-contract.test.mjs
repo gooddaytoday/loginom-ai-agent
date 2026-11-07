@@ -18,7 +18,7 @@ test('detect contract is registered with three outputs and its own parameter nam
  assert.ok(schema.properties.target.properties.type.enum.includes('preprocessing.elim_outlier'));
  assert.ok(schema.properties.mode.enum.includes('detect'));
  assert.deepEqual(schema.properties.parameters.properties.outlier.properties.method.enum,['sd','iqr']);
- assert.deepEqual(schema.properties.parameters.properties.ordered,{const:false});
+ assert.equal(schema.properties.parameters.properties.ordered.type,'boolean');// shared top-level ordered belongs to Missing Values
 });
 test('new detect requires explicit factors, method, complete field set and ordered flag',()=>{
  assert.doesNotThrow(()=>validateElimOutlierParameters({outlier},'detect',request));

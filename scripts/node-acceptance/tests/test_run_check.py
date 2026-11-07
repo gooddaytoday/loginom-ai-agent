@@ -422,6 +422,27 @@ class RunCheckTests(unittest.TestCase):
                 self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_missing_modes_use_task_csv_and_independent_oracle(self):
+        subprocess.run([sys.executable, str(runner.REPO / 'docs/node-development/nodes/missing-values/acceptance/modes/oracle.py'), '--check'],
+                       check=True, capture_output=True)
+        for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
+                                                  ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['input_files'], [csv_name])
+            self.assertTrue((case['data'] / csv_name).is_file())
+            self.assertIn('{{PACKAGE_PATH}}', case['prompt'].read_text())
+            expected = runner.expected_for(case, '/test/missing.lgp')
+            self.assertEqual(expected['package_path'], '/test/missing.lgp')
+            self.assertEqual([n['type'] for n in expected['nodes']], ['imports.text', 'preprocessing.data_recovery', 'exports.text'])
+            if rows: self.assertEqual(len(expected['outputs'][0]['rows']), rows)
+            subprocess.run(['node', '--input-type=module', '-e',
+                            "import {parseExpectedOutputs} from './scripts/node-acceptance/expected-outputs.mjs';"
+                            "let s='';for await(const part of process.stdin)s+=part;parseExpectedOutputs(JSON.parse(s));"],
+                           input=json.dumps(expected), text=True, check=True, cwd=runner.REPO, capture_output=True)
+            self.assertIn(name, runner.scenario_names(name))
+
     def test_grouping_median_uses_modes_task_csv_and_independent_oracle(self):
         case = runner.scenario('grouping-median')
         self.assertEqual(case['prompt'].name, 'task-median.md')
