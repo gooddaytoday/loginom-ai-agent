@@ -1,8 +1,8 @@
 // The node adapter supplies an owned editor, row identity and exact picker
 // predicate. Every gesture stays in the original procedure channel/receipt.
-export async function configureVariableBinding({channel,observe,state,base,identity,option,committed}){
+export async function configureVariableBinding({channel,observe,state,base,identity,option,committed,ready}){
  const one=(s,p,verb)=>{const es=s.ui.elements.filter(e=>p(e)&&e.allowed_actions.includes(verb));if(es.length!==1)throw Error('Owned variable binding control unavailable');return es[0];};
- const perform=(condition,s,resolve)=>channel.perform({condition,initialObservation:s,ready:x=>x.wizard?.root_ref===s.wizard.root_ref,identity,resolve});
+ const perform=(condition,s,resolve)=>channel.perform({condition,initialObservation:s,ready:x=>ready(x)&&x.wizard?.root_ref===s.wizard.root_ref,identity,resolve});
  const click=async(condition,s,p)=>perform(condition,s,x=>({verb:'click',ref:one(x,p,'click').ref}));
  const trigger=e=>e.tid===base+';VariableControl;trg_picker';
  let s=state;

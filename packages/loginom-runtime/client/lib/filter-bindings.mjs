@@ -50,7 +50,7 @@ export async function configureSavedFilterBindings(channel,parameters,bindings,b
    need(es.length===1,'BINDING_PARAMETER_UNSUPPORTED',b.parameter);return {verb:'click',ref:es[0].ref};
   }});
   s=await observe('saved operand editor ready',s=>s.node_filter.editor?.record_id===id&&s.node_filter.editor.field==='CompareValue');
-  s=await configureVariableBinding({channel,observe,state:s,base:s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;VariantPropEdit',identity,
+  s=await configureVariableBinding({channel,observe,ready,state:s,base:s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;VariantPropEdit',identity,
    option:e=>e.filter_cell?.record_id===id&&e.filter_cell.part==='variable_option'&&e.filter_cell.variable_name===b.variable.name,
    committed:s=>filterConditionMatches(s.node_filter.rows.find(r=>r.record_id===id),wanted)});
  }

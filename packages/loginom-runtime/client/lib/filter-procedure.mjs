@@ -208,7 +208,7 @@ export async function configureFilter(channel,parameters,{newNode=false,controlV
     const editor=arity==='list'?'StringTriggerPropEdit':'VariantPropEdit';
     const base=s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;'+editor;
     const option=e=>e.filter_cell?.record_id===id&&e.filter_cell.part==='variable_option'&&e.filter_cell.variable_name===variable.name;
-    s=await configureVariableBinding({channel,observe,state:s,base,identity,option,committed:s=>same(current(s)[arity==='list'?'values':'value'],variable)});
+    s=await configureVariableBinding({channel,observe,ready,state:s,base,identity,option,committed:s=>same(current(s)[arity==='list'?'values':'value'],variable)});
    }else if(arity===2||arity==='list'){
     s=await observe('filter value dialog trigger',s=>s.ui.elements.some(e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker')&&e.allowed_actions.includes('click')));
     await click('open bound filter value dialog',s,e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker'),identity);
