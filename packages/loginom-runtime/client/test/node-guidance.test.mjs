@@ -6,7 +6,24 @@ import {createHash} from 'node:crypto';
 import {createSkillLoader} from '../lib/skill.mjs';
 import {createUserWorkflowBindings,userNodeTool} from '../lib/user-workflow.mjs';
 import {nodeApiTools} from '../lib/node-api.mjs';
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {createBundledSkillFixture,refreshSkillFixtureManifest} from './support/bundled-skill-fixture.mjs';
+
+test('each supported regression selection mode delivers complete import and output rules',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const card={type:'datamining.lin_regression',modes:NODE_TYPES['datamining.lin_regression'].modes};
+ for(const mode of ['forward','backward','stepwise'].filter(mode=>card.modes.includes(mode))){
+  const [description]=await loader.describeNodes([card],[mode]);
+  assert.match(description.guidance,/type:"integer", data_kind:"Непрерывный"/,mode);
+  assert.match(description.guidance,/read\.ports:\[0,1\]/,mode);
+  assert.match(description.guidance,/exports\.text/,mode);
+  assert.match(description.guidance,/сохрани пакет/,mode);
+  assert.doesNotMatch(description.guidance,/как в forward выше/,mode);
+  assert.match(description.guidance,new RegExp('mode:"'+mode+'"'),mode);
+ }
+ assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
+});
 
 test('node guidance uses the prepared bundle and selects common plus requested modes',async t=>{
  const source=await createBundledSkillFixture(t);
