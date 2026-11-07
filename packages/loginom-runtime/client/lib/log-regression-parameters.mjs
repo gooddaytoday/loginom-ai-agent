@@ -25,7 +25,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
   if(mode==='apply')need(r.target.kind==='existing'&&r.inputs.length===0&&r.finish==='execute','apply requires an existing trained model, unchanged connections and finish execute');
   need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1),'one connected training table is required');
   need(r.mappings.length===0,'mapping overrides, weights and variable bindings are outside this stage');
-  need(r.read.ports.every(port=>port===0),'only prediction output 0 is supported; coefficients and summary are outside this stage');
+  need(r.read.ports.every(port=>port===0||port===1),'use prediction output 0 or full coefficient table 1; summary 2 is unsupported');
  }
 }
 export function resolveLogRegressionRoles(parameters,fields){

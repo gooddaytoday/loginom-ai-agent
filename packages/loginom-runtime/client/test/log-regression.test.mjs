@@ -16,13 +16,14 @@ const fields=[['RowID','integer','Непрерывный',0],['X','real','Неп
 const node={document_id:'doc',workflow_id:'flow',node_id:'logistic'};
 const request={operation_id:'logistic',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]},target:{kind:'new',type:'datamining.log_regression'},inputs:[{source:{...node,node_id:'import'},output:0,input:0}],mode:'enter',parameters,mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
 
-test('logistic registration and handler accept only binary Enter and its prediction port',()=>{
+test('logistic registration and handler accept prediction and full coefficient outputs',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
  const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
  assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','apply']);
  assert.equal(card.tabular_outputs,2);assert.ok(card.parameter_schema.properties.logistic.properties.event.description);
  assert.ok(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler);
- for(const patch of [{read:{...request.read,ports:[1]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
+ for(const ports of [[1],[0,1]])assert.ok(validateNodeApplyRequest({...request,read:{...request.read,ports}},support.nodeApplyHandlers).handler);
+ for(const patch of [{read:{...request.read,ports:[2]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
   assert.throws(()=>validateNodeApplyRequest({...request,...patch},support.nodeApplyHandlers));
 });
 
