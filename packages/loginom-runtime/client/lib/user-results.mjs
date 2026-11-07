@@ -112,7 +112,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   // JS configuration/source bindings remain complete; only ordinary analytical
   // rows may be omitted. Native full-table evidence keeps its strict contract.
   if(node?.configuration?.readback?.kind!=='user_variables'&&!node?.configuration?.variable_mappings?.length)budgetUserPreview(reply,
-    {preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||node?.configuration?.readback?.bindings!==undefined||data?.javascript_source?.policy==='javascript-module-v1',
+    {preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||node?.configuration?.bindings!==undefined||data?.javascript_source?.policy==='javascript-module-v1',
       wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;

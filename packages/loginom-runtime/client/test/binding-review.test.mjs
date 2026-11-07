@@ -8,3 +8,9 @@ test('bound scalar plus legacy variable list refuses during validation before ta
  const p={groups:[[{...scalar},{...scalar,operator:'in',values:{kind:'variable',name:'List'}}]]};
  assert.throws(()=>validateFilterParameters(p,'conditions',request),/BINDING_PARAMETER_UNSUPPORTED/);
 });
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+test('binding inventory has one public location in configuration',()=>{
+ const config=nodeApplyResultSchema.properties.configuration.properties;
+ const filter=config.readback.anyOf.find(s=>s.properties.kind.enum.includes('row_filter'));
+ assert.ok(config.bindings);assert.equal(filter.properties.bindings,undefined);
+});
