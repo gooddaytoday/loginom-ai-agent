@@ -1,0 +1,9 @@
+Id;Code;Status;Keep
+1;AB-12;yes;a
+2;AB-00;no;b
+3;XAB-34Y;unknown;c
+4;ab-56;?;d
+5;;yes;e
+6;?;no;f
+7;OTHER;unknown;g
+8;EXACT;yes;h
