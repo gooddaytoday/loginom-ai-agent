@@ -1,0 +1,4 @@
+Id;Amount;Active;EventAt;Note
+1;12.5;true;2026-11-07 09:30:45;first
+2;0;false;2026-11-08 00:00:00;second
+3;-2.75;true;2026-11-09 23:59:59;third
