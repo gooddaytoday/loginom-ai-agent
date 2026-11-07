@@ -16,7 +16,11 @@ export async function excelConfigureCapability(page,t,readContext){
   const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
   const point=locator=>wait('Excel control reachable: '+locator,async()=>{
-   await quiet();await guard();need(await locator.count()===1,'control missing or ambiguous');
+   await quiet();await guard();const count=await locator.count();
+   // Choosing a named object remounts dependent controls after the native mask
+   // has gone. Wait before a gesture; multiple owners still refuse immediately.
+   if(count===0&&t.excel.named_range!==undefined)return null;
+   need(count===1,'control missing or ambiguous: '+locator);
    return locator.evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
     if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))return null;return{x,y};});
   });
