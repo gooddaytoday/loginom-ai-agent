@@ -45,7 +45,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
    return 1;
   },
   evaluateAll:async(fn,arg)=>vm.runInContext('('+fn.toString()+')',scope)(options.stall==='loading'?[loading]:stage===-1?(options.mask==='real-loading'?[mask,loading]:[mask]):[],arg),
-  isVisible:async()=>stage>=0,innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
+  isVisible:async()=>stage>=0&&!(options.hiddenQuery&&selector.includes(';ParamLinks')),innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
   evaluate:async fn=>{lastSelector=selector;points.push(selector);return evaluate(fn,element);},
  }),mouse:{click:async()=>{
   if(lastSelector.includes(';btnAutoLink')){
@@ -66,6 +66,10 @@ for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 configures native '
  assert.equal(r.verified,true,r.error);
  assert.equal(r.configuration.method,method);
  assert.equal(r.configuration.body_field,method==='DELETE'?undefined:'Body');
+});
+test('C1 recognizes the owned request page when the empty query panel is hidden',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true,hiddenQuery:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(r.configuration.body_field,'Body');
 });
 test('C1 rejects a non-string body column before a body gesture',async()=>{
  const f=fixture(null,false,null,{method:'POST',empty:true,bodyType:1}),r=await f.run();

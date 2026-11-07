@@ -77,7 +77,9 @@ export async function restRequestCapability(page,t,readContext){
    return await panel()!==before;
   });await quiet();};
   let inputPages=0;
-  while(!await find(root+';RESTRequestWizard;ParamLinks').isVisible()){
+  // With no URL parameters, POST/PUT/PATCH renders only MessageBody and hides
+  // ParamLinks. The owned page caption identifies the request step in both modes.
+  while((await title()).trim()!=='Настройка запроса'){
    need(inputPages++<3,'input wizard page bound exceeded');
    need((await title()).trim()==='Настройка входных столбцов','unexpected page before request');await advance();
   }
