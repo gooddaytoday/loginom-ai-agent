@@ -1,5 +1,6 @@
 # Калькулятор (`transform.calculator`)
 
+<!-- mode: expression -->
 Для формул с переменными сценария используй `dock_node_apply` с
 `target.type:"transform.calculator"`, `mode:"expression"`.
 В `parameters.expressions[].formula` пиши `Var.Amount`; табличное поле
@@ -39,3 +40,4 @@ operation_id на том же узле. После подтверждённой 
 в следующий Калькулятор. Для ранга по позиции используй
 [RowNum()](https://help.loginom.ru/userguide/processors/func/calc-func/other.html#rownum);
 начало нумерации и правила для равных значений сверяй с заданием и Help.
+<!-- /mode -->

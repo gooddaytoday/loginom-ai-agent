@@ -9,7 +9,7 @@ export function userActionTool(tool) {
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
   copy.description=tool.name==='dock_action_run'
     ? 'Save the completed scenario with package.save_checkpoint. Use package.save_as only when the user explicitly requests reopening the saved package; it closes and reopens the workflow. First request missing action parameters with dock_action_describe. Create and configure supported nodes through dock_node_apply.'
-    : 'List supported nodes with {}. Single: action_key alone. Batch: action_keys and/or node_types; never combine action_key with either. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Read-only; does not change Loginom.';
+    : 'List nodes with {}. Use action_key alone, OR action_keys/node_types with optional modes. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and guidance from the prepared skill. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
   return copy;
 }
 export function userActionInventory(value) {
@@ -52,6 +52,22 @@ export function userNodeTool(tool) {
   delete copy.inputSchema.properties.budgets;
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
     description:'Type-specific settings. First call dock_action_describe with node_types:[target.type] and follow its parameter_schema.'};
+  copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
+    description:'Select a mode from the node card returned by dock_action_describe.'};
+  // The full runtime schema and handler still validate type-specific modes,
+  // parameters and read restrictions before any browser work.
+  delete copy.inputSchema.allOf;
+  const used=new Set();
+  const visit=value=>{
+    if(!value||typeof value!=='object')return;
+    if(value.$ref?.startsWith('#/$defs/')){
+      const name=value.$ref.slice('#/$defs/'.length);
+      if(!used.has(name)){used.add(name);visit(copy.inputSchema.$defs[name]);}
+    }
+    for(const [key,child]of Object.entries(value))if(key!=='$defs')visit(child);
+  };
+  visit(copy.inputSchema);
+  copy.inputSchema.$defs=Object.fromEntries(Object.entries(copy.inputSchema.$defs).filter(([key])=>used.has(key)));
   copy.inputSchema.properties={finish:copy.inputSchema.properties.finish,...copy.inputSchema.properties};
   copy.description = tool.name==='dock_node_resume'
     ? 'Continue the original node operation with identical original parameters after inspecting it. Never repeat an unresolved effect with a new ID.'
@@ -61,11 +77,25 @@ export function userNodeTool(tool) {
 
 export function createUserWorkflowBindings() {
   const references = new Map();
+  const described=new Set();
+  let describedDocument;
   const deliveryArtifacts=new Map(),uploads=new Map();
   const key = (document, workflow) => JSON.stringify([document, workflow]);
   const samePath = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
     && a.every((part, i) => part.tid === b[i].tid && part.label === b[i].label);
   return {
+    resetDescriptions() { described.clear(); },
+    rememberDescriptions(description) {
+      for(const card of description.node_types??[])described.add(card.type);
+    },
+    checkNodeDescription(request) {
+      if(described.has(request.target?.type)&&(!describedDocument||describedDocument===request.document_id))return null;
+      return {result_version:'user-v1',operation_id:request.operation_id??null,
+        status:'NOT_APPLIED',phase:'request_rejected',request_rejected:true,effect_possible:false,cleanup_complete:true,
+        error:{code:'NODE_TYPE_NOT_DESCRIBED',message:'Read the node card in this prepared session before creating or changing this node.'},
+        next_step:{tool:'dock_action_describe',arguments:{node_types:[request.target?.type]},
+          instruction:'Read guidance and parameter_schema; select modes to read their rules. Then submit the node request. No node operation started.'}};
+    },
     rememberDelivery(result,request) {
       if(!result?.upload_operation_id)return;
       if(typeof request?.artifact_id==='string')deliveryArtifacts.set(result.operation_id,request.artifact_id);
@@ -76,6 +106,8 @@ export function createUserWorkflowBindings() {
     },
     remember({ document_id, workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
+      if(describedDocument!==document_id)described.clear();
+      describedDocument=document_id;
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
     },
     expandNodeRead(request) {

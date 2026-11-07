@@ -1,5 +1,6 @@
 # Фильтр строк (`transform.filter_data`)
 
+<!-- mode: conditions row_number -->
 Mode `conditions`. Табличный input 0, outputs 0 (подходящие) и 1 (остальные).
 Внутри groups — AND, между группами — OR. Запроси `parameter_schema`.
 
@@ -29,3 +30,4 @@ Builtin «Переменные сценария», output 4, не исполня
 `parameters:{}`, `inputs:[]`, `finish:"execute"`, `read.ports:[0,1]`.
 Не вычисляй этот отбор через Калькулятор или JavaScript. Для обычных условий
 сохраняются literal, row_number, NULL, AND/OR и явный регистр строк.
+<!-- /mode -->

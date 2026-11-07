@@ -131,6 +131,26 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     for(const type of ['imports.lgd','exports.lgd'])assert.ok(result.knowledge.node_types.some(node=>node.type===type));
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
     assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
+    const oversized=await client.callTool({name:'dock_action_describe',arguments:{node_types:result.knowledge.node_types.map(card=>card.type)}});
+    assert.equal(oversized.isError,true);
+    assert.equal(JSON.parse(oversized.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+    const undescribed={operation_id:'without-description',contract_revision:'1.0.0',
+      document_id:result.workspace.document_id,workflow_ref:{workflow_id:result.workspace.workflow_ref.workflow_id},
+      target:{kind:'new',type:'transform.sorting'},inputs:[],mode:'keys',parameters:{},finish:'done'};
+    const beforeDescription=browserCalls.length;
+    for(const kind of ['new','existing']){
+      const blocked=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{...undescribed.target,kind}}});
+      const refusal=JSON.parse(blocked.content[0].text);
+      assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED');assert.equal(refusal.effect_possible,false);
+      assert.equal(browserCalls.length,beforeDescription,'undelivered cards cannot mutate the browser');
+    }
+    const cardReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting'],modes:['keys']}});
+    assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
+    const card=JSON.parse(cardReply.content[0].text).node_types[0];
+    assert.match(card.guidance,/Сортировка/);assert.deepEqual(card.guidance_modes,['keys']);
+    const invalidMode=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,mode:'invented'}});
+    assert.equal(JSON.parse(invalidMode.content[0].text).error.code,'REQUEST_REJECTED');
+    assert.equal(browserCalls.length,beforeDescription,'mode validation remains before mutation');
     // LAB-450: prepare -> local profile/scan/sample/admit (no browser calls)
     // -> first sample-delivery observation after native connection loss.
     connection.Connected=false;form.FReconnecting=true;
@@ -169,6 +189,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(rebound.workspace.package_ref.path,'/user/existing.lgp');
     assert.notEqual(rebound.workspace.document_id,'fixture-document');
     assert.equal(session.metadata.storageBinding.document_id,rebound.workspace.document_id);
+    const afterPrepare=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,
+      document_id:rebound.workspace.document_id,workflow_ref:{workflow_id:rebound.workspace.workflow_ref.workflow_id}}});
+    assert.equal(JSON.parse(afterPrepare.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
     assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
     reloadedPage=null;
     const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});

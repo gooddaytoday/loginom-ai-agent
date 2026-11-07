@@ -1,5 +1,6 @@
 # Экспорт LGD
 
+<!-- mode: native -->
 Получай parameter_schema через dock_action_describe(node_types:["exports.lgd"]).
 Один табличный input 0, режим native. lgd_export: destination — абсолютный .lgd
 в собственном каталоге; compression="none"/"lzo"/"lz4", overwrite="reject".
@@ -46,3 +47,4 @@ dock_storage_source, затем parameters.source:{kind:"storage",server_source_
 для Variant — тип поля и точные подтипы всех значений после обратного импорта.
 Сообщай отказ точно, сохрани файл и доказательства. Не подменяй обратный круг
 исходной таблицей и не преобразуй Variant в строку ради успешного сравнения.
+<!-- /mode -->

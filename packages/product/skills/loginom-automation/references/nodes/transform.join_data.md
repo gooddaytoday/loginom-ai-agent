@@ -1,5 +1,6 @@
 # Слияние (`transform.join_data`)
 
+<!-- mode: inner left right full difference -->
 ## Слияние
 
 Для сопоставления двух таблиц по ключам используй `loginom_dock_node_apply` с
@@ -23,3 +24,4 @@
 все три параметра: `keys:[{left:имя,right:имя}]`, `case_sensitive` и
 `include_joined_keys`. Имена — фактические имена полей каждой стороны, оба флага —
 явные boolean по задаче; не заменяй их несхемными `on` или `join_type`.
+<!-- /mode -->

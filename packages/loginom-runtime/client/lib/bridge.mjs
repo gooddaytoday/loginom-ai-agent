@@ -354,7 +354,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             workspace = await dockGate(request.params.name, async () => {
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
-              assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
+              assertAllowed() {
+                extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed();
+                userWorkflows.resetDescriptions();
+              },
               async prepare({ recoverOnly }) {
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
                 if(privatePackage){
@@ -466,6 +469,14 @@ export async function createBridge(config, session, { browserTransport: managedB
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
+              if(request.params.name==='dock_node_apply'){
+                const refusal=userWorkflows.checkNodeDescription(args);
+                if(refusal){
+                  await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,
+                    node_type:args.target?.type,result:refusal});
+                  return {content:[{type:'text',text:JSON.stringify(refusal)}],structuredContent:refusal};
+                }
+              }
               if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
                 validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
                 if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
@@ -482,12 +493,28 @@ export async function createBridge(config, session, { browserTransport: managedB
             return await (local?invoke():dockGate(request.params.name,invoke));
           }
           if (request.params.name === 'dock_action_describe') {
+            return await dockGate(request.params.name,async()=>{
             if(userProfile){
               const args=request.params.arguments??{},keys=args.action_keys??(args.action_key?[args.action_key]:[]);
               if(keys.some(key=>!['package.save_as','package.save_checkpoint'].includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
             }
-            const description=actionRuntime.describe(request.params.arguments ?? {});
-            return { content: [{ type: 'text', text: JSON.stringify(userProfile?userActionInventory(description):description) }] };
+            const args=request.params.arguments??{};
+            const description=actionRuntime.describe(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='modes')));
+            if(args.modes!==undefined&&!args.node_types)throw Error('modes requires node_types');
+            if(description.node_types?.length){
+              requirePreparedWorkspace(session.metadata);
+              description.node_types=await skill.describeNodes(description.node_types,args.modes);
+            }
+            const delivered=userProfile?userActionInventory(description):description;
+            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]}, {tool:'dock_action_describe'});
+            if(reply.isError!==true&&description.node_types?.length){
+              await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
+                skill_revision:session.metadata.skillRevision});
+            }
+            await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
+            if(reply.isError!==true)userWorkflows.rememberDescriptions(description);
+            return reply;
+            });
           }
           return await dockGate(request.params.name, async () => {
             extra.signal.throwIfAborted();
