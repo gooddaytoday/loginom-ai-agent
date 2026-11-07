@@ -123,6 +123,9 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
   assert.equal(card.javascript_knowledge.column_names.observed_pairs.length,5);
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
+  assert.deepEqual(card.validated_for,card.javascript_knowledge.validated_for);
+  assert.ok(card.javascript_knowledge.limitations.length>0);
+  assert.equal(card.limitations,undefined,'duplicate facts remain intact in javascript_knowledge');
  }
  const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,32);
  assert.ok(bytes(all)>46000);

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { lstat, readFile, readlink } from "node:fs/promises"
 import { join } from "node:path"
 
-export async function cliSourceSnapshot(repo: string) {
+export async function cliSourceSnapshot(repo: string, entries?: Map<string, string>) {
   const paths = [
     ...new Set(git(repo, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean)),
   ].sort()
@@ -15,12 +15,13 @@ export async function cliSourceSnapshot(repo: string) {
     hash.update(path).update("\0")
     if (!stat) {
       hash.update("deleted\0")
+      entries?.set(path, "deleted")
       continue
     }
     hash.update(String(stat.mode)).update("\0")
-    hash
-      .update(stat.isSymbolicLink() ? await readlink(join(repo, path)) : await readFile(join(repo, path)))
-      .update("\0")
+    const contents = stat.isSymbolicLink() ? await readlink(join(repo, path)) : await readFile(join(repo, path))
+    hash.update(contents).update("\0")
+    entries?.set(path, createHash("sha256").update(String(stat.mode)).update("\0").update(contents).digest("hex"))
   }
   return {
     sourceCommit: git(repo, ["rev-parse", "HEAD"]).trim(),
