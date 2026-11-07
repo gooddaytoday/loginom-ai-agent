@@ -328,7 +328,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
   }
 }, 15_000)
 
-test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
+test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancellation"])(
   "management commands share durable setup and recovery semantics through the real Node host: %s",
   async (phase) => {
     const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
@@ -673,6 +673,31 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
           expect(await invalid.exited).toBe(2)
           expect(await invalidOutput).toContain("CLI_ARGUMENT_INVALID")
           expect(await invalidErrors).toContain("CLI_ARGUMENT_INVALID")
+          expect(await readdir(profile)).not.toContain(".writer")
+          return
+        }
+        if (phase === "read-offset") {
+          const filePath = join(directory, "node-settings.md")
+          await writeFile(filePath, Array.from({ length: 316 }, (_, index) => `setting ${index + 1}`).join("\n"))
+          await provider.runPromise(llm.tool("read", { filePath, offset: 380, limit: 180 }))
+          await provider.runPromise(llm.tool("read", { filePath, offset: 220, limit: 100 }))
+          await provider.runPromise(llm.text("tenure-churn-profile complete"))
+          const child = invoke(true, undefined, [], false)
+          const output = new Response(child.stdout).text()
+          const errors = new Response(child.stderr).text()
+          expect(await child.exited).toBe(0)
+          const events = (await output)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          const reads = events.filter((event) => event.type === "tool_use" && event.part.tool === "read")
+          expect(reads.map((event) => event.part.state.status)).toEqual(["error", "completed"])
+          expect(reads[0].part.state.error).toBe("Offset 380 is out of range for this file (316 lines)")
+          expect(
+            events.some((event) => event.type === "text" && event.part.text === "tenure-churn-profile complete"),
+          ).toBe(true)
+          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
+          expect(await errors).not.toContain("private-setup-key")
           expect(await readdir(profile)).not.toContain(".writer")
           return
         }
