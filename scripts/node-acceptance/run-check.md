@@ -443,6 +443,12 @@ cold сверяет каждый output_port того же узла с отде�
 `oracle.py`; холодный порт 0 — отдельный `expected.json` с допуском
 вероятности abs=1e-8/rel=1e-10 и точным порядком полей.
 
+`reform-rename-lossy`: Параметры полей, обмен технических имён и меток A/B и
+real→integer с потерей дроби в одном узле. Источник —
+`docs/node-development/nodes/field-parameters/acceptance/v040/task-rename-lossy.md`,
+модели передаётся только `fixtures/reform.csv`; точный порядок полей RowID/B/A/R/S,
+типы, значения, метки A/B, CSV/Save/cold. Кэш — отдельным циклом.
+
 `types300` (через `--cases`) требует `--cold`. Только для этого сценария
 runner допускает два ограничения нативного CSV writer D76: текст `0` вместо
 эталонного отрицательного нуля и ISO-дату вместо полуночи с ненулевыми

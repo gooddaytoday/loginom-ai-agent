@@ -288,6 +288,10 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name == 'reform-rename-lossy':
+        src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
+                    expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
