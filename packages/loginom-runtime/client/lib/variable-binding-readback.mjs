@@ -42,14 +42,18 @@ export function filterBindingInventory(native,mapping,graph,node,sourceProof){
 export async function readFilterBindings(channel,{readGraph,expected,sourceProof}={}){
  const graph=await readGraph();
  await openPreparedWizard(channel);
+ let native,node;
+ try{
  const s=await channel.observe({condition:'independent saved binding readback',readFilter:true,
   ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true&&s.node_filter.inventory_complete===true&&!s.node_filter.editor&&!s.node_filter.dialogs.length});
- const native=s.node_filter,node=s.prepared_node_context;
+ native=s.node_filter;node=s.prepared_node_context;
  if(expected){
   need(native.rows.length===expected.rows.length&&native.rows.every((r,i)=>r.kind===expected.rows[i].kind),'condition identity');
   need(native.rows.every((r,i)=>r.kind==='or'||JSON.stringify([r.field,r.type,r.operator_code,r.value,r.lower,r.upper,r.values,r.case_sensitive])===JSON.stringify([expected.rows[i].field,expected.rows[i].type,expected.rows[i].operator_code,expected.rows[i].value,expected.rows[i].lower,expected.rows[i].upper,expected.rows[i].values,expected.rows[i].case_sensitive])),'saved predicates');
  }
- const close=await closePreparedWizard(channel);need(close.verified===true&&close.cleanup_complete===true,'Cancel');
+ }finally{
+  const close=await closePreparedWizard(channel);need(close.verified===true&&close.cleanup_complete===true,'Cancel');
+ }
  if(!native.rows.some(r=>r.variable_mode!==undefined&&r.variable_mode!==0))return [];
  const mapped=await channel.readVariablePortMapping({direction:'input',kind:'control',port:0});
  need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'independent mapping');
