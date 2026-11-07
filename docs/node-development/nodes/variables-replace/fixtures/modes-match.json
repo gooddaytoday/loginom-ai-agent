@@ -1,0 +1,6 @@
+{
+  "Color":{"match":"exact","from":"red","to":"blue","case_sensitive":false},
+  "Code":{"match":"regex","pattern":"^Ab-[0-9]+$","replacement":"matched"},
+  "Amount":{"match":"exact","from":1.2,"to":2.5,"precision":0.1},
+  "Other":{"other":"null"}
+}

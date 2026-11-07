@@ -125,10 +125,19 @@ Regex/прочие unmatched-политики, смена типа, файлы �
 ## 7. Дополнительные режимы LAB-1031 — checkpoint по сеансу
 
 07.11.2026, база `8943d291b046698d67828f19dcca88aab790cf2c`.
-После решения владельца об исключении отсутствующих кэша/JavaScript
-Калькулятора создан собственный узел Замены и подключён variables-источник.
-Мастер не открыт до двух разрешённых переподключений; новое исследование
-остановлено. [Матрица режимов](discovery-modes.md) содержит отдельный
-not_checked с причиной для regex, регистра, precision, смены типа,
-datetime/Variant, импорта/экспорта правил и обеих политик other≠keep.
-Поддержка exact и прежние критерии не менялись; новых ожиданий без наблюдения нет.
+В новом разрешённом сеансе закрыты хвосты: у обоих аккаунтов 0 открытых
+пакетов, logout подтверждён. Подготовлена отдельная копия источника; regex,
+ASCII insensitive, precision=0.1 и other=NULL прошли native Execute,
+Save/reopen/Close/logout. [Матрица](discovery-modes.md) содержит TID и значения.
+
+Смена типа дала объявленный Variant при keep; Variant integer→string и
+other=value подтвердились в Execute. Typed Save/reopen отказал из-за native
+назначения «Активное» для «Разное». Datetime-редактор отбросил ненулевые мс;
+положительная замена даты, other=regex и файлы правил остаются not_checked.
+После двух разрывов с UTC/load исследование остановлено без третьего восстановления.
+
+Комплект match-среза: [task](acceptance/task-match-modes.md), fixtures modes-*.json,
+[oracle/expected](acceptance/modes/oracle.py), [карточка](node-card-modes-proposal.json),
+[reference](skill-modes-proposal.md). Typed-проба помечена как не прошедшая persistence.
+Оценка match-среза 2 цикла + 1 резервный, есть аддитивная зависимость от W1 Variant.
+Поддержка exact и его критерии не менялись; новых callable typed/file-режимов нет.
