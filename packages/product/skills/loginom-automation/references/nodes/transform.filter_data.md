@@ -22,14 +22,32 @@ mapped control input 0; сначала подтверди тип/связь че
 `target.type:"transform.filter_data"`, `mode:"conditions"`, `parameters.groups`.
 Источник — исполняемый `variables.calculator`, mode `expression`, либо
 `variables.from_table`, mode `aggregate`. Выполни источник до подключения;
-после изменения его выражений/таблицы выполни источник снова. Имена и метки
-управляющих переменных должны совпадать; при необходимости задай явный W1 mapping.
-Builtin «Переменные сценария», output 4, не исполняется: handler откажет
-до изменения Фильтра. Не повторяй этот путь и не подставляй literal.
+После изменения источника выполни его снова; имена и метки переменных должны совпадать.
+Для builtin «Переменные сценария» используй общий `bindings` ниже;
+прежний operand API требует исполняемый источник.
 Повторное выполнение фильтра после смены источника: тот же NodeRef,
 `parameters:{}`, `inputs:[]`, `finish:"execute"`, `read.ports:[0,1]`.
 Не вычисляй этот отбор через Калькулятор или JavaScript. Для обычных условий
 сохраняются literal, row_number, NULL, AND/OR и явный регистр строк.
+
+## Общая привязка scalar-порога
+
+Запроси `dock_action_describe` с этим типом и mode `conditions`, прочитай
+`binding_schema`. Для Amount > Limit задай условие
+`{field:{kind:"input_field",name:"Amount"},type:"integer",operator:">"}`
+в `parameters.groups:[[...]]`, без `value`, и top-level
+`bindings:[{parameter:"/groups/0/0/value",variable:{kind:"control",input:0,name:"Limit"}}]`.
+Не совмещай binding с literal или прежним `{kind:"variable"}` в этом слоте.
+Подключи W1 `variable_inputs`, kind `control`, input 0. Источник builtin
+`variables.user` использует output 4; настрой его mode `values`, finish `done`,
+сохрани пакет и прочитай переменные отдельным `dock_node_read`. Builtin не Execute.
+Поддержаны точные integer/string scalar-сравнения, без NULL и преобразований;
+для string явно `case_sensitive`. Проверь `configuration.bindings` после Done.
+После изменения только Limit выполни тот же Фильтр: `parameters:{}`, `bindings:[]`,
+`inputs:[]`, `mappings:[]`, finish `execute`, read ports `[0,1]`.
+Настройки сохраняются. Не создавай второй Фильтр.
+Пустой bindings сохраняет привязки; снятие привязки не поддержано.
+После Save/reopen проверяй variable mode и оба результата, не заменяй binding константой.
 
 ## Продолжение пакета
 

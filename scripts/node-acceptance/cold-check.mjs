@@ -1,4 +1,5 @@
 import {inspectSavedLgd} from './lgd-cold.mjs'
+import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
@@ -240,6 +241,7 @@ page = context.pages()[0]
    state.variableInventory={outputs,links};
   }
   // A bound LGD destination needs the saved variable source's fresh value.
+  if(expected.binding_inventory)state.bindingInventory=await observeFilterBindingInventory({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
   if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
@@ -513,6 +515,7 @@ page = context.pages()[0]
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
+    ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),
     ...(state.treeOutputs?{tree_outputs:state.treeOutputs}:{}),
     ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {

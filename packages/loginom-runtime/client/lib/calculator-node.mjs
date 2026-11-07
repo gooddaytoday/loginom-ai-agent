@@ -46,6 +46,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
   revision:implementation.revision,modes:implementation.modes??[implementation.mode],output_wizard:'separate',
   configurationReadback:implementation.readback,parameter_schema:implementation.parameterSchema,
+  ...(implementation.bindingSchema?{binding_schema:implementation.bindingSchema}:{}),
   ...(implementation.fullUiOutput===true?{fullUiOutput:true}:{}),
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
@@ -205,7 +206,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      const requested=mappings[0]??{direction:'input',port:0},sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
      const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping),changes=[];
      await implementation?.validateInput?.(operation.nodeApply.request.parameters,resolved,s.node_mapping,
-       {channel,record:onRecord,operationId:operation.id});
+       {channel,record:onRecord,operationId:operation.id,request:operation.nodeApply.request});
      if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
      if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
@@ -294,7 +295,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const finish=await finishWizard('done',true,definition,outputCheckpoint);
     return verified({effect_possible:true,native_mapping:mapping,definition,changes,finish,source_identity_verified:true});
    },
-   async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
+   async finish(mode,ctx){
+    enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');
+    const result=await finishWizard(mode);
+    if(implementation?.afterDone)result.bindings=await implementation.afterDone(channel,operation.nodeApply.request,configured,{readGraph:graphForRejection});
+    return result;
+   },
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;

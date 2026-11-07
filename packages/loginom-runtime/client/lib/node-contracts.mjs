@@ -152,6 +152,7 @@ export function describeNodeTypes(types, pins = {}, actions = new Map(), candida
       candidate_node_apply_available:!!candidate,
       ...(candidate?{configuration_handler:candidate.revision,configuration_status:'candidate_pending_autonomous_acceptance',candidate_apply_tool:'dock_node_apply',candidate_modes:[...candidate.modes]}:{}),
       ...(candidate?.parameter_schema?{parameter_schema:structuredClone(candidate.parameter_schema)}:{}),
+      ...(candidate?.binding_schema?{binding_schema:structuredClone(candidate.binding_schema)}:{}),
       ...(javascript?{limitations:[...JAVASCRIPT_CARD_LIMITATIONS],knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256,
         validated_for:javascript.validated_for,javascript_knowledge:javascript}:{}),
       session_manifest: structuredClone(pins) };

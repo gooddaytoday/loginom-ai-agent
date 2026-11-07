@@ -10,6 +10,7 @@ export type NodeTarget<T extends NodeType = NodeType> =
   | {kind: 'existing'; type: T; ref: NodeRef; label?: string; position?: Position};
 export interface InputLink { source: NodeRef; output: number; input: number }
 export interface VariableInputLink extends InputLink { kind: 'variables' | 'control' }
+export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
 export interface NodeTargetRequest<T extends NodeType = NodeType> {
   document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[]; variable_inputs?: VariableInputLink[];
 }
@@ -24,12 +25,14 @@ export interface PortMapping {
 /** Each handler binds and validates P through its pinned local JSON schema. */
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
+  bindings?: VariableBinding[];
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
   read: {ports: number[]; variable_ports?: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
   type?: T; revision: string; modes: readonly string[]; parameter_schema?: object;
+  binding_schema?: object;
   output_wizard?: 'embedded' | 'separate';
   /** Host-only JavaScript lifecycle: await materialization before output mapping. */
   materialize_output?: boolean;

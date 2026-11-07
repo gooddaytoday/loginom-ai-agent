@@ -26,5 +26,5 @@ export function filterConfigurationReadback({node,phases,operation_id}){
   });need(links.size===m.source_fields.length,'complete output schema');return {port,autosync:m.autosync,fields};
  });
  return {kind:'row_filter',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),
-  groups:structuredClone(groups),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mappings:outputs,package_persistence_verified:false};
+  groups:structuredClone(groups),...(saved.value.bindings?{bindings:structuredClone(saved.value.bindings)}:{}),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mappings:outputs,package_persistence_verified:false};
 }

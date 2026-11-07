@@ -12,7 +12,7 @@ export async function readFilterContext(page,binding,readNode=readPreparedNodeCo
 export function readFilterBrowser(prefix){
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;FilterDataWizard;FilterDataPanel';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
- const roots=exact(base);if(roots.length!==1||!roots[0].checkVisibility({checkVisibilityCSS:true}))return fail('filter_root');
+ const roots=exact(base).filter(e=>e.checkVisibility({checkVisibilityCSS:true}));if(roots.length!==1)return fail('filter_root');
  const grid=globalThis.Ext?.getCmp?.(roots[0].id),controller=grid?.Controller,store=grid?.getStore?.();
  if(grid?.$className!=='bg.components.filterdata.view.FilterDataPanel'||grid.el?.dom!==roots[0]||controller?.FView!==grid
   ||controller.FFilterItemsStore!==store)return fail('filter_owner');
@@ -59,7 +59,7 @@ export function readFilterBrowser(prefix){
    if(![0,1].includes(d.RowNumberer)||typeof d.Name!=='string'||!Number.isInteger(d.RelationType)||typeof d.CaseSensitive!=='boolean'||![0,1,128].includes(d.UseVariables))return fail('filter_condition_or_variables');
    const type=types[d.DataType]??null;
    if(type==='variant')return fail('filter_variant');
-   Object.assign(row,{field:d.RowNumberer===1?{kind:'row_number'}:{kind:'input_field',name:d.Name},type,operator_code:d.RelationType,case_sensitive:d.CaseSensitive});
+   Object.assign(row,{field:d.RowNumberer===1?{kind:'row_number'}:{kind:'input_field',name:d.Name},type,operator_code:d.RelationType,case_sensitive:d.CaseSensitive,variable_mode:d.UseVariables});
    // Persisted records omit inactive operands. Never decode stale/default
    // scalar slots for an interval, list or null/boolean predicate.
    if(type){

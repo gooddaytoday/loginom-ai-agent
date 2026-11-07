@@ -1,3 +1,4 @@
+import {validateVariableBindings} from './variable-binding-parameters.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
@@ -22,7 +23,8 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
  */
 export function validateNodeApplyRequest(request, handlers) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
-    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[])]);
+    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[]),...(Object.hasOwn(request??{},'bindings')?['bindings']:[])]);
+  validateVariableBindings(request.bindings,request.target?.type);
   requireValue(id(request.operation_id) && request.contract_revision === NODE_CONTRACT_REVISION,
     'Unsupported node.apply operation ID or contract revision');
   const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
@@ -519,6 +521,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
+        if(result.configuration.readback.bindings)result.configuration.bindings=structuredClone(result.configuration.readback.bindings);
       }catch(error){
         // Projection uses only accepted receipts. Its failure cannot make the
         // completed UI phases uncertain or strand a quiet node without a phase.

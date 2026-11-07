@@ -1,4 +1,7 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
+import {resolveFilterBindings,filterBindingSchema,preserveFilterBindings,configureSavedFilterBindings} from './filter-bindings.mjs';
+import {readFilterBindings} from './variable-binding-readback.mjs';
+import {preflightBuiltinBindings} from './variable-binding-source.mjs';
 import {validateFilterConditions,resolveFilterConditions,isFilterVariable} from './filter-parameters.mjs';
 import {configureFilter} from './filter-procedure.mjs';
 import {configureFilterOutputs,readFilterOutputs} from './filter-output.mjs';
@@ -8,6 +11,10 @@ import {preflightTabularSource} from './sorting-preflight.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function validateFilterParameters(p,mode,r){
+ if(r.bindings?.length){
+  if(p.groups!==undefined)p=resolveFilterBindings(p,r.bindings);
+  else need(r.target.kind==='existing','New filter bindings require groups');
+ }
  need(mode==='conditions','Filter supports conditions mode, including row_number operands');
  if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0)need(r.target.kind==='existing','New filter requires explicit conditions');
  else validateFilterConditions(p);
@@ -20,18 +27,26 @@ export function validateFilterParameters(p,mode,r){
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
 }
 export function createFilterNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',inputMappingRecovery:true,openRecovery:true,parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
+ type:'transform.filter_data',mode:'conditions',revision:'filter-v3-bindings-1',inputMappingRecovery:true,openRecovery:true,parameterSchema:filterParametersSchema,bindingSchema:filterBindingSchema,readback:filterConfigurationReadback,
  validate:validateFilterParameters,
- validateInput:(p,resolved,native)=>p.groups===undefined?undefined:resolveFilterConditions(p,resolved.fields??native.target_fields),
+ validateInput:(p,resolved,native,{request})=>p.groups===undefined?undefined:resolveFilterConditions(resolveFilterBindings(p,request.bindings),resolved.fields??native.target_fields),
  preflight:preflightFilterSource,
  beforeInput:prepareFilterInput,
+ afterDone:(channel,request,configured,{readGraph})=>Object.hasOwn(request,'bindings')?readFilterBindings(channel,{readGraph,expected:configured}):undefined,
  configurationObservation:{condition:'filter configuration page',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true},
  async configure(channel,p,{request}){
   if(request.finish==='close'){
    const s=await channel.observe({condition:'filter draft ready for disposal',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
    return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_filter,draft_edits_skipped:true};
   }
-  const changed=await configureFilter(channel,p,{newNode:request.target.kind==='new'});
+  let changed;
+  if(Object.hasOwn(request,'bindings')){
+   const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
+   preserveFilterBindings(s.node_filter,p,request.bindings);
+   if(request.bindings.length&&p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,s.node_filter);
+   else p=resolveFilterBindings(p,request.bindings);
+  }
+  changed??=await configureFilter(channel,p,{newNode:request.target.kind==='new'});
   const s=await channel.observe({condition:'filter ready for validation',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
   await channel.perform({condition:'validate filter conditions',initialObservation:s,ready:s=>s.wizard?.stage==='row_filter',identity:s=>s.prepared_node_context,
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Filter Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'done'};}});
@@ -49,13 +64,15 @@ export async function preflightFilterSource(options,ctx,config){
    :graph.links.filter(l=>l.kind==='control'&&l.target===request.target.ref.node_id).map(l=>l.source);
   for(const id of sources){
    const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
-   if(nodes[0].type==='variables.user'){
+   if(nodes[0].type==='variables.user'&&!Object.hasOwn(request,'bindings')){
     const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values.');
     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }
+   if(nodes[0].type==='variables.user'&&request.bindings?.length&&request.target.kind==='new')await preflightBuiltinBindings(options,ctx,config,nodes[0].ref);
   }
  }
- return preflightTabularSource(options,ctx,config,{required:request.parameters.groups!==undefined,resolve:resolveFilterConditions,label:'filter'});
+ return preflightTabularSource(options,ctx,config,{required:request.parameters.groups!==undefined,
+  resolve:(p,fields)=>resolveFilterConditions(resolveFilterBindings(p,request.bindings),fields),label:'filter'});
 }
 
 export async function prepareFilterInput(options,ctx,{channel}){
@@ -64,7 +81,7 @@ export async function prepareFilterInput(options,ctx,{channel}){
  // wizard. Commit the unchanged W1 mapping first to materialize its source;
  // preserve explicit mappings already completed by the shared driver.
  if(request.target.kind==='new'&&request.finish!=='close'&&request.variable_inputs?.some(i=>i.kind==='control')
-  &&request.parameters?.groups?.flat().some(c=>isFilterVariable(c.value??c.values))
+  &&(request.bindings?.length||request.parameters?.groups?.flat().some(c=>isFilterVariable(c.value??c.values)))
   &&!request.mappings?.some(m=>m.kind==='control')){
   const mapped=await channel.mapVariablePort({direction:'input',kind:'control',port:0});
   need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'Filter control mapping materialization is unconfirmed');
