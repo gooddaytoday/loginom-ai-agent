@@ -1,0 +1,53 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.join_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.join_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "LeftID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LeftKey",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RightID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RightKey",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "LeftID": "L2",
+          "LeftKey": 2,
+          "RightID": "R1",
+          "RightKey": 2.0
+        },
+        {
+          "LeftID": "L3",
+          "LeftKey": 2,
+          "RightID": "R1",
+          "RightKey": 2.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "status": "stage-0 proposal",
+  "encoding": "UTF-8",
+  "bom": false,
+  "line_ending": "LF",
+  "null_marker": "?",
+  "empty_string": "",
+  "files": [
+    {
+      "file": "main.csv",
+      "bytes": 50,
+      "records": 4,
+      "delimiter": ",",
+      "header": true,
+      "columns": [
+        "RowID",
+        "Key",
+        "Note"
+      ]
+    },
+    {
+      "file": "ref-a.csv",
+      "bytes": 44,
+      "records": 5,
+      "delimiter": ",",
+      "header": true,
+      "columns": [
+        "Key",
+        "A"
+      ]
+    },
+    {
+      "file": "ref-b.csv",
+      "bytes": 25,
+      "records": 3,
+      "delimiter": ",",
+      "header": true,
+      "columns": [
+        "Key",
+        "B"
+      ]
+    },
+    {
+      "file": "ref-c.csv",
+      "bytes": 34,
+      "records": 4,
+      "delimiter": ",",
+      "header": true,
+      "columns": [
+        "Key",
+        "C"
+      ]
+    },
+    {
+      "file": "ref-d.csv",
+      "bytes": 30,
+      "records": 4,
+      "delimiter": ",",
+      "header": true,
+      "columns": [
+        "Key",
+        "D"
+      ]
+    }
+  ]
+}
