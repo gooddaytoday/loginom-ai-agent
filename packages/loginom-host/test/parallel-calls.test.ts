@@ -29,7 +29,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
-      let active, started, interrupts = 0;
+      let active, started, interrupted, interrupts = 0;
       const calls = [];
       const reply = (id, result) => process.send({ id, result });
       process.on('message', m => {
@@ -43,8 +43,16 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
         if (m.operation === 'list') return reply(m.id, { prepared: true, tools: ['upload','describe','save-description','independent','dock_node_read'].map(name => ({ name, inputSchema: { type: 'object' } })) });
         if (m.operation === 'inspect') return reply(m.id, calls);
         if (m.operation === 'interrupts') return reply(m.id, interrupts);
+        if (m.operation === 'interrupted') {
+          if (interrupts) return reply(m.id, true);
+          interrupted = m.id;
+          return;
+        }
         if (m.operation === 'interrupt' || m.operation === 'finish') {
-          if (m.operation === 'interrupt') interrupts++;
+          if (m.operation === 'interrupt') {
+            interrupts++;
+            if (interrupted) reply(interrupted, true);
+          }
           if (active) reply(active, {result:{name:'upload'},recoveryPending:m.input?.uncertain===true,activeWork:false});
           active = undefined;
           return reply(m.id, true);
@@ -170,6 +178,8 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       if (ending === "disconnect") LoginomHost.disconnect()
       // Attach the handler before disconnect rejection is delivered.
       const firstResult = first.catch((error: Error) => error.message)
+      // Abort traverses HostPort and Help IPC; finish goes directly to the runtime.
+      if (ending === "interrupt") await runtime.request("interrupted")
       await runtime.request("finish", { uncertain: ending === "uncertain" })
       await firstResult
       const results = await Promise.all([second, third])
