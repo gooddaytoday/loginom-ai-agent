@@ -178,21 +178,31 @@ export async function readDeferredImportCounts(options,ctx,config) {
   for(const switched of sources){
     if(switched.node.node_id===ctx.node?.node_id)continue;
     const base={node:switched.node,profile_id:switched.profile_id,expected_records:switched.scan_receipt?.records,
-      actual_records:null,matches_scan:null,execution_id:ctx.execution.execution_id};
+      actual_records:null,matches_scan:null,execution_id:ctx.execution.execution_id,chain_execution_id:ctx.execution.execution_id};
     const unavailable=reason=>({...base,status:'not_verified',message:'N не сверено',reason});
     const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:switched.node};
     operation.deadline=ctx.deadline;
     let processes;
-    try{processes=await execute(makeNodeProcessContextCode(binding),{timeout:Math.max(5000,ctx.deadline-now()+5000)});}
+    // Execution verification closes the console before output reads. Reuse the
+    // existing read-only hidden-cache allowance: no rendered controls or UI
+    // actions are taken from this inventory. The port reader rechecks ownership.
+    try{processes=await execute(makeNodeProcessContextCode(binding,{errorToast:true}),{timeout:Math.max(5000,ctx.deadline-now()+5000)});}
     catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
     const group=ctx.execution.execution_id.split(':').at(-1);
-    const own=processes.processes?.filter(p=>p.owner?.verified===true&&p.owner.node_id===switched.node.node_id
-      &&p.owner.source==='native_process_model_identity'&&p.process_id.startsWith(group+'.')
+    const candidates=processes.processes?.filter(p=>p.owner?.verified===true&&p.owner.node_id===switched.node.node_id
+      &&p.owner.source==='native_process_model_identity'&&p.parent_id===p.process_id.split('.')[0]
+      &&BigInt(p.parent_id)<=BigInt(group)
       &&p.state==='completed'&&p.error===false)??[];
-    let result=unavailable('Import has no unique completed process in this execution group');
+    // A later Export can consume the still-active import without rerunning it.
+    // Use its latest completed group; the existing reader rejects any newer
+    // native import process and rechecks the same active port/source identity.
+    const latest=candidates.reduce((latest,p)=>BigInt(p.parent_id)>BigInt(latest)?p.parent_id:latest,'0');
+    const own=candidates.filter(p=>p.parent_id===latest);
+    let result=unavailable(processes.verified!==true?'Completed import process inventory unavailable: '+processes.reason
+      :'Import has '+own.length+' completed processes in its latest execution group; expected one');
     if(processes.verified===true&&processes.inventory_complete===true
       &&ctx.execution.execution_id===ctx.document_id+':'+processes.root_id+':'+group&&own.length===1){
-      const execution={verified:true,owner_verified:true,status:'completed',execution_id:ctx.execution.execution_id,
+      const execution={verified:true,owner_verified:true,status:'completed',execution_id:ctx.document_id+':'+processes.root_id+':'+latest,
         process_id:own[0].process_id,process_record_id:own[0].record_id};
       const channel=createNodeProcedure({operation,execute,record:onRecord,now,signal:ctx.signal,
         targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,preparedNodeContext:binding});
@@ -212,7 +222,10 @@ export async function readDeferredImportCounts(options,ctx,config) {
           matches_scan:String(error.message).startsWith('LOGINOM_ROW_COUNT_MISMATCH:')?false:null};
       }
     }
-    await onRecord({operation_id:operation.id,action_key:'node.apply',phase:'node_deferred_import_count',result});
+    await onRecord({operation_id:operation.id,action_key:'node.apply',phase:'node_deferred_import_count',result,
+      process_inventory:{verified:processes.verified,reason:processes.reason,root_id:processes.root_id,
+        processes:processes.processes?.map(p=>({process_id:p.process_id,record_id:p.record_id,parent_id:p.parent_id,
+          state:p.state,error:p.error,owner:p.owner}))}});
     results.push(result);
   }
   return results;
