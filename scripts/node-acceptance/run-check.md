@@ -572,3 +572,9 @@ two variables. Task and transactions.csv reach the model; independent stage-0
 oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
+
+
+`logreg-apply`: обучение Enter на train.csv, затем замена источника того же
+импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
+`datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
+3×8 ячеек, NULL Target/ActualEvent, точные типы и порядок, CSV/Save/cold.

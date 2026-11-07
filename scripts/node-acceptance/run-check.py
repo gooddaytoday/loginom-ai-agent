@@ -359,6 +359,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-apply':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/apply'
+        return dict(source=src, prompt=src / 'task-apply.md', data=src / 'data', base=None,
+                    input_files=['train.csv', 'holdout.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py')
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
