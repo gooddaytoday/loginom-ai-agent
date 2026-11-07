@@ -127,7 +127,9 @@ export async function restRequestCapability(page,t,readContext){
    await quiet();await guard();await point(tid);
    const value=()=>find(tid).locator('input').inputValue();
    if(t.body_field!==undefined&&await value()!==t.body_field){
-    await click(tid);await click(tid+';boundlist;'+t.body_field);
+    await click(tid+';trg_picker');
+    await wait('request body options',async()=>await find(tid+';boundlist;'+t.body_field).count()===1);
+    await click(tid+';boundlist;'+t.body_field);
     await wait('request body binding',async()=>await value()===t.body_field);
    }
    body_field=await value();

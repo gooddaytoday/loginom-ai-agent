@@ -36,10 +36,11 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app,TBGHTTPVerb:{httpGET:0,httpPOST:1,httpPUT:2,httpDELETE:3,httpPATCH:4}},Ext:{getCmp:id=>fields[id]??component}});
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
  const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
- let body='';
+ let body='',bodyPickerOpen=false;
  const page={evaluate,waitForTimeout:async ms=>options.tick?.(ms),locator:selector=>({
   locator:()=>({inputValue:async()=>body,fill:async value=>{const k=Object.keys(values).find(k=>selector.includes(k));assert.ok(k);values[k]=Number(value);inputs[k].value=value;writes.push([k,Number(value)]);},press:async()=>{}}),
   count:async()=>{
+   if(selector.includes(';edtMessageBodyColumn;boundlist;Body'))return bodyPickerOpen?1:0;
    if(selector.startsWith('.x-mask'))return options.stall==='loading'||stage===-1?1:0;
    if(selector.includes(';btnError'))return 0;
    if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']')?(duplicate==='column'?2:1):0;
@@ -52,7 +53,8 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  }),mouse:{click:async()=>{
   if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;if(options.stall!=='bindings')draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
-  }else if(lastSelector.includes(';boundlist;Body')){body='Body';}
+  }else if(lastSelector.includes(';edtMessageBodyColumn;trg_picker')){bodyPickerOpen=true;}
+  else if(lastSelector.includes(';boundlist;Body')){body='Body';bodyPickerOpen=false;}
   else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
  },move:async()=>{},down:async()=>{drags++;},up:async()=>{
   const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
