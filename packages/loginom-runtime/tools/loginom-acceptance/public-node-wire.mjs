@@ -50,7 +50,6 @@ export async function createPublicNodeWire(runtime,{directory,browserSequence,us
   async runNodeRead(request,options={}) {return this.runNodeApply(request,{...options,readOnly:true});},
   async runNodeApply(request,{resume=false,signal,readOnly=false}={}) {
    if(signal?.aborted)throw Error('Operator public run was cancelled before dispatch');
-   if(!readOnly&&!resume)await call('dock_action_describe',{node_types:[request.target.type],modes:[request.mode]});
    let current=await call(readOnly?'dock_node_read':resume?'dock_node_resume':'dock_node_apply',request);
    while(current.state==='running')current=await call('dock_node_wait',{operation_id:request.operation_id,timeout_ms:10000});
    if(current.state!=='settled')throw Error('Public node worker rejected: '+JSON.stringify(current.error));
