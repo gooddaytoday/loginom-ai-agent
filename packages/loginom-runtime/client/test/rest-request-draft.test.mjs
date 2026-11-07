@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {restRequestCapability} from '../lib/rest-request.mjs';
 
 function fixture(foreign=null,manual=false,duplicate=null,options={}){
- const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
+ const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;'+(options.nestedParam?'MessageBody;':'')+'ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
  const advanced=root+';AdditionalParamsWizard',values={pedTimeout:options.timeout??-1,pedFailedRequestRepeat:options.retries??0},writes=[];
  const inputs=Object.fromEntries(Object.keys(values).map(k=>[k,{id:k,value:String(values[k]),readOnly:false,disabled:false}]));
@@ -20,18 +20,20 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const owner={id:'columnheader-1032',getAttribute:()=>columnTid};
  const mask={parentElement:owner,matches:s=>s==='.x-mask',getBoundingClientRect:()=>({x:1214,y:168,width:30,height:27})};
  const loading={matches:()=>false};
- const rootElement={contains:e=>e===owner},paramElement={},card={contains:e=>e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
+ const rootElement={contains:e=>e===owner},paramElement={getAttribute:()=>base},card={contains:e=>e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
  const component={disabled:options.mask!=='enabled',getXType:()=>options.mask==='wrong-type'?'gridcolumn':'actioncolumn',el:{dom:options.mask==='foreign-dom'?{}:owner}};
  const grid={},draw={FOwner:grid,FLinks:{}};grid.FLinkDrawContainer=draw;
  const p={FView:{el:{dom:paramElement}},FColumnsStore:columns,FParamStore:parameters,FGrdParamStore:parameters,FRequestParamLinks:saved,
   FItems:{grdFields:{getStore:()=>columns},grdParams:{getStore:()=>parameters},pnlLinkGrid:grid}};
- class RESTRequestWizard{constructor(){this.FRequestConfig=p;this.FVerb=['GET','POST','PUT','DELETE','PATCH'].indexOf(options.method??'GET');}}
+ const sourceColumns={Store:columns};
+ class RESTRequestWizard{constructor(){this.FColumns=sourceColumns;this.FVerb=['GET','POST','PUT','DELETE','PATCH'].indexOf(options.method??'GET');
+  this.FRequestConfig=[1,2,4].includes(this.FVerb)?{FColumns:sourceColumns,FParamLinks:p}:p;}}
  const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:stage===2?advancedElement:card}})}};
  const element={getBoundingClientRect:()=>({x:10,y:10,width:100,height:20}),contains:()=>false,closest:()=>null};
  const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(advanced)+']'?[advancedElement]:Object.keys(values).some(k=>s==='[data-tid='+JSON.stringify(advanced+';'+k+';ValueControl')+']')?[inputs[Object.keys(values).find(k=>s.includes(k))]]:s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
  const Workspace={getActiveTab:()=>({Controller:{FController:controller}})};
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
- const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},Ext:{getCmp:id=>fields[id]??component}});
+ const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app,TBGHTTPVerb:{httpGET:0,httpPOST:1,httpPUT:2,httpDELETE:3,httpPATCH:4}},Ext:{getCmp:id=>fields[id]??component}});
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
  const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
  let body='';
@@ -70,6 +72,11 @@ for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 configures native '
 test('C1 recognizes the owned request page when the empty query panel is hidden',async()=>{
  const f=fixture(null,false,null,{method:'POST',empty:true,hiddenQuery:true}),r=await f.run();
  assert.equal(r.verified,true,r.error);assert.equal(r.configuration.body_field,'Body');
+});
+test('C1 uses the owned nested MessageBody query data-tid for manual bindings',async()=>{
+ const f=fixture(null,true,null,{method:'POST',nestedParam:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(f.drags(),2);
+ assert.deepEqual(r.configuration.query_parameters,[{name:'requestid',field:'RequestId'},{name:'key',field:'Key'}]);
 });
 test('C1 rejects a non-string body column before a body gesture',async()=>{
  const f=fixture(null,false,null,{method:'POST',empty:true,bodyType:1}),r=await f.run();

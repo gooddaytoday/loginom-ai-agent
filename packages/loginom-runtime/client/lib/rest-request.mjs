@@ -44,7 +44,7 @@ export async function restLinkCapability(page,t,readValidation){
 export async function restRequestCapability(page,t,readContext){
  const need=(v,m)=>{if(!v)throw Error('REST request: '+m);};
  const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
- const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',base=root+';RESTRequestWizard;ParamLinks;';
+ const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',defaultBase=root+';RESTRequestWizard;ParamLinks;';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  let effect=false,step='owned wizard',control=root;
  try{
@@ -85,12 +85,20 @@ export async function restRequestCapability(page,t,readContext){
   }
   const read=async()=>{
    await guard();return page.evaluate(({root,base})=>{
-    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard'),p=w?.FRequestConfig;
+    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard');
+    // POST/PUT/PATCH owns MessageBody. Bind its ParamLinks child through that
+    // native controller and the unique DOM of its own view.
+    const v=bg.TBGHTTPVerb,method=Object.entries({GET:v.httpGET,POST:v.httpPOST,PUT:v.httpPUT,DELETE:v.httpDELETE,PATCH:v.httpPATCH}).find(([,value])=>value===w?.FVerb)?.[0];
+    const body=['POST','PUT','PATCH'].includes(method),p=body?w.FRequestConfig?.FParamLinks:w?.FRequestConfig;
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-    if(!p||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(base.slice(0,-1)).length!==1||p.FView.el.dom!==exact(base.slice(0,-1))[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
+    const tid=body?p?.FView?.el?.dom?.getAttribute('data-tid'):base.slice(0,-1);
+    if(!p||typeof tid!=='string'||!tid.startsWith(root+';RESTRequestWizard;')||!tid.endsWith(';ParamLinks')||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(tid).length!==1||p.FView.el.dom!==exact(tid)[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
      ||p.FItems.grdFields.getStore()!==p.FColumnsStore||p.FItems.grdParams.getStore()!==p.FGrdParamStore||p.FColumnsStore.loading||p.FGrdParamStore.loading||p.FRequestParamLinks.loading||p.FRequestParamLinks.complete!==true)throw Error('Native REST binding inventories are unavailable');
     const columnRows=p.FColumnsStore.getRange(),parameterRows=p.FParamStore.getRange();
-    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
+    if(body&&(!w.FColumns?.Store||w.FColumns.Store.loading||w.FRequestConfig.FColumns!==w.FColumns))throw Error('Native REST body columns are unavailable');
+    // Body selection filters that column out of ParamLinks. Read the owned
+    // source inventory so reconfiguring the same saved body remains valid.
+    const columns=(body?w.FColumns.Store.getRange():columnRows).map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
     const parameters=parameterRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
     // AutoLink changes the rendered draft; FRequestParamLinks still contains
     // the saved bindings until the wizard commits its page.
@@ -103,11 +111,12 @@ export async function restRequestCapability(page,t,readContext){
      return {name:pair[1].data.Name,field:pair[0].data.Name};
     });
     if(columns.length>1000||parameters.length>32||links.length>32)throw Error('REST binding inventory exceeds bound');
-    return {method:w.FVerb,columns,parameters,links};
-   },{root,base});
+    return {method,columns,parameters,links,binding_tid:tid};
+   },{root,base:defaultBase});
   };
   let current=await read();
-  const method=['GET','POST','PUT','DELETE','PATCH'][current.method];
+  const base=current.binding_tid+';';
+  const method=current.method;
   need(method,'unsupported native HTTP method');
   need(!t.connection?.method||method===t.connection.method,'native method differs from requested connection');
   const bodyMethod=['POST','PUT','PATCH'].includes(method);
