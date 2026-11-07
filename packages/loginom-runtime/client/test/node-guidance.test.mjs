@@ -72,3 +72,11 @@ test('admission requires the selected mode, never an index or another type mode'
  b.rememberDescriptions(cards,['conditions']);
  assert.equal(b.checkNodeDescription(filter),null);
 });
+
+test('stale document identity defers to the authoritative document guard after Save As',()=>{
+ const b=createUserWorkflowBindings();
+ b.remember({document_id:'new-document',workflow_ref:{workflow_id:'w',navigation_path:[]}});
+ const request={document_id:'old-document',target:{type:'transform.sorting'},mode:'keys'};
+ assert.equal(b.checkNodeDescription(request),null);
+ assert.equal(b.checkNodeDescription({...request,document_id:'new-document'}).error.code,'NODE_TYPE_NOT_DESCRIBED');
+});

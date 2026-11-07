@@ -95,6 +95,7 @@ export function createUserWorkflowBindings() {
         if(card.modes?.includes(mode))described.add(JSON.stringify([card.type,mode]));
     },
     checkNodeDescription(request) {
+      if(describedDocument&&describedDocument!==request.document_id)return null;
       if(described.has(JSON.stringify([request.target?.type,request.mode]))&&(!describedDocument||describedDocument===request.document_id))return null;
       return {result_version:'user-v1',operation_id:request.operation_id??null,
         status:'NOT_APPLIED',phase:'request_rejected',request_rejected:true,effect_possible:false,cleanup_complete:true,
