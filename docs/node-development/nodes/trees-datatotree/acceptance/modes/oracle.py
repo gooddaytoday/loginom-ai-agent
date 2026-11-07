@@ -7,6 +7,7 @@ No runtime imports, network access, Loginom output or expected input is used.
 import argparse
 import csv
 import json
+from datetime import datetime
 from pathlib import Path
 
 NODES = Path(__file__).resolve().parents[3]
@@ -111,13 +112,19 @@ def proposals(slug):
         def json_rows(values):
             return table([dict(name='JSON', name_any=True, label_any=True, type='string', comparison='json_ast')],
                          [{'JSON': json.dumps(v, ensure_ascii=False, separators=(',', ':'))} for v in values])
+        moment = datetime.fromisoformat(f['document']['when'])
+        assert moment.tzinfo is None
+        custom = moment.strftime('%d.%m.%Y %H:%M:%S.') + str(moment.microsecond // 1000).zfill(3)
         return [
             case('root-array', json_rows([f['root_array']]), exclude_root=True, multi_row=False),
             case('split', json_rows(f['root_array']), exclude_root=True, multi_row=True),
             case('pretty-labels', json_rows([rename(base)]), pretty=True, keys='labels', formatting='valid JSON with a line break outside string tokens; indentation not specified'),
-            case('dates', json_rows([f['document']]), datetime='iso8601', custom_date='DD.MM.YYYY', custom_time='hh:mm:ss.zzz', custom_witness='07.11.2026 12:34:56.789', timezone='none; custom exact spelling pending UI probe'),
+            case('dates', json_rows([f['document']]), datetime='iso8601', custom_date='DD.MM.YYYY', custom_time='hh:mm:ss.zzz',
+                 custom_output=json_rows([dict(f['document'],when=custom)]), timezone='none; custom exact spelling pending UI probe'),
             case('siblings', json_rows([base]), sibling_arrays='preserve independent array lengths 2 and 3; no flattening'),
-            case('empty', json_rows([[]]), multi_row_false_document_count=1, multi_row_true_output=json_rows([])),
+            case('empty', json_rows([f['empty_root_array']]), multi_row_false_document_count=1,
+                 multi_row_true_output=json_rows([]), empty_object_output=json_rows([{}]),
+                 zero_root_instances='not_checked; distinct from a present empty root array/object'),
         ]
     if slug == SLUGS[2]:
         doc = load(slug, 'document.json')
