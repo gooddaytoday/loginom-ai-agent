@@ -59,7 +59,7 @@ export async function excelConfigureCapability(page,t,readContext){
    &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)&&source.whole_sheet&&source.blank_rows==='Импортировать','source settings differ');
   await advance();await wait('Excel column page',()=>find(grid).isVisible());
   if(!t.inspect&&!t.preserve)await choose(defs+'cbbAutoDetectColumnsMode;ValueControl','Нет');
-  const types={integer:'Целый',real:'Вещественный',string:'Строковый',datetime:'Дата/Время'};
+  const types={integer:'Целый',real:'Вещественный',string:'Строковый',datetime:'Дата/Время',boolean:'Логический'};
   const read=async()=>{await quiet();await guard();return page.evaluate(({grid,root})=>{
    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
    const elements=exact(grid),form=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
@@ -78,7 +78,7 @@ export async function excelConfigureCapability(page,t,readContext){
   need(current.length===t.excel.columns.length,'explicit columns must cover the whole worksheet schema');
   need(current.every((f,i)=>f.name===(t.excel.columns[i].source_name??t.excel.columns[i].name)||f.label===(t.excel.columns[i].source_name??t.excel.columns[i].name)),'source column names differ; use exact source_name headers');
   for(let i=0;i<t.excel.columns.length;i++){
-   const c=t.excel.columns[i],expected={name:c.name,label:c.label,type:types[c.type],data_kind:c.data_kind??(c.type==='string'?'Дискретный':'Непрерывный'),used:true};
+   const c=t.excel.columns[i],expected={name:c.name,label:c.label,type:types[c.type],data_kind:c.data_kind??(['string','boolean'].includes(c.type)?'Дискретный':'Непрерывный'),used:true};
    for(const [row,key] of ['name','label','type','data_kind','used'].entries()){
     if(current[i][key]===expected[key])continue;
     const before=JSON.stringify(current),cell=find(grid+';normalHeaderCt;'+i+'_'+row);

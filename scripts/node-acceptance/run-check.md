@@ -65,6 +65,8 @@ all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
 `excel-import-columns` checks all 16 integer fields, including C16;
 `excel-import-headers` skips 11 header rows and checks both compound names.
 `excel-import-single` retains the original three-field, first-sheet fixture.
+`excel-import-boolean` checks native Boolean/discrete Active with false, true
+and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
 
