@@ -57,7 +57,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',selecting=forward||backward,method=backward?2:forward?1:0,methodLabel=backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
+ const preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=stepwise?3:backward?2:forward?1:0,methodLabel=stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -114,8 +114,8 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    state=await observe('details','linear criterion readback');
   }
   need(state.node_linregression.values.pedRegSelQuality===criterion,'selection criterion readback differs');
-  need(backward?state.node_linregression.disabled.pedAddSignificance===true&&(criterion!==0||state.node_linregression.disabled.pedRemoveSignificance===false):(criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected selection cutoff availability');
-  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[[backward?'pedRemoveSignificance':'pedAddSignificance',backward?wanted.remove_significance??0.1:wanted.add_significance??0.05]]:[])]){
+  need(stepwise?(criterion!==0||state.node_linregression.disabled.pedAddSignificance===false&&state.node_linregression.disabled.pedRemoveSignificance===false):backward?state.node_linregression.disabled.pedAddSignificance===true&&(criterion!==0||state.node_linregression.disabled.pedRemoveSignificance===false):(criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected selection cutoff availability');
+  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[...(!backward?[['pedAddSignificance',wanted.add_significance??0.05]]:[]),...(!forward?[['pedRemoveSignificance',wanted.remove_significance??0.1]]:[])]:[])]){
    if(state.node_linregression.values[key]!==value){
     const [coefficient,exponent]=String(value).split('e-');
     const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
@@ -125,7 +125,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    need(state.node_linregression.values[key]===value,'numeric readback differs: '+key);
   }
   const disabledKey=backward?'add_significance':'remove_significance',disabledControl=backward?'pedAddSignificance':'pedRemoveSignificance';
-  need(wanted[disabledKey]===undefined||state.node_linregression.values[disabledControl]===wanted[disabledKey],'disabled cutoff differs from requested assertion');
+  need(stepwise||wanted[disabledKey]===undefined||state.node_linregression.values[disabledControl]===wanted[disabledKey],'disabled cutoff differs from requested assertion');
   selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...(criterion===0?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
  }
  const details=state.node_linregression;

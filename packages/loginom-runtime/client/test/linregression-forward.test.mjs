@@ -28,9 +28,9 @@ function replay(criterion,fault,mode='forward'){
   const card=stage==='lin_regression_details'?'LinRegressionWizard-1':'LinRegressionWizard';
   const elements=[{tid:'W;btnNext',ref:'ui-next',allowed_actions:['wizard_step']}];
   for(const key of Object.keys(values))for(const suffix of ['ValueControl','ValueControl;DisplayEl','ValueControl;trg_picker'])elements.push({tid:'W;'+card+';'+key+';'+suffix,ref:'ui-'+key+'-'+suffix.replaceAll(';','-').replaceAll('_','-'),allowed_actions:['fill','press','click','set_checked']});
-  if(picker)for(const [value,label] of (picker==='pedRegressionMethod'?[[0,'Enter (Принудительное включение)'],[1,'Forward (Пошаговое включение)'],[2,'Backward (Пошаговое исключение)']]:criteria.map((c,i)=>[i,'native '+c])))elements.push({tid:'W;'+card+';'+picker+';ValueControl;boundlist;'+label,ref:'ui-option-'+value,label,allowed_actions:['click']});
+  if(picker)for(const [value,label] of (picker==='pedRegressionMethod'?[[0,'Enter (Принудительное включение)'],[1,'Forward (Пошаговое включение)'],[2,'Backward (Пошаговое исключение)'],[3,'Stepwise (Пошаговое включение/исключение)']]:criteria.map((c,i)=>[i,'native '+c])))elements.push({tid:'W;'+card+';'+picker+';ValueControl;boundlist;'+label,ref:'ui-option-'+value,label,allowed_actions:['click']});
   return {prepared_node_context:node,wizard:{status:'observed',stage,root_tid:'W',root_ref:'wizard'},ui:{elements},node_linregression:{verified:true,node_context:node,
-   ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:{kind:stage==='lin_regression'?'parameters':'details',values:{...values},switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:mode==='backward'||values.pedRegSelQuality>2,pedRemoveSignificance:mode!=='backward'||values.pedRegSelQuality>2},selection_choices:criteria.map((c,value)=>({value,label:'native '+c}))})}};
+   ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:{kind:stage==='lin_regression'?'parameters':'details',values:{...values},switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:mode==='backward'||values.pedRegSelQuality>2,pedRemoveSignificance:!['backward','stepwise'].includes(mode)||values.pedRegSelQuality>2},selection_choices:criteria.map((c,value)=>({value,label:'native '+c}))})}};
  };
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true,'ready '+stage);return s;},async perform({ready,resolve}){
   const s=state();assert.equal(ready(s),true);const a=resolve(s);validateUiAction(a,s);actions.push(a);
@@ -41,7 +41,7 @@ function replay(criterion,fault,mode='forward'){
   if(a.verb==='fill'&&fault!=='stale'&&!(fault==='stale-removal'&&key==='pedRemoveSignificance'))values[key]=Number(a.text);
   if(a.verb==='click'&&a.ref.endsWith('trg-picker'))picker=key;
  }};
- return {actions,run:()=>configureLinRegression(channel,{...p,linear_regression:{selection:{criterion,...(criterion==='f'?{add_significance:fault==='addition-mismatch'?0.04:mode==='backward'?0.05:0.03,remove_significance:mode==='backward'?0.12:0.1}:{})}}},{request:{mode,target:{kind:'new'}},inputMapping})};
+ return {actions,run:()=>configureLinRegression(channel,{...p,linear_regression:{selection:{criterion,...(criterion==='f'?{add_significance:fault==='addition-mismatch'?0.04:mode==='backward'?0.05:0.03,remove_significance:['backward','stepwise'].includes(mode)?0.12:0.1}:{})}}},{request:{mode,target:{kind:'new'}},inputMapping})};
 }
 for(const criterion of criteria.filter(c=>c!=='r2'))test('production Forward procedure selects and reads back '+criterion,async()=>{
  const f=replay(criterion),r=await f.run();assert.equal(r.configuration.mode,'forward');
@@ -52,7 +52,7 @@ for(const criterion of criteria.filter(c=>c!=='r2'))test('production Forward pro
 test('Forward refuses stale numeric readback before committing the wizard',async()=>{
  const f=replay('f','stale');await assert.rejects(f.run(),/differs|readback/);assert.notEqual(f.actions.at(-1).expected_stage,'done');
 });
-for(const mode of ['forward','backward'])test(mode+' receipt exposes the observed method, selection and solver accuracy',()=>{
+for(const mode of ['forward','backward','stepwise'])test(mode+' receipt exposes the observed method, selection and solver accuracy',()=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'regression'},operation_id='forward';
  const c={verified:true,node_context:node,mode,fields:[{name:'X',usage_type:3}],target_field:'Y',intercept:true,selection:{criterion:'f',add_significance:0.05},epsilon:1e-10};
  const phases=['input_mapping','configure','node_finish','output_mapping','finish'].map(phase=>({phase,status:'verified',receipt_id:operation_id+':'+phase,value:{verified:true,cleanup_complete:true,settings_applied:true,configuration:c,validation:{status:'accepted_by_loginom_next'},mode:'execute',execution_id:'execute',training:{status:'trained',execution_id:'train',source:[{}]}}}));
@@ -75,4 +75,24 @@ for(const criterion of criteria.filter(c=>c!=='r2'))test('production Backward pr
 for(const fault of ['stale-removal','addition-mismatch'])test('Backward refuses '+fault+' before committing',async()=>{
  const f=replay('f',fault,'backward');await assert.rejects(f.run(),/differs|readback/);
  assert.notEqual(f.actions.at(-1)?.expected_stage,'done');
+});
+
+for(const criterion of criteria.filter(c=>c!=='r2'))test('production Stepwise configures both cutoffs and reads back '+criterion,async()=>{
+ assert.doesNotThrow(()=>validateLinRegressionParameters({...p,linear_regression:{selection:{criterion}}},'stepwise'));
+ const f=replay(criterion,undefined,'stepwise'),r=await f.run();
+ assert.equal(r.configuration.mode,'stepwise');assert.equal(r.configuration.selection.criterion,criterion);
+ assert.equal(r.configuration.epsilon,1e-10);
+ if(criterion==='f'){
+  assert.equal(r.configuration.selection.add_significance,0.03);assert.equal(r.configuration.selection.remove_significance,0.12);
+  for(const control of ['pedAddSignificance','pedRemoveSignificance'])assert.equal(f.actions.some(a=>a.verb==='fill'&&a.ref?.startsWith('ui-'+control)),true);
+ }
+ assert.equal(f.actions.at(-1).expected_stage,'done');
+});
+for(const fault of ['stale','stale-removal'])test('Stepwise refuses '+fault+' before committing',async()=>{
+ const f=replay('f',fault,'stepwise');await assert.rejects(f.run(),/differs|readback/);
+ assert.notEqual(f.actions.at(-1)?.expected_stage,'done');
+});
+test('Stepwise F requires entry below removal',()=>{
+ for(const selection of [{criterion:'f',add_significance:0.1,remove_significance:0.1},{criterion:'f',add_significance:0.2},{criterion:'f',remove_significance:0.01}])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{selection}},'stepwise'),/addition.*removal/);
 });

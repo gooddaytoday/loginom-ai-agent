@@ -342,7 +342,7 @@ export interface AssnRulesConfigurationReadback {
 
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward'; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise'; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
 }

@@ -33,3 +33,12 @@ assert e==m.expected_for(f,'/worker/c2.lgp')
 print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
  assert.deepEqual(value,{task:'task-backward.md',expected:'expected/forward-f.json',files:['selection.csv']});
 });
+
+test('C3 Stepwise delivers only the approved task and CSV with unchanged F expectations',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-stepwise-f');f=m.scenario('linreg-forward-f')
+assert m.expected_for(c,'/worker/c3.lgp')==m.expected_for(f,'/worker/c3.lgp')
+print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c['input_files'])))`],{encoding:'utf8'}));
+ assert.deepEqual(value,{task:'task-stepwise.md',expected:'expected/forward-f.json',files:['selection.csv']});
+});
