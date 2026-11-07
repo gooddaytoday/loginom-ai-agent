@@ -1,5 +1,6 @@
 # Объединение (`transform.union_data`)
 
+<!-- mode: append_all -->
 ## Объединение
 
 Для добавления строк таблиц используй `transform.union_data`, `mode:"append_all"`.
@@ -16,3 +17,4 @@
 Неоднозначность требует явной карты и отклоняется до Execute.
 Проверь итоговые `configuration.readback.tables`, включая поля без пары.
 Повторную настройку делай на том же existing ref с сохранением входов.
+<!-- /mode -->

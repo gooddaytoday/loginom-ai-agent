@@ -1,5 +1,6 @@
 # Импорт LGD
 
+<!-- mode: native -->
 Получай parameter_schema через dock_action_describe(node_types:["imports.lgd"]).
 Используй source из завершённой доставки вложения. По умолчанию задавай lgd_import.checksum="verify".
 Режим native. Новый узел без табличных входов, табличный выход 0.
@@ -37,3 +38,4 @@ Readback.source.source_variable подтверждает выбранное им
 Для LGD сразу используй `loginom_file_admit` и завершённую доставку; текстовые profile/scan и выборка не нужны. Не задавай столбцы вручную — они сохранены в бинарном файле.
 
 Для точной проверки выполни `dock_node_apply` с `finish:"execute"`, `read:{ports:[0],sample_rows:100,require_exact_numbers:true}`. Сверь `row_count`, схему и все доступные строки; при большем наборе не называй выборку полным результатом.
+<!-- /mode -->

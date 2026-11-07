@@ -1,5 +1,6 @@
 # Таблица в дерево
 
+<!-- mode: manual_structure -->
 Прочитай карточку trees.from_table и полную схему параметров до настройки.
 Сначала выполни и полностью прочитай табличный источник. Используй его точные
 технические имена, типы и порт 0. Задай manual_structure: полный список nodes
@@ -21,3 +22,4 @@ NULL отличается от пустой строки, 0 и false. Int64 чи
 отклоняются до изменения UI. Пустой вход пока не поддерживается.
 
 По запросу построить дерево из строк выбирай `dock_node_apply` с `target.type:"trees.from_table"`, `mode:"manual_structure"`. Получи карточку `dock_action_describe` с `node_types:["trees.from_table"]`; её `parameter_schema` задаёт `nodes`. Дерево читает сам узел с `read.ports:[0]`.
+<!-- /mode -->
