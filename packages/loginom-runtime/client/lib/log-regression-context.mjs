@@ -24,10 +24,13 @@ export function readLogRegressionBrowser(prefix) {
   ['details','LogRegressionWizard-1',['pedEpsilon','pedIntercept','pedThreshold','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
+  const ridge=kind==='details'&&exactValue(prefix+';WizrdMCF;LogRegressionWizard;pedRegressionMethod;ValueControl')?.getValue()===4;
+  if(ridge)names.push('pedRidgeSetupMethod','pedLambdaRidge');
   const values={},switches={},disabled={};
-  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
+  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
   if(kind==='parameters'&&(!Number.isInteger(values.pedRegressionMethod)||!['pedAutoMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'].every(k=>typeof values[k]==='boolean')))return {verified:false,reason:'logregression_initializing'};
   if(kind==='details'&&(!(typeof values.pedEpsilon==='number'&&values.pedEpsilon>0)||typeof values.pedIntercept!=='boolean'))return {verified:false,reason:'logregression_initializing'};
+  if(ridge&&(![0,1].includes(values.pedRidgeSetupMethod)||typeof values.pedLambdaRidge!=='number'||!Number.isFinite(values.pedLambdaRidge)||values.pedLambdaRidge<=0))return {verified:false,reason:'logregression_initializing'};
   const classes=[];
   if(kind==='parameters'){
    const c=exactValue(base+';pedEventId;ValueControl'),store=c?.getStore?.(),records=store?.getData?.()?.items;

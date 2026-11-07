@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,142569,'5510e2c15a2bcf20fae8a8066b9684b5e96623ca38341aefeca16c312f8e937c'],
-  [nodeApiTools.map(userNodeTool),19698,'9d3089ccf965a0f3caa14793209a5b9cd7257e3d8bd36ffb3430a478e4e37810'],
+  [nodeApiTools,143151,'d4a4b2faf32378825ac9422461cc4430cf1bea8087e3701c8916a50f902c3327'],
+  [nodeApiTools.map(userNodeTool),19706,'cb6a65a40ac5950c0e699ff56ccb236d17b3e6b332ad2a1bda6b3bd88172835b'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

@@ -585,3 +585,8 @@ cold typed variable inventory and both reports, package Close and logout apply.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
+повтор настройки и Teach того же узла; прогноз по независимому штрафному
+score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
+Модели передаются только task-ridge.md и train.csv.

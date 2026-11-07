@@ -107,3 +107,32 @@ test('selection criterion picker is actionable through the serialized workspace 
  assert.ok(control?.allowed_actions.includes('click'));
  assert.equal((await page.act({verb:'click',ref:control.ref},observed)).status,'SUCCEEDED');
 });
+
+
+test('Ridge setup picker and lambda input are actionable through serialized workspace observation',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ for(const [name,part,verb] of [['pedRidgeSetupMethod','trg_picker','click'],['pedLambdaRidge','input','fill']]){
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+  page.add('div',base+';LogRegressionWizard-1;pedEpsilon','',undefined,form);
+  const owner=page.add('div',base+';LogRegressionWizard-1;'+name+';ValueControl','',undefined,form);
+  const control=page.add(part==='input'?'input':'div',part==='input'?null:owner.getAttribute('data-tid')+';'+part,'',{x:100,y:100,width:80,height:20},owner);
+  const observed=await page.observe();assert.equal(observed.wizard.stage,'lin_regression_details');
+  const e=observed.ui.elements.find(e=>part==='input'?e.signature?.tag==='input'&&e.identity?.anchor_tid===owner.getAttribute('data-tid'):e.tid===control.getAttribute('data-tid'));
+  assert.ok(e?.allowed_actions.includes(verb),name);
+ }
+});
+
+
+test('Ridge native details wait for initialized setup, finite lambda and editable controls',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'ridge'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',4);
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedRidgeSetupMethod:0}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const lambda=add(base+'LogRegressionWizard-1;pedLambdaRidge;ValueControl',1);
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaRidge,1);assert.equal(read().disabled.pedLambdaRidge,false);
+ for(const value of [null,NaN,Infinity,-1,0]){lambda.getValue=()=>value;assert.equal(read().verified,false);}
+ lambda.getValue=()=>1;delete lambda.isDisabled;assert.equal(read().verified,false);
+});

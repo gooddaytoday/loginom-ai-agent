@@ -98,7 +98,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   resolve:s=>({verb:'click',ref:one(s,e=>categoryOptions(s).includes(e)&&e.label===event.index+' ('+event.label+')','Unique event category unavailable').ref})});
  state=await observe('parameters','explicit logistic category readback');need(state.node_logregression.values.pedEventId===event.index,'event selection differs from the observed category');
  if(state.node_logregression.values.pedAutoMethod){await act('parameters','disable automatic logistic method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual logistic method');}
- const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)']};
+ const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)'],ridge:[4,'Ridge (Гребневая регрессия)']};
  need(methods[mode],'unsupported regression method');
  await choose('pedRegressionMethod',methods[mode][1],methods[mode][0]);
  if(!state.node_logregression.values.pedUseDetailedSettings){await act('parameters','show logistic details','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','logistic details enabled');}
@@ -109,9 +109,14 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  await next('lin_regression','lin_regression_details');
  state=await observe('details','complete logistic details');
  need(state.node_logregression.values.pedIntercept===true&&Object.values(state.node_logregression.switches).every(v=>v===false),'fixed intercept without variable bindings required');
- let selection;
+ let selection,regularization;
  const cutoffs=[];
- if(mode!=='enter'){
+ if(mode==='ridge'){
+  need(state.node_logregression.disabled?.pedRidgeSetupMethod===false,'manual Ridge setup must be editable');
+  await choose('pedRidgeSetupMethod','Задать вручную',0,'details');
+  need(state.node_logregression.disabled?.pedLambdaRidge===false&&state.node_logregression.values.pedRidgeSetupMethod===0,'manual Ridge lambda must be editable');
+  cutoffs.push(['pedLambdaRidge',p.regularization.lambda_ridge,'lambda_ridge']);
+ }else if(mode!=='enter'){
   const criteria={deviance:[0,'Deviance'],aic:[1,'Информационный критерий Акаике'],aicc:[2,'Информационный критерий Акаике скорректированный'],bic:[3,'Информационный критерий Байеса'],hqic:[4,'Информационный критерий Ханнана-Куинна']};
   const wanted=p.selection??{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})};
   await choose('pedRegSelQuality',criteria[wanted.criterion][1],criteria[wanted.criterion][0],'details');
@@ -149,11 +154,12 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   }
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);
  }
+ if(mode==='ridge')regularization={lambda_ridge:state.node_logregression.values.pedLambdaRidge};
  if(selection)for(const [key,,name] of cutoffs)selection[name]=state.node_logregression.values[key];
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition,classes:classes.map(({index,label})=>({index,label})),
-  mode:observedMode,...(selection?{selection}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  mode:observedMode,...(selection?{selection}:{}),...(regularization?{regularization}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
 
