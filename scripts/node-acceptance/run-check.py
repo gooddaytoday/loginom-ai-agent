@@ -196,7 +196,7 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
-    if name in ['excel-import-sheet', 'excel-import-wide', 'excel-import-single']:
+    if name in ['excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers']:
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
@@ -333,6 +333,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs']:
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')
+        return dict(source=node / 'acceptance/modes',
+                    prompt=node / ('acceptance/modes/task-forward-r2-cutoffs.md' if name == 'linreg-forward-r2-cutoffs' else 'acceptance/modes/task-forward-r2.md' if variant == 'forward-r2' else 'acceptance/modes/task-forward.md'),
+                    data=node / 'fixtures/modes', input_files=['selection.csv'], base=None,
+                    expected_name='expected/' + variant + '.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
                 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',
                 'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
@@ -528,6 +535,14 @@ def expected_for(case, package):
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
+    if case.get('linreg_forward'):
+        # C1's mathematical oracle omits presentation labels. Bind the three
+        # intrinsic labels from linregression-output.mjs; keep all numeric
+        # types, names, IDs, rows and tolerances exactly as approved.
+        labels = {'Y_rergession': 'Y|Регрессия', 'Name': 'Имена входных полей', 'Y_coefficients': 'Y|Коэффициенты'}
+        for output in expected['outputs']:
+            for column in output['columns']:
+                if column['name'] in labels: column['label'] = labels[column['name']]
     expected['package_path'] = package
     return expected
 
