@@ -1,4 +1,4 @@
-import {sameJsonValues} from './tree-conversion.mjs';
+import {sameJsonValues,sameRestEchoValues} from './tree-conversion.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 // Read the first CSV record, including quoted separators/newlines and UTF-8 BOM.
 // The complete downloaded file is checked by the scenario's file oracle.
@@ -62,7 +62,7 @@ export function parseExpectedOutputs(expected){
   for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
    &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
     ||typeof r[c.name]==='number'&&Number.isFinite(r[c.name])),'EXPECTED_CATEGORIES_INVALID');
-  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&c.comparison==='json_ast','EXPECTED_COMPARISON_INVALID');
+  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&['json_ast','rest_echo'].includes(c.comparison),'EXPECTED_COMPARISON_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -244,6 +244,7 @@ function matchesCell(cell,column,want,coarseBound=false){
    :Math.abs(value/2-want/2)<=Math.max(abs/2,rel*(Math.abs(want)/2));
  }
  if(column.comparison==='json_ast')return type==='string'&&sameJsonValues(value,want);
+ if(column.comparison==='rest_echo')return type==='string'&&sameRestEchoValues(value,want);
  if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
 }

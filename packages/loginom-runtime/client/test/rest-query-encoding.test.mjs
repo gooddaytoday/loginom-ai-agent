@@ -58,6 +58,15 @@ function encode(source,rows){
  return output;
 }
 
+test('C1 query encoder preserves the complete UTF-8 body and NULL without encoding it',()=>{
+ const r=request();r.parameters.body_field='Body';
+ const child=restQueryEncoderRequest(r,2500,1000);
+ const bodies=['{"note":"Привет & + /"}','',null];
+ const rows=encode(child.parameters.source_text,bodies.map(Body=>({Key:'a b&я',Body})));
+ assert.deepEqual(rows,bodies.map(Body=>({Key:'a%20b%26%D1%8F',Body})));
+ assert.deepEqual(child.parameters.columns.map(c=>c.name),['Key','Body']);
+});
+
 test('REST-generated codec preserves raw query values through URL parsing, including ampersands and UTF-8',()=>{
  const original=request(),before=structuredClone(original),child=restQueryEncoderRequest(original,2500,1000);
  const raw=['a b&я','x/y?','%26+#+=','😀\r\n','',null];

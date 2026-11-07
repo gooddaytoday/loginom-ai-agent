@@ -74,7 +74,7 @@ test('Excel contract and compact request schema register a zero-input XLSX impor
  for(const stage of ['excel_import_file','excel_import_columns'])assert.doesNotThrow(()=>validateUiAction({verb:'wizard_step',ref:'ui-next',expected_stage:stage}));
 });
 test('Excel rejects unsupported types, missing explicit columns, alternate formats and invalid paths before mutation',()=>{
- for(const patch of [{columns:[]},{source_path:'/worker/sales.xls'},{source_path:'/worker/../sales.xlsx'},{auto_detect:true},{named_range:'Range'},{header_rows:0},{columns:[{name:'X',label:'X',type:'variant'}]},{columns:[{name:'X',label:'X',type:'string',data_kind:'Непрерывный'}]}])
+ for(const patch of [{columns:[]},{source_path:'/worker/sales.xls'},{source_path:'/worker/../sales.xlsx'},{auto_detect:true},{named_range:''},{header_rows:0},{columns:[{name:'X',label:'X',type:'variant'}]},{columns:[{name:'X',label:'X',type:'string',data_kind:'Непрерывный'}]}])
   assert.throws(()=>validateExcelParameters({...parameters,excel:{...parameters.excel,...patch}},'xlsx',request),/Excel import:/);
  assert.throws(()=>validateExcelParameters(parameters,'delimited',request),/mode xlsx/);
  assert.throws(()=>validateExcelParameters(parameters,'xlsx',{...request,inputs:[{input:0}]}),/no table input/);

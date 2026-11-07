@@ -3,7 +3,9 @@ const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion.'},
- sheet_name:{...text(120),description:'Exact sheet; omit=first initially, preserve during source_switch. No named ranges.'},
+ sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
+ named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange. Select the native named range, only its columns; exclusive with sheet_name.'},
+ extend_range:{type:'boolean',description:'Only with named_range. false/omitted=defined boundaries; true=continue its columns to the last populated row. Reconfigure the same node to change this.'},
  header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
  columns:{type:'array',minItems:1,maxItems:64,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
@@ -26,6 +28,9 @@ export function validateExcelParameters(p,mode,r){
  need(typeof e.source_path==='string'&&e.source_path.length<=2048&&/^\/(?!\/)/.test(e.source_path)&&/\.xlsx$/i.test(e.source_path)
   &&!/[|*?%\\\x00-\x1f]/.test(e.source_path)&&e.source_path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..'),'one explicit verified XLSX storage path is required');
  need(e.sheet_name===undefined||typeof e.sheet_name==='string'&&e.sheet_name.length>0&&e.sheet_name.length<=120&&!/[\x00-\x1f]/.test(e.sheet_name),'invalid sheet name');
+ if(Object.hasOwn(e,'named_range'))need(typeof e.named_range==='string'&&e.named_range.length>0&&e.named_range.length<=120&&!/[\x00-\x1f]/.test(e.named_range),'invalid named_range');
+ need(e.named_range===undefined||e.sheet_name===undefined,'sheet_name and named_range are mutually exclusive');
+ need(!Object.hasOwn(e,'extend_range')||e.named_range!==undefined&&typeof e.extend_range==='boolean','extend_range requires named_range and a boolean');
  if(switching){
   need(r.target?.kind==='existing'&&r.finish==='execute'&&r.inputs.length===0&&r.mappings.length===0&&r.read.ports.length===1&&r.read.ports[0]===0
    &&Object.keys(e).every(k=>['source_path','sheet_name'].includes(k))&&p.source_switch&&Object.keys(p.source_switch).sort().join(',')==='profile_id,save_operation_id'
