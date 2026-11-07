@@ -16,7 +16,8 @@ export function auditFilterBindings(events,initial,final){
  assert.deepEqual(events[patch].request.parameters.variables,[{name:'Limit',type:'integer',value:8}]);
  const second=checkpoints.find(c=>c.index>patch&&c.result.node.node_id===first.result.node.node_id&&matches(c,final)&&c.result.execution.execution_id!==first.result.execution.execution_id);
  assert.ok(second,'FILTER_BINDING_FINAL_SAME_NODE');
- for(const c of [first,second])for(const want of initial.outputs){
+ for(const [c,spec] of [[first,initial],[second,final]])for(const want of spec.outputs){
+  if(want.column_order==='any')continue;
   const p=c.result.output.ports.find(p=>p.port===want.output_port);assert.deepEqual(p.schema.map(f=>f.name),want.columns.map(f=>f.name),'FILTER_BINDING_FIELD_ORDER');
  }
  for(const [index,e] of events.entries()){

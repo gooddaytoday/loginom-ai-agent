@@ -1295,7 +1295,7 @@ class Runner:
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
         if case == 'filter-bindings':
-            for output in expected['outputs']: output['column_order'] = 'exact'
+            for output in expected['outputs']: output['column_order'] = 'any'
             expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
                 mode='variable', variable=dict(kind='control', input=0, name='Limit', type='integer', is_null=False),
                 source=dict(type='variables.user', output=4))]

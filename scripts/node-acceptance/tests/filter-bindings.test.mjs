@@ -36,3 +36,11 @@ for(const fault of ['literal','second node','sentinel','identity','reconfigure',
  if(fault==='stale execution')events[4].result.execution.execution_id='first';
  assert.throws(()=>auditFilterBindings(events,initial,final));
 });
+test('native final column order may change while values and types stay exact',()=>{
+ const events=history(),expected=structuredClone(final);
+ for(const o of expected.outputs)o.column_order='any';
+ for(const p of events[4].result.output.ports){p.schema.reverse();for(const row of p.sample)row.reverse();}
+ assert.equal(auditFilterBindings(events,initial,expected).status,'PASS');
+ events[4].result.output.ports[0].sample[0][0].value='100';
+ assert.throws(()=>auditFilterBindings(events,initial,expected),/FILTER_BINDING_FINAL_SAME_NODE/);
+});
