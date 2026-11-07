@@ -1,0 +1,105 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code_Replaced",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Code": 9,
+          "Status": "yes",
+          "Keep": "a",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 2,
+          "Code": 9,
+          "Status": "no",
+          "Keep": "b",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 3,
+          "Code": 9,
+          "Status": "unknown",
+          "Keep": "c",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 4,
+          "Code": null,
+          "Status": null,
+          "Keep": "d",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 5,
+          "Code": null,
+          "Status": "yes",
+          "Keep": "e",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 6,
+          "Code": null,
+          "Status": "no",
+          "Keep": "f",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 7,
+          "Code": null,
+          "Status": "unknown",
+          "Keep": "g",
+          "Code_Replaced": true
+        },
+        {
+          "Id": 8,
+          "Code": null,
+          "Status": "yes",
+          "Keep": "h",
+          "Code_Replaced": true
+        }
+      ]
+    }
+  ]
+}

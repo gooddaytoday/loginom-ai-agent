@@ -1,0 +1,476 @@
+{
+  "type": "programming.javascript",
+  "title": "JavaScript",
+  "palette_group": "Программирование",
+  "icon_class": "bg-vendor-icon-javascript",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": true,
+  "modes": [
+    "script"
+  ],
+  "semantics": "PROPOSAL ONLY, not installed: Loginom 7.4.2 synchronous builtIn/Data, one or two tabular inputs (InputTables[0], InputTables[1]) and output0; preserve code/declared schemas. Two inputs only on explicit request. No variables, Calc, external imports, Fetch/FS or async certification. Prefer standard nodes.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "javascript-two-input-proposal",
+  "configuration_status": "proposal_not_installed",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/programming/java-script/index.html"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "script"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "source_text": {
+        "type": "string",
+        "maxLength": 32768,
+        "description": "LF source: new required; existing omit=keep, empty=replace. <=32768 UTF-8 bytes/1024 lines; no CR/NUL (local check)."
+      },
+      "expected_source_sha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64,
+        "pattern": "^[a-f0-9]{64}$",
+        "description": "Replacing saved source: complete owned read digest."
+      },
+      "schema_mode": {
+        "type": "string",
+        "enum": [
+          "declared",
+          "code"
+        ]
+      },
+      "columns": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "const": "boolean"
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Дискретный"
+                  ]
+                },
+                "usage": {
+                  "type": "string",
+                  "enum": [
+                    "Не задано",
+                    "Активное",
+                    "Выходное",
+                    "Группа",
+                    "Показатель",
+                    "Транзакция",
+                    "Элемент"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "type",
+                "data_kind",
+                "usage"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "const": "datetime"
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Непрерывный"
+                  ]
+                },
+                "usage": {
+                  "type": "string",
+                  "enum": [
+                    "Не задано",
+                    "Активное",
+                    "Выходное",
+                    "Группа",
+                    "Показатель",
+                    "Транзакция",
+                    "Элемент"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "type",
+                "data_kind",
+                "usage"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "const": "real"
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Непрерывный"
+                  ]
+                },
+                "usage": {
+                  "type": "string",
+                  "enum": [
+                    "Не задано",
+                    "Активное",
+                    "Выходное",
+                    "Группа",
+                    "Показатель",
+                    "Транзакция",
+                    "Элемент"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "type",
+                "data_kind",
+                "usage"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "const": "integer"
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Непрерывный"
+                  ]
+                },
+                "usage": {
+                  "type": "string",
+                  "enum": [
+                    "Не задано",
+                    "Активное",
+                    "Выходное",
+                    "Группа",
+                    "Показатель",
+                    "Транзакция",
+                    "Элемент"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "type",
+                "data_kind",
+                "usage"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "const": "string"
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Дискретный"
+                  ]
+                },
+                "usage": {
+                  "type": "string",
+                  "enum": [
+                    "Не задано",
+                    "Активное",
+                    "Выходное",
+                    "Группа",
+                    "Показатель",
+                    "Транзакция",
+                    "Элемент"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "type",
+                "data_kind",
+                "usage"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "maxItems": 64,
+        "minItems": 1,
+        "description": "Ordered declared columns; all 5 fields. Only default type/kind pairs (see alternatives); usage Не задано=default role."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "limitations": [
+    "Только Loginom 7.4.2 и табличный v1: другой наблюдённый build требует отказа до мутации.",
+    "Импортировать Data статически из builtIn/Data; внешние модули, FS, Fetch и Calc не входят в этот контракт.",
+    "Использовать лишь синтаксис и API, проверенные на данном build; отсутствие ошибки редактора не доказывает Execute.",
+    "Для code-defined выходной таблицы вызвать AssignColumns до первого Append; declared-режим использует сохранённую схему.",
+    "Технические имена и типы столбцов брать из свежего наблюдения; RowID в примерах — имя тестового входа, а не универсальное поле.",
+    "Числа JavaScript имеют ограничения Number; для точного чтения больших Integer требуется отдельное подтверждение результата.",
+    "Не полагаться на сохранение globals между запусками; читать фактический source, mappings, output и сохранённый пакет.",
+    "Для нового кода предпочитать ASCII Name; пользовательскую Unicode-метку задавать в DisplayName. После Execute брать фактические имена из schema/readback, не угадывать нормализацию.",
+    "schema_mode=declared: 1–64 columns с name,label,type,data_kind,usage. Для integer/real/datetime data_kind=Непрерывный, для string/boolean — Дискретный; иной вид не поддержан writer. usage=Не задано оставляет стандартную роль. Код заполняет объявленную схему без AssignColumns.",
+    "В parameters.source_text для AssignColumns использовать DataType.Integer, DataType.Float (вещественный), DataType.String, DataType.Boolean, DataType.DateTime из builtIn/Data. DataType.Real не существует; parameters.columns использует строковый type=\"real\", это другой контракт.",
+    "PROPOSAL ONLY: at most two table inputs and output0, default mappings. A two-input request requires both complete input contexts, preserved links and GUIDs. Missing requested input refuses before editing; existing one-input calls keep their behavior."
+  ],
+  "knowledge_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "validated_for": {
+    "loginom_build": "7.4.2",
+    "server_os": "Linux",
+    "server_os_evidence": "owned Session.Version.IsWindows=false",
+    "source_prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "proof_scope": "headed Ubuntu discovery; exact examples only, not full autonomous acceptance"
+  },
+  "javascript_knowledge": {
+    "version": "1.4.0-proposal",
+    "validated_for": {
+      "loginom_build": "7.4.2",
+      "server_os": "Linux",
+      "server_os_evidence": "owned Session.Version.IsWindows=false",
+      "source_prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "proof_scope": "headed Ubuntu discovery; exact examples only, not full autonomous acceptance"
+    },
+    "sources": {
+      "original_prompt": "docs/node-development/nodes/programming-javascript/references/js_node_loginom_system_prompt.md",
+      "observed_profile": "docs/node-development/nodes/programming-javascript/engine-profile.json",
+      "official_help": [
+        "https://help.loginom.ru/userguide/processors/programming/java-script/index.html",
+        "https://help.loginom.ru/userguide/processors/programming/java-script/input-tables.html",
+        "https://help.loginom.ru/userguide/processors/programming/java-script/output-tables.html",
+        "https://help.loginom.ru/userguide/processors/programming/java-script/api-description.html"
+      ],
+      "official_help_build_scope": "online help is not pinned to build 7.4.2; executable examples are backed by the observed profile"
+    },
+    "limitations": [
+      "Только Loginom 7.4.2 и табличный v1: другой наблюдённый build требует отказа до мутации.",
+      "Импортировать Data статически из builtIn/Data; внешние модули, FS, Fetch и Calc не входят в этот контракт.",
+      "Использовать лишь синтаксис и API, проверенные на данном build; отсутствие ошибки редактора не доказывает Execute.",
+      "Для code-defined выходной таблицы вызвать AssignColumns до первого Append; declared-режим использует сохранённую схему.",
+      "Технические имена и типы столбцов брать из свежего наблюдения; RowID в примерах — имя тестового входа, а не универсальное поле.",
+      "Числа JavaScript имеют ограничения Number; для точного чтения больших Integer требуется отдельное подтверждение результата.",
+      "Не полагаться на сохранение globals между запусками; читать фактический source, mappings, output и сохранённый пакет.",
+      "Для нового кода предпочитать ASCII Name; пользовательскую Unicode-метку задавать в DisplayName. После Execute брать фактические имена из schema/readback, не угадывать нормализацию.",
+      "schema_mode=declared: 1–64 columns с name,label,type,data_kind,usage. Для integer/real/datetime data_kind=Непрерывный, для string/boolean — Дискретный; иной вид не поддержан writer. usage=Не задано оставляет стандартную роль. Код заполняет объявленную схему без AssignColumns.",
+      "В parameters.source_text для AssignColumns использовать DataType.Integer, DataType.Float (вещественный), DataType.String, DataType.Boolean, DataType.DateTime из builtIn/Data. DataType.Real не существует; parameters.columns использует строковый type=\"real\", это другой контракт."
+    ],
+    "scalar_data_api": {
+      "import": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";",
+      "input": "InputTable aliases InputTables[0]. For a requested second table use InputTables[1] with its own observed mapping and technical names. Never infer table ordinal from an SVG Input_Data suffix.",
+      "output": "OutputTable.Append() добавляет строку; OutputTable.Set(technicalName, value) записывает в последнюю добавленную строку.",
+      "code_schema": "В schema_mode=code OutputTable.AssignColumns(...) задаёт типизированные столбцы до Append.",
+      "declared_schema": "В schema_mode=declared столбцы задаются в мастере до Execute; код не вызывает AssignColumns.",
+      "column_types": {
+        "integer": "DataType.Integer",
+        "real": "DataType.Float",
+        "string": "DataType.String",
+        "boolean": "DataType.Boolean",
+        "datetime": "DataType.DateTime"
+      }
+    },
+    "examples": [
+      {
+        "id": "declared-table-v1",
+        "schema_mode": "declared",
+        "input_technical_name": "RowID",
+        "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nfor (let row=0;row<InputTable.RowCount;row++) {\n    OutputTable.Append();\n    OutputTable.Set(\"ObservedID\",InputTable.Get(row,\"RowID\"));\n    OutputTable.Set(\"PhaseMarker\",\"JS_G2_TABLE_V1\");\n}\n",
+        "scope": "Диагностический пример: объявить ObservedID Integer и PhaseMarker String в мастере; заменить RowID и marker под наблюдённые данные задачи.",
+        "evidence": "G2/G7 headed Ubuntu; шесть проверенных строк, clean Save и cold Execute для фиксированного пакета."
+      },
+      {
+        "id": "code-table-v1",
+        "schema_mode": "code",
+        "input_technical_name": "RowID",
+        "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nOutputTable.AssignColumns([{Name:\"ObservedID\",DataType:DataType.Integer},{Name:\"PhaseMarker\",DataType:DataType.String}]);\nfor (let row=0;row<InputTable.RowCount;row++) {\n    OutputTable.Append();\n    OutputTable.Set(\"ObservedID\",InputTable.Get(row,\"RowID\"));\n    OutputTable.Set(\"PhaseMarker\",\"JS_G2_TABLE_V1\");\n}\n",
+        "scope": "Диагностический пример: заменить RowID, имена/типы выхода и marker под наблюдённые данные задачи.",
+        "evidence": "G2/G7 headed Ubuntu; шесть проверенных строк, clean Save и cold Execute для фиксированного пакета."
+      }
+    ],
+    "column_names": {
+      "method": "AssignColumns",
+      "evidence": "docs/node-development/nodes/programming-javascript/public-column-names-design.md",
+      "scope": "Five fixed headed public Code cases on Loginom7.4.2/Linux; observed code API, native mapping and physical schema.",
+      "name": "Техническое имя для доступа к столбцу; может отличаться от запрошенного Name.",
+      "display_name": "Пользовательская метка; в проверенном случае Сумма ё сохранена без изменения.",
+      "observed_pairs": [
+        {
+          "requested_name": "Value",
+          "actual_name": "Value",
+          "display_name": "Value"
+        },
+        {
+          "requested_name": "Сумма",
+          "actual_name": "Summa",
+          "display_name": "Value"
+        },
+        {
+          "requested_name": "Value Total",
+          "actual_name": "Value_Total",
+          "display_name": "Value"
+        },
+        {
+          "requested_name": "1Value",
+          "actual_name": "_1Value",
+          "display_name": "Value"
+        },
+        {
+          "requested_name": "Value",
+          "actual_name": "Value",
+          "display_name": "Сумма ё"
+        }
+      ],
+      "normalization_algorithm_verified": false,
+      "add_column_verified": false,
+      "rule": "Это конкретные наблюдения, не общий алгоритм. Не переносить результат на AddColumn, пустые имена или коллизии без проверки."
+    },
+    "declared_columns": {
+      "max_columns": 64,
+      "default_data_kind": {
+        "boolean": "Дискретный",
+        "datetime": "Непрерывный",
+        "real": "Непрерывный",
+        "integer": "Непрерывный",
+        "string": "Дискретный"
+      },
+      "required_fields": [
+        "name",
+        "label",
+        "type",
+        "data_kind",
+        "usage"
+      ],
+      "scope": "Existing managed column writer contract; selecting a non-default data kind is unsupported."
+    },
+    "knowledge_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}

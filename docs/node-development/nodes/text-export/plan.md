@@ -1,5 +1,118 @@
 # Текстовый экспорт: подплан для Multica
 
+## LAB-1011: предложение расширений v0.4.0, 2026-11-07
+
+База `origin/v040@35e83289792225b153ce2ffd6f62f708c16800b4`, хост mas2.
+Это облегчённый этап 0: runtime не меняется, CLI не собирается. Критерии ниже
+**предложены, не утверждены**; прежняя приёмка на новые режимы не переносится.
+Полный объём **blocked**: в текстовом мастере не найден регулятор точности
+чисел/денежных сумм; ANSI/Windows(0) и ASCII/MS DOS(1) из справки в списке
+этого стенда отсутствуют. Реализуемую часть нельзя молча объявлять всем объёмом.
+
+### Живое исследование
+
+Только `https://app.loginom.ai/app/?testable=true`, Loginom **7.4.2** из экрана
+входа, worker назначенной пары `01a14aa4-14be-7a81-808c-28afe19630ad`.
+Создан собственный черновик Package1 и загружен `lab1011-formats.csv`;
+чужие пакеты не открывались. Управление элементами по `data-tid`, без вызова
+внутренних обработчиков Loginom и без подмены JS. Это операторское исследование,
+не модельный прогон и не PASS приёмки.
+Пакет сохранён как `lab1011-discovery.lgp`, штатно закрыт, выполнен logout;
+после файлового исследования Excel также выполнен logout и закрыт browser.
+
+В палитре: `MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText`.
+Узел имеет `Input_Connection-0`, `Input_Data-1`, `Input_Var-2`; табличного
+выхода нет. При смене представления новый порт не появляется. Публичный вход
+таблицы остаётся 0, `read.ports=[]`, результат — файл, как у delimited.
+
+Префикс controls: `MF;TF-1;WizrdMCF;`.
+
+| Страница / suffix data-tid | Наблюдение |
+|---|---|
+| `ExportTextFileParamsWizard;edtDecimalSeparator;ValueControl` | Отдельно задаётся точка/запятая, native default на аккаунте — запятая |
+| `ExportTextFileParamsWizard` | Разделители, true/false/NULL, форматы даты и времени; полей разрядности чисел, денег или ширины столбцов нет |
+| `ExportTextFilePreviewWizard;edtFormatType;ValueControl;radiofield-1;DisplayEl` | Переключение «Фиксированной ширины»; `radiofield;DisplayEl` — «С разделителями» |
+| `ExportTextFilePreviewWizard;edtDelimiterChar;ValueControl` | При fixed width становится disabled |
+| `ExportTextFilePreviewWizard;edtCodePage;ValueControl;boundlist` | Windows-1250…1258, UTF-8, UTF-16 LE/BE; 0/1 отсутствуют |
+| `…;boundlist;Западноевропейская_(1252)` / `…;UTF-16_LE_(1200)` / `…;UTF-16_BE_(1201)` | Дополнительные кодировки из справки, доступные на этом стенде |
+| `ExportTextFilePreviewWizard;btnActivationPortButton` | После активации собственного CSV статус стал «Активировано» |
+| `ExportTextFilePreviewWizard;taFilePreview` | После fixed width: выравнивание текста слева, чисел справа; автоматическая ширина по содержимому и заголовку |
+
+Для Code/Amount/Money наблюдалась строка заголовка `Code   Amount   Money` и
+первая строка `А    1234,567   9,999`: дробные части сохраняются, два знака
+автоматически не добавляются. Это textarea preview, а не побайтовый результат
+скачивания: BOM, CRLF и последняя строка им не доказываются. Длину 21 символ
+можно независимо получить из ширин 4/8/7 и двух пробелов между полями.
+Ручных ширин, валютного символа или маски `0.00` в обеих страницах не обнаружено.
+
+[Справка](https://help.loginom.ru/userguide/integration/export/txt-csv.html)
+сверена 2026-11-07: источник требований, не доказательство доступности режима.
+Не подставлять Windows-1252 вместо системной ANSI или CP866 вместо MS DOS.
+
+### Приёмочный комплект для решения владельца
+
+Все новые материалы — в `acceptance/modes/` и `acceptance/task-*.md`.
+Существующая приёмка CP1251 сохраняется отдельно.
+
+| Задание | Fixture / независимое ожидание | Готовность предложения |
+|---|---|---|
+| `task-fixed-width.md` | `fixtures/formats.csv`, automatic widths 4/8/7, header names, 4 строки по 21 символу, десятичная точка, UTF-8 без BOM, CRLF | Режим есть; точные bytes ещё предстоит принять |
+| `task-encodings.md` | `fixtures/encodings.csv`, весь текст с café/€/Å; CP1252 без BOM, UTF-16 LE/BE с BOM, `;`, header names, CRLF | Все три кодировки есть в UI |
+| `task-number-format.md` | `formats.csv`: Amount `1234.57,-2.50,0.00`, Money `10.00,-12.34,0.00` | **blocked**: controls точности не найдены; не заменять критерий округлением upstream |
+
+`modes/expected.json` — предложение sink-ожиданий (`output_port:null`, `label_any`),
+`modes/oracle.py` — Python stdlib csv/Decimal/codecs, без Loginom и runtime.
+Он независимо строит текст по fixture и правилам, сверяет предложенные строки
+expected, затем **все байты** результата, включая BOM и последний CRLF.
+Числа в исходном CSV должны остаться неизменными. На денежных данных нет
+пограничных половин округления; правило для таких половин этим набором не принимается.
+
+Проверка комплекта: `python3 docs/node-development/nodes/text-export/acceptance/modes/oracle.py --self-check`.
+Файл: та же команда без `--self-check`, с `--case fixed-width|number-format|windows-1252|utf16-le|utf16-be --file <скачанный файл>`.
+Oracle/expected/карточки модели **не передаются**; только бизнес-задание и CSV.
+Стандартная будущая приёмка: ≥2/3 на одном SHA, независимые 2/3, сохранение,
+повторное открытие, cold-аудит **файла**, штатные close/logout, проверки по путям.
+Сценарии ещё не зарегистрированы в run-check; собственный runner не добавляется.
+
+### Размеры и границы будущей реализации
+
+`acceptance/modes/schema-size.mjs` строит документационный проект карточек
+обоих экспортеров через ту же user-v1 проекцию, что budget-test.
+`proposed-card.json` — будущий ответ describe **только для доступной части**,
+не текущая доступность. Все 64-символьные хеш-поля заменены нулями.
+Для отсутствующего числового режима выдуманный параметр не предлагается.
+
+| Бюджет, UTF-8 bytes | База | Предложение |
+|---|---:|---:|
+| Карточка `exports.text`, compact JSON | 3 564 | 3 843 / 12 000 |
+| Строка маршрутизации, без LF | — | 119 / ~200 |
+| Reference узла | 4 887 | 5 354 / 6 000 |
+| `SKILL.md`, обе строки заменены вместе | 39 961 | 39 983 / 40 000 |
+| `dock_node_apply`, model_tool_bytes | 14 539 | 14 559 / 20 000 |
+| full_input_schema_bytes, модели не передаётся | 63 339 | 63 893, без предела |
+
+Базовый `node --test test/model-schema-budget.test.mjs`: 51 PASS.
+Прогноз apply включает только fixed_width/xls, три кодировки и Excel numeric/replace;
+append и числового формата текста в нём нет. Повторять замер при утверждённой реализации.
+До лимита SKILL остаётся **17 Б**; расширения нужно держать в reference.
+
+Затрагиваемые собственные обработчики: `client/lib/text-export-{node,parameters,context,procedure}.mjs`.
+В context сейчас явный отказ `export_fixed_width_or_variable`; parameters
+допускает лишь delimited и UTF-8/CP1251. Требуются адресные red→green проверки.
+Оценка доступной текстовой части: **2–3 цикла** (UI/кодировки; bytes/сохранение/cold;
+при необходимости отказ/регрессия), без обещания срока отсутствующего числового режима.
+
+Общие места: декларативные добавления в `node-api.mjs`/`node-contracts.mjs`,
+адресное описание радио fixed width в `workspace-ui.mjs`, расширение allowlist
+`.txt` в `storage-policy.mjs` (сейчас export destination допускает CSV/TSV/XLSX/LGD),
+существующие run-check/cold для новых файлов. Новые механизмы верификации,
+изменение дедлайна и бюджета не предлагаются. Добавление отдельного нового
+поведения общего verifier сверх текущих аддитивных маршрутов требует решения владельца.
+
+Решение до правки runtime: утвердить доступную часть и отдельно определить судьбу
+двух знаков в текстовом файле и недоступных 0/1, либо указать штатный UI-маршрут.
+Ни критерий, ни исходные данные под observed preview не ослабляются.
+
 Статус: `reverification_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
 Component ID: `component.exports.Text`, slug `text-export`. Runtime type и режимы: `exports.text` / `delimited` — закреплены.
 База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
