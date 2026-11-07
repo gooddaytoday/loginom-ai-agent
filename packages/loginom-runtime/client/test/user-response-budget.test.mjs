@@ -223,3 +223,11 @@ test('real bridge MCP protocol retains knowledge after a refused prepare and con
  assert.match(result.stdout,/# pass 1/);
  assert.match(result.stdout,/# fail 0/);
 });
+
+test('local open_package delivers its first full knowledge bundle and retains geometry only locally',async()=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+   new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+   env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_OPEN_PACKAGE:'1'}});
+ assert.match(result.stdout,/# pass 1/);
+ assert.match(result.stdout,/# fail 0/);
+});
