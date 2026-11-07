@@ -12,7 +12,7 @@ test('C3 production capability selects the exact range, toggles extension and in
   await page.setContent('<main></main>');
   await page.evaluate(({root,file,defs,grid})=>{
    const add=(tag,tid,parent=document.querySelector('main'))=>{const e=document.createElement(tag);e.dataset.tid=tid;parent.append(e);return e;};
-   const wizard=add('div',root),panels=Array.from({length:4},(_,i)=>add('section','panel'+i,wizard));
+   const wizard=add('div',root),panels=Array.from({length:4},(_,i)=>add('section',i===0?file.slice(0,-1):'panel'+i,wizard));
    let stage=0;
    const render=()=>panels.forEach((p,i)=>p.style.display=i===stage?'block':'none');
    const input=(tid,value)=>{const e=add('div',tid,panels[0]);add('input',tid+';input',e).value=value;return e;};
