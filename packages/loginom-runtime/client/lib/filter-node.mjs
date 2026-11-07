@@ -13,6 +13,7 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function validateFilterParameters(p,mode,r){
  if(r.bindings?.length){
+  need(!p.groups?.flat().some(c=>isFilterVariable(c.values)),'BINDING_PARAMETER_UNSUPPORTED: variable lists cannot be combined with bindings');
   need(r.target.kind==='existing'||r.variable_inputs?.some(i=>i.kind==='control'&&i.input===0),'BINDING_PORT_MISMATCH: control input 0 requires one source');
   if(p.groups!==undefined)p=resolveFilterBindings(p,r.bindings);
   else need(r.target.kind==='existing','New filter bindings require groups');
@@ -50,6 +51,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
   let changed,controlVariables;
   if(request.bindings?.length){
    const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
+   need(!s.node_filter.rows.some(r=>r.variable_mode===128),'BINDING_PARAMETER_UNSUPPORTED: saved variable lists cannot be combined with bindings');
    preserveFilterBindings(s.node_filter,p,request.bindings);
    if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
     [...request.bindings.map(b=>b.variable.name),...s.node_filter.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
