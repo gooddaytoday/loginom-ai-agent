@@ -591,6 +591,11 @@ Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
 Its catalog cases remain historical reproductions for the diagnostic SHA;
 current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 
+`linreg-stepwise-f`: C3, исходный task-stepwise.md и только selection.csv.
+Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.json, оба typed
+порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
+
+
 
 
 `logreg-apply`: обучение Enter на train.csv, затем замена источника того же

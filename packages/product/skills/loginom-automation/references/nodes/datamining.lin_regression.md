@@ -19,3 +19,7 @@
 ## Режим backward
 
 Для пошагового исключения факторов выбирай `datamining.lin_regression`, `mode:"backward"` в `dock_node_apply`. Импорт, числовые типы, роли, обучение, чтение обоих портов, CSV и Save — как в forward выше. Передай `parameters.input_fields`, `target_field` и `linear_regression.selection.criterion:"f"`; `remove_significance:0.1` — порог исключения, `add_significance:0.05` — проверка отключённого сохранённого порога добавления. Настраиваемый порог исключения должен быть строго между 0 и 1. Для adjusted_r2/aic/aicc/bic/hqc пороги не передавай. R² (`r2`) отклоняется до эффекта с `NOT_APPLIED`, `effect_possible:false`; сообщи причину пользователю. Используй native Backward вместо Калькулятора или JS. Сохранение и повторное открытие должны сохранять метод и выбранные факторы без перенастройки.
+
+## Режим stepwise
+
+Для отбора с включением и исключением факторов используй `dock_node_apply`, тип `datamining.lin_regression`, `mode:"stepwise"`, вместо Калькулятора или JS. Импорт, типы и роли — как в forward. Передай `parameters.input_fields`, `target_field`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются: строго 0..1, добавление меньше исключения. `finish:"execute"` обучает, затем исполняет; читай оба порта `read.ports:[0,1]`, экспортируй прогнозы с порта 0 и сохрани пакет. После открытия исполняй сохранённый граф без перенастройки. R² (`r2`) отклоняется до эффекта; сообщи причину, не заменяй критерий.
