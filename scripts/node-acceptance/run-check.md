@@ -572,3 +572,7 @@ two variables. Task and transactions.csv reach the model; independent stage-0
 oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
+
+`linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
+Forward task. Independent mode oracle expectations remain private. Both typed
+outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.

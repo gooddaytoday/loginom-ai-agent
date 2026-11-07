@@ -333,6 +333,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['linreg-forward-f', 'linreg-forward-r2']:
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        variant = name.removeprefix('linreg-')
+        return dict(source=node / 'acceptance/modes',
+                    prompt=node / ('acceptance/modes/task-forward-r2.md' if variant == 'forward-r2' else 'acceptance/modes/task-forward.md'),
+                    data=node / 'fixtures/modes', input_files=['selection.csv'], base=None,
+                    expected_name='expected/' + variant + '.json', oracle=node / 'acceptance/modes/oracle.py')
     if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
                 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',
                 'logreg-stepwise-strict', 'logreg-stepwise-permissive']:

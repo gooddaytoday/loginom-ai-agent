@@ -72,7 +72,7 @@ RULES = (
     ((C + 'coarse-classes-*.mjs',), ('live-ui',), ('coarse-classes-train', 'coarse-classes-apply')),
     ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
-    ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
+    ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4', 'linreg-forward-f', 'linreg-forward-r2')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
     (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
