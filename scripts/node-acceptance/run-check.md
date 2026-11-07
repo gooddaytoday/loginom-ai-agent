@@ -586,3 +586,15 @@ entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
 Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
 Its catalog cases remain historical reproductions for the diagnostic SHA;
 current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
+
+
+
+`logreg-apply`: обучение Enter на train.csv, затем замена источника того же
+импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
+`datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
+3×8 ячеек, NULL Target/ActualEvent, точные типы и порядок, CSV/Save/cold.
+
+`logreg-coefficients`: Enter на train.csv, полная таблица коэффициентов порта 1,
+2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
+`modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
+точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.

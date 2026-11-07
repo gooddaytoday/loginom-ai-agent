@@ -1,0 +1,14 @@
+{
+  "base_sha": "4b202757f6d0021160dd4dfc104ee788ae33cbec",
+  "model_tool_bytes": 14539,
+  "full_input_schema_bytes": 63280,
+  "baseline_type_card_bytes": 4276,
+  "proposed_type_card_bytes": 6103,
+  "type_card_limit": 12000,
+  "skill_bytes": 39954,
+  "skill_limit": 40000,
+  "routing_proposal_bytes": 95,
+  "node_reference_proposal_bytes": 3682,
+  "node_reference_limit": 6000,
+  "note": "Manual-mode proposal only; auto/calibration/bindings are separate cycles. Full input schema has no limit. Compact apply is unchanged because it routes via the type card."
+}

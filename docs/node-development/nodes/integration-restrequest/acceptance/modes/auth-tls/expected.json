@@ -1,0 +1,47 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "auth-tls.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "AuthMode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Authenticated",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "AuthMode": "Basic",
+          "Authenticated": true,
+          "HttpStatusCode": 200
+        },
+        {
+          "AuthMode": "Bearer",
+          "Authenticated": true,
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}
