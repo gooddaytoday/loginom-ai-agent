@@ -32,22 +32,22 @@ test('node guidance uses the prepared bundle and selects common plus requested m
 test('new and existing apply require a delivered card since the latest preparation',()=>{
  const bindings=createUserWorkflowBindings();
  for(const kind of ['new','existing']){
-  const request={target:{kind,type:'transform.sorting'}};
+  const request={mode:'keys',target:{kind,type:'transform.sorting'}};
   const refused=bindings.checkNodeDescription(request);
   assert.equal(refused.error.code,'NODE_TYPE_NOT_DESCRIBED');
   assert.equal(refused.effect_possible,false);assert.equal(refused.status,'NOT_APPLIED');
-  assert.deepEqual(refused.next_step.arguments,{node_types:['transform.sorting']});
+  assert.deepEqual(refused.next_step.arguments,{node_types:['transform.sorting'],modes:['keys']});
  }
- bindings.rememberDescriptions({node_types:[{type:'transform.sorting'}]});
- assert.equal(bindings.checkNodeDescription({target:{type:'transform.sorting'}}),null);
- assert.equal(bindings.checkNodeDescription({target:{type:'imports.text'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
+ bindings.rememberDescriptions({node_types:[{type:'transform.sorting',modes:['keys']}]},['keys']);
+ assert.equal(bindings.checkNodeDescription({mode:'keys',target:{type:'transform.sorting'}}),null);
+ assert.equal(bindings.checkNodeDescription({mode:'keys',target:{type:'imports.text'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
  bindings.resetDescriptions();
- assert.equal(bindings.checkNodeDescription({target:{type:'transform.sorting'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
+ assert.equal(bindings.checkNodeDescription({mode:'keys',target:{type:'transform.sorting'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
  bindings.remember({document_id:'one',workflow_ref:{workflow_id:'workflow',navigation_path:[]}});
- bindings.rememberDescriptions({node_types:[{type:'transform.sorting'}]});
- assert.equal(bindings.checkNodeDescription({document_id:'one',target:{type:'transform.sorting'}}),null);
+ bindings.rememberDescriptions({node_types:[{type:'transform.sorting',modes:['keys']}]},['keys']);
+ assert.equal(bindings.checkNodeDescription({document_id:'one',mode:'keys',target:{type:'transform.sorting'}}),null);
  bindings.remember({document_id:'two',workflow_ref:{workflow_id:'workflow',navigation_path:[]}});
- assert.equal(bindings.checkNodeDescription({document_id:'two',target:{type:'transform.sorting'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
+ assert.equal(bindings.checkNodeDescription({document_id:'two',mode:'keys',target:{type:'transform.sorting'}}).error.code,'NODE_TYPE_NOT_DESCRIBED');
 });
 
 test('compact apply omits type branches and modes while retaining resolvable shared definitions',()=>{
@@ -56,4 +56,19 @@ test('compact apply omits type branches and modes while retaining resolvable sha
  assert.equal(tool.inputSchema.allOf,undefined);
  const refs=JSON.stringify(tool.inputSchema).matchAll(/"\$ref":"#\/\$defs\/([^"]+)"/g);
  for(const [,key] of refs)assert.ok(tool.inputSchema.$defs[key],key);
+});
+
+test('admission requires the selected mode, never an index or another type mode',()=>{
+ const b=createUserWorkflowBindings();
+ const cards={node_types:[{type:'transform.sorting',modes:['keys']},{type:'transform.filter_data',modes:['conditions']}]};
+ const sorting={mode:'keys',target:{type:'transform.sorting'}};
+ const filter={mode:'conditions',target:{type:'transform.filter_data'}};
+ b.rememberDescriptions(cards);
+ assert.equal(b.checkNodeDescription(sorting).error.code,'NODE_TYPE_NOT_DESCRIBED');
+ b.rememberDescriptions(cards,['keys']);
+ assert.equal(b.checkNodeDescription(sorting),null);
+ assert.equal(b.checkNodeDescription(filter).error.code,'NODE_TYPE_NOT_DESCRIBED');
+ assert.deepEqual(b.checkNodeDescription(filter).next_step.arguments,{node_types:['transform.filter_data'],modes:['conditions']});
+ b.rememberDescriptions(cards,['conditions']);
+ assert.equal(b.checkNodeDescription(filter),null);
 });

@@ -71,7 +71,7 @@ export function userNodeTool(tool) {
   copy.inputSchema.properties={finish:copy.inputSchema.properties.finish,...copy.inputSchema.properties};
   copy.description = tool.name==='dock_node_resume'
     ? 'Continue the original node operation with identical original parameters after inspecting it. Never repeat an unresolved effect with a new ID.'
-    : 'Create or update ONE node. Include REQUIRED top-level finish beside parameters: "finish":"execute" runs and reads output, "done" commits only, "close" discards. First read dock_action_describe({node_types:[type]}).parameter_schema. Use issued document_id/workflow_id; choose analytical settings yourself. Position, mappings and read are optional; deadlines are managed. Wait on the SAME operation_id; save the package separately.';
+    : 'Create or update ONE node. Include REQUIRED top-level finish beside parameters: "finish":"execute" runs and reads output, "done" commits only, "close" discards. First read dock_action_describe({node_types:[type],modes:[mode]}) for rules and parameter_schema. Use issued document_id/workflow_id; choose analytical settings yourself. Position, mappings and read are optional; deadlines are managed. Wait on the SAME operation_id; save the package separately.';
   return copy;
 }
 
@@ -85,15 +85,16 @@ export function createUserWorkflowBindings() {
     && a.every((part, i) => part.tid === b[i].tid && part.label === b[i].label);
   return {
     resetDescriptions() { described.clear(); },
-    rememberDescriptions(description) {
-      for(const card of description.node_types??[])described.add(card.type);
+    rememberDescriptions(description, modes=[]) {
+      for(const card of description.node_types??[])for(const mode of modes)
+        if(card.modes?.includes(mode))described.add(JSON.stringify([card.type,mode]));
     },
     checkNodeDescription(request) {
-      if(described.has(request.target?.type)&&(!describedDocument||describedDocument===request.document_id))return null;
+      if(described.has(JSON.stringify([request.target?.type,request.mode]))&&(!describedDocument||describedDocument===request.document_id))return null;
       return {result_version:'user-v1',operation_id:request.operation_id??null,
         status:'NOT_APPLIED',phase:'request_rejected',request_rejected:true,effect_possible:false,cleanup_complete:true,
         error:{code:'NODE_TYPE_NOT_DESCRIBED',message:'Read the node card in this prepared session before creating or changing this node.'},
-        next_step:{tool:'dock_action_describe',arguments:{node_types:[request.target?.type]},
+        next_step:{tool:'dock_action_describe',arguments:{node_types:[request.target?.type],modes:[request.mode]},
           instruction:'Read guidance and parameter_schema; select modes to read their rules. Then submit the node request. No node operation started.'}};
     },
     rememberDelivery(result,request) {

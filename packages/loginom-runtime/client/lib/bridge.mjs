@@ -513,7 +513,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 skill_revision:session.metadata.skillRevision});
             }
             await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
-            if(reply.isError!==true)userWorkflows.rememberDescriptions(description);
+            if(reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
             return reply;
             });
           }
