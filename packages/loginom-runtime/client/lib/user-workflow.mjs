@@ -18,7 +18,7 @@ export function userActionInventory(value) {
   for(const key of ['ui_action_tool','artifact_upload_tool','artifact_verify_tool'])delete copy[key];
   // JS knowledge already carries these exact facts; deliver them once, intact.
   for(const node of copy.node_types??[])if(node.type==='programming.javascript'&&node.javascript_knowledge){
-    for(const key of ['limitations','validated_for','knowledge_sha256'])
+    for(const key of ['limitations'])
       if(JSON.stringify(node[key])===JSON.stringify(node.javascript_knowledge[key]))delete node[key];
   }
   for(const node of copy.node_types??[])if(node.type==='exports.text'&&node.parameter_schema){
