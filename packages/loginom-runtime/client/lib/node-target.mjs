@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {createRedactor} from './redact.mjs';
-import {nodeOutputForJournal} from './node-support.mjs';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
@@ -105,6 +104,7 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
       effects:state.receipts.map(({id,kind,verified})=>({id,kind,verified})),configured:false,executed:false,package_saved:false}};
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:settled};
   const ack=await record(event);
+  const {nodeOutputForJournal}=await import('./node-support.mjs');
   if(!same(ack?.target_state,nodeOutputForJournal(event,createRedactor()).target_state))throw Error('Node target journal acknowledgement differs');
   Object.assign(state,settled);
   return true;
@@ -129,6 +129,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     // retain original graph refs and receipts in the live target state.
     const event = { operation_id: operation.id, phase, internal_provenance: 'node_target_v1', ...structuredClone(detail) };
     const ack = await record(event);
+    const {nodeOutputForJournal}=await import('./node-support.mjs');
     const expected = nodeOutputForJournal(event,createRedactor());
     if (!ack || !same(ack[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'], expected[phase === 'node_target_effect_prepared' ? 'effect' : phase === 'node_target_refusal_observed' ? 'refusal' : 'target_state'])) throw new Error('Node target journal acknowledgement differs');
   };
