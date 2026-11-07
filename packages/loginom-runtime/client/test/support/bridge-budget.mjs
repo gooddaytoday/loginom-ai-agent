@@ -21,6 +21,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const compatibility={profile_id:'loginom-7.4.2-linux-chromium-ru',loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
  const catalog=await createActionCatalogFixture(compatibility);
  const openPackage=process.env.LOGINOM_TEST_OPEN_PACKAGE==='1';
+ const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;
  const account='lab-66-monkey-'+'a'.repeat(36),documentId='d'.repeat(36),operationId='o'.repeat(36);
  let packageArtifact;
  const workflow=()=>({tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-2',prefix:'MF;TF-2',
@@ -100,7 +101,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
     endpoint:'http://memory.invalid/mcp',apiKey:'UNIT_NONSECRET',loginomUrl:'http://loginom.test/app/',
     mode:'executor-replay',resultProfile:'user-v1',stateDir:directory,
-    ...(openPackage?{storageDirectories:{inputs:'/'+account,packages:'/'+account,exports:'/'+account}}:{})},session);
+    ...(openPackage||threeFiles?{storageDirectories:{inputs:'/'+account,packages:'/'+account,exports:'/'+account}}:{})},session);
   client=new Client({name:'budget-protocol-client',version:'1'});
   const [agentTransport,bridgeTransport]=InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(agentTransport),bridge.server.connect(bridgeTransport)]);
@@ -110,6 +111,38 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const inventory=await call('dock_action_describe');
   assert.ok(parse(inventory).available_node_types.includes('programming.javascript'));
   assert.equal(browserCalls,0);
+
+  if(threeFiles){
+   const root=new URL('../../../../../',import.meta.url);
+   const data=new URL(threeFiles==='s4'
+    ?'docs/testing/loginom-ai-agent/demo-2026-10-22/s4-branches/data/'
+    :'docs/node-development/nodes/union/acceptance/union-auto-match/data/',root);
+   const names=threeFiles==='s4'?['central.csv','north.csv','south.csv']:['main.csv','second.csv','third.csv'];
+   const inputs=await Promise.all(names.map(async(name,index)=>{
+    const sourcePath=new URL(name,data).pathname,buffer=await readFile(sourcePath);
+    return session.artifactStore.admit({sourcePath,name:'a'.repeat(64)+'-'+index+'-'+name,bytes:buffer.length,
+     sha256:createHash('sha256').update(buffer).digest('hex'),upload:{directory:'/'+account,overwrite:'reject'}});
+   }));
+   const prepared=await call('dock_prepare'),delivered=parse(prepared);
+   t.diagnostic(threeFiles+' prepare envelope bytes: '+size(prepared));
+   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+   assert.ok(size(prepared)<=43000,'three-file prepare must leave at least 3000 bytes of wire headroom');
+   assert.deepEqual(delivered.input_artifacts,session.artifactStore.list());
+   for(const input of inputs)assert.deepEqual(delivered.input_artifacts.find(item=>item.artifact_id===input.artifact_id),input);
+   const diagnosticPath=join(directory,'diagnostics',createHash('sha256').update('dock:'+session.metadata.sessionId).digest('hex'),'events.jsonl');
+   const retained=JSON.parse((await readFile(diagnosticPath,'utf8')).trim().split('\n')[0]).result;
+   assert.deepEqual(delivered.knowledge,retained.knowledge);
+   assert.ok(delivered.knowledge.session_manifest.actionManifestDigest);
+   for(const node of delivered.knowledge.node_types){
+    assert.equal(node.cache_key,undefined);
+    const described=parse(await call('dock_action_describe',{node_types:[node.type]})).node_types[0];
+    assert.match(described.cache_key,/^[a-f0-9]{64}$/);
+    for(const key of Object.keys(node))assert.deepEqual(node[key],described[key],node.type+': '+key);
+   }
+   const imported=parse(await call('dock_action_describe',{node_types:['imports.text']})).node_types[0];
+   assert.ok(imported.parameter_schema);
+   return;
+  }
 
   if(openPackage){
    // Local package and CSV names have the same host-admission lengths as a
