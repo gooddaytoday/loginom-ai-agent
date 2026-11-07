@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {parseExpectedOutputs} from '../expected-outputs.mjs';
 
-for(const name of ['excel-import-sheet','excel-import-wide','excel-import-single'])test(name+' resolves only its original XLSX and user task',()=>{
+for(const name of ['excel-import-sheet','excel-import-wide','excel-import-single','excel-import-columns','excel-import-headers'])test(name+' resolves only its original XLSX and user task',()=>{
  const result=spawnSync('python3',['-B','-c',`import importlib.util
 s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 c=m.scenario('${name}');assert c['prompt'].name=='task.md'

@@ -50,6 +50,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   assert.equal(card.candidate_node_apply_available,true,card.type);
   assert.ok(card.parameter_schema,`${card.type}: missing parameter_schema`);
   const size=bytes(card),budget=NODE_CARD_BUDGET_EXCEPTIONS[card.type]??12000;
+  if(card.type==='datamining.log_regression')t.diagnostic(JSON.stringify({log_regression_card_bytes:size}));
   assert.ok(size<=budget,`${card.type}: ${size} bytes; budget ${budget} bytes; headroom ${budget-size} bytes`);
  });
 });

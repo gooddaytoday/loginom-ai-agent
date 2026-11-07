@@ -62,6 +62,8 @@ Oracle/expected не передаются модели.
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-columns` checks all 16 integer fields, including C16;
+`excel-import-headers` skips 11 header rows and checks both compound names.
 `excel-import-single` retains the original three-field, first-sheet fixture.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
@@ -584,3 +586,30 @@ HTTP-коды читает отдельно на порту 1. Python oracle и 
 PASS с cold; затем n11/r5/r6 по одному на том же SHA (решение LAB-985).
 Прежний восьмистрочный methods-body оставлен только как неактивный пример:
 в каталоге run-check и required-checks его нет.
+
+
+`linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
+Forward task. Independent mode oracle expectations remain private. Both typed
+outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
+The C1 adapter supplies the three intrinsic labels already defined by the
+production coefficient/prediction output contract. Oracle numeric types, IDs,
+values and tolerances remain exact; integer predictors are never relaxed to real.
+
+`linreg-forward-r2-cutoffs`: owner-authorized R² diagnostic with explicit native
+entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
+
+Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
+Its catalog cases remain historical reproductions for the diagnostic SHA;
+current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
+
+
+
+`logreg-apply`: обучение Enter на train.csv, затем замена источника того же
+импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
+`datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
+3×8 ячеек, NULL Target/ActualEvent, точные типы и порядок, CSV/Save/cold.
+
+`logreg-coefficients`: Enter на train.csv, полная таблица коэффициентов порта 1,
+2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
+`modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
+точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.

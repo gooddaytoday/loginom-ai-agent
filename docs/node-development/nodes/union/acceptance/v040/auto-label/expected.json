@@ -1,0 +1,76 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.union_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.union_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Code",
+          "type": "string",
+          "label": "Код"
+        },
+        {
+          "name": "Backup",
+          "type": "string",
+          "label": "Резерв"
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label": "Сумма"
+        }
+      ],
+      "rows": [
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 10
+        },
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 10
+        },
+        {
+          "Code": "B",
+          "Backup": "Y",
+          "Amount": 20
+        },
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 10
+        },
+        {
+          "Code": "A",
+          "Backup": "Q",
+          "Amount": 10
+        },
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 11
+        },
+        {
+          "Code": "C",
+          "Backup": "Z",
+          "Amount": 30
+        },
+        {
+          "Code": "C",
+          "Backup": "Z",
+          "Amount": 30
+        }
+      ]
+    }
+  ]
+}

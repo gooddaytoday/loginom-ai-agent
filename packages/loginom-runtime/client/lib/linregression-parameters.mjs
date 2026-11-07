@@ -1,9 +1,20 @@
 const need=(value,message)=>{if(!value)throw Error('Linear regression: '+message);};
 export function validateLinRegressionParameters(p,mode,r){
- need(['enter','apply'].includes(mode),'only Enter (enter) and apply with an intercept and no normalization are supported');
- need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field'].includes(k)),'use input_fields and target_field');
+ need(['enter','apply','forward','backward'].includes(mode),'only Enter (enter), Forward (forward), Backward (backward) and apply with an intercept and no normalization are supported');
+ need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','linear_regression'].includes(k)),'use input_fields and target_field');
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(n=>typeof n==='string'&&n.length>0&&n.length<=128),'input_fields must list continuous numeric predictors by their technical names');
  need(typeof p.target_field==='string'&&p.target_field.length>0&&p.target_field.length<=128,'target_field must name one continuous numeric response');
+ if(p.linear_regression!==undefined){
+  const settings=p.linear_regression;
+  need(['forward','backward'].includes(mode)&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward/backward');
+  const selection=settings.selection;
+  if(selection!==undefined){
+   need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','add_significance','remove_significance'].includes(k)),'invalid selection settings');
+   need(selection.criterion!=='r2','R² пока недоступен: критерий не прошёл native-приёмку. Запрос отклонён до изменений Loginom.');
+   need(['f','r2','adjusted_r2','aic','aicc','bic','hqc'].includes(selection.criterion),'unknown selection criterion');
+   for(const key of ['add_significance','remove_significance'])if(selection[key]!==undefined)need(selection.criterion==='f'&&Number.isFinite(selection[key])&&selection[key]>0&&selection[key]<1,'invalid or inapplicable '+key);
+  }
+ }
  const names=[...p.input_fields,p.target_field];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors must be distinct from each other and from the target');
  if(r){
   if(mode==='apply')need(r.target.kind==='existing'&&r.inputs.length===0&&r.finish==='execute','apply requires an existing trained model, unchanged connections and finish execute');
@@ -13,7 +24,7 @@ export function validateLinRegressionParameters(p,mode,r){
  }
 }
 export function resolveLinRegressionRoles(p,fields){
- validateLinRegressionParameters(p,'enter');
+ const {linear_regression,...roles}=p;validateLinRegressionParameters(roles,'enter');
  need(Array.isArray(fields)&&fields.length>0&&new Set(fields.map(f=>f.name?.toLowerCase())).size===fields.length,'complete unique input schema required');
  for(const name of [...p.input_fields,p.target_field]){
   const field=fields.find(f=>f.name===name);

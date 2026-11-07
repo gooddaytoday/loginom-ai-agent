@@ -1,0 +1,53 @@
+{
+  "status": "proposal_pending_owner_decision",
+  "api_type": "transform.calculator",
+  "api_mode": "expression",
+  "input": "modes.csv",
+  "input_types": {"RowID": "integer", "Quantity": "integer", "UnitPrice": "integer", "Amount": "integer"},
+  "initial_order": ["Amount", "Helper", "Bare", "FromField", "FromExpr", "JsTotal"],
+  "final_order": ["Amount", "Helper", "Bare", "FromField", "JsTotal", "FromExpr"],
+  "output_order": ["RowID", "Quantity", "UnitPrice", "Amount", "Bare", "FromField", "JsTotal", "FromExpr"],
+  "expressions": [
+    {
+      "name": "Amount", "type": "integer", "replace": true, "intermediate": false, "cached": false,
+      "expression": "Quantity * UnitPrice",
+      "javascript": "return Quantity === null ? null : Quantity * UnitPrice;"
+    },
+    {
+      "name": "Helper", "type": "integer", "replace": false, "intermediate": true, "cached": true,
+      "expression": "Field.Amount + 1",
+      "javascript": "return Amount + 1;"
+    },
+    {
+      "name": "Bare", "type": "integer", "replace": false, "intermediate": false, "cached": false,
+      "expression": "Amount",
+      "javascript": "return Amount;"
+    },
+    {
+      "name": "FromField", "type": "integer", "replace": false, "intermediate": false, "cached": false,
+      "expression": "Field.Amount",
+      "javascript": "return Amount;"
+    },
+    {
+      "name": "FromExpr", "type": "integer", "replace": false, "intermediate": false, "cached": false,
+      "expression": "Expr.Amount",
+      "javascript": "return this.Expr.Amount;"
+    },
+    {
+      "name": "JsTotal", "type": "integer", "replace": false, "intermediate": false, "cached": false,
+      "expression": "Expr.Helper + Expr.Helper",
+      "javascript": "return this.Expr.Helper + this.Expr.Helper;"
+    }
+  ],
+  "negative_proposals": {
+    "javascript_syntax": "return (Quantity *;",
+    "javascript_runtime_observed": "return this.Field.Amount;"
+  },
+  "limitations": [
+    "One syntax for the entire node; switching it does not translate formulas.",
+    "JavaScript criteria: ждёт решения по расхождению. Three earlier native outputs had NULL JsTotal; after five one-formula trials the original formula matched arithmetic. Cause unresolved; never change the oracle to NULL.",
+    "Loginom Field/Expr numerical behavior and native error recovery remain to be investigated.",
+    "Caching criterion covers observed flag persistence and deterministic arithmetic, not evaluation counts or performance.",
+    "No scenario variables, Variant, require, asynchronous code or recursive Data() in this proposal."
+  ]
+}
