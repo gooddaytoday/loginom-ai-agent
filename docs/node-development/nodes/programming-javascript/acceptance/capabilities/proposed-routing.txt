@@ -1,0 +1,1 @@
+| JS / 2 таблицы | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
