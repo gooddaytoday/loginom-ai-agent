@@ -15,10 +15,12 @@ export async function excelConfigureCapability(page,t,readContext){
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
   const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
-  const point=locator=>{
+  const point=(locator,settled)=>{
    waitingFor=String(locator);
    return wait('Excel control reachable: '+locator,async()=>{
-   await quiet();await guard();const count=await locator.count();
+   await quiet();await guard();
+   if(settled&&await settled())return {selected:true};
+   const count=await locator.count();
    // Choosing a named object remounts dependent controls after the native mask
    // has gone. Wait before a gesture; multiple owners still refuse immediately.
    if(count===0&&t.excel.named_range!==undefined)return null;
@@ -27,16 +29,21 @@ export async function excelConfigureCapability(page,t,readContext){
     if(r.width<=0||r.height<=0||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))return null;return{x,y};});
    }).then(p=>{waitingFor=null;return p;});
   };
-  const click=async(locator,double=false)=>{await quiet();await guard();const p=await point(locator);effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
+  const click=async(locator,double=false,settled)=>{await quiet();await guard();const p=await point(locator,settled);if(p.selected)return;effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
   const fill=async(locator,value)=>{await quiet();await guard();await point(locator);effect=true;await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
   const choose=async(owner,value,optionTid)=>{
    const input=find(owner).locator('input:not([type="hidden"])');
    if(await input.inputValue()===value)return;
    const picker=find(owner+';trg_picker');await click(picker);
    const portal=find(owner+';boundlist');
-   await wait('owned dropdown',()=>portal.isVisible());
+   const selected=optionTid?()=>input.inputValue().then(v=>v===value):undefined;
+   await wait('owned dropdown',async()=>selected&&await selected()||await portal.isVisible());
    const option=optionTid?find(optionTid):portal.getByRole('option',{name:value,exact:true});
-   await click(option);await wait('selected dropdown value',()=>input.inputValue().then(v=>v===value));
+   await click(option,false,selected);await wait('selected dropdown value',()=>input.inputValue().then(v=>v===value));
+   if(optionTid&&await portal.isVisible()){
+    await quiet();await guard();await point(input);effect=true;await input.press('Escape');
+    await wait('named dropdown closed',async()=>!await portal.isVisible());
+   }
   };
   const panel=()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FCardLayout.getActiveItem().id);
   const advance=async()=>{const before=await panel();await click(find(root+';btnNext'));await wait('wizard page transition',async()=>{

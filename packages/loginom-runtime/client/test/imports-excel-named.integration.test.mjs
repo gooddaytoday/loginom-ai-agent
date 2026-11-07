@@ -18,10 +18,17 @@ test('C3 production capability selects the exact range, toggles extension and in
    const input=(tid,value)=>{const e=add('div',tid,panels[0]);add('input',tid+';input',e).value=value;return e;};
    const combo=(tid,value,options)=>{
     const e=input(tid,value),picker=add('button',tid+';trg_picker',e);picker.textContent='Choose';
-    picker.onclick=()=>{const portal=add('div',tid+';boundlist',e);
+    picker.onclick=()=>{document.querySelector('[data-tid='+JSON.stringify(tid+';boundlist')+']')?.remove();const portal=add('div',tid+';boundlist',e);
      for(const value of options){const option=add('div',tid+';boundlist;'+value,portal);option.setAttribute('role','option');option.textContent=value+(value.startsWith('SalesRange')?' Data':'');
       option.onclick=()=>{e.querySelector('input').value=value;portal.remove();};}
+     if(window.autoSelectNamed&&tid===file+'cbbTableName;ValueContainer;cbx'){
+      e.querySelector('input').value='SalesRange';
+      if(window.autoSelectNamed!== 'keep-open')portal.style.display='none';
+     }
     };
+    e.querySelector('input').addEventListener('keydown',event=>{
+     if(event.key==='Escape')document.querySelector('[data-tid='+JSON.stringify(tid+';boundlist')+']')?.remove();
+    });
    };
    input(file+'edtFileName;ValueControl','/worker/named.xlsx');
    combo(file+'cbbTableNamingMethod;ValueControl','По номеру',['По номеру','По имени','Именованный диапазон']);
@@ -59,9 +66,19 @@ test('C3 production capability selects the exact range, toggles extension and in
    assert.deepEqual(result.configuration.columns.map(c=>c.name),['Id','Amount']);
    if(inspect)assert.equal(result.configuration.source.sheet_method,'Именованный диапазон');
   }
+  for(const automaticMode of [true,'keep-open']){
+  await page.evaluate(({file,automaticMode})=>{
+   window.reopen();window.autoSelectNamed=automaticMode;
+   document.querySelector('[data-tid='+JSON.stringify(file+'cbbTableName;ValueContainer;cbx')+'] input').value='1';
+  },{file,automaticMode});
+  const automatic=await excelConfigureCapability(page,{deadline:Date.now()+2000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},
+   excel:{source_path:'/worker/named.xlsx',named_range:'SalesRange',extend_range:false,header_rows:1,columns:['Id','Amount'].map(name=>({name,label:name,type:'integer'}))},origin:'null',build:'test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
+  assert.equal(automatic.verified,true,automatic.error);
+  assert.equal(automatic.configuration.source.named_range,'SalesRange');
+  }
   const missing=file+'cbbTableName;ValueContainer;cbx;trg_picker';
   await page.evaluate(({file,missing})=>{
-   window.reopen();
+   window.reopen();window.autoSelectNamed=false;
    document.querySelector('[data-tid='+JSON.stringify(file+'cbbTableNamingMethod;ValueControl')+'] input').value='По номеру';
    document.querySelector('[data-tid='+JSON.stringify(file+'cbbTableName;ValueContainer;cbx')+'] input').value='1';
    document.querySelector('[data-tid='+JSON.stringify(missing)+']').remove();
