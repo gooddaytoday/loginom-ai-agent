@@ -132,6 +132,7 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
  const refused=boundedUserToolReply(all,{tool:'dock_action_describe'}),value=JSON.parse(refused.content[0].text);
  assert.equal(refused.isError,true);assert.equal(value.result_delivery,'refused');
  assert.equal(value.error.scope,'whole_response');assert.equal(value.next_step.tool,'dock_action_describe');
+ assert.match(value.next_step.instruction,/modes/);
  assert.ok(bytes(refused)<2000);assert.equal(JSON.stringify(all),before);
 });
 

@@ -71,6 +71,7 @@ test('new and existing apply require a delivered card since the latest preparati
 
 test('compact apply omits type branches and modes while retaining resolvable shared definitions',()=>{
  const tool=userNodeTool(nodeApiTools.find(tool=>tool.name==='dock_node_apply'));
+ assert.match(tool.inputSchema.properties.parameters.description,/modes:\[mode\]/);
  assert.equal(tool.inputSchema.properties.mode.enum,undefined);
  assert.equal(tool.inputSchema.allOf,undefined);
  const refs=JSON.stringify(tool.inputSchema).matchAll(/"\$ref":"#\/\$defs\/([^"]+)"/g);

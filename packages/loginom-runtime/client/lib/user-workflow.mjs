@@ -56,7 +56,7 @@ export function userNodeTool(tool) {
   // still expose explicit immutable budgets.
   delete copy.inputSchema.properties.budgets;
   copy.inputSchema.properties.parameters={type:'object',properties:{},additionalProperties:true,
-    description:'Type-specific settings. First call dock_action_describe with node_types:[target.type] and follow its parameter_schema.'};
+    description:'Type-specific settings. First call dock_action_describe with node_types:[target.type], modes:[mode]; follow its parameter_schema and guidance.'};
   copy.inputSchema.properties.mode={type:'string',minLength:1,maxLength:128,
     description:'Select a mode from the node card returned by dock_action_describe.'};
   // The full runtime schema and handler still validate type-specific modes,
