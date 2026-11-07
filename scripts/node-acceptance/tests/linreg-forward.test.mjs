@@ -14,6 +14,6 @@ for name in ['linreg-forward-f','linreg-forward-r2']:
 print(json.dumps(out))`],{encoding:'utf8'}));
  assert.deepEqual(result.map(c=>c.files),[['selection.csv'],['selection.csv']]);
  assert.deepEqual(result.map(c=>c.task),['task-forward.md','task-forward-r2.md']);
- for(const c of result){assert.equal(c.expected.package_path,'/worker/c1.lgp');assert.equal(c.expected.outputs.length,2);assert.equal(c.expected.outputs[0].rows.length,16);}
+ for(const c of result){assert.equal(c.expected.package_path,'/worker/c1.lgp');assert.equal(c.expected.outputs.length,2);assert.equal(c.expected.outputs[0].rows.length,16);assert.equal(c.expected.outputs[0].columns[0].label,'Y|Регрессия');assert.equal(c.expected.outputs[1].columns[0].label,'Имена входных полей');assert.equal(c.expected.outputs[1].columns[1].label,'Y|Коэффициенты');assert.deepEqual(c.expected.outputs[0].columns.filter(f=>/^X/.test(f.name)).map(f=>f.type),['integer','integer','integer']);}
  assert.deepEqual(result.map(c=>c.expected.outputs[1].rows.map(r=>r.Name)),[['<Константа>','X1','X2'],['<Константа>','X1','X2','X3']]);
 });

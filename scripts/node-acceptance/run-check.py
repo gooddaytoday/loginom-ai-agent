@@ -339,7 +339,7 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/modes',
                     prompt=node / ('acceptance/modes/task-forward-r2.md' if variant == 'forward-r2' else 'acceptance/modes/task-forward.md'),
                     data=node / 'fixtures/modes', input_files=['selection.csv'], base=None,
-                    expected_name='expected/' + variant + '.json', oracle=node / 'acceptance/modes/oracle.py')
+                    expected_name='expected/' + variant + '.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
                 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',
                 'logreg-stepwise-strict', 'logreg-stepwise-permissive']:
@@ -511,6 +511,14 @@ def expected_for(case, package):
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
+    if case.get('linreg_forward'):
+        # C1's mathematical oracle omits presentation labels. Bind the three
+        # intrinsic labels from linregression-output.mjs; keep all numeric
+        # types, names, IDs, rows and tolerances exactly as approved.
+        labels = {'Y_rergession': 'Y|Регрессия', 'Name': 'Имена входных полей', 'Y_coefficients': 'Y|Коэффициенты'}
+        for output in expected['outputs']:
+            for column in output['columns']:
+                if column['name'] in labels: column['label'] = labels[column['name']]
     expected['package_path'] = package
     return expected
 
