@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
-import {resolveFilterBindings} from '../lib/filter-bindings.mjs';
+import {resolveFilterBindings,configureSavedFilterBindings} from '../lib/filter-bindings.mjs';
 import {filterBindingInventory} from '../lib/variable-binding-readback.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {nodeApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
+import {prepareFilterInput,preflightFilterSource} from '../lib/filter-node.mjs';
 
 const binding={parameter:'/groups/0/0/value',variable:{kind:'control',input:0,name:'Limit'}};
 const parameters={groups:[[{field:{kind:'input_field',name:'Amount'},operator:'>',type:'integer'}]]};
@@ -55,6 +56,7 @@ test('public schema and installed production handler accept the bound slot toget
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,bindings:[binding,binding]}),/BINDING_CONFLICT/);
  const conflict=structuredClone(r);conflict.parameters.groups[0][0].value=5;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',conflict),/BINDING_CONFLICT/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,variable_inputs:[]}),/BINDING_PORT_MISMATCH/);
 });
 function inventory(){
  const node={document_id:'doc',workflow_id:'wf',node_id:'filter'};
@@ -77,6 +79,27 @@ test('pending native values use a fresh independently read builtin source with e
   const bad=structuredClone(proof);Object.assign(bad.variables[0],change);
   assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node,bad));
  }
+});
+test('an existing literal slot binds by saved row identity with a validated pending source',async()=>{
+ const f=inventory();Object.assign(f.native,{input_fields:[{name:'Amount',type:'integer'}]});
+ Object.assign(f.native.rows[0],{field:{kind:'input_field',name:'Amount'},operator_code:2,value:0,variable_mode:0,cells:{value:'owned-value'}});
+ f.native.control_variables[0].is_null=true;
+ const s={wizard:{stage:'row_filter',root_tid:'owned'},node_filter:f.native,ui:{elements:[{tid:'owned-value',ref:'value-ref',allowed_actions:['click']}]}};
+ const actions=[];const channel={observe:async o=>{assert.ok(o.ready(s));return structuredClone(s);},perform:async o=>{actions.push(o.resolve(s));throw Error('OWNED_VARIABLE_EDITOR');}};
+ await assert.rejects(configureSavedFilterBindings(channel,{},[binding],f.native,{controlVariables:[{name:'Limit',index:0,type:'integer',value:5,is_null:false}]}),/OWNED_VARIABLE_EDITOR/);
+ assert.deepEqual(actions,[{verb:'click',ref:'value-ref'}]);
+ assert.equal(f.native.rows[0].record_id,'native-row');assert.equal(f.native.rows[0].value,0);
+});
+test('existing binding preparation reads and Cancels W1 mapping without committing it',async()=>{
+ const f=inventory(),calls=[],request={target:{kind:'existing'},finish:'done',bindings:[binding],mappings:[],inputs:[],variable_inputs:[],parameters:{}};
+ const operation={nodeApply:{request}};
+ await prepareFilterInput({operation},{},{channel:{readVariablePortMapping:async m=>{calls.push(m);return {verified:true,cleanup_complete:true,independent_readback:true,mapping:f.mapping};}}});
+ assert.deepEqual(calls,[{direction:'input',kind:'control',port:0}]);assert.deepEqual(operation.variableBindingMapping,f.mapping);
+});
+test('a missing existing control edge refuses before any target or settings mutation',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf'},target:{kind:'existing',ref:{node_id:'filter'}},finish:'done',bindings:[binding],variable_inputs:[],parameters:{}};
+ const operation={parameters:request,nodeTargetAdapter:{observe:async()=>({complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[],variable_links:[]})}};
+ await assert.rejects(preflightFilterSource({operation},{deadline:1000},{}),/BINDING_PORT_MISMATCH/);
 });
 for(const fault of ['NULL','type','index','owner','source','duplicate','mode'])test('binding inventory refuses '+fault,()=>{
  const f=inventory();

@@ -12,6 +12,7 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function validateFilterParameters(p,mode,r){
  if(r.bindings?.length){
+  need(r.target.kind==='existing'||r.variable_inputs?.some(i=>i.kind==='control'&&i.input===0),'BINDING_PORT_MISMATCH: control input 0 requires one source');
   if(p.groups!==undefined)p=resolveFilterBindings(p,r.bindings);
   else need(r.target.kind==='existing','New filter bindings require groups');
  }
@@ -49,8 +50,9 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
   if(Object.hasOwn(request,'bindings')){
    const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
    preserveFilterBindings(s.node_filter,p,request.bindings);
-   if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,request.bindings.map(b=>b.variable.name));
-   if(request.bindings.length&&p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,s.node_filter);
+   if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
+    [...request.bindings.map(b=>b.variable.name),...s.node_filter.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
+   if(request.bindings.length&&p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,s.node_filter,{controlVariables});
    else p=resolveFilterBindings(p,request.bindings);
   }
   changed??=await configureFilter(channel,p,{newNode:request.target.kind==='new',controlVariables});
@@ -67,8 +69,9 @@ export async function preflightFilterSource(options,ctx,config){
  if(request.finish!=='close'&&(request.target.kind==='existing'||request.variable_inputs?.some(i=>i.kind==='control'))){
   const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
   need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'Complete filter control source graph required');
-  const sources=request.target.kind==='new'?request.variable_inputs.filter(i=>i.kind==='control').map(i=>i.source.node_id)
+  const sources=request.target.kind==='new'||request.bindings?.length&&request.variable_inputs?.some(i=>i.kind==='control')?request.variable_inputs.filter(i=>i.kind==='control').map(i=>i.source.node_id)
    :(Object.hasOwn(request,'bindings')?graph.variable_links??[]:graph.links).filter(l=>l.kind==='control'&&l.target===request.target.ref.node_id).map(l=>l.source);
+  if(request.bindings?.length)need(sources.length===1,'BINDING_PORT_MISMATCH: control input 0 requires one source');
   for(const id of sources){
    const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
    if(nodes[0].type==='variables.user'&&!Object.hasOwn(request,'bindings')){
@@ -93,6 +96,11 @@ export async function prepareFilterInput(options,ctx,{channel}){
   const mapped=await channel.mapVariablePort({direction:'input',kind:'control',port:0});
   if(request.bindings?.length)options.operation.variableBindingMapping=mapped.mapping;
   need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'Filter control mapping materialization is unconfirmed');
+ }
+ if(request.target.kind==='existing'&&request.finish!=='close'&&request.bindings?.length&&!request.mappings?.some(m=>m.kind==='control')){
+  const mapped=await channel.readVariablePortMapping({direction:'input',kind:'control',port:0});
+  need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'Saved filter control mapping read is unconfirmed');
+  options.operation.variableBindingMapping=mapped.mapping;
  }
  if(request.target.kind!=='existing'||request.finish!=='execute'||request.inputs.length!==0)return;
  const state=await channel.observe({condition:'existing filter before input schema refresh',readOutputs:true,

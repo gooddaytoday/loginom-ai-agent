@@ -31,9 +31,10 @@ export function preserveFilterBindings(native,parameters,bindings){
   need(rows.length===native.rows.length&&wanted&&filterConditionMatches(row,wanted),'BINDING_CONFLICT','saved row '+row.record_id);
  }
 }
-export async function configureSavedFilterBindings(channel,parameters,bindings,baseline){
- const resolved=resolveFilterBindings(parameters,bindings,{groups:filterGroupsFromNative(baseline)});
- const groups=resolveFilterConditions(resolved,baseline.input_fields,baseline.control_variables);
+export async function configureSavedFilterBindings(channel,parameters,bindings,baseline,{controlVariables}={}){
+ const variables=controlVariables??baseline.control_variables;
+ const resolved=resolveFilterBindings(parameters,bindings,{groups:filterGroupsFromNative({...baseline,control_variables:variables})});
+ const groups=resolveFilterConditions(resolved,baseline.input_fields,variables);
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
  let s=await observe('saved binding baseline');
