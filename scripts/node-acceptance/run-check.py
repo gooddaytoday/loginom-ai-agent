@@ -380,6 +380,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
+    if name == 'sorting-locale':
+        node = REPO / 'docs/node-development/nodes/sorting'
+        src = node / 'acceptance/modes'
+        return dict(source=src, prompt=src / 'task-locale.md', data=node / 'fixtures', base=None,
+                    input_files=['modes.csv'], export_count=2, sorting_case='locale')
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -528,10 +533,19 @@ def scenario(name, case_root=None, *, cases=None):
                 csv_header='labels' if name in ['s8', 'q6', 'p24'] else 'names')
 
 
+def sorting_stages(case):
+    # Independent oracle: one ordered table per saved/exported stage, last = final node state.
+    stages = json.loads(subprocess.check_output([sys.executable, '-B', str(case['source'] / 'oracle.py')]))['cases'][case['sorting_case']]['stages']
+    return [dict(stage, column_order='exact') for stage in stages]
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
     if cold and case.get('cold_expected_name'):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
+    if case.get('sorting_case'):
+        return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
+                    outputs=[sorting_stages(case)[-1]])
     # The owner-approved sampling envelope is separate from stock exact rows.
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
@@ -1721,7 +1735,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
+            csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
+                            else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
                             else expected['outputs'][0] if spec.get('lgd_initial')
