@@ -1,5 +1,143 @@
 # Экспорт в Excel: подплан
 
+## LAB-1011: предложение расширений v0.4.0, 2026-11-07
+
+База `origin/v040@35e83289792225b153ce2ffd6f62f708c16800b4`, mas2,
+облегчённый этап 0. Ни runtime, ни действующий skill не изменены, CLI не собирался.
+Ниже **предложенные, не утверждённые** критерии. Исторический этап 0 в следующих
+разделах не описывает состояние обработчика на этой базе: XLSX уже реализован.
+Полный новый объём **blocked**: отдельных режимов append/замены только листа
+в native мастере не найдено; нужен ответ владельца до разработки.
+
+### Живой UI и семантика
+
+Только `https://app.loginom.ai/app/?testable=true`, **Loginom 7.4.2**, worker
+пары `01a14aa4-14be-7a81-808c-28afe19630ad`, собственный черновик Package1.
+В палитре `MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Excel_файл;TreeText`.
+Порты узла: `Input_Connection-0`, `Input_Data-1`, `Input_Var-2`, без табличных
+выходов. Смена формата файла не создаёт таблицу результата: публичный вход 0,
+`read.ports=[]`, `output.file_artifacts`, как у уже поддержанного XLSX.
+Выполнение без обучения; Done/Save/cold — разные проверки.
+
+Префикс controls: `MF;TF-1;WizrdMCF;ExportExcelFilePreviewWizard;`.
+
+| Suffix data-tid | Живое наблюдение |
+|---|---|
+| `cbbFileType;ValueControl;boundlist;Excel_2003` | Формат XLS доступен; при выборе пустое имя получает `.xls` |
+| `…;Excel_2007` | Формат XLSX доступен |
+| `cbbFloatFormat;ValueControl;boundlist;Числовой` | В отличие от «Общий», открывает дополнительные numeric controls |
+| `pedDecimalCount;ValueControl` | Значение по умолчанию 2, после numeric доступно для ввода |
+| `chkDivideThousands;ValueControl` | По умолчанию false, после numeric доступно |
+| `edtFileName;ValueControl` / `edtSheetName;ValueControl` | Файл и явный лист; на этом открытии initial sheet `Лист1` |
+| `cbbHeadersRow;ValueControl` | По умолчанию «Метки полей» |
+
+В полном DOM страницы отсутствуют controls append/replace-sheet, координаты
+начала записи и выбор «сохранить прочие листы». Для собственной заранее
+загруженной `lab1011-existing.xlsx` с листом «Данные» переход `WizrdMCF;btnNext`
+открыл диалог `msgbox;cnt;cnt;cmp`:
+«Файл с именем /lab85-worker-01a14aa4/lab1011-existing.xlsx существует. Записать поверх?».
+Доступны только `msgbox;tlb;yes` («Да») и `…;no` («Нет»).
+Подтверждение «Да» переводит на DoneWizard, оно не предлагает дописать строки.
+В исследовании выполнен Execute только собственного файла. Затем файл скачан
+через `FileStorageForm;colName_lab1011-existing.xlsx` → `mn;btnDownload;mn;mn.i`
+и независимо прочитан openpyxl: **3 278 байт, только лист «Данные»**, header
+Code/Amount/Money и три исходные строки из formats.csv; числа не округлены,
+style General. Лист «Контроль» и строка OLD исчезли. Таким образом, наблюдалась
+**замена всей книги**, не append и не замена только листа. Это операторское
+исследование на трёх столбцах, **не** приёмка предложенного modes.csv из двух
+столбцов и не модельный PASS. Исходные bytes результата в Git не добавляются.
+Собственный пакет сохранён как `lab1011-discovery.lgp`, закрыт штатно; наблюдался
+экран входа после logout. Финальная файловая сессия тоже закрыта с logout,
+browser/context завершены.
+
+[Справка](https://help.loginom.ru/userguide/integration/export/excel.html),
+сверено 2026-11-07: XLS/XLSX, numeric display и диапазон разрядности 0…30.
+Границы 0/30 в UI не проверялись. Переменные и нелокальное подключение вне назначения.
+
+### Предложенные критерии и независимый комплект
+
+`fixtures/modes.csv`: Code string, Amount real; три строки в исходном порядке:
+А/1234.56789, Б/-2.5, В/0. `existing.xls` и `existing.xlsx` созданы **независимыми
+writers xlwt/openpyxl**, а не экспортом Loginom. В обеих seed-книгах лист «Данные»
+имеет header Code/Amount и OLD/99.25, «Контроль» — Key/Value и сохранить/321.
+Они малы, полное чтение доступно; воспроизводящий writer включён в oracle.
+
+| Бизнес-задание в acceptance/ | Критерий из modes/expected.json | Состояние предложения |
+|---|---|---|
+| `task-xls.md` | Настоящий OLE/BIFF XLS, один лист «Данные», header + 3 строки, исходные числа и порядок | Режим есть |
+| `task-numeric-cells.md` | XLS и XLSX: числовые Amount, style `#,##0.00`; 1234.56789 хранится без округления | Controls есть; bytes/styles требуют приёмки |
+| `task-replace-workbook.md` | Явное разрешение заменить книгу целиком; header + 3 строки, OLD/прежних листов нет | Whole-file replace подтверждён оператором; модельная приёмка впереди |
+| `task-existing-workbook.md`, append | OLD сохраняется, 4 строки данных, **один** header, «Контроль» со значениями/стилями неизменен | **blocked**, штатного UI-режима не найдено |
+| То же, replace-sheet | Только 3 новые строки, OLD/предыдущего append нет, «Контроль» неизменен | **blocked**, штатного UI-режима не найдено |
+
+`acceptance/modes/oracle.py` читает **весь** каждый лист и порядок листов:
+XLS — xlrd с formatting_info и проверкой OLE magic, XLSX — openpyxl с проверкой
+ZIP magic, формул/ошибок/скрытых/объединённых ячеек. Для чисел abs 1e-9,
+rel 1e-12; boolean/строковый numeric отвергаются. Видимый формат проверяется
+отдельно от значения. Не использовать CSV-конверсию результата или сравнение
+одной входной таблицы вместо файла. Тип integer против real в Excel не доказывается.
+XLS reader читает cached values и не доказывает отсутствие BIFF-формул;
+в новых fixtures формулоподобного текста нет, общий XLSX-набор остаётся отдельным.
+
+Установка только для oracle: `python3 -m pip install -r docs/node-development/nodes/exports-excel/acceptance/modes/requirements.txt`.
+Квалификация: `python3 docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py --self-check`.
+Проверка результата: та же команда с `--case new|numeric|replace-workbook|append|replace-sheet --file <файл>`.
+Self-check использует независимые writers и отрицательные варианты: искажённое
+число, потеря sentinel, повтор заголовка, остаток OLD, неверный numeric style.
+Это проверка oracle, **не live-PASS**. Модель получает лишь task и входные файлы;
+oracle, expected, seed-ожидания и схемы модели не передаются.
+
+Стандарт после реализации: ≥2/3 и независимые 2/3 на одном SHA, Save,
+повторное открытие в новом профиле, cold полного скачанного файла, close/logout,
+проверки по изменённым путям. Новые сценарии не зарегистрированы в run-check;
+до согласования не передавать modes/expected.json в существующий XLSX runner.
+Новый собственный runner/verifier lifecycle не предлагается.
+
+### Модельные бюджеты и оценка
+
+`text-export/acceptance/modes/schema-size.mjs` измеряет оба проекта через
+userActionInventory/runtime.describe с production pins; все хеши в сохраняемых
+proposed-card.json — 64 нуля. Default проверяет drift, `--write` пересоздаёт
+**только документационные** карточки/reference/строки маршрутизации.
+
+| UTF-8 bytes | База | Предложение доступной части |
+|---|---:|---:|
+| Карточка exports.excel, compact JSON | 2 922 | 3 653 / 12 000 |
+| Строка маршрутизации, без LF | — | 109 / ~200 |
+| Reference exports.excel.md | 1 393 | 1 857 / 6 000 |
+| SKILL.md после обоих экспортеров | 39 961 | 39 983 / 40 000 |
+| model_tool_bytes apply | 14 539 | 14 559 / 20 000 |
+| full_input_schema_bytes, модели не передаётся | 63 339 | 63 893, без предела |
+
+Проект карточки включает xls/xlsx, optional number_format/decimal_count/
+divide_thousands и overwrite replace **всей книги** только с явным разрешением.
+Append/replace-sheet не предлагаются как действующие параметры. Семантика
+пропущенных настроек существующего узла сохраняется. Бюджет SKILL после этого
+оставляет 17 Б; новых пояснений в SKILL не добавлять, держать их в reference.
+
+Собственные изменения: `client/lib/exports-excel-{node,parameters,context,procedure}.mjs`.
+Настройки numeric уже читаются в EXCEL_EXPORT_FIELDS, но validateNativeExcelExport
+запрещает их, procedure настроен на Excel 2007/General и hardcoded overwrite reject.
+runExcelExportNext уже имеет exact-path ветвь replace: переписывать её не нужно.
+Общие места: `node-api.mjs`, `node-contracts.mjs`, `node-result-schema.mjs`
+(сейчас const file_type:1 / number_format:0 / divide_thousands:false),
+`workspace-ui.mjs` (decimal_count/checkbox ещё не в export field-map),
+`storage-policy.mjs` (XLS нет в export/download allowlists), существующие
+run-check/cold XLSX для новых сценариев и XLS. Это минимальные адресные расширения,
+без рефакторинга. Для append неизбежно понадобилась бы новая семантика существующего
+файла в общем text-export-output: его provenance принимает только отсутствие
+файла или explicit replace. Такая общая правка **сверх аддитивной** здесь не разрешена.
+
+Оценка доступной Excel-части после решения владельца: **3–4 цикла** — XLS/доставка;
+numeric/точность; replace/отказы; Save/cold/регрессия при необходимости.
+Вместе с текстом — **5–7 циклов**. Для отсутствующих UI-режимов срок реализации
+без нового решения не оценивается. В этой карточке runtime red→green и CLI-прогоны
+не выполняются: нет утверждённого изменения обработчика.
+
+Нужно решение владельца: принять доступный поднабор, отдельно отложив append,
+замену листа и форматирование чисел текста, либо указать поддерживаемый native
+маршрут этих возможностей. Подмена их whole-file replace или округлением не предлагается.
+
 ## 0. Историческая основа и текущий срез
 
 Ниже сохранены наблюдения и критерии прежнего этапа 0 на указанной базе. Текущие режимы и ограничения v0.4.0 — в [карточке](README.md); история не заменяет приёмку нового SHA.
