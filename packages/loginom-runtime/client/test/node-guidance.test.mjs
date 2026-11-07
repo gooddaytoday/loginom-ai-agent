@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {createHash} from 'node:crypto';
 import {createSkillLoader} from '../lib/skill.mjs';
 import {createUserWorkflowBindings,userNodeTool} from '../lib/user-workflow.mjs';
 import {nodeApiTools} from '../lib/node-api.mjs';
@@ -23,7 +24,8 @@ test('node guidance uses the prepared bundle and selects common plus requested m
  assert.doesNotMatch(inner.guidance,/Outer rule/);
  const [outer]=await loader.describeNodes([card],['left','full']);
  assert.equal(outer.guidance.match(/Outer rule/g).length,1);
- assert.equal(outer.session_manifest?.skillRevision??prepared.detail.revision,prepared.detail.revision);
+ assert.equal(outer.cache_key,createHash('sha256').update(JSON.stringify([card.cache_key,prepared.detail.revision,outer.guidance])).digest('hex'));
+ assert.notEqual(outer.cache_key,inner.cache_key);
  await assert.rejects(loader.describeNodes([card],['invented']),/mode/i);
  await writeFile(file,'tampered');
  await assert.rejects(loader.describeNodes([card],['inner']),/LOGINOM_SKILL_HASH_MISMATCH/);
