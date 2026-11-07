@@ -1,0 +1,27 @@
+{
+  "status": "proposal_requires_owner_decision",
+  "stock_csv_does_not_verify_files": true,
+  "native_file_format_and_names": "not_observed",
+  "requests": [
+    {
+      "method": "POST",
+      "request_id": "r-a",
+      "url": "https://httpbin.org/anything",
+      "header": {
+        "X-Lab-Cycle": "dump"
+      },
+      "body_utf8": "{\"amount\":10,\"note\":\"Привет & + /\"}",
+      "body_bytes": 41
+    },
+    {
+      "method": "POST",
+      "request_id": "r-b",
+      "url": "https://httpbin.org/anything",
+      "header": {
+        "X-Lab-Cycle": "dump"
+      },
+      "body_utf8": "{\"amount\":20,\"note\":\"second\"}",
+      "body_bytes": 29
+    }
+  ]
+}

@@ -190,3 +190,96 @@ Checkpoint 2026-10-07: [discovery](discovery.md), [fixtures/oracle/prototype](ac
 - **Исполнитель:** discovery → fixtures/oracle/full reader qualification → независимая приёмка этапа 0 → этап 1 с W1 → тесты → CLI/независимый аудит 20 789 строк.
 - **Ловец:** независимая приёмка опубликованного SHA и полного узлового результата.
 - **Следующая карточка:** этап 1 в Backlog до принятого discovery SHA; затем тот же PR/ветка. Этапы 2+, Desktop, merge и release отдельно. Неизвестные defaults, mapping, freshness и side effects пока не подтверждены.
+
+## 7. Возможности Excel v040: этап 0 LAB-974
+
+Назначение от 07.11.2026, база **`origin/v040@4b202757f6d0021160dd4dfc104ee788ae33cbec`**.
+Этот раздел описывает новый объём; исторические назначения в разделах 0–6
+не разрешают реализацию новых возможностей. Результат — docs-only предложение
+критериев владельцу до правки обработчика. CLI не собирается, режимы runtime
+не регистрируются, установленный `SKILL.md` не меняется.
+
+Комплект: [fixtures, задачи, oracle и предложенные expected](acceptance/capabilities/README.md).
+13 исходных книг, 70 003 Б; независимые writer XlsxWriter/xlwt и reader OpenPyXL/xlrd.
+`expected.json` содержит отдельные cases, пока не зарегистрированные в run-check.
+Ни этот документ, ни oracle/expected не передаются модели бизнес-прогона.
+
+### Живые наблюдения 7.4.2
+
+Только `https://app.loginom.ai/app/?testable=true`, собственные новые черновики
+разрешённой пары на mas3. `P` ниже — фактический prefix текущего документа
+`MF;TF-N;WizrdMCF;`, `S=P+ImportExcelFilePreviewWizard;`,
+`D=P+ImportExcelColumnDefsWizard;`. Каждый prefix наблюдается заново;
+он не переносится между профилями. Полный UI/DOM — приватное приложение к
+карточке; в git не включаются сырые журналы, аккаунты и снимки.
+
+| Возможность | Где и что наблюдалось | Отличие от поддержанного обработчика |
+|---|---|---|
+| >12 полей | `D;ColumnDefsTuning;grdSettings;grd-1;normalHeaderCt;15_0` = C16, `15_2` = Целый; данные `ColumnDefsTuning;normalHeaderCt;15_0/15_1` = 16/116, всего 16 полей × 2 строки | В параметрах, validator, DOM-reader и schema snapshot сейчас жёсткий предел 12; общая схема UI его не имеет |
+| >10 строк заголовка | `S;edtTitleRowCount;ValueControl` = 11; поля Id×11 и Amount×11, соединённые `_`; данные только 1/10 и 2/20 | Предел handler 10; профиль XLSX также отвергает header_rows>10 |
+| Boolean | После чтения boolean.xlsx `D;...;1_2` = Логический; строки false, true, пустое значение, Id1/2/3 | Native тип Boolean, а не целое 0/1. Handler допускает только string/integer/real/datetime; профилировщик отдельно объявляет boolean неподдержанным |
+| Именованный диапазон | `S;cbbTableNamingMethod;ValueControl;boundlist` содержит «Именованный диапазон»; `cbbTableName;ValueContainer;cbx;boundlist;SalesRange` указывает Data. `chkAllRows;ValueControl;DisplayEl` false/true даёт 2/3 строки B:C | Отдельный выбор объекта и продолжение области; первый лист/whole_sheet не эквивалентны диапазону |
+| Автоопределение | `D;cbbAutoDetectColumnsMode;ValueControl;boundlist`: Нет / Только новые / Все. При Все dblclick type-cell не открывает editor (`bg-grid-column-spectator`). Live Execute: All AB→BC перестраивает выход B20,C2; Only new BC→AB сохраняет B1,C10, затем BC→ABD добавляет D:string=`new`. None на сохранённых B,C дал B20,C2. All types-a→types-b меняет Value integer4→string5, `10`→`text` на том же узле | Политики Нет/Только новые сохраняют существующие позиции, не выполняют matching заголовков. Handler принудительно выбирает Нет, readback требует const Нет, source_switch требует неизменную схему; вручную имитировать автоматическое обновление нельзя |
+| Несколько файлов | `S;edtFileName;ValueControl`: два пути через `|` во внутреннем getValue; raw DOM отображает `｜` U+FF5C. Две книги дали Id1/2/3 с Amount10/20/30 | Один узел, один табличный output0; один delivery proof одного файла недостаточен для списка |
+| Маска и потоки | `S;chkParallelProcessing;ValueControl;DisplayEl`, `cbbMaxThreadCount;ValueControl;boundlist`: авто / 2 / 4 / 8 / 16 / 32. Маска sales-*.xlsx с 2 потоками дала Id3/1/2 | Полное совпадение значений/кратности без гарантии межфайлового порядка; маска должна быть связана с точным набором источников |
+| Сведения о файле | `S;cbbFileInfoColumnsType;ValueControl;boundlist` содержит Нет, имя/относительный/абсолютный путь и каждый с mtime. После Execute «Имя файла, Время модификации» output0 имеет Id4,Amount4,FileName5,FileTime2 (native types) | Добавляются поля после исходных; Id1/2 связаны с sales-a, Id3 — с sales-b. Время загрузки сервера отличается от фиксированной ZIP-даты книги |
+| XLSM | filter `OpenDialogForm;cbxFileType;boundlist` включает XLSM; исходная macro-enabled книга без VBA дала строки 1/10,2/20 | Фильтр не означает поддержку handler; source_path сейчас допускает только .xlsx. Макросы не запускались |
+| XLS | Тот же filter содержит XLS; после выбора уникального legacy.xls и RefreshAll `D;ColumnDefsTuning;PreviewPanel;cntErrorInfo`: «Файл excel не открыт. По текущим настройкам невозможно определить количество столбцов для импорта» | Положительное чтение 71/710,72/720 не получено; старый XLSM preview не принят за XLS. Конверсия не предлагалась |
+| Имя из переменной | `S;edtFileName;SwitchButton` и `VariableControl;boundlist`; отдельный vars input `Graph;<Excel>;Input_Var-1`, пользовательская переменная приходит с output4 builtin source. Один node GUID дал 2 строки a → 1 строку b после изменения только ExcelPath и повторного Execute | Это input переменных 0, не табличный/connection/control вход; до активации source выбранное имя дало «Имя файла не может быть пустым», после активации dropdown показал фактическое значение и импорт прошёл |
+| HTTP/Basic | Поле в UI имеет заголовок «Имя файла / URL», рядом `edtConnection`/`btnConnect`; собственного HTTP fixture и защищённого подключения в назначении нет | Доступность запросов/Basic не квалифицирована. Один UI caption не доказывает чтение/401/секретное хранение. Внешний адрес не угадывался |
+
+Важные ограничения наблюдения: 16 полей, 11 заголовков, Boolean, именованные
+области и XLSM прочитаны в мастере; полный native Execute и все 3 строки output0
+проверены для списка+provenance и маски+параллельности; отдельно 2→1 строки
+filename binding на том же узле без повторной настройки импорта. Это не CLI acceptance,
+Save/cold и не 2/3 PASS. Пределы самого Excel и все возможные файлы не квалифицированы.
+
+Первая исследовательская сессия потеряла соединение; диалог «Восстановление
+сессии» не имеет `data-tid`. Неизвестный эффект не повторялся, восстановление
+через скрытый JS/неразмеченную кнопку не выполнялось. Локальный браузер закрыт;
+server package_closed/logged_out первой сессии **не подтверждены**. Следующее
+исследование выполнено отдельным профилем второго аккаунта разрешённой пары:
+последний пакет сохранён и закрыт без discard, packages 1→0, logout подтверждён
+возвращением LoginForm. Save/cold каждой возможности этим не квалифицированы.
+
+### Циклы этапа 1 по ценности пользователю
+
+Порядок и задачи — предложение. Диапазоны строк кода — оценка production-правки,
+без тестов/docs; это не обещание размера diff и не готовая реализация.
+
+| Цикл, один PR | Узловая правка / оценка | Общие зависимости и допуск |
+|---|---|---|
+| C1: больше столбцов/строк заголовка | `imports-excel-parameters.mjs`, `imports-excel-procedure.mjs`, `imports-excel-node.mjs`: 40–80 строк, снять согласованные пределы во всех трёх местах | `packages/opencode/src/tool/loginom-file-xlsx.ts`: header_rows, settings_complete (30–60 строк); новая граница 64/1000 требует решения владельца и boundary tests, не изменения общего model-visible бюджета |
+| C2: Boolean без потери false/NULL | Те же parameters/procedure: 15–40 строк; native Логический ↔ boolean и дискретный kind | XLSX profiler уже читает bool, но запрещает settings_complete: 5–15 строк; снять только согласованный guard. Общий typed reader bool уже умеет |
+| C3: именованный диапазон | parameters/procedure/node: 80–150 строк, явный метод/name/extend и readback | Нынешний `verifyExcelFullCount` знает только лист/whole sheet. До реализации выбрать аддитивное region-proof расширение либо честное N not_verified; нельзя ослабить прежний source_switch proof |
+| C4: список/маска/потоки | parameters/procedure/node: 120–220 строк, полные источники, native канонизация, порядок/кратность | Общий source admission сегодня один путь/один proof; нужен согласованный узловой комплект proofs и exact mask expansion. Новые публичные source fields не вводить без решения |
+| C5: происхождение | procedure/node + readback: 40–80 строк; +40–80 на cold-проверку | Нужны независимые серверные путь/mtime и сохранённый выбор file_info. Новый способ проверки метаданных не вводится этим PR; без решения — stop |
+| C6: XLSM | parameters/source admission: 15–50 строк; исходные bytes без макросов | Профилирование/доставка XLSM нуждаются в отдельной оценке `packages/opencode` (50–100 строк); suffix-only разрешение неполно |
+| C7: filename binding | Excel input mapping + procedure/node: 80–140 строк; reuse существующих LGD/variables приёмов | Зарегистрировать variable_inputs:1, разрешить только mapping vars input0; новые поля readback должны быть аддитивными. Пустое/NULL значение отказывать до Execute |
+| C8: динамическая схема/тип | parameters/procedure/node: 150–300 строк; 80–160 на cold-аудит политики | `node-result-schema.mjs` сейчас auto_detect const Нет; отдельная аддитивная readback-ветка и node-specific source proof требуют допуска. Общую exact-schema проверку других импортов не менять |
+| C9: XLS | Пока только честный отказ на этом стенде; оценка положительного handler отложена | Нужен доступный native importer на другом согласованном стенде; конверсия не является реализацией |
+| C10: HTTP/Basic | До появления собственного стенда production-оценка неизвестна | Владелец предоставляет endpoint/credential connection и утверждает существующий либо новый source proof. Публичный пароль/обход файловой системы не предлагается |
+
+Во всех циклах обновляется отдельный `references/nodes/imports.excel.md` и карточка
+типа; общие модули не рефакторятся. C1/C2/C6 затрагивают `packages/opencode`,
+C3/C4/C5/C7/C8/C10 — границы source/readback/приёмки. Это точки решения владельца,
+а не разрешение вносить изменения в общем коде. На этапе 0 таких изменений нет.
+
+### Размеры и критерии для утверждения
+
+На базе назначения `node --test test/model-schema-budget.test.mjs`:
+`model_tool_bytes=14539` (≤20 000), `full_input_schema_bytes=63280` (без лимита).
+Текущая карточка `imports.excel` — **4822 Б**, предложенная — **6887 Б** compact
+JSON (≤12 000). Hash-поля в обоих приложенных JSON — 64 нуля; это заготовки.
+Печатные JSON-файлы с отступами не являются wire-размером карточки.
+Предлагаемый отдельный файл узла — **5651 Б** (≤6000), routing row — **100 Б**
+(≤~200), вместо нынешних 99 Б. Установленный SKILL.md **39 954 Б** и не изменён;
+даже необязательная замена routing row дала бы 39 955 Б. Новые абзацы в SKILL
+не нужны. Будущие изменения полного schema измеряются повторно после реализации;
+generic compact parameters от размера карточки не растут автоматически.
+
+Предложить владельцу: C1–C8 принимать стандартными полными CSV/Save/cold/cleanup
+и 2/3 на одном SHA; C5 сначала связать с независимыми серверными метаданными,
+C8 утвердить семантику Нет/Только новые/Все и смены типа, C9/C10 отложить до
+доступной среды. Наличие fixtures/expected или ручного preview не повышает
+готовность обработчика. Новый runtime PR — только после решения по этим границам.
