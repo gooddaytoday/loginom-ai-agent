@@ -469,12 +469,13 @@ export async function createBridge(config, session, { browserTransport: managedB
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
-              if(request.params.name==='dock_node_apply'){
+              if(request.params.name==='dock_node_apply'&&typeof args.target?.type==='string'){
                 const refusal=userWorkflows.checkNodeDescription(args);
                 if(refusal){
                   await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,
                     node_type:args.target?.type,result:refusal});
-                  return {content:[{type:'text',text:JSON.stringify(refusal)}],structuredContent:refusal};
+                  return {content:[{type:'text',text:JSON.stringify(refusal)}],
+                    ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
               }
               if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {

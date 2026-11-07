@@ -9,7 +9,7 @@ export function userActionTool(tool) {
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
   copy.description=tool.name==='dock_action_run'
     ? 'Save the completed scenario with package.save_checkpoint. Use package.save_as only when the user explicitly requests reopening the saved package; it closes and reopens the workflow. First request missing action parameters with dock_action_describe. Create and configure supported nodes through dock_node_apply.'
-    : 'List nodes with {}. Use action_key alone, OR action_keys/node_types with optional modes. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and guidance from the prepared skill. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
+    : 'List nodes with {}. Single: action_key alone; never combine action_key with a batch. Batch: action_keys/node_types, optional modes. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and guidance from the prepared skill. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
   return copy;
 }
 export function userActionInventory(value) {

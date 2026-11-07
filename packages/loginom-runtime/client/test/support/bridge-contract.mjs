@@ -208,6 +208,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     const replay=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
     assert.deepEqual(replay.structuredContent,sourceReceipt);
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
+    const undescribed=await client.callTool({name:'dock_node_apply',arguments:{operation_id:'without-card',target:{kind:'new',type:'imports.text'}}});
+    assert.equal(undescribed.isError,true);
+    assert.equal(JSON.parse(undescribed.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    assert.equal(browserCalls,beforeSource);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);
