@@ -1,0 +1,28 @@
+{
+  "status": "proposal-owner-approval-required-not-a-stock-expected-field",
+  "checkpoints": ["after_done_reopen", "after_source_value_update", "after_save_cold_before_execute", "after_cold_execute"],
+  "invariants": [
+    "exactly one tested node; same node GUID across main phases",
+    "source variable ID/type and Sentinel unchanged",
+    "same bound parameter and mapped variable identity; no literal substitution",
+    "unchanged table mappings, filter predicates or import format/schema",
+    "new document references resolved from native GUIDs, not copied session refs",
+    "current file admission and bytes prove the selected own source in each import phase"
+  ],
+  "bindings": [
+    {
+      "node": {"type":"transform.filter_data"},
+      "parameter":"/groups/0/0/value",
+      "mode":"variable",
+      "variable":{"kind":"control","input":0,"name":"Limit","type":"integer","is_null":false},
+      "source":{"type":"variables.user","output":4}
+    },
+    {
+      "node":{"type":"imports.text"},
+      "parameter":"/settings/source/source_path",
+      "mode":"variable",
+      "variable":{"kind":"variables","input":0,"name":"CsvPath","type":"string","is_null":false},
+      "source":{"type":"variables.user","output":4}
+    }
+  ]
+}
