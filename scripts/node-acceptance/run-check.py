@@ -422,6 +422,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/calculator/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-expression-options.md', data=src.parent / 'fixtures',
                     input_files=['modes.csv'], base=None, expected_name='expected-expression-options.json')
+    if name == 'calculator-javascript':
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-javascript.md', data=src.parent / 'fixtures',
+                    input_files=['modes.csv'], base=None, expected_name='expected.json')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

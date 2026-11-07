@@ -48,3 +48,8 @@ test('calculator readback requires saved input autosync and mappings from its ow
   const g=structuredClone(f);mutate(g.phases.at(-1).value);assert.throws(()=>calculatorConfigurationReadback(g));
  }
 });
+
+test('calculator readback reports the observed language and defaults to expression',()=>{
+ const f=fixture();assert.equal(calculatorConfigurationReadback(f).syntax,'expression');
+ f.phases[0].value.configuration.syntax='javascript';assert.equal(calculatorConfigurationReadback(f).syntax,'javascript');
+});

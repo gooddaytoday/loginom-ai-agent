@@ -59,7 +59,7 @@ export function calculatorConfigurationReadback({node,phases,operation_id}) {
  requireValue(JSON.stringify(input_mapping.fields.map(f=>pick(f,['name','label','type'])))
   ===JSON.stringify(c.input_fields.map(f=>pick(f,['name','label','type']))),'configured input schema differs');
  return {kind:'calculator',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
-  receipt_ids:[incoming,configured,nodeFinished,mapped,finished].map(p=>p.receipt_id),mode:'expression',
+  receipt_ids:[incoming,configured,nodeFinished,mapped,finished].map(p=>p.receipt_id),mode:'expression',syntax:c.syntax??'expression',
   expressions:c.expressions.map(e=>pick(e,['index','name','label','type','formula','replace','intermediate','cached','description'])),
   input_fields:c.input_fields.map(f=>pick(f,['name','label','type'])),
   syntax_validation:'accepted_by_loginom_next',input_mapping,output_mapping,package_persistence_verified:false};

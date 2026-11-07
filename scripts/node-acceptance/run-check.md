@@ -111,6 +111,9 @@ changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
 
+`calculator-javascript` uses `task-javascript.md` and `modes/expected.json` (JavaScript language, `this.Expr`,
+intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` reach the model.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2

@@ -27,6 +27,22 @@ export async function previewCalculator(channel) {
  return {status:'accepted_by_loginom_preview',settings_applied:false};
 }
 
+// The language is one native setting for the whole node. Its button is a split
+// button: the arrow opens the menu, whose portal items are the two choices.
+async function selectCalculatorSyntax(channel,syntax) {
+ const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
+ let s=await channel.observe({condition:'calculator language before change',readCalculator:true,ready});
+ if(s.node_calculator.syntax===syntax)return s;
+ await channel.perform({condition:'open calculator language menu',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({verb:'press',ref:control(s,';CalcDataWizard;btnCalcMode','press').ref,key:'ArrowDown'})});
+ const item=';CalcDataWizard;btnCalcMode;mn;'+(syntax==='javascript'?'cmJavaScript':'cmExpression');
+ s=await channel.observe({condition:'calculator language choices',readCalculator:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+item&&e.allowed_actions.includes('click'))});
+ await channel.perform({condition:'choose calculator language',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({verb:'click',ref:control(s,item,'click').ref})});
+ s=await channel.observe({condition:'calculator language changed',readCalculator:true,ready:s=>ready(s)&&s.ui.dialogs.length===0&&s.node_calculator.syntax===syntax});
+ return s;
+}
+
 export async function configureCalculator(channel,parameters,{newNode=false,recoverRejectedRequest=false,captureBaseline}={}) {
  const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
  const observe=condition=>channel.observe({condition,readCalculator:true,ready});
@@ -38,6 +54,7 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
   if(recoverRejectedRequest&&!newNode)await rejectUnchangedCalculatorDraft(channel,baseline,error);
   throw error;
  }
+ if(parameters.syntax!==undefined)await selectCalculatorSyntax(channel,parameters.syntax);
  const identities=new Map(baseline.node_calculator.expressions.map(e=>[e.name,e.record_id]));
  const row=(s,id)=>s.node_calculator?.expressions.find(e=>e.record_id===id);
  const select=async id=>{
@@ -159,6 +176,6 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
  }
  const final=await observe('complete configured calculator readback');
  requireValue(same(final.node_calculator.expressions.map(semantic),plan.expressions.map(semantic)),'Complete calculator differs from requested patch');
- return {verified:true,cleanup_complete:true,effect_possible:plan.changes.length>0||parameters.order!==undefined,
+ return {verified:true,cleanup_complete:true,effect_possible:plan.changes.length>0||parameters.order!==undefined||(parameters.syntax!==undefined&&parameters.syntax!==(baseline.node_calculator.syntax??'expression')),
   before:baseline.node_calculator,configuration:final.node_calculator,settings_applied:false};
 }
