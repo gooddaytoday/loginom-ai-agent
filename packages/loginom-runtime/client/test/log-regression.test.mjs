@@ -139,6 +139,8 @@ test('readback binds training, event and cutoff to committed settings and separa
  const entries={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute',training:{status:'trained',node,execution_id:'teach',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
  const candidate={node,operation_id:'logistic',phases:Object.entries(entries).map(([phase,value])=>({phase,status:'verified',receipt_id:'logistic:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};
  const result=logRegressionConfigurationReadback(candidate);assert.equal(result.threshold,0.8);assert.equal(result.event,'yes');assert.equal(result.training.execution_id,'teach');assert.equal(result.package_persistence_verified,false);
+ c.normalization=[{name:'X',norm_type:5},{name:'Target',norm_type:9}];
+ assert.equal(logRegressionConfigurationReadback(candidate).normalization,'standardize');
  entries.finish.training.execution_id='execute';assert.throws(()=>logRegressionConfigurationReadback(candidate),/training/);
 });
 
