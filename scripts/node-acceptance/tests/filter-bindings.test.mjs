@@ -34,7 +34,7 @@ for(const fault of ['literal','second node','sentinel','identity','reconfigure',
  if(fault==='identity')events[3].result.configuration.readback.variables[0].id=3;
  if(fault==='reconfigure')events.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'transform.filter_data',ref:events[1].result.node},mode:'conditions',parameters:{groups:[]}}});
  if(fault==='stale execution')events[4].result.execution.execution_id='first';
- assert.throws(()=>auditFilterBindings(events,initial,final));
+ assert.throws(()=>auditFilterBindings(events,initial,final),{literal:/FILTER_BINDING_INITIAL/,'second node':/FILTER_BINDING_FINAL_SAME_NODE/,sentinel:{code:'ERR_ASSERTION'},identity:{code:'ERR_ASSERTION'},reconfigure:/FILTER_BINDING_RECONFIGURED/,'stale execution':/FILTER_BINDING_FINAL_SAME_NODE/}[fault]);
 });
 test('native final column order may change while values and types stay exact',()=>{
  const events=history(),expected=structuredClone(final);

@@ -21,7 +21,7 @@ export function resolveFilterBindings(parameters,bindings,saved){
  validateFilterConditions(result);return result;
 }
 export function preserveFilterBindings(native,parameters,bindings){
- if(bindings===undefined||parameters.groups===undefined)return;
+ if(!bindings?.length||parameters.groups===undefined)return;
  const rows=parameters.groups.flatMap((g,i)=>[...(i?[null]:[]),...g]);let group=0,condition=0;
  for(const [index,row] of native.rows.entries()){
   if(row.kind==='or'){group++;condition=0;continue;}

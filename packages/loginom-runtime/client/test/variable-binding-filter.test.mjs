@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
-import {resolveFilterBindings,configureSavedFilterBindings} from '../lib/filter-bindings.mjs';
+import {resolveFilterBindings,configureSavedFilterBindings,preserveFilterBindings} from '../lib/filter-bindings.mjs';
 import {filterBindingInventory} from '../lib/variable-binding-readback.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
@@ -26,7 +26,7 @@ test('strict envelope rejects duplicate, unsupported type, port, extra propertie
  assert.throws(()=>validateVariableBindings([binding,binding],'transform.filter_data'),/BINDING_CONFLICT/);
  assert.throws(()=>validateVariableBindings([binding],'transform.sorting'),/BINDING_PARAMETER_UNSUPPORTED/);
  for(const variable of [null,{...binding.variable,input:1},{...binding.variable,kind:'variables'},{...binding.variable,name:''},{...binding.variable,extra:true}])
-  assert.throws(()=>validateVariableBindings([{...binding,variable}],'transform.filter_data'));
+  assert.throws(()=>validateVariableBindings([{...binding,variable}],'transform.filter_data'),variable?.name===''?/BINDING_VARIABLE_MISSING/:/BINDING_PORT_MISMATCH/);
 });
 test('only canonical scalar pointers and integer/string comparisons are registered',()=>{
  for(const parameter of ['/groups/00/0/value','/groups/0/0/lower','/groups/64/0/value','/groups/0/128/value','/groups/0/0/value/x'])
@@ -57,7 +57,7 @@ test('public schema and installed production handler accept the bound slot toget
  const conflict=structuredClone(r);conflict.parameters.groups[0][0].value=5;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',conflict),/BINDING_CONFLICT/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,variable_inputs:[]}),/BINDING_PORT_MISMATCH/);
- await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,mode:'read_existing_output'}),/BINDING_PARAMETER_UNSUPPORTED/);
+ assert.throws(()=>validateNodeApplyRequest({...r,mode:'read_existing_output'},support.nodeApplyHandlers),/BINDING_PARAMETER_UNSUPPORTED/);
  const handlers=new Map(support.nodeApplyHandlers),unregistered={...handlers.get(r.target.type)};delete unregistered.binding_schema;handlers.set(r.target.type,unregistered);
  assert.throws(()=>validateNodeApplyRequest(r,handlers),/BINDING_PARAMETER_UNSUPPORTED/);
 });
@@ -80,7 +80,7 @@ test('pending native values use a fresh independently read builtin source with e
  assert.equal(filterBindingInventory(f.native,f.mapping,f.graph,f.node,proof)[0].variable.is_null,false);
  for(const change of [{id:10},{type:'string'},{cell:{type:'integer',is_null:true,value:null}}]){
   const bad=structuredClone(proof);Object.assign(bad.variables[0],change);
-  assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node,bad));
+  assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node,bad),change.id?/source variable identity/:change.type?/BINDING_TYPE_MISMATCH/:/BINDING_NULL_UNSUPPORTED/);
  }
 });
 test('an existing literal slot binds by saved row identity with a validated pending source',async()=>{
@@ -93,7 +93,7 @@ test('an existing literal slot binds by saved row identity with a validated pend
  assert.deepEqual(actions,[{verb:'click',ref:'value-ref'}]);
  assert.equal(f.native.rows[0].record_id,'native-row');assert.equal(f.native.rows[0].value,0);
 });
-test('existing binding preparation reads and Cancels W1 mapping without committing it',async()=>{
+test('existing binding preparation requests independent read-only W1 mapping',async()=>{
  const f=inventory(),calls=[],request={target:{kind:'existing'},finish:'done',bindings:[binding],mappings:[],inputs:[],variable_inputs:[],parameters:{}};
  const operation={nodeApply:{request}};
  await prepareFilterInput({operation},{},{channel:{readVariablePortMapping:async m=>{calls.push(m);return {verified:true,cleanup_complete:true,independent_readback:true,mapping:f.mapping};}}});
@@ -113,5 +113,16 @@ for(const fault of ['NULL','type','index','owner','source','duplicate','mode'])t
  if(fault==='source')f.mapping.fields[0].source=null;
  if(fault==='duplicate')f.mapping.fields.push(f.mapping.fields[0]);
  if(fault==='mode')f.native.rows[0].variable_mode=128;
- assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node));
+ assert.throws(()=>filterBindingInventory(f.native,f.mapping,f.graph,f.node),{NULL:/BINDING_NULL_UNSUPPORTED/,type:/BINDING_TYPE_MISMATCH/,index:/BINDING_TYPE_MISMATCH/,owner:/node owner/,source:/connected source identity/,duplicate:/unique mapped name/,mode:/unsupported active binding/}[fault]);
+});
+
+test('preserveFilterBindings keeps untargeted saved bindings and rejects implicit replacement',()=>{
+ const row={kind:'condition',record_id:'keep-row',variable_mode:1,field:{kind:'input_field',name:'Amount'},type:'integer',operator_code:2,value:{kind:'variable',name:'Limit'}};
+ const literal={...row,record_id:'target-row',variable_mode:0,value:0};
+ const native={rows:[row,literal]},p={groups:[[{field:row.field,type:'integer',operator:'>',value:row.value},{field:row.field,type:'integer',operator:'>'}]]};
+ const bindings=[{...binding,parameter:'/groups/0/1/value'}],before=structuredClone(native);
+ assert.doesNotThrow(()=>preserveFilterBindings(native,p,bindings));
+ p.groups[0][0].value=5;assert.throws(()=>preserveFilterBindings(native,p,bindings),/BINDING_CONFLICT/);
+ assert.deepEqual(native,before);
+ for(const empty of [undefined,[]])assert.doesNotThrow(()=>preserveFilterBindings(native,p,empty));
 });
