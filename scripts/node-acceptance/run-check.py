@@ -408,7 +408,8 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         return dict(source=src / 'acceptance/modes/methods-body',
                     prompt=src / 'acceptance/task-methods-body.md',
-                    data=src / 'fixtures/modes', input_files=['requests.csv'], base=None)
+                    data=src / 'fixtures/modes', input_files=['requests.csv'], base=None,
+                    expected_name='expected.json', oracle=src / 'acceptance/modes/oracle.py')
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task-exact.md', data=src / 'data', base=None, expected_name='expected-exact.json')
