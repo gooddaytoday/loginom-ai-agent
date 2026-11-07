@@ -2,11 +2,21 @@ import {configureSortingOutput} from './sorting-output.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
-export async function configureFilterOutputs(channel,configuration,parameters,mappings,finishWizard){
+export function resolveFilterOutputMapping(configuration,mapping,{request,inputMapping}={}){
+ if(mapping)return mapping;
+ if(request?.target.kind!=='new'||!request.bindings?.length)return {};
+ const fields=inputMapping?.target_fields;
+ need(inputMapping?.verified===true&&inputMapping.inventory_complete===true&&inputMapping.node_context?.input_port?.port===0
+  &&['document_id','workflow_id','node_id'].every(k=>typeof inputMapping.node_context[k]==='string'&&inputMapping.node_context[k]===configuration.node_context?.[k])
+  &&Array.isArray(fields)&&fields.length>0&&fields.every((f,i)=>f.index===i&&typeof f.name==='string')
+  &&new Set(fields.map(f=>f.name)).size===fields.length,'Owned ordered Filter input mapping required');
+ return {autosync:false,fields:fields.map(f=>({source:{kind:'configured_field',name:f.name}}))};
+}
+export async function configureFilterOutputs(channel,configuration,parameters,mappings,finishWizard,context){
  const ports=[];
  for(const port of [0,1]){
   await channel.openOutputPort(port);
-  const mapped=await configureSortingOutput(channel,configuration,parameters,{direction:'output',port,...mappings.find(m=>m.port===port)});
+  const mapped=await configureSortingOutput(channel,configuration,parameters,{direction:'output',port,...resolveFilterOutputMapping(configuration,mappings.find(m=>m.port===port),context)});
   need(mapped.native_mapping.node_context?.output_port?.port===port,'Filter output mapping owner differs');
   const definition=await readOutputDefinitionPages(channel,{expectedCount:mapped.native_mapping.target_fields.length});
   need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapped.native_mapping.target_fields[i][k])),'Filter output definition differs');

@@ -220,7 +220,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      return verified({effect_possible:true,native_mapping,definition,changes,finish,source_identity_verified:true});
     }
     enter(ctx);requireValue(configured,'Configured calculator missing');
-    if(implementation?.configureAllOutputs){multipleOutputs=await implementation.configureAllOutputs(channel,configured,operation.nodeApply.request.parameters,mappings,finishWizard);return multipleOutputs;}
+    if(implementation?.configureAllOutputs){multipleOutputs=await implementation.configureAllOutputs(channel,configured,operation.nodeApply.request.parameters,mappings,finishWizard,
+     ...(implementation.bindingSchema?[{request:operation.nodeApply.request,inputMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping}]:[]));return multipleOutputs;}
     // CrossTable generates its output only on Execute. This internal hook is
     // restricted to that component; all existing handlers keep strict mappings.
     if(implementation?.type==='transform.cross_table'&&implementation.materializedSchema){

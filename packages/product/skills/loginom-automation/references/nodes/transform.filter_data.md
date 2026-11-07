@@ -4,8 +4,7 @@
 Mode `conditions`. Табличный input 0, outputs 0 (подходящие) и 1 (остальные).
 Внутри groups — AND, между группами — OR. Запроси `parameter_schema`.
 
-Literal-значения остаются обычными scalar/массивом. Для управляющей переменной
-используй `value:{kind:"variable",name:"limit"}`, для списка —
+Legacy scalar: `value:{kind:"variable",name:"limit"}`, для списка —
 `values:{kind:"variable",name:"codes"}`. name — точное имя переменной на
 mapped control input 0; сначала подтверди тип/связь через W1. Общая связь:
 `variable_inputs:[{source:<observed NodeRef>,output:0,input:0,kind:"control"}]`.
@@ -16,19 +15,17 @@ mapped control input 0; сначала подтверди тип/связь че
 через запятую. Для строк явно задай case_sensitive. NULL входного поля
 не проходит обычное сравнение/in. Интервалы и остальные типы переменных,
 кавычки/разделитель внутри элемента и NULL-переменные в этом срезе исключены.
-Сохрани остальные настройки, проверь оба выхода и Save отдельно от Execute.
 
 Для отбора по управляющей переменной выбирай этот узел: `dock_node_apply`,
 `target.type:"transform.filter_data"`, `mode:"conditions"`, `parameters.groups`.
 Источник — исполняемый `variables.calculator`, mode `expression`, либо
-`variables.from_table`, mode `aggregate`. Выполни источник до подключения;
-После изменения источника выполни его снова; имена и метки переменных должны совпадать.
+`variables.from_table`, mode `aggregate`. Выполни источник до подключения
+и после изменения; имена и метки переменных должны совпадать.
 Для builtin «Переменные сценария» используй общий `bindings` ниже;
 прежний operand API требует исполняемый источник.
 Повторное выполнение фильтра после смены источника: тот же NodeRef,
 `parameters:{}`, `inputs:[]`, `finish:"execute"`, `read.ports:[0,1]`.
-Не вычисляй этот отбор через Калькулятор или JavaScript. Для обычных условий
-сохраняются literal, row_number, NULL, AND/OR и явный регистр строк.
+Не вычисляй этот отбор через Калькулятор или JavaScript.
 
 ## Общая привязка scalar-порога
 
@@ -43,6 +40,13 @@ mapped control input 0; сначала подтверди тип/связь че
 сохрани пакет и прочитай переменные отдельным `dock_node_read`. Builtin не Execute.
 Поддержаны точные integer/string scalar-сравнения, без NULL и преобразований;
 для string явно `case_sensitive`. Проверь `configuration.bindings` после Done.
+При создании Фильтра фиксируй порядок полей обоих outputs 0/1: в первом apply
+задай для каждого `mappings` с `direction:"output"`, его `port`, `autosync:false`
+и полным `fields` в порядке источника или пользователя; каждый source —
+`{kind:"configured_field",name:<имя>}`. Native autosync=true после Save/reopen
+может переставить поля по алфавиту. Не исправляй это перенастройкой после reopen.
+Для привязки существующего условия используй `parameters:{}` и `bindings`;
+pointer относится к сохранённым groups. Остальные условия и их строки сохраняются.
 После изменения только Limit выполни тот же Фильтр: `parameters:{}`, `bindings:[]`,
 `inputs:[]`, `mappings:[]`, finish `execute`, read ports `[0,1]`.
 Настройки сохраняются. Не создавай второй Фильтр.
@@ -51,15 +55,13 @@ mapped control input 0; сначала подтверди тип/связь че
 
 ## Продолжение пакета
 
-В продолжении после открытия пакета сохранение не доказывает активность выхода.
-Перед новым `transform.filter_data` подтверди нужный выход того же существующего табличного
-источника. Используй `loginom_dock_node_read` с успешной локальной операцией
-текущей подготовки; если её нет — existing apply с точным ref, прежним типом/mode,
-`inputs:[]`, пустым patch по схеме и `finish=execute`. Дождись подтверждённого
-выполнения/чтения источника; примеры пустого patch — [Граф и узлы](../canvas.md#продолжение-пакета).
-Отказ `filter preflight requires an active source output` с `NOT_APPLIED`,
-`effect_possible=false`, `cleanup_complete=true` означает, что новый узел ещё не
-создан: после выполнения источника повтори запрос с новым operation_id, не
-пересоздавая источник и не освобождая несуществующий целевой узел. Это не разрешает
-повтор неизвестного запуска или автоматический запуск REST/JS/экспорта вне просьбы.
+Save не доказывает активность табличного источника после открытия пакета.
+До нового Фильтра подтверди выход того же источника: `dock_node_read` с успешной
+операцией текущей подготовки либо existing apply с прежними ref/type/mode,
+пустым patch по схеме, `inputs:[]`, `finish:execute`; дождись результата.
+Примеры — [Граф и узлы](../canvas.md#продолжение-пакета).
+`filter preflight requires an active source output` с NOT_APPLIED,
+effect_possible=false и cleanup_complete=true: новый Фильтр не создан.
+Выполни источник, повтори запрос с новым operation_id. Не повторяй неизвестный
+запуск и не запускай REST/JS/экспорт вне просьбы пользователя.
 <!-- /mode -->
