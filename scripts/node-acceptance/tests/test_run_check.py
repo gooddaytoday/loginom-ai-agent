@@ -347,6 +347,20 @@ class RunCheckTests(unittest.TestCase):
         self.assertNotEqual(rows[1]['R_Delta'], 0.249999)
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
+        for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], ['input.csv'])
+            self.assertTrue((case['data'] / 'input.csv').is_file())
+            expected = runner.expected_for(case, '/test/replacement.lgp')
+            self.assertEqual(expected['package_path'], '/test/replacement.lgp')
+            self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+            self.assertEqual(expected['outputs'][0]['output_node_type'], 'transform.replace_columns')
+            self.assertEqual(len(expected['outputs'][0]['columns']), 5)
+
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')
         self.assertTrue(case['prompt'].is_file())

@@ -600,3 +600,8 @@ current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
+и только fixtures/extended/input.csv из replacement. Независимые expected.json
+и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
+Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.

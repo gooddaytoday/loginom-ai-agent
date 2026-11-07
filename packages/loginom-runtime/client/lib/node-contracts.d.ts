@@ -155,15 +155,25 @@ export interface RegexReplacementRule {
   pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
   other: {mode: 'keep' | 'null'};
 }
+export interface ExtendedReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string' | 'integer' | 'real';
+  result_type?: 'string' | 'integer' | 'real' | 'datetime' | 'boolean';
+  pairs: Array<{from: ReplacementValue; to: ReplacementValue | {type: 'datetime'; value: string | null} | {type: 'boolean'; value: boolean | null}}>;
+  regex_pairs?: RegexReplacementRule['pairs'];
+  other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue | {type: 'datetime'; value: string | null}};
+  case_sensitive?: boolean;
+  precision?: number;
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: Array<ReplacementRule | RegexReplacementRule>;
+  rules?: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex' | 'mixed'; rules: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }

@@ -1694,14 +1694,14 @@ function wizardStepFixture(page,direction='next') {
 }
 
 test('replacement type portal exposes only items owned by the selected field and split button',async()=>{
- for(const foreign of [false,true]){
+ for(const foreign of [false,true])for(const type of ['Int','Boolean']){
   const page=new Page(),c=wizardStepFixture(page),base=c.base+';ReplaceColumnsWizard;';
   page.context.innerWidth=1000;page.context.innerHeight=800;
   c.marker.attrs['data-tid']=base+'grdDataList;tbl';
   const grid=page.add('div',base+'grdDataList','',undefined,c.form);grid.id='replace-input';
   const button=page.add('a',base+'btnTypeChange','Изменить тип замены',undefined,c.form);button.id='replace-type';
   const menu=page.add('div',base+'btnTypeChange;mn','',{x:200,y:150,width:200,height:160});menu.id='replace-menu';
-  const item=page.add('div',base+'itmTypeChangeInt','Целый',{x:220,y:180,width:160,height:24},menu);item.id='replace-integer';item.attrs.role='menuitemcheckbox';
+  const item=page.add('div',base+'itmTypeChange'+type,'Целый',{x:220,y:180,width:160,height:24},menu);item.id='replace-integer';item.attrs.role='menuitemcheckbox';
   const selected={isModel:true,internalId:'field',data:{Name:'Code',ReplaceMode:1}},nativeMenu={el:{dom:foreign?{}:menu}};
   const components={
    'replace-input':{el:{dom:grid},getSelectionModel:()=>({getSelection:()=>[selected]}),getStore:()=>({getData:()=>({items:[selected]})})},
@@ -1712,7 +1712,7 @@ test('replacement type portal exposes only items owned by the selected field and
   const roots=(await page.execute({mode:'observe',discover_roots:true})).output;
   const root=roots.ui.elements.find(e=>e.tid===base+'btnTypeChange;mn');assert.ok(root);
   const observed=(await page.execute({mode:'observe',root_ref:root.ref})).output;
-  const control=observed.ui.elements.find(e=>e.tid===base+'itmTypeChangeInt');
+  const control=observed.ui.elements.find(e=>e.tid===base+'itmTypeChange'+type);
   if(foreign)assert.equal(control?.replacement_field,undefined);
   else{assert.equal(control?.replacement_field?.field_key,'Code');assert.ok(control.allowed_actions.includes('click'),JSON.stringify(control));}
  }
