@@ -4,7 +4,7 @@ import {createNodeTargetBrowserAdapter} from './node-target-browser.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {effectiveEnrichInput} from './enrich-mappings.mjs';
-import {validateEnrichSchemas} from './enrich-parameters.mjs';
+import {validateEnrichSchemas,MAX_ENRICH_LOOKUPS} from './enrich-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 export function validateEnrichGraphInputs(request,graph){
  for(const input of request.inputs){
@@ -26,7 +26,7 @@ export async function preflightEnrich(options,ctx,config){
  const count=request.parameters.enrichment?request.parameters.enrichment.tables.length+1:existing?.inputs.length;
  try{
   validateEnrichGraphInputs(request,graph);
-  need(Number.isInteger(count)&&count>=2&&count<=3,'Enrich requires two or three tabular inputs');
+  need(Number.isInteger(count)&&count>=2&&count<=MAX_ENRICH_LOOKUPS+1,'Enrich requires two to '+(MAX_ENRICH_LOOKUPS+1)+' tabular inputs');
   if(request.target.kind==='existing')need(existing?.type==='transform.enrich_data','Existing enrich identity required');
   need(!existing||existing.locked===false,'Enrich input preflight requires a writable node');
   need(!existing||existing.inputs.length<=count,'Removing an existing enrich input requires explicit separate intent');

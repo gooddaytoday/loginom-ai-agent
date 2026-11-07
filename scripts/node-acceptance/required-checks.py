@@ -32,7 +32,7 @@ RULES = (
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
     ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns', 'variables-rows')),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
-    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
+    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite', 'enrich-three-lookups', 'enrich-four-lookups')),
     ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),
     ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),

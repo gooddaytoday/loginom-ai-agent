@@ -317,7 +317,7 @@ for(const type of ['transform.group_data','transform.sorting','transform.calcula
   assert.deepEqual(records.at(-1).proof.managed_javascript_source,{source_operation_id:'pareto-001',execution_id:f.history.outcome.output.execution.execution_id});
  }
 });
-for(const type of ['enrich_input_0','enrich_input_1','enrich_input_2'])test(type+' refuses unsettled, stale or foreign managed JS before preview',async()=>{
+for(const type of ['enrich_input_0','enrich_input_1','enrich_input_2','enrich_input_4'])test(type+' refuses unsettled, stale or foreign managed JS before preview',async()=>{
  for(const change of [f=>f.history.cleanup_confirmed=false,
   f=>f.history.outcome.output.output.ports[0].fresh=false,
   f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
