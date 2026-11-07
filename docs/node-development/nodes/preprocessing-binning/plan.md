@@ -139,3 +139,79 @@ PASS исполнителя ≥2/3 на одном опубликованном 
 ## 6. Точка перепроверки
 
 Прежние задания, oracle и критерии выше сохраняются для своих ревизий. Новая приёмка выполняется по назначению на точном SHA; статическая синхронизация документации не утверждает новые критерии и не переносит прежний PASS. Текущая регистрация и ограничения — в [карточке](README.md).
+
+## 7. LAB-1046: расширения v0.4.0, checkpoint этапа 0
+
+07.11.2026, mas2, Loginom 7.4.2, только `https://app.loginom.ai/app/?testable=true`,
+worker назначенной пары `01a124e5-1623-7a32-93c7-a3754c7dbdd7`.
+Назначение указывало `afaa1f300687501c26b2e0921b05553cd75052f5`; по действующему
+регламенту взята текущая голова `v040@9ec18ee987bc16d953f985a173d85e8b08a93020`.
+Node 24.19.0; для native discovery использован установленный Chromium 1243.
+CLI не собирался, runtime не менялся, run-check/CSV/cold не выполнялись.
+**Этап не завершён:** после двух восстановлений разорванного сеанса остановка
+по условию назначения. Этот раздел не утверждает новые критерии.
+
+### Наблюдено в UI
+
+Корень опыта `MF;TF-1`, далее B = `WizrdMCF;MethodSettingsWizard-1`.
+`B;colDisplayName_2` — DateTime When, `colMethodType_2` открывает те же методы,
+что и numeric: ширина, количество, плитка, коэффициенты СКО.
+Нужна стабилизация выбранной строки/редактора до следующего действия.
+
+- DateTime/count: `MethodSettingFrame;cbbCountBins;ValueControl`,
+  `chkStrictLowerLimit`/`chkStrictUpperLimit`, границы в
+  `edtLowerLimit;ValueContainer;datetimefield` и соответствующем edtUpperLimit.
+  Не искать их numeric num/Int64Field-путями. Флаги округления/открытых краёв видны.
+- SD: `cbbSDBinsMode;ValueControl` предлагает ±1/±2/±3 СКО; ±1 показывает три класса.
+  На Integer X получены численные границы -3/1/11/15 и открытые хвосты;
+  это не подтверждение Real-округления или универсальной формулы СКО.
+- Frequency: `cbbMatchingObservationsMode;ValueControl` содержит next/current/
+  random/unchanged/equal tiles; `chkSummTile;ValueControl` включается, current
+  читается обратно как «Сохранять в текущем». Вычисления этих расширений не выполнены.
+- После Train `B;grdBins` содержит materialized intervals.
+  `colUpperBoundValue_0` — редактируемый DateTime; перенос Jan 2 12:00 → Jan 2 00:00
+  одновременно изменил `colLowerBoundValue_1`. `colBinLabel_0/1` изменены на Early/Late.
+  После Done/Execute без нового Train метки и ручные границы сохранились в выходах.
+
+Повторяющиеся `MethodSettingFrame` принадлежат разным полям/скрытым страницам:
+сначала подтвердить выбранное поле и единственный видимый owner, не брать first().
+Второй выход при одном DateTime-поле имеет datetime LowBound/UppBound/LowDev/UppDev,
+BoundsDataType=2; при одновременно настроенных numeric/DateTime границы становятся
+Variant. Предлагаемый контракт пока сохраняет **одно** обрабатываемое поле.
+
+По modes.csv оба полных выхода DateTime/manual сверены с независимым календарным
+oracle: схемы, порядок и все 146 значений совпали. Когда When=NULL, BinsID=When,
+номер/метка/границы/OutOfBins=NULL, флаги open=false. Исходные X/Target/Segment и
+их NULL сохранены. Это native discovery, не PASS production reader или run-check.
+
+### Предложение и оставшаяся работа
+
+[Комплект и статусы](acceptance/modes/README.md),
+[oracle](acceptance/modes/oracle.py), [схема](acceptance/modes/parameter-schema.proposal.json),
+[карточка](acceptance/modes/node-card.proposal.json).
+DateTime/manual — точные даты, два порта, ручные метки, без повторного Train.
+Auto/count и population-SD на Real — отдельные численные предложения, ещё без UI-сверки.
+Все task/oracle/expected отделены; модели только выбранный task и CSV.
+Random исключён из схемы до решения о критерии. Остальные непроверенные ветки
+перечислены в README комплекта, их нельзя считать покрытыми наличием контролов.
+
+Оценка — **3–4 цикла** после завершения исследования и утверждения критериев:
+DateTime/auto/SD; deterministic ties/sums; materialized edits и lifecycle;
+округление/open-края и persistence. Затронутся существующие
+`client/lib/binning-{parameters,context,procedure,node,output,readback}.mjs` в
+packages/loginom-runtime. Сейчас context принимает метод 5 в inventory, но его
+settings не декодирует; интервалы требуют Number.isFinite и отвергают Date.
+Readback пока жёстко пишет rounding=false/open_ends=false/ties-next.
+До manual-edit нельзя сохранять текущий порядок «правка → автоматический Train».
+
+Общая работа по текущей оценке — аддитивные схемы/регистрация собственных параметров
+в node-api/node-contracts и расширение справки; новый общий verifier не нужен.
+Необходимость иной общей правки не доказана. Если она появится — отдельный стоп.
+
+### Модельный бюджет предложения
+
+Измерение: `node .../preprocessing-binning/fixtures/measure-modes.mjs --write`;
+карта получена из настоящего userActionInventory/describe с нулевыми hash-полями.
+Учитываются реальные pins, не пустая вручную собранная карточка.
+Общие размеры и команда model-schema-budget приведены в [smoothing-подплане](../preprocessing-smoothing/plan.md#7-lab-1046-вейвлеты-checkpoint-этапа-0).
+Точные актуальные байты воспроизводит скрипт; таблица фиксируется перед PR.
