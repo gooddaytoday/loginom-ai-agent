@@ -6,6 +6,9 @@ import {configureTextExport} from '../lib/text-export-procedure.mjs';
 import {requireStorageDestination} from '../lib/storage-policy.mjs';
 import {readTextExportBrowser} from '../lib/text-export-context.mjs';
 import {chromium} from 'playwright-core';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {textExportReadback} from '../lib/text-export-node.mjs';
 
 const encodings=[['Windows-1252',1252,'Западноевропейская (1252)'],['UTF-16 LE',1200,'UTF-16 LE (1200)'],['UTF-16 BE',1201,'UTF-16 BE (1201)']];
 test('fixed width and explicit Unicode/western encodings reach production preflight',()=>{
@@ -24,6 +27,20 @@ test('fixed width and explicit Unicode/western encodings reach production prefli
 
 const root='MF;TF-1;WizrdMCF',base=root+';ExportTextFilePreviewWizard;';
 const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'export'}};
+test('actual export readback validates for both representations and every registered encoding',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ for(const format of ['delimited','fixed_width'])for(const encoding of [65001,1251,1252,1200,1201]){
+  const settings={destination:'/test-2/fixed.txt',text_qualifier:'"',decimal_separator:'.',date_separator:'',time_separator:'',true_value:'True',false_value:'False',null_marker:'',date_format:'',time_format:'',delimiter:';',encoding,bom:false,line_ending:1,header:1};
+  const readback=textExportReadback({node:binding.node,phases:[
+   {phase:'input_mapping',receipt_id:'input',value:{source_identity_verified:true,native_mapping:{autosync:true,target_fields:[]}}},
+   {phase:'configure',receipt_id:'configure',value:{configuration:{destination:settings.destination,configured:{text_export_format:{format,values:Object.fromEntries(Object.entries(settings).map(([k,value])=>[k,{value}]))}}}}},
+   {phase:'finish',receipt_id:'finish',status:'verified'}
+  ]});
+  const result={operation_id:'export',status:'SUCCEEDED',effect_possible:true,phases:[],node:binding.node,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback}};
+  assert.equal(validate(result).valid,true,format+' / '+encoding);
+  delete readback.format;assert.equal(validate(result).valid,true,'legacy readbacks remain valid');
+ }
+});
 function fixture({initial='delimited',mode='fixed_width',encoding,wrong=false,unrelated=false}={}){
  let stage='text_export_params',format=initial,code=65001,opened=false;
  const actions=[];
