@@ -156,7 +156,7 @@ test('installed import discovery supplies its complete parameter vocabulary on t
     const { description, ...shape } = schema.properties[key];
     assert.deepEqual(shape, nodeApplyInputSchema.properties.parameters.properties[key]);
   }
-  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns']);
+  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns', 'analysis']);
   schema.properties.settings.properties.columns.maxItems = 0;
   const fresh = describeNodeTypes(['imports.text'], {}, new Map(), support.nodeApplyHandlers)[0];
   assert.equal(fresh.parameter_schema.properties.settings.properties.columns.maxItems, 1000);
