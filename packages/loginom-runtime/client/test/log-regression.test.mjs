@@ -36,22 +36,36 @@ test('logistic roles keep identifiers and comments and require a discrete string
  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,target_field:'x'}},'enter'));
 });
 
-function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,needsScroll=false,initialCriterion=1}={}){
+function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,needsScroll=false,initialCriterion=1,normalization,initialNorm=0,existing=false,corruptTarget=false}={}){
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
  const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:initialCriterion,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
  if(mode==='apply'){Object.assign(values,{pedAutoMethod:false,pedRegressionMethod:0,pedUseDetailedSettings:true,pedEventType:4,pedEventId:2});Object.assign(details,{pedEpsilon:1e-10,pedThreshold:0.8});}
- let stage='input_mapping',picker=null,scrollTop=0;const actions=[];
+ let stage='input_mapping',picker=null,scrollTop=0,normType=initialNorm,normSelected=false,normEditor=false,editorNorm=initialNorm;const actions=[];
  const rawState=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',owner_context:{status:'observed'},stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']},{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
   ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
   node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:details.pedRegSelQuality!==0||mode==='forward'}})}});
- const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
+ const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();
+  if(stage==='normalization'){
+   s.node_logregression.fields[0].norm_type=normType;
+   if(corruptTarget&&normType!==initialNorm)s.node_logregression.fields[1].norm_type=8;
+   s.node_logregression.selected=normSelected?['role-1']:[];
+   s.node_logregression.editor=normEditor?{root_tid:s.wizard.root_tid+';ColumnsEditForm',record_ids:['role-1'],norm_type:editorNorm}:null;
+   for(const [key,tid] of [['norm-row','NormTuneWizard;colDisplayName_X'],['norm-edit','NormTuneWizard;btnEdit'],['norm-picker','ColumnsEditForm;cbxNormType;trg_picker'],['norm-apply','ColumnsEditForm;btnApply']])s.ui.elements.push({ref:key,tid:s.wizard.root_tid+';'+tid,allowed_actions:['click']});
+   if(picker==='norm')for(const [value,label] of [[0,'Нет'],[5,'Стандартизация']])s.ui.elements.push({ref:'norm-option-'+value,tid:s.wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist;'+label,label,role:'option',allowed_actions:['click']});
+  }
+  if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
  const channel={async observe({ready,condition}){const s=state();assert.ok(ready(s),condition);return s;},async perform({ready,resolve,initialObservation}){
   const s=initialObservation??state();assert.ok(ready(s));const a=resolve(s);actions.push(a);
   if(a.ref==='close'){stage='closed';return;}
   if(a.verb==='wizard_step'){validateUiAction(a,s);stage=a.expected_stage;return;}
+  if(a.ref==='norm-row'){normSelected=true;return;}
+  if(a.ref==='norm-edit'){normEditor=true;editorNorm=normType;return;}
+  if(a.ref==='norm-picker'){picker='norm';return;}
+  if(a.ref.startsWith('norm-option-')){editorNorm=Number(a.ref.slice(12));picker=null;return;}
+  if(a.ref==='norm-apply'){normType=editorNorm;normEditor=false;return;}
   const key=a.ref.split(':')[0],target=stage==='lin_regression_details'?details:values;
   if(a.verb==='scroll'){scrollTop=43;return;}
   if(a.verb==='fill'&&key==='pedRemoveSignificance'&&needsScroll&&scrollTop===0)throw Error('UI_REFERENCE_OBSCURED');
@@ -61,8 +75,38 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
   else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
- return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(selection?{selection}:{})}},{request:{...request,mode},inputMapping})};
+ return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(normalization!==undefined?{normalization}:{}),...(selection?{selection}:{})}},{request:{...request,mode,target:existing?{kind:'existing',ref:node}:request.target},inputMapping})};
 }
+
+test('normalization validates the native none/standardize choices before mutation',()=>{
+ for(const normalization of ['none','standardize'])assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,normalization}},'enter'));
+ for(const normalization of [null,5,'minmax',{},''])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,normalization}},'enter'));
+});
+
+test('standardize edits only predictors and preserves target encoding and denormalized coefficients',async()=>{
+ const f=fixture({normalization:'standardize'}),result=await f.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.equal(result.configuration.normalization[1].norm_type,1);
+ assert.equal(f.values.pedDenormalize,true);
+ assert.equal(f.actions.filter(a=>a.ref==='norm-apply').length,1);
+ assert.deepEqual(result.configuration.fields.map(f=>f.usage_type),[0,3,4,0]);
+ await assert.rejects(fixture({normalization:'standardize',corruptTarget:true}).run(),/other|unrelated/);
+});
+
+test('existing omitted normalization persists; explicit none reverses standardize',async()=>{
+ const kept=fixture({existing:true,initialNorm:5}),result=await kept.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.ok(!kept.actions.some(a=>a.ref==='norm-apply'));
+ const reset=await fixture({existing:true,initialNorm:5,normalization:'none'}).run();
+ assert.equal(reset.configuration.normalization[0].norm_type,0);
+});
+
+test('apply inspects saved standardize without edits and rejects an explicit mismatch',async()=>{
+ const f=fixture({mode:'apply',initialNorm:5,normalization:'standardize'}),result=await f.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+ await assert.rejects(fixture({mode:'apply',initialNorm:5,normalization:'none'}).run(),/saved.*normalization/);
+});
 
 test('Enter resolves event from observed classes, sets explicit threshold/epsilon and advances to Done',async()=>{
  const f=fixture(),result=await f.run();
@@ -95,6 +139,8 @@ test('readback binds training, event and cutoff to committed settings and separa
  const entries={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute',training:{status:'trained',node,execution_id:'teach',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
  const candidate={node,operation_id:'logistic',phases:Object.entries(entries).map(([phase,value])=>({phase,status:'verified',receipt_id:'logistic:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};
  const result=logRegressionConfigurationReadback(candidate);assert.equal(result.threshold,0.8);assert.equal(result.event,'yes');assert.equal(result.training.execution_id,'teach');assert.equal(result.package_persistence_verified,false);
+ c.normalization=[{name:'X',norm_type:5},{name:'Target',norm_type:9}];
+ assert.equal(logRegressionConfigurationReadback(candidate).normalization,'standardize');
  entries.finish.training.execution_id='execute';assert.throws(()=>logRegressionConfigurationReadback(candidate),/training/);
 });
 

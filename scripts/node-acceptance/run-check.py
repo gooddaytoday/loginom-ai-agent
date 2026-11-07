@@ -366,6 +366,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-normalization':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization'
+        return dict(source=src, prompt=src / 'task-normalization.md', data=src / 'data', base=None,
+                    input_files=['normalization.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py', logreg_normalization=True,
+                    cold_expected_name='cold/expected.json', export_count=2)
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -501,8 +507,10 @@ def scenario(name, case_root=None, *, cases=None):
                 csv_header='labels' if name in ['s8', 'q6', 'p24'] else 'names')
 
 
-def expected_for(case, package):
+def expected_for(case, package, cold=False):
     src = case['source']
+    if cold and case.get('cold_expected_name'):
+        return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
     # The owner-approved sampling envelope is separate from stock exact rows.
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
@@ -521,6 +529,8 @@ def expected_for(case, package):
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
+    if case.get('logreg_normalization'):
+        expected['logreg_normalization'] = True
     if case.get('linreg_forward'):
         # C1's mathematical oracle omits presentation labels. Bind the three
         # intrinsic labels from linregression-output.mjs; keep all numeric
@@ -531,6 +541,27 @@ def expected_for(case, package):
                 if column['name'] in labels: column['label'] = labels[column['name']]
     expected['package_path'] = package
     return expected
+
+
+def logreg_normalization_exports(destinations):
+    assert len(destinations) == 2, 'LOGREG_NORMALIZATION_TWO_EXPORTS_REQUIRED'
+    return (f'{destinations[0]} — итоговый прогноз порта 0 после стандартизации; '
+            f'{destinations[1]} — полная таблица коэффициентов порта 1 той же нормализованной модели. '
+            'Выгрузи оба CSV до Save/reopen. Прогноз без нормализации покажи чтением порта узла.')
+
+
+def save_confirmed(case, receipt, package):
+    if receipt.get('status') != 'SUCCEEDED' or receipt.get('action_key') not in ['package.save_checkpoint', 'package.save_as']:
+        return False
+    output = receipt.get('output', {})
+    if output.get('save_completed') is True:
+        return True
+    # This scenario also accepts the verified save_as v2 receipt (which has
+    # no save_completed field). Require the complete reopened path identity.
+    return (case.get('logreg_normalization') is True and receipt.get('action_key') == 'package.save_as'
+            and receipt.get('action_revision') == '2' and receipt.get('phase') == 'verified'
+            and receipt.get('cleanup_complete') is True and output.get('reopened') is True
+            and output.get('package_ref') == dict(kind='package', path=package, active_identity=package))
 
 
 def arguments(argv=None):
@@ -1279,6 +1310,8 @@ class Runner:
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if not spec.get('upload_only'):
+            if spec.get('logreg_normalization'):
+                prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
             if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
@@ -1379,7 +1412,7 @@ class Runner:
             assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
             self.current.update(save='0', cleanup='main PASS', upload='ready', cold='—', csv='—')
             return session, expected, None, None
-        assert any(o.get('status') == 'SUCCEEDED' and o.get('action_key') in ['package.save_checkpoint', 'package.save_as'] and o.get('output', {}).get('save_completed') is True for _, o in replies), 'SAVE_NOT_CONFIRMED'
+        assert any(save_confirmed(spec, o, package) for _, o in replies), 'SAVE_NOT_CONFIRMED'
         self.current['save'] = 'PASS'
         if refusal:
             allowed = {n['type'] for n in expected['nodes']}
@@ -1667,6 +1700,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('logreg_normalization'):
+            write(folder / 'logreg-replies.json', [o for _, o in replies])
+            self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
+                folder / 'expected.json', folder / 'logreg-replies.json', folder / 'logreg-normalization-proof.json'], folder, timeout=60)
         if expected.get('clustering_normalized'):
             write(folder / 'clustering-replies.json', [o for _, o in replies])
             self.phase('clustering-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-normalized.mjs',
@@ -1717,8 +1754,12 @@ class Runner:
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
+                        cold_expected = stage / 'expected.json'
+                        if spec.get('cold_expected_name'):
+                            cold_expected = stage / 'expected-cold.json'
+                            write(cold_expected, expected_for(spec, r['package'], cold=True))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
