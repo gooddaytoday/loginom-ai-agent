@@ -77,3 +77,9 @@ python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle.py e
 
 Выводы должны побайтно совпадать с соответствующими expected, включая
 шаблон `{{PACKAGE_PATH}}`. Runner подставит реальный `.lgp` до cold-check.
+
+## LAB-1018: новые режимы, этап 0
+
+[Предложение и незавершённые проверки](../modes-stage0.md). Старые expected выше
+сохраняются; новые файлы LAB-1018 не утверждают native/runtime поддержку.
+После двух разрывов связи исследование остановлено по карточке.

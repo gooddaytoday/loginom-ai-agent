@@ -10,7 +10,7 @@ import csv
 import json
 import math
 from pathlib import Path
-from statistics import NormalDist
+from statistics import NormalDist, mean, stdev
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -127,6 +127,43 @@ def expectations():
         'output_node_type':'datamining.log_regression','output_port':1,'ordered':True,'column_order':'exact',
         'columns':[{'name':n,'type':t,'label_any':True,**({'tolerance':{'abs':1e-7,'rel':1e-8}} if t=='real' else {})} for n,t in fields],
         'rows':[dict(zip([n for n,_ in fields],r)) for r in coeff]}]}
+    # Owner decision v040-native-semantics-0711: port 1 uses standardized
+    # factors regardless of denormalize. Derive everything from source X',
+    # never from native observed coefficients. Port 0 remains the original fit.
+    mu,sd=mean(r['X'] for r in normalized),stdev(r['X'] for r in normalized)
+    za,zb=na+nb*mu,nb*sd
+    standardized=[{**r,'X':(r['X']-mu)/sd} for r in normalized]
+    fa,fb=fit(standardized)
+    assert abs(fa-za)<1e-12 and abs(fb-zb)<1e-12
+    h00=h01=h11=0.0
+    for r in standardized:
+        x=r['X'];p=sigmoid(za+zb*x);v=p*(1-p)
+        h00+=v;h01+=x*v;h11+=x*x*v
+    det=h00*h11-h01*h01
+    s0,s1=math.sqrt(h11/det),math.sqrt(h00/det)
+    norm_coeff=[['<Константа>',None,None,za,s0,(za/s0)**2,math.erfc(abs(za/s0)/math.sqrt(2)),None,None,None],
+                ['X','X',None,zb,s1,(zb/s1)**2,math.erfc(abs(zb/s1)/math.sqrt(2)),math.exp(zb),math.exp(zb-z*s1),math.exp(zb+z*s1)]]
+    norm_columns=json.loads(json.dumps(result['coefficients']['outputs'][0]['columns']))
+    # New derived statistics propagate the established beta/SE error envelope.
+    # In particular exp(beta+z*SE) amplifies absolute errors in both operands.
+    # Existing expectations and prediction tolerances are unchanged.
+    eps=1e-7
+    derived={
+        'wald':max(abs(((zb+eps)/(s1-eps))**2-(zb/s1)**2),abs(((zb-eps)/(s1+eps))**2-(zb/s1)**2)),
+        'oddsRatio':math.exp(zb)*math.expm1(eps),
+        'lowerBound':math.exp(zb-z*s1)*math.expm1((1+z)*eps),
+        'upperBound':math.exp(zb+z*s1)*math.expm1((1+z)*eps)}
+    for col in norm_columns:
+        suffix=col['name'].removeprefix('Target_')
+        if suffix in derived:
+            col['tolerance']={'abs':max(eps,derived[suffix]),'rel':1e-8}
+    result['normalization']['outputs'].append({**result['coefficients']['outputs'][0], 'columns':norm_columns,
+        'rows':[dict(zip([n for n,_ in fields],r)) for r in norm_coeff]})
+    # Cold retains the original exact field order; main has the independently
+    # observed native order. Only columns move; values/types/tolerances do not.
+    result['normalization/cold']=json.loads(json.dumps(result['normalization']))
+    cols=result['normalization']['outputs'][0]['columns']
+    result['normalization']['outputs'][0]['columns']=cols[:4]+[cols[6],cols[4],cols[5],cols[7]]
     dev=-2*sum(math.log(sigmoid(a+b*r['X']) if r['Target']=='yes' else 1-sigmoid(a+b*r['X'])) for r in rows)
     null=2*len(rows)*math.log(2);n=len(rows);p=2
     summary={'TotalSamples':n,'TotalSelectedSamples':n,'TrainSamples':n,

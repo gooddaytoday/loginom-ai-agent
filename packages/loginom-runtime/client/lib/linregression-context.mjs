@@ -21,16 +21,17 @@ export function readLinRegressionBrowser(prefix) {
  const active=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],e=es[0],b=e?.getBoundingClientRect();return es.length===1&&e.checkVisibility({checkVisibilityCSS:true})&&b.width>0&&b.height>0&&b.x>=0&&b.y>=0&&b.x<innerWidth&&b.y<innerHeight;};
  for(const [kind,card,names] of [
   ['parameters','LinRegressionWizard',['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs']],
-  ['details','LinRegressionWizard-1',['pedEpsilon','pedIntercept','pedPredictionIntervalLevel','pedLambdaLasso','pedLambdaRidge','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
+  ['details','LinRegressionWizard-1',['pedEpsilon','pedIntercept','pedPredictionIntervalLevel','pedLambdaLasso','pedRidgeSetupMethod','pedLambdaRidge','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
   const values={},switches={},disabled={};
-  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'linregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'linregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'linregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
+  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'linregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'linregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'linregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
   if(kind==='parameters'&&(!Number.isInteger(values.pedRegressionMethod)||!['pedAutoMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'].every(k=>typeof values[k]==='boolean')))return {verified:false,reason:'linregression_initializing'};
   if(kind==='details'&&(!(typeof values.pedEpsilon==='number'&&values.pedEpsilon>0)||typeof values.pedIntercept!=='boolean'))return {verified:false,reason:'linregression_initializing'};
   const selection=kind==='details'&&exactValue(base+';pedRegSelQuality;ValueControl'),store=selection?.getStore?.(),records=store?.getData?.()?.items;
   const selection_choices=Array.isArray(records)&&records.length===7&&!store.isLoading?.()?records.map(r=>({value:r.data?.[selection.valueField],label:r.data?.[selection.displayField]})):[];
-  return {verified:true,kind,values,switches,disabled,selection_choices};
+  const options=name=>{const c=exactValue(base+';'+name+';ValueControl'),store=c?.getStore?.(),rs=store?.getData?.()?.items;return Array.isArray(rs)&&!store.isLoading?.()?rs.map(r=>({value:r.data?.[c.valueField],label:r.data?.[c.displayField]})):[];};
+  return {verified:true,kind,values,switches,disabled,selection_choices,...(kind==='parameters'?{method_choices:options('pedRegressionMethod')}:{ridge_choices:options('pedRidgeSetupMethod')})};
  }
  const partitionBase=prefix+';WizrdMCF;LearnPartitionWizard';
  if(active(partitionBase)){

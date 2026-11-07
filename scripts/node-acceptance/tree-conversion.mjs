@@ -23,6 +23,14 @@ export function sameJsonValues(a,b){
  };
  try{return decode(a)===decode(b);}catch{return false;}
 }
+// Owner-approved C1 oracle projection. Do not normalize the echoed body JSON.
+export function sameRestEchoValues(actual,expected){
+ if(!sameJsonValues(actual,actual)||!sameJsonValues(expected,expected))return false;
+ const a=JSON.parse(actual),b=JSON.parse(expected);
+ return [a,b].every(v=>v&&typeof v==='object'&&!Array.isArray(v)
+  &&['method','data'].every(k=>typeof v[k]==='string'))
+  &&['method','data'].every(k=>Buffer.from(a[k],'utf8').equals(Buffer.from(b[k],'utf8')));
+}
 export async function observeTreeConversionSavedSettings({load,channel,expected,type}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs'),{closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');

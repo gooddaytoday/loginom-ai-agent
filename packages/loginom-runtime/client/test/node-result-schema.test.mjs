@@ -18,6 +18,14 @@ test('REST readback admits optional observed response Content-Type without chang
  for(const response_content_type of [null,true,'text/plain']){
   connection.response_content_type=response_content_type;assert.equal(validate(r).valid,false);
  }
+ delete connection.response_content_type;
+ for(const method of ['POST','PUT','PATCH','DELETE']){
+  r.configuration.readback.method=method;connection.method=method;
+  if(method!=='DELETE'){
+   connection.request_content_type='application/json';r.configuration.readback.body_field='Body';
+  }else{delete connection.request_content_type;delete r.configuration.readback.body_field;}
+  assert.equal(validate(r).valid,true,method);
+ }
 });
 test('result schema preserves uncertainty and forbids claiming node-level package persistence',()=>{
  assert.equal(validate(result()).valid,true);

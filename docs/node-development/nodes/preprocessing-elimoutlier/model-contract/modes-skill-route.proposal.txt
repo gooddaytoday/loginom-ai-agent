@@ -1,0 +1,1 @@
+| Выбросы SD/IQR | `preprocessing.elim_outlier` / detect, edit, quality, apply | [читать](references/nodes/preprocessing.elim_outlier.md) |
