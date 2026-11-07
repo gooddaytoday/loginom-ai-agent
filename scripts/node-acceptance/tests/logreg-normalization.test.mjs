@@ -46,6 +46,10 @@ assert c['base'] is None and c['oracle'].is_file() and (c['data']/'normalization
 assert e['logreg_normalization'] is True and len(e['outputs'][0]['rows'])==32
 assert e['outputs'][0]['column_order']=='exact' and e['package_path']=='/own/normalization.lgp'
 assert c['export_count']==2
+request=r.logreg_normalization_exports(['/own/predictions.csv','/own/coefficients.csv'])
+assert '/own/predictions.csv — итоговый прогноз порта 0 после стандартизации' in request
+assert '/own/coefficients.csv — полная таблица коэффициентов порта 1' in request
+assert 'до Save/reopen' in request and 'без нормализации' in request
 cold=r.expected_for(c,'/own/normalization.lgp',cold=True)
 assert [x['name'] for x in e['outputs'][0]['columns']][-4:]==['RowID','X','Target','Note']
 assert [x['name'] for x in cold['outputs'][0]['columns']][-4:]==['X','Target','RowID','Note']

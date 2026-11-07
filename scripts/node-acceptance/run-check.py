@@ -528,6 +528,13 @@ def expected_for(case, package, cold=False):
     return expected
 
 
+def logreg_normalization_exports(destinations):
+    assert len(destinations) == 2, 'LOGREG_NORMALIZATION_TWO_EXPORTS_REQUIRED'
+    return (f'{destinations[0]} — итоговый прогноз порта 0 после стандартизации; '
+            f'{destinations[1]} — полная таблица коэффициентов порта 1 той же нормализованной модели. '
+            'Выгрузи оба CSV до Save/reopen. Прогноз без нормализации покажи чтением порта узла.')
+
+
 def save_confirmed(case, receipt, package):
     if receipt.get('status') != 'SUCCEEDED' or receipt.get('action_key') not in ['package.save_checkpoint', 'package.save_as']:
         return False
@@ -1288,6 +1295,8 @@ class Runner:
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if not spec.get('upload_only'):
+            if spec.get('logreg_normalization'):
+                prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
             if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
