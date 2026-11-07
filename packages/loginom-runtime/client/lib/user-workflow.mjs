@@ -96,7 +96,7 @@ export function createUserWorkflowBindings() {
     },
     checkNodeDescription(request) {
       if(describedDocument&&describedDocument!==request.document_id)return null;
-      if(described.has(JSON.stringify([request.target?.type,request.mode]))&&(!describedDocument||describedDocument===request.document_id))return null;
+      if(described.has(JSON.stringify([request.target?.type,request.mode])))return null;
       return {result_version:'user-v1',operation_id:request.operation_id??null,
         status:'NOT_APPLIED',phase:'request_rejected',request_rejected:true,effect_possible:false,cleanup_complete:true,
         error:{code:'NODE_TYPE_NOT_DESCRIBED',message:'Read the node card in this prepared session before creating or changing this node.'},
