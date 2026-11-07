@@ -30,6 +30,7 @@ export function validateNodeApplyRequest(request, handlers) {
   const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
   const installed = handlers.get(request.target.type);
+  requireValue(!request.bindings?.length||installed?.binding_schema&&request.mode!==NODE_READ_MODE,'BINDING_PARAMETER_UNSUPPORTED: bindings require a registered configuration mode');
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
   requireValue(handler && typeof handler.validate === 'function' && typeof handler.configure === 'function'
     && typeof handler.revision === 'string' && handler.revision.length > 0, 'No local configuration handler for this node type');

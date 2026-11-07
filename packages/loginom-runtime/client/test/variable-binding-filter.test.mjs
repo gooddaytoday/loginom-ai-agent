@@ -57,6 +57,9 @@ test('public schema and installed production handler accept the bound slot toget
  const conflict=structuredClone(r);conflict.parameters.groups[0][0].value=5;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',conflict),/BINDING_CONFLICT/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,variable_inputs:[]}),/BINDING_PORT_MISMATCH/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,mode:'read_existing_output'}),/BINDING_PARAMETER_UNSUPPORTED/);
+ const handlers=new Map(support.nodeApplyHandlers),unregistered={...handlers.get(r.target.type)};delete unregistered.binding_schema;handlers.set(r.target.type,unregistered);
+ assert.throws(()=>validateNodeApplyRequest(r,handlers),/BINDING_PARAMETER_UNSUPPORTED/);
 });
 function inventory(){
  const node={document_id:'doc',workflow_id:'wf',node_id:'filter'};
