@@ -1,0 +1,101 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.ungroup_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Total_Rounded",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "OutputValue",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "a",
+          "OutputValue": 25
+        },
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "b",
+          "OutputValue": 75
+        },
+        {
+          "Group": "H",
+          "Total": 80,
+          "Total_Rounded": 80,
+          "Item": "c",
+          "OutputValue": 20
+        },
+        {
+          "Group": "H",
+          "Total": 80,
+          "Total_Rounded": 80,
+          "Item": "d",
+          "OutputValue": 60
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

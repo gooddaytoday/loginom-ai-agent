@@ -7,6 +7,10 @@ const skill = await Bun.file(new URL("SKILL.md", root)).text()
 
 test("automation entry stays below 40 KB as the node catalog grows", () => {
   expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+  const fileScope = "Файлы задания ищи только в рабочем каталоге и по точным путям из задания."
+  expect(skill).toContain(fileScope)
+  expect(skill).toContain("В CLI `glob`, `read`, `list` вне рабочего каталога отклоняются и обрывают прогон.")
+  expect(skill.indexOf(fileScope)).toBeLessThan(skill.indexOf("Если пользователь явно просит сначала загрузить"))
 })
 
 test("row filter routing includes both registered modes without growing its row", () => {
