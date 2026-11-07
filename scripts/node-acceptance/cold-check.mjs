@@ -1,4 +1,5 @@
 import {inspectSavedLgd} from './lgd-cold.mjs'
+import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
@@ -318,6 +319,10 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.excel_named_range&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});
+   await record({phase:'cold_excel_named_saved_settings',node,...settings});
+  }
   if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
    const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
    await record({phase:'cold_tree_saved_settings',node,...settings});

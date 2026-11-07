@@ -70,6 +70,13 @@ and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
 
+`excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
+затем продолжение до последней заполненной строки на том же узле (3 строки).
+Два CSV проверяются отдельно; внутренние typed-checkpoints подтверждают оба
+состояния и неизменный узел. Cold читает сохранённые имя/продолжение диапазона,
+отменяет мастер без применения настроек и штатно проверяет конечную таблицу.
+Модель получает только исходный task-named-range и named.xlsx.
+
 `missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
 use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
 reach the model. Independent expected tables check numeric zero imputation,

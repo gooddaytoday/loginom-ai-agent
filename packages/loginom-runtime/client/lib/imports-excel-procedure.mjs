@@ -40,23 +40,36 @@ export async function excelConfigureCapability(page,t,readContext){
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
   if(await pathInput.inputValue()!==t.excel.source_path)await fill(pathInput,t.excel.source_path);
   if(!t.preserve||t.excel.sheet_name!==undefined){
-  await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.sheet_name===undefined?'По номеру':'По имени');
-  const sheet=find(file+'cbbTableName;ValueContainer;cbx').locator('input');
-  await fill(sheet,t.excel.sheet_name??'1');
+  await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
+  if(t.excel.named_range!==undefined)await choose(file+'cbbTableName;ValueContainer;cbx',t.excel.named_range);
+  else{
+   const sheet=find(file+'cbbTableName;ValueContainer;cbx').locator('input');
+   await fill(sheet,t.excel.sheet_name??'1');
+  }
   }
   }
   if(!t.inspect&&!t.preserve){
-  const whole=find(file+'chkUsedRange;ValueControl');
-  if(!await whole.evaluate(e=>e.classList.contains('x-form-cb-checked')))await click(whole);
+  if(t.excel.named_range!==undefined){
+   const all=find(file+'chkAllRows;ValueControl');
+   if(await all.evaluate(e=>e.classList.contains('x-form-cb-checked'))!==(t.excel.extend_range??false))await click(all);
+  }else{
+   const whole=find(file+'chkUsedRange;ValueControl');
+   if(!await whole.evaluate(e=>e.classList.contains('x-form-cb-checked')))await click(whole);
+  }
   await choose(file+'cbbActionBlankRow;ValueControl','Импортировать');
   await fill(find(file+'edtTitleRowCount;ValueControl').locator('input'),t.excel.header_rows);
   }
   await quiet();await guard();
   const source=await page.evaluate(({file})=>{const input=key=>{const a=document.querySelectorAll('[data-tid='+JSON.stringify(file+key)+'] input');if(a.length!==1)throw Error('Excel source field ambiguous');return a[0].value;};
-   return {source_path:input('edtFileName;ValueControl'),sheet_method:input('cbbTableNamingMethod;ValueControl'),sheet:input('cbbTableName;ValueContainer;cbx'),header_rows:Number(input('edtTitleRowCount;ValueControl')),
+   const method=input('cbbTableNamingMethod;ValueControl'),name=input('cbbTableName;ValueContainer;cbx');
+   const region=()=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+'chkAllRows;ValueControl')+']');if(es.length!==1)throw Error('Excel range extension ambiguous');return {named_range:name,extend_range:es[0].classList.contains('x-form-cb-checked')};};
+   return {source_path:input('edtFileName;ValueControl'),sheet_method:method,sheet:name,...(method==='Именованный диапазон'?region():{}),header_rows:Number(input('edtTitleRowCount;ValueControl')),
     whole_sheet:document.querySelector('[data-tid='+JSON.stringify(file+'chkUsedRange;ValueControl')+']')?.classList.contains('x-form-cb-checked'),blank_rows:input('cbbActionBlankRow;ValueControl')};},{file});
-  need((t.inspect||source.source_path===t.excel.source_path&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.sheet_name??'1')))
-   &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)&&source.whole_sheet&&source.blank_rows==='Импортировать','source settings differ');
+  const named=source.sheet_method==='Именованный диапазон';
+  need((t.inspect||source.source_path===t.excel.source_path&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
+   &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)
+   &&(named?typeof source.extend_range==='boolean':source.whole_sheet)&&source.blank_rows==='Импортировать','source settings differ');
+  if(!t.inspect&&!t.preserve&&t.excel.named_range!==undefined)need(named&&source.named_range===t.excel.named_range&&source.extend_range===(t.excel.extend_range??false),'named range settings differ');
   await advance();await wait('Excel column page',()=>find(grid).isVisible());
   if(!t.inspect&&!t.preserve)await choose(defs+'cbbAutoDetectColumnsMode;ValueControl','Нет');
   const types={integer:'Целый',real:'Вещественный',string:'Строковый',datetime:'Дата/Время',boolean:'Логический'};
