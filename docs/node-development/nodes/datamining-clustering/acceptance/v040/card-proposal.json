@@ -12,7 +12,7 @@
     "g_means",
     "apply"
   ],
-  "semantics": "DESIGN ONLY: fixed k-means, g-means and saved-model apply; range settings provisional. Ratio blocked: absent in observed UI. Outputs remain assignments and centers. Apply must not retrain.",
+  "semantics": "DESIGN ONLY: fixed k-means, g-means and existing saved-model apply. Outputs are assignments and source-unit centers. Apply must not retrain. Range-control settings need a separate completed UI contract.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "clustering-v1-internal-1",
@@ -88,10 +88,9 @@
           "standardize",
           "scale_minus_one_one",
           "scale_zero_one",
-          "absolute_scale",
-          "ratio"
+          "absolute_scale"
         ],
-        "description": "DESIGN ONLY: ratio requires UI confirmation; others keep existing native numeric semantics."
+        "description": "Existing native numeric normalizations; centers use source units, distances use normalized units."
       },
       "min_clusters": {
         "type": "integer",
@@ -107,22 +106,6 @@
         "type": "number",
         "minimum": 0.1,
         "maximum": 5
-      },
-      "range_control": {
-        "type": "boolean"
-      },
-      "manual_range": {
-        "type": "object",
-        "properties": {
-          "minimum": {
-            "type": "number"
-          },
-          "maximum": {
-            "type": "number"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
       }
     },
     "required": [],

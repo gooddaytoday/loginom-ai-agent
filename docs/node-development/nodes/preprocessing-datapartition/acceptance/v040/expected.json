@@ -154,6 +154,6 @@
     "three CSVs equal full native outputs; Save and cleanup"
   ],
   "unresolved": [
-    "priority boundaries and combined ordering need live confirmation"
+    "end/algorithm priority and cold repeat need confirmation"
   ]
 }

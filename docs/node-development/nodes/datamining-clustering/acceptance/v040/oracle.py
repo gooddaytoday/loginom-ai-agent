@@ -17,6 +17,10 @@ def rows(name):
 
 def expected():
     train, holdout = rows('train.csv'), rows('holdout.csv')
+    with (ROOT / 'fixtures/v040/probe.csv').open(newline='', encoding='utf-8') as stream:
+        probe = [dict(RowID=int(r['RowID']), X=float(r['X']), Y=float(r['Y']), Txn=r['Txn'], Item=r['Item'])
+                 for r in csv.DictReader(stream)]
+    assert [r['RowID'] for r in probe] == list(range(1, 7))
     centers = {c: [mean(r[k] for r in train if r['Category'] == c) for k in ('X', 'Y')]
                for c in sorted({r['Category'] for r in train})}
     assert centers == dict(A=[2, 2], B=[20, 2], C=[2, 20])
@@ -30,15 +34,14 @@ def expected():
                 numeric_features=['X', 'Y'], retained_fields=['RowID', 'Category'], seed=42,
                 separated_centers=centers, training_distance=math.sqrt(2), raw_holdout=assigned,
                 tolerance=dict(abs=1e-8, rel=1e-8),
-                g_means=dict(min_clusters=2, max_clusters=4, threshold=1,
+                g_means=dict(source=probe, min_clusters=2, max_clusters=4, threshold=1,
                              exact_cluster_count=None, checks=['count within configured bounds',
                              'each input row exactly once', 'centers are means of assigned features',
                              'distance independently recomputed from assigned center']),
                 apply=dict(retrain=False, expected_centers='unchanged saved training centers',
                            sensitivity='holdout includes X=100, so retraining changes center B'),
-                unresolved=['g-means output not observed', 'manual range and control not observed',
-                            'ratio normalizer absent in continuous and discrete UI; blocked',
-                            'saved-model apply and native column ordering not observed'])
+                unresolved=['manual range and control not observed',
+                            'cold saved-model apply and exact native column ordering not checked'])
 
 
 if __name__ == '__main__':

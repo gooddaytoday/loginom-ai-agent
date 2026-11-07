@@ -22,7 +22,7 @@ def expected():
                         'two executions match with the same source, seed and group size',
                         'saved uniform method and group size survive cold reopen',
                         'CSV equals full native output; Save and cleanup'],
-                unresolved=['output cardinality and uniform interval guarantees need live confirmation'])
+                unresolved=['uniform interval guarantees and cold repeat need confirmation'])
 
 
 if __name__ == '__main__':

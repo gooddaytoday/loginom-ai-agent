@@ -322,14 +322,161 @@
       "lift": 1.3333333333333333
     }
   ],
+  "selected_item_A_rules": [
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "B",
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A",
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "A",
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A",
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B",
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A",
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    }
+  ],
+  "selected_item_A_then_exclude_support_above_90": [],
   "recommendations": {
-    "allowed_consequents": [
-      "A"
+    "max_items": 2,
+    "max_consequents": 1,
+    "source": "recommend-train.csv",
+    "holdout_source": "recommend-holdout.csv",
+    "rules": [
+      {
+        "antecedent": [
+          "A"
+        ],
+        "consequent": [
+          "B"
+        ],
+        "support": 0.75,
+        "confidence": 0.75,
+        "lift": 1.0
+      },
+      {
+        "antecedent": [
+          "B"
+        ],
+        "consequent": [
+          "A"
+        ],
+        "support": 0.75,
+        "confidence": 1.0,
+        "lift": 1.0
+      }
     ],
     "holdout": [
       {
         "transaction": "H1",
-        "item": "A"
+        "item": "B",
+        "support": 0.75,
+        "confidence": 0.75,
+        "lift": 1.0
       }
     ],
     "rule_metrics": "from saved train model; never from holdout"
@@ -337,7 +484,7 @@
   "holdout_retraining_would_change_rules": true,
   "unresolved": [
     "native RuleID order",
-    "auxiliary field roles and filter semantics",
+    "numerical effect of restrictive auxiliary item values",
     "native recommendation table and padding for two consequences"
   ]
 }

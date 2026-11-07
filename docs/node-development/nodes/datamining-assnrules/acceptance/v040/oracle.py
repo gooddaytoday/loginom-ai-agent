@@ -45,17 +45,24 @@ def expected():
     filtered = rules(source, Fraction(6, 5), 2)
     assert len(extended) > len(base) and len(filtered) < len(extended)
     assert any(r['consequent'] == ['B', 'C'] and r['antecedent'] == ['A'] for r in extended)
-    # A single possible missing item eliminates recommendation ranking ambiguity.
-    candidates = [dict(transaction=t, item='A') for t, b in holdout.items()
-                  if {'B', 'C'} <= b and 'A' not in b]
-    assert candidates == [dict(transaction='H1', item='A')]
+    # A dedicated pair model leaves exactly one applicable rule for H1.
+    rec_train = baskets('recommend-train.csv')
+    rec_holdout = baskets('recommend-holdout.csv')
+    rec_rules = rules(rec_train, Fraction(0), 1)
+    candidates = [dict(transaction=t, item=r['consequent'][0],
+                       support=r['support'], confidence=r['confidence'], lift=r['lift'])
+                  for t, b in rec_holdout.items() for r in rec_rules
+                  if set(r['antecedent']) <= b and not set(r['consequent']) & b]
+    assert candidates == [dict(transaction='H1', item='B', support=.75, confidence=.75, lift=1.)]
     return dict(status='proposal_not_stock_expected', columns='technical schema to bind from live UI',
                 thresholds=dict(min_support_pct=50, min_confidence_pct=60, max_items=3),
                 single_consequent=base, two_consequents=extended, min_lift_1_2=filtered,
-                recommendations=dict(allowed_consequents=['A'], holdout=candidates,
+                selected_item_A_rules=[r for r in extended if 'A' in r['antecedent'] + r['consequent']],
+                selected_item_A_then_exclude_support_above_90=[],
+                recommendations=dict(max_items=2, max_consequents=1, source='recommend-train.csv', holdout_source='recommend-holdout.csv', rules=rec_rules, holdout=candidates,
                                      rule_metrics='from saved train model; never from holdout'),
                 holdout_retraining_would_change_rules=rules(holdout, Fraction(0), 2) != extended,
-                unresolved=['native RuleID order', 'auxiliary field roles and filter semantics',
+                unresolved=['native RuleID order', 'numerical effect of restrictive auxiliary item values',
                             'native recommendation table and padding for two consequences'])
 
 

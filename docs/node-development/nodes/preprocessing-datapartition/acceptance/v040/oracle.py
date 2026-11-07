@@ -26,7 +26,7 @@ def expected():
                         'combined is train then test with false/true IsTestSet',
                         'two identical executions and cold preserve settings and results',
                         'three CSVs equal full native outputs; Save and cleanup'],
-                unresolved=['priority boundaries and combined ordering need live confirmation'])
+                unresolved=['end/algorithm priority and cold repeat need confirmation'])
 
 
 if __name__ == '__main__':

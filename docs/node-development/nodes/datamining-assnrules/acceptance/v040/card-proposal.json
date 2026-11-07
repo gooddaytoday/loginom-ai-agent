@@ -11,7 +11,7 @@
     "fp_growth",
     "apply"
   ],
-  "semantics": "DESIGN ONLY: FP-Growth training or saved-model apply; 2 inputs, 3 outputs. Auxiliary roles, item filtering and recommendation selection remain unobserved. Support/confidence parameters are percentages; outputs are fractions.",
+  "semantics": "DESIGN ONLY: FP-Growth training or existing-model apply; 2 inputs, 3 outputs. Native support/confidence are fractions in outputs, percentages in parameters. Multi-consequence schema observed for max_items=3; auxiliary role binding and cold apply remain to verify.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "assn-rules-v1-internal-1",
@@ -79,12 +79,36 @@
         "minimum": 1,
         "maximum": 3
       },
-      "selected_items": {
+      "selected_auxiliary_fields": {
         "type": "array",
         "items": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
-        "maxItems": 128
+        "maxItems": 128,
+        "description": "Exact input-1 field names with native Item role, selected in containing-selected-items. Not a consequence whitelist or Boolean metadata predicate."
+      },
+      "exclude_large_support_items": {
+        "type": "boolean"
+      },
+      "max_support_pct": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "exclude_single_items": {
+        "type": "boolean"
+      },
+      "auxiliary_item_fields": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "maxItems": 128,
+        "description": "Input 1 fields assigned the native Item role; selected_auxiliary_fields is a subset of these. Boolean Keep with role unset is not a filter predicate."
       }
     },
     "required": []

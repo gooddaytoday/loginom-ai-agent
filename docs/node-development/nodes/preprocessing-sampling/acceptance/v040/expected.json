@@ -96,6 +96,6 @@
     "CSV equals full native output; Save and cleanup"
   ],
   "unresolved": [
-    "output cardinality and uniform interval guarantees need live confirmation"
+    "uniform interval guarantees and cold repeat need confirmation"
   ]
 }
