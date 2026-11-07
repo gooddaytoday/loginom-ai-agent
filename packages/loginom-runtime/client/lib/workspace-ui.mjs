@@ -362,7 +362,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
-      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator','cbbAutoDetectColumnsMode'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      '[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"]','[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"] input',
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
@@ -2211,7 +2212,7 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && wizard.stage==='text_import_format') {
       const base=wizard.root_tid+';ImportTextFileParamsWizard;';
-      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator'};
+      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator',auto_detect_columns:'cbbAutoDetectColumnsMode'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const owners=(tids.get(base+key+';ValueControl')??[]).filter(item=>wizardForms[0].contains(item) && visible(item) && !sensitive(item));
         const inputs=owners.length===1?dom.filter(item=>{charge();return owners[0].contains(item) && item.matches('input:not([type="hidden"]),textarea') && visible(item) && !sensitive(item);}):[];
@@ -2225,6 +2226,17 @@ function readRenderedInputMapping(observation) {
         return [name,{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,truncated:value.length>256,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text',native_max_length_utf16:nativeMax}];
       }))};
+      // Added fields stay absent when unobserved so older guards over every setting are unchanged.
+      if(wizard.settings.fields.auto_detect_columns.status!=='observed')delete wizard.settings.fields.auto_detect_columns;
+      const rowsTid=base+'ColumnDefsTuning;seReadRowCount';
+      const rowsOwners=(tids.get(rowsTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const rowsInputs=rowsOwners.length===1?dom.filter(e=>{charge();return rowsOwners[0].contains(e)&&e.matches('input:not([type="hidden"])')&&visible(e)&&!sensitive(e);}):[];
+      if(rowsInputs.length===1&&/^[0-9]{1,7}$/.test(String(rowsInputs[0].value))) {
+        const input=rowsInputs[0],value=String(input.value);
+        if(enabled(input)&&!input.readOnly)wizardFields.set(input,{name:'analysis_rows',scope:'import_format',max_length_utf16:7,stage:wizard.stage,root_ref:refOf(wizardForms[0]),owner_ref:refOf(rowsOwners[0])});
+        wizard.settings.fields.analysis_rows={status:'observed',value,value_length_utf16:value.length,truncated:false,enabled:enabled(input),read_only:input.readOnly===true,
+          source_tid:rowsTid,input_ref:refOf(input),owner_ref:refOf(rowsOwners[0]),value_kind:'displayed_input_text'};
+      }
       const multipleTid=base+'edtMultipleDelimiters;ValueControl';
       const multipleOwners=(tids.get(multipleTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
       const multipleDisplays=(tids.get(multipleTid+';DisplayEl')??[]).filter(e=>multipleOwners.length===1&&multipleOwners[0].contains(e)&&visible(e)&&!sensitive(e));
