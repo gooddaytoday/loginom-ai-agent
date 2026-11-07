@@ -34,8 +34,11 @@ test('C3 production capability selects the exact range, toggles extension and in
    combo(file+'cbbTableNamingMethod;ValueControl','По номеру',['По номеру','По имени','Именованный диапазон']);
    combo(file+'cbbTableName;ValueContainer;cbx','1',['SalesRangeOther','SalesRange']);
    input(file+'cbbActionBlankRow;ValueControl','Импортировать');input(file+'edtTitleRowCount;ValueControl','1');
-   const all=add('button',file+'chkAllRows;ValueControl',panels[0]);all.textContent='Extend';
-   all.onclick=()=>all.classList.toggle('x-form-cb-checked');
+   const all=add('div',file+'chkAllRows;ValueControl',panels[0]);all.className='x-form-cb-checked';
+   all.style.cssText='width:203px;height:23px';
+   const display=add('button',file+'chkAllRows;ValueControl;DisplayEl',all);display.textContent='✓';
+   display.style.cssText='width:18px;height:18px;padding:0';
+   display.onclick=()=>all.classList.toggle('x-form-cb-checked');
    add('div',file+'chkUsedRange;ValueControl',panels[0]);
    const auto=add('div',defs+'cbbAutoDetectColumnsMode;ValueControl',panels[1]);add('input','auto',auto).value='Нет';
    const table=add('table',grid,panels[1]);table.id='grid';

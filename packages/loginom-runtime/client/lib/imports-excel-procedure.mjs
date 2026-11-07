@@ -65,7 +65,7 @@ export async function excelConfigureCapability(page,t,readContext){
   if(!t.inspect&&!t.preserve){
   if(t.excel.named_range!==undefined){
    const all=find(file+'chkAllRows;ValueControl');
-   if(await all.evaluate(e=>e.classList.contains('x-form-cb-checked'))!==(t.excel.extend_range??false))await click(all);
+   if(await all.evaluate(e=>e.classList.contains('x-form-cb-checked'))!==(t.excel.extend_range??false))await click(find(file+'chkAllRows;ValueControl;DisplayEl'));
   }else{
    const whole=find(file+'chkUsedRange;ValueControl');
    if(!await whole.evaluate(e=>e.classList.contains('x-form-cb-checked')))await click(whole);
