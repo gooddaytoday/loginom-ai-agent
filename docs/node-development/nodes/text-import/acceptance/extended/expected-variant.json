@@ -1,0 +1,55 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "variant",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Value": {
+            "cell_type": "integer",
+            "value": 42
+          }
+        },
+        {
+          "Id": 2,
+          "Value": {
+            "cell_type": "string",
+            "value": "word"
+          }
+        },
+        {
+          "Id": 3,
+          "Value": {
+            "cell_type": "real",
+            "value": 3.5
+          }
+        },
+        {
+          "Id": 4,
+          "Value": null
+        }
+      ]
+    }
+  ]
+}
