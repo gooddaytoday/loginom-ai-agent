@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import {createRedactor} from './redact.mjs';
+import {journalCopy} from './execution-journal.mjs';
 import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
@@ -85,14 +85,6 @@ function nativeRestServiceEdge(graph,edge){
     &&source.length===1&&target.length===1&&source[0].type==='bg-vendor-icon-restclientconnection'&&target[0].type==='integration.rest_request'
     &&source[0].other_ports?.includes('Output_Connection-0')&&target[0].other_ports?.includes('Input_Connection-0')
     &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
-}
-
-// The journal stores a redacted copy (preserveJsonText, canonical URLs). Compare
-// its ACK with the same copy; the live state keeps the original refs and receipts.
-function journalCopy(event){
-  const cleaned=createRedactor().redact(event,{preserveJsonText:true});
-  if(cleaned?.type==='redaction_failure')throw Error('Node target evidence could not be redacted');
-  return cleaned;
 }
 
 // A completed drag can miss the requested grid point. Settle only that known

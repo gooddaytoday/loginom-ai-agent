@@ -3,6 +3,13 @@ import { constants } from 'node:fs';
 import { join } from 'node:path';
 import { createRedactor } from './redact.mjs';
 
+// Match the journal representation while retaining the original live refs.
+export function journalCopy(event){
+  const cleaned=createRedactor().redact(event,{preserveJsonText:true});
+  if(cleaned?.type==='redaction_failure')throw Error('Node target evidence could not be redacted');
+  return cleaned;
+}
+
 // The caller awaits this record before applying a mutation. This is independent
 // of native transcript capture, which may arrive after the browser response.
 export function createExecutionJournal({ directory, metadata, knownSecrets = [], redactor = createRedactor(knownSecrets) }) {

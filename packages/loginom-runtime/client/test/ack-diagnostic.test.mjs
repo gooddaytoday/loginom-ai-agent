@@ -7,6 +7,58 @@ import {join} from 'node:path';
 import {inspectNodeTarget, prepareNodeTarget} from '../lib/node-target.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {createRedactor} from '../lib/redact.mjs';
+import {applyNode, reconcileNodeWorkflow, releaseNodeApply} from '../lib/node-apply.mjs';
+
+const ackLabel = 'Итог https://example.org/путь_Кириллица';
+const ackNode = {document_id:'doc', workflow_id:'wf', node_id:'target'};
+const ackWorkflow = {workflow_id:'wf', tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix:'MF;TF-1', navigation_path:[{tid:'path',label:'Сценарий'}]};
+const ackRequest = () => ({operation_id:'ack', contract_revision:'1.0.0', document_id:'doc', workflow_ref:ackWorkflow,
+  target:{kind:'new',type:'imports.text',label:ackLabel,position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+
+for (const site of ['workflow','release-before-target','release-known-node','apply-checkpoint'])
+for (const corruptAck of [false,true])
+test(`node.apply real journal ACK: ${site}, corrupt=${corruptAck}`, async t => {
+  const directory = await mkdtemp(join(tmpdir(),'lab1041-ack-'));
+  t.after(() => rm(directory,{recursive:true,force:true}));
+  const journal = createExecutionJournal({directory,metadata:{sessionId:'offline-lab1041'}});
+  const events = [];
+  const record = async event => {
+    events.push(structuredClone(event));
+    const saved = await journal(event);
+    if(corruptAck && (site==='workflow' ? event.phase==='node_phase_completed' : site==='apply-checkpoint' ? event.phase==='node_checkpoint' : event.phase==='node_operation_released'))
+      saved.signature='corrupt-signature';
+    return saved;
+  };
+  const request = ackRequest();
+  const handlers = new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:async()=>({verified:true,cleanup_complete:true})}]]);
+  const operation = {id:'ack',nodeApply:{request,signature:'signature',phases:[{phase:'source'}],pending:{phase:site==='workflow'?'workflow':site==='release-before-target'?'target':'open',receipt_id:'ack:workflow'},
+    node:site==='release-known-node'?ackNode:null,execution:{status:'not_requested',execution_id:null},output:{},effect_possible:true}};
+  const graph = {complete:true,document_id:'doc',workflow_ref:ackWorkflow,nodes:[{ref:ackNode,type:'imports.text',label:ackLabel,position:{x:96,y:80},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+  const proof = {verified:true,cleanup_complete:true,node:ackNode,node_context:ackNode,graph,target_state:'found',cleanup:{wizard_closed:true}};
+  const run = async () => {
+    if(site==='workflow') {
+      const receipt = {status:'SUCCEEDED',verified:true,cleanup_complete:true,document_id:'doc',workflow_ref:ackWorkflow};
+      return reconcileNodeWorkflow({operation,record,adapter:{readWorkflowReceipt:async()=>({output:{state:'completed',receipt}}),verifyWorkflow:async()=>({...receipt,effect_possible:false})}});
+    }
+    if(site!=='apply-checkpoint')return releaseNodeApply({operation,handlers,record,releaseBeforeTarget:async()=>proof,drivers:{releasePending:async()=>proof}});
+    delete operation.nodeApply;
+    delete request.target.label;
+    const ok = async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+    return applyNode({request,operation,handlers,record,drivers:{verifySource:ok,prepareTarget:async()=>({...await ok(),node:ackNode,target:{node:graph.nodes[0]}}),mapPorts:ok,openWizard:ok,
+      finish:async mode=>({...await ok(),mode,execution_started:false,execution_id:null}),waitExecution:ok,readOutput:ok}});
+  };
+  if(corruptAck && site!=='apply-checkpoint') {
+    await assert.rejects(run,/journal acknowledgement differs/);
+    assert.ok(operation.nodeApply.pending);
+  } else {
+    const result = await run();
+    assert.equal(site==='workflow'?result:result.status,site==='workflow'?true:corruptAck?'AMBIGUOUS':site==='apply-checkpoint'?'SUCCEEDED':'FAILED',JSON.stringify(result));
+    if(!corruptAck)assert.equal(operation.nodeApply.pending,null);
+  }
+  assert.ok(events.some(event=>site==='workflow'?event.phase==='node_phase_completed':site==='apply-checkpoint'?event.phase==='node_checkpoint':event.phase==='node_operation_released'));
+  assert.equal(graph.nodes[0].label,ackLabel);
+});
 
 for (const url of ['https://creativecommons.org/licenses/by/4.0/', 'https://person:private-userinfo@example.org/path?access_token=private-query#token=private-fragment'])
 for (const corruptAck of [false, true])

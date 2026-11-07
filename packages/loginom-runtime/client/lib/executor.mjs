@@ -1,5 +1,6 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
 import {createRedactor} from './redact.mjs';
+import {journalCopy} from './execution-journal.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -2243,7 +2244,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const event={operation_id:operation.id,action_key:'node.apply',action_revision:state.request.contract_revision,
             phase:'node_target_reconciled',signature:state.signature,result:structuredClone(result)};
           const ack=await onRecord(event);
-          if(!ack || fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',event))
+          if(!ack || fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',journalCopy(event)))
             throw Error('Node target recovery journal acknowledgement differs');
           state.pending=null;state.cleanup_complete=true;state.target_reconciled=true;
           operation.outcome=nodeApplyOutcome(operation,{...operation.outcome.output,pending_phase:null,cleanup_complete:true,
