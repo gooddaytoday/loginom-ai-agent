@@ -1,0 +1,90 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "methods-body.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Method",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RequestId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Body",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Method": "POST",
+          "RequestId": "r-a",
+          "Body": "{\"amount\":10,\"note\":\"Привет & + /\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "POST",
+          "RequestId": "r-b",
+          "Body": "{\"amount\":20,\"note\":\"second\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "PUT",
+          "RequestId": "r-a",
+          "Body": "{\"amount\":10,\"note\":\"Привет & + /\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "PUT",
+          "RequestId": "r-b",
+          "Body": "{\"amount\":20,\"note\":\"second\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "PATCH",
+          "RequestId": "r-a",
+          "Body": "{\"amount\":10,\"note\":\"Привет & + /\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "PATCH",
+          "RequestId": "r-b",
+          "Body": "{\"amount\":20,\"note\":\"second\"}",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "DELETE",
+          "RequestId": "r-a",
+          "Body": "",
+          "HttpStatusCode": 200
+        },
+        {
+          "Method": "DELETE",
+          "RequestId": "r-b",
+          "Body": "",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}

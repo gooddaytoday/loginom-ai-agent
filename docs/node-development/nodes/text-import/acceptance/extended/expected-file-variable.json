@@ -1,0 +1,130 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "null_marker": "NULL",
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 3,
+          "Item": "Сок",
+          "Amount": 7
+        },
+        {
+          "Id": 4,
+          "Item": "",
+          "Amount": 18
+        },
+        {
+          "Id": 5,
+          "Item": "Чай",
+          "Amount": -2
+        }
+      ]
+    }
+  ],
+  "file_variable_proposal": {
+    "status": "awaiting_owner_approval",
+    "scope": "task-file-variable-import.md only; exports use literal paths",
+    "stages": [
+      {
+        "date": "2026-11-05",
+        "source": "sales-2026-11-05.csv",
+        "source_bytes": 58,
+        "input_path": "{{INPUTS_DIR}}/sales-2026-11-05.csv",
+        "export_path": "{{EXPORTS_DIR}}/report-2026-11-05.csv",
+        "rows": [
+          {
+            "Id": 1,
+            "Item": "Чай",
+            "Amount": 12
+          },
+          {
+            "Id": 2,
+            "Item": "Кофе, молотый",
+            "Amount": 0
+          }
+        ],
+        "canonical_export_bytes": 58
+      },
+      {
+        "date": "2026-11-06",
+        "source": "sales-2026-11-06.csv",
+        "source_bytes": 44,
+        "input_path": "{{INPUTS_DIR}}/sales-2026-11-06.csv",
+        "export_path": "{{EXPORTS_DIR}}/report-2026-11-06.csv",
+        "rows": [
+          {
+            "Id": 3,
+            "Item": "Сок",
+            "Amount": 7
+          },
+          {
+            "Id": 4,
+            "Item": "",
+            "Amount": 18
+          },
+          {
+            "Id": 5,
+            "Item": "Чай",
+            "Amount": -2
+          }
+        ],
+        "canonical_export_bytes": 44
+      }
+    ],
+    "binding": {
+      "kind": "variable",
+      "input_names": [
+        "InputFile"
+      ]
+    },
+    "cold": {
+      "stage": 2,
+      "settings_reapplied": false,
+      "binding_names_preserved": true
+    },
+    "negative_values": [
+      null,
+      "",
+      " ",
+      42,
+      false,
+      "relative.csv",
+      "{{INPUTS_DIR}}/../escape.csv",
+      "{{EXPORTS_DIR}}-sibling/report.csv",
+      "https://example.invalid/a.csv",
+      "{{EXPORTS_DIR}}/report-%Unknown%.csv"
+    ],
+    "negative_outcome": "refusal before graph/wizard/file mutation; no fallback to retained filename",
+    "same_import_node": true
+  }
+}
