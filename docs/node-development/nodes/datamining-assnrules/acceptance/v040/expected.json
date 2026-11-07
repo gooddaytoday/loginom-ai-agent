@@ -1,0 +1,343 @@
+{
+  "status": "proposal_not_stock_expected",
+  "columns": "technical schema to bind from live UI",
+  "thresholds": {
+    "min_support_pct": 50,
+    "min_confidence_pct": 60,
+    "max_items": 3
+  },
+  "single_consequent": [
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A",
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "A",
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B",
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    }
+  ],
+  "two_consequents": [
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "B",
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 0.75,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "A",
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "A",
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A",
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B",
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.0
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A",
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    }
+  ],
+  "min_lift_1_2": [
+    {
+      "antecedent": [
+        "A",
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "A",
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "A",
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "B"
+      ],
+      "consequent": [
+        "C"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "A",
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    },
+    {
+      "antecedent": [
+        "C"
+      ],
+      "consequent": [
+        "B"
+      ],
+      "support": 0.75,
+      "confidence": 1.0,
+      "lift": 1.3333333333333333
+    }
+  ],
+  "recommendations": {
+    "allowed_consequents": [
+      "A"
+    ],
+    "holdout": [
+      {
+        "transaction": "H1",
+        "item": "A"
+      }
+    ],
+    "rule_metrics": "from saved train model; never from holdout"
+  },
+  "holdout_retraining_would_change_rules": true,
+  "unresolved": [
+    "native RuleID order",
+    "auxiliary field roles and filter semantics",
+    "native recommendation table and padding for two consequences"
+  ]
+}
