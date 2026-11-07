@@ -333,12 +333,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f']:
+    if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')
         return dict(source=node / 'acceptance/modes',
-                    prompt=node / ('acceptance/modes/task-forward-r2-cutoffs.md' if name == 'linreg-forward-r2-cutoffs' else 'acceptance/modes/task-forward-r2.md' if variant == 'forward-r2' else 'acceptance/modes/task-stepwise.md' if variant == 'stepwise-f' else 'acceptance/modes/task-backward.md' if variant == 'backward-f' else 'acceptance/modes/task-forward.md'),
-                    data=node / 'fixtures/modes', input_files=['selection.csv'], base=None,
+                    prompt=node / ('acceptance/modes/task-forward-r2-cutoffs.md' if name == 'linreg-forward-r2-cutoffs' else 'acceptance/modes/task-forward-r2.md' if variant == 'forward-r2' else 'acceptance/modes/task-stepwise.md' if variant == 'stepwise-f' else 'acceptance/modes/task-backward.md' if variant == 'backward-f' else 'acceptance/modes/task-ridge.md' if variant == 'ridge' else 'acceptance/modes/task-forward.md'),
+                    data=node / 'fixtures/modes', input_files=['regularization.csv' if variant == 'ridge' else 'selection.csv'], base=None,
                     expected_name='expected/' + ('forward-f' if variant in ['backward-f', 'stepwise-f'] else variant) + '.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name in ['logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise',
                 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic',

@@ -23,3 +23,7 @@
 ## Режим stepwise
 
 Для отбора с включением и исключением факторов используй `dock_node_apply`, тип `datamining.lin_regression`, `mode:"stepwise"`, вместо Калькулятора или JS. Импорт, типы и роли — как в forward. Передай `parameters.input_fields`, `target_field`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются: строго 0..1, добавление меньше исключения. `finish:"execute"` обучает, затем исполняет; читай оба порта `read.ports:[0,1]`, экспортируй прогнозы с порта 0 и сохрани пакет. После открытия исполняй сохранённый граф без перенастройки. R² (`r2`) отклоняется до эффекта; сообщи причину, не заменяй критерий.
+
+## Ridge
+
+Use native `datamining.lin_regression` in `dock_node_apply`, `mode:"ridge"`, instead of Calculator/JS. Set `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l2:1}}`. Manual L2 only; no auto-selection or bindings. Import Y as real/continuous, retain other source types. All rows train with intercept, no normalization/validation. `finish:"execute"` trains then executes; `read.ports:[0,1]` reads predictions and coefficients. Export port 0 with `exports.text`, Save; cold executes the saved graph.
