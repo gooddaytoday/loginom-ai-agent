@@ -57,7 +57,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const preserve=request.mode==='apply',forward=request.mode==='forward',method=forward?1:0,methodLabel=forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
+ const preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',selecting=forward||backward,method=backward?2:forward?1:0,methodLabel=backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -100,7 +100,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  state=await observe('details','regression intercept readback');
  need(state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'a fixed intercept is required');
  let selection;
- if(forward){
+ if(selecting){
   const wanted=p.linear_regression?.selection??{criterion:'f'},criteria=['f','r2','adjusted_r2','aic','aicc','bic','hqc'];
   const criterion=criteria.indexOf(wanted.criterion),choices=state.node_linregression.selection_choices;
   need(choices.length===7&&new Set(choices.map(c=>c.value)).size===7&&choices.every(c=>Number.isInteger(c.value)&&c.value>=0&&c.value<7&&typeof c.label==='string'&&c.label.length>0),'complete native selection choices required');
@@ -114,8 +114,8 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    state=await observe('details','linear criterion readback');
   }
   need(state.node_linregression.values.pedRegSelQuality===criterion,'selection criterion readback differs');
-  need((criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected Forward cutoff availability');
-  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[['pedAddSignificance',wanted.add_significance??0.05]]:[])]){
+  need(backward?state.node_linregression.disabled.pedAddSignificance===true&&(criterion!==0||state.node_linregression.disabled.pedRemoveSignificance===false):(criterion!==0||state.node_linregression.disabled.pedAddSignificance===false)&&state.node_linregression.disabled.pedRemoveSignificance===true,'unexpected selection cutoff availability');
+  for(const [key,value] of [['pedEpsilon',1e-10],...(criterion===0?[[backward?'pedRemoveSignificance':'pedAddSignificance',backward?wanted.remove_significance??0.1:wanted.add_significance??0.05]]:[])]){
    if(state.node_linregression.values[key]!==value){
     const [coefficient,exponent]=String(value).split('e-');
     const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
@@ -124,11 +124,12 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    }
    need(state.node_linregression.values[key]===value,'numeric readback differs: '+key);
   }
-  need(wanted.remove_significance===undefined||state.node_linregression.values.pedRemoveSignificance===wanted.remove_significance,'disabled removal cutoff differs from requested assertion');
+  const disabledKey=backward?'add_significance':'remove_significance',disabledControl=backward?'pedAddSignificance':'pedRemoveSignificance';
+  need(wanted[disabledKey]===undefined||state.node_linregression.values[disabledControl]===wanted[disabledKey],'disabled cutoff differs from requested assertion');
   selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...(criterion===0?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
  }
  const details=state.node_linregression;
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:forward?{mode:'forward',selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
