@@ -62,6 +62,8 @@ Oracle/expected не передаются модели.
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-columns` checks all 16 integer fields, including C16;
+`excel-import-headers` skips 11 header rows and checks both compound names.
 `excel-import-single` retains the original three-field, first-sheet fixture.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
