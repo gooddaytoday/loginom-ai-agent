@@ -221,6 +221,14 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', input_files=[('core' if kind == 'mean' else kind) + '.csv'], base=None,
                     expected_name='expected.json' if kind == 'core' else 'expected-' + kind + '.json')
 
+    if name in ['text-export-fixed-width', 'text-export-encodings']:
+        src = REPO / 'docs/node-development/nodes/text-export/acceptance/modes'
+        fixed = name == 'text-export-fixed-width'
+        return dict(source=src, prompt=src.parent / ('task-fixed-width.md' if fixed else 'task-encodings.md'),
+                    data=src.parent.parent / 'fixtures', input_files=['formats.csv' if fixed else 'encodings.csv'], base=None,
+                    expected_name='expected-fixed-width-run.json' if fixed else 'expected-encodings-run.json',
+                    text_export_cases=['fixed-width'] if fixed else ['windows-1252', 'utf16-le', 'utf16-be'],
+                    csv_encoding='UTF-8' if fixed else 'UTF-16BE')
     if name == 'text-export-cp1251':
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1256,7 +1264,7 @@ class Runner:
                     and not rejection and not spec.get('upload_only')), 'INVALID_EXECUTION_ERROR_ORACLE'
         if rejection is not None:
             assert rejection == dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data') and expected['outputs'] == [], 'INVALID_REJECTION_ORACLE'
-        filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
+        filenames = re.findall(r'[\w-]+\.(?:csv|xlsx|txt)', prompt)
         exports = ([Path(output['export_destination']).name for output in expected['outputs']]
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
@@ -1280,7 +1288,7 @@ class Runner:
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if not spec.get('upload_only'):
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for output in expected['outputs']:
             if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
@@ -1605,6 +1613,16 @@ class Runner:
                 if spec.get('lgd_empty_variant'):
                     assert binary[16:20] == bytes.fromhex('04224d18'), 'LGD_EDGE_HEADER:' + fmt['name']
                 shutil.copyfile(lgd_file, folder / (fmt['name'] + '.lgd'))
+        if spec.get('text_export_cases'):
+            cases = spec['text_export_cases']
+            assert len(destinations) == len(cases), 'TEXT_EXPORT_FILE_COUNT'
+            for index, (destination, kind) in enumerate(zip(destinations, cases)):
+                actual = folder / Path(destination).name
+                shutil.copyfile(downloaded_csv(profile, destination), actual)
+                self.phase('oracle-' + str(index + 1), [sys.executable, '-B', src / 'oracle.py',
+                    '--case', kind, '--file', actual], folder, timeout=60)
+            self.current['csv'] = 'PASS (exact text bytes)'
+            return session, expected, actual, ';'
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
             actual = folder / Path(destinations[0]).name
@@ -1718,7 +1736,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

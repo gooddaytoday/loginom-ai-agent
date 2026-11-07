@@ -19,14 +19,14 @@ export const EXPORT_FIELDS=Object.freeze({
 });
 const need=(v,m)=>{if(!v)throw Error(m);};
 export function validateExportDestination(value,directories=null){
- need(typeof value==='string'&&/\.(csv|tsv)$/i.test(value),'Text export requires a CSV or TSV filename');
+ need(typeof value==='string'&&/\.(csv|tsv|txt)$/i.test(value),'Text export requires a CSV, TSV or TXT filename');
  return requireExportDestination(value,directories);
 }
 export function validateTextExportParameters(p,mode,r,directories=null){
  need(p&&typeof p==='object'&&!Array.isArray(p),'Invalid parameters.parameters: expected export settings object');
  const unknown=Object.keys(p).find(k=>k!=='overwrite'&&!Object.hasOwn(EXPORT_FIELDS,k));
  need(unknown===undefined,'Invalid parameters.parameters.'+unknown+': unknown text export parameter; use the exports.text parameter_schema');
- need(mode==='delimited','Invalid parameters.mode: text export supports delimited mode');
+ need(['delimited','fixed_width'].includes(mode),'Invalid parameters.mode: text export supports delimited or fixed_width mode');
  need(r.read.ports.length===0,'Invalid parameters.read.ports: use an empty list; text export returns output.file_artifacts');
  need(r.mappings.length===0,'Invalid parameters.mappings: use an empty list; text export does not support requested port mappings');
  need(r.inputs.length<=1,'Invalid parameters.inputs: text export accepts at most one table');
@@ -38,7 +38,7 @@ export function validateTextExportParameters(p,mode,r,directories=null){
   need(!missing.length,'Invalid parameters.'+missing[0]+': required for a new export; missing fields: '+missing.join(', '));
  }
  if('destination'in p)validateExportDestination(p.destination,directories);
- for(const [k,values]of Object.entries({encoding:['UTF-8','Windows-1251'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
+ for(const [k,values]of Object.entries({encoding:['UTF-8','Windows-1251','Windows-1252','UTF-16 LE','UTF-16 BE'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
   decimal_separator:['.',','],text_qualifier:['"'],null_marker:['','?','null','NULL'],date_separator:['.','/','\\','-'],time_separator:[':', '.'],
   date_format:['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'],time_format:['h:mm','hh:mm','h:mm:ss','hh:mm:ss','hh:nn:ss.zzz'],
   true_value:['True','Истина','Да'],false_value:['False','Ложь','Нет'],overwrite:['reject','replace']}))
@@ -47,13 +47,13 @@ export function validateTextExportParameters(p,mode,r,directories=null){
  if(p.overwrite==='replace')need('destination'in p,'Replace requires an explicit destination on every operation');
 }
 export function nativeExportValue(key,value){
- return key==='encoding'?{'UTF-8':65001,'Windows-1251':1251}[value]:key==='header'?{none:0,names:1,labels:2}[value]:key==='line_ending'?{LF:0,CRLF:1}[value]:value;
+ return key==='encoding'?{'UTF-8':65001,'Windows-1251':1251,'Windows-1252':1252,'UTF-16 LE':1200,'UTF-16 BE':1201}[value]:key==='header'?{none:0,names:1,labels:2}[value]:key==='line_ending'?{LF:0,CRLF:1}[value]:value;
 }
 
 // Existing nodes may retain formats outside the candidate contract. Check the
 // observed final format before Done/Execute, including fields omitted by a patch.
 export function validateNativeExportFormat(values){
- for(const [key,allowed] of Object.entries({encoding:[65001,1251],delimiter:[';',',','\t'],header:[0,1,2],line_ending:[0,1],bom:[true,false]}))
+ for(const [key,allowed] of Object.entries({encoding:[65001,1251,1252,1200,1201],delimiter:[';',',','\t'],header:[0,1,2],line_ending:[0,1],bom:[true,false]}))
   need(allowed.includes(values[key]?.value),'Unsupported retained export '+key);
 }
 

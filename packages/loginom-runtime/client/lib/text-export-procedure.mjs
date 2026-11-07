@@ -90,7 +90,17 @@ export async function configureTextExport(channel,p,ctx,options){
  for(const stage of ['text_export_params','text_export_format']){
   if(stage==='text_export_format'){guard();await readUi(stage);guard();}
   let current=await native();need(current.stage===stage,'Wrong export stage');initial[stage]=current;
+  if(stage==='text_export_format'&&ctx.mode&&(current.format??'delimited')!==ctx.mode){
+   const mode=ctx.mode,tid=binding.workflow_ref.prefix+';WizrdMCF';
+   const option=tid+';ExportTextFilePreviewWizard;edtFormatType;ValueControl;radiofield'+(mode==='fixed_width'?'-1':'')+';DisplayEl';
+   await channel.perform({condition:'export representation',ready:s=>s.wizard?.stage===stage,
+    identity:()=>({node:ctx.node,mode}),resolve:s=>({verb:'set_checked',ref:one(s.ui.elements.filter(e=>e.tid===option&&e.check_state?.kind==='radio'&&e.allowed_actions.includes('set_checked'))).ref,checked:true})});
+   const after=await native();need(after.format===mode,'Export format differs');
+   for(const key of Object.keys(current.values))need(same(current.values[key],after.values[key]),'Unrequested export setting changed: '+key);
+   current=after;
+  }
   for(const [key,value]of Object.entries(p)){
+   if(key==='delimiter'&&(ctx.mode??current.format)==='fixed_width')continue;
    if(key==='overwrite'||EXPORT_FIELDS[key]?.[0]!== (stage==='text_export_params'?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard'))continue;
    const expected=nativeExportValue(key,value);if(current.values[key].value===expected)continue;
    const tid=current.values[key].tid;let s=await readUi(stage);
@@ -113,7 +123,7 @@ export async function configureTextExport(channel,p,ctx,options){
      identity:s=>({node:ctx.node,key,field:tid,name:picker(s).wizard_combo?.field?.name,wizard:s.wizard.root_ref,root:s.wizard.root_tid,value:picker(s).wizard_combo?.field?.value}),
      resolve:s=>({verb:'click',ref:picker(s).ref})});
     s=await channel.observe({condition:'export option '+key,ready:s=>s.wizard?.stage===stage&&s.ui.elements.some(e=>e.allowed_actions.includes('select_wizard_option'))});
-    const labels={encoding:{'UTF-8':'UTF-8 (65001)','Windows-1251':'Кириллическая (1251)'}[value],delimiter:{';':'Точка с запятой',',':'Запятая','\t':'Символ табуляции'}[value],header:{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value],line_ending:{LF:'Unix (LF)',CRLF:'Windows (CRLF)'}[value],text_qualifier:'Двойная кавычка (")',decimal_separator:{'.':'Точка (.)',',':'Запятая (,)'}[value],date_separator:{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[value],time_separator:{':':'Двоеточие (:)','.':'Точка (.)'}[value],null_marker:value===''?'Пустая строка':value};
+    const labels={encoding:{'UTF-8':'UTF-8 (65001)','Windows-1251':'Кириллическая (1251)','Windows-1252':'Западноевропейская (1252)','UTF-16 LE':'UTF-16 LE (1200)','UTF-16 BE':'UTF-16 BE (1201)'}[value],delimiter:{';':'Точка с запятой',',':'Запятая','\t':'Символ табуляции'}[value],header:{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value],line_ending:{LF:'Unix (LF)',CRLF:'Windows (CRLF)'}[value],text_qualifier:'Двойная кавычка (")',decimal_separator:{'.':'Точка (.)',',':'Запятая (,)'}[value],date_separator:{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[value],time_separator:{':':'Двоеточие (:)','.':'Точка (.)'}[value],null_marker:value===''?'Пустая строка':value};
     const label=labels[key]??value,choice=one(s.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));
     await channel.perform({condition:'choose export '+key,initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
    }

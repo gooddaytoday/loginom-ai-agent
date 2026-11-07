@@ -602,3 +602,11 @@ current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`text-export-fixed-width` uses the approved task-fixed-width.md/formats.csv;
+`text-export-encodings` uses task-encodings.md/encodings.csv. The unchanged
+stage-0 modes/oracle.py compares every downloaded byte, including BOM and final
+CRLF. Stock cold reads the saved export input with exact types, values and field
+order; fixed width supplies the real .txt file without treating it as CSV,
+while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
+the byte oracle for the file passed through --csv. No oracle reaches the model.

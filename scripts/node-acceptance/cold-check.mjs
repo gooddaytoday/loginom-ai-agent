@@ -30,6 +30,7 @@ const args = parseArgs({
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'csv-encoding': { type: "string", default: 'UTF-8' },
+    'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
@@ -65,6 +66,10 @@ const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
+if(args['text-export-case']){
+ if(!args.csv||!['fixed-width','windows-1252','utf16-le','utf16-be'].includes(args['text-export-case']))throw Error('COLD_TEXT_FILE_REQUIRED');
+ execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/text-export/acceptance/modes/oracle.py',import.meta.url).pathname,'--case',args['text-export-case'],'--file',resolve(args.csv)],{stdio:'pipe'});
+}
 const rawExpected = JSON.parse(await readFile(args.expected, "utf8"))
 const excelExpected=excelColdExpected(rawExpected)
 if(excelExpected){
