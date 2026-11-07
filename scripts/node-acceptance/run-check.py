@@ -202,7 +202,7 @@ def scenario(name, case_root=None, *, cases=None):
 
     if name == 'grouping-median':
         root = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=root / 'acceptance', prompt=root / 'acceptance/modes/task-median.md',
+        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance/modes/task-median.md',
                     data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode='median')
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
@@ -506,7 +506,7 @@ def expected_for(case, package):
             'expected', str(src / 'modes/expected.json'), case['sampling_mode'], package]))
     # Grouping mode cycles take their stage from the independent modes oracle.
     if case.get('grouping_mode'):
-        cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'modes/oracle.py')]))['cases']
+        cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
                     outputs=cases[case['grouping_mode']]['stages'])
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
