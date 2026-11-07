@@ -139,11 +139,16 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       target:{kind:'new',type:'transform.sorting'},inputs:[],mode:'keys',parameters:{},finish:'done'};
     const beforeDescription=browserCalls.length;
     for(const kind of ['new','existing']){
-      const blocked=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{...undescribed.target,kind}}});
+      const blocked=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{...undescribed.target,kind,...(kind==='existing'?{ref:{document_id:undescribed.document_id,workflow_id:undescribed.workflow_ref.workflow_id,node_id:'existing-sorting'}}:{})}}});
       const refusal=JSON.parse(blocked.content[0].text);
-      assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED');assert.equal(refusal.effect_possible,false);
+      assert.equal(refusal.error.code,'NODE_TYPE_NOT_DESCRIBED',JSON.stringify(refusal));assert.equal(refusal.effect_possible,false);
       assert.equal(browserCalls.length,beforeDescription,'undelivered cards cannot mutate the browser');
     }
+    await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting']}});
+    const indexed=await client.callTool({name:'dock_node_apply',arguments:undescribed});
+    assert.equal(JSON.parse(indexed.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    const unknownType=await client.callTool({name:'dock_node_apply',arguments:{...undescribed,target:{kind:'new',type:'unknown.type'}}});
+    assert.equal(JSON.parse(unknownType.content[0].text).error.code,'REQUEST_REJECTED');
     const cardReply=await client.callTool({name:'dock_action_describe',arguments:{node_types:['transform.sorting'],modes:['keys']}});
     assert.notEqual(cardReply.isError,true,JSON.stringify(cardReply));
     const card=JSON.parse(cardReply.content[0].text).node_types[0];

@@ -16,6 +16,7 @@ import { diagnoseConnection } from './diagnostics.mjs';
 import { pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
 import { makeWorkspacePrepareCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
@@ -469,7 +470,13 @@ export async function createBridge(config, session, { browserTransport: managedB
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
-              if(request.params.name==='dock_node_apply'&&typeof args.target?.type==='string'){
+              if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
+                validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
+                if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
+                if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
+              }
+              if(userProfile&&request.params.name==='dock_node_apply'){
+                validateActionParameters({type:'string',enum:NODE_TYPES[args.target.type].modes},args.mode,'parameters.mode');
                 const refusal=userWorkflows.checkNodeDescription(args);
                 if(refusal){
                   await recordExecution({phase:'node_type_not_described',operation_id:args.operation_id,
@@ -477,11 +484,6 @@ export async function createBridge(config, session, { browserTransport: managedB
                   return {content:[{type:'text',text:JSON.stringify(refusal)}],
                     ...(userProfile?{structuredContent:refusal}:{isError:true})};
                 }
-              }
-              if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
-                validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
-                if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
-                if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal,scanReceipt});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
@@ -502,18 +504,19 @@ export async function createBridge(config, session, { browserTransport: managedB
             const args=request.params.arguments??{};
             const description=actionRuntime.describe(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='modes')));
             if(args.modes!==undefined&&!args.node_types)throw Error('modes requires node_types');
-            if(description.node_types?.length){
+            if(userProfile&&description.node_types?.length){
               requirePreparedWorkspace(session.metadata);
               description.node_types=await skill.describeNodes(description.node_types,args.modes);
             }
             const delivered=userProfile?userActionInventory(description):description;
-            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]}, {tool:'dock_action_describe'});
-            if(reply.isError!==true&&description.node_types?.length){
+            const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
+            const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe'}):content;
+            if(userProfile&&reply.isError!==true&&description.node_types?.length){
               await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
-                skill_revision:session.metadata.skillRevision});
+                skill_revision:(await skill.prepare()).detail.revision});
             }
             await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
-            if(reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
+            if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
             return reply;
             });
           }

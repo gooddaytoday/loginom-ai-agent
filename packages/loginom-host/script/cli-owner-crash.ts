@@ -137,6 +137,7 @@ try {
     }
     if (delivery.status !== "SUCCEEDED" || !delivery.output.upload_completion_verified)
       throw Error("CRASH_DELIVERY_FAILED")
+    await call("dock_action_describe", { node_types: ["imports.text"], modes: ["delimited"] })
     const applied = await call("dock_node_apply", {
       contract_revision: "1.0.0",
       document_id: receipt.workspace.document_id,

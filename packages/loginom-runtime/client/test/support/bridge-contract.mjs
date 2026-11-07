@@ -145,6 +145,9 @@ test('MCP application refusals remain typed normal content and the same connecti
       observation_id:'o',operation_id:'u',destination:'/other'}});
     assert.equal(JSON.parse(rejectedUpload.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls,0);
+    const unpreparedCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
+    assert.notEqual(unpreparedCards.isError,true,JSON.stringify(unpreparedCards));
+    assert.equal(JSON.parse(unpreparedCards.content[0].text).node_types.length,2);
     const available = await client.callTool({ name: 'dock_action_describe', arguments: {} });
     assert.notEqual(available.isError, true);
     assert.deepEqual(JSON.parse(available.content[0].text).available_actions, ['node.add', 'link.create', 'package.save_as', 'node.configure_text_import', 'package.save_checkpoint']);
@@ -210,8 +213,13 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     const undescribed=await client.callTool({name:'dock_node_apply',arguments:{operation_id:'without-card',target:{kind:'new',type:'imports.text'}}});
     assert.equal(undescribed.isError,true);
-    assert.equal(JSON.parse(undescribed.content[0].text).error.code,'NODE_TYPE_NOT_DESCRIBED');
+    assert.equal(JSON.parse(undescribed.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls,beforeSource);
+    const diagnosticTypes=metadata.executor.available_node_types;
+    const largeCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:diagnosticTypes}});
+    assert.notEqual(largeCards.isError,true);
+    assert.ok(Buffer.byteLength(JSON.stringify(largeCards))>46000);
+    assert.equal(JSON.parse(largeCards.content[0].text).node_types.length,diagnosticTypes.length);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);
