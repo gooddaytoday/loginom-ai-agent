@@ -1,0 +1,1 @@
+| Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |

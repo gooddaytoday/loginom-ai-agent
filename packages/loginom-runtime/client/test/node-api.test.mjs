@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,143151,'d4a4b2faf32378825ac9422461cc4430cf1bea8087e3701c8916a50f902c3327'],
+  [nodeApiTools,145053,'d6ff978e6e966a4fa979d3a184324d4c174e254bea62df07ab0bb7b851f58ca1'],
   [nodeApiTools.map(userNodeTool),19706,'cb6a65a40ac5950c0e699ff56ccb236d17b3e6b332ad2a1bda6b3bd88172835b'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -216,4 +216,18 @@ test('W1 variable reread selection is additive and distinct from table ports',as
  const args={operation_id:'fresh',source_operation_id:'executed',read:{ports:[],variable_ports:[0]}};
  await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(received,args);
  await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_read',{...args,read:{...args.read,variable_ports:[100]}}));
+});
+
+test('Forward scoped selection passes the public schema and real registered handler together',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'forward',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'datamining.lin_regression',ref:{document_id:'doc',workflow_id:'wf',node_id:'regression'}},inputs:[],mode:'forward',
+  parameters:{input_fields:['X'],target_field:'Y',linear_regression:{selection:{criterion:'f',add_significance:0.05,remove_significance:0.1}}},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:100,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
 });

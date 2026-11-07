@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import {excelConfigureCapability} from '../lib/imports-excel-procedure.mjs';
 
-for(const width of [12,16,64,65])test('Excel production wizard reads '+width+' DOM columns and scrolls to edit the last type',
+for(const width of [2,12,16,64,65])test('Excel production wizard reads '+width+' DOM columns and edits the last type',
  {skip:!process.env.LOGINOM_DOCK_TEST_BROWSER},async()=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,args:['--no-proxy-server']});
  try{
@@ -33,7 +33,7 @@ for(const width of [12,16,64,65])test('Excel production wizard reads '+width+' D
     for(let c=0;c<width;c++){
      const cell=add('td',grid+';normalHeaderCt;'+c+'_'+r,row);
      if(r===4)add('span','check'+c,cell).className='x-grid-checkcolumn x-grid-checkcolumn-checked';
-     else cell.textContent=r<2?'Field'+c:r===2?'Целый':'Непрерывный';
+     else cell.textContent=r<2?'Field'+c:r===2?'Целый':width===2&&c===width-1?'Дискретный':'Непрерывный';
      if(c===width-1&&r===2)cell.ondblclick=()=>{
       window.lastTypeEditScroll=scroller.scrollLeft;
       cell.classList.add('x-grid-cell-selected');
@@ -42,8 +42,9 @@ for(const width of [12,16,64,65])test('Excel production wizard reads '+width+' D
       const picker=add('button',editor.dataset.tid+';trg_picker',editor);picker.textContent='type';
       picker.onclick=()=>{
        const portal=add('div',editor.dataset.tid+';boundlist',editor);
-       const option=add('div','real-option',portal);option.setAttribute('role','option');option.textContent='Вещественный';
-       option.onclick=()=>{cell.textContent='Вещественный';editor.querySelector('input').value='Вещественный';editor.style.display='none';};
+       const label=width===2?'Логический':'Вещественный';
+       const option=add('div','type-option',portal);option.setAttribute('role','option');option.textContent=label;
+       option.onclick=()=>{cell.textContent=label;editor.querySelector('input').value=label;editor.style.display='none';};
       };
      };
     }
@@ -56,13 +57,15 @@ for(const width of [12,16,64,65])test('Excel production wizard reads '+width+' D
    window.Ext={getCmp:()=>({el:{dom:table},getStore:()=>({loading:false,getCount:()=>5})})};
    render();
   },{root,file,defs,grid,width});
-  const columns=Array.from({length:width},(_,i)=>({name:'Field'+i,label:'Field'+i,type:i===width-1?'real':'integer'}));
+  const type=width===2?'boolean':'real';
+  const columns=Array.from({length:width},(_,i)=>({name:'Field'+i,label:'Field'+i,type:i===width-1?type:'integer'}));
   const result=await excelConfigureCapability(page,{deadline:Date.now()+30000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},
    excel:{source_path:'/worker/wide.xlsx',header_rows:1,columns},origin:'null',build:'test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
   if(width===65){assert.equal(result.verified,false);assert.match(result.error,/1..64 columns/);return;}
   assert.equal(result.verified,true,result.error);
   assert.equal(result.configuration.columns.length,width);
-  assert.equal(result.configuration.columns[width-1].type,'real');
-  assert.ok(await page.evaluate(()=>window.lastTypeEditScroll)>0,'last column was reached by horizontal scrolling');
+  assert.equal(result.configuration.columns[width-1].type,type);
+  assert.equal(result.configuration.columns[width-1].data_kind,width===2?'Дискретный':'Непрерывный');
+  if(width>2)assert.ok(await page.evaluate(()=>window.lastTypeEditScroll)>0,'last column was reached by horizontal scrolling');
  }finally{await browser.close();}
 });

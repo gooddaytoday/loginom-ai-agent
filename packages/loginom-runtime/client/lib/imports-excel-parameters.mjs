@@ -7,7 +7,7 @@ export const excelSettingsSchema=object({
  header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
  columns:{type:'array',minItems:1,maxItems:64,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
-  type:{type:'string',enum:['string','integer','real','datetime']},
+  type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
  },['name','label','type'])},
 },['source_path']);
@@ -39,12 +39,13 @@ export function validateExcelParameters(p,mode,r){
   need(c&&Object.keys(c).every(k=>['source_name','name','label','type','data_kind'].includes(k)),'unsupported column setting');
   need(typeof c.name==='string'&&c.name.length<=120&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.name),'technical names must be ASCII identifiers; keep the header in source_name');
   need(['label',...(c.source_name===undefined?[]:['source_name'])].every(k=>typeof c[k]==='string'&&c[k].length>0&&c[k].length<=120&&!/[\x00-\x1f]/.test(c[k])),'column label/header is required');
-  need(['string','integer','real','datetime'].includes(c.type),'explicit string/integer/real/datetime type required');
+  need(['string','integer','real','datetime','boolean'].includes(c.type),'explicit string/integer/real/datetime/boolean type required');
   need(c.data_kind===undefined||['Непрерывный','Дискретный'].includes(c.data_kind),'invalid data kind');
   need(c.type!=='string'||c.data_kind===undefined||c.data_kind==='Дискретный','string columns require discrete kind');
+  need(c.type!=='boolean'||c.data_kind===undefined||c.data_kind==='Дискретный','boolean columns require discrete kind');
  }
  need(new Set(e.columns.map(c=>c.name)).size===e.columns.length&&new Set(e.columns.map(c=>c.source_name??c.name)).size===e.columns.length,'duplicate source or output names');
  need(r.inputs.length===0&&r.mappings.length===0,'Excel has no table input; output remapping is outside stage 1');
  need(['done','execute','close'].includes(r.finish)&&r.read.ports.every(p=>p===0)&&r.read.ports.length<=1,'only output 0 is supported');
 }
-export const excelColumns=e=>e.columns.map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind??(c.type==='string'?'Дискретный':'Непрерывный'),used:true}));
+export const excelColumns=e=>e.columns.map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind??(['string','boolean'].includes(c.type)?'Дискретный':'Непрерывный'),used:true}));

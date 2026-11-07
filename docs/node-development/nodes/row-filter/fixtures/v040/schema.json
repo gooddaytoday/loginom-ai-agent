@@ -1,0 +1,16 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "first_line_as_title": true,
+  "null_marker": "NULL",
+  "files": {
+    "rows.csv": {
+      "rows": 6,
+      "columns": [
+        {"name": "RowID", "type": "integer"},
+        {"name": "Region", "type": "string"},
+        {"name": "Amount", "type": "integer"}
+      ]
+    }
+  }
+}

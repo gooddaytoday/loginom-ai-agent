@@ -1,0 +1,1 @@
+| Параметры полей | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |

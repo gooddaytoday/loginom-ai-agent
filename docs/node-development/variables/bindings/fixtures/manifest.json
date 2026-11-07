@@ -1,0 +1,39 @@
+{
+  "source": "authored deterministic proposal fixtures; no account data",
+  "csv": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "header": true,
+    "null_marker": "?",
+    "columns": [
+      "RowID",
+      "Amount"
+    ],
+    "types": [
+      "integer",
+      "integer"
+    ]
+  },
+  "files": [
+    {
+      "name": "filter.csv",
+      "bytes": 46,
+      "sha256": "321cabf0ba1a97ab7e348ba45f1e19b0e2c0716132682544877a11b8ef964eb5"
+    },
+    {
+      "name": "import-a.csv",
+      "bytes": 26,
+      "sha256": "492ac8c6428265d1e14ac2c470b7a74fc81bb33800e30cfbd89f69001ffc3103"
+    },
+    {
+      "name": "import-b.csv",
+      "bytes": 27,
+      "sha256": "63b3c9fc0bae6945b5d19edcac573aba95107eef07ffc5908d2f34142f56d4f5"
+    },
+    {
+      "name": "variant-input.json",
+      "bytes": 619,
+      "sha256": "9e9b47d539f129dca29e69d5e0ffcb3dbea4d594420fcdf11a9cc2d69b712b60"
+    }
+  ]
+}
