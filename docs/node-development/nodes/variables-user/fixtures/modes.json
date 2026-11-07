@@ -1,0 +1,9 @@
+{
+  "initial": [{"name":"amount","label":"Сумма","type":"integer","value":7}, {"name":"keep","label":"Сохранить","type":"string","value":""}],
+  "patch": {"name":"amount","type":"real","value":7.5},
+  "date_only": "2026-01-02",
+  "milliseconds": "2026-01-02T03:04:05.123",
+  "timezone": "2026-01-02T03:04:05+03:00",
+  "non_user_port": 1,
+  "non_user_value": {"name":"scope_value","type":"integer","value":13}
+}
