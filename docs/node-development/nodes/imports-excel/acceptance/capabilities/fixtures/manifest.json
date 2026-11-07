@@ -1,0 +1,72 @@
+{
+  "writer": "XlsxWriter 3.2.9; xlwt 1.3.0",
+  "xlsm": "macro-enabled content type; no vbaProject.bin, no macros",
+  "server_mtime": "not encoded in workbook; bind after upload, never use ZIP timestamps",
+  "files": [
+    {
+      "file": "boolean.xlsx",
+      "bytes": 5305,
+      "sha256": "5d47c5770050f2f55accde5fc71aa8c9435d44b60e5938cf7fdd71b851375c8b"
+    },
+    {
+      "file": "format.xlsm",
+      "bytes": 5303,
+      "sha256": "283212b794baa23ed50e7dd058109f0c8eb440ae313b5589782075416862a237"
+    },
+    {
+      "file": "headers11.xlsx",
+      "bytes": 5384,
+      "sha256": "ddcda114be70294f2c1d91905484eee5e415876169624c2e96f06623809d49e3"
+    },
+    {
+      "file": "legacy.xls",
+      "bytes": 5632,
+      "sha256": "19f29cdddc7f732b62ad5bdcdb98322c1c962cb8c1fc02a708800ac50364b903"
+    },
+    {
+      "file": "named.xlsx",
+      "bytes": 5893,
+      "sha256": "5eaa9d4a7d3bb1137d6094191c1610614ef6fe4c269f4fa8ae323b9a32f5b5d7"
+    },
+    {
+      "file": "sales-a.xlsx",
+      "bytes": 5290,
+      "sha256": "2e492cad13b481b5e3c82548ff4242254c8075b1e87b75b55eb2eb22a94863c1"
+    },
+    {
+      "file": "sales-b.xlsx",
+      "bytes": 5279,
+      "sha256": "8a571f683fe6697299409f9cc90ad4f010c9db6cb83f82cb9033aee873e93777"
+    },
+    {
+      "file": "schema-ab.xlsx",
+      "bytes": 5275,
+      "sha256": "1c8c2f71391893a3603684d6cb529edcc149c69177e59b218d9ea702ce9184ac"
+    },
+    {
+      "file": "schema-abd.xlsx",
+      "bytes": 5295,
+      "sha256": "254d3bdae4964942f69fbd08dd5fa2dfd520252aae0419156d6531efb207d80b"
+    },
+    {
+      "file": "schema-bc.xlsx",
+      "bytes": 5275,
+      "sha256": "24b6f1ab0a9e50f363e68f85e94746eb7689c7583aa3118765369f3615643e59"
+    },
+    {
+      "file": "types-a.xlsx",
+      "bytes": 5278,
+      "sha256": "506d9084b99e3736e8209f7671f9abfa968b87d01de7ef990d5fc7c69bbe343b"
+    },
+    {
+      "file": "types-b.xlsx",
+      "bytes": 5284,
+      "sha256": "1a235fec9fdba319d93b8fcddf3befc171bf2f4a194b1d92fd9743afc7193619"
+    },
+    {
+      "file": "wide16.xlsx",
+      "bytes": 5510,
+      "sha256": "53bd26774ef32693f6b9e7b0eb0f24bac6217714057068212065211f834f1764"
+    }
+  ]
+}

@@ -1,0 +1,1135 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "PredictionEvent",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "PredictionProbability",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "ActualEvent",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Target_predicted",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Fold",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "yes",
+          "RowID": 1,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 2,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 3,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 4,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 5,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 6,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 7,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 8,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 9,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 10,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "yes",
+          "RowID": 11,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 12,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 13,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 14,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 15,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 16,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 17,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 18,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 19,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 20,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 21,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "no",
+          "RowID": 22,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 23,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 24,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 25,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 26,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 27,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 28,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 29,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 30,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 31,
+          "Note": null,
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": false,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "no",
+          "RowID": 32,
+          "Note": "synthetic",
+          "Fold": 0
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "yes",
+          "RowID": 33,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 34,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 35,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 36,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 37,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 38,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 39,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 40,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 41,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 42,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "yes",
+          "RowID": 43,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 44,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 45,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 46,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 47,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 48,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 49,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 50,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 51,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 52,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 53,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "no",
+          "RowID": 54,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 55,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 56,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 57,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 58,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 59,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 60,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 61,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 62,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 63,
+          "Note": null,
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": false,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "no",
+          "RowID": 64,
+          "Note": "synthetic",
+          "Fold": 1
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "yes",
+          "RowID": 65,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 66,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 67,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 68,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 69,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 70,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 71,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 72,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 73,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.09999999999999998,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -2.0,
+          "Target": "no",
+          "RowID": 74,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "yes",
+          "RowID": 75,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 76,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 77,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.25000000000000006,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": -1.0,
+          "Target": "no",
+          "RowID": 78,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 79,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "yes",
+          "RowID": 80,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 81,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.5000000000000001,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 0.0,
+          "Target": "no",
+          "RowID": 82,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 83,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 84,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": true,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "yes",
+          "RowID": 85,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": false,
+          "PredictionProbability": 0.75,
+          "ActualEvent": false,
+          "Target_predicted": "no",
+          "X": 1.0,
+          "Target": "no",
+          "RowID": 86,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 87,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 88,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 89,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 90,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 91,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 92,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 93,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 94,
+          "Note": "synthetic",
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": true,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "yes",
+          "RowID": 95,
+          "Note": null,
+          "Fold": 2
+        },
+        {
+          "PredictionEvent": true,
+          "PredictionProbability": 0.8999999999999999,
+          "ActualEvent": false,
+          "Target_predicted": "yes",
+          "X": 2.0,
+          "Target": "no",
+          "RowID": 96,
+          "Note": "synthetic",
+          "Fold": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,446 @@
+{
+  "type": "object",
+  "properties": {
+    "input_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Observed predictor name."
+      },
+      "minItems": 1,
+      "maxItems": 128,
+      "description": "Numeric predictors; categorical indicator support in its separate cycle."
+    },
+    "target_field": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "One real continuous response."
+    },
+    "linear_regression": {
+      "type": "object",
+      "description": "Proposed type-specific advanced settings; omit to preserve current Enter/apply behavior.",
+      "properties": {
+        "intercept": {
+          "type": "boolean",
+          "description": "Include a constant. Editing requires denormalize=false."
+        },
+        "denormalize": {
+          "type": "boolean",
+          "description": "Report coefficients in original units."
+        },
+        "detailed": {
+          "type": "boolean",
+          "description": "Use explicit detailed settings; do not combine with automatic method."
+        },
+        "epsilon": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Native solver stopping tolerance; preserve requested value by readback."
+        },
+        "confidence": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 100,
+          "description": "Confidence percent for coefficient intervals."
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "criterion": {
+              "type": "string",
+              "enum": [
+                "f",
+                "r2",
+                "adjusted_r2",
+                "aic",
+                "aicc",
+                "bic",
+                "hqc"
+              ],
+              "description": "Factor selection criterion; f uses p-value thresholds."
+            },
+            "add_significance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Add when p is below this value."
+            },
+            "remove_significance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Remove when p is above this value."
+            }
+          },
+          "required": [
+            "criterion"
+          ],
+          "additionalProperties": false
+        },
+        "regularization": {
+          "type": "object",
+          "properties": {
+            "l1": {
+              "type": "object",
+              "properties": {
+                "setup": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "auto"
+                  ],
+                  "description": "LASSO/Elastic Net L1 setup."
+                },
+                "lambda": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Nonnegative strength, present only with manual setup."
+                }
+              },
+              "required": [
+                "setup"
+              ],
+              "additionalProperties": false
+            },
+            "l2": {
+              "type": "object",
+              "properties": {
+                "setup": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "auto"
+                  ],
+                  "description": "Ridge/Elastic Net L2 setup."
+                },
+                "lambda": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Nonnegative strength, present only with manual setup."
+                }
+              },
+              "required": [
+                "setup"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "priority": {
+          "type": "object",
+          "properties": {
+            "auto": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "description": "0 accuracy through 4 speed; automatic method only."
+            },
+            "speed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "description": "Manual accuracy/speed; conditional on method."
+            },
+            "data": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "description": "Accurate/inaccurate data; Ridge and Elastic Net."
+            },
+            "factors": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "description": "Few/many factors; Forward, Backward, Stepwise, LASSO, Elastic Net."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "normalization": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Observed numeric predictor or categorical predictor."
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minmax",
+                  "minus_one_one",
+                  "zero_one",
+                  "absolute",
+                  "standard",
+                  "ratio",
+                  "indicator"
+                ],
+                "description": "Only observed native normalizers; discrete fields support indicator."
+              },
+              "min": {
+                "type": "number",
+                "minimum": -1e+100,
+                "description": "Lower normalized endpoint."
+              },
+              "max": {
+                "type": "number",
+                "minimum": -1e+100,
+                "description": "Upper normalized endpoint."
+              },
+              "divisor": {
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "minimum": 1e-300,
+                    "description": "Explicit nonzero divisor."
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "min",
+                      "max",
+                      "mean",
+                      "sum",
+                      "sd"
+                    ],
+                    "description": "Learned statistic divisor."
+                  }
+                ]
+              },
+              "range_control": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "error",
+                  "winsorize"
+                ],
+                "description": "Out-of-range behavior."
+              },
+              "manual_range": {
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "number",
+                    "minimum": -1e+100,
+                    "description": "Lower control boundary."
+                  },
+                  "max": {
+                    "type": "number",
+                    "minimum": -1e+100,
+                    "description": "Upper control boundary."
+                  }
+                },
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "additionalProperties": false
+              },
+              "reference": {
+                "type": "string",
+                "enum": [
+                  "first",
+                  "last",
+                  "rare",
+                  "frequent",
+                  "explicit"
+                ],
+                "description": "Indicator reference category."
+              },
+              "reference_value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Explicit category value; ordering and tied frequencies need acceptance."
+              },
+              "irremovable": {
+                "type": "boolean",
+                "description": "Keep this predictor during selection."
+              },
+              "importance": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Native predictor multiplier."
+              }
+            },
+            "required": [
+              "field",
+              "method"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "partition": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "random",
+                "sequential",
+                "column"
+              ],
+              "description": "Training/test partition method."
+            },
+            "train": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Train size; unit declares rows or percent."
+            },
+            "test": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Test size; unit declares rows or percent."
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "rows",
+                "percent"
+              ],
+              "description": "Size units."
+            },
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Boolean test flag: true=test, false=train."
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Fixed seed; random seed mode is a separate proposed behavior."
+            },
+            "order": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "train",
+                  "unused",
+                  "test"
+                ],
+                "description": "Native allocation segment."
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "method"
+          ],
+          "additionalProperties": false
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "none",
+                "kfold",
+                "monte_carlo"
+              ],
+              "description": "Validation is used by automatic search."
+            },
+            "folds": {
+              "type": "integer",
+              "minimum": 2,
+              "description": "K-fold count."
+            },
+            "sampling": {
+              "type": "string",
+              "enum": [
+                "random",
+                "sequential"
+              ],
+              "description": "K-fold sampling method."
+            },
+            "iterations": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Monte Carlo iteration count."
+            },
+            "train_percent": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 100,
+              "description": "Monte Carlo training fraction."
+            }
+          },
+          "required": [
+            "method"
+          ],
+          "additionalProperties": false
+        },
+        "statistics": {
+          "type": "string",
+          "enum": [
+            "coefficients",
+            "full"
+          ],
+          "description": "Two-column coefficients or complete nine-column native coefficient output."
+        },
+        "reference_coefficients": {
+          "type": "boolean",
+          "description": "Show reference category coefficients; changes coefficient rows."
+        },
+        "bindings": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "properties": {
+              "parameter": {
+                "type": "string",
+                "enum": [
+                  "regularization.l1.lambda",
+                  "regularization.l2.lambda",
+                  "epsilon",
+                  "confidence",
+                  "intercept",
+                  "denormalize",
+                  "priority.auto",
+                  "partition.train",
+                  "partition.test",
+                  "partition.seed"
+                ],
+                "description": "Type-local proposed control binding; not a shared public binding contract."
+              },
+              "variable": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact name from the connected control-variable input."
+              }
+            },
+            "required": [
+              "parameter",
+              "variable"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "input_fields",
+    "target_field"
+  ],
+  "additionalProperties": false
+}
