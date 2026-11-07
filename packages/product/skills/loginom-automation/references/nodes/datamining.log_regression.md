@@ -50,9 +50,8 @@
 Для стандартизации факторов используй этот узел через `loginom_dock_node_apply`,
 `parameters.logistic.normalization:"standardize"`; `"none"` отключает её.
 Сначала `mode:"enter"`, normalization none, `finish:"execute"`, `read.ports:[0]`;
-затем на том же `target.kind:"existing"` и `target.ref` — standardize и Execute.
-Прочие logistic-параметры сохраняй. Нормируются только факторы; кодирование
-цели и коэффициенты в исходном масштабе сохраняются. Пропуск normalization
+затем на том же `target.kind:"existing"` и `target.ref` — standardize, Execute и `read.ports:[0,1]`.
+Прочие logistic-параметры и кодирование цели сохраняй. Коэффициенты нормализованной модели выдаются в шкале нормализованных факторов. Пропуск normalization
 на существующем узле сохраняет её. После Save/reopen `mode:"apply"` с прежними
 параметрами сверяет нормализатор без Teach. Для этой задачи выбирай
 Логистическую регрессию вместо Калькулятора или JavaScript.

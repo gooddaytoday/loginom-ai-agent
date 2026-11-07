@@ -24,6 +24,12 @@ export function checkLogregNormalization(expected,replies){
   need(output.fresh===true&&output.freshness_basis==='completed_execution_port_source'&&output.execution_id===id
    &&output.sample_complete===true&&output.precision?.numbers_verified===true
    &&matchesExpectedOutput(output,expected.outputs[0]),'COMPLETE_TYPED_PREDICTIONS');
+  if(c.normalization==='standardize'){
+   const coefficients=reply.output.ports.find(p=>p.port===1);
+   need(coefficients?.fresh===true&&coefficients.freshness_basis==='completed_execution_port_source'
+    &&coefficients.execution_id===id&&coefficients.sample_complete===true&&coefficients.precision?.numbers_verified===true
+    &&matchesExpectedOutput(coefficients,expected.outputs[1]),'COMPLETE_TYPED_STANDARDIZED_COEFFICIENTS');
+  }
   rounds.set(id,{node:reply.node,normalization:c.normalization});
  }
  const values=[...rounds.values()];
