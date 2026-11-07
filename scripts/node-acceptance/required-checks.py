@@ -34,7 +34,7 @@ RULES = (
     ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns', 'variables-rows')),
     ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
-    ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),
+    ((C + 'join-*.mjs', 'docs/node-development/nodes/join/acceptance/**'), ('live-ui',), ('join-right', 'join-full', 'join-difference', 'join-full-no-keys', 'join-cross')),
     ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),

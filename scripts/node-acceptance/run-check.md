@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`join-full-no-keys` and `join-cross` use the approved full-without-keys and
+Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
+from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the
+independent `oracle-v040.py`. Each checks all six combinations, four columns
+in exact order and native types, CSV, Save, cold reexecution and cleanup.
+Only the selected task and the two inputs reach the model.
+
 `tree-parent-child`, `tree-parent-roots`, `tree-parent-cycle`, `tree-parent-orphan`
 use the owner-approved id/parent_id cases under `trees-datatotree/acceptance/parent-child`.
 Only one CSV and its business task reach the model. The independent Python oracle

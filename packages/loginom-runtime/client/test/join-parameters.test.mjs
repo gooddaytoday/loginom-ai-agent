@@ -3,6 +3,15 @@ import {validateJoinParameters,resolveJoinKeys,joinOutputFields} from '../lib/jo
 const request={target:{kind:'new'},inputs:[{input:0},{input:1}],read:{ports:[0]},finish:'execute',mappings:[]};
 const valid=()=>({keys:[{left:'Key',right:'Id'},{left:'Part',right:'Section'}],case_sensitive:true,include_joined_keys:false});
 const fields=[['Key','Part','LValue'],['Id','Section','RValue']].map(names=>names.map((name,i)=>({name,label:name,type:i===1?'integer':'string'})));
+test('full without keys accepts Cartesian inputs and retains all fields for either key flag',()=>{
+ for(const include_joined_keys of [false,true]){
+  const p={keys:[],case_sensitive:true,include_joined_keys};
+  assert.doesNotThrow(()=>validateJoinParameters(p,'full',request));
+  assert.deepEqual(resolveJoinKeys(p,fields),[]);
+  assert.deepEqual(joinOutputFields({...p,mode:'full',input_fields:fields}).map(f=>f.name),fields.flat().map(f=>f.name));
+  for(const mode of ['inner','left','right','difference'])assert.throws(()=>validateJoinParameters(p,mode,request));
+ }
+});
 test('join supports five keyed modes and ordered composite keys with equal types',()=>{for(const mode of ['inner','left','right','full','difference'])validateJoinParameters(valid(),mode,request);assert.deepEqual(resolveJoinKeys(valid(),fields).map(k=>k.type),['string','integer']);});
 test('join rejects invalid settings before effects',()=>{for(const change of [p=>p.keys=[],p=>p.keys.push(p.keys[0]),p=>p.keys[1].left='KEY',p=>p.keys[0].left='',p=>delete p.case_sensitive,p=>p.include_joined_keys='false',p=>p.extra=1,p=>p.keys[0].extra=1]){const p=valid();change(p);assert.throws(()=>validateJoinParameters(p,'inner',request));}assert.throws(()=>validateJoinParameters(valid(),'cross',request));});
 test('join refuses incompatible types or missing keys',()=>{const f=structuredClone(fields);f[1][0].type='integer';assert.throws(()=>resolveJoinKeys(valid(),f),/types differ/);f[1][0].name='Other';assert.throws(()=>resolveJoinKeys(valid(),f),/absent/);});
