@@ -1,0 +1,3 @@
+RowID,MethodPOST,MethodPUT,MethodPATCH,MethodDELETE,Body
+0,POST,PUT,PATCH,DELETE,"{""amount"":10,""note"":""Привет & + /""}"
+1,POST,PUT,PATCH,DELETE,"{""amount"":20,""note"":""second""}"

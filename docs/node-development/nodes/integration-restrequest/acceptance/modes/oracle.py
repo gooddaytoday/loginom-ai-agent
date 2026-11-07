@@ -34,11 +34,12 @@ def proposal(case):
     header_columns = [("RequestId", "string"), ("HeaderValue", "string"),
                       ("Body", "string"), ("HttpStatusCode", "integer")]
     if case == "methods-body":
-        outputs = [output("methods-body.csv", [("Method", "string"),
-            ("RequestId", "string"), ("Body", "string"), ("HttpStatusCode", "integer")],
-            [{"Method": method, "RequestId": row["RequestId"],
-              "Body": row["Body"] if method != "DELETE" else "", "HttpStatusCode": 200}
-             for method in ("POST", "PUT", "PATCH", "DELETE") for row in requests])]
+        outputs = [output("methods-body.csv", [("RowID", "integer"), ("Method", "string"),
+            ("HttpStatusCode", "integer"), ("Response", "string")],
+            [{"RowID": index, "Method": method, "HttpStatusCode": 200,
+              "Response": json.dumps({"method": method, "data": row["Body"] if method != "DELETE" else ""}, ensure_ascii=False)}
+             for method in ("POST", "PUT", "PATCH", "DELETE") for index, row in enumerate(requests)])]
+        outputs[0]["columns"][-1]["comparison"] = "rest_echo"
     elif case in ("headers", "variables"):
         outputs = [output(f"{case}.csv", header_columns,
                    [{"RequestId": row["RequestId"], "HeaderValue": "second",
@@ -92,6 +93,27 @@ def proposal(case):
     return {"package_path": "{{PACKAGE_PATH}}",
             "nodes": [{"type": "integration.rest_request"}, {"type": "exports.text"}],
             "outputs": outputs}
+
+
+def matches_echo(actual, expected):
+    """Independent C1 criterion: compare echo method and exact body bytes only."""
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("Duplicate JSON key")
+            result[key] = value
+        return result
+    def reject(value):
+        raise ValueError("Nonfinite JSON")
+    try:
+        values = [json.loads(text, object_pairs_hook=pairs, parse_constant=reject)
+                  for text in (actual, expected) if isinstance(text, str) and len(text.encode("utf-8")) <= 1048576]
+        return len(values) == 2 and all(isinstance(v, dict) and all(isinstance(v.get(k), str)
+            for k in ("method", "data")) for v in values) and all(
+            values[0][key].encode("utf-8") == values[1][key].encode("utf-8") for key in ("method", "data"))
+    except (ValueError, TypeError, UnicodeError):
+        return False
 
 
 if __name__ == "__main__":

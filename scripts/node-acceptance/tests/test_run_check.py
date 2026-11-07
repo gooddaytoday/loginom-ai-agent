@@ -24,13 +24,39 @@ spec.loader.exec_module(runner)
 class RunCheckTests(unittest.TestCase):
     def test_rest_methods_body_uses_frozen_c1_task_and_only_requests(self):
         case = runner.scenario('rest-methods-body')
-        self.assertEqual(case['input_files'], ['requests.csv'])
+        self.assertEqual(case['input_files'], ['requests-c1.csv'])
         self.assertEqual(case['prompt'].name, 'task-methods-body.md')
-        self.assertTrue((case['data'] / 'requests.csv').is_file())
+        self.assertTrue((case['data'] / 'requests-c1.csv').is_file())
+        with (case['data'] / 'requests.csv').open() as stream:
+            original = list(csv.DictReader(stream))
+        with (case['data'] / 'requests-c1.csv').open() as stream:
+            raw = list(csv.DictReader(stream))
+        self.assertEqual([r['Body'] for r in raw], [r['Body'] for r in original])
+        self.assertEqual([r['RowID'] for r in raw], ['0', '1'])
+        self.assertTrue(all(row['Method' + method] == method for row in raw
+                            for method in ['POST', 'PUT', 'PATCH', 'DELETE']))
         expected = runner.expected_for(case, '/own/rest.lgp')
         self.assertEqual(len(expected['outputs'][0]['rows']), 8)
         self.assertEqual({row['Method'] for row in expected['outputs'][0]['rows']},
                          {'POST', 'PUT', 'PATCH', 'DELETE'})
+        output = expected['outputs'][0]
+        self.assertEqual(output['columns'][-1]['comparison'], 'rest_echo')
+        def render(rows):
+            stream = io.StringIO()
+            writer = csv.writer(stream)
+            writer.writerow([c['name'] for c in output['columns']])
+            writer.writerows([[r[c['name']] for c in output['columns']] for r in rows])
+            return stream.getvalue()
+        rows = copy.deepcopy(output['rows'])
+        for row in rows:
+            row['Response'] = json.dumps(dict(json.loads(row['Response']), origin='variable', headers={'X': 'random'}))
+        self.csv_result(output, render(rows))
+        for value in ['null', '{}', '{"method":"POST","data":null}',
+                      '{"method":"POST","data":"wrong"}', '{"method":"POST","method":"POST","data":"wrong"}']:
+            bad = copy.deepcopy(rows)
+            bad[0]['Response'] = value
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, render(bad))
 
     def test_calculator_variables_use_approved_tasks_and_only_the_input_csv(self):
         for name, expected_name, value in [('calculator-vars', 'expected-initial.json', 7),

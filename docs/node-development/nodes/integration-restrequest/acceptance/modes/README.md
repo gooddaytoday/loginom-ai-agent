@@ -8,7 +8,7 @@
 
 | Приоритет / цикл | Пользовательское задание (в `acceptance/`) | Вход модели из `fixtures/modes/` | Oracle / предложение |
 |---|---|---|---|
-| 1 — методы и тело | `task-methods-body.md` | `requests.csv` | `methods-body/expected.json`: 8 строк, фактический Method, неизменённый Body; DELETE без тела |
+| 1 — методы и тело | `task-methods-body.md` | `requests-c1.csv` | `methods-body/expected.json`: 8 сырых ответов REST; независимый rest_echo сверяет фактический method и точные байты data; DELETE без тела |
 | 2 — заголовки | `task-headers.md` | `requests.csv` | `headers/expected.json`: окончательный second, прежние тела и HTTP-коды |
 | 3 — сохранённая авторизация/TLS | `task-auth-tls.md` | нет; приватная подготовка LabBasic/LabBearer оператором | `auth-tls/expected.json`: authenticated=true от проверочного сервиса |
 | 4 — переменные | `task-variables.md` | `requests.csv` | `variables/expected.json`: second после изменения только источника Cycle |
@@ -50,6 +50,12 @@ python3 docs/node-development/nodes/integration-restrequest/acceptance/modes/ora
 выбрать `--case methods-body`. `--write` не запускает модель и не утверждает
 полученные ожидания. Все десять гидратированных документов проверяются существующим
 `parseExpectedOutputs` из `scripts/node-acceptance/expected-outputs.mjs`.
+Для C1 решение оркестратора LAB-985 разрешает raw Response вместо модельного
+разбора JSON. RowID 0/1 связывает ответ с прежними двумя requests.csv; Body
+и метки методов в requests-c1.csv повторяют те же исходные строки. Python oracle
+генерирует ожидаемые method/data, CSV и cold сравнивают только эту проекцию,
+не меняя типы/NULL и не нормализуя текст Body. Нестабильные headers/origin/url
+ответа не сравниваются. Expected/oracle модели не передаются.
 Для error-descriptions внешний сценарий штатно убирает routing hint
 export_destination перед stock parser. Проверяется непосредственно REST port 1,
 поэтому удаление ErrorDesc только после REST не сможет подменить native критерий.

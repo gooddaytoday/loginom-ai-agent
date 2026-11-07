@@ -574,6 +574,9 @@ check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
 
 `rest-methods-body`: C1 POST/PUT/PATCH с исходным UTF-8 Body и DELETE без тела.
-Только task-methods-body.md и requests.csv передаются модели; независимый
-methods-body/expected.json проверяет все восемь строк, типы и порядок полей.
+Только task-methods-body.md и requests-c1.csv передаются модели. Модель выгружает
+RowID/Method/HttpStatusCode/Response без разбора JSON. Независимый oracle и cold
+matcher rest_echo извлекают method/data из Response, сверяют метод и точные
+UTF-8 байты Body; прочие echo-метаданные свободны. Восемь строк, типы и NULL
+проверяет штатный табличный matcher. DELETE требует data="", не NULL.
 Штатные CSV, Save, cold и cleanup обязательны.
