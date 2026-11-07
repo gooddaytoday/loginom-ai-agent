@@ -404,6 +404,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'rest-methods-body':
+        src = REPO / 'docs/node-development/nodes/integration-restrequest'
+        return dict(source=src / 'acceptance/modes/methods-body',
+                    prompt=src / 'acceptance/task-methods-body.md',
+                    data=src / 'fixtures/modes', input_files=['requests.csv'], base=None)
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task-exact.md', data=src / 'data', base=None, expected_name='expected-exact.json')

@@ -572,3 +572,8 @@ two variables. Task and transactions.csv reach the model; independent stage-0
 oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
 check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
 cold typed variable inventory and both reports, package Close and logout apply.
+
+`rest-methods-body`: C1 POST/PUT/PATCH с исходным UTF-8 Body и DELETE без тела.
+Только task-methods-body.md и requests.csv передаются модели; независимый
+methods-body/expected.json проверяет все восемь строк, типы и порядок полей.
+Штатные CSV, Save, cold и cleanup обязательны.

@@ -104,7 +104,24 @@ export async function restRequestCapability(page,t,readContext){
     return {method:w.FVerb,columns,parameters,links};
    },{root,base});
   };
-  let current=await read();need(current.method===0,'only GET is supported');
+  let current=await read();
+  const method=['GET','POST','PUT','DELETE','PATCH'][current.method];
+  need(method,'unsupported native HTTP method');
+  need(!t.connection?.method||method===t.connection.method,'native method differs from requested connection');
+  const bodyMethod=['POST','PUT','PATCH'].includes(method);
+  let body_field;
+  if(bodyMethod){
+   const tid=root+';RESTRequestWizard;MessageBody;edtMessageBodyColumn';
+   need(t.body_field===undefined||current.columns.some(c=>c.name===t.body_field&&c.type===5),'body_field requires an observed string input field');
+   await quiet();await guard();await point(tid);
+   const value=()=>find(tid).locator('input').inputValue();
+   if(t.body_field!==undefined&&await value()!==t.body_field){
+    await click(tid);await click(tid+';boundlist;'+t.body_field);
+    await wait('request body binding',async()=>await value()===t.body_field);
+   }
+   body_field=await value();
+   need(t.body_field===undefined||body_field===t.body_field,'request body readback differs');
+  }else need(t.body_field===undefined,'GET/DELETE does not support a body');
   if(t.query_parameters){
    need(JSON.stringify(current.parameters.map(p=>p.name))===JSON.stringify(t.query_parameters.map(p=>p.name))&&current.parameters.every(p=>p.type===5),'query parameter definitions differ');
    need(t.query_parameters.every(q=>current.columns.some(c=>c.name===q.field&&c.type===5)),'each query parameter requires an existing string input field');
@@ -122,7 +139,7 @@ export async function restRequestCapability(page,t,readContext){
     control=base+'pnlLinkGrid';current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});
    }
   }
-  const configuration={verified:true,node_context:{...t.node,verified:true},method:'GET',query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
+  const configuration={verified:true,node_context:{...t.node,verified:true},method,...(body_field!==undefined?{body_field}:{}),query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
   await advance();
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){

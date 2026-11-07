@@ -22,6 +22,16 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_methods_body_uses_frozen_c1_task_and_only_requests(self):
+        case = runner.scenario('rest-methods-body')
+        self.assertEqual(case['input_files'], ['requests.csv'])
+        self.assertEqual(case['prompt'].name, 'task-methods-body.md')
+        self.assertTrue((case['data'] / 'requests.csv').is_file())
+        expected = runner.expected_for(case, '/own/rest.lgp')
+        self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+        self.assertEqual({row['Method'] for row in expected['outputs'][0]['rows']},
+                         {'POST', 'PUT', 'PATCH', 'DELETE'})
+
     def test_calculator_variables_use_approved_tasks_and_only_the_input_csv(self):
         for name, expected_name, value in [('calculator-vars', 'expected-initial.json', 7),
                                            ('calculator-vars-update', 'expected.json', 11)]:
