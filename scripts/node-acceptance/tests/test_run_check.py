@@ -1482,6 +1482,15 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
 
+    def test_reform_rename_lossy_resolves_task_data_and_expected(self):
+        case = runner.scenario('reform-rename-lossy')
+        self.assertEqual(case['prompt'].name, 'task-rename-lossy.md')
+        self.assertTrue((case['data'] / 'reform.csv').is_file())
+        expected = runner.expected_for(case, '/test/reform.lgp')
+        self.assertEqual(expected['package_path'], '/test/reform.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'B', 'A', 'R', 'S'])
+        self.assertEqual([r['R'] for r in expected['outputs'][0]['rows']], [2, -3, 0])
+
     def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
         case = runner.scenario('rest-get-plain')
         self.assertIsNone(case['base'])
