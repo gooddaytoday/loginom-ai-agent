@@ -1,0 +1,1453 @@
+{
+  "status": "proposal_requires_owner_approval",
+  "cases": {
+    "wide16": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "wide16.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "C01",
+              "label": "C01",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C02",
+              "label": "C02",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C03",
+              "label": "C03",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C04",
+              "label": "C04",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C05",
+              "label": "C05",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C06",
+              "label": "C06",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C07",
+              "label": "C07",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C08",
+              "label": "C08",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C09",
+              "label": "C09",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C10",
+              "label": "C10",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C11",
+              "label": "C11",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C12",
+              "label": "C12",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C13",
+              "label": "C13",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C14",
+              "label": "C14",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C15",
+              "label": "C15",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C16",
+              "label": "C16",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "C01": 1,
+              "C02": 2,
+              "C03": 3,
+              "C04": 4,
+              "C05": 5,
+              "C06": 6,
+              "C07": 7,
+              "C08": 8,
+              "C09": 9,
+              "C10": 10,
+              "C11": 11,
+              "C12": 12,
+              "C13": 13,
+              "C14": 14,
+              "C15": 15,
+              "C16": 16
+            },
+            {
+              "C01": 101,
+              "C02": 102,
+              "C03": 103,
+              "C04": 104,
+              "C05": 105,
+              "C06": 106,
+              "C07": 107,
+              "C08": 108,
+              "C09": 109,
+              "C10": 110,
+              "C11": 111,
+              "C12": 112,
+              "C13": 113,
+              "C14": 114,
+              "C15": 115,
+              "C16": 116
+            }
+          ]
+        }
+      ]
+    },
+    "headers11": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "headers11.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id",
+              "label": "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount",
+              "label": "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id": 1,
+              "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount": 10
+            },
+            {
+              "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id": 2,
+              "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount": 20
+            }
+          ]
+        }
+      ]
+    },
+    "boolean": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "boolean.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Active",
+              "label": "Active",
+              "label_any": true,
+              "type": "boolean"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Active": false
+            },
+            {
+              "Id": 2,
+              "Active": true
+            },
+            {
+              "Id": 3,
+              "Active": null
+            }
+          ]
+        }
+      ]
+    },
+    "xlsm": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "xlsm.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            }
+          ]
+        }
+      ]
+    },
+    "named-fixed": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "named-fixed.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            }
+          ]
+        }
+      ]
+    },
+    "named-extend": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "named-extend.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            },
+            {
+              "Id": 3,
+              "Amount": 30
+            }
+          ]
+        }
+      ]
+    },
+    "multi-list": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "multi.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            },
+            {
+              "Id": 3,
+              "Amount": 30
+            }
+          ]
+        }
+      ]
+    },
+    "multi-mask": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "mask.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            },
+            {
+              "Id": 3,
+              "Amount": 30
+            }
+          ]
+        }
+      ]
+    },
+    "multi-parallel": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "parallel.csv",
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            },
+            {
+              "Id": 3,
+              "Amount": 30
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-name": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-name.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "sales-a.xlsx"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "sales-a.xlsx"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "sales-b.xlsx"
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-name-mtime": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-name-mtime.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            },
+            {
+              "name": "FileTime",
+              "label": "Время модификации",
+              "label_any": true,
+              "type": "datetime"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "sales-a.xlsx",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "sales-a.xlsx",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "sales-b.xlsx",
+              "FileTime": "{{SERVER_MTIME_sales-b.xlsx}}"
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-relative": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-relative.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "{{RELATIVE_PATH_sales-a.xlsx}}"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "{{RELATIVE_PATH_sales-a.xlsx}}"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "{{RELATIVE_PATH_sales-b.xlsx}}"
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-relative-mtime": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-relative-mtime.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            },
+            {
+              "name": "FileTime",
+              "label": "Время модификации",
+              "label_any": true,
+              "type": "datetime"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "{{RELATIVE_PATH_sales-a.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "{{RELATIVE_PATH_sales-a.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "{{RELATIVE_PATH_sales-b.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-b.xlsx}}"
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-absolute": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-absolute.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "{{ABSOLUTE_PATH_sales-a.xlsx}}"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "{{ABSOLUTE_PATH_sales-a.xlsx}}"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "{{ABSOLUTE_PATH_sales-b.xlsx}}"
+            }
+          ]
+        }
+      ]
+    },
+    "file-info-absolute-mtime": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "file-info-absolute-mtime.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "FileName",
+              "label": "Имя файла",
+              "label_any": true,
+              "type": "string"
+            },
+            {
+              "name": "FileTime",
+              "label": "Время модификации",
+              "label_any": true,
+              "type": "datetime"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10,
+              "FileName": "{{ABSOLUTE_PATH_sales-a.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 2,
+              "Amount": 20,
+              "FileName": "{{ABSOLUTE_PATH_sales-a.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-a.xlsx}}"
+            },
+            {
+              "Id": 3,
+              "Amount": 30,
+              "FileName": "{{ABSOLUTE_PATH_sales-b.xlsx}}",
+              "FileTime": "{{SERVER_MTIME_sales-b.xlsx}}"
+            }
+          ]
+        }
+      ]
+    },
+    "variable-a": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "variable-a.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            }
+          ]
+        }
+      ]
+    },
+    "variable-b": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "variable-b.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 3,
+              "Amount": 30
+            }
+          ]
+        }
+      ]
+    },
+    "xls-if-supported": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "xls.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 71,
+              "Amount": 710
+            },
+            {
+              "Id": 72,
+              "Amount": 720
+            }
+          ]
+        }
+      ]
+    },
+    "auto-all-bc": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "all.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C",
+              "label": "C",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "B": 20,
+              "C": 2
+            }
+          ]
+        }
+      ]
+    },
+    "auto-new-bc": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "new-position.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "A",
+              "label": "A",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "A": 20,
+              "B": 2
+            }
+          ]
+        }
+      ]
+    },
+    "auto-none-bc": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "none.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "A",
+              "label": "A",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "A": 20,
+              "B": 2
+            }
+          ]
+        }
+      ]
+    },
+    "auto-new-abd": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "new.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "A",
+              "label": "A",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "D",
+              "label": "D",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "A": 1,
+              "B": 10,
+              "D": "new"
+            }
+          ]
+        }
+      ]
+    },
+    "auto-new-bc-to-ab": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "new-reverse.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C",
+              "label": "C",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "B": 1,
+              "C": 10
+            }
+          ]
+        }
+      ]
+    },
+    "auto-new-bc-to-abd": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "new-append.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C",
+              "label": "C",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "D",
+              "label": "D",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "B": 1,
+              "C": 10,
+              "D": "new"
+            }
+          ]
+        }
+      ]
+    },
+    "auto-none-saved-bc": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "none-saved.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "B",
+              "label": "B",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "C",
+              "label": "C",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "B": 20,
+              "C": 2
+            }
+          ]
+        }
+      ]
+    },
+    "auto-type-a": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "type-before.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Value",
+              "label": "Value",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Value": 10
+            }
+          ]
+        }
+      ]
+    },
+    "auto-type-b": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "type.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Value",
+              "label": "Value",
+              "label_any": true,
+              "type": "string"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 2,
+              "Value": "text"
+            }
+          ]
+        }
+      ]
+    },
+    "http-if-available": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.excel"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "imports.excel",
+          "output_port": 0,
+          "export_destination": "http.csv",
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "Id": 1,
+              "Amount": 10
+            },
+            {
+              "Id": 2,
+              "Amount": 20
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "unbound": {
+    "file_info": "Bind path/mtime placeholders to independent server source receipts before execution; never use actual output, local or ZIP mtime.",
+    "http_basic": "Own reachable HTTP source and secret handle required; no endpoint/credential supplied.",
+    "xls": "Positive table conditional on native Linux support; actual refusal documented separately."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "purpose": "Stage-0 acceptance proposals; no credentials",
+  "csv": {"encoding": "UTF-8", "bom": false, "newline": "LF", "delimiter": ",", "header": true, "nulls": false},
+  "files": [
+    {"path": "requests.csv", "bytes": 127, "rows": 2, "columns": {"RequestId": "string", "Key": "string", "Body": "string"}},
+    {"path": "content-types.csv", "bytes": 125, "rows": 2, "columns": {"Case": "string", "RequestContentType": "string", "Body": "string"}},
+    {"path": "response.json", "bytes": 57, "encoding": "UTF-8", "bom": false}
+  ],
+  "cycles": [
+    {"id": "methods-body", "data": ["requests.csv"], "endpoint": "https://httpbin.org/anything", "methods": ["POST", "PUT", "PATCH", "DELETE"]},
+    {"id": "headers", "data": ["requests.csv"], "header": "X-Lab-Cycle", "values": ["first", "second"]},
+    {"id": "content-types", "data": ["content-types.csv"], "response_endpoint": "https://httpbin.org/response-headers?Content-Type=text/plain&Fixture=LAB-976"},
+    {"id": "url-modes", "data": ["requests.csv"], "modes": ["query", "segments", "replacement"]},
+    {"id": "variables", "data": ["requests.csv"], "variable": "Cycle", "values": ["first", "second"]},
+    {"id": "auth-tls", "data": [], "saved_connections": ["LabBasic", "LabBearer"], "credentials": "operator-private; never fixture/model input"},
+    {"id": "timeout-retry", "data": [], "endpoint": "https://httpbin.org/status/500", "connect_timeout_ms": 60000, "timeout_seconds": 10, "retries": 2, "retry_delay_ms": 1000},
+    {"id": "simulation", "data": ["response.json"], "table_input": false},
+    {"id": "request-dump", "data": ["requests.csv"], "directory": "operator-prepared empty private RestRequests", "file_audit": "requires owner decision"},
+    {"id": "error-descriptions", "data": ["response.json"], "produce_error_descriptions": false, "native_output_port": 1}
+  ]
+}

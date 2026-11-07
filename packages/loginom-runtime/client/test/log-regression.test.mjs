@@ -19,10 +19,10 @@ const request={operation_id:'logistic',contract_revision:'1.0.0',document_id:'do
 test('logistic registration and handler accept only binary Enter and its prediction port',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
  const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
- assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise']);
+ assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','apply']);
  assert.equal(card.tabular_outputs,2);assert.ok(card.parameter_schema.properties.logistic.properties.event.description);
  assert.ok(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler);
- for(const patch of [{mode:'apply'},{read:{...request.read,ports:[1]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
+ for(const patch of [{read:{...request.read,ports:[1]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
   assert.throws(()=>validateNodeApplyRequest({...request,...patch},support.nodeApplyHandlers));
 });
 
@@ -40,14 +40,16 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
  const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:initialCriterion,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
+ if(mode==='apply'){Object.assign(values,{pedAutoMethod:false,pedRegressionMethod:0,pedUseDetailedSettings:true,pedEventType:4,pedEventId:2});Object.assign(details,{pedEpsilon:1e-10,pedThreshold:0.8});}
  let stage='input_mapping',picker=null,scrollTop=0;const actions=[];
- const rawState=()=>({prepared_node_context:{...node,verified:true},wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
+ const rawState=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',owner_context:{status:'observed'},stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']},{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
   ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
   node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:details.pedRegSelQuality!==0||mode==='forward'}})}});
- const state=()=>{const s=rawState();if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
+ const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
  const channel={async observe({ready,condition}){const s=state();assert.ok(ready(s),condition);return s;},async perform({ready,resolve,initialObservation}){
   const s=initialObservation??state();assert.ok(ready(s));const a=resolve(s);actions.push(a);
+  if(a.ref==='close'){stage='closed';return;}
   if(a.verb==='wizard_step'){validateUiAction(a,s);stage=a.expected_stage;return;}
   const key=a.ref.split(':')[0],target=stage==='lin_regression_details'?details:values;
   if(a.verb==='scroll'){scrollTop=43;return;}
@@ -125,4 +127,40 @@ for(const mode of ['forward','backward','stepwise'])test(mode+' preserves native
  assert.doesNotThrow(()=>validateLogRegressionParameters(parameters,mode));
  const f=fixture({mode}),r=await f.run();
  assert.deepEqual(r.configuration.selection,{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})});
+});
+
+test('apply accepts only an existing connected model and forbids rewiring or configuration',()=>{
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ const applying={...request,mode:'apply',target:{kind:'existing',type:'datamining.log_regression',ref:node},inputs:[]};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(applying,support.nodeApplyHandlers));
+ for(const patch of [{target:request.target},{inputs:request.inputs},{finish:'done',read:{...request.read,ports:[]}},{parameters:{logistic:{...logistic,selection:{criterion:'aic'}}}}])
+  assert.throws(()=>validateNodeApplyRequest({...applying,...patch},support.nodeApplyHandlers));
+});
+
+test('apply inspects the saved logistic model without editing settings or activating training data',async()=>{
+ const f=fixture({mode:'apply'}),result=await f.run();
+ assert.equal(result.configuration.mode,'apply');
+ assert.equal(result.settings_applied,false);
+ assert.equal(result.configuration.event,'yes');
+ assert.equal(result.configuration.threshold,0.8);
+ assert.ok(f.actions.length>0&&f.actions.every(a=>a.verb==='wizard_step'));
+});
+
+test('apply rejects changed saved event, threshold or training method before any edit',async()=>{
+ for(const change of [f=>f.values.pedEventId=7,f=>f.details.pedThreshold=0.5,f=>f.values.pedRegressionMethod=1]){
+  const f=fixture({mode:'apply'});change(f);
+  await assert.rejects(f.run(),/saved|apply/);
+  assert.ok(f.actions.every(a=>a.verb==='wizard_step'||a.ref==='close'));
+ }
+});
+
+test('apply readback requires discarded draft and no training receipt',()=>{
+ const c={verified:true,node_context:node,mode:'apply',fields,target_field:'Target',classes:[{index:7,label:'no'},{index:2,label:'yes'}],event:'yes',threshold:0.8,intercept:true,epsilon:1e-10};
+ const entries={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:false,draft_discarded:true},output_mapping:{},finish:{settings_applied:false,mode:'execute',execution_id:'fresh'}};
+ const candidate=()=>({node,operation_id:'logistic',phases:Object.entries(entries).map(([phase,value])=>({phase,status:'verified',receipt_id:'logistic:'+phase,value:{verified:true,cleanup_complete:true,...value}}))});
+ assert.equal(logRegressionConfigurationReadback(candidate()).training.status,'not_requested');
+ entries.finish.training={status:'trained'};
+ assert.throws(()=>logRegressionConfigurationReadback(candidate()),/train/);
+ delete entries.finish.training;entries.node_finish.settings_applied=true;
+ assert.throws(()=>logRegressionConfigurationReadback(candidate()),/preserv|commit/);
 });
