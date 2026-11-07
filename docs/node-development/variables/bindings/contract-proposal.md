@@ -1,6 +1,6 @@
 # Предложение контракта для утверждения
 
-Непроверенные предпосылки — [discovery](discovery.md). Имена ниже проектные;
+Native факты и границы — [discovery](discovery.md). Имена ниже проектные;
 их нет в публичном API базы. Изменений `packages/agent`, Host-протокола,
 deadline, общего бюджета и нового универсального evaluator не предлагается.
 
@@ -140,7 +140,9 @@ Preflight до изменения настроек проверяет: declarati
 атомарность. Гонка источника, неизвестный результат Done, изменившийся owner
 после записи — прежний AMBIGUOUS/uncertain-effect, не «без эффекта» и не новый apply.
 
-Writer использует штатные жесты SwitchButton/picker/commit и проверяет их owner;
+Writer использует штатные жесты SwitchButton/picker/commit и проверяет их visible owner;
+reader не выбирает скрытую копию с тем же TID, ждёт загрузку полного store
+и quiet master. Автовыбор первого eligible record не заменяет точный выбор имени;
 после Done заново открывает мастер и сверяет весь inventory, завершает Cancel.
 Нет изменения внутреннего JS Loginom, XML writer, скрытых RPC, blanket scan всех
 SwitchButton и обхода Next/ошибок. Другой жест у строки требует узлового адаптера;
@@ -190,7 +192,7 @@ reference bytes и запас записаны в implementation. SKILL.md не 
 ## Решения владельца до реализации
 
 Утверждение общего optional top-level bindings и binding_schema; точные
-первые шесть полей после живого подтверждения; запрет неявных conversion/NULL
+первые пять полей из живой матрицы; запрет неявных conversion/NULL
 и отсутствие unbind в первом срезе; адаптация существующих Filter/CrossTable/LGD
 без смены их контрактов; предложенный cold inventory и две приёмки.
 Охват Variant читателя для трёх табличных типов — отдельный цикл W2 после

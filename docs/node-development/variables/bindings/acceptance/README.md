@@ -1,6 +1,6 @@
 # Предложение приёмки двух узлов
 
-Создано до живых прогонов LAB-989. **Не зарегистрировано в run-check,
+Комплект предложения для будущей модельной приёмки. **Не зарегистрировано в run-check,
 не утверждено, модельных PASS нет.** Независимые expected — желаемая семантика,
 не новые наблюдения Loginom. Новый verifier/runner в этом PR не добавлен.
 
@@ -75,13 +75,16 @@ Stock expected уже используют существующие таблиц
 
 | Запрос / состояние | Ожидание контракта | Что проверять до/после |
 |---|---|---|
-| Limit string "8"; CsvPath integer 1; любой typed NULL | Отказ без конверсии/снятия связи | Прежние binding/mapping/parameters/source value, нет нового Execute/export; UI-реакция native пока неизвестна |
+| Limit string "8"; CsvPath integer 1; любой typed NULL | Отказ без конверсии/снятия связи | Прежние binding/mapping/parameters/source value, нет нового Execute/export; Native picker исключает неверные scalar types; NULL-реакция зависит от поля, см. discovery |
 | Unknown pointer, mapped name, другой workflow или subtype | Отказ до записи, если известно preflight | Нет нового узла/связи при детерминированном preflight отказе |
 | Literal и binding одного parameter; duplicate pointer | `BINDING_CONFLICT` | Никакого приоритета по порядку |
 | Путь вне своей области; A receipt вместо B | `BINDING_SOURCE_UNVERIFIED` | Ни чтения нового файла, ни изменения источника/привязки |
 | `bindings:[]`, patch посторонней переменной | Сохранить binding и неуказанные настройки | Не вызвать SwitchButton, literal не подставить |
 | Старый existing Filter variable operand / CrossTable local / LGD binding | Прежняя семантика сохранена | Существующие живые regression cases, не только новый envelope |
 
-Native тип/NULL и Variant-кейсы шести мастеров сначала закрываются по
-discovery после восстановления доступа. Этот комплект покрывает два узла,
-не заменяет всю матрицу или exact Variant W2-приёмку.
+Native тип/NULL и Variant-кейсы пяти полей и трёх табличных узлов описаны
+в discovery. Живой Фильтр использовал одну строку Amount=7 и Limit 5→9;
+это отдельный минимальный опыт, не прогон предлагаемого fixture из восьми строк
+с Limit 5→8. Import проверен на тех же исходных CSV A/B, с именами собственной
+доставки. Этот комплект покрывает два узла, не заменяет всю матрицу или
+exact Variant W2-приёмку.

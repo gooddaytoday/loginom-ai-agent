@@ -1,105 +1,132 @@
-# Наблюдения и открытые проверки
+# Наблюдения native UI
 
-База и ограничение доступа — [README](README.md). Ни один нижеследующий
-положительный UI-результат не получен в LAB-989. Метки: **предыдущее UI** —
-цитирование исследования; **код** — чтение текущей базы; **не проверено** —
-обязательная оставшаяся работа. Отказ доступа не является продуктовым FAIL.
+LAB-989, mas2, 07.11.2026, Loginom 7.4.2; база — [README](README.md).
+Исследован только собственный пакет и назначенная уточнённая пара. Факты ниже
+получены штатными жестами по `data-tid`; чтение native объектов — read-only.
+Сырой журнал `bindings-native/ui.jsonl` остаётся вне Git; номера ниже позволяют
+сопоставить наблюдение с приватной диагностикой. Это native discovery, не
+модельная приёмка и не подтверждение ещё не реализованного общего API.
 
-## Шесть полей разных семейств
+## Пять полей разных семейств
 
-TID ниже — суффикс внутри наблюдённого владельца `…;WizrdMCF;`;
-`TF-1` из старого сеанса нельзя переносить как identity нового документа.
-Для каждой строки надо подтвердить совпадение владельца узла/мастера,
-порт и mapping. Строки и выбранный режим — часть адреса динамического поля.
+TID — суффикс владельца `MF;TF-1;WizrdMCF;` наблюдённого документа. В другом
+документе owner надо разрешать заново. Общий source содержит integer Amount=7,
+Limit=5, K=2, Seed=42; boolean Flag=true; string Wrong="bad", CsvPath=A;
+типизированные NULL Missing(integer), NullFlag(boolean), NullPath(string).
 
-| Узел / поле / ожидаемый тип | TID переключателя | Что уже известно | Что осталось |
+| Узел / поле | TID редактора (его дети SwitchButton, VariableControl) | Тип / привязка | Несовместимый тип и NULL |
 |---|---|---|---|
-| Фильтр строк / scalar порог / integer | `FilterDataWizard;FilterDataPanel;VariantPropEdit;SwitchButton` | Предыдущее UI: picker `VariableControl;trg_picker`; `Amount > Limit`, 5→9 меняет результат без настройки | Привязка к ID конкретного условия, неверный тип/NULL, новый Save/reopen |
-| Импорт текста / имя файла / string | `ImportTextFilePreviewWizard;edtFileName;SwitchButton` | Предыдущее UI: FileCsv выбран, Done/Execute; subtype 3 для управляющей роли файловых узлов | Два собственных файла без перенастройки; повторный readback после Save; неверный тип/NULL |
-| Кластеризация / число кластеров / integer | `ClusterizationWizard;pedClusters;SwitchButton` | Предыдущее UI: наличие переключателя; код читает `pedAutoClusters` и `pedClusters` отдельно | Отключить автоопределение, выбрать K, Done/Save/reopen; строка/NULL/вне диапазона |
-| Линейная регрессия / seed / integer | `LearnPartitionWizard;RandSeedEdit;edtRandSeed;SwitchButton` | Предыдущее UI: переключатель на странице разбиения; обучение не проверялось | Выбор Seed и readback до/после Done/Save; string/NULL; сохранить остальные параметры |
-| Группировка / сортировать результат / boolean | `GroupDataWizard;pedSortResult;SwitchButton` | Предыдущее UI: поле доступно; код читает `ValueControl` и pressed отдельно | Bool-переменная, оба значения, Done/Save/reopen; integer/string/NULL |
-| Сортировка / сравнение по локали / boolean | `SortingWizard;SortingColumnCollection;chkLocaleAware;SwitchButton` | Предыдущее UI: опция есть; код читает `chkLocaleAware` и pressed | Подтвердить полный TID мастера в новом DOM, bool, Done/Save/reopen; integer/NULL |
+| Фильтр строк, Amount > порог | `FilterDataWizard;FilterDataPanel;VariantPropEdit` | integer → Limit | Picker содержит только integer, строка/bool отсутствуют. Missing разрешён на Next; Execute с NULL дал пустой выход 0 (журнал 18–22) |
+| Импорт текста, имя файла | `ImportTextFilePreviewWizard;edtFileName` | string → CsvPath | Picker содержит только строки; integer/bool отсутствуют. NullPath выбирается, Next отклонён: «Имя файла не может быть пустым» (`btnError`, data-qtip; 25–26) |
+| Кластеризация, число кластеров | `ClusterizationWizard;pedClusters` | integer → K; autoClusters=false | Только integer. Missing допускается до Done/«Обучить», обучение с NULL не запускалось; восстановлен K=2 (42–43) |
+| Группировка, сортировать результат | `GroupDataWizard;pedSortResult` | boolean → Flag | Только Flag и NullFlag. NullFlag допускается до Done, выполнение с NULL не проверялось (36–37) |
+| Сортировка, локаль | `SortingWizard;SortingColumnCollection;chkLocaleAware` | boolean → Flag | Только Flag и NullFlag. NullFlag допускается до Done, выполнение с NULL не проверялось (39–40) |
 
-Источники: [LAB-828 evidence](../capabilities-evidence.md), разделы
-`transform-filter_data`, `imports-text`, `datamining-clustering`,
-`datamining-lin_regression`, `transform-group_data`, `transform-sorting`.
-У Фильтра — прежний `ui.jsonl:17–20,219–221,204`; у импорта — `235–239`;
-кластеризация — `100`; seed — `106`; Группировка — `27–30`;
-Сортировка — `22–24`. Это ссылки на выдержки прежнего исследования,
-не на доступный читателю сырой журнал текущего запуска.
+Это пять полей из разрешённых назначением 5–6. Seed линейной регрессии остаётся
+кандидатом из [LAB-828 evidence](../capabilities-evidence.md), а не шестым
+подтверждённым полем этого запуска. Диапазон K и false для двух boolean-полей
+здесь не проверены; их будущая узловая регистрация требует адресной проверки.
 
-Предыдущее сохранение/новое открытие и сериализованные
-`PropBinder/PropertyBindSavers` для Фильтра/имён файлов описаны там же
-в разделе «Сохранение и чтение в новом документе». Там доказано сохранение
-`PropertyPath` → `VariableName`, но не все шесть строк этой таблицы.
-Переменная выбирается по техническому имени, подпись со значением не identity.
+Общий жест: подключить variables/control input → открыть нужную страницу →
+SwitchButton → VariableControl/picker → точная переменная → commit → Next/Done.
+Для Фильтра сначала открывается inline-редактор конкретной строки условия;
+для K нужна ручная настройка числа кластеров. Это узловые условия адресации,
+а не принципиально иной механизм. При включении SwitchButton native может
+автоматически выбрать первую подходящую переменную (например Amount вместо K).
+Обязателен явный выбор и readback точного mapped имени, не только pressed=true.
 
-## Единый жест: гипотеза с ограниченными доказательствами
+Filter/Grouping/Sorting/Clustering используют раскрытый control input subtype 4.
+Файловый Import Text — variables input subtype 3 (`Input_Var-1` в этом DOM),
+роль которого объявлена файловым обработчиком. Ordinal W1 не следует получать
+из текстового суффикса TID. Каждый вход связан с собственным source output 4.
 
-Предыдущее UI показывает общий образец: подключить source → input,
-открыть страницу → SwitchButton → VariableControl/picker → точная переменная
-→ commit → Done. `VariantPropEdit` у Фильтра — класс редактора параметра;
-это **не** доказательство приёма табличного поля типа Variant.
+Неподходящие типы исключены native picker; принудительная подстановка ID через
+JS не делалась. NULL не равен неподходящему типу: native реакции различны.
+Предлагаемый строгий отказ NULL в первом API-срезе — осознанная политика
+[контракта](contract-proposal.md), а не утверждение универсального native отказа.
 
-На базе есть частные реализации: `client/lib/filter-procedure.mjs:205–225`
-и `crosstable-variables.mjs:222–257` (пути от `packages/loginom-runtime`).
-Они подтверждают сходство UI-процедуры в коде, но не универсальную writer
-функцию для всех мастеров. Фильтр уже принимает variable operand;
-LGD Import/Export уже имеют собственные bindings. Их нельзя объявлять
-отсутствующими или менять молча при добавлении общего API.
+## Done, изменение только source и Save
 
-Отдельная ловушка текущего кода: `grouping-context.mjs:46–50` и
-`sorting-context.mjs:42–48` читают значение **ValueControl**, сохраняя pressed
-отдельно. После привязки скрытая константа не подтверждает выбранную переменную
-или фактическое значение. Нужен независимый readback variable mode/picker.
+Фильтр после Done и независимого reopen показывал `Limit (5)` (22).
+При Amount=7 выход 0 содержал одну строку. Затем в прежнем source изменены
+только Limit 5→9 и CsvPath A→B. Все десять names/types/IDs сохранены
+(58–60); настройки проверяемых Фильтра и Импорта между выполнениями не открывались.
+Тот же Фильтр дал выход 0 пустой, выход 1 — одну строку Amount=7/Limit=9
+(57,61–62). Тот же Import Text прочитал три строки A: Amount=10,0,NULL;
+после source-only update — B: 20,-4,7 (32,63). Загружены собственные CSV из
+`fixtures/import-a.csv` и `import-b.csv` под исследовательскими именами.
 
-План живой проверки каждой строки: записать schema переменных и source IDs;
-выбрать подходящую; Done → reopen; Save → закрытие → новый документ → активация
-источника → reopen без редактирования. Сверить binding, mapping, порт и ID узла;
-изменить только значение источника и выполнить. Затем в отдельной собственной
-копии проверить неверный тип, типизированный NULL и недопустимое значение.
-Записать, что именно делает UI: скрывает вариант, отказывает при выборе/Next
-или выдаёт execution error. Не исправлять тип и не снимать binding автоматически.
+В пакет сохранены пять variable-mode настроек, три Variant-сценария, 11 узлов
+и 14 связей (64). Пакет закрыт штатным меню, выполнен logout, старый browser
+context закрыт (65). В новом context выполнены новый вход и OpenPackage;
+восстановлены те же GUID 11 узлов (66). До выполнения проверяемых узлов
+независимо открыты сохранённые настройки, без переноса старых component handles:
 
-До этого вывода нельзя утверждать ни общую native конверсию типов, ни смысл NULL.
-Контракт ниже **предлагает** консервативный отказ; он не описывает измеренное
-поведение Loginom. Наблюдение разных реакций на тип ещё не означает принципиально
-разный механизм привязки: это может быть разная политика самого поля.
+| Cold readback | Variable mode / ровно один selected record | Журнал |
+|---|---|---|
+| Фильтр | true / Limit (9) | 67–68 |
+| Импорт текста | true / CsvPath (собственный B) | 69 |
+| Группировка | true / Flag (true) | 70 |
+| Сортировка | true / Flag (true) | 71 |
+| Число кластеров | true / K (2) | 72 |
+
+После чтения каждый мастер закрыт Cancel с подтверждением; настройки не
+переписывались. Native активация источника/входа допустима и не заменяет
+readback. Новое Execute Фильтра: выход 0 — 0 строк, выход 1 — одна строка
+Amount=7/Limit=9 (73,76); Import B — 3 строки с Amount=20,-4,7 (75).
+Ранняя пустая модель preview выхода 1 (74) не использована как результат:
+окончательное чтение дождалось полной схемы и строки (76).
+После cold собственный пакет закрыт штатным меню без запроса сохранения,
+logout выполнен, видимых model graphs нет (77); context и браузер закрыты.
+
+Нельзя читать первый найденный DOM-элемент: скрытый старый master может иметь
+тот же data-tid. Использованы visible owner и его Ext component. Также VariableControl
+создаётся до загрузки store: pressed=false и options=[""] в промежуточном UI
+не доказывают потерю binding (такое раннее чтение было в 38). Нужны quiet owner,
+полный непустой store, ровно один выбранный ConnectedRecord и точный variable ID.
+Скрытый literal ValueControl — не доказательство выбранной переменной.
 
 ## Variant на табличном входе
 
-Все три живые строки **не проверены из-за входа**. Подготовлен минимальный
-[typed fixture](fixtures/variant-input.json) для native источника; JSON не
-импортируется как обычный CSV, который потерял бы subtype. Предлагаемый путь —
-собственные переменные r01…r08 → VarToData rows, уже описанный в W2:
-Name переименовать в RowID (string), Value в V (variant), DisplayName исключить
-штатным выходным mapping. У r06 исходный тип integer и значение NULL;
-остальные source types/values заданы ячейками JSON. Альтернатива — собственный
-LGD с доказанной Variant-схемой. Реальная схема и subtype проверяются до мастера.
+Native source: собственные десять переменных → VarToData rows. Полная input
+схема: Name:string, DisplayName:string, Value:variant (native DataType=6).
+Значения: integer 7,5,2,42; boolean true; string bad и собственный path A;
+три NULL с исходными scalar types integer/boolean/string. Для этих трёх NULL
+VarToData выдаёт Variant-NULL; сохранение исходного scalar типа NULL не обещается.
+Отдельный [variant-input.json](fixtures/variant-input.json) — более строгий
+предлагаемый будущий fixture, **не** точная запись этого native источника.
 
-| Узел | Что известно по коду базы | Обязательное UI/execute наблюдение |
+| Узел | Действие и результат | Что это доказывает / граница |
 |---|---|---|
-| Калькулятор | `calculator-context.mjs:47,77+` распознаёт native DataType=6; expression schema результата ограничена scalar | Пропустить V без выражения над ним, затем отдельное явно типизированное выражение; принятие/ошибка Next, выходная схема, все значения и NULL |
-| Группировка | `grouping-context.mjs:28+` знает variant; `grouping-parameters.mjs` допускает sum/avg только integer/real и unique_count только integer/string | V как ключ; V как count/min/max; отдельно sum и отказ/приведение; native schema каждого результата |
-| Сортировка | `sorting-context.mjs:23–35` знает variant; `sortingKeySchema` требует case_sensitive для string/variant | V ASC, locale=false, вторичный RowID для равных значений; actual порядок subtype/NULL, сохранение Variant и значений |
+| Калькулятор | Production context reader видит Value:variant. Добавлено независимое real-выражение `0`; Next/Done принято. Execute: 10 строк, три входных поля сохранены, Value header `bg-TBGDataType-dtVariant-before` (48–50) | Variant можно пропускать, новое выражение имеет свой scalar type. Операции над самим Value, subtype и temporal precision не проверены |
+| Группировка | Value:variant выбран ключом; Name — мера Count. Next/Done принято. Execute: 8 групп, NULL-группа count=3, остальные count=1; Value header dtVariant, count dtInteger (51–53) | Ключ Variant принят без принудительного scalar cast в этом случае. Sum/min/max над Variant и эквивалентность 7 и "7" не проверены |
+| Сортировка | Value ASC, затем Name ASC; native locale=true. Execute: все 10 строк, Value header dtVariant (55–56) | Наблюдён порядок NULL×3, true, 2,5,7,42, path A, bad; это один fixture, не универсальный порядок subtype/locale |
 
-Тот факт, что reader узнаёт тип 6, не доказывает принятие мастером, порядок
-сравнения mixed scalar или точность чтения. Ключ Variant в Группировке также
-не считается принятым только потому, что локальный валидатор его не запретил.
-Не обещать приведение 7 и "7" к одному ключу и не закреплять порядок NULL до UI.
+Отказа мастера или вынужденного scalar cast в этих трёх сценариях не было.
+Значения наблюдены в native preview; текст и CSS типа колонки не доказывают
+exact cell subtype, integer precision или civil time. Принятие входной Variant
+колонки отдельно от функций/агрегатов над нею. Обещать все операции нельзя.
 
 W2: [VarToData discovery](../../nodes/variables-vartodata/discovery.md),
 [контракт](../../nodes/variables-vartodata/contract.md),
-[план, этап 2](../../nodes/variables-vartodata/plan.md#этап-2--отдельное-назначение-r02-r03).
-Старый план не отражает весь новый код: на данной базе `node-procedure.mjs:263`
-включает `typedVariants:true` для `variables.to_table` и `imports.lgd`.
-`node-port-output.mjs:328–342` уже использует native typed reader с civil time.
-Для трёх исследуемых типов этот opt-in отсутствует; перенос его без проверки
-owner/полноты/cleanup и действующего W2 решения не предлагается как готовая правка.
+[план этапа 2](../../nodes/variables-vartodata/plan.md#этап-2--отдельное-назначение-r02-r03).
+На базе `node-procedure.mjs:263` включает typedVariants только для
+`variables.to_table` и `imports.lgd`. `node-port-output.mjs:328–342` уже имеет
+native typed reader с civil time. Opt-in трёх новых типов требует адресной W2
+проверки owner/completeness/cleanup, а не нового универсального evaluator.
 
 Читателю нужны отдельные column type=variant и cell subtype, exact integer,
 boolean/string/real, NULL без подмены, temporal civil time/точность до ms;
-0, false, пустая строка и NULL различимы. Схема, число строк, новые execution/read
-IDs и completeness обязательны. Показанный текст ячейки или AsVariant без subtype
-не доказывает exact result. Общий writer bindings этого вопроса не решает.
+0, false, пустая строка и NULL различимы. Полная схема, count, новые execution/read
+IDs обязательны. Наблюдённый preview не является exact typed-output PASS.
+
+## Существующий код и границы общего среза
+
+[LAB-828](../capabilities.md), [W1](../discovery.md) и
+[Калькулятор](../../nodes/calculator/discovery-variables.md) использованы как
+исходные материалы. `filter-procedure.mjs:205–225` и `crosstable-variables.mjs:222–257`
+уже содержат частные жесты. Filter variable operand, CrossTable local bindings
+и LGD bindings сохраняют свои API. Общий envelope нельзя объявлять уже доступным.
+`grouping-context.mjs:46–50` и `sorting-context.mjs:42–48` читают hidden literal
+отдельно от pressed: им нужен явный variable-mode inventory.
+Пути client/lib в этом документе относительны `packages/loginom-runtime`.
