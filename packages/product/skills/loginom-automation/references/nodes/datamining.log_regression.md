@@ -45,15 +45,14 @@
 
 ## Регуляризация
 
-Для Ridge (L2) выбирай `datamining.log_regression`, `mode:"ridge"` и
-`parameters.logistic.regularization:{lambda_ridge:1}` (либо явное положительное
-λ пользователя). Остальные logistic-параметры обязательны, `selection` запрещён.
-λ ручной; константа не штрафуется. `finish:"execute"` выполняет Teach и прогноз.
-Для повтора укажи прежний `target.ref`, `target.kind:"existing"`, `inputs:[]`,
-те же параметры и режим ridge. Save отдельно. Проверь сохранённый результат после открытия пакета.
-Для Ridge используй этот узел; Калькулятор и JavaScript не нужны.
-
-Первый CSV-экспорт создавай только после повторного открытия пакета: новый `exports.text`
-(`target.kind:"new"`, связь `output:0` от прежнего узла, `finish:"execute"`),
-технические имена и порядок полей наблюдаемого сохранённого порта.
-Сохрани пакет ещё раз с экспортом.
+Для Ridge (L2): `mode:"ridge"`, `parameters.logistic.regularization:{lambda_ridge:1}`
+(либо λ>0 пользователя), остальные logistic-параметры обязательны, без `selection`.
+λ ручной, константа не штрафуется; `finish:"execute"` обучает и прогнозирует.
+Повтор — прежний `target.ref`, `target.kind:"existing"`, `inputs:[]`, те же параметры.
+Save отдельно.
+После открытия обнови `workflow_ref` и `target.ref` наблюдением графа.
+Не используй Enter-only `mode:"apply"` для Ridge. На прежнем узле — `mode:"ridge"`,
+те же параметры, `inputs:[]`, `mappings:[]`, `finish:"done"`, `read.ports:[]`:
+без Teach. Первый CSV — после открытия: новый `exports.text`, связь `output:0`
+от этого узла, `finish:"execute"`, технические имена и порядок сохранённого порта.
+Проверь результат CSV и снова сохрани пакет с экспортом.
