@@ -163,12 +163,13 @@ test('MCP application refusals remain typed normal content and the same connecti
     const bootstrapPending=client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
     await entered;
     const describePending=client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text']}});
+    let descriptionAvailable;
     try{
-      assert.equal(await Promise.race([describePending.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),2000);})]),true,
-        'diagnostic describe must not queue behind browser work');
+      descriptionAvailable=await Promise.race([describePending.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),2000);})]);
     }finally{clearTimeout(timer);releaseBrowser();}
     const bootstrap=await bootstrapPending;
     assert.notEqual((await describePending).isError,true);
+    assert.equal(descriptionAvailable,true,'diagnostic describe must not queue behind browser work');
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');
     assert.equal(initial.output.bootstrap, true);
