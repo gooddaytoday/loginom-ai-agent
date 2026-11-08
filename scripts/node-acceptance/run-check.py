@@ -493,6 +493,15 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name in ['variables-from-table-aggregates', 'variables-from-table-scalars']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        scalars = name == 'variables-from-table-scalars'
+        expected = 'expected-scalar-types-run.json' if scalars else 'expected-aggregates-run.json'
+        # The scalar task opens a source copy and saves the result as the run package.
+        return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
+                    input_files=[] if scalars else ['aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
+                    **(dict(source_package=src.parent / 'fixtures/aggregate-source.lgp', source_package_separate=True) if scalars else {}),
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -635,6 +644,11 @@ def scenario(name, case_root=None, *, cases=None):
     # independent (in particular s8 binds its export by export_destination).
     return dict(source=src, prompt=prompt, data=data, base=base,
                 csv_header='labels' if name in ['s8', 'q6', 'p24'] else 'names')
+
+
+def source_package_path(case, package):
+    # A separate copy keeps the opened source distinct from the saved result.
+    return package.removesuffix('.lgp') + '-source.lgp' if case.get('source_package_separate') else package
 
 
 def sorting_stages(case):
@@ -1427,7 +1441,7 @@ class Runner:
                 if isinstance(case, Path) else scenario(case, getattr(self, 'options', {}).get('case_root'),
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
-        prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', source_package_path(spec, package))
         if spec.get('excel_mode') == 'replace': prompt = prompt.replace('existing.xlsx либо\nexisting.xls', 'existing.xlsx')
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
@@ -2009,7 +2023,7 @@ class Runner:
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('source_package'):
-                        write(folder / 'source-config.json', dict(login=login, package=r['package']))
+                        write(folder / 'source-config.json', dict(login=login, package=source_package_path(spec, r['package'])))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     base = spec['base']
                     session = None

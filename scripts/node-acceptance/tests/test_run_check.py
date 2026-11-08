@@ -302,6 +302,24 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_datatovar_cycle1_cases_bind_independent_oracle_and_separate_source_copy(self):
+        oracle = runner.read(runner.REPO / 'docs/node-development/nodes/variables-datatovar/acceptance/aggregate-types/expected.json')
+        for name, section, files, source in [('variables-from-table-aggregates', 'numeric', ['aggregate-numeric.csv'], 'imports.text'),
+                                             ('variables-from-table-scalars', 'scalar_types', [], 'programming.javascript')]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/aggregate.lgp')
+            self.assertEqual((case['variable_audit'], case['input_files'], expected['package_path']), (name, files, '/own/aggregate.lgp'))
+            self.assertEqual(expected['nodes'], [{'type': source}, {'type': 'variables.from_table'}])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertEqual((output['node'], output['port'], output['ordered']), ({'type': 'variables.from_table'}, 0, True))
+            self.assertEqual(output['variables'], oracle[section]['variables'])
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+        scalars = runner.scenario('variables-from-table-scalars')
+        self.assertTrue(scalars['source_package'].is_file())
+        self.assertEqual(runner.source_package_path(scalars, '/own/run-x.lgp'), '/own/run-x-source.lgp')
+        self.assertEqual(runner.source_package_path(runner.scenario('variables-column-union'), '/own/run-x.lgp'), '/own/run-x.lgp')
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')

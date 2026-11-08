@@ -523,7 +523,7 @@ export interface VariablesCalculatorConfigurationReadback {
 export interface DataToVarParameters { fields?: Array<{field: {kind: 'input_field'; name: string}; aggregations: Array<'sum'|'count'|'min'|'max'|'avg'>}> }
 export interface DataToVarConfigurationReadback {
  kind: 'variables_from_table'; mode: 'aggregate'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
- node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'; order: number; aggregations: string[]}>;
+ node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'|'string'|'boolean'|'datetime'; order: number; aggregations: string[]}>;
  input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
  output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
 }

@@ -29,8 +29,17 @@ test('DataToVar readback refuses stale/duplicate receipts, foreign owners and mi
   f=>f.phases[2].value.settings_applied=false,f=>f.phases[3].value.cleanup_complete=false,
   f=>f.phases[0].value.native_mapping.target_fields[0].label='changed',
   f=>f.phases[0].value.native_mapping.target_fields[0].source.record_id='foreign',
-  f=>f.phases[1].value.configuration.fields[0].functions=32,
+  f=>f.phases[1].value.configuration.fields[0].functions=16384,
+  f=>{const c=f.phases[1].value.configuration;c.fields[0].type=c.input_fields[0].type='string';},
   f=>f.phases[1].value.configuration.fields[0].order=1,
   f=>f.phases[1].value.configuration.fields.push({...f.phases[1].value.configuration.fields[0]}),
  ]){const f=fixture();mutate(f);assert.throws(()=>dataToVarConfigurationReadback(f));}
+});
+
+test('DataToVar readback reports extended functions in native order for scalar input types',()=>{
+ const f=fixture(),c=f.phases[1].value.configuration,input=f.phases[0].value.native_mapping.target_fields[0];
+ c.fields[0].type=c.input_fields[0].type=input.type='string';c.fields[0].functions=c.input_fields[0].functions=8192|4096|2;
+ assert.deepEqual(dataToVarConfigurationReadback(f).fields[0].aggregations,['count','only','concat']);
+ c.fields[0].type=c.input_fields[0].type=input.type='datetime';
+ assert.throws(()=>dataToVarConfigurationReadback(f),/supported ordered/);
 });

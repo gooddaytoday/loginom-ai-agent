@@ -32,7 +32,38 @@ export function auditDataToVarHistory(events,initial,final){
  return {status:'PASS',node:first.result.node,updated:update,initial_read_id:first.output.read_id,final_read_id:last.output.read_id};
 }
 
+// LAB-1111 cycle 1: one configured node, one exact typed result. The field
+// order and per-field native functions are the task's configuration criterion.
+export const DATATOVAR_RESULT_CASES=Object.freeze({
+ 'variables-from-table-aggregates':{source:'imports.text',fields:[
+  ['N',['median','mode','standard_deviation','unique_count','null_count','first','last','only','concat']],['K',['only']]]},
+ 'variables-from-table-scalars':{source:'programming.javascript',fields:[
+  ['S',['count','min','max','mode','unique_count','null_count','first','last','only','concat']],
+  ['B',['count','min','max','mode','unique_count','null_count','first','last','only']],
+  ['D',['count','min','max','mode','unique_count','null_count','first','last','only']]]},
+});
+export function auditDataToVarResult(name,events,final){
+ const spec=DATATOVAR_RESULT_CASES[name],want=parseExpectedVariableInventory(final)?.outputs;
+ need(spec&&want?.length===1&&want[0].node.type==='variables.from_table','DATATOVAR_EXPECTED_INVALID');
+ const requests=events.filter(e=>e.phase==='node_apply_prepared');
+ // The provided JavaScript source may be read, never reconfigured or replaced.
+ need(requests.every(e=>e.request?.target?.type==='variables.from_table'||e.request?.target?.type===spec.source
+  &&(spec.source==='imports.text'||e.request.target.kind==='existing'&&Object.keys(e.request.parameters??{}).length===0)),'DATATOVAR_UNEXPECTED_NODE');
+ const checkpoints=events.flatMap((e,index)=>{
+  const r=e.result;
+  return e.phase==='node_checkpoint'&&r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.node&&r.execution?.status==='completed'
+   ?(r.output?.variable_ports??[]).filter(output=>output.execution_id===r.execution.execution_id).map(output=>({index,result:r,output})):[];
+ });
+ const matches=s=>{try{return matchVariableInventoryOutput(s.output,want[0]);}catch{return false;}};
+ const configured=checkpoints.find(s=>s.result.configuration?.readback?.kind==='variables_from_table'&&matches(s));
+ need(configured,'DATATOVAR_RESULT_MISSING');
+ const readback=configured.result.configuration.readback;
+ need(readback.mode==='aggregate'&&JSON.stringify(readback.fields?.map(f=>[f.name,f.aggregations]))===JSON.stringify(spec.fields),'DATATOVAR_AGGREGATES_DIFFER');
+ return {status:'PASS',node:configured.result.node,read_id:configured.output.read_id,fields:readback.fields.map(f=>f.name)};
+}
+
 if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
- const {readFileSync}=await import('node:fs');
- console.log(JSON.stringify(auditDataToVarHistory(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
+ const {readFileSync}=await import('node:fs'),json=i=>JSON.parse(readFileSync(process.argv[i],'utf8'));
+ console.log(JSON.stringify(Object.hasOwn(DATATOVAR_RESULT_CASES,process.argv[2])?auditDataToVarResult(process.argv[2],json(5),json(4))
+  :auditDataToVarHistory(json(5),json(3),json(4))));
 }

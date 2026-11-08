@@ -1,4 +1,4 @@
-import {DATA_TO_VAR_FUNCTIONS} from './variables-datatovar-parameters.mjs';
+import {DATA_TO_VAR_FUNCTIONS,dataToVarMask} from './variables-datatovar-parameters.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error('Table to variables readback: '+message);};
 const pick=(v,keys)=>Object.fromEntries(keys.map(k=>[k,v[k]]));
@@ -33,8 +33,7 @@ export function dataToVarConfigurationReadback({node,phases,operation_id}){
   &&new Set(c.input_fields.map(f=>f.name.toLowerCase())).size===c.input_fields.length,'unique native input identities required');
  const seen=new Set(),fields=c.fields.map((f,index)=>{
   need(f.order===index&&f.role==='selected'&&!seen.has(f.record_id)
-   &&c.input_fields.filter(x=>same(x,f)).length===1&&['integer','real'].includes(f.type)
-   &&Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=31,'supported ordered native aggregation required');
+   &&c.input_fields.filter(x=>same(x,f)).length===1&&dataToVarMask(f.type,f.functions),'supported ordered native aggregation required');
   seen.add(f.record_id);
   return {...pick(f,['name','label','type','order']),aggregations:Object.keys(DATA_TO_VAR_FUNCTIONS).filter(a=>(f.functions&DATA_TO_VAR_FUNCTIONS[a])!==0)};
  });

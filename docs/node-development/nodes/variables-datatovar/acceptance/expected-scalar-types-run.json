@@ -1,0 +1,193 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "variables.from_table"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.from_table"
+        },
+        "port": 0,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "S_Count",
+            "label": "S|Количество",
+            "type": "integer",
+            "value": 5
+          },
+          {
+            "name": "S_Min",
+            "label": "S|Минимум",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "S_Max",
+            "label": "S|Максимум",
+            "type": "string",
+            "value": "b"
+          },
+          {
+            "name": "S_Mode",
+            "label": "S|Мода",
+            "type": "string",
+            "value": "a"
+          },
+          {
+            "name": "S_Uniq",
+            "label": "S|Кол-во уникальных",
+            "type": "integer",
+            "value": 3
+          },
+          {
+            "name": "S_Null",
+            "label": "S|Кол-во пропусков",
+            "type": "integer",
+            "value": 1
+          },
+          {
+            "name": "S_First",
+            "label": "S|Первый",
+            "type": "string",
+            "value": "b"
+          },
+          {
+            "name": "S_Last",
+            "label": "S|Последний",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "S_Only",
+            "label": "S|Единственный",
+            "type": "string",
+            "value": null
+          },
+          {
+            "name": "S_Concat",
+            "label": "S|Список",
+            "type": "string",
+            "value": "b,a,"
+          },
+          {
+            "name": "B_Count",
+            "label": "B|Количество",
+            "type": "integer",
+            "value": 5
+          },
+          {
+            "name": "B_Min",
+            "label": "B|Минимум",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "B_Max",
+            "label": "B|Максимум",
+            "type": "boolean",
+            "value": true
+          },
+          {
+            "name": "B_Mode",
+            "label": "B|Мода",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "B_Uniq",
+            "label": "B|Кол-во уникальных",
+            "type": "integer",
+            "value": 2
+          },
+          {
+            "name": "B_Null",
+            "label": "B|Кол-во пропусков",
+            "type": "integer",
+            "value": 1
+          },
+          {
+            "name": "B_First",
+            "label": "B|Первый",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "B_Last",
+            "label": "B|Последний",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "B_Only",
+            "label": "B|Единственный",
+            "type": "boolean",
+            "value": null
+          },
+          {
+            "name": "D_Count",
+            "label": "D|Количество",
+            "type": "integer",
+            "value": 5
+          },
+          {
+            "name": "D_Min",
+            "label": "D|Минимум",
+            "type": "datetime",
+            "value": "2026-01-01T00:00:00.456"
+          },
+          {
+            "name": "D_Max",
+            "label": "D|Максимум",
+            "type": "datetime",
+            "value": "2026-01-03T00:00:00.000"
+          },
+          {
+            "name": "D_Mode",
+            "label": "D|Мода",
+            "type": "datetime",
+            "value": "2026-01-01T00:00:00.456"
+          },
+          {
+            "name": "D_Uniq",
+            "label": "D|Кол-во уникальных",
+            "type": "integer",
+            "value": 3
+          },
+          {
+            "name": "D_Null",
+            "label": "D|Кол-во пропусков",
+            "type": "integer",
+            "value": 1
+          },
+          {
+            "name": "D_First",
+            "label": "D|Первый",
+            "type": "datetime",
+            "value": "2026-01-02T03:04:05.123"
+          },
+          {
+            "name": "D_Last",
+            "label": "D|Последний",
+            "type": "datetime",
+            "value": "2026-01-03T00:00:00.000"
+          },
+          {
+            "name": "D_Only",
+            "label": "D|Единственный",
+            "type": "datetime",
+            "value": null
+          }
+        ]
+      }
+    ]
+  }
+}

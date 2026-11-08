@@ -1,8 +1,8 @@
-import {resolveDataToVarParameters,DATA_TO_VAR_FUNCTIONS} from './variables-datatovar-parameters.mjs';
+import {resolveDataToVarParameters,dataToVarMask,DATA_TO_VAR_FUNCTIONS} from './variables-datatovar-parameters.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error('Table to variables: '+message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const supported=f=>['integer','real'].includes(f.type)&&Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=31;
+const supported=f=>dataToVarMask(f.type,f.functions);
 const FACTORS=['sum','count','min','max','average','median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'];
 
 export async function configureDataToVarWizard(channel,p,{finish='done',newNode=false}={}){
@@ -29,10 +29,13 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
  const baseline=first.node_datatovar,owner=baseline.node_context;
  need(owner?.verified===true&&owner.surface==='wizard'&&!owner.input_port&&!owner.output_port,'native wizard owner is required');
  const unchanged=f=>({record_id:f.record_id,name:f.name,label:f.label,type:f.type,settings:f.settings});
+ // Native list settings of a field may change only when Apply toggles its
+ // concat function; they are then rebound and recorded, never written by us.
+ let expected=baseline.input_fields.map(unchanged);const concatDefaults=[];
  const observe=async condition=>{
   const s=await channel.observe({condition,readDataToVar:true,ready});
   need(same(s.node_datatovar.node_context,owner)&&s.wizard.root_tid===first.wizard.root_tid,'wizard owner changed');
-  need(same(s.node_datatovar.input_fields.map(unchanged),baseline.input_fields.map(unchanged)),'input identity or unrelated settings changed');
+  need(same(s.node_datatovar.input_fields.map(unchanged),expected),'input identity or unrelated settings changed');
   return s;
  };
  if(p&&Object.keys(p).length===0){
@@ -112,7 +115,7 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
   const editor=async()=>{
    const s=await channel.observe({condition:'complete bound table-to-variables factor editor',readDataToVar:true,ready:editorReady});
    need(same(s.node_datatovar.node_context,owner),'factor editor owner changed');
-   need(same(s.node_datatovar.input_fields.map(unchanged),baseline.input_fields.map(unchanged)),'input identity changed in factor editor');
+   need(same(s.node_datatovar.input_fields.map(unchanged),expected),'input identity changed in factor editor');
    const os=s.wizard.factor_editor.options;
    need(os.length===14&&FACTORS.every(a=>os.filter(o=>o.aggregation===a).length===1)
     &&os.every(o=>typeof o.checked==='boolean'&&typeof o.enabled==='boolean'&&typeof o.display_ref==='string')
@@ -122,8 +125,7 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
   // Enabling first avoids a transient empty selection when replacing the only
   // old function. Unknown mutation outcomes propagate; no gesture is replayed.
   for(const enabled of [true,false])for(const aggregation of FACTORS){
-   const wanted=Object.hasOwn(DATA_TO_VAR_FUNCTIONS,aggregation==='average'?'avg':aggregation)
-    &&desired.aggregations.includes(aggregation==='average'?'avg':aggregation);
+   const wanted=desired.aggregations.includes(aggregation==='average'?'avg':aggregation);
    if(wanted!==enabled)continue;
    s=await editor();const o=s.wizard.factor_editor.options.find(o=>o.aggregation===aggregation);
    if(o.checked===wanted)continue;need(o.enabled,'requested native aggregation is disabled: '+aggregation);
@@ -134,9 +136,17 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
   need(s.wizard.factor_editor.options.every(o=>o.checked===desired.aggregations.includes(o.aggregation==='average'?'avg':o.aggregation)),'native factor set differs before Apply');
   await channel.perform({condition:'apply factors to the exact selected field',initialObservation:s,ready:editorReady,
    identity:()=>({owner,record_id:f.record_id,mask:desired.mask}),resolve:s=>({verb:'click',ref:control(s,'FactorEditDialog;btnApply').ref})});
-  s=await observe('table-to-variables factors applied');need(fieldAt(s,name).functions===desired.mask,'applied native function bitset differs');
+  const concat=((f.functions^desired.mask)&DATA_TO_VAR_FUNCTIONS.concat)!==0;
+  if(concat){
+   s=await channel.observe({condition:'table-to-variables factors applied',readDataToVar:true,ready});
+   need(same(s.node_datatovar.node_context,owner)&&s.wizard.root_tid===first.wizard.root_tid,'wizard owner changed');
+   const settings=fieldAt(s,name).settings,rebound=expected.map(x=>x.record_id===f.record_id?{...x,settings}:x);
+   need(same(s.node_datatovar.input_fields.map(unchanged),rebound),'input identity or unrelated settings changed');
+   expected=rebound;concatDefaults.push({name,settings:structuredClone(settings)});
+  }else s=await observe('table-to-variables factors applied');
+  need(fieldAt(s,name).functions===desired.mask,'applied native function bitset differs');
  }
  const after=(await observe('complete final table-to-variables configuration')).node_datatovar;
  need(same(after.fields.map(f=>({name:f.name,mask:f.functions})),plan.fields.map(f=>({name:f.input.name,mask:f.mask}))),'final native field/function order differs');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,field_settings:true}};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,field_settings:!concatDefaults.length,...(concatDefaults.length?{native_concat_settings:concatDefaults}:{})}};
 }
