@@ -36,6 +36,13 @@ test('incomplete input/bins, pending selection, foreign owners and invalid inter
 test('settings-only field is distinguished from a materialized saved model',()=>{
  const f=fixture();f.records[1].data.BinsCount=0;f.bins.splice(0);const r=f.read();assert.equal(r.verified,true);assert.equal(r.state,'settings');assert.deepEqual(r.intervals,[]);
 });
+test('materialized DateTime bounds retain civil milliseconds in the production reader',()=>{
+ const f=fixture();f.records[1].data.DataType=2;
+ f.bins.forEach((b,i)=>{b.data.LowerBoundValue=new Date(2026,0,1+i,0,0,0,123);b.data.UpperBoundValue=new Date(2026,0,2+i,0,0,0,123);});
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[1].type,'datetime');
+ assert.equal(r.intervals[0].lower,'2026-01-01T00:00:00.123');
+ assert.equal(r.intervals[1].upper,'2026-01-03T00:00:00.123');
+});
 test('an empty numeric store after reopening is not a ready Binning inventory',()=>{
  const f=fixture();f.records.splice(0);f.selection.splice(0);f.bins.splice(0);f.controller.FViewedColumnRecord=null;
  assert.equal(f.read().verified,false);

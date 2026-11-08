@@ -9,6 +9,24 @@ import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const parameters={binning:{field:'X',method:'count',size:2,limits:[0,20]}};
 const fields=[{name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный'},{name:'X',label:'X',type:'real',data_kind:'Непрерывный'},{name:'Note',label:'Note',type:'string',data_kind:'Дискретный'}];
+test('DateTime count and existing manual edits use civil milliseconds without training',async()=>{
+ const limits=['2026-01-01T00:00:00.000','2026-01-04T00:00:00.000'];
+ const date={binning:{field:'When',method:'count',size:2,limits}};
+ assert.doesNotThrow(()=>validateBinningParameters(date,'internal'));
+ assert.equal(resolveBinningField(date,[{name:'When',type:'datetime'}]).type,'datetime');
+ for(const invalid of [['2026-02-30T00:00:00.000',limits[1]],[limits[0]+'Z',limits[1]],[limits[0],20]])
+  assert.throws(()=>validateBinningParameters({binning:{...date.binning,limits:invalid}},'internal'));
+ const manual={binning:{field:'When',method:'manual',intervals:[
+  {lower:limits[0],upper:'2026-01-02T00:00:00.000',lower_included:true,upper_included:true,label:'Early'},
+  {lower:'2026-01-02T00:00:00.000',upper:limits[1],lower_included:false,upper_included:true,label:'Late'}]}};
+ const request={target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1]}};
+ assert.doesNotThrow(()=>validateBinningParameters(manual,'internal',request));
+ assert.throws(()=>validateBinningParameters(manual,'internal',{...request,target:{kind:'new'}}));
+ const broken=structuredClone(manual);broken.binning.intervals[1].lower=limits[0];
+ assert.throws(()=>validateBinningParameters(broken,'internal',request),/adjacent/);
+ assert.deepEqual(await binningBeforeGraphExecute({operation:{nodeApply:{request:{mode:'internal',parameters:manual}}}},null,{manual_edits:true},null),{});
+ assert.equal(binningOutputColumns({fields:[{name:'When',type:'datetime'}],field:'When',type:'datetime'},1)[3].type,'datetime');
+});
 test('binning handler is installed for internal/apply and apply never enters training',async()=>{
  const handler=createCandidateNodeSupport({}).nodeApplyHandlers.get('preprocessing.binning');
  assert.deepEqual(handler.modes,['internal','apply']);assert.equal(handler.output_wizard,'separate');

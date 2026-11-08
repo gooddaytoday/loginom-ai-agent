@@ -741,3 +741,9 @@ Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
 Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`binning-datetime-manual`: DateTime When из modes.csv, count=2, затем ручные
+граница 02.01 и Early/Late на том же обученном узле без повторного Train.
+Задание task-datetime-manual.md; неизменный modes/expected.json проверяет
+146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
+Модель получает только task и modes.csv; oracle остаётся в оснастке.

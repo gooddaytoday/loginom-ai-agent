@@ -60,3 +60,36 @@ test('a delayed native editor closure after Width selection needs no cached-inpu
  const {result,calls,replacementTicks}=await methodSelection({method:'width',replaceEditor:true,closeEditor:true});
  assert.equal(result.verified,true);assert.equal(replacementTicks,3);assert.deepEqual(calls.filter(a=>a.verb==='press'),[]);
 });
+test('manual changes the shared boundary and labels of the saved node without choosing a method',async()=>{
+ const field={index:0,record_id:'date',label:'When',type:'datetime',method_code:3,bins_count:2,automatic:false};
+ const lo='2026-01-01T00:00:00.000',mid='2026-01-02T12:00:00.000',hi='2026-01-04T00:00:00.000',boundary='2026-01-02T00:00:00.000';
+ const intervals=[{number:0,lower:lo,upper:mid,lower_included:true,upper_included:true,label:'first'},
+  {number:1,lower:mid,upper:hi,lower_included:false,upper_included:true,label:'last'}];
+ const c={verified:true,binding_ready:true,fields:[field],selected:field,state:'materialized',intervals,frame:{record_id:'date',switches:[],controls:{},values:{}},
+  settings:{method:'count',size:2,limits:[lo,hi],strict_lower:true,strict_upper:true,rounding:false,lower_open:false,upper_open:false},bin_editor:null};
+ const base='W;MethodSettingsWizard-1;',editor=base+'grdBins;celleditor',calls=[];
+ const cells=()=>intervals.flatMap((b,i)=>['UpperBoundValue','BinLabel'].map(key=>({tid:base+'col'+key+'_'+i,ref:key+'_'+i,allowed_actions:['double_click']})));
+ const s={wizard:{root_tid:'W',stage:'binning'},node_binning:c,ui:{elements:cells()}};
+ let text;
+ const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
+  assert.ok(o.ready(s));const a=o.resolve(s);calls.push(a);
+  if(a.verb==='double_click'){
+   const [key,i]=a.ref.split('_');c.bin_editor={number:Number(i),field:key,root_tid:editor};
+   s.ui.elements=[{tid:null,ref:'owned-date-input',signature:{tag:'input'},identity:{anchor_tid:editor+';datetimefield'},allowed_actions:['fill','press']}];
+  }else if(a.verb==='fill')text=a.text;
+  else if(a.verb==='press'){
+   const e=c.bin_editor,b=intervals[e.number];
+   if(e.field==='UpperBoundValue'){b.upper=text;intervals[e.number+1].lower=text;}else b.label=text;
+   c.bin_editor=null;s.ui.elements=cells();
+  }else if(a.verb==='wizard_step')s.wizard.stage=a.expected_stage;
+  else assert.fail('unexpected manual action');
+  if(!c.bin_editor&&!s.ui.elements.some(e=>e.tid==='W;btnNext'))s.ui.elements.push({tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']});
+ }};
+ const wanted=[{lower:lo,upper:boundary,lower_included:true,upper_included:true,label:'Early'},
+  {lower:boundary,upper:hi,lower_included:false,upper_included:true,label:'Late'}];
+ const result=await configureBinning(channel,{binning:{field:'When',method:'manual',intervals:wanted}},
+  {request:{mode:'internal'},preconfiguration:{target_fields:[{name:'When',label:'When',type:'datetime'}]}});
+ assert.equal(result.configuration.manual_edits,true);assert.equal(result.configuration.state,'materialized');
+ assert.deepEqual(result.configuration.intervals.map(({number,...b})=>b),wanted);
+ assert.deepEqual(calls.filter(a=>a.verb==='double_click').map(a=>a.ref),['UpperBoundValue_0','BinLabel_0','BinLabel_1']);
+});

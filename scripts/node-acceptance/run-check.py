@@ -319,6 +319,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
+    if name == 'binning-datetime-manual':
+        node = REPO / 'docs/node-development/nodes/preprocessing-binning'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
+                    data=node / 'fixtures', base=None, export_count=2, input_files=['modes.csv'],
+                    expected_name='modes/expected.json', oracle=node / 'acceptance/modes/oracle.py')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
