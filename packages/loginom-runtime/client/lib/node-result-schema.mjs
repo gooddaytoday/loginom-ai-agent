@@ -33,7 +33,7 @@ const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool
  ['port','port_guid','fresh','execution_id','schema','row_count','sample','sample_rows','sample_complete','precision'],true);
 const treeSchemaNode=object({index:integer,parent:nullable(integer),path:str,name:str,label:str,type:str,is_container:bool,is_array:bool,children:array(integer)});
 const treeInstance=object({index:integer,parent:nullable(integer),schema_index:integer,path:str,type:str,children:array(integer),
- is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str},['index','parent','schema_index','path','type']);
+ is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str},['index','parent','schema_index','path','type']);
 const treePort=object({port:integer,port_guid:str,port_kind:values('tree'),fresh:bool,freshness_basis:values('completed_execution_port_source'),execution_id:str,
  tree:object({schema:{...array(treeSchemaNode),minItems:1,maxItems:256},instances:{...array(treeInstance),minItems:1,maxItems:256},
  complete:{const:true},node_count:{type:'integer',minimum:1,maximum:256},max_depth:{type:'integer',minimum:0,maximum:16},
@@ -301,7 +301,7 @@ const jsonTreeConfigurationReadback=object({kind:values('json_to_tree'),mode:val
  node:ref,receipt_ids:array(str),package_persistence_verified:{const:false},json_field:str,root_mode:values('auto'),auto_structure:{const:true},strict:{const:true},exclude_root:{const:false}});
 const treeTableConfigurationReadback=object({kind:values('tree_to_table'),mode:values('selected_nodes'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),
  node:ref,receipt_ids:array(str),package_persistence_verified:{const:false},selected_paths:{...array(str),minItems:1,maxItems:64},repeat_parents:bool,
- composite_names:{const:false},composite_labels:{const:false},label_separator:values('.')});
+ composite_names:{const:false},composite_labels:{const:false},label_separator:values('.'),global_index_paths:{...array(str),maxItems:1}});
 const lgdImportConfigurationReadback=object({kind:values('lgd_import'),scope:values('observed_before_verified_finish'),node:ref,values_are:values('observed_ui_values'),source:object({source_path:str,source_variable:str,checksum:bool,compression:str,bitness:str,written_checksum:str,connection:values('Локальное')},['source_path','checksum','compression','bitness','written_checksum','connection']),output_mapping:object({port:{const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),receipt_ids:array(str),package_persistence_verified:{const:false}});
 const lgdExportConfigurationReadback=object({kind:values('lgd_export'),scope:values('observed_before_verified_finish'),node:ref,receipt_ids:{...array(str),minItems:3,maxItems:3},values_are:values('observed_ui_values'),destination:str,settings:object({destination:str,compression:{const:2},checksum:{const:1},string_cache_max_size:{const:131072}}),input_mapping:object({port:{const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),package_persistence_verified:{const:false}});
 const tableTreeConfigurationReadback=object({kind:values('table_to_tree'),mode:values('manual_structure'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,input_port:{const:0},output_port:{const:0},receipt_ids:array(str),package_persistence_verified:{const:false},nodes:tableToTreeParametersSchema.properties.nodes});
