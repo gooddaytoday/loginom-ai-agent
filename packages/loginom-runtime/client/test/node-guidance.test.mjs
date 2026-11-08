@@ -100,3 +100,17 @@ test('stale document identity defers to the authoritative document guard after S
  assert.equal(b.checkNodeDescription(request),null);
  assert.equal(b.checkNodeDescription({...request,document_id:'new-document'}).error.code,'NODE_TYPE_NOT_DESCRIBED');
 });
+
+test('LAB-1162 skill text covers repeated model refusals from live runs',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const skill=await readFile(source.main,'utf8');
+ assert.match(skill,/[Пп]осле каждого `loginom_dock_prepare`[^\n]*(open_package|повторн)[^\n]*\n?[^\n]*describe/);
+ const workflow=await readFile(join(source.directory,'references/workflow.md'),'utf8');
+ assert.match(workflow,/source_operation_id[\s\S]{0,80}finish:"execute"/);
+ assert.match(workflow,/finish:"done"[\s\S]{0,60}не подходит/);
+ const card={type:'transform.group_data',modes:NODE_TYPES['transform.group_data'].modes};
+ const [aggregate]=await loader.describeNodes([card],['aggregate']);
+ assert.match(aggregate.guidance,/configured_field\.name[\s\S]{0,120}`name` меры/);
+ assert.match(aggregate.guidance,/Amount_Median/);
+});
