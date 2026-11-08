@@ -23,10 +23,10 @@ node docs/node-development/nodes/transform-ungroupdata/model-contract/measure-se
 |---|---:|---:|---:|
 | Сжатый модельный dock_node_apply | 8 051 | 8 051 | 20 000 |
 | Полная inputSchema (не передаётся модели) | 71 306 | 72 302 | нет |
-| Карточка типа с session envelope, без guidance | 5 600 | 6 189 | — |
-| Карточка типа с полным proposed guidance и guidance_modes | — | **11 139** | 12 000 |
+| Карточка типа с session envelope, без guidance | 5 600 | 7 022 | — |
+| Карточка типа с полным proposed guidance и guidance_modes | — | **11 935** | 12 000 |
 | Общий SKILL.md после одной замены маршрута | 28 823 | 28 844 | 40 000 |
-| Файл references/nodes/transform.ungroup_data.md | 4 165 | 4 869 | 6 000 |
+| Файл references/nodes/transform.ungroup_data.md | 4 165 | 4 834 | 6 000 |
 | Строка маршрута, включая LF | 117 | 138 | около 200 |
 
 Первая редакция (12 203 Б) превышала бюджет на 203 Б. Сжато без потери
@@ -42,7 +42,15 @@ shares-semantics даёт 11 892 Б для всех режимов. На баз�
 (#883) сумма трёх режимов превышает 12 000 Б и 6 000 Б файла — это
 решение этапа 1, не этого предложения.
 
-Размер файла предложенной карточки (компактный JSON) — 5 247 Б.
+LAB-1166: semantics предложения теперь содержит действующие правила shares
+(без фразы базы «seasonality… unsupported») и seasonal; служебные пометки
+«PROPOSAL, not implemented», «Seasonal proposal (requires approval…)» и
+«lack an independent oracle» убраны из текста для модели. Измеритель с этой
+semantics даёт 11 935 Б из 12 000 (запас 65 Б). Статус: предложение LAB-1127,
+не реализовано и не утверждено владельцем; непостоянная опора и формула
+доверительных границ не имеют независимого oracle.
+
+Размер файла предложенной карточки (компактный JSON) — 6 080 Б.
 `cache_key` — 64 нуля, `session_manifest={}`; измеритель подставляет текущую
 форму session envelope и placeholder skill revision, ничего не публикует
 как действующий pin. Вызовы сервера/браузера в измерителе запрещены.
