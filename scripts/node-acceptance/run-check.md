@@ -117,7 +117,15 @@ Stratified and biased are registered as `sampling-stratified`, `sampling-biased`
 `partition-stratified`, `partition-biased`. Stratified additionally checks exact
 size, Class quotas and combined/train/test relations. Biased checks repeats and
 exact typed membership without sizes or quotas. Both require saved native field
-order; uniform remains unsupported.
+order; uniform is registered below.
+`sampling-uniform`, `partition-uniform` and `partition-test-priority` use the
+approved v040 task/expected/source fixtures. Uniform checks typed membership,
+unique RowID, unchanged executions, separate native group row sizes and every
+CSV. Partition additionally checks disjoint train/test and combined IsTestSet.
+The priority task checks beginning then end on the same node; cold compares
+the final end result. Cold inspects saved method, sizes, seed and priority
+through the production reader and verified Cancel without applying settings.
+No PRNG formula or Class quotas are asserted for uniform.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh
@@ -697,6 +705,14 @@ Only task and matrix.csv reach the model.
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
+задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
+Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
+oracle и expected — нет. Проверяются все значения, типы, порядок полей, Save, cold и
+cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
+сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
+выгрузке run-check не различает — его подтверждает журнал вызова узла.
 
 `replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
 на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,

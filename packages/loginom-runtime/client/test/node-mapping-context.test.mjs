@@ -60,6 +60,7 @@ test('node mapping brackets its read with the same prepared wizard identity',asy
 
  test('native mapping refuses a plain reconnect mask even while cached grids remain',()=>{
  const f=fixture();f.all.push({mask:true,getAttribute:()=>null,checkVisibility:()=>true});assert.equal(f.read().reason,'mapping_mask');
+ assert.ok(Array.isArray(f.read().mask_detail),'a refused mask names what was observed');
  });
 
 function excludedFixture() {
@@ -459,5 +460,35 @@ test('empty output socket mapping reports actual empty inventories without inven
    assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.rendered_indices.length,0);
    assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
   }
+ }
+});
+
+test('auto-detected text import output mapping admits its native disabled delete-column mask only inside the import wizard',()=>{
+ for(const variant of ['import','other','enabled','duplicate-mask']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant!=='other')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:variant!=='enabled'};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  const result=f.read();
+  assert.equal(result.verified,variant==='import',variant+': '+result.reason);
+  if(variant!=='import')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
+
+test('text import output mapping may be empty before execution only for the import wizard (auto-detect all)',()=>{
+ for(const variant of ['import','other']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant==='import')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  f.source.length=0;f.target.length=0;for(const row of f.rows)row.row=false;
+  const r=f.read();
+  assert.equal(r.verified,variant==='import',variant+': '+r.reason);
+  if(variant==='import'){assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.source_identity_verified,true);}
+  else assert.equal(r.reason,'mapping_render_bound');
  }
 });

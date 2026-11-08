@@ -1628,6 +1628,22 @@ test('import settings preserve blank and whitespace values and exclude hidden or
   assert.equal((await page.observe()).wizard.settings.fields.delimiter.status,'unobserved');
 });
 
+test('import wizard exposes detection mode and analysis rows only when natively observed',async()=>{
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base),p=base+';ImportTextFileParamsWizard;';
+  page.add('div',p+'edtValueNull','',undefined,form);
+  const nullOwner=page.add('div',p+'edtValueNull;ValueControl','',undefined,form);page.add('input',null,'',undefined,nullOwner).value='NULL';
+  let fields=(await page.observe()).wizard.settings.fields;
+  assert.equal(Object.hasOwn(fields,'auto_detect_columns'),false);assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+  const mode=page.add('div',p+'cbbAutoDetectColumnsMode;ValueControl','',undefined,form),modeInput=page.add('input',null,'',undefined,mode);modeInput.value='Только новые';modeInput.readOnly=true;
+  const rows=page.add('div',p+'ColumnDefsTuning;seReadRowCount','',undefined,form),rowsInput=page.add('input',null,'',undefined,rows);rowsInput.value='25';
+  const snapshot=await page.observe();fields=snapshot.wizard.settings.fields;
+  assert.equal(fields.auto_detect_columns.value,'Только новые');assert.equal(fields.auto_detect_columns.status,'observed');
+  assert.equal(fields.analysis_rows.value,'25');assert.equal(fields.analysis_rows.enabled,true);
+  assert.ok(snapshot.ui.elements.some(e=>e.wizard_field?.name==='analysis_rows'&&e.allowed_actions.includes('set_wizard_field')));
+  assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.name==='auto_detect_columns'));
+  rowsInput.value='many';fields=(await page.observe()).wizard.settings.fields;assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+});
+
 function importFormatField(page) {
   page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   page.context.innerWidth=1000;page.context.innerHeight=800;

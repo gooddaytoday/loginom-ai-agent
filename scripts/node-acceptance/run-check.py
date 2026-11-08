@@ -215,6 +215,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name in ['text-auto-types', 'text-auto-update']:
+        node = REPO / 'docs/node-development/nodes/text-import'
+        update = name == 'text-auto-update'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
+                    data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -451,6 +457,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'variables-replace-match':
+        src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-match-modes.md', data=src.parent / 'fixtures', base=None,
+                    expected_name='expected-reopened-run.json', cold_expected_name='expected-reopened-run.json',
+                    input_files=['modes-source.json'], variable_only=True,
+                    variable_audit='variables-replace-match', variable_initial='expected-run.json', variable_read_path='execution',
+                    oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
     if name == 'variables-replace-exact':
         src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -549,6 +562,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-uniform', 'partition-uniform', 'partition-test-priority']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        root = REPO / 'docs/node-development/nodes' / slug
+        src = root / 'acceptance/v040'
+        return dict(source=src, prompt=src / ('task-test-priority.md' if name.endswith('test-priority') else 'task-uniform.md'),
+                    data=root / 'fixtures/v040', input_files=['rows.csv'], base=None, sampling_uniform=True,
+                    sampling_priority=name.endswith('test-priority'),
+                    export_count=6 if name.endswith('test-priority') else 2 if name.startswith('sampling') else 3)
     if name in ['sampling-random', 'sampling-stratified', 'sampling-biased', 'partition-random', 'partition-stratified', 'partition-biased']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         mode = name.rsplit('-', 1)[1]
@@ -621,6 +642,16 @@ def expected_for(case, package, cold=False):
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]])
+    if case.get('sampling_uniform'):
+        proposal = read(src / 'expected.json')
+        partition = proposal['node_type'] == 'preprocessing.data_partition'
+        proposal['source'] = dict(rows=proposal['source'], row_count=len(proposal['source']))
+        proposal['requested_sizes'] = dict(train=proposal['train_count'], test=proposal['test_count']) if partition else dict(sample=proposal['count'])
+        proposal['group_size_rows'] = list(proposal['group_size_rows'].values()) if partition else [proposal['group_size_rows']]
+        if case.get('sampling_priority'):
+            proposal.update(test_priority=True, test_priority_position='both')
+        return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
+            'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
     if case.get('excel_xls_refusal'):
         return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
     if case.get('excel_mode'):
@@ -1438,7 +1469,9 @@ class Runner:
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
-            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('sampling_uniform'):
+                prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
