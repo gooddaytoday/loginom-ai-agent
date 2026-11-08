@@ -20,15 +20,15 @@
    "column_order": "exact",
    "columns": [
     {
+     "name": "batch",
+     "label_any": true,
+     "type": "string"
+    },
+    {
      "name": "item_index",
      "name_any": true,
      "label_any": true,
      "type": "integer"
-    },
-    {
-     "name": "batch",
-     "label_any": true,
-     "type": "string"
     },
     {
      "name": "code",
@@ -43,58 +43,16 @@
    ],
    "rows": [
     {
-     "item_index": 0,
      "batch": "Бета",
+     "item_index": 0,
      "code": "x",
      "qty": 2
     },
     {
-     "item_index": 1,
      "batch": "Бета",
+     "item_index": 1,
      "code": "y",
      "qty": 0
-    }
-   ]
-  },
-  {
-   "output_node_type": "trees.to_table",
-   "output_port": 0,
-   "export_destination": "global-index.csv",
-   "ordered": true,
-   "column_order": "exact",
-   "columns": [
-    {
-     "name": "group",
-     "label_any": true,
-     "type": "string"
-    },
-    {
-     "name": "code",
-     "label_any": true,
-     "type": "string"
-    },
-    {
-     "name": "global_index",
-     "name_any": true,
-     "label_any": true,
-     "type": "integer"
-    }
-   ],
-   "rows": [
-    {
-     "group": "A",
-     "code": "x",
-     "global_index": 0
-    },
-    {
-     "group": "A",
-     "code": "z",
-     "global_index": 1
-    },
-    {
-     "group": "B",
-     "code": "y",
-     "global_index": 2
     }
    ]
   }

@@ -150,15 +150,14 @@ export async function readTreePortSource(source,call,track,decode) {
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- // Each native root row is one document; a single row keeps the original shape.
- const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(Number.isSafeInteger(rows)&&rows>=1&&rows<=256,'tree_document_count');
- const documents=[];for(let row=0;row<rows;row++)documents.push(await instance(0,row,'',0));
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(rows===1,'tree_document_count');
+ const document=await instance(0,0,'',0);
  const instances=[];
- const flatten=(node,parent,row)=>{
-  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(rows>1&&parent===null?{root_row:row}:{}),...(children?{children:[]}: {})};
+ const flatten=(node,parent)=>{
+  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(children?{children:[]}: {})};
   instances.push(record);if(children)for(const child of children)record.children.push(flatten(child,index));return index;
- };documents.forEach((document,row)=>flatten(document,null,row));
- const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,...(rows>1?{root_rows:rows}:{}),
+ };flatten(document,null);
+ const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,
   limits:{max_nodes:256,max_depth:16,max_bytes:1024*1024}};
  bytes(result);return result;
 }

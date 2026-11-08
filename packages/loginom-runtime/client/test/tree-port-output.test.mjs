@@ -78,22 +78,6 @@ test('tree_io public schema and compaction preserve the complete schema and inst
  assert.deepEqual(result.output.ports,[port]);
  const bad=structuredClone(port);bad.tree.complete=false;assert.equal(validate(bad).valid,false);
 });
-test('tree_io reads every native root row in order; one row keeps the original shape',async()=>{
- const one=await read();assert.equal(Object.hasOwn(one,'root_rows'),false);assert.equal(one.instances.some(n=>Object.hasOwn(n,'root_row')),false);
- const result=await read({rows:2,count:2});
- assert.equal(result.root_rows,2);assert.equal(result.node_count,28);
- const roots=result.instances.filter(n=>n.parent===null);
- assert.deepEqual(roots.map(n=>[n.path,n.root_row]),[['',0],['',1]]);
- const under=(root,path)=>{const seen=[];const walk=i=>{const n=result.instances[i];if(n.path===path)seen.push(n.value);for(const c of n.children??[])walk(c);};walk(root.index);return seen;};
- assert.deepEqual(under(roots[0],'/id'),['7']);assert.deepEqual(under(roots[1],'/id'),['8']);
- assert.deepEqual(under(roots[0],'/items/0/sku'),['A']);assert.deepEqual(under(roots[1],'/items/0/sku'),['C']);assert.deepEqual(under(roots[1],'/items/1/qty'),['1']);
- const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
- assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree:result,sample_complete:true}).valid,true);
-});
-test('tree_io keeps refusing an empty tree and the 256 instance bound across root rows',async()=>{
- await assert.rejects(read({rows:0}),/tree_document_count/);
- await assert.rejects(read({rows:52,count:4}),/tree_instance_limit/);
-});
 test('tree_io reads datetime leaves as civil milliseconds and still refuses Variant leaves',async()=>{
  // Temporal-based datetime decoding is covered in the browser integration test;
  // here the tree reader must admit the type and keep the decoded civil cell.
@@ -107,10 +91,7 @@ test('tree_io reads datetime leaves as civil milliseconds and still refuses Vari
  assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree:result,sample_complete:true}).valid,true);
  await assert.rejects(read({noteType:6}),/tree_scalar_type/);
 });
-test('tree_io public schema admits root_rows only from 2 and root_row only as a nonnegative integer',async()=>{
- const tree=await read({rows:2,count:2}),validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
- const port=tree=>({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true});
- assert.equal(validate(port(tree)).valid,true);
- for(const rows of [1,0,257])assert.equal(validate(port({...tree,root_rows:rows})).valid,false,String(rows));
- const bad=structuredClone(tree);bad.instances[0].root_row=-1;assert.equal(validate(port(bad)).valid,false);
+test('tree_io still reads exactly one native document: several root rows and an empty tree refuse',async()=>{
+ await assert.rejects(read({rows:2,count:2}),/tree_document_count/);
+ await assert.rejects(read({rows:0}),/tree_document_count/);
 });

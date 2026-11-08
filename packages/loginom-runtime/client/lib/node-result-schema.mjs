@@ -33,11 +33,11 @@ const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool
  ['port','port_guid','fresh','execution_id','schema','row_count','sample','sample_rows','sample_complete','precision'],true);
 const treeSchemaNode=object({index:integer,parent:nullable(integer),path:str,name:str,label:str,type:str,is_container:bool,is_array:bool,children:array(integer)});
 const treeInstance=object({index:integer,parent:nullable(integer),schema_index:integer,path:str,type:str,children:array(integer),
- is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str,root_row:integer},['index','parent','schema_index','path','type']);
+ is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str},['index','parent','schema_index','path','type']);
 const treePort=object({port:integer,port_guid:str,port_kind:values('tree'),fresh:bool,freshness_basis:values('completed_execution_port_source'),execution_id:str,
  tree:object({schema:{...array(treeSchemaNode),minItems:1,maxItems:256},instances:{...array(treeInstance),minItems:1,maxItems:256},
- complete:{const:true},node_count:{type:'integer',minimum:1,maximum:256},root_rows:{type:'integer',minimum:2,maximum:256},max_depth:{type:'integer',minimum:0,maximum:16},
- limits:object({max_nodes:{const:256},max_depth:{const:16},max_bytes:{const:1048576}})},['schema','instances','complete','node_count','max_depth','limits']),sample_complete:{const:true}});
+ complete:{const:true},node_count:{type:'integer',minimum:1,maximum:256},max_depth:{type:'integer',minimum:0,maximum:16},
+ limits:object({max_nodes:{const:256},max_depth:{const:16},max_bytes:{const:1048576}})}),sample_complete:{const:true}});
 export const nodeOutputPortSchema=port;
 export const nodeTreeOutputPortSchema=treePort;
 const fileArtifact=object({artifact_id:str,destination:str,bytes:integer,sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},execution_id:str,verification_id:str,

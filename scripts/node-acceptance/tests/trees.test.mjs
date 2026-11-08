@@ -102,19 +102,19 @@ c=r.scenario('trees-to-table-indices');e=r.expected_for(c,'/owned/tree.lgp')
 assert c['external'] and c['base'] is None
 assert [p.name for p in c['data'].glob('*.csv')]==['documents.csv']
 task=c['prompt'].read_text()
-assert c['prompt'].name=='task-indices.md' and 'documents.csv' in task and 'oracle' not in task and 'input.json' not in task
+assert c['prompt'].name=='task-indices.md' and 'documents.csv' in task and 'oracle' not in task and 'input.json' not in task and 'group' not in task
 oracle=json.loads((c['source']/'expected.json').read_text())
 case=next(x for x in oracle['cases'] if x['id']=='indices')
-assert [o['export_destination'] for o in e['outputs']]==['indices.csv','global-index.csv']
-for out,want in zip(e['outputs'],[case['output'],case['settings_proposal']['global_output']]):
- assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered']
- assert out['columns']==want['columns'] and out['rows']==want['rows']
-assert [c['name'] for c in e['outputs'][1]['columns']]==['group','code','global_index']
+assert [o['export_destination'] for o in e['outputs']]==['indices.csv']
+out,want=e['outputs'][0],case['output']
+assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered']
+assert out['columns']==want['columns'] and out['rows']==want['rows']
+assert [c['name'] for c in out['columns']]==['batch','item_index','code','qty'] and out['columns'][1]['name_any']
+assert [r['item_index'] for r in out['rows']]==[0,1]
 source=json.loads((c['data']/'input.json').read_text())
 rows=list(csv.DictReader(io.StringIO((c['data']/'documents.csv').read_text())))
-assert [int(x['RowID']) for x in rows]==[1,2,3]
+assert [int(x['RowID']) for x in rows]==[1]
 assert json.loads(rows[0]['Document'])=={'batch':source['document']['batch'],'items':source['document']['items']}
-assert [json.loads(x['Document']) for x in rows[1:]]==source['grouped_document']['groups']
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
  const e=JSON.parse(spawnSync('python3',['-B','-c',`import importlib.util,json

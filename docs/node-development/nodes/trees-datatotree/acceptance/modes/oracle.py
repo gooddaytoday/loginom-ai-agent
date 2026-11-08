@@ -145,19 +145,16 @@ def proposals(slug):
     d, labels = f['document'], f['labels']
     rows = [dict(batch=d['batch'], code=item['code'], qty=item['qty']) for item in d['items']]
     columns = [dict(name=k, label_any=True, type=t) for k,t in [('batch','string'),('code','string'),('qty','integer')]]
-    indexed = [dict(item_index=i, **r) for i,r in enumerate(rows, start=f['index_base_proposal'])]
+    # Index values are computed here; column position follows the native 7.4.2 layout (LAB-1112 owner decision):
+    # the global index is the first column of the array branch, after ancestor leaves.
+    indexed = [dict(batch=r['batch'], item_index=i, code=r['code'], qty=r['qty']) for i,r in enumerate(rows, start=f['index_base_proposal'])]
     composite = [{'items_code':r['code'],'items_qty':r['qty']} for r in rows]
     wide_names = ['f' + str(i).zfill(2) for i in range(f['wide_fields'])]
     wide = {k:i for i,k in enumerate(wide_names)}
-    local_rows = [(g['group'],item['code'],i) for g in f['grouped_document']['groups'] for i,item in enumerate(g['items'],start=f['index_base_proposal'])]
-    # Native TreeToData has one global index leaf per array and no per-parent index (wizard observation, LAB-1112).
-    global_rows = [dict(group=g,code=code,global_index=global_i)
-                   for global_i,(g,code,_i) in enumerate(local_rows,start=f['index_base_proposal'])]
     return [
-        case('indices', table([dict(name='item_index',name_any=True,label_any=True,type='integer'),*columns], indexed),
-             global_index_paths=['/items'], index_base=f['index_base_proposal'], global_index_proposal='zero-based across all items, not reset for a new parent',
-             global_output=table([dict(name='group',label_any=True,type='string'),dict(name='code',label_any=True,type='string'),
-                                  dict(name='global_index',name_any=True,label_any=True,type='integer')],global_rows),
+        case('indices', table([columns[0],dict(name='item_index',name_any=True,label_any=True,type='integer'),*columns[1:]], indexed),
+             global_index_paths=['/items'], index_base=f['index_base_proposal'], index_position='native 7.4.2 layout: first column of the array branch',
+             grouped_documents='deferred: several JSON rows build a native root array (LAB-1112)',
              index_metadata='native generated names need readback; no UI row index substitution'),
         case('composite', table([dict(name='items_code',label='Позиции.Код',type='string'),dict(name='items_qty',label='Позиции.Количество',type='integer')], composite),
              composite_names=True, composite_labels=True, label_separator='.',

@@ -49,11 +49,12 @@ export function createTreeNodeSupport(config,{json}){
    const previous=request.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,request.target.ref)).at(-1)?.outcome?.output?.configuration?.readback:null;
    if(json){
     const field=request.parameters.json_field??previous?.json_field,index=port.schema?.findIndex(c=>c.name===field&&c.type==='string');
-    // Each JSON row becomes one native root row; the whole tree keeps the 256-node bound.
-    need(port.port_kind!=='tree'&&Number.isSafeInteger(port.row_count)&&port.row_count>=1&&port.row_count<=100&&port.sample?.length===port.row_count&&index>=0
-     &&port.sample.every(row=>row[index]?.is_null===false&&typeof row[index].value==='string'),'Tree stage 1 needs non-NULL JSON string rows in the exact input field');
-    let nodes=0;for(const row of port.sample)nodes+=validateTreeJsonScope(row[index].value).node_count;
-    need(nodes<=256,'Tree JSON exceeds 256 nodes or depth 16');
+    // Native JSON-to-tree turns several rows into a root array, not root rows; refuse before mutation.
+    need(!(port.port_kind!=='tree'&&Number.isSafeInteger(port.row_count)&&port.row_count>1),
+     'Несколько документов JSON в одном импорте пока не поддержаны; подай один документ (multiple JSON documents per input are not supported yet)');
+    need(port.port_kind!=='tree'&&port.row_count===1&&port.sample?.length===1&&index>=0&&port.sample[0][index]?.is_null===false
+     &&typeof port.sample[0][index].value==='string','Tree stage 1 needs one non-NULL JSON string row in the exact input field');
+    validateTreeJsonScope(port.sample[0][index].value);
    }else{
     need(port.port_kind==='tree'&&port.tree?.complete===true,'Tree-to-table needs the actual complete typed tree port');
     validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,request.parameters.global_index_paths??previous?.global_index_paths);

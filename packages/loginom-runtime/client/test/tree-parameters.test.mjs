@@ -112,15 +112,13 @@ function jsonPreflight(sample,row_count=sample.length){
  const driver=createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:true}).nodeApplyDriverFactory(options);
  return driver.beforeTarget({deadline:Date.now()+10000});
 }
-test('JSON tree preflight admits several JSON rows as root rows and keeps empty, NULL and oversize refusals',async()=>{
- assert.equal((await jsonPreflight(['{"group":"A","items":[{"code":"x"},{"code":"z"}]}','{"group":"B","items":[{"code":"y"}]}'])).verified,true);
+test('JSON tree preflight refuses several JSON documents before mutation and keeps the one-document path',async()=>{
  assert.equal((await jsonPreflight(['{"items":[{"sku":"A"}]}'])).verified,true);
- await assert.rejects(jsonPreflight([]),/non-NULL JSON string rows/);
- await assert.rejects(jsonPreflight(['{"items":[{"sku":"A"}]}',null]),/non-NULL JSON string rows/);
- await assert.rejects(jsonPreflight(['{"items":[{"sku":"A"}]}'],2),/non-NULL JSON string rows/);
- await assert.rejects(jsonPreflight(['{"items":[{"sku":"A"}]}','{"a":[{}],"b":[{}]}']),/one nonempty repeated object branch/);
- const big='{"items":['+Array.from({length:60},(_,i)=>'{"v":'+i+'}').join(',')+']}';
- await assert.rejects(jsonPreflight([big,big,big]),/256 nodes/);
+ for(const rows of [['{"group":"A","items":[{"code":"x"}]}','{"group":"B","items":[{"code":"y"}]}'],['{"items":[{"sku":"A"}]}',null]])
+  await assert.rejects(jsonPreflight(rows),/Несколько документов JSON в одном импорте пока не поддержаны; подай один документ/);
+ await assert.rejects(jsonPreflight([]),/one non-NULL JSON string row/);
+ await assert.rejects(jsonPreflight([null]),/one non-NULL JSON string row/);
+ await assert.rejects(jsonPreflight(['{"a":[{}],"b":[{}]}']),/one nonempty repeated object branch/);
 });
 
 function tableImplementation(){

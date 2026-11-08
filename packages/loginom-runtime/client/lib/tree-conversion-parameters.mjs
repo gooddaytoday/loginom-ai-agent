@@ -49,6 +49,5 @@ export function validateSerializationTree(port){
  const s=port?.tree?.schema;
  need(port?.port_kind==='tree'&&port.tree?.complete===true&&Array.isArray(s)&&s.length>0&&s.length<=64&&!s[0].is_array&&s[0].is_container&&s.filter(n=>n.is_array).length===1,'Serialization requires a complete object tree with one array');
  need(s.every(n=>n.is_container||['integer','real','string','boolean'].includes(n.type)),'Serialization rejects dates and Variant');
- need(!port.tree.root_rows,'Serialization requires one root document; a tree with several root rows is unsupported');
  return true;
 }
