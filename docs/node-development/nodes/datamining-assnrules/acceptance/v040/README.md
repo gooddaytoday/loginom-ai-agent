@@ -85,3 +85,6 @@ SKILL.md содержит только оглавление.
 ```text
 |Правила|`datamining.assn_rules` / fp_growth,apply|[читать](references/nodes/datamining.assn_rules.md)|
 ```
+
+Проекты `*proposal*` (справка, карточка, схема, semantics) — источник идей для
+цикла, а не замена текущей справки и semantics.
