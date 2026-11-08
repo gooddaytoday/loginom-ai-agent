@@ -176,7 +176,6 @@ const missingValuesZeroConfigurationReadback=object({...missingValuesConfigurati
   ...missingValuesConfigurationReadback.properties.fields.items.anyOf,
   object({...missingValuesField,type:values('integer','real'),data_kind:values('Непрерывный','Дискретный'),used:{type:'boolean',const:true},method:values('zero')}),
  ]}}});
-// v0.4.0 modes: ordered is observed, not constant; previous belongs to ordered input only.
 const missingValuesModesConfigurationReadback=object({...missingValuesZeroConfigurationReadback.properties,ordered:bool,
  fields:{...missingValuesZeroConfigurationReadback.properties.fields,items:{anyOf:[
   ...missingValuesZeroConfigurationReadback.properties.fields.items.anyOf,
