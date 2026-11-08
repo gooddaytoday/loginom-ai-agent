@@ -166,7 +166,8 @@ export async function stageResources(input: {
     await setLinuxSandboxMode(sandbox)
   }
   if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
-  await mkdir(join(staging, "licenses"))
+  // stageRipgrep has already created licenses/ripgrep.
+  await mkdir(join(staging, "licenses"), { recursive: true })
   const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
     buildPackageDocs(join(staging, "skills/package-docs/scripts")))
   await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
