@@ -1,6 +1,10 @@
 import {resolveMissingValuesParameters} from './missing-values-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
+// Native menu item tids are the visible item text with spaces replaced by underscores.
+const METHOD_OPTIONS={mean:'Заменять_средним',zero:'Заменять_на_0',constant:'Заменять_заданным_значением',median:'Заменять_медианой',
+ most_probable:'Заменять_наиболее_вероятным',previous:'Заменять_предыдущим_значением',delete:'Удалять_записи'};
+
 export async function configureMissingValues(channel,p){
  const ready=s=>s.wizard?.stage==='missing_values'&&s.node_missing_values?.verified===true;
  const observe=condition=>channel.observe({condition,readMissingValues:true,ready});
@@ -8,9 +12,9 @@ export async function configureMissingValues(channel,p){
  need(Object.values(baseline.options).every(o=>!o.switch_pressed),'Variable-driven missing values settings unsupported');
  need(baseline.options.pedUseQuality.value===false,'Quality-driven missing values settings unsupported');
  const requested=p.fields===undefined?baseline.fields.filter(f=>f.used).map(f=>({field:{kind:'input_field',name:f.name},method:f.method,...(f.method==='constant'?{value:f.value}:{})})):p.fields;
- const plan=resolveMissingValuesParameters({fields:requested},baseline.input_fields);
+ const wantedOrdered=p.fields===undefined?baseline.ordered:p.ordered;
+ const plan=resolveMissingValuesParameters({fields:requested},baseline.input_fields,wantedOrdered);
  need(plan.length>0,'Missing values requires supported nonempty processing fields');
- need(p.fields!==undefined||baseline.ordered===false,'Saved ordered input unsupported');
  const control=(s,tid,verb='click')=>{const es=s.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions.includes(verb));need(es.length===1,'Missing values control unavailable: '+tid);return es[0];};
  const fieldControl=(s,name,part)=>{const es=s.ui.elements.filter(e=>e.missing_values_field?.field_key===name&&e.missing_values_field.part===part&&e.allowed_actions.includes('click'));need(es.length===1,'Missing values field unavailable: '+name+'/'+part);return es[0];};
  const reveal=async(name,part)=>{
@@ -30,9 +34,10 @@ export async function configureMissingValues(channel,p){
  const base=initial.wizard.root_tid+';DataRecoveryWizard;',editorBase=base+'grdColumnsSettings;tbl;celleditor;cbx';
  if(p.fields!==undefined){
   let s=await observe('missing values ordering');
-  if(s.node_missing_values.ordered){
-   await act(s,'use unordered input',s=>control(s,base+'pedOrderedSample;ValueControl;DisplayEl','set_checked'),{verb:'set_checked',checked:false});
-   need(!(await observe('unordered input applied')).node_missing_values.ordered,'Ordering differs');
+  // The method menu depends on ordering, so set it before any method.
+  if(s.node_missing_values.ordered!==p.ordered){
+   await act(s,'set requested input ordering',s=>control(s,base+'pedOrderedSample;ValueControl;DisplayEl','set_checked'),{verb:'set_checked',checked:p.ordered});
+   need((await observe('input ordering applied')).node_missing_values.ordered===p.ordered,'Ordering differs');
   }
   if(s.node_missing_values.max_nulls_percent!==p.max_nulls_percent){
    s=await observe('explicit missing values threshold');
@@ -52,7 +57,7 @@ export async function configureMissingValues(channel,p){
    if(actual.method===wanted.method&&(wanted.method!=='constant'||actual.value===wanted.value))continue;
    await act(s,'open method '+field.name,s=>fieldControl(s,field.name,'method'),{verb:'click'});
    s=await observe('owned method editor');need(s.node_missing_values.editor?.field_name===field.name,'Foreign method editor');
-   const option=editorBase+';boundlist;'+(wanted.method==='mean'?'Заменять_средним':wanted.method==='zero'?'Заменять_на_0':'Заменять_заданным_значением');
+   const option=editorBase+';boundlist;'+METHOD_OPTIONS[wanted.method];
    await act(s,'select explicit method '+field.name,s=>control(s,option),{verb:'click'});
    s=await observe('method choice selected');
    if(actual.method!==wanted.method){
@@ -93,7 +98,7 @@ export async function configureMissingValues(channel,p){
  }
  const after=(await observe('complete final missing values settings')).node_missing_values;
  need(same(after.input_fields,baseline.input_fields),'Missing values input schema changed');
- need(after.ordered===false&&after.max_nulls_percent===(p.max_nulls_percent??baseline.max_nulls_percent),'Missing values options differ');
+ need(after.ordered===wantedOrdered&&after.max_nulls_percent===(p.max_nulls_percent??baseline.max_nulls_percent),'Missing values options differ');
  need(same(after.options.pedUseQuality,baseline.options.pedUseQuality)&&same(after.options['RandSeedEdit;edtRandSeed'],baseline.options['RandSeedEdit;edtRandSeed']),'Unrequested missing values settings changed');
  need(after.fields.every(f=>{const wanted=plan.find(p=>p.name===f.name);return f.used===!!wanted&&(!wanted||f.method===wanted.method&&(wanted.method!=='constant'||f.value===wanted.value));}),'Final processing set differs');
  return {verified:true,cleanup_complete:true,effect_possible:p.fields!==undefined,configuration:after};

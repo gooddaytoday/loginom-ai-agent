@@ -5,6 +5,7 @@ export function validateReplacementValue(v,type){
  need(keys(v,['type','value'])&&Object.hasOwn(v,'value')&&v.type===type,'Replacement requires a typed value of the declared key/result type');
  if(v.value===null)return;
  if(type==='string')need(typeof v.value==='string'&&v.value.length<=2048&&!/[\x00\r\n]/.test(v.value),'Invalid replacement string');
+ else if(type==='boolean')need(typeof v.value==='boolean','Boolean replacement requires true or false');
  else if(type==='real')need(typeof v.value==='number'&&Number.isFinite(v.value),'Finite real replacement required');
  else if(type==='integer'){
   need(typeof v.value==='number'&&Number.isSafeInteger(v.value)||typeof v.value==='string'&&/^-?(0|[1-9]\d*)$/.test(v.value),'Exact integer replacement required; use a decimal string for Int64 values outside the safe JavaScript integer range');
@@ -19,7 +20,7 @@ export function replacementValueKey(v,caseSensitive=true){
  return v.type+':value:'+ (v.type==='integer'?BigInt(v.value).toString():v.type==='string'&&!caseSensitive?v.value.toLowerCase():String(v.value));
 }
 export function validateReplacementParameters(p,mode,r){
- need(['exact','regex'].includes(mode),'Replacement supports exact or regex internal tables only');
+ need(['exact','regex','mixed'].includes(mode),'Replacement supports exact, regex or mixed internal tables only');
  need(keys(p,['rules','output_mode']),'Invalid replacement parameters');
  need(p.rules!==undefined||r.target.kind==='existing','New replacement requires complete rules');
  need(p.output_mode===undefined?r.target.kind==='existing':['replace','add'].includes(p.output_mode),'Explicit replacement output_mode required');
@@ -27,17 +28,30 @@ export function validateReplacementParameters(p,mode,r){
   need(Array.isArray(p.rules)&&p.rules.length>0&&p.rules.length<=128,'Nonempty replacement rules required');
   const fields=new Set();
   for(const [index,rule] of p.rules.entries()){
-   need(keys(rule,['field','type','result_type','pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
+   need(keys(rule,['field','type','result_type','pairs','regex_pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
    need(!fields.has(rule.field.name.toLowerCase()),'Duplicate replacement field');fields.add(rule.field.name.toLowerCase());
    need(['string','integer','real'].includes(rule.type),'Replacement type unsupported');
    const resultType=rule.result_type??rule.type;
-   need(['string','integer','real','datetime'].includes(resultType),'Replacement result_type unsupported');
+   need(['string','integer','real','datetime','boolean'].includes(resultType),'Replacement result_type unsupported');
    need(mode==='exact'||resultType===rule.type,'Regex replacement result_type must remain string');
    need(resultType===rule.type||rule.other?.mode!=='keep','Different replacement result_type with other.keep produces Variant; choose other.null or other.value');
+   need(resultType!=='boolean'||rule.other?.mode==='null','Boolean replacement requires other.null');
    need(resultType!=='datetime'||rule.other?.mode==='null','Datetime replacement requires other.null');
    if(mode==='regex')need(rule.type==='string'&&rule.case_sensitive===undefined&&rule.precision===undefined,'Regex requires string rules; omit case_sensitive and precision, use inline (?i)');
-   if(mode==='exact')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:typeof rule.precision==='number'&&Number.isFinite(rule.precision)&&rule.precision>=0&&Number(rule.precision.toFixed(2))===rule.precision&&rule.case_sensitive===undefined,
+   if(mode!=='regex')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:typeof rule.precision==='number'&&Number.isFinite(rule.precision)&&rule.precision>=0&&Number(rule.precision.toFixed(2))===rule.precision&&rule.case_sensitive===undefined,
     'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires finite precision>=0 (precision=0 is exact), at most two decimal places, and forbids case_sensitive'));
+   need(mode==='mixed'||rule.regex_pairs===undefined,'regex_pairs requires mode mixed');
+   if(mode==='mixed'){
+    need(rule.type==='string'&&resultType==='string','Mixed replacement requires string keys and results');
+    need(rule.regex_pairs===undefined||Array.isArray(rule.regex_pairs)&&rule.regex_pairs.length<=256,'Mixed regex table exceeds supported bound');
+    const patterns=new Set();
+    for(const pair of rule.regex_pairs??[]){
+     need(keys(pair,['from','to']),'Invalid regex pair');validateReplacementValue(pair.from,'string');validateReplacementValue(pair.to,'string');
+     validateReplacementRegex(pair.from.value);need(typeof pair.to.value==='string','Regex replacement must be a literal string constant');
+     need(!patterns.has(pair.from.value),'Duplicate regex pattern');patterns.add(pair.from.value);
+    }
+    need(['keep','null'].includes(rule.other?.mode),'Mixed remaining values support keep or null only');
+   }
    need(Array.isArray(rule.pairs)&&rule.pairs.length<=256,'Replacement table exceeds supported bound');
    if(mode==='regex')need(rule.pairs.length>0,'Regex requires at least one pattern');
    const seen=new Set();

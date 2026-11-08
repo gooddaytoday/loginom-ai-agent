@@ -42,8 +42,9 @@ export function readCalculatorBrowser(prefix) {
   const lines=Array.from({length:count},(_,i)=>doc.getLine(i));
   if(lines.some(s=>typeof s!=='string'||/[\r\n\0]/.test(s)))return fail('calculator_editor_text');
   const text=lines.join('\n');if(text.length>2048)return fail('calculator_editor_size');
-  const modes=exact(base+'btnCalcMode');
-  if(modes.length!==1||!modes[0].querySelector('.bg-TBGCalcMode-cmExpression')||modes[0].querySelector('.bg-TBGCalcMode-cmJavaScript'))return fail('calculator_mode');
+  // The language is one node-wide setting: exactly one native icon must show it.
+  const modes=exact(base+'btnCalcMode'),icons=modes.length===1?['Expression','JavaScript'].filter(m=>modes[0].querySelector('.bg-TBGCalcMode-cm'+m)):[];
+  if(icons.length!==1)return fail('calculator_mode');
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},names=new Set(),ids=new Set(),expressionIds=new Set(),expressions=[];
   for(const [index,r] of records.entries()) {
     const d=r?.data,id=String(r?.internalId??'');
@@ -88,7 +89,7 @@ export function readCalculatorBrowser(prefix) {
   }
   const errorControls=exact(prefix+';WizrdMCF;btnError');
   const error=errorControls.length===1?errorControls[0].getAttribute('data-qtip'):null;
-  return {verified:true,mode:'expression',inventory_complete:true,state_source:'cached_expression_store_and_selected_editor',
+  return {verified:true,mode:'expression',syntax:icons[0]==='JavaScript'?'javascript':'expression',inventory_complete:true,state_source:'cached_expression_store_and_selected_editor',
     expressions,input_fields:fields,input_variables:variables,settings_applied:false,syntax_validity:'unverified',
     syntax_error:typeof error==='string'&&error.length>0?error.slice(0,4096):null};
 }
