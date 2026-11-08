@@ -460,7 +460,7 @@ export interface QualityConfigurationReadback {
 }
 export interface CoarseClassesConfigurationReadback {
  kind: 'coarse_classes'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
- mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic';
+ mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic' | 'manual';
  min_class_percent: number; max_classes: number; uniformity_percent: number;
  roles: {name: string; role: 'unused' | 'input' | 'target'}[];
  state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;

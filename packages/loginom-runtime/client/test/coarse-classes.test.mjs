@@ -6,6 +6,15 @@ import {coarseClassesOutputColumns} from '../lib/coarse-classes-output.mjs';
 
 const parameters={coarse_classes:{input_field:'Segment',target_field:'Target',event_value:'yes',partition:'automatic',min_class_percent:5,max_classes:2,uniformity_percent:0}};
 const fields=[{name:'RowID',type:'integer'},{name:'Segment',type:'string',data_kind:'Дискретный'},{name:'Target',type:'string',data_kind:'Дискретный'},{name:'Note',type:'string'}];
+test('manual continuous integer input admits one cut and refuses unsupported partitions before mutation',()=>{
+ const p={coarse_classes:{...parameters.coarse_classes,input_field:'X',partition:'manual',cut:7}};
+ const schema=[{name:'X',type:'integer',data_kind:'Непрерывный'},fields[2]];
+ assert.doesNotThrow(()=>validateCoarseClassesParameters(p,'internal'));
+ assert.equal(resolveCoarseClassesFields(p,schema).input_field,'X');
+ for(const patch of [{cut:NaN},{cut:7.5},{max_classes:3},{cut:undefined}])assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...p.coarse_classes,...patch}},'internal'));
+ assert.throws(()=>resolveCoarseClassesFields(p,schema.map(f=>({...f,type:'string'}))));
+ assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...parameters.coarse_classes,cut:7}},'internal'));
+});
 test('coarse classes registers train and saved-model apply with three exact output schemas',()=>{
  const h=createCandidateNodeSupport({}).nodeApplyHandlers.get('preprocessing.coarse_classes');
  assert.deepEqual(h.modes,['internal','apply']);
@@ -33,6 +42,15 @@ test('serialized observer binds coarse classes stages and actionable named role 
   const s=await p.observe();assert.equal(s.wizard.stage,stage);
   if(stage==='coarse_classes')assert.ok(s.ui.elements.find(e=>e.tid?.endsWith(';colColumnDisplayName_Segment'))?.allowed_actions.includes('click'));
  }
+});
+test('manual boundary cells are actionable only on the owned class editor page',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const p=new Page(),base='MF;TF-1;WizrdMCF',root=p.add('div',base,'',{x:0,y:70,width:900,height:600});
+ const card=p.add('div',base+';CoarseClassesWizard-2','',{x:10,y:80,width:500,height:400},root);
+ const tid=base+';CoarseClassesWizard-2;CoarseClassesEditor;colCoarseClassHighBorder_0';
+ p.add('td',tid,'4',{x:40,y:120,width:100,height:25},card);
+ const s=await p.observe();assert.equal(s.wizard.stage,'coarse_classes_model');
+ assert.ok(s.ui.elements.find(e=>e.tid===tid)?.allowed_actions.includes('double_click'));
 });
 
 test('production envelope admits explicit three-port coarse classes requests',async()=>{

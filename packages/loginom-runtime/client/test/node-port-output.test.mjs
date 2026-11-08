@@ -547,3 +547,30 @@ test('typedVariants guard or transport failure stops at once with its Variant re
   if(message.startsWith('Variant read:'))assert.equal(result.reason,message);else assert.doesNotMatch(result.reason,/variant_cells/);
  }
 });
+
+// Logical payloads observed on the completed Collapse port (variant-reader plan.md, Values 0..14).
+const collapseObserved={
+ 20:[[20,0,10,0,0,0,0,0,0,0],'integer','10'],
+ 5:[[5,0,0,0,0,0,0,0,244,63],'real','1.25'],
+ 8:[[8,0,0,0,0,0,0,0,0,0,0,0,0,0],'string',''],
+ 11:[[11,0,1,0,0,0,0,0,0,0],'boolean',true],
+ 7:[[7,0,0,0,0,0,176,159,230,64],'datetime','2026-11-07T12:00:00.000'],
+ 1:[[1,0,0,0,0,0,0,0,0,0],'null',null],
+};
+const observedCapability=tag=>({read:`async(source,options,decode)=>({pending:0,unsettled:false,read:async(row,column)=>{
+ const frame=[...${JSON.stringify(collapseObserved[tag][0])},...Array(${48-collapseObserved[tag][0].length}).fill(0)],d=decode(frame,60);
+ return {row,column,tag:d.tag,payload:frame.slice(0,d.consumed_bytes),frame_size:60,...(d.tag===7?{civilTime:{value:'2026-11-07T12:00:00.000',timezone:'America/New_York'}}:{})};}})`,
+ decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}});
+for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value with subtype for observed native tag '+tag,async()=>{
+ const options={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},rows=[[1,tag===1?null:'shown']];
+ if(tag!==1){
+  const plain=await readNodePortOutput(fixture({rows,types:[4,6]}).page,fixture().binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},options);
+  assert.equal(plain.verified,false);assert.equal(plain.reason,'unverified_precision');
+ }
+ const f=fixture({rows,types:[4,6]});
+ const read=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true},options,undefined,undefined,undefined,undefined,null,observedCapability(tag));
+ assert.equal(read.verified,true,JSON.stringify(read));
+ const cell=read.output.sample[0][1],[,cellType,value]=collapseObserved[tag];
+ assert.deepEqual([cell.type,cell.cell_type,cell.value,cell.is_null,cell.precision,cell.native.tag],['variant',cellType,value,tag===1,'exact_native',tag]);
+ assert.deepEqual(read.output.sample[0][0].value,'1');assert.deepEqual(read.output.precision.limitations,[]);
+});
