@@ -663,3 +663,12 @@ CRLF. Stock cold reads the saved export input with exact types, values and field
 order; fixed width supplies the real .txt file without treating it as CSV,
 while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
 the byte oracle for the file passed through --csv. No oracle reaches the model.
+
+`grouping-first`, `grouping-last`, `grouping-only`, `grouping-concat`: цикл 3
+Группировки из `nodes/grouping/acceptance/modes`. Модель получает только
+соответствующий task и modes.csv; независимый oracle остаётся в проверке.
+Для concat три последовательных результата одного узла сверяются с тремя
+CSV в порядке задания, cold Execute проверяет последнее состояние.
+Первое/последнее включают крайний NULL; единственное допускает повторы;
+список исключает NULL, сохраняет пустую строку, сортировку и уникальность.
+Типы/порядок полей, Save и cleanup проверяются штатными reader/matcher.

@@ -21,7 +21,7 @@ test('Grouping unique_count is advertised and resolves string/integer with count
  for(const type of ['real','boolean','datetime','variant']){
   assert.throws(()=>resolveGroupingParameters(parameters,fields.map(f=>f.name==='CustomerId'?{...f,type}:f)),/incompatible/);
  }
- for(const fn of ['first','last','only','concat','list']){
+ for(const fn of ['concat','list']){
   assert.throws(()=>validateGroupingParameters({...parameters,measures:[measure('Customer',fn,'Bad')]},'aggregate',request));
  }
  assert.throws(()=>validateGroupingParameters({...parameters,measures:[...parameters.measures,measure('Customer','unique_count','Duplicate')]},'aggregate',request),/Duplicate field\/function/);
@@ -47,11 +47,11 @@ test('Grouping unique_count output binds Uniq integer sources and renames mixed/
  }
 });
 
-test('Grouping preserves saved unique_count masks, refusing all other new bits and types',async()=>{
+test('Grouping preserves saved unique_count masks, refusing unknown bits and incompatible types',async()=>{
  const channel=c=>({observe:async options=>{const s={wizard:{stage:'grouping'},node_grouping:{...c,verified:true}};assert.ok(options.ready(s));return s;},perform:()=>assert.fail('preservation must not mutate')});
  const saved=await configureGrouping(channel(configuration),{});
  assert.equal(saved.preservation.unchanged,true);
- for(const bit of [1024,2048,4096,8192]){
+ for(const bit of [16384,32768]){
   const c=structuredClone(configuration);c.measures[0].functions|=bit;
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);

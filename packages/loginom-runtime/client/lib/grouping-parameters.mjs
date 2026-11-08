@@ -1,8 +1,8 @@
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
-export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},mode:{bit:64,suffix:'Mode',label:'Мода'},stddev:{bit:128,suffix:'Std',label:'Стандартное откл.'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'},null_count:{bit:512,suffix:'Null',label:'Кол-во пропусков'}});
+export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},mode:{bit:64,suffix:'Mode',label:'Мода'},stddev:{bit:128,suffix:'Std',label:'Стандартное откл.'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'},null_count:{bit:512,suffix:'Null',label:'Кол-во пропусков'},first:{bit:1024,suffix:'First',label:'Первый'},last:{bit:2048,suffix:'Last',label:'Последний'},only:{bit:4096,suffix:'Only',label:'Единственный'},concat:{bit:8192,suffix:'Concat',label:'Список'}});
 const supportedMask=Object.values(GROUPING_FUNCTIONS).reduce((mask,f)=>mask|f.bit,0);
 // Input types observed for the functions that are not available on every field.
-const inputTypes={unique_count:['integer','string'],median:['integer'],mode:['integer','string'],stddev:['integer'],null_count:['integer','string']};
+const inputTypes={unique_count:['integer','string'],median:['integer'],mode:['integer','string'],stddev:['integer'],null_count:['integer','string'],first:['integer','string'],last:['integer','string'],only:['integer','string'],concat:['integer','string']};
 const typeFits=(fn,type)=>!inputTypes[fn]||inputTypes[fn].includes(type);
 export const supportedGroupingMeasure=f=>Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=supportedMask&&(f.functions&~supportedMask)===0
  &&Object.keys(inputTypes).every(fn=>!(f.functions&GROUPING_FUNCTIONS[fn].bit)||typeFits(fn,f.type));
@@ -19,7 +19,13 @@ export function validateGroupingParameters(p,mode,r) {
   requireValue(Array.isArray(p.measures)&&p.measures.length<=256,'Grouping measures array required; use [] for unique key combinations');
   const pairs=new Set(),names=new Set(p.group_by.map(f=>f.name.toLowerCase()));
   for(const m of p.measures){
-   requireValue(m&&Object.keys(m).sort().join(',')==='field,function,label,name'&&field(m.field)&&Object.hasOwn(GROUPING_FUNCTIONS,m.function),'Invalid grouping measure');
+   requireValue(m&&Object.keys(m).sort().join(',')===(m.function==='concat'?'concat,field,function,label,name':'field,function,label,name')&&field(m.field)&&Object.hasOwn(GROUPING_FUNCTIONS,m.function),'Invalid grouping measure');
+   if(m.function==='concat'){
+    const c=m.concat;
+    requireValue(c&&Object.keys(c).sort().join(',')==='order,separator,unique,wrapper'
+     &&typeof c.separator==='string'&&c.separator.length>=1&&c.separator.length<=16&&!/[\x00-\x1f]/.test(c.separator)
+     &&['', '"', "'"].includes(c.wrapper)&&typeof c.unique==='boolean'&&['none','ASC','DESC'].includes(c.order),'Complete concat separator/wrapper/unique/order required');
+   }
    requireValue(name(m.name)&&!names.has(m.name.toLowerCase()),'Invalid or duplicate grouping output name');names.add(m.name.toLowerCase());
    requireValue(typeof m.label==='string'&&m.label.length>0&&m.label.length<=120&&!/[\x00-\x1f]/.test(m.label),'Invalid grouping output label');
    const key=m.field.name.toLowerCase()+':'+m.function;requireValue(!pairs.has(key),'Duplicate field/function pair');pairs.add(key);

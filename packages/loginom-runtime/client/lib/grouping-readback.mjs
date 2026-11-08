@@ -24,6 +24,7 @@ export function groupingConfigurationReadback({node,phases,operation_id}){
  });
  need(linked.size===m.source_fields.length,'derived source coverage');
  return {kind:'grouping',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'aggregate',
-  group_by:c.keys.map(f=>pick(f,['name','label','type','order'])),measures:c.measures.map(f=>pick(f,['name','label','type','order','functions'])),
+  group_by:c.keys.map(f=>pick(f,['name','label','type','order'])),measures:c.measures.map(f=>({...pick(f,['name','label','type','order','functions']),
+   ...(f.functions&8192?{concat:structuredClone(f.concat)}:{})})),
   options:structuredClone(c.options),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mapping:{port:0,autosync:m.autosync,fields:output},package_persistence_verified:false};
 }
