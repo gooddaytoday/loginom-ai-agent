@@ -34,7 +34,9 @@ export function resolveReformChanges(p,baseline) {
  const caching=p.caching===undefined?baseline.caching:{value:Object.keys(REFORM_CACHE).indexOf(p.caching),display:REFORM_CACHE[p.caching],variable:false};
  need(p.caching===undefined||baseline.caching?.variable!==true,'Reform variable caching cannot be replaced');
  if(p.changes.some(c=>c.cache!==undefined)){
-  need((p.caching===undefined&&!baseline.caching)||caching?.value===3&&caching.variable===false,'Field cache requires literal selected_fields caching');
+  // A baseline without observed caching (new-node preview) cannot prove the
+  // native mode, so field cache needs explicit selected_fields before mutation.
+  need(caching?.value===3&&caching.variable===false,'Field cache requires literal selected_fields caching');
  }
  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length&&new Set(fields.map(f=>f.record_id)).size===fields.length,'Unique reform identities required');
  const changes=p.changes.map(c=>{

@@ -30,8 +30,8 @@ def expected(swap):
                          'ordered': True, 'column_order': 'exact', 'columns': columns, 'rows': values}]}
 
 
-# UI correspondence observed on mas2: evidence/cache-dom.jsonl:1-2,
-# 2026-11-08, data-tid ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl
+# UI correspondence observed on mas2 2026-11-08 (LAB-1223 report comment,
+# attachment cache-settings-evidence.json), data-tid ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl
 # and EditReformColumnDefForm;cntMain;cbxCachingMethod. Only numeric codes
 # come from that observation; desired modes and fields come from task-cache.md.
 def cache_settings():
