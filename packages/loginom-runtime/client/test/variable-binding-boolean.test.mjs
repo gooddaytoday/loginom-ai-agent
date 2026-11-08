@@ -25,7 +25,9 @@ for(const [type,parameter,mode] of [['transform.group_data','/sort_result','aggr
  });
  test(type+' source-only rerun executes saved settings without applying a wizard',()=>{
   const r={target:{type,kind:'existing'},mode,finish:'execute',inputs:[],mappings:[],parameters:{}};
-  assert.equal(isUnchangedTransformExecution(r),true);
+  const handler=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers.get(type);
+  assert.equal(isUnchangedTransformExecution(r,handler),true);
+  assert.equal(isUnchangedTransformExecution(r),false);
   assert.equal(isUnchangedTransformExecution({...r,bindings:[binding]}),false);
  });
  test(type+' rejects literal conflict, duplicate and wrong port',()=>{

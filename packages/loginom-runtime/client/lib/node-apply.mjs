@@ -379,7 +379,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -643,7 +643,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=['exports.text','exports.excel','exports.lgd'].includes(request.target.type);
