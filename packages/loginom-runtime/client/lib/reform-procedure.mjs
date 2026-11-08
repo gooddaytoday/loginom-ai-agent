@@ -39,7 +39,8 @@ export async function configureReform(channel,parameters,{inputMapping}={}) {
   const identity=s=>({node:s.node_reform.node_context,root:s.wizard.root_ref});
   await channel.perform({condition:'open reform node cache choices',initialObservation:s,ready,identity,
    resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click'),'Reform node cache picker unavailable').ref})});
-  s=await observe('reform node cache choices');
+  s=await channel.observe({condition:'reform node cache choices',readReform:true,
+   ready:s=>ready(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===plan.caching.display)});
   await channel.perform({condition:'select reform node caching',initialObservation:s,ready,identity,
    resolve:s=>({verb:'select_wizard_option',ref:unique(s,e=>choice(e,'option')&&e.wizard_combo.label===plan.caching.display&&e.allowed_actions.includes('select_wizard_option'),'Reform node cache option unavailable').ref})});
   s=await observe('verify reform node cache without collateral edits');

@@ -8220,7 +8220,10 @@ test('reform literal node cache picker uses the existing owned wizard choice pro
  page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist;Выбранные_поля','Выбранные поля',{x:605,y:305,width:150,height:25},list);
  const full=await page.observe(),option=full.ui.elements.find(e=>e.wizard_combo?.kind==='option');
  assert.ok(option);assert.equal(option.wizard_combo.field.scope,'reform_node');
+ const narrow=await page.execute({mode:'observe',root_ref:option.wizard_combo.list_ref});
+ const selected=narrow.output.ui.elements.find(e=>e.ref===option.ref);
+ assert.equal(selected?.wizard_combo?.field?.scope,'reform_node');
  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
- const r=await page.act({verb:'select_wizard_option',ref:option.ref},full);
+ const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
  assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
 });

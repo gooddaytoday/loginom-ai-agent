@@ -362,6 +362,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
       '[data-tid$=";WizrdMCF;DataSetOutputSocketWizard;btnAddMappingColumn"]',
+      ...['pedDataSourceCachingMethod;ValueControl','pedDataSourceCachingMethod;SwitchButton'].flatMap(name=>{
+        const owner='[data-tid$=";WizrdMCF;ReformColumnsWizard;'+name+'"]';return [owner,owner+' input'];}),
       ...Object.entries({ExportNativeParamsWizard:['edtFileName','cbbCompression','cbbWriteChecksum','edtStringCacheMaxSize'],ExportExcelFilePreviewWizard:['edtFileName','edtSheetName','cbbFileType','cbbHeadersRow','cbbFloatFormat','pedDecimalCount','chkDivideThousands'],ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
