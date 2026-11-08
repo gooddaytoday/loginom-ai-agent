@@ -1,4 +1,4 @@
-import {resolveSmoothingParameters} from './smoothing-parameters.mjs';
+import {resolveSmoothingParameters,validateSmoothingParameters} from './smoothing-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Smoothing: '+m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const ready=s=>s.wizard?.stage==='smoothing'&&s.node_smoothing?.verified===true&&s.node_smoothing.binding_ready===true;
 const observe=(channel,condition)=>channel.observe({condition,readSmoothing:true,ready});
@@ -7,7 +7,7 @@ export async function selectSmoothingField(channel,baseline,name){
  let s=await observe(channel,'smoothing field before selection');
  const field=baseline.fields.find(f=>f.name===name);need(field,'field disappeared');
  for(let attempt=0;attempt<130;attempt++){
-  need(same(s.node_smoothing.fields.map(({used,...f})=>f),baseline.fields.map(({used,...f})=>f)),'field inventory changed');
+  need(same(s.node_smoothing.fields.map(({used,algorithm,...f})=>f),baseline.fields.map(({used,algorithm,...f})=>f)),'field inventory changed');
   if(s.node_smoothing.selected?.record_id===field.record_id)return s;
   const cells=s.ui.elements.filter(e=>e.smoothing_cell?.part==='field'),cell=cells.find(e=>e.smoothing_cell.record_id===field.record_id&&e.allowed_actions.includes('click'));
   if(cell){
@@ -19,16 +19,17 @@ export async function selectSmoothingField(channel,baseline,name){
   await channel.perform({condition:'reveal smoothing field',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'scroll',ref:anchor.ref,delta_y:field.index<first?-350:350})});s=await observe(channel,'smoothing fields scrolled');
  }
 }
-export async function configureSmoothing(channel,p,{inputMapping}){
+export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_prescott'}){
  const initial=await observe(channel,'complete smoothing field inventory'),baseline=initial.node_smoothing;
- need(baseline.fields.every(f=>f.algorithm===0),'wavelet settings unsupported');
+
  need(inputMapping?.verified&&inputMapping.inventory_complete,'verified input mapping required');
  const inputs=inputMapping.target_fields,schema=fs=>fs.map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
  need(same(schema(inputs.filter(f=>['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный')),schema(baseline.fields)),'smoothing input schema differs');
  resolveSmoothingParameters(p,inputs);
  const before=[];
  for(const field of baseline.fields){const s=await selectSmoothingField(channel,baseline,field.name);before.push({...field,...s.node_smoothing.settings});}
- const rules=p.smoothing??before.filter(f=>f.used).map(f=>({field:f.name,[f.strength]:f[f.strength]}));
+ const rules=p.smoothing??before.filter(f=>f.used).map(f=>f.algorithm===1?{field:f.name,family:f.family,order:f.order,depth:f.depth,boundary:f.boundary}:{field:f.name,[f.strength]:f[f.strength]});
+ validateSmoothingParameters({smoothing:rules},mode,{target:{kind:'existing'},mappings:[]});
  resolveSmoothingParameters({smoothing:rules},inputs);
  const act=async(s,key,action)=>channel.perform({condition:'set smoothing '+key,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,field:s.node_smoothing.selected.record_id}),
   resolve:s=>({...action,ref:one(s,e=>(e.tid===s.wizard.root_tid+';SmoothingWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';SmoothingWizard;'+key)&&e.allowed_actions.includes(action.verb),'Smoothing control unavailable: '+key).ref})});
@@ -41,6 +42,31 @@ export async function configureSmoothing(channel,p,{inputMapping}){
    s=await channel.observe({condition:'smoothing participation readback',readSmoothing:true,ready:s=>ready(s)&&s.node_smoothing.selected?.record_id===field.record_id&&s.node_smoothing.selected.used===!!rule});
   }
   if(rule){
+   const algorithm=rule.family?1:0;
+   if(s.node_smoothing.selected.algorithm!==algorithm){
+    const cell=one(s,e=>e.smoothing_cell?.record_id===field.record_id&&e.smoothing_cell.part==='algorithm'&&e.allowed_actions.includes('double_click'),'exact algorithm cell unavailable');
+    await channel.perform({condition:'open smoothing algorithm',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'double_click',ref:cell.ref})});
+    s=await observe(channel,'smoothing algorithm editor');
+    await act(s,'grdColumnsSettings;tbl;celleditor;cbx;trg_picker',{verb:'click'});s=await observe(channel,'smoothing algorithm options');
+    const label=algorithm===1?'Вейвлет-сглаживание':'Ходрика–Прескотта';
+    const option=one(s,e=>e.tid?.startsWith(s.wizard.root_tid+';SmoothingWizard;grdColumnsSettings;tbl;celleditor;cbx;boundlist;')&&(algorithm===1?e.tid.endsWith(';Вейвлет-сглаживание'):!e.tid.endsWith(';Вейвлет-сглаживание'))&&e.allowed_actions.includes('click'),'algorithm option unavailable: '+label);
+    await channel.perform({condition:'choose smoothing algorithm',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'click',ref:option.ref})});
+    s=await observe(channel,'smoothing algorithm committed');
+    need(s.node_smoothing.selected.algorithm===algorithm,'algorithm differs');
+   }
+   if(algorithm===1){
+    if(s.node_smoothing.settings.family!=='daubechies'){await act(s,'pedWaveletType;ValueControl;radiofield;DisplayEl',{verb:'click'});s=await observe(channel,'wavelet family readback');}
+    for(const [key,value] of [['edtWaveletOrder',rule.order],['edtDecompositionLevel',rule.depth]])if(s.node_smoothing.settings[key==='edtWaveletOrder'?'order':'depth']!==value){
+     await act(s,key+';ValueControl',{verb:'fill',text:String(value)});s=await observe(channel,'wavelet value before blur');
+     await act(s,key+';ValueControl',{verb:'press',key:'Tab'});s=await observe(channel,'wavelet value committed');
+    }
+    if(s.node_smoothing.settings.boundary!=='symmetric'){
+     await act(s,'edtEdgeExtension;ValueControl;trg_picker',{verb:'click'});s=await observe(channel,'wavelet boundary options');
+     const option=one(s,e=>e.tid?.startsWith(s.wizard.root_tid+';SmoothingWizard;edtEdgeExtension;ValueControl;boundlist;')&&/симметрич/i.test(e.label??'')&&!/анти|без/i.test(e.label??'')&&e.allowed_actions.includes('click'),'symmetric boundary option unavailable');
+     await channel.perform({condition:'choose symmetric boundary',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'click',ref:option.ref})});s=await observe(channel,'wavelet boundary committed');
+    }
+    need(s.node_smoothing.settings.family===rule.family&&s.node_smoothing.settings.order===rule.order&&s.node_smoothing.settings.depth===rule.depth&&s.node_smoothing.settings.boundary===rule.boundary,'wavelet settings differ');
+   }else{
    const strength=rule.lambda===undefined?'period':'lambda',title=strength==='lambda'?'Lambda':'Period';
    if(s.node_smoothing.settings.strength!==strength){await act(s,'rb'+title+';ValueControl;DisplayEl',{verb:'click'});s=await observe(channel,'smoothing strength mode readback');}
    if(s.node_smoothing.settings[strength]!==rule[strength]){
@@ -48,10 +74,11 @@ export async function configureSmoothing(channel,p,{inputMapping}){
     await act(s,'edt'+title+';ValueControl',{verb:'press',key:'Tab'});s=await observe(channel,'smoothing strength committed');
    }
    need(s.node_smoothing.settings.strength===strength&&s.node_smoothing.settings[strength]===rule[strength],'smoothing strength differs');
+   }
   }
   after.push({...s.node_smoothing.selected,...(rule?s.node_smoothing.settings:{})});
  }
  const final=(await observe(channel,'complete final smoothing settings')).node_smoothing;
  need(final.fields.every(f=>f.used===rules.some(r=>r.field===f.name)),'processing set differs');
- return {verified:true,cleanup_complete:true,effect_possible:!same(before,after),configuration:{...final,input_fields:structuredClone(inputs),fields:after},before};
+ return {verified:true,cleanup_complete:true,effect_possible:!same(before,after),configuration:{...final,mode,input_fields:structuredClone(inputs),fields:after},before};
 }

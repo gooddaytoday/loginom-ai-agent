@@ -404,6 +404,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'union-auto-match':
         src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['smoothing-haar', 'smoothing-haar-depth2']:
+        node = REPO / 'docs/node-development/nodes/preprocessing-smoothing'
+        depth2 = name.endswith('depth2')
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-wavelet-depth2.md' if depth2 else 'task-wavelet.md'),
+                    data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
+                    expected_name='expected-depth2.json' if depth2 else 'expected.json')
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

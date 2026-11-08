@@ -91,7 +91,7 @@ RULES = (
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random', 'sampling-stratified', 'sampling-biased', 'partition-stratified', 'partition-biased')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec')),
-    ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
+    ((C + 'smoothing-*.mjs', 'docs/node-development/nodes/preprocessing-smoothing/acceptance/modes/**'), ('live-ui',), ('smoothing-hp', 'smoothing-haar', 'smoothing-haar-depth2')),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat')),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),

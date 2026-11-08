@@ -741,3 +741,8 @@ Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
 Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`smoothing-haar` and `smoothing-haar-depth2` use the approved Haar tasks and
+immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
+`fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
+real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.

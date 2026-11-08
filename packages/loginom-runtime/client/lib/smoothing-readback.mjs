@@ -19,6 +19,6 @@ export function smoothingConfigurationReadback({node,phases,operation_id}){
   return {name:f.name,label:f.label,type:f.type,source_field:origin.source_field,smoothed:origin.smoothed,excluded:f.excluded};
  });
  need(linked.size===origins.length,'complete output coverage');
- return {kind:'smoothing',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'hodrick_prescott',
-  smoothing:c.fields.filter(f=>f.used).map(f=>({field:f.name,lambda:f.lambda,period:f.period,strength:f.strength})),output_port:0,fields:output,package_persistence_verified:false};
+ return {kind:'smoothing',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'hodrick_prescott',
+  smoothing:c.fields.filter(f=>f.used).map(f=>(f.algorithm===1?{field:f.name,family:f.family,order:f.order,depth:f.depth,boundary:f.boundary}:{field:f.name,lambda:f.lambda,period:f.period,strength:f.strength})),output_port:0,fields:output,package_persistence_verified:false};
 }
