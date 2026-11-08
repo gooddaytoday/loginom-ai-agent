@@ -189,7 +189,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
-| Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
+| Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
 | Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
 | Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |

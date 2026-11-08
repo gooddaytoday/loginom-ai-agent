@@ -558,6 +558,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=['minsec.csv'])
+    if name == 'date-time-formats':
+        node = REPO / 'docs/node-development/nodes/date-time'
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/task-string-formats.md',
+                    data=node / 'fixtures', base=None, expected_name='expected.json',
+                    input_files=['formats.csv'])
     if name in ['date-time-iso', 'date-time-iso-empty']:
         node = REPO / 'docs/node-development/nodes/date-time'
         empty = name.endswith('-empty')

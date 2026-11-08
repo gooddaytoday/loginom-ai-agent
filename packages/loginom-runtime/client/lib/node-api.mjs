@@ -128,7 +128,7 @@ export const slidingWindowParametersSchema={
   "required": [],
   "additionalProperties": false
 };
-export const dateTimeParametersSchema=object({fields:array(object({field:groupingFieldSchema,transformations:array(object({operation:choice(...Object.keys(DATE_TIME_OPERATIONS)),name:text(128),label:text(120)}),12)}),128)},[]);
+export const dateTimeParametersSchema=object({fields:array(object({field:groupingFieldSchema,transformations:array(object({operation:choice(...Object.keys(DATE_TIME_OPERATIONS)),name:text(128),label:text(120),format:{...text(128),description:'Only string_custom (required there): numeric markers %Y %Q %m %d %H %i %s %u; civil time.'}},['operation','name','label']),12)}),128)},[]);
 export const missingValuesFieldSchema=object({field:groupingFieldSchema,method:{...choice('mean','constant','zero','median','most_probable','previous','delete'),description:'median: continuous integer/real; most_probable: discrete string; previous: ordered:true only; delete removes rows with NULL in the field, ordered:false only.'},value:{type:'string',maxLength:2048}},['field','method']);
 export const missingValuesParametersSchema=object({fields:array(missingValuesFieldSchema,128,1),max_nulls_percent:{type:'integer',minimum:0,maximum:100},ordered:{type:'boolean',description:'true only for previous (physical row order, never sort by ID); false for all other methods.'}},[]);
 export const collapseParametersSchema=object({information:array(groupingFieldSchema,128),transposed:array(groupingFieldSchema,128,1),ignore_empty:boolean},[]);

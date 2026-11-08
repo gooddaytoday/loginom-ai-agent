@@ -201,3 +201,26 @@ SHA под reviewer-аккаунтом назначенной пары по де
 Общая оболочка, `packages/agent`, форматы readback, бюджеты и deadline изменений
 не требуют по результатам этого исследования. Нативное расхождение конца недели
 не предлагается исправлять в общем runtime или маскировать новой верификацией.
+
+## Строковые представления: native-проба этапа 1 (LAB-1101)
+
+База `origin/v040@d355159858e2b090a60b11cc21735fa5206c9308`, mas2, 08.11.2026,
+Loginom 7.4.2 / Chromium 1246, `https://app.loginom.ai/app/?testable=true`, своя пара;
+пакет — сохранённый результат `date-time-iso`, открыт только для чтения и закрыт
+без сохранения (`package_closed=true`, `logged_out=true`). Журналы и снимки —
+вне Git, у карточки.
+
+| Наблюдение | Значение |
+|---|---|
+| Флаг строки | колонка `;colDoString_<index>`, чекбокс в той же ячейке; `DoString` в cached store `grdDataFormat` |
+| Исходные `StringFmt` на свежем поле | Func 4 `%Y`, 16 `%Y-%m-%d`, 17 `%H:%i:%s`, 18 («Свой формат») пустая строка |
+| Редактор формата | клик по ячейке «Строка» вне картинки-чекбокса открывает Ext CellEditing: ComboBox (`editable`, `forceSelection=false`) `;grdDataFormat;tbl;celleditor;FormatStrEditor;cbx`, его input без `data-tid` |
+| Ввод | `fill` не обновляет модель; настоящий набор с клавиатуры и `Enter` записывает `StringFmt` в store (`|`, `%`, `.` в шаблоне сохраняются) |
+| Источники вывода | `DateA_Y_<n>` «DateA (Год)» **string** (то же имя метки у integer-года; различает тип), `DateA_D_<n>` «DateA (Дата)» string, `DateA_T_<n>` «DateA (Время)» string, `DateA_U_<n>` «DateA (Свой формат)» string |
+
+Справка Loginom (`trans-datatime/syntax.html`): `%d %m %H %i %s` — «с ведущим нулём»,
+`%u` — «с ведущими нулями», `%Q` — номер квартала. Выполненные значения
+(дополнение нулями `%u` = 001/003, NULL → NULL, 999 мс) этой пробой на фикстуре
+`formats.csv` **не наблюдались** — их подтверждает первый живой прогон
+`date-time-formats` независимым oracle; расхождение с expected остановит карточку
+(`blocked`), expected не подгоняется.

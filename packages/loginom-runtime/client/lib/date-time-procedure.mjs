@@ -1,4 +1,4 @@
-import {DATE_TIME_OPERATIONS,resolveDateTimeParameters} from './date-time-parameters.mjs';
+import {DATE_TIME_OPERATIONS,DATE_TIME_DEFAULT_FORMATS,resolveDateTimeParameters} from './date-time-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Date/time: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const flagKey={DoDateTimeFirst:'first',DoDateTimeLast:'last',DoNumber:'number',DoString:'string'};
@@ -24,6 +24,8 @@ export async function configureDateTime(channel,p,{inputMapping,beforeChanges,pr
   need(same(original,(progress?.expected??before).find(f=>f.name===field.name).matrix),'matrix changed outside verified configuration');
   if(wanted.has(field.name)){
    const desired=wanted.get(field.name).map(t=>DATE_TIME_OPERATIONS[t.operation]);
+   for(const t of wanted.get(field.name)){const expectedFormat=DATE_TIME_DEFAULT_FORMATS[t.operation],op=DATE_TIME_OPERATIONS[t.operation];
+    if(expectedFormat!==undefined)need(original.find(r=>r.func===op.func&&r.iso===op.iso)?.string_format===expectedFormat,'native string format differs from the expected '+t.operation+' format');}
    for(const row of original)for(const [flag,key] of Object.entries(flagKey)){
     const checked=desired.some(d=>d.func===row.func&&d.iso===row.iso&&d.flag===flag);
     const native=s.node_date_time.matrix.find(r=>r.func===row.func&&r.iso===row.iso);need(native,'matrix row disappeared');
@@ -49,13 +51,47 @@ export async function configureDateTime(channel,p,{inputMapping,beforeChanges,pr
     }
    }
   }
+  const custom=wanted.get(field.name)?.find(t=>t.operation==='string_custom');
+  if(custom)s=await setDateTimeFormat(channel,field,custom.format,{ready,observe,select,progress});
   s=await select(field.name);after.push({name:field.name,matrix:structuredClone(s.node_date_time.matrix)});
-  need(same(before.find(f=>f.name===field.name).matrix.map(r=>[r.func,r.iso,r.string_format]),s.node_date_time.matrix.map(r=>[r.func,r.iso,r.string_format])),'unrequested string formats changed');
+  const formats=(matrix,requested)=>matrix.map(r=>[r.func,r.iso,requested!==undefined&&r.func===18&&!r.iso?requested:r.string_format]);
+  need(same(formats(before.find(f=>f.name===field.name).matrix,custom?.format),formats(s.node_date_time.matrix)),'unrequested string formats changed');
   if(!wanted.has(field.name))need(same(original,s.node_date_time.matrix),'untouched field changed');
  }
  const final=await observe('date/time full configuration collected');
  return {verified:true,cleanup_complete:true,effect_possible:p.fields!==undefined,configuration:{...final.node_date_time,input_fields:inputs,field_matrices:after},
   preservation:{unrequested_fields:true,string_formats:true},before};
+}
+
+// The custom row's StringFmt is typed into Loginom's transient cell editor
+// (an editable ComboBox). Commit is Enter; the native cache must then hold the
+// exact text. Other rows are compared by the caller after this returns.
+async function setDateTimeFormat(channel,field,text,{ready,observe,select,progress}){
+ let s=await select(field.name);
+ const row=s.node_date_time.matrix.find(r=>r.func===18&&!r.iso);need(row?.string===true,'custom string flag is required before its format');
+ if(row.string_format===text)return s;
+ const owned=s=>ready(s)&&s.node_date_time.selected.name===field.name&&s.node_date_time.selected.record_id===field.record_id;
+ const editors=s=>s.ui.elements.filter(e=>e.date_time_cell?.role==='format_editor'&&e.date_time_cell.record_id===row.record_id&&e.allowed_actions.includes('fill'));
+ const identity=()=>({field:field.name,record_id:row.record_id,format:true});
+ for(let attempt=0;attempt<12&&!editors(s).length;attempt++){
+  const cell=s.ui.elements.find(e=>e.date_time_cell?.role==='format_cell'&&e.date_time_cell.record_id===row.record_id&&e.allowed_actions.includes('click'));
+  if(cell){
+   await channel.perform({condition:'open date/time string format editor',initialObservation:s,ready:owned,identity,resolve:()=>({verb:'click',ref:cell.ref})});
+   s=await channel.observe({condition:'date/time string format editor opened',readDateTime:true,ready:s=>owned(s)&&editors(s).length===1});break;
+  }
+  const es=s.ui.elements.filter(e=>e.date_time_cell?.role==='format_cell'&&e.scroll&&e.allowed_actions.includes('scroll'));need(es.length&&attempt<11,'date string format cell cannot be revealed');
+  const anchor=es[Math.floor(es.length/2)],first=s.node_date_time.matrix.find(r=>r.record_id===es[0].date_time_cell.record_id)?.index;
+  await channel.perform({condition:'reveal date/time string format cell',initialObservation:s,ready:owned,identity,resolve:()=>({verb:'scroll',ref:anchor.ref,delta_y:(row.index<first?-1:1)*350})});
+  s=await observe('date string format cell scrolled');
+ }
+ need(editors(s).length===1,'date/time string format editor unavailable');
+ await channel.perform({condition:'type date/time string format',initialObservation:s,ready:owned,identity,resolve:s=>({verb:'fill',ref:editors(s)[0].ref,text})});
+ s=await channel.observe({condition:'date/time string format typed',readDateTime:true,ready:s=>owned(s)&&editors(s).length===1&&editors(s)[0].value===text});
+ await channel.perform({condition:'commit date/time string format',initialObservation:s,ready:owned,identity,resolve:s=>({verb:'press',ref:editors(s)[0].ref,key:'Enter'})});
+ s=await channel.observe({condition:'date/time string format committed',readDateTime:true,
+  ready:s=>owned(s)&&editors(s).length===0&&s.node_date_time.matrix.find(r=>r.func===18&&!r.iso)?.string_format===text});
+ if(progress)progress.expected.find(f=>f.name===field.name).matrix=structuredClone(s.node_date_time.matrix);
+ return s;
 }
 
 export async function selectDateTimeField(channel,baseline,name){

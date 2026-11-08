@@ -539,6 +539,13 @@ abs=1e-8 только для real, метки через label_any.
 `docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
 из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
 
+`date-time-formats`: строковые представления года, даты и времени и свой формат с
+числовыми маркерами (%Y %Q %m %d %H %i %s %u) на двух datetime-полях в «Дата и время».
+Утверждённые `task-string-formats.md`, `fixtures/formats.csv` и независимый expected из
+`docs/node-development/nodes/date-time/acceptance/modes`; модели передаются только
+задание и CSV. Порядок полей и строк точный, Raw не разбирается, Keep не меняется,
+пропуски остаются NULL; CSV/Save/cold/cleanup.
+
 `logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
 со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
 Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние

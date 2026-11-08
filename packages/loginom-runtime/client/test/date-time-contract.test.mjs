@@ -39,9 +39,9 @@ test('effective input mapping is validated before its Done, preserving retained 
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'Renamed',type:'datetime'}]},native));
 });
 test('unsupported ISO end/string operations and repeated assignments are refused',()=>{
- for(const operation of ['iso_week_end','custom','week','to_string'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
+ for(const operation of ['iso_week_end','custom','week','to_string','string_week'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
  const p=structuredClone(parameters);p.fields[0].transformations.push({...p.fields[0].transformations[0],name:'Other'});assert.throws(()=>validateDateTimeParameters(p,'calendar',request));
- assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,18);
+ assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,22);
 });
 test('four ISO-week operations validate and resolve distinct generated sources beside calendar year',()=>{
  const operations=[['year','A_Y_1','Дата (Год)','integer'],['iso_year','A_Y_2','Дата (Год, ISO8601)','integer'],['iso_week','A_WY_7','Дата (Неделя, ISO8601)','integer'],['iso_week_start','A_YW_3','Дата (Год + Неделя, Первый день, ISO8601)','datetime'],['day_of_week','A_DW_1','Дата (День недели)','integer']];

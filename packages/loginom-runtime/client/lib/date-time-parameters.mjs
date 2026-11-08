@@ -12,7 +12,13 @@ export const DATE_TIME_OPERATIONS=Object.freeze(Object.fromEntries([
  ['iso_year',4,'DoNumber','Год','Y','integer',true],['iso_week',7,'DoNumber','Неделя','WY','integer',true],
  ['iso_week_start',2,'DoDateTimeFirst','Год + Неделя','YW','datetime',true],
  ['day_of_week',11,'DoNumber','День недели','DW','integer'],
+ // StringFmt of rows 4/16/17 already holds %Y, %Y-%m-%d, %H:%i:%s on a fresh
+ // field; only row 18 has an empty format that string_custom must type.
+ ['string_year',4,'DoString','Год','Y','string'],['string_date',16,'DoString','Дата','D','string'],
+ ['string_time',17,'DoString','Время','T','string'],['string_custom',18,'DoString','Свой формат','U','string'],
 ].map(([operation,func,flag,label,suffix,type,iso=false])=>[operation,Object.freeze({operation,func,flag,label,suffix,type,iso})])));
+// Native defaults of the three non-custom string rows on a fresh field.
+export const DATE_TIME_DEFAULT_FORMATS=Object.freeze({string_year:'%Y',string_date:'%Y-%m-%d',string_time:'%H:%i:%s'});
 const need=(v,m)=>{if(!v)throw Error('Date/time: '+m);};
 export function validateDateTimeParameters(p,mode,request){
  need(mode==='calendar','unsupported mode');
@@ -28,7 +34,9 @@ export function validateDateTimeParameters(p,mode,request){
   need(f&&Object.keys(f).every(k=>['field','transformations'].includes(k))&&f.field?.kind==='input_field'
    &&Object.keys(f.field).every(k=>['kind','name'].includes(k))&&typeof f.field.name==='string'&&f.field.name.length>0&&f.field.name.length<=128&&!fields.has(f.field.name),'unique exact field required');fields.add(f.field.name);
   need(Array.isArray(f.transformations)&&f.transformations.length<=12,'invalid transformations');const ops=new Set();
-  for(const t of f.transformations){need(t&&Object.keys(t).every(k=>['operation','name','label'].includes(k))&&Object.hasOwn(DATE_TIME_OPERATIONS,t.operation)&&!ops.has(t.operation),'unsupported or repeated operation');ops.add(t.operation);
+  for(const t of f.transformations){need(t&&Object.keys(t).every(k=>['operation','name','label','format'].includes(k))&&Object.hasOwn(DATE_TIME_OPERATIONS,t.operation)&&!ops.has(t.operation),'unsupported or repeated operation');ops.add(t.operation);
+   need((t.operation==='string_custom')===(t.format!==undefined),'format is required by string_custom and accepted only there');
+   need(t.format===undefined||typeof t.format==='string'&&t.format.length>0&&t.format.length<=128&&!/[\u0000-\u001f\u007f]/.test(t.format),'invalid string format');
    need(typeof t.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(t.name)&&!names.has(t.name.toLowerCase()),'unique output name required');names.add(t.name.toLowerCase());
    need(typeof t.label==='string'&&t.label.length>0&&t.label.length<=120,'output label required');
   }
