@@ -354,6 +354,11 @@ large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
+`missing-median-mode`, `missing-previous`, `missing-delete`: цикл 1 «Заполнение пропусков»
+(median/most_probable, previous при ordered, delete). Модель получает только
+`acceptance/task-*.md` и CSV из `fixtures/` (statistics, ordered, delete); ожидания —
+`acceptance/modes/expected*.json` (воспроизводит `oracle.py --check`). CSV, Save, cold и cleanup — штатная оснастка.
+
 `grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
 `fixtures/modes.csv` модели; ожидания берутся из независимого
 `acceptance/modes/oracle.py` (case median), Amount integer, выход Metric real,
