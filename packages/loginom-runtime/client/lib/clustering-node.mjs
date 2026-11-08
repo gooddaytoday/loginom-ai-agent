@@ -7,7 +7,7 @@ import {clusteringParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('Clustering: '+message);};
 export function createClusteringNodeSupport(config){const support=createTabularTransformNodeSupport(config,{
- type:'datamining.clustering',modes:['k_means','g_means','apply'],revision:'clustering-v1-internal-1',parameterSchema:clusteringParametersSchema,
+ type:'datamining.clustering',modes:['k_means','g_means','apply'],revision:'clustering-v1-internal-2',parameterSchema:clusteringParametersSchema,
  validate:validateClusteringParameters,validateInput:(p,resolved,native)=>resolveClusteringFeatures(p,resolved.fields??native.target_fields),readback:clusteringConfigurationReadback,
  configurationObservation:{condition:'clustering feature roles',readClustering:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_clustering?.verified===true},
  async configure(channel,p,context){

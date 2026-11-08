@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
-import {checkGmeansRound,checkGmeansMain} from '../clustering-gmeans.mjs';
+import {checkGmeansRound,checkGmeansMain,checkGmeansSeedRepeat} from '../clustering-gmeans.mjs';
 
 const root=new URL('../../../docs/node-development/nodes/datamining-clustering/acceptance/v040/',import.meta.url);
 const expected=JSON.parse(readFileSync(new URL('expected-g-means-run.json',root),'utf8'));
@@ -30,9 +30,11 @@ test('g-means refuses source changes, missing/NULL cells, wrong native types/ord
   const r=records();change(r);assert.throws(()=>checkGmeansRound(expected,r),/CLUSTERING_GMEANS/);
  }
 });
-test('g-means requires two verified executions with saved config, same node and exact seed repeat',()=>{
+test('g-means accepts one model execution and validates any extra receipts',()=>{
  const replies=[receipt(),receipt('exec2')];assert.equal(checkGmeansMain(expected,replies).outputs[0].rows.length,6);
- for(const change of [r=>r.pop(),r=>r[1].execution.execution_id='exec1',r=>r[1].node.node_id='other',r=>r[1].configuration.readback.threshold=2,r=>r[1].configuration.readback.mode='k_means',r=>r[1].output.ports[0].fresh=false,r=>r[1].output.ports[1].sample.forEach(row=>row[0].value='100')]){
+ assert.equal(checkGmeansMain(expected,[receipt()]).outputs[0].rows.length,6);
+ assert.throws(()=>checkGmeansMain(expected,[]),/VERIFIED_EXECUTION/);
+ for(const change of [r=>r[1].node.node_id='other',r=>r[1].configuration.readback.threshold=2,r=>r[1].configuration.readback.mode='k_means',r=>r[1].output.ports[0].fresh=false,r=>r[1].output.ports[1].sample.forEach(row=>row[0].value='100')]){
   const r=structuredClone(replies);change(r);assert.throws(()=>checkGmeansMain(expected,r),/CLUSTERING_GMEANS/);
  }
  assert.throws(()=>checkGmeansMain(expected,[receipt(),receipt('exec2',records([[1,2],[3,4],[5,6]]))]),/SEED_REPEAT/);
@@ -46,4 +48,14 @@ test('registered g-means scenario sends only the approved task and probe.csv',()
  const stage0=JSON.parse(spawnSync('python3',[new URL('oracle.py',root).pathname],{encoding:'utf8'}).stdout);
  assert.deepEqual(expected.clustering_gmeans.source,stage0.g_means.source);
  for(const k of ['min_clusters','max_clusters','threshold'])assert.equal(expected.clustering_gmeans[k],stage0.g_means[k]);
+});
+
+test('harness repeat compares two complete cold rounds of one node with distinct execution proofs',()=>{
+ const round=(id,groups)=>records(groups).map(r=>({...r,node:{node_id:'one'},execution:{execution_id:id,status:'completed',verified:true,owner_verified:true},data:{...r.data,schema:expected.clustering_gmeans.cold_column_order[r.output_port].map(name=>r.data.schema.find(f=>f.name===name)),sample:r.data.sample.map(row=>expected.clustering_gmeans.cold_column_order[r.output_port].map(name=>row[r.data.schema.findIndex(f=>f.name===name)]))}}));
+ const first=round('a'),second=round('b');
+ assert.equal(checkGmeansSeedRepeat(expected,first,second).verified,true);
+ for(const change of [r=>r.pop(),r=>r[0].node.node_id='other',r=>r[0].execution.verified=false,r=>r.forEach(x=>x.execution.execution_id='a')]){
+  const bad=structuredClone(second);change(bad);assert.throws(()=>checkGmeansSeedRepeat(expected,first,bad),/CLUSTERING_GMEANS/);
+ }
+ assert.throws(()=>checkGmeansSeedRepeat(expected,first,round('c',[[1,2],[3,4],[5,6]])),/SEED_REPEAT/);
 });

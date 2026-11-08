@@ -49,10 +49,23 @@ export async function configureClusteringRoles(channel,p,inputMapping){
 
 export async function configureClustering(channel,p,{request,inputMapping}){
  if(request.mode==='apply')return configureClusteringApply(channel);
- const roles=await configureClusteringRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'clustering '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
+ const automatic=request.mode==='g_means';
+ const required=automatic?['min_clusters','max_clusters','threshold']:['clusters'];
+ if(request.target.kind==='existing'&&required.some(key=>p[key]===undefined)){
+  // Inspect the saved mode before editing roles, normalizers or parameters.
+  await next('input_mapping','normalization');
+  await next('normalization','clustering');
+  const saved=await channel.observe({condition:'saved clustering mode before edits',readClustering:true,
+   ready:s=>s.wizard?.stage==='clustering'&&s.node_clustering?.verified===true&&s.node_clustering.kind==='parameters'});
+  need(saved.node_clustering.auto===automatic,'mode change requires explicit '+required.join(', '));
+  for(const [stage,destination] of [['clustering','normalization'],['normalization','input_mapping']])
+   await channel.perform({condition:'return from saved clustering inspection',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
+    resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step'),'Previous unavailable').ref,expected_stage:destination})});
+ }
+ const roles=await configureClusteringRoles(channel,p,inputMapping);
  await next('input_mapping','normalization');
  const normReady=s=>s.wizard?.stage==='normalization'&&s.node_clustering?.verified===true&&s.node_clustering.kind==='normalization';
  const norm=condition=>channel.observe({condition,readClustering:true,ready:normReady});
@@ -99,9 +112,8 @@ export async function configureClustering(channel,p,{request,inputMapping}){
  need(Object.values(old.switches).every(v=>v===false),'variable-driven clustering parameters are unsupported');
  const control=(s,key,verb)=>one(s,e=>(e.tid===s.wizard.root_tid+';ClusterizationWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';ClusterizationWizard;'+key)&&e.allowed_actions.includes(verb),'Clustering control unavailable: '+key);
  const act=async(s,condition,key,action)=>channel.perform({condition,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,parameters:s.node_clustering}),resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
- const automatic=request.mode==='g_means';
  const wanted=automatic?{min_clusters:p.min_clusters??old.min_clusters,max_clusters:p.max_clusters??old.max_clusters,threshold:p.threshold??old.threshold,seed:p.seed??(request.target.kind==='new'?42:old.seed)}:{clusters:p.clusters??old.clusters,seed:p.seed??(request.target.kind==='new'?42:old.seed)};
- need(!automatic||Number.isSafeInteger(wanted.min_clusters)&&Number.isSafeInteger(wanted.max_clusters)&&wanted.min_clusters>=1&&wanted.min_clusters<=wanted.max_clusters&&wanted.max_clusters<=1000&&Number.isFinite(wanted.threshold)&&wanted.threshold>0,'automatic cluster bounds or threshold are invalid');
+ need(!automatic||Number.isSafeInteger(wanted.min_clusters)&&Number.isSafeInteger(wanted.max_clusters)&&wanted.min_clusters>=1&&wanted.min_clusters<=wanted.max_clusters&&wanted.max_clusters<=1000&&Number.isFinite(wanted.threshold)&&wanted.threshold>=0.1&&wanted.threshold<=5,'automatic cluster bounds or threshold are invalid');
  if(old.auto!==automatic){await act(state,'set automatic cluster selection','pedAutoClusters;ValueControl;DisplayEl',{verb:'set_checked',checked:automatic});state=await observe('cluster count mode readback');need(state.node_clustering.auto===automatic,'automatic cluster selection differs');}
  const bounds=automatic?(wanted.min_clusters>old.max_clusters?[['max_clusters','pedClustersMax;ValueControl'],['min_clusters','pedClustersMin;ValueControl']]:[['min_clusters','pedClustersMin;ValueControl'],['max_clusters','pedClustersMax;ValueControl']]):[['clusters','pedClusters;ValueControl']];
  for(const [name,key] of [...bounds,...(automatic?[['threshold','pedThreshold;ValueControl']]:[]),['seed','RandSeedEdit;edtRandSeed;ValueControl']]){

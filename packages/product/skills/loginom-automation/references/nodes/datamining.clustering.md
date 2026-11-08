@@ -28,7 +28,7 @@ NULL/некорректные значения до Teach/Execute, без под
 Для автоподбора используй `loginom_dock_node_apply`,
 `target.type:"datamining.clustering"`, `mode:"g_means"`, вход 0.
 Новый узел требует `features:[{kind:"input_field",name:"X"},...]`,
-`min_clusters`, `max_clusters` (целые 1…1000, min≤max), `threshold` (>0).
+`min_clusters`, `max_clusters` (целые 1…1000, min≤max), `threshold` (0.1…5).
 `clusters` относится только к k_means. RowID, Txn, Item и прочие идентификаторы не включай в features: они сохраняются
 в строках. Нативный g-means выбирает число в пределах диапазона; Cluster —
 метка, не ранг. Не вычисляй кластеры через Калькулятор или JavaScript.
@@ -37,17 +37,18 @@ NULL/некорректные значения до Teach/Execute, без под
 0 — все строки с Cluster и Distance; 1 — центры в исходных единицах.
 Нормировка поддерживается теми же значениями, что в k_means.
 При пропуске параметров existing сохраняет текущие min/max/threshold/seed.
-При заданном seed выполни повторный запуск того же existing узла с mode g_means
-и finish execute перед экспортом; сохрани пакет после выполнения. Ручные диапазоны и
+При смене режима existing явно задай clusters для k_means или
+min_clusters/max_clusters/threshold для g_means.
+Сохрани пакет после выполнения. Ручные диапазоны и
 применение сохранённой модели к holdout относятся к отдельным режимам.
 <!-- /mode -->
 
 <!-- mode: apply -->
 ## Применение сохранённой модели без переобучения
 
-Обучи тот же узел через `mode:"k_means"`, `clusters:3`, `seed:42`,
-`normalization:"none"`, `finish:"execute"`. Затем замени источник того же
-`imports.text` на holdout с прежними именами и типами полей и выполни импорт.
+Если узел не обучен, обучи через `mode:"k_means"` с параметрами пользователя,
+`normalization:"none"`, `finish:"execute"`. Обучен — сразу `apply`, без k_means.
+Замени источник `imports.text` на holdout с прежними именами и типами полей; выполни импорт.
 Связь с Кластеризацией сохрани. Вызови `loginom_dock_node_apply` для
 `target:{kind:"existing",type:"datamining.clustering",ref:...}`,
 `mode:"apply"`, `parameters:{}`, `inputs:[]`, `mappings:[]`,
@@ -62,7 +63,7 @@ holdout с назначениями и расстояниями; порт 1 — 
 Cluster/Distance и исходные поля); второй — `inputs:[{source:node_ref,output:1,input:0}]`
 (Cluster и координаты центров). В обоих source — ref того же узла Кластеризации;
 `finish:"execute"` выгружает и скачивает каждый CSV. Два целевых файла относятся
-к выходам 0/1 итогового apply. Train нужен для обучения. Сохрани пакет после
+к выходам 0/1 итогового apply. Сохрани пакет после
 обоих экспортов. Не вызывай k_means на holdout: это
 переобучение. Калькулятор и JavaScript для применения модели не нужны.
 Apply принимает только существующий обученный fixed-k/none узел; параметры,
