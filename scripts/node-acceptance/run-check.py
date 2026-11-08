@@ -204,10 +204,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
-    if name == 'grouping-median':
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
         root = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance/modes/task-median.md',
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode='median')
+        return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

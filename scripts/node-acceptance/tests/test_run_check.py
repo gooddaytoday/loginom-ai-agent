@@ -467,6 +467,19 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual({r['Region']: r['Metric'] for r in expected['outputs'][0]['rows']}, {'B': 3, 'A': 4, 'C': 7, 'D': None, 'E': 2})
         self.assertIn('grouping-median', runner.scenario_names('grouping-median'))
 
+    def test_grouping_cycle_two_uses_approved_tasks_and_oracle(self):
+        for scenario, mode, types in [('grouping-mode', 'mode', ['string', 'integer', 'string']),
+                                     ('grouping-stddev', 'stddev', ['string', 'real']),
+                                     ('grouping-null-count', 'null_count', ['string', 'integer', 'integer'])]:
+            with self.subTest(scenario=scenario):
+                case = runner.scenario(scenario)
+                self.assertEqual(case['prompt'].name, 'task-' + scenario.removeprefix('grouping-') + '.md')
+                self.assertEqual(case['input_files'], ['modes.csv'])
+                expected = runner.expected_for(case, '/test/modes.lgp')
+                self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
+                    sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
+                self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
+
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')
         self.assertEqual(case['prompt'].name, 'task.md')
