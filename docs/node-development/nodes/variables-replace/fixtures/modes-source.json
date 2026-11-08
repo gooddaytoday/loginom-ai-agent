@@ -1,7 +1,7 @@
 [
-  {"name":"report_date","label":"Дата отчёта","type":"datetime","value":"2026-11-07T23:59:58"},
-  {"name":"mixed","label":"Разное","type":"integer","value":7},
-  {"name":"total","label":"Итого","type":"integer","value":3},
+  {"name":"report_date","label":"report_date","type":"datetime","value":"2026-11-07T23:59:58"},
+  {"name":"mixed","label":"mixed","type":"integer","value":7},
+  {"name":"total","label":"total","type":"integer","value":3},
   {"name":"Color","label":"Color","type":"string","value":"RED"},
   {"name":"Code","label":"Code","type":"string","value":"Ab-12"},
   {"name":"Amount","label":"Amount","type":"real","value":1.25},

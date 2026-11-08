@@ -8,19 +8,19 @@
     "variables": [
       {
         "name": "report_date",
-        "label": "Дата отчёта",
+        "label": "report_date",
         "type": "datetime",
         "value": "2026-11-07T23:59:58"
       },
       {
         "name": "mixed",
-        "label": "Разное",
+        "label": "mixed",
         "type": "integer",
         "value": 7
       },
       {
         "name": "total",
-        "label": "Итого",
+        "label": "total",
         "type": "integer",
         "value": 3
       },
