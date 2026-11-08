@@ -492,7 +492,8 @@ def scenario(name, case_root=None, *, cases=None):
         src = node / 'acceptance/v040'
         return dict(source=src, prompt=src / 'task-consequents.md', data=node / 'fixtures/v040',
                     base=None, input_files=['train.csv'], export_count=4,
-                    expected_name='expected-consequents.json', cold_expected_name='expected-consequents-cold.json')
+                    expected_name='expected-consequents.json', cold_expected_name='expected-consequents-cold.json',
+                    csv_expected_name='expected-consequents-csv.json')
     if name == 'assnrules-retrain':
         src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
         return dict(source=src, prompt=src / 'task-retrain.md',
@@ -2105,7 +2106,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
+            csv_expected = (read(src / spec['csv_expected_name'])['outputs'][index] if spec.get('csv_expected_name')
+                            else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
