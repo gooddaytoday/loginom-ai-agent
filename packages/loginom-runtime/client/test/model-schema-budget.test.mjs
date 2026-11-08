@@ -13,7 +13,9 @@ import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 // Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
 // boundedUserToolReply below also enforces this limit on the complete JS wire reply.
-const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET});
+const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET,
+ // Text Import reference compaction (LAB-1139, cycle C0): keep room for cycles 2-8 under the shared 12000.
+ 'imports.text':10301});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');

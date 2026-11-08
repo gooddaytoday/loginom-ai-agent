@@ -25,6 +25,20 @@ test('each supported regression selection mode delivers complete import and outp
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
 });
 
+test('text Import delimited guidance keeps every rule in compact English',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [description]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
+ const text=description.guidance.replace(/\s+/g,' ');
+ for(const rule of [/confirmed source CSV/,/visualizer table/,/effect_possible=false/,/preview_only:true/,/server_profile/,
+  /CP1251/,/mojibake/,/rare types/,/download\/sampling/,/full sample Import settings/,/settings\.columns`; add no Reform/,/order/,/overwrite=reject/,
+  /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
+  /auto_detect_columns/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
+  /Calculator\/JS/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
+ assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
+ assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
+});
+
 test('node guidance uses the prepared bundle and selects common plus requested modes',async t=>{
  const source=await createBundledSkillFixture(t);
  const file=join(source.directory,'references/nodes/transform.join_data.md');
