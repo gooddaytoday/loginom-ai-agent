@@ -50,3 +50,12 @@ test('apply preserves holdout row order and native ascending center labels',()=>
  const e=checkApplyRound(expected,tables);
  assert.deepEqual(e.outputs[1].rows.map(row=>row.Cluster),[17,19,29]);
 });
+
+test('cold resolves saved center labels by coordinates after native label sorting',()=>{
+ const tables=records(),ids=[29,17,19];
+ for(const t of tables)t.data.sample.forEach(row=>row[0].value=String(ids[Number(row[0].value)-17]));
+ tables[1].data.sample.sort((a,b)=>Number(a[0].value)-Number(b[0].value));
+ const e=checkApplyRound(expected,tables),cold=records(applyColdExpected(e));
+ cold.forEach(t=>t.data.sample.forEach(row=>row[0].value=String(Number(row[0].value)-17)));
+ assert.ok(checkApplyRound(e,cold,{cold:true}));
+});
