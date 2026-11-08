@@ -202,7 +202,7 @@ export function readMappingBrowser(request) {
   const rows=[...elements[1].querySelectorAll('table.x-grid-item')],rendered=new Set();
   // A cold code-generated output can have two fully empty cached stores.
   // Nonempty inventories still require rendered rows as an independent witness.
-  if(!rows.length&&!(form==='DataSetOutputSocketWizard'&&sources.length===0&&targets.length===0)||rows.length>200)return fail('mapping_render_bound');
+  if(!rows.length&&!(form==='DataSetOutputSocketWizard'&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
   for(const row of rows) {
     const index=Number(row.getAttribute('data-recordindex')),target=targets[index];
     if(!Number.isSafeInteger(index)||index<0||!target||rendered.has(index)
