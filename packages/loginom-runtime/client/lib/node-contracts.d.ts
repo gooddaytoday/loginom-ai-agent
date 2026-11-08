@@ -297,6 +297,15 @@ export interface MissingValuesConfigurationReadback {
   output_mapping:SortingConfigurationReadback['output_mapping'];
 }
 
+export interface MissingValuesModesParameters {
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  max_nulls_percent:number; ordered:boolean;
+}
+export interface MissingValuesModesConfigurationReadback extends Omit<MissingValuesConfigurationReadback,'ordered'|'fields'> {
+  ordered:boolean;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete';value?:string}>;
+}
+
 export interface CollapseParameters {
   information?: Array<{kind: 'input_field'; name: string}>;
   transposed?: Array<{kind: 'input_field'; name: string}>;

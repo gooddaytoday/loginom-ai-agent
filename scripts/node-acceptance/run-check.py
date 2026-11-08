@@ -221,6 +221,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
+    if name in ['missing-median-mode', 'missing-previous', 'missing-delete']:
+        # v0.4.0 cycle 1: only the task and its CSV go to the model; expected tables are static oracle output.
+        root = REPO / 'docs/node-development/nodes/missing-values'
+        task, csv_name, expected = {'missing-median-mode': ('task-median-mode.md', 'statistics.csv', 'expected.json'),
+                                    'missing-previous': ('task-previous.md', 'ordered.csv', 'expected-previous.json'),
+                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json')}[name]
+        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance' / task, data=root / 'fixtures',
+                    input_files=[csv_name], base=None, expected_name=expected)
     if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
         src = REPO / 'docs/node-development/nodes/missing-values/acceptance/zero'
         kind = {'missing-zero': 'core', 'missing-zero-threshold': 'threshold',
