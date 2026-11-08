@@ -486,3 +486,7 @@ export interface DataToVarConfigurationReadback {
  input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
  output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
 }
+
+export interface SamplingUniformConfigurationReadback extends Omit<SamplingModesConfigurationReadback,'mode'|'test_priority'> {
+ mode:'uniform'; group_size_rows:number[]; test_priority:boolean; test_priority_position?:'beginning'|'end'|'algorithm'|null;
+}

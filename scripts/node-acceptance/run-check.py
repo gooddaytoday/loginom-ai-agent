@@ -493,6 +493,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-uniform', 'partition-uniform', 'partition-test-priority']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        root = REPO / 'docs/node-development/nodes' / slug
+        src = root / 'acceptance/v040'
+        return dict(source=src, prompt=src / ('task-test-priority.md' if name.endswith('test-priority') else 'task-uniform.md'),
+                    data=root / 'fixtures/v040', input_files=['rows.csv'], base=None, sampling_uniform=True,
+                    sampling_priority=name.endswith('test-priority'))
     if name in ['sampling-random', 'sampling-stratified', 'sampling-biased', 'partition-random', 'partition-stratified', 'partition-biased']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         mode = name.rsplit('-', 1)[1]
@@ -562,6 +569,16 @@ def expected_for(case, package, cold=False):
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]])
+    if case.get('sampling_uniform'):
+        proposal = read(src / 'expected.json')
+        partition = proposal['node_type'] == 'preprocessing.data_partition'
+        proposal['source'] = dict(rows=proposal['source'], row_count=len(proposal['source']))
+        proposal['requested_sizes'] = dict(train=proposal['train_count'], test=proposal['test_count']) if partition else dict(sample=proposal['count'])
+        proposal['group_size_rows'] = list(proposal['group_size_rows'].values()) if partition else [proposal['group_size_rows']]
+        if case.get('sampling_priority'):
+            proposal.update(test_priority=True, test_priority_position='both')
+        return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
+            'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
     # The owner-approved sampling envelope is separate from stock exact rows.
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),

@@ -43,7 +43,7 @@ test('proposal remains rejected by stock parser; ordinary exact expectations ret
  assert.equal(matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs).length,1);
  exact.outputs[0].rows[0].Value=999;
  assert.throws(()=>matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs));
- assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'uniform','/test/x.lgp'),/MODE_UNSUPPORTED/);
+ assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'uniform','/test/x.lgp'),/GROUP_SIZES_INVALID/);
 });
 test('random decision 1 accepts variable sizes, source ordering and independent partition subsets',()=>{
  for(const partition of [false,true]){
@@ -185,5 +185,19 @@ test('cold admits the complete frozen categorical definition without claiming na
   for(const mutate of [m=>m.autosync=true,m=>m.source_fields.push({name:'foreign'}),m=>m.target_fields[0].inherited=true]){
    const before=structuredClone(mapping);mutate(mapping);await assert.rejects(run(),/MAPPING_OWNER/);Object.assign(mapping,before);
   }
+ }
+});
+
+for(const partition of [false,true])test('uniform complete membership, repeat, group settings, CSV and cold '+partition,()=>{
+ const f=fixture(partition,'stratified');
+ f.expected.sampling_modes.mode='uniform';f.expected.sampling_modes.group_size_rows=partition?[1,1]:[1];
+ for(const r of f.replies)Object.assign(r.configuration.readback,{mode:'uniform',group_size_rows:partition?[1,1]:[1]});
+ const baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+ assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,true);
+ const changed=structuredClone(f.replies);changed[0].configuration.readback.group_size_rows=[9];
+ assert.throws(()=>checkSamplingMain(f.expected,changed,f.csvs),/GROUP_SIZES_CHANGED/);
+ if(partition){
+  const overlap=structuredClone(f.replies);overlap.forEach(r=>r.output.ports[2].sample[0]=structuredClone(r.output.ports[1].sample[0]));
+  assert.throws(()=>checkSamplingMain(f.expected,overlap,f.csvs),/TRAIN_TEST_OVERLAP/);
  }
 });

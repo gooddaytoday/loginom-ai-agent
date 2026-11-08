@@ -4,7 +4,7 @@ import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
-import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
+import {observeSamplingSavedSettings,parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
 import {parseExpectedVariableInventory,selectVariableInventoryNode,matchVariableInventoryOutput,matchVariableInventoryLinks,parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
@@ -279,6 +279,11 @@ page = context.pages()[0]
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
    const settings=await observeClusteringSavedSettings({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
    await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.sampling_modes?.mode==='uniform'){
+   const target=graph.nodes.find(n=>n.type===expected.sampling_modes.node_type);
+   const settings=await observeSamplingSavedSettings({load,channel:channelFor(target.ref,'uniform-saved'),expected});
+   await record({phase:'sampling_saved_settings',node:target.ref,...settings});
   }
   const actual=[],ownedExecutions=[];
   const readPlans=sampling?[...reads,...reads]:reads;
