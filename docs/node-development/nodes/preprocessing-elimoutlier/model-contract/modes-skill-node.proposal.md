@@ -10,8 +10,9 @@ NULL не участвует в статистике. `finish:execute`, `read.po
 для её самостоятельного вычисления не нужны.
 
 <!-- mode: detect -->
-`mode:detect`, `parameters.outlier`: `fields`, `method:sd|iqr`,
-явные `outlier_factor`, `extreme_factor` и `ordered` для нового узла.
+`mode:detect`, `parameters.outlier`: `fields` (технические имена только
+непрерывных числовых полей), `method:sd|iqr`, явные `outlier_factor`,
+`extreme_factor` (не меньше первого) и `ordered` для нового узла.
 Входной флаг ordered не сортирует данные. Оба действия — keep.
 Перед Execute обучи на текущем входе. Patch сохраняет неуказанные настройки.
 IQR: Q(p)=sorted_non_null[min(floor(n*p),n-1)], строгие границы
@@ -19,8 +20,8 @@ Q1−k*(Q3−Q1), Q3+k*(Q3−Q1); квантили не интерполирую
 <!-- /mode -->
 
 <!-- mode: edit -->
-`mode:edit`, `parameters.outlier`: `fields`, `method:sd|iqr`, явные
-`outlier_factor`, `extreme_factor` и `ordered` для нового узла.
+`mode:edit`, `parameters.outlier`: `fields` (технические имена), `method:sd|iqr`,
+явные `outlier_factor`, `extreme_factor` (не меньше первого) и `ordered` для нового узла.
 Перед Execute обучи на текущем входе.
 Дополнительно задай независимые `outlier_policy` и
 `extreme_policy`: keep, delete, mean, median, most_probable, constant, limit.
