@@ -76,7 +76,7 @@ RULES = (
     ((C + 'assn-rules-*.mjs', 'docs/node-development/nodes/datamining-assnrules/acceptance/**'), ('live-ui',), ('assnrules-basic', 'assnrules-length')),
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
-    ((C + 'coarse-classes-*.mjs',), ('live-ui',), ('coarse-classes-train', 'coarse-classes-apply')),
+    ((C + 'coarse-classes-*.mjs', 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/**'), ('live-ui',), ('coarse-classes-continuous-manual', 'coarse-classes-train', 'coarse-classes-apply')),
     ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
     (('scripts/node-acceptance/logreg-normalization.mjs', 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization/**'), ('live-ui',), ('logreg-normalization',)),
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-ridge', 'logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
