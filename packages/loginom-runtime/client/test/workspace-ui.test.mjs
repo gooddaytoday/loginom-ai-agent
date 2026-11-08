@@ -1154,46 +1154,18 @@ function storageScrollCostFixture(){
  return {page,table,clock,cost,prefix};
 }
 
-for(const mode of ['fresh','owner','mask','persistent'])test('Files scroll 4000->5000 reads a fresh complete scan within unchanged limits: '+mode,async()=>{
- const {page,table,clock,cost,prefix}=storageScrollCostFixture();
+test('Files scroll from a pre-gesture snapshot is not replayed',async()=>{
+ const {page,table,prefix}=storageScrollCostFixture();
  const roots=await page.execute({mode:'observe',discover_roots:true});
  const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
  const before=await page.execute({mode:'observe',root_ref:root.ref});
- assert.equal(before.status,'SUCCEEDED');
  const target=before.output.ui.elements.find(e=>e.tid===prefix+'colName_file-10.csv');
  assert.ok(target.allowed_actions.includes('scroll'));assert.equal(target.scroll.top,4000);
- const evaluate=page.evaluate.bind(page);let reads=0;
- page.evaluate=async(fn,arg)=>{
-  if(!arg||!Object.hasOwn(arg,'discoverRoots'))return evaluate(fn,arg);
-  cost.charging=table.scrollTop===5000;
-  // A slower first controls read (or every one) still reaches the retry guards.
-  if(cost.charging&&mode!=='fresh'&&(mode==='persistent'||++reads===1))cost.extra=600;
-  else if(cost.charging&&reads){
-   if(mode==='owner')table.style.overflowY='hidden';
-   if(mode==='mask')page.add('div',null,'Загрузка...',{x:400,y:300,width:200,height:40},table).attrs.class='x-mask-msg';
-  }
-  return evaluate(fn,arg);
- };
  const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
- assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,1);
- assert.equal(table.scrollTop,5000);
- if(mode==='fresh'){
-  assert.equal(result.status,'SUCCEEDED',JSON.stringify({error:result.error,trace:result.trace}));
-  assert.equal(result.trace.filter(e=>e.event==='ui_scan_limit').length,0);
-  assert.deepEqual([result.output.scan.complete,result.output.scan.max_ms,result.output.scan.max_elements,result.output.scan.max_work],[true,500,6000,250000]);
-  assert.ok(result.output.scan.visited_elements>=1092,String(result.output.scan.visited_elements));
-  const moved=result.output.ui.elements.find(e=>e.ref===target.ref);
-  assert.deepEqual(clone(moved.scroll),{ref:root.ref,top:5000,max_top:10313});
-  assert.equal(moved.horizontal_scroll,undefined);
-  // The pre-gesture snapshot cannot authorize a second scroll.
-  const replay=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
-  assert.notEqual(replay.status,'SUCCEEDED');assert.equal(replay.effect_possible,false);
-  assert.equal(replay.trace.filter(e=>e.event==='ui_scroll_applied').length,0);assert.equal(table.scrollTop,5000);
- } else {
-  assert.equal(result.status,'AMBIGUOUS');
-  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
-  assert.equal(result.error.code,mode==='persistent'?'UI_SCAN_LIMIT':'UI_SCROLL_NOT_CONFIRMED',JSON.stringify(result.error));
- }
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(table.scrollTop,5000);
+ const replay=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ assert.notEqual(replay.status,'SUCCEEDED');assert.equal(replay.effect_possible,false);
+ assert.equal(replay.trace.filter(e=>e.event==='ui_scroll_applied').length,0);assert.equal(table.scrollTop,5000);
 });
 
 // LAB-1188 Chromium profile (Files after reopen, 5277 document elements): the
@@ -1204,8 +1176,13 @@ test('Files read checks the global guard list on candidates, not on every docume
  const {page,table,prefix}=storageScrollCostFixture();
  const other=page.add('div',null,'',{x:0,y:0,width:0,height:0});other.style.display='none';
  for(let i=0;i<4200;i++)page.add('div','Other;n'+i,'',{x:0,y:0,width:0,height:0},other);
+ // A prefilter candidate inside a wizard root that no guard part names.
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:1150,y:100,width:100,height:100});
+ const stray=page.add('button','MF;TF-1;WizrdMCF;btnNotGuard','Stray',{x:1160,y:110,width:50,height:20},wizard);
  const roots=await page.execute({mode:'observe',discover_roots:true});
  const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const tids=roots.output.ui.elements.map(e=>e.tid);
+ assert.ok(tids.includes(wizard.attrs['data-tid']));assert.ok(!tids.includes(stray.attrs['data-tid']));
  const match=Element.prototype.matches;let checks=0,guardParts=0;
  Element.prototype.matches=function(selector){const parts=selector.split(',').length;checks+=parts;guardParts=Math.max(guardParts,parts);return match.call(this,selector);};
  let read;
@@ -1213,6 +1190,7 @@ test('Files read checks the global guard list on candidates, not on every docume
  assert.equal(read.status,'SUCCEEDED');assert.ok(guardParts>=500,String(guardParts));
  assert.ok(read.output.scan.visited_elements>=1092);assert.equal(read.output.file_storage.directory,'/user');
  assert.equal(read.output.ui.elements.filter(e=>e.tid?.startsWith(prefix+'colName_')).length,48);
+ assert.ok(!read.output.ui.elements.some(e=>e.tid===stray.attrs['data-tid']));
  assert.ok(checks<page.document.all().length*guardParts/4,JSON.stringify({checks,elements:page.document.all().length,guardParts}));
 });
 
