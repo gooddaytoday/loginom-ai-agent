@@ -46,9 +46,9 @@ min_clusters/max_clusters/threshold для g_means.
 <!-- mode: apply -->
 ## Применение сохранённой модели без переобучения
 
-Обучи тот же узел через `mode:"k_means"` с явным числом кластеров и seed,
-`normalization:"none"`, `finish:"execute"`. Затем замени источник того же
-`imports.text` на holdout с прежними именами и типами полей и выполни импорт.
+Если узел не обучен, обучи через `mode:"k_means"` с параметрами пользователя,
+`normalization:"none"`, `finish:"execute"`. Обучен — сразу `apply`, без k_means.
+Замени источник `imports.text` на holdout с прежними именами и типами полей; выполни импорт.
 Связь с Кластеризацией сохрани. Вызови `loginom_dock_node_apply` для
 `target:{kind:"existing",type:"datamining.clustering",ref:...}`,
 `mode:"apply"`, `parameters:{}`, `inputs:[]`, `mappings:[]`,
@@ -63,7 +63,7 @@ holdout с назначениями и расстояниями; порт 1 — 
 Cluster/Distance и исходные поля); второй — `inputs:[{source:node_ref,output:1,input:0}]`
 (Cluster и координаты центров). В обоих source — ref того же узла Кластеризации;
 `finish:"execute"` выгружает и скачивает каждый CSV. Два целевых файла относятся
-к выходам 0/1 итогового apply. Train нужен для обучения. Сохрани пакет после
+к выходам 0/1 итогового apply. Сохрани пакет после
 обоих экспортов. Не вызывай k_means на holdout: это
 переобучение. Калькулятор и JavaScript для применения модели не нужны.
 Apply принимает только существующий обученный fixed-k/none узел; параметры,

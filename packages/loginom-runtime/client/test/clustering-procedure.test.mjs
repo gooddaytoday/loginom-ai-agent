@@ -1,28 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureClustering} from '../lib/clustering-procedure.mjs';
+import {createClusteringNodeSupport} from '../lib/clustering-node.mjs';
 
 // Native selector observed at lab717-integrated-norm-1/main journal:475.
 // The browser transport alone is replaced; production configuration and its
 // ownership/readback guards decide every gesture and stage transition.
-function fixture(initial=[5,5],kind='existing',parameters={}){
+function fixture(initial=[5,5],kind='existing',parameters={},fieldOverrides=[]){
  const node={verified:true,document_id:'doc',workflow_id:'wf',node_id:'cluster'};
- const fields=['X','Y'].map((name,index)=>({name,label:name,type:'real',data_kind:'Непрерывный',index,field_id:String(index),record_id:'role-'+index,usage_type:3}));
+ const fields=['X','Y'].map((name,index)=>({name,label:name,type:'real',data_kind:'Непрерывный',index,field_id:String(index),record_id:'role-'+index,usage_type:3,...fieldOverrides[index]}));
  const source_fields=fields.map(f=>({record_id:'src-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
- const norms=fields.map((f,i)=>({...f,norm_type:initial[i],importance:1,irremovable:false})),actions=[];
+ const norms=fields.map((f,i)=>({...f,norm_type:initial[i],importance:1,irremovable:false})),actions=[],cancelActions=[];
  const labels={'Нет':0,'Масштабирование [-1;1]':2,'Масштабирование [0;1]':3,'Абсолютное масштабирование':4,'Стандартизация':5};
  let stage='input_mapping',selected=[],editor=null,picker=false;
  const params={auto:false,clusters:3,min_clusters:1,max_clusters:10,threshold:1,seed:42,...parameters};
  const keys={clusters:'pedClusters',min_clusters:'pedClustersMin',max_clusters:'pedClustersMax',threshold:'pedThreshold',seed:'RandSeedEdit;edtRandSeed'};
  const element=(tid,verb='click',label)=>({tid,ref:tid,allowed_actions:[verb],label});
- const state=()=>({prepared_node_context:node,wizard:{stage,root_tid:'W',root_ref:'wizard'},
+ const state=()=>({prepared_node_context:{...node,surface:stage==='closed'?'graph':'wizard',locked:false},wizard:stage==='closed'?{status:'absent'}:{status:'observed',stage,root_tid:'W',root_ref:'wizard',owner_context:{status:'observed'}},
   node_clustering:{verified:true,node_context:node,inventory_complete:true,...(stage==='input_mapping'?{fields}:stage==='normalization'?{kind:'normalization',fields:structuredClone(norms),selected,editor,source_status:'Вход активирован'}:{kind:'parameters',...params,switches:{},values:{pedClustersMin:params.min_clusters,pedClustersMax:params.max_clusters,pedThreshold:params.threshold}})},
-  ui:{elements:[element('W;btnNext','wizard_step'),element('W;btnPrev','wizard_step'),element('W;ClusterizationWizard;pedAutoClusters;ValueControl;DisplayEl','set_checked'),...Object.values(keys).flatMap(key=>['fill','press'].map(verb=>element('W;ClusterizationWizard;'+key+';ValueControl',verb))),...fields.map(f=>element('W;NormTuneWizard;colDisplayName_'+f.name)),element('W;NormTuneWizard;btnEdit'),
+  ui:{dialogs:[],masks:[],elements:[element('W;btnClose'),element('W;btnNext','wizard_step'),element('W;btnPrev','wizard_step'),element('W;ClusterizationWizard;pedAutoClusters;ValueControl;DisplayEl','set_checked'),...Object.values(keys).flatMap(key=>['fill','press'].map(verb=>element('W;ClusterizationWizard;'+key+';ValueControl',verb))),...fields.map(f=>element('W;NormTuneWizard;colDisplayName_'+f.name)),element('W;NormTuneWizard;btnEdit'),
    ...(editor?[element('W;ColumnsEditForm;cbxNormType;trg_picker'),element('W;ColumnsEditForm;btnApply')]:[]),
    ...(picker?Object.keys(labels).map(label=>element('W;ColumnsEditForm;cbxNormType;boundlist;'+label,'click',label)):[])]}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform({ready,resolve}){
-  const s=state();assert.equal(ready(s),true);const a=resolve(s);actions.push(a);
+  const s=state();assert.equal(ready(s),true);const a=resolve(s);
+  // Record cancellation separately from settings gestures; run the real Close
+  // procedure and require its same-node graph proof in refusal tests below.
+  if(a.ref==='W;btnClose'){cancelActions.push(a);stage='closed';return;}
+  actions.push(a);
   if(a.verb==='wizard_step'){stage=a.expected_stage;return;}
   if(a.verb==='set_checked')params.auto=a.checked;
   if(a.verb==='fill'){const key=Object.keys(keys).find(k=>a.ref==='W;ClusterizationWizard;'+keys[k]+';ValueControl');params[key]=Number(a.text);}
@@ -32,7 +37,7 @@ function fixture(initial=[5,5],kind='existing',parameters={}){
   if(a.ref.includes(';boundlist;')){editor.norm_type=labels[a.ref.split(';boundlist;')[1]];picker=false;}
   if(a.ref.endsWith(';btnApply')){norms.find(f=>selected.includes(f.record_id)).norm_type=editor.norm_type;editor=null;}
  }};
- return {actions,norms,run:(p,mode='k_means')=>configureClustering(channel,p,{request:{target:{kind},mode},inputMapping})};
+ return {actions,cancelActions,norms,run:(p,mode='k_means')=>configureClustering(channel,p,{request:{target:{kind},mode},inputMapping})};
 }
 
 for(const [method,id,label] of [['scale_minus_one_one',2,'Масштабирование [-1;1]'],['scale_zero_one',3,'Масштабирование [0;1]'],['absolute_scale',4,'Абсолютное масштабирование']]){
@@ -94,4 +99,51 @@ test('apply inspects fixed saved parameters without editing roles or normalizati
  assert.equal(r.configuration.mode,'apply');assert.equal(r.settings_applied,false);
  assert.equal(r.configuration.clusters,3);assert.deepEqual(r.configuration.normalization.map(n=>n.norm_type),[0,0]);
  assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+});
+
+for(const [name,normalization,parameters,fields,stages] of [
+ ['automatic count',[0,0],{auto:true},[],['normalization','clustering']],
+ ['standardized features',[5,5],{},[],['normalization']],
+ ['string feature',[0,0],{},[{type:'string',data_kind:'Дискретный'}],[]],
+])test('apply preserves and closes unsupported saved '+name,async()=>{
+ const f=fixture(normalization,'existing',parameters,fields);
+ await assert.rejects(f.run({},'apply'),error=>{
+  assert.equal(error.nodePhaseRefusal?.verification,'clustering_apply_preserved');
+  assert.equal(error.nodePhaseRefusal.settings_unchanged,true);
+  assert.equal(error.nodePhaseRefusal.proof.closed.verified,true);
+  assert.equal(error.nodePhaseRefusal.proof.closed.mode,'close');
+  assert.equal(error.nodePhaseRefusal.proof.closed.settings_applied,false);
+  return true;
+ });
+ assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+ assert.deepEqual(f.actions.map(a=>a.expected_stage),stages);
+ assert.deepEqual(f.cancelActions,[{verb:'click',ref:'W;btnClose'}]);
+});
+
+test('apply beforeGraphExecute skips graph inspection and native training',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'cluster'};
+ const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};
+ const deadline=Date.now()+10000,continued=Error('graph continuation reached without training');
+ const tid='MF;TF-1;Graph;Cluster';
+ const state={origin:'https://loginom.test',loginom_build:'7.4.2',workflow_ref:workflow,
+  dom_epoch:{document:'dom',revision:1},scan:{complete:true},wizard:{status:'absent'},
+  prepared_node_context:{...node,verified:true,surface:'graph',locked:false,tid},
+  ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},elements:[{tid,ref:'body',scope:'graph',graph_node:{part:'body'},signature:{tag:'g'},
+   bounding_box:{x:100,y:100,width:56,height:104},allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
+ const support=createClusteringNodeSupport({targetOrigin:'https://loginom.test',targetBuild:'7.4.2'});
+ const driver=support.nodeApplyDriverFactory({now:Date.now,receiptOptions:()=>({}),
+  operation:{id:'apply',deadline,action:{action_key:'node.apply',revision:'1'},parameters:{mode:'apply'},nodeApply:{request:{mode:'apply'},node},
+   nodeTargetAdapter:{async observe(){assert.fail('apply must not inspect the training graph');}}},
+  execute:async()=>({status:'SUCCEEDED',output:state}),
+  onRecord:async row=>{
+   if(row.phase==='node_observation_sample'){
+    // Training starts with process-console observations. Only the first graph
+    // continuation after the production hook may reach this test boundary.
+    assert.equal(row.readiness.condition,'calculator graph ready after port commit','apply must not enter native training');
+    assert.equal(row.readiness.satisfied,true);
+    throw continued;
+   }
+   return structuredClone(row);
+  }});
+ await assert.rejects(driver.finishGraph('execute',{document_id:node.document_id,workflow_ref:workflow,node,deadline}),error=>error===continued);
 });
