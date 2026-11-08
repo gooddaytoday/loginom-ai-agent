@@ -3,7 +3,7 @@ import {readPreparedNodeContext,validatePreparedNodeContext} from './node-contex
 
 // Only a fully loaded, bounded native Ext store is a complete variable set.
 // Value/$self RPC proxies are deliberately never inspected or invoked.
-export function readVariableRecords(store,mode,decode){
+export function readVariableRecords(store,mode,decode,allowIndexGaps=false){
  const need=(ok,message)=>{if(!ok)throw Error('Variable inventory: '+message);};
  const items=store?.getData?.()?.items,count=store?.getCount?.();
  need(['preview','values'].includes(mode)&&store.isLoading()===false&&Array.isArray(items)
@@ -11,7 +11,8 @@ export function readVariableRecords(store,mode,decode){
  if(mode==='preview')need(store.complete===true&&store.loadCount>=1&&store.getTotalCount()===count,'preview total/load completeness');
  const variables=items.map((record,index)=>{
   const d=record?.data,type={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string'}[d?.DataType];
-  need(record?.isModel===true&&d.Index===index&&(Number.isSafeInteger(d.ID)&&d.ID>=0||typeof d.ID==='string'&&d.ID.length>0&&d.ID.length<=128)
+  // Native delete leaves the survivors' old Index values until the wizard is reopened.
+  need(record?.isModel===true&&(allowIndexGaps===true?Number.isSafeInteger(d?.Index)&&d.Index>=index&&(index===0||d.Index>items[index-1].data.Index):d.Index===index)&&(Number.isSafeInteger(d.ID)&&d.ID>=0||typeof d.ID==='string'&&d.ID.length>0&&d.ID.length<=128)
    &&typeof d.Name==='string'&&d.Name.length>0&&d.Name.length<=128&&typeof d.DisplayName==='string'&&d.DisplayName.length<=1024&&type,'record metadata/type');
   if(mode==='values')need(typeof d.ValueIsNull==='boolean'&&d.OriginType===1,'local value/null metadata');
   const raw=mode==='values'?(d.ValueIsNull?null:d.DisplayValue):d.ValueVariant;

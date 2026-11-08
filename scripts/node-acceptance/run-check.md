@@ -751,3 +751,10 @@ typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
 2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
 и два исходных CSV передаются модели; oracle/expected остаются в оснастке.
+
+`variables-totable-switch` (LAB-1095, «Переменные в таблицу», цикл 1): модель получает `task-switch-run.md`
+и `modes.json` (initial/changed; метки равны именам), сама собирает источник и преобразователь columns,
+затем переключает тот же узел columns→rows, правит источник, повторяет выполнение и возвращает columns.
+Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
+аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
+свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.

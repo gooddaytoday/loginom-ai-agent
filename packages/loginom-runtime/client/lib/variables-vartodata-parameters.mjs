@@ -1,6 +1,6 @@
 const need=(value,message)=>{if(!value)throw Error('Переменные в таблицу: '+message);};
 export const variablesToTableParametersSchema={type:'object',properties:{},required:[],additionalProperties:false,
- description:'Use parameters:{} and mode columns or rows. Columns produces one typed row preserving variable names, labels, types and order. Rows produces Name string, DisplayName string, Value variant, one row per variable in source order; each Value retains its native subtype and civil datetime milliseconds. NULL, empty string, false and zero are distinct. Values belong to the upstream variable source. Done commits, Execute computes, Close discards; save separately.'};
+ description:'Use parameters:{} and mode columns or rows. Columns produces one typed row preserving variable names, labels, types and order. Rows produces Name string, DisplayName string, Value variant, one row per variable in source order; each Value retains its native subtype and civil datetime milliseconds. NULL, empty string, false and zero are distinct. Values belong to the upstream variable source. An existing node switches columns/rows in place (target.kind existing, same variable_inputs, mappings []); edit the source node, then execute the same converter again. Done commits, Execute computes, Close discards; save separately.'};
 
 export function validateVariablesToTableParameters(parameters,mode,request){
  need(['columns','rows'].includes(mode),'Этот режим пока не поддерживается');

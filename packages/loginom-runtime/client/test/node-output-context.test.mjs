@@ -131,3 +131,11 @@ test('W1 local datetime values retain civil milliseconds and typed NULL through 
   assert.equal(results[0].type,'datetime');assert.equal(results[0].cell.value,'2026-11-05T05:47:52.160');assert.equal(results[0].cell.precision,'millisecond');assert.equal(results[1].cell.is_null,true);
  }
 });
+
+test('native delete leaves old Index values: tolerated only with the explicit option and only in increasing order',()=>{
+ const s=variableStore();s.items.splice(1,1);
+ assert.throws(()=>readVariableRecords(s,'values',decodePortCell),/record metadata/);
+ const r=readVariableRecords(s,'values',decodePortCell,true);
+ assert.deepEqual(r.variables.map(v=>[v.name,v.index]),[['v0',0],['v2',1],['v3',2]]);
+ s.items.reverse();assert.throws(()=>readVariableRecords(s,'values',decodePortCell,true),/record metadata/);
+});

@@ -6,22 +6,22 @@
     "columns": [
       {
         "name": "amount",
-        "label": "Сумма",
+        "label": "amount",
         "type": "integer"
       },
       {
         "name": "empty",
-        "label": "Пустая строка",
+        "label": "empty",
         "type": "string"
       },
       {
         "name": "enabled",
-        "label": "Включён",
+        "label": "enabled",
         "type": "boolean"
       },
       {
         "name": "missing",
-        "label": "Пропуск",
+        "label": "missing",
         "type": "integer"
       }
     ],
@@ -52,7 +52,7 @@
     "rows": [
       {
         "Name": "amount",
-        "DisplayName": "Сумма",
+        "DisplayName": "amount",
         "Value": {
           "cell_type": "integer",
           "is_null": false,
@@ -61,7 +61,7 @@
       },
       {
         "Name": "empty",
-        "DisplayName": "Пустая строка",
+        "DisplayName": "empty",
         "Value": {
           "cell_type": "string",
           "is_null": false,
@@ -70,7 +70,7 @@
       },
       {
         "Name": "enabled",
-        "DisplayName": "Включён",
+        "DisplayName": "enabled",
         "Value": {
           "cell_type": "boolean",
           "is_null": false,
@@ -79,7 +79,7 @@
       },
       {
         "Name": "missing",
-        "DisplayName": "Пропуск",
+        "DisplayName": "missing",
         "Value": {
           "cell_type": "integer",
           "is_null": true,
@@ -106,7 +106,7 @@
     "rows": [
       {
         "Name": "amount",
-        "DisplayName": "Сумма",
+        "DisplayName": "amount",
         "Value": {
           "cell_type": "integer",
           "is_null": false,
@@ -115,7 +115,7 @@
       },
       {
         "Name": "enabled",
-        "DisplayName": "Включён",
+        "DisplayName": "enabled",
         "Value": {
           "cell_type": "boolean",
           "is_null": false,
@@ -124,7 +124,7 @@
       },
       {
         "Name": "missing",
-        "DisplayName": "Пропуск",
+        "DisplayName": "missing",
         "Value": {
           "cell_type": "integer",
           "is_null": true,
@@ -133,7 +133,7 @@
       },
       {
         "Name": "rate",
-        "DisplayName": "Доля",
+        "DisplayName": "rate",
         "Value": {
           "cell_type": "real",
           "is_null": false,
@@ -146,22 +146,22 @@
     "columns": [
       {
         "name": "amount",
-        "label": "Сумма",
+        "label": "amount",
         "type": "integer"
       },
       {
         "name": "enabled",
-        "label": "Включён",
+        "label": "enabled",
         "type": "boolean"
       },
       {
         "name": "missing",
-        "label": "Пропуск",
+        "label": "missing",
         "type": "integer"
       },
       {
         "name": "rate",
-        "label": "Доля",
+        "label": "rate",
         "type": "real"
       }
     ],
@@ -178,7 +178,7 @@
     "columns": [
       {
         "name": "mixed",
-        "label": "Переменное значение",
+        "label": "mixed",
         "type": "variant"
       }
     ],
@@ -210,7 +210,7 @@
     "rows": [
       {
         "Name": "mixed",
-        "DisplayName": "Переменное значение",
+        "DisplayName": "mixed",
         "Value": {
           "cell_type": "string",
           "is_null": false,
