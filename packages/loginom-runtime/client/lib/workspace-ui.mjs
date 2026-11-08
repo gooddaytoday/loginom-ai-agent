@@ -1184,14 +1184,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         if(crumbs.length>32)context.status='bounded';
         else if(preparedAncestryObserved&&crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||hiddenPreparedAncestor(e)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata,.bg-vendor-icon-enrichdata').length===1
               ||singleInputOverflow||joinInputOverflow||colUnionInputOverflow||restInputOverflow
-              ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
+              ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&(crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1||preparedInputPort.node_icon_class==='bg-vendor-icon-exportexcelfile'&&crumbs[5].querySelectorAll('.bg-vendor-icon-exportexcelfile').length===1)))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata,.bg-vendor-icon-enrichdata').length===1
               ||singleInputOverflow||joinInputOverflow||colUnionInputOverflow||restInputOverflow
-              ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
+              ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&(crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1||preparedInputPort.node_icon_class==='bg-vendor-icon-exportexcelfile'&&crumbs[5].querySelectorAll('.bg-vendor-icon-exportexcelfile').length===1))
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
               ||preparedInputPort.port===0&&preparedInputPort.native_index===2&&e.textContent.trim()==='Источник данных запроса'
@@ -2194,7 +2194,7 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && ['text_export_params','text_export_format','excel_export','lgd_export'].includes(wizard.stage)) {
       const lgd=wizard.stage==='lgd_export',excel=wizard.stage==='excel_export',first=wizard.stage==='text_export_params',base=wizard.root_tid+';'+(lgd?'ExportNativeParamsWizard':excel?'ExportExcelFilePreviewWizard':first?'ExportTextFileParamsWizard':'ExportTextFilePreviewWizard')+';';
-      const fields=lgd?{destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum'}:excel?{destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat'}:first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
+      const fields=lgd?{destination:'edtFileName',compression:'cbbCompression',checksum:'cbbWriteChecksum'}:excel?{destination:'edtFileName',sheet_name:'edtSheetName',file_type:'cbbFileType',header:'cbbHeadersRow',number_format:'cbbFloatFormat',decimal_count:'pedDecimalCount'}:first?{destination:'edtFileName',text_qualifier:'edtTextQualifier',decimal_separator:'edtDecimalSeparator',date_separator:'edtDateSeparator',time_separator:'edtTimeSeparator',true_value:'edtValueTrue',false_value:'edtValueFalse',null_marker:'edtValueNull',date_format:'edtDateFormat',time_format:'edtTimeFormat'}
         :{delimiter:'edtDelimiterChar',encoding:'edtCodePage',line_ending:'edtLineEnding',header:'edtCaptionType'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const ownerTid=base+key+';ValueControl',owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
@@ -2203,8 +2203,8 @@ function readRenderedInputMapping(observation) {
         if(owners.length!==1||inputs.length!==1||sw?.pressed!==false)return [name,{status:'unobserved_or_variable'}];
         const input=inputs[0],value=String(input.value??''),limit=name==='destination'?512:256;
         if(value.length<=limit&&enabled(input)) {
-          if(!['destination','sheet_name'].includes(name))wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
-          if(['destination','sheet_name','time_format'].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
+          if(!['destination','sheet_name',...(excel?['decimal_count']:[])].includes(name))wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
+          if(['destination','sheet_name','time_format',...(excel?['decimal_count']:[])].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
         }
         return [name,{status:'observed',value:value.slice(0,limit),value_length_utf16:value.length,truncated:value.length>limit,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text'}];

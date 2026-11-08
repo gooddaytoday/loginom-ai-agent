@@ -8161,3 +8161,25 @@ test('filter variable picker binds cached metadata without reading the RPC varia
  assert.ok(observedOption.allowed_actions.includes('click'));
  assert.ok(observed.ui.elements.find(e=>e.tid===switchButton.attrs['data-tid']).allowed_actions.includes('click'));
 });
+
+test('Excel input0 overflow retains typed Close only for its native input1 owner',async()=>{
+ for(const mode of ['valid','wrong_icon','wrong_index','foreign_node','missing_opening']){
+  const {page,binding,crumbs,opening,preparation}=await exportInputPortOverflowFixture();
+  opening.node.FIconCls='bg-vendor-icon-exportexcelfile';
+  crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exportexcelfile';
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_index')opening.nativeIndex=0;
+  if(mode==='foreign_node')opening.node.FGuid='foreign';
+  if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const r=await page.execute({mode:'observe',prepared_node_context:binding});
+  const yes=r.output?.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});

@@ -11,7 +11,7 @@ test('missing values resolves by name despite identical labels and leaves unrequ
  assert.deepEqual(schema.map(f=>f.data_kind),['Непрерывный','Дискретный','Дискретный']);
 });
 test('missing values requires full settings and rejects unsupported methods before configuration',()=>{
- for(const mutate of [p=>delete p.ordered,p=>p.ordered=true,p=>delete p.max_nulls_percent,p=>p.max_nulls_percent=-1,p=>p.max_nulls_percent=101,p=>p.max_nulls_percent=0.5,p=>p.fields=[],p=>p.fields.push(p.fields[0]),p=>p.fields[0].method='median',p=>p.fields[0].value=0,p=>p.fields[1].value=42,p=>delete p.fields[1].value,p=>p.fields[0].field.kind='label',p=>p.extra=true]){
+ for(const mutate of [p=>delete p.ordered,p=>p.ordered=true,p=>delete p.max_nulls_percent,p=>p.max_nulls_percent=-1,p=>p.max_nulls_percent=101,p=>p.max_nulls_percent=0.5,p=>p.fields=[],p=>p.fields.push(p.fields[0]),p=>p.fields[0].method='linear',p=>p.fields[0].method='random',p=>p.fields[0].value=0,p=>p.fields[1].value=42,p=>delete p.fields[1].value,p=>p.fields[0].field.kind='label',p=>p.extra=true]){
   const p=parameters();mutate(p);assert.throws(()=>validate(p,'impute',request));
  }
  for(const value of ['', 'null', '0', '—', '"quoted"']){const p=parameters();p.fields[1].value=value;assert.doesNotThrow(()=>validate(p,'impute',request));}
@@ -38,4 +38,16 @@ test('native zero accepts numeric integer/real without a replacement value',()=>
   for(const value of [0,'0',null])assert.throws(()=>validate({...p,fields:[{...p.fields[0],value}]},'impute',request));
   for(const source of [{...schema[0],type:'string'},{...schema[0],type:'variant'},{...schema[0],type:'datetime'},{...schema[0],type:'boolean'},{...schema[0],data_kind:'unknown'}])assert.throws(()=>resolve(p,[source]),/incompatible/);
  }
+});
+test('v0.4.0 modes: median, most_probable, previous and delete follow the observed menu split',()=>{
+ const base=(ordered,fields)=>({ordered,max_nulls_percent:100,fields});
+ const stats=[{name:'I',type:'integer',data_kind:'Непрерывный'},{name:'R',type:'real',data_kind:'Непрерывный'},{name:'S',type:'string',data_kind:'Дискретный'}];
+ const ok=base(false,[{field:field('I'),method:'median'},{field:field('R'),method:'median'},{field:field('S'),method:'most_probable'}]);
+ assert.doesNotThrow(()=>validate(ok,'impute',request));assert.deepEqual(resolve(ok,stats).map(f=>f.method),['median','median','most_probable']);
+ const prev=base(true,[{field:field('R'),method:'previous'}]);assert.doesNotThrow(()=>validate(prev,'impute',request));assert.equal(resolve(prev,stats)[0].method,'previous');
+ const del=base(false,[{field:field('R'),method:'delete'}]);assert.doesNotThrow(()=>validate(del,'impute',request));assert.equal(resolve(del,stats)[0].method,'delete');
+ for(const bad of [base(false,[{field:field('R'),method:'previous'}]),base(true,[{field:field('R'),method:'delete'}]),base(true,[{field:field('R'),method:'median'}]),base(true,[{field:field('R'),method:'previous'},{field:field('I'),method:'mean'}])])assert.throws(()=>resolve(bad,stats),/ordered|incompatible/);
+ for(const method of ['median','most_probable','previous','delete'])assert.throws(()=>validate(base(method==='previous',[{field:field('R'),method,value:'0'}]),'impute',request));
+ for(const [method,type,data_kind] of [['median','string','Дискретный'],['median','real','Дискретный'],['most_probable','real','Непрерывный'],['most_probable','integer','Дискретный'],['delete','string','Дискретный'],['delete','real','Дискретный'],['previous','string','Дискретный'],['previous','datetime','Непрерывный']])
+  assert.throws(()=>resolve(base(method==='previous',[{field:field('X'),method}]),[{name:'X',type,data_kind}]),/incompatible/);
 });
