@@ -72,12 +72,14 @@ test('partial replacement validates saved rules with the effective output mode',
  assert.doesNotThrow(()=>resolve({rules:[rule('A')]},fields,[rule('B')],'replace'));
 });
 
-test('Boolean result constants preserve false and NULL and refuse Variant or boolean remaining editor',()=>{
+test('Boolean result constants preserve false and NULL and allow keep as Variant and refuse boolean remaining editor',()=>{
  const p=params(),r=p.rules[0];r.result_type='boolean';r.other={mode:'null'};
  r.pairs=[{from:value('yes'),to:value(true,'boolean')},{from:value('no'),to:value(false,'boolean')},{from:value(null),to:value(null,'boolean')}];
  assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
  for(const v of ['false',0,1])assert.throws(()=>validateReplacementValue(value(v,'boolean'),'boolean'),/Boolean/);
- r.other={mode:'keep'};assert.throws(()=>validateReplacementParameters(p,'exact',request),/Variant/);
+ r.other={mode:'keep'};assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ r.result_type='real';r.pairs=[{from:value('1.25'),to:value(1.25,'real')}];assert.throws(()=>validateReplacementParameters(p,'exact',request),/only Boolean/);r.result_type='boolean';
+ r.pairs=[{from:value('yes'),to:value(true,'boolean')}];
  r.other={mode:'value',value:value(false,'boolean')};assert.throws(()=>validateReplacementParameters(p,'exact',request),/Boolean.*null/);
 });
 test('mixed mode validates exact keys independently of ordered regex pairs',()=>{

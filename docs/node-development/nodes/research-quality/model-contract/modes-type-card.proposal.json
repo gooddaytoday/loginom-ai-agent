@@ -10,7 +10,7 @@
   "modes": [
     "profile"
   ],
-  "semantics": "LAB-1103 PROPOSAL; profile input extension not implemented or owner-approved. parameters:{}; five fresh full outputs. Add boolean/discrete, datetime/continuous and discrete numeric inputs to existing continuous numeric and discrete string support. Default ports 0/3 preserve input, 1/2 can be empty despite summary counts. Fixed summary order N,DisplayName,DataType,DataKind,Null,Out,Extr,Avg,Moda,Median. Numeric Moda is histogram-based even for discrete numeric fields. Boolean Avg is true fraction, Median NULL, Moda frequency; date summary displays serial-day numbers. Exact boolean/date Moda subtype requires bounded native preflight before acceptance; no decoder budget increase. Input variant and continuous string unobserved. Algorithm wizard and hidden MaxNullsPercent/actions UI are unavailable in 7.4.2; no hidden-setting or frozen-model apply parameters.",
+  "semantics": "parameters:{}; five fresh full outputs. Inputs: continuous or discrete integer/real, discrete string and boolean, continuous datetime. Default ports 0/3 preserve input, 1/2 can be empty despite summary counts. Fixed summary order N,DisplayName,DataType,DataKind,Null,Out,Extr,Avg,Moda,Median. Numeric Moda is histogram-based even for discrete numeric fields. Boolean Avg is true fraction, Median NULL, Moda frequency; date summary displays serial-day numbers. Input variant and continuous string are unsupported. Algorithm wizard and hidden MaxNullsPercent/actions UI are unavailable in 7.4.2; no hidden-setting or frozen-model apply parameters.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "quality-v1-internal-1",

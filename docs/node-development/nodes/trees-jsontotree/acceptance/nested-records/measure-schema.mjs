@@ -21,9 +21,9 @@ try {
  const pins={...pinned.pins,skillRevision:skill.detail.revision,loginomProfile:pinned.compatibility};
  const [base]=await loader.describeNodes(describeNodeTypes(['trees.from_json'],pins,new Map(),handlers),['auto_structure']);
  const proposal=structuredClone(base);
- proposal.semantics='Proposal: one JSON object in one table row, auto structure/root. Nested objects and object arrays in repeated records, empty containers and typed NULL. Mixed/NULL-only leaves require exact Variant readback. Always-empty arrays may be non-container Variant arrays. Preserve schema order, array boundaries and exact Int64. No manual schema, dates, forced root, sibling/nonempty scalar arrays or multiple root rows. Bounds 256 instances/depth 16/1 MiB unchanged.';
+ proposal.semantics='One JSON object in one table row, auto structure/root. Nested objects and object arrays in repeated records, empty containers and typed NULL. Mixed/NULL-only leaves require exact Variant readback. Preserve schema order, array boundaries and exact Int64. No manual schema, dates, forced root, sibling/nonempty scalar arrays or multiple root rows. Bounds 256 instances/depth 16/1 MiB unchanged.';
  proposal.parameter_schema.properties.json_field.description='Exact input string column containing one JSON object, including nested object records.';
- proposal.parameter_schema.properties.root_mode.description='Automatic root; nested object arrays proposed. One root row only.';
+ proposal.parameter_schema.properties.root_mode.description='Automatic root; nested object arrays allowed. One root row only.';
  const reference=await readFile(new URL('./skill-proposal.md',import.meta.url),'utf8');
  const section=/^<!-- mode: auto_structure -->\r?\n([\s\S]*?)^<!-- \/mode -->\r?$/m;
  proposal.guidance=[reference.replace(section,'').trim(),reference.match(section)[1].trim()].join('\n\n');

@@ -17,6 +17,14 @@ oracle, карточка проекта и expected ей не передаютс
 | 8. Пути источников | task-file-info.md | fixtures/multi-file/ | expected-absolute-path.json; expected-relative-path.json |
 | Отложено. HTTP/Basic | task-http.md | byte-identical fixtures/extended/typed.csv на контролируемом endpoint | expected-http.json — только тело, транспорт не доказан |
 
+Бюджет карточки и справки по циклам 2–8, компактный вариант справки и схемы —
+[budget-cycles.md](budget-cycles.md) (LAB-1137). В заданиях с двумя выгрузками
+имена CSV заданы явно. Сверка первой выгрузки с expected первой стадии
+(Variant on, автометка, тот же список, абсолютный путь) появится только после
+регистрации сценария: `expected_name` — финальная стадия, ключ начальной стадии —
+существующий `lgd_initial` (`run-check.py:1956-1957`). Без него run-check
+сравнивает выгрузку `index` с `outputs[index]` единственного output.
+
 Пути fixtures указаны от каталога узла. Все JSON — обычная форма существующего
 expected-outputs; временное package_path={{PACKAGE_PATH}} до регистрации заменяют
 на конкретный путь .lgp. В expected-absolute-path.json также подставляют

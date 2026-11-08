@@ -5,11 +5,11 @@ Component ID `component.research.CorrAnalysis`, native engine `TBGCorrAnalysisEn
 
 ## Текущий срез v0.4.0
 
-Зарегистрирован `research.corr_analysis` / `pearson`. Два набора числовых полей; попарное исключение NULL; повторный расчёт текущего входа; пять полей порта 0.
+Зарегистрирован `research.corr_analysis` / `pearson`, `spearman`, `kendall` (#867). Два набора числовых полей; попарное исключение NULL; повторный расчёт текущего входа; пять полей порта 0 (Pirson, Spearman или TauBKendall).
 
-Ограничения: Только Pearson; нулевая дисперсия даёт NULL; пустой вход не принят.
+Ограничения: ровно один коэффициент; текстовые/дискретные поля и взаимная корреляция не поддержаны; нулевая дисперсия даёт NULL; пустой вход не принят.
 
-Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [corr-analysis-node.mjs](../../../../packages/loginom-runtime/client/lib/corr-analysis-node.mjs):1–14; [corr-analysis-parameters.mjs](../../../../packages/loginom-runtime/client/lib/corr-analysis-parameters.mjs):1–19; [research.corr_analysis.md](../../../../packages/product/skills/loginom-automation/references/nodes/research.corr_analysis.md):1–20. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+Источник: `origin/v040` после #867 (валидатор pearson/spearman/kendall; прежняя ревизия `94551fa4` поддерживала только pearson); [corr-analysis-node.mjs](../../../../packages/loginom-runtime/client/lib/corr-analysis-node.mjs):1–14; [corr-analysis-parameters.mjs](../../../../packages/loginom-runtime/client/lib/corr-analysis-parameters.mjs):1–19; [research.corr_analysis.md](../../../../packages/product/skills/loginom-automation/references/nodes/research.corr_analysis.md):1–20. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений
 

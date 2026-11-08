@@ -1,6 +1,7 @@
 # Дубликаты и противоречия (`research.duplicates`)
 
 <!-- mode: mark -->
+Перед настройкой прочитай общие правила [навыка](../../SKILL.md) и запроси `parameter_schema`.
 
 Используй `mode:"mark"` и полные списки `input_fields`/`output_fields`.
 Ключи и сравниваемые значения допускают integer/string/boolean/real/datetime.

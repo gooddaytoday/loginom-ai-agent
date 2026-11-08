@@ -12,5 +12,6 @@ RowID и Keep в сравнении не участвуют. Не округля
 Порядок полей: Duplicate, DuplicateGroup, Contradiction, ContradictionGroup,
 RowID, B, R, D, Value, Keep.
 Выполни и прочитай полную таблицу, выгрузи результат в typed-keys-result.csv
-с явным маркером пропуска NULL и скачай его.
+с явным маркером пропуска NULL, D в формате yyyy-mm-dd hh:nn:ss.zzz
+без смены часового пояса, и скачай его.
 Сохрани пакет в {{PACKAGE_PATH}}.

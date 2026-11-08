@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/node-port-output.mjs';
+import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
+import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
@@ -500,4 +502,48 @@ test('shared ordinary output refuses reordered fields and cells even when every 
  f.output.sample=f.output.sample.map(row=>row.toReversed());
  await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),
   /Output field order differs from the configured output/);
+});
+
+test('typedVariants read failure names its real cause while ordinary reads keep the generic reason',async()=>{
+ const rows=[['x']],typed=fixture({rows,types:[6]}),plain=fixture({rows,types:[6]});
+ const bad=await typed.run({port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true});
+ assert.equal(bad.verified,false);assert.match(bad.reason,/^read_failed: \w+: .+/);assert.ok(bad.reason.length<=480);
+ const ordinary=await plain.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
+ assert.equal(ordinary.verified,true);
+});
+test('typedVariants refusal lists every unreadable Variant cell with its ordinary value kind',async()=>{
+ const rows=[['a'],[null],['c']],f=fixture({rows,types:[6]});
+ const variant={read:'async(source,options,decode)=>({pending:0,unsettled:false,read:async row=>{if(row===1)decode([0],60);return {tag:8};}})',
+  decode:'()=>{throw Error("unknown/interface tag 0 frame 60");}',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,false);assert.equal(result.cleanup_complete,true);
+ assert.match(result.reason,/variant_cells r1c0 null unknown\/interface tag 0 frame 60$/);
+});
+
+function emptyVariantCapability(){
+ // Real decoder and adapter; only the transport is faked: row 1 is a VT_EMPTY frame, the others Boolean true.
+ return {read:'async(source,options,decode)=>({pending:0,unsettled:false,read:async(row,column)=>{const payload=Array(48).fill(0);if(row===1){payload[0]=0;payload.fill(7,2,10);}else{payload[0]=11;payload[2]=1;}const d=decode(payload,60);return {row,column,tag:d.tag,payload:payload.slice(0,d.consumed_bytes),frame_size:60};}})',
+  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}};
+}
+const emptyRequest=extra=>({port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true,...extra});
+const readEmpty=(f,extra)=>readNodePortOutput(f.page,f.binding,emptyRequest(extra),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,emptyVariantCapability());
+test('Replacement option reads VT_EMPTY as NULL; other typedVariants paths still refuse it',async()=>{
+ const f=fixture({rows:[['a'],[null],['c']],types:[6]});
+ const refused=await readEmpty(f);
+ assert.equal(refused.verified,false);assert.match(refused.reason,/variant_cells r1c0 null unknown\/interface tag 0/);
+ const read=await readEmpty(fixture({rows:[['a'],[null],['c']],types:[6]}),{variantEmptyIsNull:true});
+ assert.equal(read.verified,true,JSON.stringify(read));
+ assert.deepEqual(read.output.sample.map(r=>[r[0].cell_type,r[0].value]),[['boolean',true],['null',null],['boolean',true]]);
+ assert.equal(read.output.sample[1][0].is_null,true);assert.equal(read.output.sample[1][0].precision,'exact_native');
+ assert.throws(()=>makeNodePortOutputCode(f.binding,emptyRequest({typedVariants:false,variantEmptyIsNull:true}),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000}),/Exact bounded/);
+});
+test('typedVariants guard or transport failure stops at once with its Variant read cause and no diagnostic RPC',async()=>{
+ for(const [message,unsettled] of [['Variant read: session transport not live',false],['Variant read: deadline; native cancellation unproven',false],['socket reset',true],['socket reset',false]]){
+  const f=fixture({rows:[['a'],['b'],['c']],types:[6]});
+  const variant={read:`async()=>{const r={pending:0,unsettled:false,read:async row=>{if(row===1){r.unsettled=${unsettled};throw Error(${JSON.stringify(message)});}return {tag:8};}};return r;}`,
+   decode:'()=>({})',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+  const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+  assert.equal(result.verified,false);assert.deepEqual(f.rpcCalls,[],message);
+  if(message.startsWith('Variant read:'))assert.equal(result.reason,message);else assert.doesNotMatch(result.reason,/variant_cells/);
+ }
 });

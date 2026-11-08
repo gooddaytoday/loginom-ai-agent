@@ -8,7 +8,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Exact observed Integer, Real or DateTime input name."
+          "description": "Exact observed Integer, Real or DateTime input name; only this field is binned."
         },
         "method": {
           "type": "string",
@@ -19,7 +19,7 @@
             "sd",
             "manual"
           ],
-          "description": "Count/width, frequency by count or sum, population SD, or explicit materialized intervals."
+          "description": "Count/width, frequency by row count, population SD, or explicit materialized intervals."
         },
         "size": {
           "type": "number",
@@ -42,7 +42,7 @@
           },
           "minItems": 2,
           "maxItems": 2,
-          "description": "Optional explicit limits; omit both for native automatic limits. Values must match selected field type."
+          "description": "Optional explicit [lower,upper], lower<upper; omit both for native automatic limits. Values must match selected field type."
         },
         "sd_coefficient": {
           "type": "integer",
@@ -53,45 +53,14 @@
           ],
           "description": "SD bands around mean; 2*k+1 classes including open tails."
         },
-        "rounding": {
-          "type": "boolean",
-          "description": "Use native boundary rounding; preserve original source values."
-        },
-        "open_ends": {
-          "type": "object",
-          "properties": {
-            "lower": {
-              "type": "boolean",
-              "description": "Extend first interval to minus infinity."
-            },
-            "upper": {
-              "type": "boolean",
-              "description": "Extend last interval to plus infinity."
-            }
-          },
-          "required": [
-            "lower",
-            "upper"
-          ],
-          "additionalProperties": false
-        },
         "ties": {
           "type": "string",
           "enum": [
             "next",
-            "current",
-            "unchanged",
-            "equal_tiles"
+            "current"
           ],
-          "description": "Native deterministic tie policy. Random is excluded pending an approved acceptance criterion."
-        },
-        "measure": {
-          "type": "string",
-          "enum": [
-            "count",
-            "sum"
-          ],
-          "description": "Frequency tiles by row counts or sums of the selected numeric field."
+          "default": "next",
+          "description": "Frequency ties: next (default) moves equal values to the next bin; current keeps them in the current bin. Other tie policies are not admitted."
         },
         "labels": {
           "type": "array",
@@ -167,7 +136,7 @@
         "method"
       ],
       "additionalProperties": false,
-      "description": "Proposal: one numeric/DateTime field; train generated bins, then edit materialized intervals/labels without a second Train. Existing apply preserves them.",
+      "description": "One numeric/DateTime field; train generated bins, then edit materialized intervals/labels without a second Train. Existing apply preserves them. No rounding or open-end options; preserve other fields.",
       "allOf": [
         {
           "if": {
