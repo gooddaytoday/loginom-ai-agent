@@ -99,6 +99,7 @@ Dock сохранит остальные поля. mappings.fields — полн�
 Загрузи файлы данных из input_artifacts через loginom_dock_artifact_deliver, сохрани подтверждённую identity
 источника для импорта. Каждый node.apply сам проверяет настройки и выполнение.
 Для loginom_dock_node_resume передавай только исходный operation_id; запрос хранится в Dock.
+loginom_dock_node_resume и abandon_operation вызывай, только если loginom_dock_operation_inspect назвал их в recovery_options или next_steps: отказ recover (request_rejected) не меняет операцию. Если recovery_options пуст, next_steps не называет loginom_dock_node_resume или loginom_dock_browser_recovery и нет user_action, сообщи operation_id, фазу и причину и остановись ([правило](browser.md)).
 Промежуточные выходы читай лишь для следующего решения или диагностики.
 Если успешный apply/wait уже вернул нужные строки и схему с sample_complete=true,
 используй этот результат; не вызывай node_read повторно без изменения источника.

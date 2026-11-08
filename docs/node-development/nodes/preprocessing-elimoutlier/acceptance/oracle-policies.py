@@ -8,6 +8,7 @@ for the fixture's outlier multiplier 1 (also for extremes). General multipliers
 and exact clipping precision still require acceptance. No saved-model apply
 claim: --apply produces the desired frozen-fit contrast, not observed behavior.
 No Loginom, runtime, browser or actual-output inputs.
+--check regenerates the committed expected files in memory and fails on drift.
 """
 import argparse
 import csv
@@ -18,10 +19,15 @@ from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+COMMITTED = [(f"expected-{policy.replace('_', '-')}.json", policy, False, 'policies.csv')
+             for policy in ('delete', 'mean', 'median', 'most_probable', 'constant', 'limit')]
+COMMITTED += [('expected-apply.json', 'constant', True, 'policies.csv')]
+COMMITTED += [(f"expected-replacement-{policy.replace('_', '-')}.json", policy, False, 'replacement-discriminator.csv')
+              for policy in ('mean', 'median', 'most_probable', 'limit')]
 
 
 def read(name):
-    with (ROOT / 'fixtures' / name).open() as stream:
+    with (ROOT / 'fixtures' / name).open(newline='', encoding='utf-8') as stream:
         return [dict(RowID=int(row['RowID']), X=None if row['X'] == '?' else Fraction(row['X']),
                      Note=row['Note']) for row in csv.DictReader(stream)]
 
@@ -71,11 +77,20 @@ def expected(policy, apply=False, fixture='policies.csv', extreme_constant=-7):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('policy', choices=['delete', 'mean', 'median', 'most_probable', 'constant', 'limit'])
+    parser.add_argument('policy', nargs='?', choices=['delete', 'mean', 'median', 'most_probable', 'constant', 'limit'])
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--fixture', choices=['policies.csv', 'replacement-discriminator.csv'], default='policies.csv')
     parser.add_argument('--extreme-constant', type=int, default=-7)
+    parser.add_argument('--check', action='store_true', help='compare committed expected files')
     args = parser.parse_args()
+    if args.check:
+        for name, policy, apply, fixture in COMMITTED:
+            text = json.dumps(expected(policy, apply, fixture), ensure_ascii=False, indent=2) + '\n'
+            assert (Path(__file__).parent / name).read_text(encoding='utf-8') == text, name
+        print(f'OK: {len(COMMITTED)} expected files match')
+        raise SystemExit
+    if args.policy is None:
+        parser.error('policy is required without --check')
     result = expected(args.policy, args.apply, args.fixture, args.extreme_constant)
     assert result['outputs'][2]['rows'][0]['RowID'] == (3 if args.apply else 7 if args.fixture == 'policies.csv' else 8)
     assert len(result['outputs'][1]['rows']) == (1 if args.apply else 0)

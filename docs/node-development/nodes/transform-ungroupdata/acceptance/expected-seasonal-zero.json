@@ -1,4 +1,6 @@
 {
+  "claim": "наблюдение, не заявляется",
+  "observation": "OutputVT=6 «Исключено», OutputValue=OutputTrend=0 и UngroupQuality=1 при нулевой опоре",
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {

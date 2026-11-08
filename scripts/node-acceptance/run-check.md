@@ -728,7 +728,6 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
-
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
@@ -747,3 +746,21 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 Задание task-datetime-manual.md; неизменный modes/expected.json проверяет
 146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
 Модель получает только task и modes.csv; oracle остаётся в оснастке.
+
+`replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
+на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
+прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
+typed matcher native reader, порядок, CSV/Save/cold/cleanup.
+
+`clustering-apply`: обучение k=3/none/seed 42 на train.csv, замена источника
+того же импорта на holdout.csv, Activate сохранённого узла без Teach.
+Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
+2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
+и два исходных CSV передаются модели; oracle/expected остаются в оснастке.
+
+`variables-totable-switch` (LAB-1095, «Переменные в таблицу», цикл 1): модель получает `task-switch-run.md`
+и `modes.json` (initial/changed; метки равны именам), сама собирает источник и преобразователь columns,
+затем переключает тот же узел columns→rows, правит источник, повторяет выполнение и возвращает columns.
+Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
+аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
+свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.

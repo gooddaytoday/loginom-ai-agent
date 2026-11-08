@@ -3,6 +3,7 @@
 
 Reads authored CSV fixtures, never Loginom, a runtime module or actual output.
 All fence comparisons use exact rational arithmetic, including SD squared.
+--check regenerates the committed expected files in memory and fails on drift.
 """
 import argparse
 import csv
@@ -13,6 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 QUARTILE_CANDIDATES = ("type1", "type2", "type4", "type7", "tukey", "upper_rank")
+COMMITTED = (("expected.json", "sd", None), ("iqr/expected.json", "iqr", None),
+             ("expected-quartile-boundaries.json", "quartile-boundaries", "upper_rank"))
 
 
 def quantile(values, probability, convention):
@@ -123,5 +126,12 @@ if __name__ == "__main__":
     parser.add_argument("--quartile-convention", choices=QUARTILE_CANDIDATES,
                         help="Diagnostic hypothesis only; default requires agreement of all remaining candidates")
     parser.add_argument("--package-path", default="{{PACKAGE_PATH}}")
+    parser.add_argument("--check", action="store_true", help="compare committed expected files")
     args = parser.parse_args()
+    if args.check:
+        for name, case, convention in COMMITTED:
+            text = json.dumps(expected(case, "{{PACKAGE_PATH}}", convention), ensure_ascii=False, indent=2) + "\n"
+            assert (Path(__file__).parent / name).read_text(encoding="utf-8") == text, name
+        print(f"OK: {len(COMMITTED)} expected files match")
+        raise SystemExit
     print(json.dumps(expected(args.case, args.package_path, args.quartile_convention), ensure_ascii=False, indent=2))
