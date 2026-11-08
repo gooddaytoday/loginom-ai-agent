@@ -537,3 +537,13 @@ test('Replacement option reads VT_EMPTY as NULL; other typedVariants paths still
  assert.equal(read.output.sample[1][0].is_null,true);assert.equal(read.output.sample[1][0].precision,'exact_native');
  assert.throws(()=>makeNodePortOutputCode(f.binding,emptyRequest({typedVariants:false,variantEmptyIsNull:true}),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000}),/Exact bounded/);
 });
+test('typedVariants guard or transport failure stops at once with its Variant read cause and no diagnostic RPC',async()=>{
+ for(const [message,unsettled] of [['Variant read: session transport not live',false],['Variant read: deadline; native cancellation unproven',false],['socket reset',true]]){
+  const f=fixture({rows:[['a'],['b'],['c']],types:[6]});
+  const variant={read:`async()=>{const r={pending:0,unsettled:false,read:async row=>{if(row===1){r.unsettled=${unsettled};throw Error(${JSON.stringify(message)});}return {tag:8};}};return r;}`,
+   decode:'()=>({})',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+  const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+  assert.equal(result.verified,false);assert.deepEqual(f.rpcCalls,[],message);
+  if(message.startsWith('Variant read:'))assert.equal(result.reason,message);else assert.doesNotMatch(result.reason,/variant_cells/);
+ }
+});
