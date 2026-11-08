@@ -21,7 +21,7 @@
 
 Во всех сценариях два входных CSV: totals и support из `oracle-seasonal.py:CASES`;
 выгрузки названы в task: `seasonal-details.csv` — порт 0, `seasonal-quality.csv` — порт 1
-(порядок `outputs` в expected), даты экспорта — `yyyy-mm-dd hh:nn:ss`, NULL входа — `?`;
+(порядок `outputs` в expected), даты экспорта — `yyyy-mm-dd hh:mm:ss`, NULL входа — `?`;
 пустые файлы импортируются с явно заданной схемой, без определения типов
 по отсутствующим строкам. Два экспорта, новый чат/профиль/пакет, стандартные
 CSV/Save/cold/cleanup, 2/3 и независимые 2/3 на одном SHA. При пустых входах
