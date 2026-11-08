@@ -50,7 +50,7 @@ export function verifyGroupingInlineSync(configuration,before,after,missing){
 }
 // Both grouping and sorting expose this same conditional native output page
 // after their input-derived schema changes. Each supplies its source contract.
-export async function configureDerivedInlineMapping(channel,configuration,validateSources,verifySync=verifyCalculatorInlineSync,{sourceOf=f=>f.source}={}){
+export async function configureDerivedInlineMapping(channel,configuration,validateSources,verifySync=verifyCalculatorInlineSync,{sourceOf=f=>f.source,nextStage='done'}={}){
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true
   &&s.node_mapping.mapping_wizard==='DerivedDataSourceMappingEngineOutputPortWizard';
  let state=await channel.observe({condition:'grouping conditional output inventory',readMappings:true,ready});
@@ -94,6 +94,6 @@ export async function configureDerivedInlineMapping(channel,configuration,valida
  const after=state.node_mapping;
  need(after.target_fields.length===after.source_fields.length,'Incomplete grouping conditional output');
  await channel.perform({condition:'finish grouping conditional mapping',initialObservation:state,ready,identity:()=>after.node_context,
-  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Grouping conditional Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'done'};}});
+  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Grouping conditional Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:nextStage};}});
  return {verified:true,before,after,removed,added_sources:missing.map(f=>f.name)};
 }

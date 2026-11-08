@@ -100,7 +100,12 @@ export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
   output_schema_changed:Math.min(features.length,old.output_cap?old.values.pedNOutFactorsMax:features.length)!==Math.min(features.length,output_cap?output_factors:features.length)};
  await next('factor_analysis',['output_mapping','done']);
  const destination=await channel.observe({condition:'PCA validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
- if(destination.wizard.stage==='output_mapping')await configureDerivedInlineMapping(channel,configuration,factorAnalysisInlineSources);
+ if(destination.wizard.stage==='output_mapping'){
+  await configureDerivedInlineMapping(channel,configuration,factorAnalysisInlineSources,undefined,{nextStage:'binning_ranges_mapping'});
+  // The second native derived-output card uses the shared historical stage
+  // name. Its complete loadings layout is reconciled through output port 1.
+  await next('binning_ranges_mapping','done');
+ }
  const done=await channel.observe({condition:'PCA accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...configuration,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

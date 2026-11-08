@@ -40,7 +40,7 @@ function fixture(initial={}){
   node_factor_analysis:stage==='input_mapping'?{verified:true,inventory_complete:true,node_context:node,fields}:{verified:true,kind:'parameters',...structuredClone(native)}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform(task){const s=state();assert.equal(task.ready(s),true);const a=task.resolve(s);actions.push(a);
   if(a.verb==='wizard_step'){
-   const destination=stage==='factor_analysis'&&initial.inline_page?'output_mapping':Array.isArray(a.expected_stage)?'done':a.expected_stage;
+   const destination=stage==='factor_analysis'&&initial.inline_page?'output_mapping':stage==='output_mapping'&&initial.inline_page?'binning_ranges_mapping':Array.isArray(a.expected_stage)?'done':a.expected_stage;
    assert.ok(Array.isArray(a.expected_stage)?a.expected_stage.includes(destination):a.expected_stage===destination,'WIZARD_STEP_NOT_CONFIRMED: native entered '+destination);
    stage=destination;
   }
@@ -83,7 +83,7 @@ test('cap accepts the native conditional output page before reaching Done',async
  const f=fixture({inline_page:true});
  const result=await configureFactorAnalysis(f.channel,{factor_analysis:{output_factors:1}},{inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}});
  assert.equal(result.configuration.output_cap,true);
- assert.deepEqual(f.actions.filter(a=>a.verb==='wizard_step').map(a=>a.expected_stage),['factor_analysis',['output_mapping','done'],'done']);
+ assert.deepEqual(f.actions.filter(a=>a.verb==='wizard_step').map(a=>a.expected_stage),['factor_analysis',['output_mapping','done'],'binning_ranges_mapping','done']);
 });
 
 test('conditional PCA transition is admitted only for its observed wizard stage',async()=>{
