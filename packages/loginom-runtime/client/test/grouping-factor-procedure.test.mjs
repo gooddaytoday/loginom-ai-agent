@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureGrouping} from '../lib/grouping-procedure.mjs';
+import {validateUiAction} from '../lib/workspace-ui.mjs';
 
 function fixture(fn,bit){
  const concat={separator:',',wrapper:'',unique:false,sort:false,direction:0};
@@ -20,7 +21,7 @@ function fixture(fn,bit){
    {ref:'unique',tid:'W;FactorEditDialog;cntCheckboxes;fs;fc;chkConcatUniqueOnly;DisplayEl',check_state:{checked:editor?.concat.unique},allowed_actions:['set_checked']},
    {ref:'apply',tid:'W;FactorEditDialog;btnApply',allowed_actions:['click']}]}});
  const channel={async observe(o){const s=state();assert.ok(o.ready(s),o.condition);return s;},async perform(o){
-  const s=state();assert.ok(o.ready(s),o.condition);const action=o.resolve(s);actions.push(action);
+  const s=state();assert.ok(o.ready(s),o.condition);const action=o.resolve(s);validateUiAction({...action,ref:'ui-fixture'});actions.push(action);
   if(action.verb==='click'&&['key','amount'].includes(action.ref))native.selected_records=[action.ref];
   else if(action.verb==='double_click')editor={mask:input_fields[1].functions,concat:structuredClone(input_fields[1].concat),index:0};
   else if(action.verb==='fill')editor.concat[action.ref]=action.text;
