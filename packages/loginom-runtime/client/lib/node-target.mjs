@@ -388,8 +388,8 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       graph=await change('connect',{edge},(before,after)=>(after.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge))
         &&unchangedExcept(before,normalizeVariablesToTableLinkGraph(before,after,edge),[],[edgeKey(edge)]));
     }
-    // Its first native variable link derives the default caption. Preserve an
-    // explicitly requested label after that owned transition, without relinking.
+    // Native variable links derive these default captions. Preserve an explicitly
+    // requested label after the owned transitions, without relinking.
     if(request.target.kind==='new'&&['variables.to_table','variables.column_union'].includes(request.target.type)&&request.target.label!==undefined
       &&node(graph,state.targetId).label!==request.target.label){
       graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>

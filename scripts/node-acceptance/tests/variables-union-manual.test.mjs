@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import {auditVariablesUnionManual,auditVariablesUnionRefusal} from '../variables-union-manual.mjs';
 const load=phase=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-manual-'+phase+'-run.json',import.meta.url)));
 const initial=load('initial'),updated=load('updated');
+test('stock refusal validator admits the two Variables Calculator sources only for the union refusal case',()=>{
+ const r=spawnSync('python3',['-c',`import ast, importlib.util
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+tree=ast.parse(open('scripts/node-acceptance/run-check.py').read())
+check=next(n for n in ast.walk(tree) if isinstance(n,ast.Assert) and isinstance(n.msg,ast.Constant) and n.msg.value=='INVALID_REFUSAL_ORACLE')
+expr=compile(ast.Expression(check.test),'refusal validator','eval')
+spec=m.scenario('variables-union-type-refusal');expected=m.expected_for(spec,'/worker/refusal.lgp');refusal=expected['refusal'];rejection=None;execution_error=None;lgd_corrupt=False
+assert eval(expr)
+spec={};assert not eval(expr)
+spec={'variables_union_refusal':True};expected['nodes'].append({'type':'variables.column_union'});assert not eval(expr)
+`],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
+ assert.equal(r.status,0,r.stderr);
+});
 function history(){
  const node={document_id:'d',workflow_id:'w',node_id:'u'},inputs=[0,1].map(input=>({kind:'variables',input,output:0,source:{...node,node_id:'s'+input}}));
  const fields=initial.variable_inventory.outputs[0].variables.map((v,i)=>({input:1-i,source:'amount',name:v.name,label:v.label,type:v.type}));

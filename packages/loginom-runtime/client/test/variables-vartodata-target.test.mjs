@@ -34,9 +34,12 @@ test('a user label and an existing connection do not acquire automatic-label per
 });
 for(const type of ['variables.to_table','variables.column_union'])for(const mode of ['owned','foreign','wrong-guid','other-type'])test('serialized link primitive handles '+type+' caption: '+mode,async()=>{
  const f=fixture(),page=linkPage();page.nodes=[];
- if(type==='variables.column_union'){f.before.nodes[1].type=type;f.before.nodes[1].label='Соединение (переменные)';f.after.nodes[1].type=type;f.after.nodes[1].label='amount, empty';}
+ if(type==='variables.column_union'){
+  const target=f.before.nodes[1];Object.assign(target,{type,label:'Соединение (переменные)',outputs:[],variable_inputs:[0,1].map(port=>({kind:'variables',port,native_index:port,port_guid:port?'other':'target-guid'})),variable_outputs:[{kind:'variables',port:0,native_index:0,port_guid:'out'}]});
+  f.after.nodes[1]={...structuredClone(target),label:'amount, empty',dom_epoch:4};
+ }
  const defaultTid=type==='variables.column_union'?'Соединение_(переменные)':'Переменные_в_таблицу';
- page.addNode('Source',104,104,['Output_Var-0']);page.addNode(defaultTid,400,104,['Input_Var-0','Output_Data-0']);
+ page.addNode('Source',104,104,['Output_Var-0']);page.addNode(defaultTid,400,104,type==='variables.column_union'?['Input_Var-0','Input_Var-1','Output_Var-0']:['Input_Var-0','Output_Data-0']);
  f.before.workflow_ref={tab_tid:page.tabTid,prefix:page.prefix,workflow_id:'wf'};
  f.after.workflow_ref=structuredClone(f.before.workflow_ref);
  const renamed=type==='variables.column_union'?'amount_empty':'В_столбцы:_Количество_Флаг_(+6)';
@@ -79,4 +82,28 @@ for(const label of [undefined,'Переменные в таблицу'])test('ne
  const result=await prepareNodeTarget({request,operation:{id:'var',deadline:Date.now()+10000},adapter,record:async e=>e});
  assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.node.label,label??f.after.nodes[1].label);
  assert.deepEqual(calls,['create','connect',...(label?['rename']:[])]);
+});
+for(const foreign of [false,true])test('serialized union second variable link preserves the first edge through native caption replacement, foreign='+foreign,async()=>{
+ const f=fixture(),page=linkPage(),old='amount_empty',next='amount_empty_amount_enabled';page.nodes=[];
+ page.addNode('Source',104,104,['Output_Var-0']);page.addNode(old,400,104,['Input_Var-0','Input_Var-1','Output_Var-0']);page.addNode('Left',104,300,['Output_Var-0']);
+ const target=f.before.nodes[1];target.type='variables.column_union';target.label='amount, empty';target.outputs=[];
+ target.variable_inputs=[0,1].map(port=>({kind:'variables',port,native_index:port,port_guid:'input-'+port}));
+ target.variable_outputs=[{kind:'variables',port:0,native_index:0,port_guid:'out'}];
+ f.before.nodes.push({...structuredClone(f.before.nodes[0]),ref:{document_id:'doc',workflow_id:'wf',node_id:'left'},label:'Left'});
+ const first={source:'left',output:0,target:'t',input:0,kind:'variables',source_port_guid:'source-guid',target_port_guid:'input-0'};
+ f.before.variable_links=[first];f.before.workflow_ref={tab_tid:page.tabTid,prefix:page.prefix,workflow_id:'wf'};
+ f.after=structuredClone(f.before);f.after.nodes[1].label='amount, empty, amount, enabled';
+ f.after.variable_links.push({source:'s',output:0,target:'t',input:1,kind:'variables',source_port_guid:'source-guid',target_port_guid:'input-1'});
+ if(foreign)f.after.nodes[2].label='changed';
+ page.edges=['Left|Output_Var-0|'+old+'|Input_Var-0'];
+ page.onDrop=()=>{page.nodes[1].label=next;page.edges=['Left|Output_Var-0|'+next+'|Input_Var-0','Source|Output_Var-0|'+next+'|Input_Var-1'];};
+ page.nativeGraph=probe=>{const g=structuredClone(page.drops?f.after:f.before);if(probe?.read_bindings)g.native_bindings=[{node_id:'s',label:'Source'},{node_id:'t',label:page.drops?next:old},{node_id:'left',label:'Left'}];return g;};
+ const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('Node target link context changed'))return;
+  if(fn.toString().includes('Link validation workflow changed')){const b=page.elements().find(e=>e.port==='Input_Var-1').box;return {state:'ready',target_ready:true,point:{x:b.x+b.width/2,y:b.y+b.height/2}};}
+  return evaluate(fn,arg);
+ };
+ const result=await run(page,'link.create',{source_node:page.ref('Source'),target_node:page.ref(old),source_port:{kind:'var',index:0},target_port:{kind:'var',index:1}},
+  {node_target_graph_reader:async(page,probe)=>page.nativeGraph(probe),node_target_context:{request:{document_id:'doc',workflow_ref:f.before.workflow_ref,target:{kind:'new',type:'variables.column_union'}},graph_baseline:f.before,graph_probe:{},dom_epoch:1,nodes:[{id:'s',tid:'Source',dom_epoch:2},{id:'t',tid:old,dom_epoch:3}]}});
+ assert.equal(result.status,foreign?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result));assert.equal(page.drops,1);assert.equal(page.edges.length,2);
 });

@@ -1407,7 +1407,9 @@ class Runner:
                     and isinstance(refusal['text'], str) and refusal['text'].strip()
                     and expected['outputs'] == [] and not rejection and not execution_error
                     and not spec.get('upload_only') and not lgd_corrupt
-                    and all(n['type'].startswith('imports.') for n in expected['nodes'])), 'INVALID_REFUSAL_ORACLE'
+                    and (all(n['type'].startswith('imports.') for n in expected['nodes'])
+                         or spec.get('variables_union_refusal') and len(expected['nodes']) == 2
+                         and all(n['type'] == 'variables.calculator' for n in expected['nodes']))), 'INVALID_REFUSAL_ORACLE'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -1745,7 +1747,7 @@ class Runner:
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
                 src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union'] else 'snapshot')})
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union', 'variables-union-manual'] else 'snapshot')})
             return session, expected, None, None
         if refusal:
             if spec.get('variables_union_refusal'):

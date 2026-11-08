@@ -41,20 +41,20 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
-for(const uncertain of [false,true])test('variable union first native caption change never repeats a connection, uncertain='+uncertain,async()=>{
+for(const uncertain of [-1,0,1])test('variable union first native caption change never repeats a connection, uncertain='+uncertain,async()=>{
  const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:0,port_guid:'source-var'}];
  f.graph.nodes.push({...structuredClone(f.graph.nodes[0]),ref:ref('right'),label:'Right'});
  f.graph.nodes.push({ref:ref('union'),type:'variables.column_union',label:'Соединение (переменные)',inputs:[],outputs:[],
   variable_inputs:[0,1].map(port=>({kind:'variables',port,port_guid:'input-'+port})),variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]});
  f.adapter.mutate=async effect=>{f.calls.push(effect.kind);const edge=effect.parameters.edge;
   f.graph.variable_links??=[];f.graph.variable_links.push({...edge,source_port_guid:'source-var',target_port_guid:'input-'+edge.input});
-  if(edge.input===0)f.graph.nodes[2].label='amount, empty';
-  return {status:uncertain?'AMBIGUOUS':'SUCCEEDED',cleanup_complete:!uncertain,effect_possible:true};
+  f.graph.nodes[2].label=edge.input===0?'amount, empty':'amount, empty, amount, enabled';
+  return {status:edge.input===uncertain?'AMBIGUOUS':'SUCCEEDED',cleanup_complete:edge.input!==uncertain,effect_possible:true};
  };
  const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'variables.column_union',ref:ref('union')},inputs:[],
   variable_inputs:['source','right'].map((id,input)=>({kind:'variables',source:ref(id),output:0,input}))};
- const result=await f.run(r);assert.equal(result.status,uncertain?'AMBIGUOUS':'SUCCEEDED',result.error);
- if(uncertain){await f.run(r);assert.deepEqual(f.calls,['connect']);assert.equal(f.graph.variable_links.length,1);}
+ const result=await f.run(r);assert.equal(result.status,uncertain>=0?'AMBIGUOUS':'SUCCEEDED',result.error);
+ if(uncertain>=0){await f.run(r);assert.deepEqual(f.calls,Array(uncertain+1).fill('connect'));assert.equal(f.graph.variable_links.length,uncertain+1);}
  else {assert.deepEqual(f.calls,['connect','connect']);assert.equal(f.graph.variable_links.length,2);}
 });
 for(const replacement of ['source','output'])test('existing text export refuses '+replacement+' replacement without advising a second export',async()=>{

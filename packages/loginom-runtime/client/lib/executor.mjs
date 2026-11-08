@@ -1228,7 +1228,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           const exact=graphPrefix+sourceNode.node_label+'|Output_Var-'+task.parameters.source_port.index+'|'+label+'|Input_Var-'+targetPort.index;
           const links=await graphLinks(prefix),actualPorts=await ports(prefix,label),oldPrefix=graphPrefix+original+';',newPrefix=graphPrefix+label+';';
           if(!before.ports.every(p=>p.startsWith(oldPrefix))||links.filter(l=>l===exact).length!==1
-            ||!same(links.filter(l=>l!==exact),before.links)
+            ||!same(sorted(links.filter(l=>l!==exact)),sorted(before.links.map(l=>l.replace('|'+original+'|','|'+label+'|'))))
             ||!same(sorted(actualPorts),sorted(before.ports.map(p=>newPrefix+p.slice(oldPrefix.length)))))throw Error('VarToData caption DOM differs from its native graph');
           bound.nodes=bound.nodes.map(n=>{const b=native.native_bindings.filter(b=>b.node_id===n.id),v=native.nodes.filter(v=>v.ref.node_id===n.id);if(b.length!==1||v.length!==1)throw Error('VarToData link endpoint disappeared');return {id:n.id,tid:b[0].label,dom_epoch:v[0].dom_epoch};});
           phase='verified';record('variables_to_table_link_caption_verified',{node_id:edge.target,before:target[0].label,after:native.nodes.find(n=>n.ref.node_id===edge.target).label});
