@@ -499,7 +499,8 @@ def scenario(name, case_root=None, *, cases=None):
         src = root / 'acceptance/v040'
         return dict(source=src, prompt=src / ('task-test-priority.md' if name.endswith('test-priority') else 'task-uniform.md'),
                     data=root / 'fixtures/v040', input_files=['rows.csv'], base=None, sampling_uniform=True,
-                    sampling_priority=name.endswith('test-priority'))
+                    sampling_priority=name.endswith('test-priority'),
+                    export_count=6 if name.endswith('test-priority') else 2 if name.startswith('sampling') else 3)
     if name in ['sampling-random', 'sampling-stratified', 'sampling-biased', 'partition-random', 'partition-stratified', 'partition-biased']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         mode = name.rsplit('-', 1)[1]
@@ -1379,7 +1380,9 @@ class Runner:
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
-            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('sampling_uniform'):
+                prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
