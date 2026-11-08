@@ -339,10 +339,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
                     input_files=inputs, export_count=count)
-    if name == 'corr-ranks':
+    if name in ['corr-ranks', 'corr-discrete']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
-        return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,
-                    input_files=['ranks.csv'], corr_ranks=True)
+        return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,
+                    input_files=['ranks.csv'], corr_ranks='discrete' if name=='corr-discrete' else True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -684,7 +684,7 @@ def expected_for(case, package, cold=False):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
                     outputs=cases[case['grouping_mode']]['stages'])
     if case.get('corr_ranks'):
-        expected = read(src / 'expected.json')['cases']['kendall']
+        expected = read(src / 'expected.json')['cases']['discrete_kendall' if case['corr_ranks']=='discrete' else 'kendall']
         expected['package_path'] = package
         return expected
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
@@ -1561,7 +1561,7 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'corr-ranks-events.json', evidence)
             self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
-                src / 'expected.json', folder / 'corr-ranks-events.json'], folder, timeout=60)
+                src / 'expected.json', folder / 'corr-ranks-events.json', *(['discrete'] if spec['corr_ranks']=='discrete' else [])], folder, timeout=60)
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))

@@ -12,6 +12,8 @@
 Выход: ColSet1, ColSet1_Label, ColSet2, ColSet2_Label, Pirson. Пропуски
 исключаются попарно, при нулевой дисперсии коэффициент NULL. Для этой
 корреляции не вычисляй суммы и коэффициент в Калькуляторе или JavaScript.
+Выбирай integer/real, в том числе integer «Дискретный». String разрешён
+только в spearman/kendall; boolean/datetime/variant не поддержаны.
 На существующем узле переданный набор заменяет прежний; пропуск сохраняет его.
 В этапе 1 поддержаны непустой источник и минимум два совместных наблюдения
 на пару. Этот режим включает только Пирсона. Для ранговых коэффициентов выбери
@@ -27,7 +29,7 @@ mode spearman или kendall.
 
 Для Спирмена используй `dock_node_apply`, `target.type:"research.corr_analysis"`,
 `mode:"spearman"`, `parameters.first_set` и `parameters.second_set` — полные
-массивы технических имён непрерывных integer/real полей. Таблица — вход 0;
+массивы технических имён integer/real (включая «Дискретный») и string полей. Таблица — вход 0;
 `finish:"execute"`, `read.ports:[0]`, полное чтение порта. Узел использует средние
 ранги при совпадениях; не считай ранги и коэффициент в Калькуляторе или JavaScript.
 Выход: ColSet1, ColSet1_Label, ColSet2, ColSet2_Label (string), Spearman (real).
@@ -38,7 +40,9 @@ mode spearman или kendall.
 новый mode, `inputs:[]`, `mappings:[]`, `finish:"execute"`. Пропущенные наборы
 сохраняются; переданные заменяются целиком. Включён ровно один коэффициент;
 после смены заново прочитай выход, прежние поля коэффициентов исчезают.
-Текстовые/дискретные поля и взаимная корреляция пока не поддержаны.
+Сохрани string и дискретные integer как есть: не кодируй категории числами.
+Порядок произвольного Unicode, регистра и локали не установлен.
+Boolean/datetime/variant не выбирай; взаимная корреляция вне режима.
 <!-- /mode -->
 
 <!-- mode: kendall -->
@@ -46,7 +50,7 @@ mode spearman или kendall.
 
 Для Kendall tau-b используй `dock_node_apply`, `target.type:"research.corr_analysis"`,
 `mode:"kendall"`, `parameters.first_set` и `parameters.second_set` — полные
-массивы технических имён непрерывных integer/real полей. Таблица — вход 0;
+массивы технических имён integer/real (включая «Дискретный») и string полей. Таблица — вход 0;
 `finish:"execute"`, `read.ports:[0]`, полное чтение порта. Это native tau-b с
 поправкой на совпадения, без обучения и вычислений в Калькуляторе или JavaScript.
 Выход: ColSet1, ColSet1_Label, ColSet2, ColSet2_Label (string), TauBKendall (real).
@@ -57,5 +61,7 @@ mode spearman или kendall.
 `inputs:[]`, `mappings:[]`, `finish:"execute"`, `read.ports:[0]`. Наборы сохранятся,
 Спирмен и остальные коэффициенты выключатся. Прочитай новую таблицу целиком;
 в ней должно остаться только поле TauBKendall после четырёх идентификаторов.
-Переданные наборы заменяются полностью. Текстовые/дискретные поля и лаги вне режима.
+Переданные наборы заменяются полностью. Сохрани string и дискретные integer
+без кодирования категорий. Unicode/регистр/локаль не установлены.
+Boolean/datetime/variant не выбирай; лаги вне режима.
 <!-- /mode -->
