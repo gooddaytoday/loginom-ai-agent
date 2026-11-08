@@ -83,3 +83,16 @@ test('enrich output mapping must cover every generated field and preserve unique
   {source:{kind:'configured_field',name:'Amount'},name:'ALIAS'},
  ]}]}));
 });
+
+test('enrich accepts three to fourteen lookups, keeps source order and rejects a fifteenth',()=>{
+ const tables=n=>Array.from({length:n},(_,i)=>({port:i+1,keys:[{main:'Key',lookup:'Key'}]}));
+ const inputs=n=>Array.from({length:n+1},(_,i)=>({input:i}));
+ const prefixes={enabled:false,name:'',label:''};
+ for(const n of [3,4,14])assert.doesNotThrow(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(n)}},'left',{...request,inputs:inputs(n)}));
+ assert.throws(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(15)}},'left',{...request,inputs:inputs(15)}));
+ assert.throws(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(3)}},'left',{...request,inputs:inputs(2)}));
+ const names=['A','B','C','D'],input_fields=[[field('RowID','integer'),field('Key','integer'),field('Note')],...names.map(n=>[field('Key','integer'),field(n)])];
+ const p={enrichment:{prefixes,tables:tables(4)}},mappings=resolveEnrichTables(p,input_fields);
+ assert.deepEqual(mappings.map(m=>[m.port,m.unmatched]),[[1,['A']],[2,['B']],[3,['C']],[4,['D']]]);
+ assert.deepEqual(enrichOutputFields({input_fields,mappings,prefixes}).map(f=>f.name),['RowID','Key','Note','A','B','C','D']);
+});

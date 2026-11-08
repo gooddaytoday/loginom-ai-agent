@@ -1,14 +1,14 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';
 import {readEnrichBrowser,readEnrichContext} from '../lib/enrich-context.mjs';
-function fixture(){
+function fixture(names=[['A','B'],['Y','X'],['P','Q','Extra']]){
  const all=[],components={},base='MF;TF;WizrdMCF;EnrichDataWizard';
  const element=(tid,parent=null)=>{const e={id:'e'+all.length,tid,parent,getAttribute(name){return name==='data-tid'?this.tid:null;},checkVisibility:()=>true,contains(x){return x===this||!!x.parent&&this.contains(x.parent)}};all.push(e);return e;};
  const wizard=element('MF;TF;WizrdMCF'),root=element(base,wizard),form={};
  const add=(key,value)=>{const e=element(base+';'+key,root);components[e.id]={el:{dom:e},...value};return components[e.id];};
- const records=[['A','B'],['Y','X'],['P','Q','Extra']].map((names,port)=>names.map((Name,Index)=>({isModel:true,internalId:port+'-'+Index,data:{Name,DisplayName:'Same label',DataType:5,Index,...(port?{Value:Index,Link:Index<2?1-Index:-1}:{chk1:true,col1:1-Index,chk2:true,col2:1-Index})}})));
+ const records=names.map((fields,port)=>fields.map((Name,Index)=>({isModel:true,internalId:port+'-'+Index,data:{Name,DisplayName:'Same label',DataType:5,Index,...(port?{Value:Index,Link:Index<2?1-Index:-1}:Object.fromEntries(names.slice(1).flatMap((_,p)=>[['chk'+(p+1),true],['col'+(p+1),1-Index]])))}})));
  const stores=records.map(items=>({$className:'Ext.data.Store',getProxy:()=>({$className:'bg.ext.CollectionProxy'}),getData:()=>({items}),getCount:()=>items.length,getTotalCount:()=>items.length,getRemoteFilter:()=>false,getRemoteSort:()=>false}));
  for(const key of ['grdEnrichData','grdEnrichData;grd','grdEnrichData;grd-1'])add(key,{getStore:()=>stores[0]});
- const owner={constructor:{name:'EnrichDataWizard'},FWizardForm:form,FMainColumnStore:stores[0],FJoinedColumnStores:stores.slice(1),FColumnsPrepared:true,FLinkAssignedProps:['chk1','chk2'],FLinkValueProps:['col1','col2']};
+ const owner={constructor:{name:'EnrichDataWizard'},FWizardForm:form,FMainColumnStore:stores[0],FJoinedColumnStores:stores.slice(1),FColumnsPrepared:true,FLinkAssignedProps:names.slice(1).map((_,p)=>'chk'+(p+1)),FLinkValueProps:names.slice(1).map((_,p)=>'col'+(p+1))};
  components[root.id]={el:{dom:root},'@@TestCmpController':owner};components[wizard.id]={el:{dom:wizard},Controller:form};
  add('cntUsePrefixes;cnt;chb',{getValue:()=>false});const properties=[];add('pedUsePrefixes',{Controller:{FLastViewMode:0,FLastValue:false,FInitializing:false}});add('pedUsePrefixes;ValueControl',{getValue:()=>false});
  for(const key of ['pedNamePrefix','pedDisplayNamePrefix']){properties.push(add(key,{Controller:{FLastViewMode:0,FLastValue:'Enrich',FInitializing:false}}));add(key+';ValueControl',{getValue:()=>'Enrich'});}
@@ -36,4 +36,12 @@ test('Enrich binds a lazily numbered editor to the actual input, row and source 
  field.picker=picker;grid.editingPlugin={editing:true,context:{field:'col2',column:{dataIndex:'col2'},record:f.records[0][0]},activeEditor:{el:root.el,field,isVisible:()=>true}};return {f,plugin:grid.editingPlugin};};
  const {f}=setup(),r=f.read();assert.equal(r.verified,true);assert.equal(r.editor.port,2);assert.equal(r.editor.main,'A');assert.ok(r.editor.choices_tid.endsWith('celleditor-5;cbx;boundlist'));
  for(const change of [p=>p.context.record={},p=>p.context.column.dataIndex='col1',p=>p.activeEditor.field.getStore=()=>({}),p=>p.activeEditor.isVisible=()=>false,p=>p.activeEditor.field.picker.el.dom.tid='foreign']){const {f,plugin}=setup();change(plugin);assert.equal(f.read().verified,false);}
+});
+
+test('enrich reads four joined inputs and rejects an inventory beyond fourteen lookups',()=>{
+ const four=fixture([['A','B'],['Y','X'],['P','Q'],['M','N'],['R','S']]).read();
+ assert.equal(four.verified,true);assert.equal(four.input_fields.length,5);assert.deepEqual(JSON.parse(JSON.stringify(four.mappings.map(m=>m.port))),[1,2,3,4]);
+ const names=n=>Array.from({length:n+1},()=>['A','B']);
+ assert.equal(fixture(names(14)).read().verified,true);
+ assert.equal(fixture(names(15)).read().verified,false);
 });

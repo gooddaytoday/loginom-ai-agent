@@ -1,14 +1,14 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {enrichConfigurationReadback} from '../lib/enrich-readback.mjs';
-function fixture(){
+function fixture(lookups=1){
  const node={document_id:'document',workflow_id:'workflow',node_id:'enrich'},owner={...node,verified:true};
- const input_fields=[['Key','Left'],['Id','Right']].map(ns=>ns.map((name,i)=>({name,label:name,type:'string',record_id:name,field_id:String(i),index:i})));
+ const input_fields=[['Key','Left'],...Array.from({length:lookups},(_,i)=>['Id','Right'+(i?i+1:'')])].map(ns=>ns.map((name,i)=>({name,label:name,type:'string',record_id:name,field_id:String(i),index:i})));
  const mapping=(source_fields,direction,port)=>({verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,node_context:{...owner,[direction+'_port']:{port,native_index:port,port_guid:'port-'+port}},source_fields,
   target_fields:source_fields.map((f,i)=>({...f,index:i,record_id:'t'+f.record_id,data_kind:'Дискретный',excluded:false,source:f}))});
  const finish={settings_applied:true,mode:'done',node_context:owner};
- const c={verified:true,inventory_complete:true,node_context:owner,input_fields,prefixes:{enabled:false,name:'Enrich',label:'Объединение'},mappings:[{port:1,pairs:[{main:'Key',source:'Id'}],unmatched:['Right']}]};
+ const c={verified:true,inventory_complete:true,node_context:owner,input_fields,prefixes:{enabled:false,name:'Enrich',label:'Объединение'},mappings:input_fields.slice(1).map((fs,i)=>({port:i+1,pairs:[{main:'Key',source:'Id'}],unmatched:[fs[1].name]}))};
  const values={input_mapping:{ports:input_fields.map((fs,port)=>({port,source:{node:{document_id:node.document_id,workflow_id:node.workflow_id,node_id:'source-'+port},output:0},native_mapping:mapping(fs,'input',port),finish}))},configure:{configuration:c,validation:{status:'accepted_by_loginom_next',node_context:owner}},node_finish:finish,
- output_mapping:{native_mapping:mapping([...input_fields[0],input_fields[1][1]],'output',0),finish},finish};
+ output_mapping:{native_mapping:mapping([...input_fields[0],...input_fields.slice(1).map(fs=>fs[1])],'output',0),finish},finish};
  const phases=Object.entries(values).map(([phase,value])=>({phase,receipt_id:'op:'+phase,status:'verified',value:{...value,verified:true,cleanup_complete:true}}));
  return {node,phases,operation_id:'op'};
 }
@@ -26,4 +26,15 @@ test('Enrich readback rejects a different native port, source workflow or absent
   f=>f.phases[1].value.configuration.mappings[0].pairs=[]]){
   const f=fixture();change(f);assert.throws(()=>enrichConfigurationReadback(f));
  }
+});
+test('Enrich readback binds four lookups and registers them in the public schema',async()=>{
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const schema=nodeApplyResultSchema.properties.configuration.properties.readback;
+ for(const lookups of [3,4]){
+  const r=enrichConfigurationReadback(fixture(lookups));
+  assert.equal(r.input_mappings.length,lookups+1);assert.deepEqual(r.tables.map(t=>t.port),Array.from({length:lookups},(_,i)=>i+1));
+  assert.deepEqual(r.output_mapping.fields.map(f=>f.name),['Key','Left','Right',...Array.from({length:lookups-1},(_,i)=>'Right'+(i+2))]);
+  assert.doesNotThrow(()=>validateActionParameters(schema,r));
+ }
+ const f=fixture(4);f.phases[0].value.ports.pop();assert.throws(()=>enrichConfigurationReadback(f));
 });

@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,158132,'2a983688fad8ec86013f111fec74852233ec270dbc20b2208c63a12cac4f8f35'],
+  [nodeApiTools,158922,'187eb8d742945ba640e3089c99b04d8a8db67fd6fdd874cf0bd07e08739dd787'],
   [nodeApiTools.map(userNodeTool),13183,'03d4f81d1e939ce5aacbdf33a3cb9c09ae7405eed44544cfbc4c91264a4c9623'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -55,6 +55,16 @@ test('public apply mode reaches only the existing LinRegression handler',async()
  const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
  await dispatchNodeApi(runtime,'dock_node_apply',request);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'},parameters:{expressions:[]}}),/Unsupported node configuration mode/);
+});
+test('g-means public schema reaches the production handler with bounded automatic parameters',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'gmeans',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'datamining.clustering',position:{x:320,y:280}},inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:0,input:0}],mode:'g_means',parameters:{features:[{kind:'input_field',name:'X'},{kind:'input_field',name:'Y'}],min_clusters:2,max_clusters:4,threshold:1,seed:42,normalization:'none'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,clusters:3}}),/unsupported parameter/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'}}),/Unsupported node configuration mode/);
 });
 test('lifecycle dispatch retains ID, local cancellation and independent server stop',async()=>{
  const {runtime,calls}=fixture(),signal=new AbortController().signal;
@@ -177,7 +187,7 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
  const {runtime,calls}=fixture();
  const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
  const cross={operation_id:'cross',contract_revision:'1.0.0',document_id:'doc',
-  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'MF;TF',navigation_path:[{tid:'path',label:'Scenario'}]},
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
   target:{kind:'new',type:'transform.cross_table'},inputs:[{source,output:0,input:0}],mode:'pivot',
   parameters:{row_keys:[],columns:[{kind:'input_field',name:'Category'}],
    facts:[{field:{kind:'input_field',name:'Amount'},functions:['sum']}],category_mode:'sliding'},

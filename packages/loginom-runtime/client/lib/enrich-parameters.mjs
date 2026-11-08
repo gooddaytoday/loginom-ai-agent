@@ -1,5 +1,6 @@
 const need=(v,m)=>{if(!v)throw Error(m);};
 const object=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');
+export const MAX_ENRICH_LOOKUPS=14;
 const name=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!/[\x00-\x1f]/.test(v);
 
 export function validateEnrichParameters(p,mode,r){
@@ -17,7 +18,7 @@ export function validateEnrichParameters(p,mode,r){
    &&typeof e.prefixes.name==='string'&&e.prefixes.name.length<=128
    &&typeof e.prefixes.label==='string'&&e.prefixes.label.length<=128,'Explicit enrichment prefix settings required');
   need(!e.prefixes.enabled||e.prefixes.name===''||/^[\p{L}_][\p{L}\p{N}_]*$/u.test(e.prefixes.name),'Enrich name prefix must be an identifier');
-  need(Array.isArray(e.tables)&&e.tables.length>=1&&e.tables.length<=2,'Enrich requires one or two lookups');
+  need(Array.isArray(e.tables)&&e.tables.length>=1&&e.tables.length<=MAX_ENRICH_LOOKUPS,'Enrich requires one to '+MAX_ENRICH_LOOKUPS+' lookups');
   for(const [i,t] of e.tables.entries()){
    need(object(t,['port','keys'])&&t.port===i+1,'Enrich tables must be ordered and contiguous');
    need(Array.isArray(t.keys)&&t.keys.length>=1&&t.keys.length<=128,'Each lookup requires a nonempty bounded composite key');

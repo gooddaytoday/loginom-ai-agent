@@ -594,6 +594,11 @@ cold обоих портов с независимым Apriori oracle, точн�
 Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
 модели передаются только соответствующее задание и перечисленные CSV.
 
+`enrich-three-lookups`, `enrich-four-lookups`: Дополнение данных, три и четыре
+справочника одного узла (7×6 и 7×7); четвёртый добавляется к тому же узлу после
+выполнения с тремя. Задания `task-three-lookups.md`, `task-four-lookups.md`,
+ожидания `acceptance/extended/`, CSV `fixtures/extended/`.
+
 `ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
 по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
 Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
@@ -719,3 +724,16 @@ cleanup. Для update сравнивается итоговая стадия (`
 `task-weights.md` и weights-totals/support.csv передаются модели; независимый
 Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
 повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
+`clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
+Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
+Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
+Distance из независимой геометрии, точные типы/NULL/порядок, два CSV, Save,
+cold Execute с сохранёнными ролями/auto/min/max/threshold/seed и cleanup.
+Эталон геометрии из stage-0 oracle остаётся только в оснастке.
+
+В `clustering-gmeans` точный hot-порядок порта 0 —
+Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
+Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
+нативное восстановление ставит используемые поля перед сохранёнными ID.
+Оба порядка проверяются явно; остальные перестановки запрещены.
