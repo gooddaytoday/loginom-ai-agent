@@ -14,7 +14,7 @@ export async function configureEnrichInputs(channel,mappings,ctx,request,finishW
  const target=graph?.nodes.find(n=>n.ref.node_id===node?.node_id);
  need(graph?.complete&&target?.type==='transform.enrich_data','Verified enrichment graph required');
  const count=request.parameters.enrichment?request.parameters.enrichment.tables.length+1:target.inputs.length;
- need(count>=2&&count<=3,'One or two enrichment lookups required');
+ need(count>=2&&count<=15,'One to 14 enrichment lookups required');
  const observations=[],ports=Array.from({length:count},(_,i)=>i),sourceOutputs=ports.map(port=>{
   const edges=graph.links.filter(e=>e.target===node.node_id&&e.input===port);
   need(edges.length===1,'Exact connected enrichment input required');

@@ -47,3 +47,12 @@ test('enrich model contract stays within apply, type card and node-reference bud
  assert.ok(Buffer.byteLength(reference)<=6000);
  assert.doesNotMatch(reference,/\$(?:[1-9][0-9]*|ARGUMENTS)\b/);
 });
+
+test('public enrich schema accepts four lookups and rejects a fifteenth',async()=>{
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');
+ const handler=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers.get('transform.enrich_data');
+ const tables=n=>Array.from({length:n},(_,i)=>({port:i+1,keys:[{main:'Key',lookup:'Key'}]}));
+ const params=n=>({enrichment:{prefixes:{enabled:false,name:'',label:''},tables:tables(n)}});
+ for(const n of [3,4,14])assert.doesNotThrow(()=>validateActionParameters(handler.parameter_schema,params(n)));
+ assert.throws(()=>validateActionParameters(handler.parameter_schema,params(15)));
+});
