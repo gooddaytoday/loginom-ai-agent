@@ -514,7 +514,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         // «Только новые» adds source fields, but their outputs appear only through native synchronization;
         // requested mappings are then resolved against the synchronized native mapping.
         if(shouldResyncNewOutputs(configured,native)) {
-          const resync=await resyncOutputFields(channel,native,{restoreOutputs:changes=>configureOutputFields(channel,{direction:'output',port:0,changes},configured.columns)});
+          const resync=await resyncOutputFields(channel,native,{previousColumns:configured.preservation?.columns_before?.map(c=>c.name),
+            restoreOutputs:changes=>configureOutputFields(channel,{direction:'output',port:0,changes},configured.columns)});
           changes.push(resync);native=resync.native_mapping;
         }
         if(mappings.length) {

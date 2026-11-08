@@ -186,8 +186,8 @@ test('an empty native mapping is deferred to execution only for auto-detect all 
 
 const fieldOf=(name,id)=>({record_id:'s'+id,field_id:String(id),name,label:name,type:'string'});
 const targetOf=(source,name=source.name)=>({name,label:name,type:'string',source:{record_id:source.record_id,field_id:source.field_id,name:source.name,label:source.label}});
-function mappingFixture({targetsOf,autosync=false,reset=false}) {
- const sources=['Id','Amount','Extra'].map((n,i)=>fieldOf(n,i));
+function mappingFixture({targetsOf,autosync=false,reset=false,names=['Id','Amount','Extra']}) {
+ const sources=names.map((n,i)=>fieldOf(n,i));
  let on=autosync,targets=targetsOf(sources),clicks=0;
  const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:true,autosync:on,source_fields:sources,target_fields:structuredClone(targets)});
  const state=()=>({wizard:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'wizard',output_columns:{auto_sync:{status:'observed',value:on,ref:'sync'}}},
@@ -253,10 +253,27 @@ test('an output that lost its source on re-read keeps its alias or refuses befor
  const plain=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Amount'),targetOf(s[2])]});
  const kept=await resyncOutputFields(plain.channel,plain.native,restore(plain));
  assert.deepEqual(kept.restored_outputs,[]);assert.deepEqual(kept.native_mapping.target_fields.map(t=>t.name),['Id','Amount','Extra']);
+ // The aliased output may belong only to a field of the previous schema (Amount, whose type changed).
  const alias=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom','Своё'),targetOf(s[2])]});
- const restored=await resyncOutputFields(alias.channel,alias.native,restore(alias));
+ const restored=await resyncOutputFields(alias.channel,alias.native,{...restore(alias),previousColumns:['Id','Amount','Extra']});
  assert.deepEqual(restored.native_mapping.target_fields.map(t=>[t.name,t.label]),[['Id','Id'],['Custom','Своё'],['Extra','Extra']]);
  const ambiguous=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom')]});
- await assert.rejects(resyncOutputFields(ambiguous.channel,ambiguous.native,restore(ambiguous)),/cannot attribute an output that lost its source: Custom/);
+ await assert.rejects(resyncOutputFields(ambiguous.channel,ambiguous.native,{...restore(ambiguous),previousColumns:['Id','Amount','Extra']}),/cannot attribute an output that lost its source: Custom/);
  assert.equal(ambiguous.clicks,0);
+});
+
+test('a renamed source column does not inherit the output of the removed column',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ // «Только новые», autosync off: the new file renames Amount to Sum. The Amount output lost its source.
+ const orphan=(name,label=name)=>({name,label,type:'string',source:null});
+ const previousColumns=['Id','Amount','Extra'],calls=[];
+ const restore=f=>({previousColumns,restoreOutputs:async changes=>{calls.push(changes);return f.rename(changes);}});
+ const renamed=mappingFixture({names:['Id','Sum','Extra'],targetsOf:s=>[targetOf(s[0]),orphan('Amount'),targetOf(s[2])]});
+ const result=await resyncOutputFields(renamed.channel,renamed.native,restore(renamed));
+ assert.deepEqual(calls,[]);assert.deepEqual(result.restored_outputs,[]);
+ assert.deepEqual(result.native_mapping.target_fields.map(t=>[t.name,t.source.name]),[['Id','Id'],['Sum','Sum'],['Extra','Extra']]);
+ // An alias whose column was removed has no field of the previous schema left: refuse before any gesture.
+ const alias=mappingFixture({names:['Id','Sum','Extra'],targetsOf:s=>[targetOf(s[0]),orphan('Custom'),targetOf(s[2])]});
+ await assert.rejects(resyncOutputFields(alias.channel,alias.native,restore(alias)),/cannot attribute an output that lost its source: Custom/);
+ assert.equal(alias.clicks,0);assert.deepEqual(calls,[]);
 });

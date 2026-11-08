@@ -58,7 +58,7 @@ export function outputsOutOfSync(native) {
 // outputs are matched by their source field name: a re-read recreates source
 // records, so synchronization may replace an aliased output with a default one.
 // Such names and labels are restored through restoreOutputs(changes).
-export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
+export async function resyncOutputFields(channel,before,{restoreOutputs,previousColumns}={}) {
   const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='output_mapping'
     &&!s.wizard.column_parameters&&s.wizard.output_columns?.auto_sync?.status==='observed'
     &&typeof s.wizard.output_columns.auto_sync.value==='boolean';
@@ -81,6 +81,9 @@ export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
   // re-read leaves an output either on a stale source record (still named) or
   // without a source (execution-events.jsonl: Amount output with source null);
   // such an output is attributed by its own name or as the only unlinked pair.
+  // previousColumns is the import schema before this source change: an orphan
+  // named after a removed previous column is that column's output, and only
+  // previous columns (never new fields) may inherit an alias.
   const names=f=>f.name+'\u0000'+f.label;
   const sourceName=t=>t.source?.name??before.source_fields.find(f=>t.source&&sourceKey(f)===sourceKey(t.source))?.name;
   const previous=new Map(),orphans=[];
@@ -92,8 +95,10 @@ export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
   }
   const unlinked=()=>before.source_fields.map(f=>f.name).filter(n=>!previous.has(n));
   for(const t of orphans.filter(t=>unlinked().includes(t.name)))previous.set(t.name,t);
-  const aliased=orphans.filter(t=>![...previous.values()].includes(t));
-  if(aliased.length===1&&unlinked().length===1)previous.set(unlinked()[0],aliased[0]);
+  const prior=new Set(previousColumns??[]),present=new Set(before.source_fields.map(f=>f.name));
+  const aliased=orphans.filter(t=>![...previous.values()].includes(t)&&!(prior.has(t.name)&&!present.has(t.name)));
+  const candidates=unlinked().filter(n=>prior.has(n));
+  if(aliased.length===1&&candidates.length===1)previous.set(candidates[0],aliased[0]);
   else if(aliased.length)throw new Error('Output resynchronization cannot attribute an output that lost its source: '+aliased[0].name);
   const on=await toggle(false,true,initial);
   const synced=(await channel.observe({condition:'native output mapping after synchronization',readMappings:true,
