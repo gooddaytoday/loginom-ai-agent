@@ -86,9 +86,18 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
  s=await inspectBinningSettings(channel,baseline,index);
  if(manual){
   need(s.node_binning.state==='materialized'&&s.node_binning.intervals.length===wanted.intervals.length,'manual requires the complete saved materialized intervals');
+  need(wanted.intervals.every((b,i)=>s.node_binning.intervals[i].lower_included===b.lower_included&&s.node_binning.intervals[i].upper_included===b.upper_included),'manual edits preserve observed inclusion flags');
+  // Native boundary edits also move the adjacent bound. Check the entire edit
+  // sequence before opening a cell: an invalid intermediate store is unreadable.
+  const planned=s.node_binning.intervals.map(({lower,upper})=>({lower,upper}));
+  for(const [i,b] of wanted.intervals.entries())for(const key of ['lower','upper']){
+   if(planned[i][key]===b[key])continue;
+   planned[i][key]=b[key];
+   if(key==='lower'&&i>0)planned[i-1].upper=b[key];
+   if(key==='upper'&&i+1<planned.length)planned[i+1].lower=b[key];
+   need(planned.every(b=>b.lower<b.upper),'manual boundary would invalidate an observed interval; move boundaries in smaller steps');
+  }
   for(const [i,b] of wanted.intervals.entries()){
-   const current=s.node_binning.intervals[i];
-   need(current.lower_included===b.lower_included&&current.upper_included===b.upper_included,'manual edits preserve observed inclusion flags');
    for(const [key,value] of [['lower',b.lower],['upper',b.upper],['label',b.label]]){
     if(s.node_binning.intervals[i][key]===value)continue;
     const field={lower:'LowerBoundValue',upper:'UpperBoundValue',label:'BinLabel'}[key],tid=s.wizard.root_tid+';MethodSettingsWizard-1;col'+field+'_'+i;
@@ -123,9 +132,9 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
    const label=wanted.ties==='current'?'Сохранять в текущем':'Добавлять в следующий';
    const owner=s.node_binning.frame.controls['cbbMatchingObservationsMode;ValueControl'];
    await act('cbbMatchingObservationsMode;ValueControl',{verb:'click'});
-   s=await observeBinning(channel,'native next-bin tie option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
-   await channel.perform({condition:'choose next bin for ties',initialObservation:s,ready:binningReady,identity:()=>field,resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'next-bin option required').ref})});
-   s=await observeBinning(channel,'next-bin tie readback');
+   s=await observeBinning(channel,'native tie policy option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
+   await channel.perform({condition:'choose requested tie policy',initialObservation:s,ready:binningReady,identity:()=>field,resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'requested tie option required').ref})});
+   s=await observeBinning(channel,'requested tie policy readback');
   }
  }
  const c=s.node_binning,q=c.settings;

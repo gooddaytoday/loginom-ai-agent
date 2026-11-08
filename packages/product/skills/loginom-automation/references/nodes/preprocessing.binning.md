@@ -26,23 +26,22 @@
 
 Для поля DateTime (тип 2) используй этот узел, без Калькулятора и JavaScript.
 Сначала `internal`, `method:"count"`, `size:2`, `limits` как civil ISO
-`["2026-01-01T00:00:00.000","2026-01-04T00:00:00.000"]`. Часовой пояс не добавляй
+`["2027-07-10T00:00:00.000","2027-07-22T00:00:00.000"]`. Часовой пояс не добавляй
 и не пересчитывай. Выполни и прочитай оба порта. Для переноса общей границы
 и изменения меток вызови `dock_node_apply` для **того же** `target.kind:"existing"`
 и ref, `mode:"internal"`, `inputs:[]`, `mappings:[]`,
-`parameters:{binning:{field:"When",method:"manual",intervals:[
-{lower:"2026-01-01T00:00:00.000",upper:"2026-01-02T00:00:00.000",lower_included:true,upper_included:true,label:"Early"},
-{lower:"2026-01-02T00:00:00.000",upper:"2026-01-04T00:00:00.000",lower_included:false,upper_included:true,label:"Late"}]}}`.
+`parameters:{binning:{field:"EventTime",method:"manual",intervals:[
+{lower:"2027-07-10T00:00:00.000",upper:"2027-07-18T00:00:00.000",lower_included:true,upper_included:true,label:"Phase A"},
+{lower:"2027-07-18T00:00:00.000",upper:"2027-07-22T00:00:00.000",lower_included:false,upper_included:true,label:"Phase B"}]}}`.
 Передавай все интервалы в их порядке; флаги включения сохраняют наблюдённые
 значения. `size`, `limits`, `ties` в manual опусти. Этот вызов сохраняет ручные
 границы и метки, выполняет узел **без повторного Train**. После него не вызывай
 count для применения: он обучит заново. Для следующего выполнения используй
 `apply`. В manual тоже нужны `finish:"execute"`,
 `read:{ports:[0,1],sample_rows:100,require_exact_numbers:true}`.
-Порт 0 сохраняет When и исходные поля, производные идут сразу после When;
-порт 1 содержит datetime-границы и BoundsDataType=2. When=NULL сохраняется,
-номер/метка/границы/OutOfBins=NULL, BinsID=When, open=false. При экспорте дат
-используй дату yyyy-mm-dd и время hh:nn:ss.zzz. Затем сохрани пакет.
+Порт 0 сохраняет исходные поля, производные идут сразу после выбранного поля;
+порт 1 содержит datetime-границы и BoundsDataType=2. Исходный NULL сохраняется,
+номер/метка/границы/OutOfBins=NULL; BinsID содержит имя выбранного поля, open=false.
 
 ## Квантование числового поля
 

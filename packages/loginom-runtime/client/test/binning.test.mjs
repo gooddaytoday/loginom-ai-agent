@@ -48,10 +48,20 @@ test('readback requires a separately trained materialized model or an uncommitte
  const trained=binningConfigurationReadback(candidate());assert.equal(trained.state,'materialized');assert.deepEqual(trained.intervals,intervals);
  const configurationSchema=nodeApplyResultSchema.properties.configuration.properties.readback;
  const validate=new AjvJsonSchemaValidator().getValidator(configurationSchema);assert.equal(validate(trained).valid,true,JSON.stringify(validate(trained)));
+ Object.assign(c,{method:'frequency',limits:null,ties:'current'});
+ const frequency=binningConfigurationReadback(candidate());assert.equal(frequency.ties,'current');assert.equal(validate(frequency).valid,true);
+ Object.assign(c,{method:'count',limits:[0,20],ties:null});
  values.finish.training.execution_id='execute';assert.throws(()=>binningConfigurationReadback(candidate()),/separate training/);
  c.mode='apply';c.state='materialized';c.intervals=intervals;values.node_finish={settings_applied:false,draft_discarded:true};values.finish={mode:'execute',settings_applied:false,execution_id:'apply'};
  const applied=binningConfigurationReadback(candidate());assert.equal(applied.training.status,'not_requested');assert.equal(validate(applied).valid,true);
  c.state='settings';c.intervals=[];assert.throws(()=>binningConfigurationReadback(candidate()),/materialized/);
+});
+test('ties current validates only for frequency and other methods report ties explicitly',()=>{
+ assert.doesNotThrow(()=>validateBinningParameters({binning:{field:'X',method:'frequency',size:2,ties:'current'}},'internal'));
+ for(const method of ['count','width','manual']){
+  assert.throws(()=>validateBinningParameters({binning:{...parameters.binning,method,ties:'current'}},'internal'),/ties is supported only for frequency/);
+ }
+ assert.throws(()=>validateBinningParameters({binning:{field:'X',method:'frequency',size:2,ties:'unknown'}},'internal'),/ties/);
 });
 test('binning rejects unsupported combinations before mutation',()=>{
  assert.doesNotThrow(()=>validateBinningParameters(parameters,'internal'));

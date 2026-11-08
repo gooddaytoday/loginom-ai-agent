@@ -18,8 +18,23 @@ function fixture(){
  const controller=Object.assign(new MethodSettingsWizard(),{FView:{},FGrdColumns:grid,FInputColumnStore:store,FBinItemsStore:binStore,FBinsReloading:false,FWizardForm:{FView:w},FViewedColumnRecord:records[1],FMethodSettingFrames:{}});
  view['@@TestCmpController']=controller;Object.assign(components,{[root.id]:view,[wizard.id]:w,[gridElement.id]:grid,[binElement.id]:binGrid});
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- return {controller,store,binStore,records,bins,selection,grid,w,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
+ const frequency=ties=>{
+  records[1].data.MethodType=4;
+  const frame=element('MethodSettingFrame',root);frame.getAttribute=()=> 'MethodSettingFrame';frame.querySelectorAll=()=>[];
+  const values={'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false,chkRoundingLevel:false,
+   'cbbTileCount;ValueControl':2,'cbbMatchingObservationsMode;ValueControl':ties,'chkSummTile;ValueControl':false};
+  for(const [key,value] of Object.entries(values)){
+   const e=element('MethodSettingFrame;'+key,frame);components[e.id]={el:{dom:e},getValue:()=>value};
+  }
+  controller.FMethodSettingFrames={frequency:{FInputColumnRecord:records[1],FOwner:controller,FView:{el:{dom:frame}}}};
+ };
+ return {controller,store,binStore,records,bins,selection,grid,w,frequency,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
 }
+test('native frequency tie code 1 reads back current without falling back to next',()=>{
+ const f=fixture();f.frequency(1);const r=f.read();
+ assert.equal(r.verified,true);assert.equal(r.settings.method,'frequency');assert.equal(r.settings.ties,'current');
+ assert.equal(r.frame.values['cbbMatchingObservationsMode;ValueControl'],1);
+});
 test('bound binning UI inventory survives detached vendor FView and never calls column RPC',()=>{
  const f=fixture(),r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.fields.map(f=>[f.index,f.label,f.method_code]),[[0,'RowID',0],[1,'X',3]]);
  assert.equal(r.state,'materialized');assert.deepEqual(r.intervals.map(b=>[b.lower,b.upper,b.lower_included,b.upper_included]),[[0,10,true,true],[10,20,false,true]]);

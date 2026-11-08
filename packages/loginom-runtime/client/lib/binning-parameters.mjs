@@ -13,8 +13,9 @@ export function validateBinningParameters(parameters,mode,r){
   need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['field','method','size','limits','intervals','ties'].includes(k)),'use field, method, size, limits, intervals and ties only');
   need(typeof p.field==='string'&&p.field.trim().length>0&&p.field.length<=128,'field must be an exact Integer/Real/DateTime input name');
   need(['count','width','frequency','manual'].includes(p.method),'method must be count, width, frequency or manual');
+  need(p.ties===undefined||p.method==='frequency','ties is supported only for frequency; omit ties for '+p.method);
   if(p.method==='manual'){
-   need(p.size===undefined&&p.limits===undefined&&p.ties===undefined,'manual preserves saved method/size/limits; omit those parameters');
+   need(p.size===undefined&&p.limits===undefined,'manual preserves saved method/size/limits; omit those parameters');
    need(Array.isArray(p.intervals)&&p.intervals.length>0&&p.intervals.length<=1000,'manual requires all materialized intervals');
    p.intervals.forEach((b,i)=>{
     need(b&&Object.keys(b).length===5&&['lower','upper','lower_included','upper_included','label'].every(k=>Object.hasOwn(b,k))&&bounds([b.lower,b.upper])&&typeof b.lower_included==='boolean'&&typeof b.upper_included==='boolean'&&typeof b.label==='string'&&b.label.length<=128,'invalid manual interval');
@@ -25,7 +26,7 @@ export function validateBinningParameters(parameters,mode,r){
    need(p.intervals===undefined,'interval edits require method manual after training');
    need(Number.isFinite(p.size)&&p.size>0&&(p.method==='width'||Number.isSafeInteger(p.size)),'size must be positive; count/frequency need an integer');
    if(p.method==='frequency')need(p.limits===undefined&&(p.ties===undefined||['next','current'].includes(p.ties)),'frequency omits limits; ties next (default) or current');
-   else need(bounds(p.limits)&&p.ties===undefined,'count/width require explicit typed limits [lower,upper], lower<upper');
+   else need(bounds(p.limits),'count/width require explicit typed limits [lower,upper], lower<upper');
   }
   if(r){
    need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1),'one table source at input 0 required');
