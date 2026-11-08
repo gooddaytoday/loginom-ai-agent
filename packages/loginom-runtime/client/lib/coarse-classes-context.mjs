@@ -13,7 +13,8 @@ export function readCoarseClassesBrowser(prefix){
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;CoarseClassesWizard-1';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const editors=exact(prefix+';WizrdMCF;CoarseClassesWizard-2;CoarseClassesEditor');
- if(editors.length===1&&editors[0].checkVisibility({checkVisibilityCSS:true})){
+ const editorBox=editors.length===1?editors[0].getBoundingClientRect():null;
+ if(editors.length===1&&editors[0].checkVisibility({checkVisibilityCSS:true})&&editorBox.width>0&&editorBox.height>0&&editorBox.right>0&&editorBox.bottom>0&&editorBox.left<innerWidth&&editorBox.top<innerHeight){
   const editor=editors[0],owner=exact(prefix+';WizrdMCF'),w=owner.length===1&&globalThis.Ext?.getCmp?.(owner[0].id);
   if(!w||w.el?.dom!==owner[0]||!owner[0].contains(editor))return fail('coarse_classes_model_owner');
   const queues=Object.getOwnPropertySymbols(w).filter(s=>s.description==='LockQueue');
@@ -48,7 +49,7 @@ export function readCoarseClassesBrowser(prefix){
  }
  if(new Set(fields.map(f=>f.name)).size!==fields.length||new Set(fields.map(f=>f.record_id)).size!==fields.length)return fail('coarse_classes_identity');
  const selected=selection.length?fields[rs.indexOf(selection[0])]:null,settings={},controlBase=base+';CoarseClassesSettingsFrame;';
- for(const [key,path] of Object.entries({role:'cbxColumnPurpose',min_class_percent:'edtMinimalClassRate;ValueControl',max_classes:'edtDesiredClassCount;ValueControl',uniformity_percent:'edtUniformityCoefficient;ValueControl',fine_classes:'chkUseFineClassesBinning;ValueControl',prequanting:'chkPreQuanting;ValueControl'})){
+ for(const [key,path] of Object.entries({role:'cbxColumnPurpose',min_class_percent:'edtMinimalClassRate;ValueControl',max_classes:'edtDesiredClassCount;ValueControl',uniformity_percent:'edtUniformityCoefficient;ValueControl',fine_classes:'chkUseFineClassesBinning;ValueControl',prequanting:'chkPreQuanting;ValueControl',include_upper_input:'chkIncludeHighBounds;ValueControl'})){
   const c=cmp(controlBase+path);settings[key]=typeof c?.getValue==='function'?c.getValue():null;
  }
  const eventPaths=['cbxEventValue;ValueContainer;txt','cbxEventValue;ValueContainer;txt-1','cbxEventValue;ValueContainer;cbx'];

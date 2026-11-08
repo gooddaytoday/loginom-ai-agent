@@ -79,6 +79,13 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
   await act('chkPreQuanting;ValueControl',{verb:'set_checked',checked:false},input);
   need(s.node_coarse_classes.settings.prequanting===false,'manual partition requires preliminary quantization off');
  }
+ if(wanted?.partition==='manual'){
+  // The input checkbox controls X<=cut. The separate port-1 field remains
+  // native false in 7.4.2 and is not a readback of this setting.
+  need(typeof s.node_coarse_classes.settings.include_upper_input==='boolean','selected input boundary checkbox required');
+  if(!s.node_coarse_classes.settings.include_upper_input)await act('chkIncludeHighBounds;ValueControl',{verb:'set_checked',checked:true},input);
+  need(s.node_coarse_classes.settings.include_upper_input===true,'manual partition requires an inclusive upper boundary');
+ }
  const settings=s.node_coarse_classes.settings;
  need(settings.fine_classes===false,'initial-class bypass is outside this stage');
  const configuration={...s.node_coarse_classes,mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:wanted?.partition??'automatic',min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
