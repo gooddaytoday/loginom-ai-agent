@@ -13,6 +13,13 @@ fresh typed rows, field order, variable identities and retained Sentinel; cold
 independently reads the filename binding and W1 mapping before execution.
 Only the business task and the two input files reach the model.
 
+`acf-nonzero` uses the approved LAB-1144 edge task and
+fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
+return all lags 0…7. The Fraction oracle stays private. Singleton is only an
+unclaimed observation and has no registered acceptance scenario.
+Exact types/field order/NULL, real abs=1e-8/rel=1e-10,
+CSV, Save, cold execution and cleanup use the stock matchers.
+
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
 from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the

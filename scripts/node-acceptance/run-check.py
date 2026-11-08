@@ -383,6 +383,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
+    if name == 'acf-nonzero':
+        src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
+        return dict(source=src, prompt=src / 'task-nonzero.md',
+                    data=src / 'fixtures', base=None, autocorrelation_edge=True,
+                    input_files=['lab1144-series.csv'])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -701,6 +706,11 @@ def sorting_stages(case):
 
 def expected_for(case, package, cold=False):
     src = case['source']
+    if case.get('autocorrelation_edge'):
+        approved = read(src / 'expected.json')
+        output = approved['series']['count12']
+        return dict(package_path=package, nodes=[{'type': t} for t in
+                    ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])
     if cold and case.get('cold_expected_name'):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
     if case.get('factor_mode'):
