@@ -1,0 +1,9 @@
+{
+  "document":{"batch":"Бета","items":[{"code":"x","qty":2},{"code":"y","qty":0}],"tags":[{"tag":"a"},{"tag":"b"},{"tag":"c"}]},
+  "grouped_document":{"groups":[{"group":"A","items":[{"code":"x"},{"code":"z"}]},{"group":"B","items":[{"code":"y"}]}]},
+  "labels":{"batch":"Партия","items":"Позиции","code":"Код","qty":"Количество","tags":"Теги","tag":"Тег"},
+  "wide_fields":70,
+  "index_base_proposal":0,
+  "sibling_policy_proposal":"cartesian, items outer / tags inner; must be confirmed in native output",
+  "delivery":"Independently prepare and read the tree. Do not infer a native index base, generated name or label from this fixture."
+}

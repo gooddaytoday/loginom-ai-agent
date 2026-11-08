@@ -1,0 +1,9 @@
+{
+  "batch":"Бета",
+  "items":[
+    {"id":9007199254740993,"details":{"code":"x","active":true},"parts":[{"qty":2}]},
+    {"id":9007199254740994,"details":{"code":"","active":false},"parts":[{"qty":0},{"qty":null}]}
+  ],
+  "tags":[{"tag":"a"},{"tag":"b"},{"tag":"c"}],
+  "when":"2026-11-07T12:34:56.789"
+}
