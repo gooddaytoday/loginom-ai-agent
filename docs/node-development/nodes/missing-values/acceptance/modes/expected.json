@@ -1,0 +1,84 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.data_recovery"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.data_recovery",
+      "output_node_label": "Медиана и мода",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "I",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "S",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "I": 2,
+          "R": 2.5,
+          "S": "red",
+          "Keep": null
+        },
+        {
+          "RowID": 2,
+          "I": 8,
+          "R": 8.5,
+          "S": "red",
+          "Keep": ""
+        },
+        {
+          "RowID": 3,
+          "I": 10,
+          "R": 10.5,
+          "S": "blue",
+          "Keep": "null"
+        },
+        {
+          "RowID": 4,
+          "I": 8,
+          "R": 8.5,
+          "S": "red",
+          "Keep": "0"
+        }
+      ]
+    }
+  ]
+}

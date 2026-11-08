@@ -2,6 +2,7 @@ import {validateVariableBindings} from './variable-binding-parameters.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
+import {journalCopy} from './execution-journal.mjs';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
@@ -151,7 +152,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const acknowledge=async entry=>{
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,...entry};
     const saved=await record(event);
-    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),
+    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),
       'Node phase journal acknowledgement differs');
     return saved;
   };
@@ -628,7 +629,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
       phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
     const saved=await record(event);
-    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
     state.pending=null;state.cleanup_complete=true;state.result=structuredClone(result);
     return result;
   }
@@ -687,7 +688,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
     phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
   const saved=await record(event);
-  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
   state.pending=null;state.cleanup_complete=true;state.effect_possible=true;state.result=structuredClone(result);
   return result;
 }

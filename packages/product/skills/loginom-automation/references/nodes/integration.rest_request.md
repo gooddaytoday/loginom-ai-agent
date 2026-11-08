@@ -1,6 +1,29 @@
 # REST-запрос (`integration.rest_request`)
 
 <!-- mode: request -->
+## Режим request — методы и тело
+
+Для POST/PUT/PATCH/DELETE выбирай `dock_node_apply` с
+`target.type:"integration.rest_request"`, `mode:"request"`, `finish:"execute"`.
+В `parameters.connection` укажи `name`, `base_url`, `method`;
+для каждого метода создай отдельное подключение с уникальным именем.
+Для POST/PUT/PATCH задай `request_content_type:"application/json"` (или
+`"text/plain"`) в connection и `parameters.body_field:"Body"` — имя
+наблюдённого строкового поля входа 0. Каждая строка отправляется отдельно.
+Body передаётся как исходный текст UTF-8; привязка к query для него запрещена.
+DELETE не принимает body_field и request_content_type. Передай исходную
+таблицу в `inputs`, даже при `query_parameters:[]`, чтобы запросов было по
+одному на строку. Query и Body сохраняются вместе, кодируется только query.
+Для отправки HTTP используй REST-запрос. Если нужны исходные ответы, сохраняй
+Response без разбора JSON, JS и Калькуляторов. Для задания с одним методом
+достаточно импорт → один REST → экспорт порта 0: RequestID и Response.
+Не присоединяй исходную таблицу и не добавляй столбец метода: метод уже задан
+в подключении. Статус читай отдельно с порта 1, без Слияния с ответами.
+RequestID — индекс строки с нуля. Сохрани пакет и скачай экспорт после чтения.
+На существующем узле `parameters:{}` сохраняет метод и тело без перенастройки.
+
+## Режим request — ответы GET
+
 Если нужны только HTTP-статусы и ошибки REST, выполняй с read.ports:[1]:
 HttpStatusCode, ErrorCode и ErrorDesc находятся на порту 1. Порт 0 читай,
 когда задаче нужны тело ответа или его разбор; код 200 не подтверждает тело.

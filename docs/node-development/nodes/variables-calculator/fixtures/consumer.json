@@ -1,0 +1,11 @@
+{
+  "extra_source_variables": [
+    {"name":"Color","label":"Color","type":"string","value":"RED"},
+    {"name":"Code","label":"Code","type":"string","value":"Ab-12"},
+    {"name":"Amount","label":"Amount","type":"real","value":1.25},
+    {"name":"TextNum","label":"TextNum","type":"string","value":"007"},
+    {"name":"Other","label":"Other","type":"string","value":"untouched"}
+  ],
+  "expression":{"name":"total","label":"Скорректировано","type":"integer","formula":"total+10","replace":true},
+  "increment":10
+}

@@ -1,0 +1,360 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.binning"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.binning",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "X_BinsID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_Number",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X_Label",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_LowBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "X_UppBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "X_LowBoundIncl",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "X_UppBoundIncl",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "X_LowLimOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "X_UppLimOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "X_OutOfBins",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0.0,
+          "Note": null,
+          "X_BinsID": "X",
+          "X_Number": 0,
+          "X_Label": "Low",
+          "X_LowBound": -7.0,
+          "X_UppBound": 7.0,
+          "X_LowBoundIncl": true,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 2,
+          "X": 2.0,
+          "Note": "",
+          "X_BinsID": "X",
+          "X_Number": 0,
+          "X_Label": "Low",
+          "X_LowBound": -7.0,
+          "X_UppBound": 7.0,
+          "X_LowBoundIncl": true,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 3,
+          "X": 2.0,
+          "Note": "tie",
+          "X_BinsID": "X",
+          "X_Number": 0,
+          "X_Label": "Low",
+          "X_LowBound": -7.0,
+          "X_UppBound": 7.0,
+          "X_LowBoundIncl": true,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 4,
+          "X": 6.0,
+          "Note": "keep",
+          "X_BinsID": "X",
+          "X_Number": 0,
+          "X_Label": "Low",
+          "X_LowBound": -7.0,
+          "X_UppBound": 7.0,
+          "X_LowBoundIncl": true,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 5,
+          "X": 8.0,
+          "Note": "keep",
+          "X_BinsID": "X",
+          "X_Number": 1,
+          "X_Label": "High",
+          "X_LowBound": 7.0,
+          "X_UppBound": 21.0,
+          "X_LowBoundIncl": false,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 6,
+          "X": 10.0,
+          "Note": "keep",
+          "X_BinsID": "X",
+          "X_Number": 1,
+          "X_Label": "High",
+          "X_LowBound": 7.0,
+          "X_UppBound": 21.0,
+          "X_LowBoundIncl": false,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        },
+        {
+          "RowID": 7,
+          "X": null,
+          "Note": "missing",
+          "X_BinsID": "X",
+          "X_Number": null,
+          "X_Label": null,
+          "X_LowBound": null,
+          "X_UppBound": null,
+          "X_LowBoundIncl": null,
+          "X_UppBoundIncl": null,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": null
+        },
+        {
+          "RowID": 8,
+          "X": 14.0,
+          "Note": "keep",
+          "X_BinsID": "X",
+          "X_Number": 1,
+          "X_Label": "High",
+          "X_LowBound": 7.0,
+          "X_UppBound": 21.0,
+          "X_LowBoundIncl": false,
+          "X_UppBoundIncl": true,
+          "X_LowLimOpen": false,
+          "X_UppLimOpen": false,
+          "X_OutOfBins": 0
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.binning",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "BinsID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "BoundsDataType",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Number",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "LowBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "UppBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Label",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LowBoundQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "UppBoundQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "BinQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "LowDev",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "UppDev",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "LowLimitOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "UppLimitOpen",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "BinsID": "X",
+          "BoundsDataType": 3,
+          "Number": 0,
+          "LowBound": -7.0,
+          "UppBound": 7.0,
+          "Label": "Low",
+          "LowBoundQuota": 1.0,
+          "UppBoundQuota": 1.0,
+          "BinQuota": null,
+          "LowDev": -7.0,
+          "UppDev": 7.0,
+          "LowLimitOpen": false,
+          "UppLimitOpen": false
+        },
+        {
+          "BinsID": "X",
+          "BoundsDataType": 3,
+          "Number": 1,
+          "LowBound": 7.0,
+          "UppBound": 21.0,
+          "Label": "High",
+          "LowBoundQuota": 0.0,
+          "UppBoundQuota": 1.0,
+          "BinQuota": null,
+          "LowDev": 7.0,
+          "UppDev": 21.0,
+          "LowLimitOpen": false,
+          "UppLimitOpen": false
+        }
+      ]
+    }
+  ]
+}

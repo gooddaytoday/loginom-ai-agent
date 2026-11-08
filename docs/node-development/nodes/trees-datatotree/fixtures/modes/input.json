@@ -1,0 +1,18 @@
+{
+  "columns": [
+    {"name":"Group","label":"Группа","type":"string"},
+    {"name":"Code","label":"Код","type":"string"},
+    {"name":"Qty","label":"Количество","type":"integer"},
+    {"name":"When","label":"Момент","type":"datetime"},
+    {"name":"Value","label":"Значение","type":"variant"}
+  ],
+  "csv_null":"?",
+  "datetime":"civil milliseconds, no timezone conversion",
+  "variant_cells":[
+    {"type":"integer","value":"9007199254740993"},
+    {"type":"boolean","value":false},
+    {"type":"string","value":""}
+  ],
+  "delivery":"CSV alone does not establish Variant subtypes. A source with the declared native types must be independently checked before a future run.",
+  "grouping":"Proposal: group by Group in first-occurrence order; preserve input order within a group. Not a native observation."
+}

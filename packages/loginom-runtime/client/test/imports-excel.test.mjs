@@ -13,6 +13,20 @@ import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mj
 const request={inputs:[],mappings:[],finish:'execute',read:{ports:[0]}};
 const parameters={source:{artifact_id:'book',upload_operation_id:'upload'},excel:{source_path:'/worker/sales.xlsx',header_rows:1,
  columns:[{name:'Id',label:'Id',type:'integer'},{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'Amount',type:'real'}]}};
+test('Excel Boolean is admitted as discrete and survives configuration and output mapping readback',()=>{
+ const excel={...parameters.excel,columns:[{name:'Id',label:'Id',type:'integer'},{name:'Active',label:'Active',type:'boolean'}]};
+ validateExcelParameters({...parameters,excel},'xlsx',request);
+ assert.ok(excelParametersSchema.properties.excel.properties.columns.items.properties.type.enum.includes('boolean'));
+ assert.equal(excelColumns(excel)[1].data_kind,'Дискретный');
+ assert.throws(()=>validateExcelParameters({...parameters,excel:{...excel,columns:[{...excel.columns[1],data_kind:'Непрерывный'}]}},'xlsx',request),/discrete/);
+ const fixture=excelReadbackFixture(),columns=excelColumns(excel);
+ fixture.phases[0].value.configuration.columns=columns;
+ const mapping=fixture.phases[2].value.native_mapping;
+ mapping.source_fields=columns.map((c,index)=>({...c,index,record_id:'source-'+index}));
+ mapping.target_fields=mapping.source_fields.map((c,index)=>({...c,record_id:'target-'+index,excluded:false,inherited:false,source:structuredClone(c)}));
+ assert.equal(excelReadback(fixture).output_mapping.fields[1].type,'boolean');
+ assert.equal(excelReadback(fixture).output_mapping.fields[1].data_kind,'Дискретный');
+});
 test('Excel accepts twelve explicit fields on a named sheet and preserves the first-sheet default',()=>{
  const columns=Array.from({length:12},(_,i)=>({name:'Field'+i,label:'Field'+i,type:i%2?'real':'string'}));
  for(const sheet_name of [undefined,'Продажи 2026']){
@@ -60,7 +74,7 @@ test('Excel contract and compact request schema register a zero-input XLSX impor
  for(const stage of ['excel_import_file','excel_import_columns'])assert.doesNotThrow(()=>validateUiAction({verb:'wizard_step',ref:'ui-next',expected_stage:stage}));
 });
 test('Excel rejects unsupported types, missing explicit columns, alternate formats and invalid paths before mutation',()=>{
- for(const patch of [{columns:[]},{source_path:'/worker/sales.xls'},{source_path:'/worker/../sales.xlsx'},{auto_detect:true},{named_range:'Range'},{header_rows:0},{columns:[{name:'X',label:'X',type:'boolean'}]},{columns:[{name:'X',label:'X',type:'string',data_kind:'Непрерывный'}]}])
+ for(const patch of [{columns:[]},{source_path:'/worker/sales.xls'},{source_path:'/worker/../sales.xlsx'},{auto_detect:true},{named_range:''},{header_rows:0},{columns:[{name:'X',label:'X',type:'variant'}]},{columns:[{name:'X',label:'X',type:'string',data_kind:'Непрерывный'}]}])
   assert.throws(()=>validateExcelParameters({...parameters,excel:{...parameters.excel,...patch}},'xlsx',request),/Excel import:/);
  assert.throws(()=>validateExcelParameters(parameters,'delimited',request),/mode xlsx/);
  assert.throws(()=>validateExcelParameters(parameters,'xlsx',{...request,inputs:[{input:0}]}),/no table input/);

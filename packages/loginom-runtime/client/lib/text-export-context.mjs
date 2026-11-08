@@ -9,7 +9,7 @@ export async function readTextExportContext(page,binding,readNode=readPreparedNo
  return {...result,node_context:after};
 }
 export function readTextExportBrowser({prefix,fields}){
- let stage;
+ let stage,format='delimited';
  const fail=reason=>({verified:false,reason,...(stage?{stage}:{})}),base=prefix+';WizrdMCF;';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const roots=['ExportTextFileParamsWizard','ExportTextFilePreviewWizard'].flatMap(name=>exact(base+name).filter(e=>e.checkVisibility({checkVisibilityCSS:true})).map(e=>({name,e})));
@@ -28,7 +28,8 @@ export function readTextExportBrowser({prefix,fields}){
   const c=cmp(base+name+';edtConnection');if(c?.getValue?.()!=='Локальное')return fail('export_connection');
  }else{
   const c=cmp(base+name+';edtFormatType;ValueControl'),v=c?.getValue?.(),sw=cmp(base+name+';edtFormatType;SwitchButton');
-  if(!v||Object.values(v).length!==1||String(Object.values(v)[0])!=='0'||sw?.pressed!==false)return fail('export_fixed_width_or_variable');
+  if(!v||Object.values(v).length!==1||!['0','1'].includes(String(Object.values(v)[0]))||sw?.pressed!==false)return fail('export_format_or_variable');
+  format=String(Object.values(v)[0])==='1'?'fixed_width':'delimited';
  }
- return {verified:true,stage,values,connection:'Локальное',format:'delimited',settings_applied:false};
+ return {verified:true,stage,values,connection:'Локальное',format,settings_applied:false};
 }

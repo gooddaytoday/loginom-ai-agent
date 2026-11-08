@@ -156,5 +156,7 @@ test('the installed catalog and request validator admit Enter with both tabular 
  const source={document_id:'doc',workflow_id:'flow',node_id:'input'};
  const request={operation_id:'regression',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:'Scenario'}]},target:{kind:'new',type:'datamining.lin_regression'},inputs:[{source,output:0,input:0}],mode:'enter',parameters:{input_fields:['Factor'],target_field:'Response'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
  assert.equal(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
- assert.throws(()=>validateNodeApplyRequest({...request,mode:'ridge'},support.nodeApplyHandlers),/mode|Enter/);
+ assert.throws(()=>validateNodeApplyRequest({...request,mode:'ridge'},support.nodeApplyHandlers),/ridge requires/);
+ assert.equal(validateNodeApplyRequest({...request,mode:'ridge',parameters:{...request.parameters,linear_regression:{lambda_l2:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
+ assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l2.minimum,0);
 });

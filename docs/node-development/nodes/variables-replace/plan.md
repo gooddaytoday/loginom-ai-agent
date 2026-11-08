@@ -121,3 +121,23 @@ Regex/прочие unmatched-политики, смена типа, файлы �
 ## 6. Точка перепроверки
 
 Прежние задания, oracle и критерии выше сохраняются для своих ревизий. Новая приёмка выполняется по назначению на точном SHA; статическая синхронизация документации не утверждает новые критерии и не переносит прежний PASS. Текущая регистрация и ограничения — в [карточке](README.md).
+
+## 7. Дополнительные режимы LAB-1031 — checkpoint по сеансу
+
+07.11.2026, база `8943d291b046698d67828f19dcca88aab790cf2c`.
+В новом разрешённом сеансе закрыты хвосты: у обоих аккаунтов 0 открытых
+пакетов, logout подтверждён. Подготовлена отдельная копия источника; regex,
+ASCII insensitive, precision=0.1 и other=NULL прошли native Execute,
+Save/reopen/Close/logout. [Матрица](discovery-modes.md) содержит TID и значения.
+
+Смена типа дала объявленный Variant при keep; Variant integer→string и
+other=value подтвердились в Execute. Typed Save/reopen отказал из-за native
+назначения «Активное» для «Разное». Datetime-редактор отбросил ненулевые мс;
+положительная замена даты, other=regex и файлы правил остаются not_checked.
+После двух разрывов с UTC/load исследование остановлено без третьего восстановления.
+
+Комплект match-среза: [task](acceptance/task-match-modes.md), fixtures modes-*.json,
+[oracle/expected](acceptance/modes/oracle.py), [карточка](node-card-modes-proposal.json),
+[reference](skill-modes-proposal.md). Typed-проба помечена как не прошедшая persistence.
+Оценка match-среза 2 цикла + 1 резервный, есть аддитивная зависимость от W1 Variant.
+Поддержка exact и его критерии не менялись; новых callable typed/file-режимов нет.

@@ -203,8 +203,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&state.node_clustering.kind==='normalization'&&state.node_clustering.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
     &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
     &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
+  const allowedLogRegressionEditor=(dialog,state)=>state.wizard?.stage==='normalization'&&state.node_logregression?.verified===true
+    &&state.node_logregression.kind==='normalization'&&state.node_logregression.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
+    &&dialog.identity?.anchor_tid===state.node_logregression.editor.root_tid
+    &&state.node_logregression.editor.record_ids.length>0&&state.node_logregression.editor.record_ids.every(id=>state.node_logregression.selected.includes(id));
   const allowedTreeConversionEditor=(dialog,state)=>{const c=state.node_tree,portal=c?.editor??c?.delete_confirmation;return state.wizard?.stage==='table_tree'&&c?.verified===true&&portal&&c.selected.length===1&&c.selected[0]===portal.selected_record_id&&(portal.root_tid==='msgbox'?state.ui.elements.some(e=>e.tid==='msgbox;tlb;yes'&&e.signature?.dialog_ref===dialog.ref):dialog.identity?.anchor_tid===portal.root_tid);};
-  const allowedNodeEditor=(dialog,state)=>allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedDataToVarFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedNodeEditor=(dialog,state)=>allowedLogRegressionEditor(dialog,state)||allowedSamplingFactorEditor(dialog,state)||allowedTreeConversionEditor(dialog,state)||allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedDataToVarFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedCalculatorPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -632,8 +636,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const replacementTypeMenus=readReplacement&&wizard?.stage==='replacement'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';ReplaceColumnsWizard;btnTypeChange;mn'):[];
         if(replacementTypeMenus.length>1)throw Error('Replacement type menu is ambiguous');
         const trainingRoot=readTraining?(roots.output.ui?.elements??[]).find(e=>e.tid==='mn')?.ref:undefined;
-        const normEditor=readClustering&&wizard?.stage==='normalization'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';ColumnsEditForm')?.ref:undefined;
-        const normPortal=readClustering&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
+        const normEditor=(readClustering||readLogRegression)&&wizard?.stage==='normalization'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';ColumnsEditForm')?.ref:undefined;
+        const normPortal=(readClustering||readLogRegression)&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
         const treeEditor=readTrees&&wizard?.stage==='table_tree'?(roots.output.ui?.elements??[]).find(e=>e.tid==='EditDataTreeNodeDefForm')?.ref:undefined;
         const treeQuestion=readTrees&&wizard?.stage==='table_tree'&&roots.output.ui?.dialogs?.length===1?roots.output.ui.dialogs[0].ref:undefined;
         const root = (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));

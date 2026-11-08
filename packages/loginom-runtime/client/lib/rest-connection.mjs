@@ -137,11 +137,21 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
    const value=name=>find(fields+name).locator('input').inputValue();
    return {name:await value('fldLabel'),base_url:await value('pedURL;ValueControl'),method:await value('pedVerb;ValueControl'),url_mode:await value('pedFieldType;ValueControl'),authentication:await value('txtAuth'),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
+    ...(t.connection.request_content_type!==undefined?{request_content_type:await find(fields+'pedRequestContentType;ValueControl').locator('input').count()?await value('pedRequestContentType;ValueControl'):null}:{}),
     ...(t.connection.response_content_type!==undefined?{response_content_type:await value('pedResponseContentType;ValueControl')}:{}),
     parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   };
   let observed=await read();
-  need(observed.method==='GET'&&observed.url_mode==='Строка запроса'&&observed.authentication==='Не требуется'&&!observed.ignore_certificate,'only GET/query without authentication and with certificate verification is supported');
+  need(['GET','POST','PUT','PATCH','DELETE'].includes(observed.method)&&observed.url_mode==='Строка запроса'&&observed.authentication==='Не требуется'&&!observed.ignore_certificate,'only HTTP/query without authentication and with certificate verification is supported');
+  const method=t.connection.method??(existing.length?observed.method:'GET');
+  need(!existing.length||observed.method===method,'saved connection method differs; use a NEW connection name for another method');
+  if(observed.method!==method){
+   await click(fields+'pedVerb;ValueControl');
+   await click(fields+'pedVerb;ValueControl;boundlist;'+method);
+   await wait('selected HTTP method',async()=>await find(fields+'pedVerb;ValueControl').locator('input').inputValue()===method);
+  }
+  if(t.connection.request_content_type!==undefined&&(await read()).request_content_type!==t.connection.request_content_type)
+   await fill(fields+'pedRequestContentType;ValueControl',t.connection.request_content_type);
   if(t.connection.response_content_type!==undefined&&observed.response_content_type!==t.connection.response_content_type)
    await fill(fields+'pedResponseContentType;ValueControl',t.connection.response_content_type);
   if(!existing.length){
@@ -160,6 +170,8 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    }
   }
   observed=await read();
+  need(observed.method===method,'request method differs');
+  need(t.connection.request_content_type===undefined||observed.request_content_type===t.connection.request_content_type,'request Content-Type differs');
   need(t.connection.response_content_type===undefined||observed.response_content_type===t.connection.response_content_type,'allowed response Content-Type differs');
   need(observed.name===t.connection.name&&(!t.connection.base_url||observed.base_url===t.connection.base_url),'connection label or URL differs');
   need(JSON.stringify(observed.parameters.map(p=>p.name))===JSON.stringify(t.query_parameters.map(p=>p.name))&&observed.parameters.every(p=>p.type==='Строковый'),'saved query parameters differ');
@@ -170,6 +182,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
   need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
   await connectionOwner.dispose();
   const persisted={name:await find(fields+'fldLabel').locator('input').inputValue(),base_url:await find(fields+'pedURL;ValueControl').locator('input').inputValue(),method:await find(fields+'pedVerb;ValueControl').locator('input').inputValue(),url_mode:await find(fields+'pedFieldType;ValueControl').locator('input').inputValue(),authentication:await find(fields+'txtAuth').locator('input').inputValue(),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
+   ...(t.connection.request_content_type!==undefined?{request_content_type:await find(fields+'pedRequestContentType;ValueControl').locator('input').inputValue()}:{}),
    ...(t.connection.response_content_type!==undefined?{response_content_type:await find(fields+'pedResponseContentType;ValueControl').locator('input').inputValue()}:{}),
    parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   need(JSON.stringify(persisted)===JSON.stringify(observed),'saved connection readback differs');
@@ -179,7 +192,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll((es,label)=>es.filter(e=>e.textContent.trim()===label).map(e=>e.getAttribute('data-tid')),t.workflow_ref.navigation_path.at(-1).label);return es.length===1?es[0]:null;
   });
   await click(workflow,true);const graphTid=t.workflow_ref.prefix+';ModelForm;cmpDiagram';await wait('original workflow graph',()=>find(graphTid).isVisible());await quiet();
-  const connection={name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name)};
+  const connection={name:persisted.name,base_url:persisted.base_url,method:persisted.method,url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.request_content_type!==undefined?{request_content_type:persisted.request_content_type}:{}),...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name)};
   if(reusedReference){
    const graph=await readPlacementGraph(page,{request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types});
    need(graph.complete===true&&graph.interaction_ready===true&&graph.document_id===t.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(t.workflow_ref)

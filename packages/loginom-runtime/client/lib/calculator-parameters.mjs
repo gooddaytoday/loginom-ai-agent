@@ -2,6 +2,7 @@ const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const types=['integer','real','string','boolean','datetime'];
 const properties=['name','label','type','formula','replace'];
+const flags=['intermediate','cached'];
 
 export function validateCalculatorParameters(parameters,mode,request) {
   requireValue(mode==='expression','Only Loginom expression syntax is supported');
@@ -14,7 +15,7 @@ export function validateCalculatorParameters(parameters,mode,request) {
   const targets=new Set(),names=new Set();
   for(const [index,e] of parameters.expressions.entries()) {
     const path='parameters.parameters.expressions['+index+']';
-    requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties].includes(k)),'Invalid expression parameters');
+    requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties,...flags].includes(k)),'Invalid expression parameters');
     const t=e.target;
     requireValue(t&&typeof t==='object'&&!Array.isArray(t)&&['new','existing'].includes(t.kind),
       'Invalid '+path+'.target: choose {kind:new} or {kind:existing,name:saved_name}');
@@ -35,6 +36,7 @@ export function validateCalculatorParameters(parameters,mode,request) {
     if(e.formula!==undefined)requireValue(typeof e.formula==='string'&&e.formula.trim().length>0&&e.formula.length<=2048
       &&!/[\r\0]/.test(e.formula)&&e.formula.split('\n').length<=128,'Bounded nonempty LF expression required');
     if(e.replace!==undefined)requireValue(typeof e.replace==='boolean','Expression replacement must be boolean');
+    for(const k of flags)if(e[k]!==undefined)requireValue(typeof e[k]==='boolean','Expression '+k+' must be boolean');
   }
   if(parameters.order!==undefined)requireValue(Array.isArray(parameters.order)&&parameters.order.length>0&&parameters.order.length<=128
     &&parameters.order.every(name)&&new Set(parameters.order.map(n=>n.toLowerCase())).size===parameters.order.length,'Explicit unique expression order required');
@@ -72,7 +74,7 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     requireValue(!existing||matches.length===1,'Existing expression name is missing or ambiguous');
     const before=existing?matches[0]:newNode&&index===0?baseline[0]:null;
     const after=before?structuredClone(before):{intermediate:false,cached:false,description:'',replace:false};
-    for(const key of properties)if(patch[key]!==undefined)after[key]=patch[key];
+    for(const key of [...properties,...flags])if(patch[key]!==undefined)after[key]=patch[key];
     // A new expression inherits no stale formula/options from another row.
     if(existing)resolved[resolved.findIndex(e=>e.record_id===before.record_id)]=after;else resolved.push(after);
     changes.push({before,after,reuse_default:newNode&&index===0});
