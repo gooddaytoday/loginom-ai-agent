@@ -1,5 +1,15 @@
 const need=(ok,message)=>{if(!ok)throw Error('Table to variables: '+message);};
-export const DATA_TO_VAR_FUNCTIONS=Object.freeze({sum:1,count:2,min:4,max:8,avg:16});
+// GroupFunctions bits follow the native FactorEditDialog order; the first ten
+// match GROUPING_FUNCTIONS, first..concat continue it (LAB-1051 discovery).
+export const DATA_TO_VAR_FUNCTIONS=Object.freeze({sum:1,count:2,min:4,max:8,avg:16,median:32,mode:64,standard_deviation:128,
+ unique_count:256,null_count:512,first:1024,last:2048,only:4096,concat:8192});
+const SCALAR=['count','min','max','mode','unique_count','null_count','first','last','only'];
+// Native per-type availability observed in the factor editor. Variant is not
+// admitted: its variable output has no approved exact reader yet.
+export const DATA_TO_VAR_TYPE_FUNCTIONS=Object.freeze({integer:Object.keys(DATA_TO_VAR_FUNCTIONS),real:Object.keys(DATA_TO_VAR_FUNCTIONS),
+ string:[...SCALAR,'concat'],boolean:SCALAR,datetime:SCALAR});
+export const dataToVarMask=(type,functions)=>Number.isSafeInteger(functions)&&functions>0&&Object.hasOwn(DATA_TO_VAR_TYPE_FUNCTIONS,type)
+ &&(functions&~DATA_TO_VAR_TYPE_FUNCTIONS[type].reduce((m,a)=>m|DATA_TO_VAR_FUNCTIONS[a],0))===0;
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
 
@@ -9,8 +19,8 @@ export const dataToVarParametersSchema={type:'object',additionalProperties:false
   description:'Complete selected fields in native field order. Supply the full set when changing configuration.',
   items:{type:'object',additionalProperties:false,properties:{
    field:{type:'object',additionalProperties:false,properties:{kind:{const:'input_field'},name:{type:'string',minLength:1,maxLength:128}},required:['kind','name']},
-   aggregations:{type:'array',minItems:1,maxItems:5,uniqueItems:true,items:{type:'string',enum:Object.keys(DATA_TO_VAR_FUNCTIONS)},
-    description:'Native order: sum,count,min,max,avg. count includes NULL rows; other functions skip NULL. sum/avg return real; count integer; min/max retain numeric type.'},
+   aggregations:{type:'array',minItems:1,maxItems:14,uniqueItems:true,items:{type:'string',enum:Object.keys(DATA_TO_VAR_FUNCTIONS)},
+    description:'Native order as listed. integer/real: all; string: no sum,avg,median,standard_deviation; boolean/datetime: also no concat. count includes NULL; unique_count/null_count skip/count NULL. sum,avg,median,standard_deviation (sample) are real; counts integer; min,max,mode,first,last,only keep the input type; only is NULL unless one distinct value. concat: string, comma, no wrapper, unique, appearance order.'},
   },required:['field','aggregations']}}}};
 
 function validateSpecification(p){
@@ -22,9 +32,9 @@ function validateSpecification(p){
   need(object(f)&&Object.keys(f).sort().join(',')==='aggregations,field'&&object(f.field)
    &&Object.keys(f.field).sort().join(',')==='kind,name'&&f.field.kind==='input_field'&&name(f.field.name),'exact input_field references are required');
   need(!names.has(f.field.name.toLowerCase()),'duplicate selected field');names.add(f.field.name.toLowerCase());
-  need(Array.isArray(f.aggregations)&&f.aggregations.length>0&&f.aggregations.length<=5
+  need(Array.isArray(f.aggregations)&&f.aggregations.length>0&&f.aggregations.length<=14
    &&f.aggregations.every(a=>typeof a==='string'&&Object.hasOwn(DATA_TO_VAR_FUNCTIONS,a))
-   &&new Set(f.aggregations).size===f.aggregations.length,'choose unique sum,count,min,max,avg functions');
+   &&new Set(f.aggregations).size===f.aggregations.length,'choose unique functions from '+Object.keys(DATA_TO_VAR_FUNCTIONS).join(','));
  }
  need(p.fields.reduce((n,f)=>n+f.aggregations.length,0)<=128,'variable inventory exceeds 128');
 }
@@ -54,7 +64,10 @@ export function resolveDataToVarParameters(p,fields){
   &&new Set(fields.map(f=>f.record_id)).size===fields.length,'complete unique input record IDs are required');
  return {fields:p.fields.map(f=>{
   const input=fields.find(x=>x.name===f.field.name);need(input,'input field is missing: '+f.field.name);
-  need(['integer','real'].includes(input.type),'a numeric input field is required: '+f.field.name);
+  const allowed=DATA_TO_VAR_TYPE_FUNCTIONS[input.type];
+  need(allowed,'an integer, real, string, boolean or datetime input field is required: '+f.field.name);
+  const refused=f.aggregations.filter(a=>!allowed.includes(a));
+  need(!refused.length,f.field.name+' ('+input.type+') does not support '+refused.join(',')+'; allowed: '+allowed.join(','));
   const aggregations=Object.keys(DATA_TO_VAR_FUNCTIONS).filter(a=>f.aggregations.includes(a));
   return {input:structuredClone(input),aggregations,mask:aggregations.reduce((mask,a)=>mask|DATA_TO_VAR_FUNCTIONS[a],0)};
  })};

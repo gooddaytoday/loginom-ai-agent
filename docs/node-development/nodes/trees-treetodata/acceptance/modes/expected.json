@@ -17,56 +17,8 @@
           "/items"
         ],
         "index_base": 0,
-        "global_index_proposal": "zero-based across all items, not reset for a new parent",
-        "global_output": {
-          "port": 0,
-          "port_kind": "table",
-          "columns": [
-            {
-              "name": "group",
-              "label_any": true,
-              "type": "string"
-            },
-            {
-              "name": "code",
-              "label_any": true,
-              "type": "string"
-            },
-            {
-              "name": "item_index",
-              "name_any": true,
-              "label_any": true,
-              "type": "integer"
-            },
-            {
-              "name": "global_index",
-              "name_any": true,
-              "label_any": true,
-              "type": "integer"
-            }
-          ],
-          "rows": [
-            {
-              "group": "A",
-              "code": "x",
-              "item_index": 0,
-              "global_index": 0
-            },
-            {
-              "group": "A",
-              "code": "z",
-              "item_index": 1,
-              "global_index": 1
-            },
-            {
-              "group": "B",
-              "code": "y",
-              "item_index": 0,
-              "global_index": 2
-            }
-          ],
-          "ordered": true
-        },
+        "index_position": "native 7.4.2 layout: first column of the array branch",
+        "grouped_documents": "deferred: several JSON rows build a native root array (LAB-1112)",
         "index_metadata": "native generated names need readback; no UI row index substitution"
       },
       "output": {
@@ -74,15 +26,15 @@
         "port_kind": "table",
         "columns": [
           {
+            "name": "batch",
+            "label_any": true,
+            "type": "string"
+          },
+          {
             "name": "item_index",
             "name_any": true,
             "label_any": true,
             "type": "integer"
-          },
-          {
-            "name": "batch",
-            "label_any": true,
-            "type": "string"
           },
           {
             "name": "code",
@@ -97,14 +49,14 @@
         ],
         "rows": [
           {
-            "item_index": 0,
             "batch": "Бета",
+            "item_index": 0,
             "code": "x",
             "qty": 2
           },
           {
-            "item_index": 1,
             "batch": "Бета",
+            "item_index": 1,
             "code": "y",
             "qty": 0
           }

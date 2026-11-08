@@ -16,6 +16,11 @@
       "path": "aggregate-numeric.csv",
       "bytes": 24,
       "sha256": "58e951001e42b03349d44925a11573e6a15c54d7f48b96df4413330022a552da"
+    },
+    {
+      "path": "aggregate-types.csv",
+      "bytes": 163,
+      "sha256": "ea75d03540d689e0643a4a2d32412b00d4a06bcb8766e0caab35f6213523a0c9"
     }
   ],
   "source": "One JavaScript input source plus builtin scenario variables; no DataToVar or exported result",

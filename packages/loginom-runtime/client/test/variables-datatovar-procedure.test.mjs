@@ -5,8 +5,8 @@ import {configureDataToVar,configureDataToVarWizard} from '../lib/variables-data
 const spec=(name='X',aggregations=['sum','count','min','max','avg'])=>({fields:[{field:{kind:'input_field',name},aggregations}]});
 function fixture(){
  const owner={verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'n'};
- const fields=['RowID','X','Category'].map((name,i)=>({record_id:'r'+i,name,label:name,type:i===2?'string':'integer',role:i===0?'selected':'available',order:i===0?0:-1,functions:i===0?1:0,settings:{Separator:',',Wrapper:'',UniqueOnly:false}}));
- let selected=fields[0],editor=null,moves=0,omit='',done=false;const mutations=[];
+ const fields=['RowID','X','Category'].map((name,i)=>({record_id:'r'+i,name,label:name,type:i===2?'string':'integer',role:i===0?'selected':'available',order:i===0?0:-1,functions:i===0?1:0,settings:{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}}));
+ let selected=fields[0],editor=null,moves=0,omit='',done=false,applyHook=null,liveSettings=false;const mutations=[];
  const state=()=>{
   const used=fields.filter(f=>f.role==='selected').sort((a,b)=>a.order-b.order);
   return {prepared_node_context:structuredClone(owner),wizard:{root_tid:'W',stage:done?'done':'datatovar',...(editor?{factor_editor:{status:'rendered_factor_options',selected_field:{field_key:editor.name},options:['sum','count','min','max','average','median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'].map((aggregation,i)=>({aggregation,display_ref:'check'+i,checked:!!(editor.draft&(1<<i)),enabled:true}))}}:{})},
@@ -20,8 +20,12 @@ function fixture(){
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const s=state();assert.ok(o.ready(s),o.condition);const action=o.resolve(s);mutations.push(action);moves++;
   if(action.verb==='wizard_step'){assert.equal(action.ref,'Next');assert.equal(action.expected_stage,'done');done=true;return;}
-  if(action.verb==='set_checked'){const bit=1<<Number(action.ref.slice(5));if(action.checked)editor.draft|=bit;else editor.draft&=~bit;return;}
-  if(action.ref==='FactorEditDialog;btnApply'){editor.field.functions=editor.draft;editor=null;return;}
+  if(action.verb==='set_checked'){const bit=1<<Number(action.ref.slice(5));if(action.checked)editor.draft|=bit;else editor.draft&=~bit;if(liveSettings&&bit===8192)editor.field.settings={...editor.field.settings,Wrapper:'live'};return;}
+  if(action.ref==='FactorEditDialog;btnApply'){
+   // Observed native behavior to model: enabling «Список» writes its list defaults.
+   if(applyHook)applyHook(editor.field);
+   editor.field.functions=editor.draft;editor=null;return;
+  }
   if(action.verb==='double_click'){assert.equal(action.ref,selected.name);editor={field:selected,name:selected.name,draft:selected.functions};return;}
   if(action.verb==='press'){
    assert.equal(action.key,'Delete');const old=selected.order;selected.role='available';selected.order=-1;
@@ -31,7 +35,7 @@ function fixture(){
   if(action.ref.endsWith('btnUp')){const previous=fields.find(f=>f.role==='selected'&&f.order===selected.order-1);assert.ok(previous);previous.order++;selected.order--;return;}
   selected=fields.find(f=>f.name===action.ref);assert.ok(selected,'summary cannot be selected');
  }};
- return {channel,fields,owner,mutations,moves:()=>moves,omit:name=>omit=name};
+ return {channel,fields,owner,mutations,moves:()=>moves,omit:name=>omit=name,onApply:hook=>applyHook=hook,liveSettings:()=>liveSettings=true};
 }
 
 test('DataToVar replaces selected fields and applies the exact native function bitset',async()=>{
@@ -59,10 +63,14 @@ test('DataToVar enables requested factors before disabling the old last factor a
 });
 
 test('DataToVar refuses unsupported/missing fields and incomplete preservation before any gesture',async()=>{
- for(const p of [spec('missing'),spec('Category'),spec('X',['median']),{fields:[]}]){
+ for(const p of [spec('missing'),spec('Category'),spec('Category',['median']),spec('X',['variance']),{fields:[]}]){
   const f=fixture();await assert.rejects(configureDataToVar(f.channel,p));assert.equal(f.moves(),0);
  }
- const f=fixture();f.fields[0].functions=32;await assert.rejects(configureDataToVar(f.channel,{}),/unsupported/);assert.equal(f.moves(),0);
+ for(const [type,functions]of [['integer',16384],['string',1],['boolean',8192],['variant',2]]){
+  const f=fixture();Object.assign(f.fields[0],{type,functions});await assert.rejects(configureDataToVar(f.channel,{}),/unsupported/);assert.equal(f.moves(),0);
+ }
+ const existing=fixture();Object.assign(existing.fields[0],{type:'string',functions:8192|2});
+ assert.equal((await configureDataToVar(existing.channel,{})).effect_possible,false);
  const empty=fixture();await assert.rejects(configureDataToVar(empty.channel,{}, {newNode:true}));assert.equal(empty.moves(),0);
 });
 
@@ -73,4 +81,37 @@ test('DataToVar refuses unknown effect, changed ownership and missing exact row 
  const g=fixture(),observe=g.channel.observe;let count=0;
  g.channel.observe=async o=>{const s=await observe(o);if(++count===2)s.node_datatovar.node_context.node_id='foreign';return s;};
  await assert.rejects(configureDataToVar(g.channel,spec()),/owner/);assert.equal(g.moves(),0);
+});
+
+test('DataToVar applies extended numeric and scalar functions and rebinds only native concat list defaults',async()=>{
+ const f=fixture();
+ const all=['median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'];
+ const r=await configureDataToVar(f.channel,{fields:[...spec('X',all).fields,...spec('Category',['count','min','concat']).fields]});
+ assert.deepEqual(r.configuration.fields.map(x=>[x.name,x.functions]),[['X',16352],['Category',8198]]);
+ assert.deepEqual(r.preservation.native_concat_settings.map(x=>[x.name,x.settings]),[['X',{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}],['Category',{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}]]);
+ assert.equal(r.preservation.field_settings,false);
+ assert.equal(r.configuration.input_fields.find(x=>x.name==='RowID').settings.Separator,',');
+});
+
+test('DataToVar refuses list-setting changes outside the field whose concat Apply toggled',async()=>{
+ const f=fixture();f.onApply(field=>{f.fields.find(x=>x.name==='RowID').settings.Separator=';';});
+ await assert.rejects(configureDataToVar(f.channel,spec('X',['concat'])),/unrelated settings/);
+ const g=fixture();g.onApply(field=>{field.settings={...field.settings,Separator:';'};});
+ await assert.rejects(configureDataToVar(g.channel,spec('X',['median'])),/unrelated settings/);
+});
+
+test('DataToVar refuses concat when native list settings differ from comma, no wrapper, unique, unsorted',async()=>{
+ // Existing custom settings: refused before any gesture, naming the found value.
+ for(const [settings,found,functions]of [[{Separator:';'},/Separator=";"/,0],[{Wrapper:'"'},/Wrapper="\\""/,8192],[{UniqueOnly:false},/UniqueOnly=false/,0],[{Sort:true},/Sort=true/,8192]]){
+  const f=fixture(),x=f.fields[1];Object.assign(x.settings,settings);
+  if(functions){x.role='selected';x.order=1;x.functions=functions;}
+  await assert.rejects(configureDataToVar(f.channel,{fields:[...spec('RowID',['sum']).fields,...spec('X',['concat']).fields]}),found);
+  assert.equal(f.moves(),0);
+ }
+ // A field without requested concat keeps its own list settings.
+ const keep=fixture();keep.fields[1].settings.Separator=';';
+ assert.equal((await configureDataToVar(keep.channel,spec('X',['median']))).configuration.fields[0].functions,32);
+ // Settings bound by the open dialog are verified after Apply and refused.
+ const live=fixture();live.liveSettings();
+ await assert.rejects(configureDataToVar(live.channel,spec('X',['first','concat'])),/concat list settings of X are Wrapper="live".*after native Apply/);
 });

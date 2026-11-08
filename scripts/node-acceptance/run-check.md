@@ -6,6 +6,13 @@ The independent Kaiser oracle checks both ports, exact field order and Factor3
 (NULL scores, zero loadings). Stock final CSV, Save, cold and cleanup apply.
 Oracle and expected values never reach the model.
 
+`duplicates-typed`, `duplicates-empty`, `duplicates-singleton` use the approved
+`duplicates/acceptance/task-{typed-keys,empty,singleton}.md`, one corresponding
+`fixtures/typed-*.csv` and unchanged `acceptance/modes/expected*.json`.
+Only task and CSV reach the model. Stock exact typed matching checks Boolean,
+real precision, civil datetime, NULL versus empty string, all original fields
+and four marker columns; CSV, Save, cold execution and cleanup are required.
+
 `corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
 and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
 production checkpoints verify Spearman followed by Kendall tau-b on the same
@@ -439,6 +446,12 @@ every typed tree instance and schema field against `proposed_tree_output`.
 With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
 table is read with the existing completed-port reader. Repeat on/off run in
 separate chats, profiles and packages; no oracle content reaches the model.
+
+`trees-to-table-indices` uses `trees-treetodata/acceptance/modes/task-indices.md`
+and only `fixtures/modes/documents.csv` (one JSON document). `expected-indices-run.json`
+is derived from the independent `expected.json` case `indices`: one Tree-to-Table
+table with the native global index column (`name_any`, native 7.4.2 position:
+first column of the array branch), CSV, Save, cold.
 
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
