@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {colUnionConfigurationReadback} from '../lib/col-union-readback.mjs';
 function fixture(count=2){
  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},context={verified:true,...node};
@@ -19,4 +21,12 @@ test('positional readback refuses wrong source GUID, lost fields, foreign owners
 test('positional readback proves all three mappings and refuses a missing third input receipt',()=>{
  const f=fixture(3),r=colUnionConfigurationReadback(f);assert.equal(r.input_mappings.length,3);assert.equal(r.output_mapping.fields.length,3);
  f.phases[0].value.ports.pop();assert.throws(()=>colUnionConfigurationReadback(f));
+});
+
+test('production result schema accepts third-port readback and its determining selector',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ const readback=colUnionConfigurationReadback(fixture(3));readback.settings={row_count:'input',padding:'repeat',determining_input:'third'};
+ const result={operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:readback.node,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},configuration:{status:'applied',readback},package_saved:false,cleanup_complete:true,warnings:[]};
+ assert.equal(validate(result).valid,true);
+ readback.input_mappings[2].port=3;assert.equal(validate(result).valid,false);
 });

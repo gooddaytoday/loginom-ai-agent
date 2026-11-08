@@ -148,8 +148,8 @@ const joinConfigurationReadback=object({kind:values('join'),scope:values('observ
 joinConfigurationReadback.anyOf=[{properties:{mode:{const:'full'}}},{properties:{keys:{minItems:1}}}];
 const colUnionConfigurationReadback=object({kind:values('col_union'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{type:'array',items:str,minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('positional'),
- settings:object({row_count:values('minimum','maximum','input'),padding:values('null','repeat','last'),determining_input:values('main','attached')},['row_count','padding']),
- input_mappings:{type:'array',items:object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:{type:'array',items:readbackMappingField,maxItems:1000}}),minItems:2,maxItems:2},
+ settings:object({row_count:values('minimum','maximum','input'),padding:values('null','repeat','last'),determining_input:values('main','attached','third')},['row_count','padding']),
+ input_mappings:{type:'array',items:object({port:{type:'integer',minimum:0,maximum:2},autosync:bool,fields:{type:'array',items:readbackMappingField,maxItems:1000}}),minItems:2,maxItems:3},
  output_mapping:object({port:{const:0},autosync:bool,fields:{type:'array',items:object({...readbackMappingField.properties,excluded:bool}),maxItems:1000}}),package_persistence_verified:{const:false}});
 const enrichConfigurationReadback=object({kind:values('enrich'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{type:'array',items:str,minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('left'),
