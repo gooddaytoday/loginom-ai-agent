@@ -132,3 +132,13 @@ discovery, экранной округлённой Moda или предыдущ�
 прежние результаты detect/profile не подтверждают его. Runtime, общий код
 и продуктовые навыки не менялись. До завершения живого discovery и решения
 владельца предложенные expected/карточки типа не являются принятой спецификацией.
+
+## 8. LAB-1103: типы и ограничения UI
+
+[Дополнение discovery и приёмочные предложения](modes-lab1103.md).
+База — `v040@d355159858e2b090a60b11cc21735fa5206c9308`.
+Boolean/discrete, datetime/continuous и discrete integer/real выполнены
+нативно; предложены `acceptance/oracle-types.py` и `expected-types.json`.
+Новые настройки сверх profile не выставляются в UI; отдельный apply не
+обнаружен. Критерии, точные variant subtypes и разрешённый объём этапа 1
+должен подтвердить владелец. Runtime не изменён, model/cold PASS не заявлен.

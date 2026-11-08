@@ -46,6 +46,7 @@ def expected(case, package_path, quartile_convention=None):
     cases = {
         "sd": ("values", "sd", Fraction(1), Fraction(3)),
         "iqr": ("iqr", "iqr", Fraction("1.5"), Fraction(3)),
+        "quartile-boundaries": ("quartile-boundaries", "iqr", Fraction("1.5"), Fraction(3)),
         "null": ("null", "sd", Fraction(1), Fraction(3)),
         "update": ("update", "sd", Fraction(1), Fraction(3)),
         "sd-boundary": ("sd-boundary", "sd", Fraction("1.3"), Fraction(3)),
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=["sd", "iqr", "null", "update", "sd-boundary",
                                           "iqr-boundary", "fences", "constant",
-                                          "conventions", "conventions-refresh", "quartile-conventions"], default="sd")
+                                          "conventions", "conventions-refresh", "quartile-conventions", "quartile-boundaries"], default="sd")
     parser.add_argument("--quartile-convention", choices=QUARTILE_CANDIDATES,
                         help="Diagnostic hypothesis only; default requires agreement of all remaining candidates")
     parser.add_argument("--package-path", default="{{PACKAGE_PATH}}")
