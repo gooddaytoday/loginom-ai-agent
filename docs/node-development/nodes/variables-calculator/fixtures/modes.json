@@ -1,0 +1,12 @@
+{
+  "civil_date": [2026, 11, 7, 23, 59, 58, 123],
+  "base": 2,
+  "updated_base": 4,
+  "reordered_expression_names": ["mixed", "report_date", "base", "total"],
+  "expressions": [
+    {"name":"report_date","label":"Дата отчёта","type":"datetime","formula":"EncodeDateTime(2026,11,7,23,59,58,123)"},
+    {"name":"mixed","label":"Разное","type":"variant","formula":"7"},
+    {"name":"base","label":"Основа","type":"integer","formula":"2","intermediate":true},
+    {"name":"total","label":"Итого","type":"integer","formula":"base+1"}
+  ]
+}
