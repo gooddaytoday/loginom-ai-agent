@@ -1,7 +1,7 @@
 const need=(v,m)=>{if(!v)throw Error('Ungroup: '+m);};
 const name=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!/[\x00-\x1f]/.test(v);
 export function validateUngroupParameters(p,mode,r){
- need(mode==='shares','only shares supported; computed weights, seasonality and variables are unsupported');
+ need(['shares','computed'].includes(mode),'only shares/computed supported; seasonality and variables are unsupported');
  need(p&&typeof p==='object'&&!Array.isArray(p),'parameters required');
  need(Object.keys(p).every(k=>k==='ungroup'),'unknown parameters');
  const u=p.ungroup;
@@ -22,10 +22,11 @@ export function validateUngroupParameters(p,mode,r){
   need(Object.keys(round).sort().join(',')===(round.format==='none'?'format':'format,value'),'explicit rounding parameter required only for precision/multiple');
   if(round.format!=='none')need(Number.isInteger(round.value)&&round.value>=(round.format==='precision'?0:1)&&round.value<=(round.format==='precision'?12:2147483647),'rounding value outside supported range');
   need(['none','last','proportional','equal'].includes(u.balance),'balance unsupported');
+  if(mode==='computed')need(round.format==='none'&&u.balance==='none','computed supports no rounding or balancing in this cycle');
  }
  need(r.inputs.length<=2&&new Set(r.inputs.map(i=>i.input)).size===r.inputs.length&&r.inputs.every(i=>[0,1].includes(i.input)),'two distinct table inputs required');
  need(r.target.kind==='existing'||r.inputs.length===2,'both totals input 0 and support input 1 required');
- need(r.read.ports.every(p=>p===0)&& (r.finish!=='execute'||r.read.ports.length===1),'only output 0 is supported; execution must read it');
+ need(r.read.ports.every(p=>p===0||mode==='computed'&&p===1)&& (r.finish!=='execute'||r.read.ports.length>0),'shares reads output 0; computed reads output 0 and/or 1');
  need(r.mappings.every(m=>(m.direction==='input'?[0,1].includes(m.port):m.port===0)
   &&(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&f.excluded!==true)),'unsupported mapping or port 1');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
@@ -40,5 +41,6 @@ export function resolveUngroupFields(u,schemas,{requireKinds=true}={}){
 }
 export function ungroupOutputFields(c){
  const u=c.ungroup,totals=c.input_fields[0];
- return [...totals,{name:u.value_field+'_Rounded',label:u.value_field+'_Rounded',type:'real'},c.input_fields[1].find(f=>f.name===u.item_field),{name:'OutputValue',label:'OutputValue',type:'real'}].map(f=>({...f,used:true}));
+ const numeric=c.method==='computed'?totals.find(f=>f.name===u.value_field).type:'real';
+ return [...totals,{name:u.value_field+'_Rounded',label:u.value_field+'_Rounded',type:numeric},c.input_fields[1].find(f=>f.name===u.item_field),{name:'OutputValue',label:'OutputValue',type:numeric}].map(f=>({...f,used:true}));
 }

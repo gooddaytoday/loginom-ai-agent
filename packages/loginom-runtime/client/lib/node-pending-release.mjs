@@ -42,7 +42,7 @@ export function unionWizardOpeningRefusal(operation,receipt){
 // question/buttons, native pending owner and fresh-surface checks.
 function deactivationOpeningBinding(operation,r){
  const state=operation.nodeApply,ref=operation.lastReceipt,n=r?.output?.prepared_node_context;
- const variables=state?.request?.target?.type==='variables.calculator',gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+ const gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
  if(operation.transportUncertain||state?.pending?.phase!=='open'||!['imports.text','variables.calculator'].includes(state.request.target?.type)
   ||r?.action_key!=='ui.act'||ref?.action_key!=='ui.act'||typeof ref.operation_id!=='string'||r.operation_id!==ref.operation_id
   ||r.operation_id!==ref.id||!r.operation_id.startsWith(operation.id+':n')
@@ -54,12 +54,12 @@ function deactivationOpeningBinding(operation,r){
  const s=r.output,path=s.workflow_navigation?.path;
  if(s.authenticated!==true||s.workflow_navigation?.status!=='observed'||!path?.length
   ||!same(path,state.request.workflow_ref.navigation_path)
-  ||!(same(s.workflow_navigation.current_path,[...path,n.pending_wizard_node])||variables&&same(s.workflow_navigation.current_path,path))
+  ||!(same(s.workflow_navigation.current_path,[...path,n.pending_wizard_node])||same(s.workflow_navigation.current_path,path))
   ||!n.pending_wizard_node.tid.startsWith(path.at(-1).tid+'>')
   ||typeof s.dom_epoch?.document!=='string'||typeof s.active_tab_ref!=='string'||s.ui?.dialogs?.length!==1)return null;
  const binding={kind:'deactivation',release_opening:{node:n,workflow_ref:s.workflow_ref,document:s.dom_epoch.document,
   origin:s.origin,build:s.loginom_build,active_tab_ref:s.active_tab_ref,package_identity:s.package_identity,
-  navigation:s.workflow_navigation,dialog:s.ui.dialogs[0],...(variables?{native_pending_overflow:true}:{})}};
+  navigation:s.workflow_navigation,dialog:s.ui.dialogs[0],native_pending_overflow:true}};
  return boundWizardDeactivationConfirmation(s,binding)?structuredClone(binding):null;
 }
 

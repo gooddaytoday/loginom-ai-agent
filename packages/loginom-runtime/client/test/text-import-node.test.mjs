@@ -8,6 +8,22 @@ const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
 
+for(const kind of ['new','existing'])test('bound Import observes its input mapping through Cancel before opening settings: '+kind,async()=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const r={...request(),document_id:'doc',workflow_ref:workflow,target:{kind,type:'imports.text',...(kind==='existing'?{ref:node}:{})},parameters:params()};
+ const operation={id:'bound-import',action:{action_key:'node.apply',revision:'1'},parameters:r,nodeApply:{request:r},importBinding:{}};
+ let prepared;
+ const driver=createTextImportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation,
+  now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{if(e.phase==='node_step_prepared')prepared=e;return e;},
+  execute:async()=>{
+   assert.equal(prepared.action.verb,'variable_mapping_read','no input mapping Done without a requested change');
+   assert.equal(prepared.action.read_only,true);
+   assert.deepEqual(prepared.action.mapping,{direction:'input',kind:'variables',port:0});
+   throw Error('STOP_AFTER_READ_ONLY_MAPPING');
+  }});
+ await assert.rejects(driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000}),/STOP_AFTER_READ_ONLY_MAPPING/);
+});
+
 function coveredImport({existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={}}={}) {
  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const actions=[],records=[];let covered=!repaint,opened=false,pending,generation=0;

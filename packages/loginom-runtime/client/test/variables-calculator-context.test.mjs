@@ -23,6 +23,12 @@ test('native configuration reads selected CodeMirror text and retains unselected
  assert.equal(r.settings_applied,false);assert.equal(r.syntax_validity,'unverified');
  assert.equal(r.expressions[0].type,'integer');assert.equal(r.expressions[1].index,1);
 });
+test('native datetime and intermediate are retained without admitting Variant',()=>{
+ const f=fixture();f.records[1].data.DataType=2;f.records[0].data.Intermediate=true;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.expressions[1].type,'datetime');
+ assert.equal(r.expressions[0].intermediate,true);
+ f.records[1].data.DataType=6;assert.equal(f.read().verified,false);
+});
 test('incomplete or foreign stores, duplicate identities, foreign selection and unsupported native types refuse',()=>{
  for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.isBufferedStore=true,f=>f.store.getCount=()=>3,
   f=>f.store.getData=()=>({items:f.records,getSource:()=>({items:[f.records[0],f.records[0]]})}),

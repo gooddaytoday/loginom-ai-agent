@@ -90,6 +90,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'import-bindings':
+        src = REPO / 'docs/node-development/variables/bindings'
+        return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
+                    input_files=['import-a.csv', 'import-b.csv'], export_count=3, import_initial='import/expected-initial.json',
+                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py')
     if name == 'filter-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
@@ -299,6 +304,15 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name in ['crosstable-numeric', 'crosstable-scalar', 'crosstable-datetime', 'crosstable-null-cells']:
+        kind = name.removeprefix('crosstable-')
+        src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance'
+        task = kind if kind == 'null-cells' else kind + '-aggregates'
+        return dict(source=src, prompt=src / ('task-' + task + '.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-values.csv'], base=None,
+                    expected_name='modes/expected-' + kind + '.json',
+                    oracle=src / 'modes/oracle.py',
+                    export_count={'numeric': 4, 'scalar': 2, 'datetime': 2, 'null-cells': 1}[kind])
     if name == 'crosstable-real-keys':
         src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data',
@@ -341,9 +355,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
-    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding']:
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights']:
         node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
         task, expected, inputs, count = {
+            'ungroup-weights': ('task-weights.md', 'expected-weights.json', ['weights-totals.csv', 'weights-support.csv'], 2),
             'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
             'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
             'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
@@ -351,11 +366,11 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
-                    input_files=inputs, export_count=count)
-    if name == 'corr-ranks':
+                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance/oracle-weights.py'} if name == 'ungroup-weights' else {}))
+    if name in ['corr-ranks', 'corr-discrete']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
-        return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,
-                    input_files=['ranks.csv'], corr_ranks=True)
+        return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,
+                    input_files=['ranks.csv'], corr_ranks='discrete' if name=='corr-discrete' else True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -520,6 +535,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-calculator-modes':
+        src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-datetime-intermediate.md', data=src.parent / 'fixtures', base=None,
+                    expected_name='expected-modes-run.json', variable_initial='expected-modes-initial-run.json',
+                    variable_only=True, variable_read_path='execution', variable_audit='variables-calculator-modes',
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
     if name == 'variables-user-real-date':
         src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
@@ -707,7 +728,7 @@ def expected_for(case, package, cold=False):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
                     outputs=cases[case['grouping_mode']]['stages'][-1:] if cold else cases[case['grouping_mode']]['stages'])
     if case.get('corr_ranks'):
-        expected = read(src / 'expected.json')['cases']['kendall']
+        expected = read(src / 'expected.json')['cases']['discrete_kendall' if case['corr_ranks']=='discrete' else 'kendall']
         expected['package_path'] = package
         return expected
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
@@ -941,14 +962,16 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     assert len(data_rows) == len(expected['rows']), 'CSV_ROW_COUNT'
 
     def limitation(value, col, target):
-        # Owner-approved D76 forms are code-owned and only apply to types300.
-        if scenario_name != 'types300': return None
-        if (col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
+        # LAB-1153: CrossTable permits only omission of exactly zero time.
+        # Keep types300's prior millisecond and negative-zero rules unchanged.
+        if scenario_name not in ['types300', 'crosstable-datetime']: return None
+        if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
                 and math.copysign(1, target) < 0 and value == '0'):
             return 'negative_zero'
         if col['type'] == 'datetime' and isinstance(target, str):
             goal = datetime.fromisoformat(target)
-            if (goal.hour == goal.minute == goal.second == 0 and goal.microsecond != 0
+            if (goal.hour == goal.minute == goal.second == 0
+                    and (goal.microsecond != 0 if scenario_name == 'types300' else goal.microsecond == 0)
                     and value == goal.date().isoformat()):
                 return 'midnight_date'
         return None
@@ -1039,7 +1062,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             key, value = expected['rows'][want][columns[i]['name']], data_rows[actual][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
-    if scenario_name == 'types300' and d76 is not None:
+    if scenario_name in ['types300', 'crosstable-datetime'] and d76 is not None:
         counts = dict(negative_zero=0, midnight_date=0)
         for want, actual in enumerate(pairs):
             for i, col in enumerate(columns):
@@ -1505,9 +1528,10 @@ class Runner:
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
+            if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
-            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and spec.get('grouping_mode') != 'concat' and not spec.get('import_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1527,6 +1551,11 @@ class Runner:
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
+        if case == 'import-bindings':
+            for output in expected['outputs']: output['column_order'] = 'exact'
+            expected['binding_inventory'] = [dict(node=dict(type='imports.text'), parameter='/settings/source/source_path',
+                mode='variable', variable=dict(kind='variables', input=0, name='CsvPath', type='string', is_null=False),
+                source=dict(type='variables.user', output=4))]
         if spec.get('excel_mode') == 'replace':
             write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
             self.phase('excel-seeds', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs', build / 'resources/loginom', folder / 'seed-config.json', folder / 'seeds'], folder, timeout=300)
@@ -1586,24 +1615,36 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'corr-ranks-events.json', evidence)
             self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
-                src / 'expected.json', folder / 'corr-ranks-events.json'], folder, timeout=60)
+                src / 'expected.json', folder / 'corr-ranks-events.json', *(['discrete'] if spec['corr_ranks']=='discrete' else [])], folder, timeout=60)
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
-        if spec.get('excel_named_initial'):
+        if case == 'import-bindings':
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
-            write(folder / 'excel-named-events.json', evidence)
-            self.phase('excel-named-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-named.mjs',
-                src / spec['excel_named_initial'], folder / 'expected.json', folder / 'excel-named-events.json'], folder, timeout=60)
+            updates = [v['value'] for e in evidence if e.get('phase') == 'node_apply_prepared'
+                       and e.get('request', {}).get('target', {}).get('type') == 'variables.user'
+                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == 'CsvPath']
+            assert updates, 'IMPORT_BINDING_SOURCE_UPDATE'
+            expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = updates[-1]
+            write(folder / 'expected.json', expected)
+            write(folder / 'binding-events.json', evidence)
+            self.phase('import-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/import-bindings.mjs',
+                src / spec['import_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if case == 'filter-bindings':
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'binding-events.json', evidence)
             self.phase('filter-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/filter-bindings.mjs',
                 src / spec['filter_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
+        if spec.get('excel_named_initial'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'excel-named-events.json', evidence)
+            self.phase('excel-named-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-named.mjs',
+                src / spec['excel_named_initial'], folder / 'expected.json', folder / 'excel-named-events.json'], folder, timeout=60)
         if spec.get('variables_real_date'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1991,6 +2032,8 @@ class Runner:
             csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
+                            else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('import_initial')
                             else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
                             else expected['outputs'][0] if spec.get('lgd_initial')
                             else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2

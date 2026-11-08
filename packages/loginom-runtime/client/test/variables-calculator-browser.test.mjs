@@ -6,11 +6,12 @@ import {configureVariablesCalculator} from '../lib/variables-calculator-procedur
 import {readVariablesCalculatorContext} from '../lib/variables-calculator-context.mjs';
 import {resolveVariablesCalculatorPatch} from '../lib/variables-calculator-parameters.mjs';
 const fixture=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/variables-calculator/fixtures/expressions.json',import.meta.url)));
+const modes=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/variables-calculator/fixtures/modes.json',import.meta.url)));
 test('rendered UI creates the stage-0 expressions, changes limit and preserves the remaining native records',{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
 },async t=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
- for(const fault of ['background','transient','foreign']){
+ for(const [expressions,fault] of [...['background','transient','foreign'].map(f=>[fixture.expressions,f]),[modes.expressions.filter(e=>e.type!=='variant'),'background']]){
  const page=await browser.newPage();t.after(()=>page.close());
  await page.route('http://variables.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('http://variables.test/');
  await page.evaluate(fault=>{
@@ -39,7 +40,9 @@ test('rendered UI creates the stage-0 expressions, changes limit and preserves t
     const field=make(dialog,editor+';'+key),control=document.createElement('input');control.value=draft[prop];control.oninput=()=>{draft[prop]=control.value;};field.append(control);components.set(field.id,{el:{dom:field},getValue:()=>control.value});
    }
    const combo=make(dialog,editor+';cbxDataType'),picker=make(dialog,editor+';cbxDataType;boundlist');picker.style.display='none';
-   const types=[[1,'Логический'],[3,'Вещественный'],[4,'Целый'],[5,'Строковый']].map(([Value,DisplayText])=>({data:{Value,DisplayText}}));
+   const checkbox=make(dialog,editor+';chbIntermediate'),display=make(checkbox,editor+';chbIntermediate;DisplayEl','button');display.textContent='Промежуточное';
+   display.onclick=()=>{draft.Intermediate=!draft.Intermediate;};components.set(checkbox.id,{el:{dom:checkbox},getValue:()=>draft.Intermediate,disabled:false});
+   const types=[[1,'Логический'],[2,'Дата/Время'],[3,'Вещественный'],[4,'Целый'],[5,'Строковый']].map(([Value,DisplayText])=>({data:{Value,DisplayText}}));
    for(const r of types){const item=make(picker,editor+';type'+r.data.Value);item.textContent=r.data.DisplayText;item.onclick=()=>{draft.DataType=r.data.Value;picker.style.display='none';};}
    const trigger=make(combo,editor+';cbxDataType;trg_picker','button');trigger.textContent='Тип';trigger.onclick=()=>{picker.style.display='block';};
    components.set(combo.id,{el:{dom:combo},getValue:()=>draft.DataType,getStore:()=>({getData:()=>({items:types})}),picker:{el:{dom:picker},getNode:r=>picker.children[types.indexOf(r)],getRecord:e=>types[[...picker.children].indexOf(e)]}});
@@ -52,17 +55,28 @@ test('rendered UI creates the stage-0 expressions, changes limit and preserves t
  const binding={document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'node'}},owner={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node'};
  const readNode=async()=>owner;
  let before=await readVariablesCalculatorContext(page,binding,readNode);assert.equal(before.verified,true);
- const parameters={expressions:fixture.expressions.map(e=>({target:{kind:'new'},...e}))};
+ const parameters={expressions:expressions.map(e=>({target:{kind:'new'},...e}))};
  const plan=resolveVariablesCalculatorPatch(parameters,before,{newNode:true});
  const task={binding,plan,origin:'http://variables.test',build:'7.4.2',deadline:Date.now()+15000};
  const created=await configureVariablesCalculator(page,task,readNode);
  if(fault==='foreign'){assert.equal(created.status,'AMBIGUOUS');assert.equal(await page.locator('[data-tid$=";colExpressionName_Expr1"]').count(),1);continue;}
  assert.equal(created.status,'SUCCEEDED',created.error);
- assert.deepEqual(created.configuration.expressions.map(({name,label,type,formula})=>({name,label,type,formula})),fixture.expressions);
+ assert.deepEqual(created.configuration.expressions.map(({name,label,type,formula,intermediate})=>({name,label,type,formula,intermediate})),expressions.map(e=>({intermediate:false,...e})));
  before=await readVariablesCalculatorContext(page,binding,readNode);
- const patch={expressions:[{target:{kind:'existing',name:'limit'},formula:'120'}]};
+ const name=expressions===fixture.expressions?'limit':'base',formula=name==='limit'?'120':'4';
+ const patch={expressions:[{target:{kind:'existing',name},formula}]};
  const changed=await configureVariablesCalculator(page,{...task,plan:resolveVariablesCalculatorPatch(patch,before)},readNode);
- assert.equal(changed.status,'SUCCEEDED',changed.error);assert.equal(changed.configuration.expressions[0].formula,'120');
- assert.deepEqual(changed.configuration.expressions.slice(1).map(e=>({...e,selected:false})),before.expressions.slice(1).map(e=>({...e,selected:false})));
+ assert.equal(changed.status,'SUCCEEDED',changed.error);assert.equal(changed.configuration.expressions.find(e=>e.name===name).formula,formula);
+ assert.deepEqual(changed.configuration.expressions.filter(e=>e.name!==name).map(e=>({...e,selected:false})),before.expressions.filter(e=>e.name!==name).map(e=>({...e,selected:false})));
+ if(name==='base'){
+  assert.equal(changed.configuration.expressions.find(e=>e.name===name).intermediate,true);
+  for(const intermediate of [false,true]){
+   const previous=await readVariablesCalculatorContext(page,binding,readNode);
+   const plan=resolveVariablesCalculatorPatch({expressions:[{target:{kind:'existing',name},intermediate}]},previous);
+   const toggled=await configureVariablesCalculator(page,{...task,plan},readNode);
+   assert.equal(toggled.status,'SUCCEEDED',toggled.error);
+   assert.deepEqual(toggled.configuration.expressions.map(e=>({...e,selected:false})),previous.expressions.map(e=>({...e,intermediate:e.name===name?intermediate:e.intermediate,selected:false})));
+  }
+ }
  }
 });

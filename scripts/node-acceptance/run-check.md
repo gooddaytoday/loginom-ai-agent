@@ -6,6 +6,13 @@ Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
 Run live acceptance without repeatedly reading live logs:
 
+`import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
+and both original CSVs. Three exports check the initial file, source-only CsvPath
+update on the same Import, and saved-package reopen. The private oracle verifies
+fresh typed rows, field order, variable identities and retained Sentinel; cold
+independently reads the filename binding and W1 mapping before execution.
+Only the business task and the two input files reach the model.
+
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
 from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the
@@ -464,6 +471,16 @@ runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
 
+`crosstable-numeric`, `crosstable-scalar`, `crosstable-datetime`, `crosstable-null-cells`:
+цикл A Кросс-таблицы, соответственно 4/2/2/1 полных отчётов. Задания —
+`transform-crosstable/acceptance/task-*-aggregates.md` и `task-null-cells.md`,
+независимые ожидания — `acceptance/modes/expected-*.json`. Модель получает ровно
+один `aggregate-values.csv` из fixtures и выбранное задание. CSV/Save/cold
+сверяют значения, типы, NULL и порядок полей. Только `crosstable-datetime`
+учитывает D76 `midnight_date`: отсутствие строго нулевого времени; потеря
+ненулевых миллисекунд не разрешена. У numeric нет выходных DateTime-полей,
+`negative_zero` не расширен. Настройки масок и ISO-ожидания прежние (#914).
+
 `crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
 ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
 `docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
@@ -728,6 +745,13 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
+
+`ungroup-weights`: Разгруппировка с расчётом долей по всей выборке,
+положительные целые опорные веса и повторяющиеся позиции. Только
+`task-weights.md` и weights-totals/support.csv передаются модели; независимый
+Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
+повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
@@ -758,3 +782,10 @@ typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
 аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
 свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.
+
+`variables-calculator-modes` uses the approved three-expression datetime/intermediate
+`task-datetime-intermediate.md`. Only the task reaches the model; modes/oracle.py
+supplies the private initial/final W1 expectations. Two typed execution variables
+retain civil milliseconds, IDs, types and order; native configuration retains
+three expressions, intermediate base and every property except base formula 2→4.
+Save, independent cold execution and confirmed package close/logout are required.

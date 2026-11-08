@@ -19,8 +19,9 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
     ||before.input_port.port_guid!==editor.port_guid||before.input_port.opening_operation_id!==editor.opening_operation_id))
     return {verified:false,reason:'mapping_editor_owner'};
   // Only the native, receipt-bound input owner selects the extra role set.
-  const nodeType=before.input_port?.direction==='input'&&before.input_port.port===0
-    &&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules':undefined;
+  const nodeType=before.input_port?.direction!=='input'?undefined
+    :before.input_port.port===0&&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules'
+    :before.input_port.port===1&&before.input_port.node_icon_class==='bg-vendor-icon-ungroupdata'?'transform.ungroup_data':undefined;
   const result=await page.evaluate(readBrowser,editor||nodeType?{prefix:binding.workflow_ref.prefix,editor,node_type:nodeType}:binding.workflow_ref.prefix);
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'mapping_node_changed'};
@@ -30,7 +31,10 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
 // Only local UI stores are read. No model loads, server requests or dataset APIs.
 export function readMappingBrowser(request) {
   const prefix=typeof request==='string'?request:request.prefix,editor=typeof request==='string'?null:request.editor;
-  const inputRolesByType={'datamining.assn_rules':[0,1,2,3,4,5,6,7,8,9]};
+  // Ungroup retains usage 9 (share/weight) on its support input after Execute.
+  // The native port receipt above admits it only for that type and input 1.
+  const inputRolesByType={'datamining.assn_rules':[0,1,2,3,4,5,6,7,8,9],
+    'transform.ungroup_data':[0,1,2,3,4,5,6,7,9]};
   const inputRoles=Object.hasOwn(inputRolesByType,request?.node_type)?inputRolesByType[request.node_type]:[0,1,2,3,4,5,6,7];
   const fail=reason=>({verified:false,reason,source_identity_verified:false});
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};

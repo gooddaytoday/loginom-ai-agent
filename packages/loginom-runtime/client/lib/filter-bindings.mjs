@@ -21,14 +21,14 @@ export function resolveFilterBindings(parameters,bindings,saved){
  validateFilterConditions(result);return result;
 }
 export function preserveFilterBindings(native,parameters,bindings){
- if(!bindings?.length||parameters.groups===undefined)return;
+ if(parameters.groups===undefined)return;
  const rows=parameters.groups.flatMap((g,i)=>[...(i?[null]:[]),...g]);let group=0,condition=0;
  for(const [index,row] of native.rows.entries()){
   if(row.kind==='or'){group++;condition=0;continue;}
-  const parameter=`/groups/${group}/${condition++}/value`,bound=bindings.some(b=>b.parameter===parameter);
+  const parameter=`/groups/${group}/${condition++}/value`,bound=bindings?.some(b=>b.parameter===parameter);
   if(!row.variable_mode)continue;
   const wanted=bound&&rows[index]?{...rows[index],value:row.value}:rows[index];
-  need(rows.length===native.rows.length&&wanted&&filterConditionMatches(row,wanted),'BINDING_CONFLICT','saved row '+row.record_id);
+  need(wanted&&filterConditionMatches(row,wanted),'BINDING_CONFLICT',`saved row ${row.record_id} keeps variable ${(row.value??row.values)?.name}; resend it at the same position as {kind:"variable",name}`);
  }
 }
 export async function configureSavedFilterBindings(channel,parameters,bindings,baseline,{controlVariables}={}){

@@ -24,3 +24,19 @@ test('sets replace selections, retain native field order and allow overlapping f
  assert.throws(()=>resolveCorrAnalysisSets({first_set:['Missing']},actual));
  assert.throws(()=>resolveCorrAnalysisSets({first_set:['X']},actual.map(f=>({...f,type:'string'}))));
 });
+
+for(const mode of ['pearson','spearman','kendall'])test(mode+' accepts discrete integers and only rank modes accept strings',()=>{
+ const fields=[{name:'X',type:'real',kind:'continuous',first_set:true,second_set:false},
+  {name:'Z',type:'integer',kind:'discrete',first_set:false,second_set:true},
+  {name:'Tag',type:'string',kind:'discrete',first_set:false,second_set:false}];
+ assert.doesNotThrow(()=>resolveCorrAnalysisSets({},fields,mode));
+ const text=()=>resolveCorrAnalysisSets({second_set:['Z','Tag']},fields,mode);
+ if(mode==='pearson')assert.throws(text,/pearson.*Tag.*string/);
+ else {
+  assert.deepEqual(text().filter(f=>f.second_set).map(f=>f.name),['Z','Tag']);
+  assert.doesNotThrow(()=>resolveCorrAnalysisSets({first_set:['Tag'],second_set:['X']},fields,mode));
+  assert.doesNotThrow(()=>resolveCorrAnalysisSets({},text(),mode));
+ }
+ for(const type of ['boolean','datetime','variant'])assert.throws(
+  ()=>resolveCorrAnalysisSets({},fields.map(f=>f.name==='Z'?{...f,type}:f),mode),new RegExp(mode+'.*Z.*'+type));
+});
