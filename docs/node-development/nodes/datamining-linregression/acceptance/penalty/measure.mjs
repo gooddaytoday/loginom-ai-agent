@@ -32,7 +32,9 @@ const fixture=await createBundledSkillFixture({after(fn){disposals.push(fn);}});
 try{
  const loader=createSkillLoader({resources:fixture.resources});
  const current=(await loader.describeNodes([base],base.modes))[0];
- await writeFile(join(fixture.directory,'references/nodes/datamining.lin_regression.md'),await readFile(new URL('node-reference-proposal.md',import.meta.url)));
+ const fragments=await readFile(new URL('node-reference-proposal.md',import.meta.url),'utf8');
+ const combined=await readFile(join(fixture.directory,'references/nodes/datamining.lin_regression.md'),'utf8')+'\n'+fragments;
+ await writeFile(join(fixture.directory,'references/nodes/datamining.lin_regression.md'),combined);
  await refreshSkillFixtureManifest(fixture.resources);
  const next=(await createSkillLoader({resources:fixture.resources}).describeNodes([proposed],proposed.modes))[0];
  const safe=JSON.parse(JSON.stringify(next,(_k,v)=>typeof v==='string'&&/^[a-f0-9]{40,64}$/.test(v)?'0'.repeat(64):v));
@@ -53,7 +55,7 @@ try{
  proposed_full_input_schema_bytes:bytes(full.inputSchema),full_schema_diagnostic_before_proposal:before,
  skill_bytes:Buffer.byteLength(skill),proposed_skill_bytes:Buffer.byteLength(skill)-Buffer.byteLength(currentRouting)+Buffer.byteLength(routing),skill_limit:40000,
  current_routing_bytes:Buffer.byteLength(currentRouting),routing_bytes:Buffer.byteLength(routing),
- current_node_reference_bytes:Buffer.byteLength(await readFile(new URL('../../../../../../packages/product/skills/loginom-automation/references/nodes/datamining.lin_regression.md',import.meta.url))),proposed_node_reference_bytes:Buffer.byteLength(await readFile(new URL('node-reference-proposal.md',import.meta.url))),node_reference_limit:6000};
+ current_node_reference_bytes:Buffer.byteLength(await readFile(new URL('../../../../../../packages/product/skills/loginom-automation/references/nodes/datamining.lin_regression.md',import.meta.url))),proposal_fragment_bytes:Buffer.byteLength(fragments),proposed_node_reference_bytes:Buffer.byteLength(combined),node_reference_limit:6000};
  await writeFile(new URL('sizes.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
  console.log(JSON.stringify(result,null,2));
 }finally{for(const dispose of disposals)await dispose();}

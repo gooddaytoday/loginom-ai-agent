@@ -1,32 +1,12 @@
-# Линейная регрессия (`datamining.lin_regression`)
+# Дополнения к справке линейной регрессии
 
-Проект текста для этапа 1; сейчас новые режимы не зарегистрированы.
-Импортируй цель как real/continuous, сохраняй исходные типы остальных полей.
-Задай технические имена input_fields и target_field. RowID не фактор.
-Без нормализации, все строки для обучения, с константой, без валидации.
-При настройке и повторном обучении нужен явный Teach; Execute применяет
-сохранённую модель. Читай прогнозы с порта 0, коэффициенты с порта 1.
-Для выгрузки используй exports.text на порту 0, затем Save.
-
-<!-- mode: enter apply -->
-Enter обучает/переобучает. Apply требует существующей обученной модели,
-прежних ролей, inputs:[], finish:execute; настройки и связи не меняются.
-<!-- /mode -->
-
-<!-- mode: forward backward stepwise -->
-Для отбора используй native Forward/Backward/Stepwise, точность 1e-10.
-linear_regression.selection.criterion: f/adjusted_r2/aic/aicc/bic/hqc.
-R² пока отклоняется до изменений, сообщи причину пользователю.
-Только для f передавай пороги строго 0..1. Forward добавляет при p<0.05,
-Backward исключает при p>0.1; Stepwise использует оба порога,
-add_significance<remove_significance. Отключённый для метода порог лишь
-проверяется. Другим критериям пороги не передавай.
-<!-- /mode -->
-
-<!-- mode: ridge -->
-Ручной Ridge: linear_regression.lambda_l2 — конечное число ≥0; точность 1e-10.
-Автоподбор и привязки в этом режиме не поддерживаются.
-<!-- /mode -->
+Это фрагменты новых режимов для этапа 1, **не замена действующей справки целиком**.
+Вставлять только утверждённый режим в соответствующий раздел
+`packages/product/skills/loginom-automation/references/nodes/datamining.lin_regression.md`.
+Сжимать файл до 6000 Б без потери принятых правил: Integer/continuous при импорте,
+`read.ports:[0,1]`, `NOT_APPLIED`/`effect_possible:false` для r2 и полного примера Ridge.
+Сохранить разделы enter/apply/forward/backward/stepwise/ridge и инструкции cold.
+Elastic Net и auto_lambda ниже остаются проектами, пока цикл отдельно не утверждён.
 
 <!-- mode: lasso -->
 Проект: ручной LASSO, linear_regression.lambda_l1≥0, точность 1e-10.
