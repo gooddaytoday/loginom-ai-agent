@@ -150,7 +150,7 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,...(type==='imports.text'&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
+  return {...drivers,...(type==='imports.text'&&readOnly&&options.operation.parameters.finish==='execute'&&typeof options.isBoundFileInput==='function'?{async beforeTarget(ctx){
    const value=await drivers.beforeTarget?.(ctx);
    const prepared=await prepareImportBinding(options,ctx,config,{saved:true});
    if(prepared){

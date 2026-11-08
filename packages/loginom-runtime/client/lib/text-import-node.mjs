@@ -373,10 +373,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     };
     return {
       ...(operation.parameters?.bindings?.length?{async beforeTarget(ctx){
-        if(operation.parameters?.bindings?.length){
-          operation.importBinding=await prepareImportBinding(options,ctx,{targetOrigin,targetBuild},{expectedPath:sourceReceipt?.source.destination});
-          sourceReceipt??=verified({source:operation.importBinding.file});
-        }
+        operation.importBinding=await prepareImportBinding(options,ctx,{targetOrigin,targetBuild},{expectedPath:sourceReceipt?.source.destination});
+        sourceReceipt??=verified({source:operation.importBinding.file});
         return verified();
       }}:{}),
       verifySource:async (p,ctx)=>{
@@ -606,7 +604,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           if(mode==='execute'){
             await executionDriver.launchGraph();
             const execution=await executionDriver.identify();
-            return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,execution_group:execution,node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true});
+            const continuationSurface=finishedImportSurface(await channel.observe({condition:'bound import execution continuity',readProcesses:true,readOutputs:true,
+              ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true}));
+            return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true});
           }
         }
         const execution=executeRequested?await executionDriver.identify():null;

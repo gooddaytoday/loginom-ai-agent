@@ -55,6 +55,7 @@ export async function prepareImportBinding(options,ctx,config,settings){
  }
 }
 async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath}={}){
+ if(saved&&typeof options.isBoundFileInput!=='function')return null;
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
@@ -63,6 +64,8 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  if(!links.length&&saved)return null;
  need(links.length===1,'BINDING_PORT_MISMATCH');
  const link=links[0];
+ const nodes=graph.nodes.filter(n=>n.ref.node_id===(link.source?.node_id??link.source));
+ if(saved&&(nodes.length!==1||nodes[0].type!=='variables.user'||link.output!==4))return null;
  let mapping,name=r.bindings?.[0]?.variable.name;
  if(r.target.kind==='existing'){
   const target=importBindingChannel(options,ctx,config,r.target.ref);
@@ -79,13 +82,23 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
    need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
   }
  }
- const nodes=graph.nodes.filter(n=>n.ref.node_id===(link.source?.node_id??link.source));
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
  const sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
- const proof=saved?await channel.configureUserVariables([],'close'):
-  sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;
+ let proof=sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;
+ // Cancel in the values editor deactivates the source. Use it only when the
+ // source is already inactive; preview preserves active foreign Imports too.
+ if(saved&&proof?.source_active===false)proof=await channel.configureUserVariables([],'close');
  need(saved||proof?.source_active===true,'BINDING_SOURCE_UNVERIFIED: execute variables.to_table from source output 4 before configuring Import; do not reopen source values');
+ if(saved){
+  need(proof?.verified===true&&proof.cleanup_complete===true&&proof.independent_readback===true,'BINDING_SOURCE_UNVERIFIED');
+  const sourceName=mapping.fields.find(f=>f.name===name)?.source?.name??name;
+  const values=proof.variables?.filter(v=>v.name===sourceName);
+  // Scope before imposing our file/path policy. A different directory retains
+  // native Execute; NULL/empty values still refuse before our bound Execute.
+  if(values?.length===1&&typeof values[0].cell?.value==='string'&&values[0].cell.value.length>0
+    &&!options.isBoundFileInput(values[0].cell.value))return null;
+ }
  const result={...resolveImportBindingValue(proof,name,mapping,expectedPath),proof,source,link,graph,mapping};
  // The host resolves only an observed/admitted file in its own selected input
  // directory. It never turns an arbitrary string into a storage reference.

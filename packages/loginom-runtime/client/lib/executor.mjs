@@ -3697,6 +3697,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
+            isBoundFileInput:path=>{
+              try{requireStorageDestination(path,getStorageBinding()?.directories,'inputs');return true;}
+              catch{return false;}
+            },
             resolveBoundFileSource:path=>{
               // Hand the original native Files witness to this one Import
               // request. Its later graph preflight must not navigate Files or
