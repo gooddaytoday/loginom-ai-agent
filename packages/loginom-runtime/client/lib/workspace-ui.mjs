@@ -3071,7 +3071,22 @@ function readRenderedInputMapping(observation) {
           const imgs=cells.length===1?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:[];
           if(imgs.length===1&&typeof d[flag]==='boolean'&&imgs[0].classList.contains('x-grid-checkcolumn-checked')===d[flag])
             dateTimeCells.set(refOf(imgs[0]),{role,flag,func:d.Func,iso:d.ISO8601,checked:d[flag],record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
+          // The same cell opens the native string-format editor (Ext CellEditing);
+          // a click away from the checkbox image never toggles the flag.
+          if(flag==='DoString'&&cells.length===1&&typeof d.StringFmt==='string')
+            dateTimeCells.set(refOf(cells[0]),{role:'format_cell',func:d.Func,iso:d.ISO8601,string_format:d.StringFmt,record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
         }
+      }
+    }
+    // The active string-format editor is one ComboBox inside the matrix; its
+    // anonymous input carries the typed text. Bind it to the edited record only.
+    if(!discoverRoots&&wizard.stage==='date_time'){
+      const base=wizard.root_tid+';DateReformWizard;',editors=tids.get(base+'grdDataFormat;tbl;celleditor;FormatStrEditor;cbx')??[],panels=tids.get(base+'grdDataFormat')??[];
+      if(editors.length===1&&panels.length===1){
+        // CellEditing belongs to the grid panel, not to its table view.
+        const inputs=[...editors[0].querySelectorAll('input[type="text"]')],panel=globalThis.Ext?.getCmp?.(panels[0].id),context=panel?.findPlugin?.('cellediting')?.context,record=context?.record;
+        if(inputs.length===1&&panel?.el?.dom===panels[0]&&context?.column?.dataIndex==='DoString'&&record?.isModel&&record.data.Func===18&&record.data.ISO8601===false)
+          dateTimeCells.set(refOf(inputs[0]),{role:'format_editor',func:18,iso:false,record_id:String(record.internalId),grid_ref:refOf(panels[0]),wizard_root_ref:wizard.root_ref});
       }
     }
     // A removed date transform can leave a renamed, unbound output behind.
@@ -3346,7 +3361,7 @@ function readRenderedInputMapping(observation) {
       }
       return null;
     };
-    const interactionOf = element => {
+    const interactionOf = (element, accept) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
@@ -3356,7 +3371,7 @@ function readRenderedInputMapping(observation) {
       for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
         charge();
         const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
-        if (hit && (hit===element || element.contains(hit))) return {state:'point_observed',point};
+        if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
           // No text or values: identify the covering layer without reading its
@@ -3469,7 +3484,9 @@ function readRenderedInputMapping(observation) {
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
-      const interaction = interactionOf(element);
+      // A date string-format cell also holds the flag checkbox image: never
+      // choose a point on that image, it would toggle the flag instead of editing.
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
@@ -3621,7 +3638,7 @@ function readRenderedInputMapping(observation) {
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: datatovarField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : ungroupField ? (allowed&&interaction.state==='point_observed'?['click','double_click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : smoothingCell ? (allowed && interaction.state==='point_observed' ? ['click',...(scroll?['scroll']:[])] : []) : elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : enrichField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','right_click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: datatovarField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : ungroupField ? (allowed&&interaction.state==='point_observed'?['click','double_click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : smoothingCell ? (allowed && interaction.state==='point_observed' ? ['click',...(scroll?['scroll']:[])] : []) : elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(dateTimeCell.role==='format_editor'?['fill','press']:[]),...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : enrichField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','right_click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     // VariablesNode has no visible Label cell and cannot be selected like a
@@ -4339,17 +4356,18 @@ function readRenderedInputMapping(observation) {
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const formatCell = current.date_time_cell?.role==='format_cell';
+    const point = (formatCell || current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
-    const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {
+    const hit = await handle.evaluate((element, { point, viewport, isGraphLink, formatCell }) => {
       let checked = 0;
       const ownsPoint = candidate => {
         if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.y) || candidate.x < 0 || candidate.y < 0
           || (viewport && (candidate.x >= viewport.width || candidate.y >= viewport.height))) return false;
         checked++;
         const target = document.elementFromPoint(candidate.x, candidate.y);
-        return target === element || element.contains(target);
+        return (target === element || element.contains(target)) && !(formatCell && target?.closest?.('img.x-grid-checkcolumn'));
       };
       if (ownsPoint(point)) return { point, source: 'box_center', candidates_checked: checked };
       if (!isGraphLink) return null;
@@ -4373,7 +4391,7 @@ function readRenderedInputMapping(observation) {
         } catch { /* Detached or malformed SVG geometry is never a click target. */ }
       }
       return null;
-    }, { point, viewport, isGraphLink });
+    }, { point, viewport, isGraphLink, formatCell });
     if (!hit) {
       if(!effectPossible&&task.snapshot?.wizard?.status==='observed') {
         const waits=trace.filter(e=>e.event==='ui_mask_wait_started').length;
