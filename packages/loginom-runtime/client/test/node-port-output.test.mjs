@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/node-port-output.mjs';
+import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
+import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
@@ -516,4 +518,22 @@ test('typedVariants refusal lists every unreadable Variant cell with its ordinar
  const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
  assert.equal(result.verified,false);assert.equal(result.cleanup_complete,true);
  assert.match(result.reason,/variant_cells r1c0 null unknown\/interface tag 0 frame 60$/);
+});
+
+function emptyVariantCapability(){
+ // Real decoder and adapter; only the transport is faked: row 1 is a VT_EMPTY frame, the others Boolean true.
+ return {read:'async(source,options,decode)=>({pending:0,unsettled:false,read:async(row,column)=>{const payload=Array(48).fill(0);if(row===1){payload[0]=0;payload.fill(7,2,10);}else{payload[0]=11;payload[2]=1;}const d=decode(payload,60);return {row,column,tag:d.tag,payload:payload.slice(0,d.consumed_bytes),frame_size:60};}})',
+  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}};
+}
+const emptyRequest=extra=>({port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true,...extra});
+const readEmpty=(f,extra)=>readNodePortOutput(f.page,f.binding,emptyRequest(extra),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,emptyVariantCapability());
+test('Replacement option reads VT_EMPTY as NULL; other typedVariants paths still refuse it',async()=>{
+ const f=fixture({rows:[['a'],[null],['c']],types:[6]});
+ const refused=await readEmpty(f);
+ assert.equal(refused.verified,false);assert.match(refused.reason,/variant_cells r1c0 null unknown\/interface tag 0/);
+ const read=await readEmpty(fixture({rows:[['a'],[null],['c']],types:[6]}),{variantEmptyIsNull:true});
+ assert.equal(read.verified,true,JSON.stringify(read));
+ assert.deepEqual(read.output.sample.map(r=>[r[0].cell_type,r[0].value]),[['boolean',true],['null',null],['boolean',true]]);
+ assert.equal(read.output.sample[1][0].is_null,true);assert.equal(read.output.sample[1][0].precision,'exact_native');
+ assert.throws(()=>makeNodePortOutputCode(f.binding,emptyRequest({typedVariants:false,variantEmptyIsNull:true}),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000}),/Exact bounded/);
 });

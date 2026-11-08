@@ -214,8 +214,9 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>k!=='typedVariants').sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull'].includes(k)).sort().join(','))
   ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
+  ||Object.hasOwn(request,'variantEmptyIsNull')&&(request.variantEmptyIsNull!==true||request.typedVariants!==true)
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
   ||!Number.isInteger(request.sampleRows)||request.sampleRows<0||request.sampleRows>100
   ||Object.hasOwn(request,'rowOffset')&&(!Number.isSafeInteger(request.rowOffset)||request.rowOffset<0)
@@ -330,7 +331,9 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    // full Collapse/CrossTable path, keep their previous envelopes and calls.
    const variantFailures=[];
    const exactVariants=q.typedVariants===true&&requested>0&&schema.some(c=>c.type==='variant');
-   const nativeDecode=exactVariants?eval('('+variant.decode+')'):null,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
+   const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
+   // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
+   const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
    if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},nativeDecode,eval('('+variant.collect+')'),variant.pins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const helper=sourceBaseline.helper;
