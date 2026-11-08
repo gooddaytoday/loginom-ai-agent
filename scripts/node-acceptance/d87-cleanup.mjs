@@ -8,7 +8,7 @@ process.umask(0o077);
 const [root, configPath, output] = process.argv.slice(2);
 const load = name => import(pathToFileURL(join(resolve(root), 'runtime', name)).href);
 const {verifyResources} = await load('src/resources.mjs');
-const {loginBrowser} = await load('src/connection-check.mjs');
+const {loginBrowser, loginomAddress} = await load('src/connection-check.mjs');
 const {makeWorkspaceUiCode} = await load('client/lib/workspace-ui.mjs');
 const {findNativeStorageRow} = await load('client/lib/text-export-output.mjs');
 const {makeWorkspacePrepareCode} = await load('client/lib/workspace.mjs');
@@ -16,9 +16,11 @@ const {makePackageCleanupCode} = await load('client/lib/package-cleanup.mjs');
 const resources = await verifyResources(root);
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const {login} = config;
+// Prepare compares the exact page path: a pair URL of the public root lands on /app/.
+const app = loginomAddress(login.url);
 const names = config.names ?? [config.name];
 if (!Array.isArray(names) || !names.length || names.some(name => typeof name !== 'string'
-    || !/^(?:[a-f0-9]{64}-(?:[0-9]+-)?)?d87-[A-Za-z0-9_-]+-(?:E[123]\.csv|X1\.xlsx|upload_only\.csv)$/.test(name))) throw Error('D87_NAME_INVALID');
+    || !/^(?:(?:[a-f0-9]{64}-(?:[0-9]+-)?)?d87-[A-Za-z0-9_-]+-(?:E[123]\.csv|X1\.xlsx|upload_only\.csv)|[A-Za-z0-9_-]+-source\.lgp)$/.test(name))) throw Error('D87_NAME_INVALID');
 const directory = login.package_directory.replace(/\/$/, '');
 if (!directory.startsWith('/') || directory.split('/').slice(1).some(p => !p || p === '.' || p === '..')) throw Error('D87_DIRECTORY_INVALID');
 await mkdir(output, {recursive: true, mode: 0o700});
@@ -35,7 +37,7 @@ try {
   const execute = code => new Function('page', `return (${code})(page)`)(page);
   // Loginom's Files toolbar needs a prepared package context (Home has no
   // selected native NodeIndex). Own a pristine draft, then use stock teardown.
-  prepared = await execute(makeWorkspacePrepareCode({loginomUrl: login.url, sessionId: session,
+  prepared = await execute(makeWorkspacePrepareCode({loginomUrl: app, sessionId: session,
     operationId: 'd87-cleanup', intent: 'new_draft',
     compatibility: {loginom_build: '7.4.2', platform: 'linux', browser: 'chromium'}}));
   if (prepared.status !== 'READY') throw Error('D87_DRAFT_PREPARATION_FAILED');
@@ -133,7 +135,7 @@ try {
         .some(e => e.getBoundingClientRect().width && e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden'));
       const cleanup = await new Function('page', `return (${makePackageCleanupCode({sessionId: session,
         documentId: prepared.document_id, account: login.username, packagePath: null,
-        loginomUrl: login.url, loginomBuild: '7.4.2', tabTid: prepared.workflow_ref.tab_tid,
+        loginomUrl: app, loginomBuild: '7.4.2', tabTid: prepared.workflow_ref.tab_tid,
         unsavedDraft: true})})(page)`)(page);
       report.draft_cleanup = cleanup;
       report.logged_out = cleanup.logged_out === true;

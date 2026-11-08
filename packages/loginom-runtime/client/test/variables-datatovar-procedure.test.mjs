@@ -5,7 +5,7 @@ import {configureDataToVar,configureDataToVarWizard} from '../lib/variables-data
 const spec=(name='X',aggregations=['sum','count','min','max','avg'])=>({fields:[{field:{kind:'input_field',name},aggregations}]});
 function fixture(){
  const owner={verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'n'};
- const fields=['RowID','X','Category'].map((name,i)=>({record_id:'r'+i,name,label:name,type:i===2?'string':'integer',role:i===0?'selected':'available',order:i===0?0:-1,functions:i===0?1:0,settings:{Separator:',',Wrapper:'',UniqueOnly:false}}));
+ const fields=['RowID','X','Category'].map((name,i)=>({record_id:'r'+i,name,label:name,type:i===2?'string':'integer',role:i===0?'selected':'available',order:i===0?0:-1,functions:i===0?1:0,settings:{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}}));
  let selected=fields[0],editor=null,moves=0,omit='',done=false,applyHook=null,liveSettings=false;const mutations=[];
  const state=()=>{
   const used=fields.filter(f=>f.role==='selected').sort((a,b)=>a.order-b.order);
@@ -23,7 +23,6 @@ function fixture(){
   if(action.verb==='set_checked'){const bit=1<<Number(action.ref.slice(5));if(action.checked)editor.draft|=bit;else editor.draft&=~bit;if(liveSettings&&bit===8192)editor.field.settings={...editor.field.settings,Wrapper:'live'};return;}
   if(action.ref==='FactorEditDialog;btnApply'){
    // Observed native behavior to model: enabling «Список» writes its list defaults.
-   if((editor.draft^editor.field.functions)&8192)editor.field.settings={...editor.field.settings,UniqueOnly:!!(editor.draft&8192)};
    if(applyHook)applyHook(editor.field);
    editor.field.functions=editor.draft;editor=null;return;
   }
@@ -89,9 +88,9 @@ test('DataToVar applies extended numeric and scalar functions and rebinds only n
  const all=['median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'];
  const r=await configureDataToVar(f.channel,{fields:[...spec('X',all).fields,...spec('Category',['count','min','concat']).fields]});
  assert.deepEqual(r.configuration.fields.map(x=>[x.name,x.functions]),[['X',16352],['Category',8198]]);
- assert.deepEqual(r.preservation.native_concat_settings.map(x=>[x.name,x.settings.UniqueOnly]),[['X',true],['Category',true]]);
+ assert.deepEqual(r.preservation.native_concat_settings.map(x=>[x.name,x.settings]),[['X',{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}],['Category',{Separator:',',Wrapper:'',UniqueOnly:true,Sort:false}]]);
  assert.equal(r.preservation.field_settings,false);
- assert.equal(r.configuration.input_fields.find(x=>x.name==='RowID').settings.UniqueOnly,false);
+ assert.equal(r.configuration.input_fields.find(x=>x.name==='RowID').settings.Separator,',');
 });
 
 test('DataToVar refuses list-setting changes outside the field whose concat Apply toggled',async()=>{
@@ -101,8 +100,18 @@ test('DataToVar refuses list-setting changes outside the field whose concat Appl
  await assert.rejects(configureDataToVar(g.channel,spec('X',['median'])),/unrelated settings/);
 });
 
-test('DataToVar tolerates list settings bound live by the open dialog and verifies them after Apply',async()=>{
- const f=fixture();f.liveSettings();
- const r=await configureDataToVar(f.channel,spec('X',['first','concat']));
- assert.deepEqual(r.preservation.native_concat_settings[0].settings,{Separator:',',Wrapper:'live',UniqueOnly:true});
+test('DataToVar refuses concat when native list settings differ from comma, no wrapper, unique, unsorted',async()=>{
+ // Existing custom settings: refused before any gesture, naming the found value.
+ for(const [settings,found,functions]of [[{Separator:';'},/Separator=";"/,0],[{Wrapper:'"'},/Wrapper="\\""/,8192],[{UniqueOnly:false},/UniqueOnly=false/,0],[{Sort:true},/Sort=true/,8192]]){
+  const f=fixture(),x=f.fields[1];Object.assign(x.settings,settings);
+  if(functions){x.role='selected';x.order=1;x.functions=functions;}
+  await assert.rejects(configureDataToVar(f.channel,{fields:[...spec('RowID',['sum']).fields,...spec('X',['concat']).fields]}),found);
+  assert.equal(f.moves(),0);
+ }
+ // A field without requested concat keeps its own list settings.
+ const keep=fixture();keep.fields[1].settings.Separator=';';
+ assert.equal((await configureDataToVar(keep.channel,spec('X',['median']))).configuration.fields[0].functions,32);
+ // Settings bound by the open dialog are verified after Apply and refused.
+ const live=fixture();live.liveSettings();
+ await assert.rejects(configureDataToVar(live.channel,spec('X',['first','concat'])),/concat list settings of X are Wrapper="live".*after native Apply/);
 });

@@ -3,6 +3,15 @@ import {resolveDataToVarParameters,dataToVarMask,DATA_TO_VAR_FUNCTIONS} from './
 const need=(ok,message)=>{if(!ok)throw Error('Table to variables: '+message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const supported=f=>dataToVarMask(f.type,f.functions);
+// Native list defaults observed on every input record (LAB-1111 live run);
+// the published concat contract is exactly this: comma, no wrapper, unique,
+// appearance order. Other list settings are refused, never rewritten.
+const CONCAT_DEFAULTS=Object.freeze({Separator:',',Wrapper:'',UniqueOnly:true,Sort:false});
+const concatSettingsDiffer=(name,settings)=>{
+ const found=Object.keys(CONCAT_DEFAULTS).filter(k=>settings?.[k]!==CONCAT_DEFAULTS[k]).map(k=>k+'='+JSON.stringify(settings?.[k]));
+ return found.length?'concat list settings of '+name+' are '+found.join(', ')
+  +'; only comma separator, no wrapper, unique values and no sorting are supported':null;
+};
 const FACTORS=['sum','count','min','max','average','median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'];
 
 export async function configureDataToVarWizard(channel,p,{finish='done',newNode=false}={}){
@@ -43,6 +52,10 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
   return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,preservation:{unchanged:true}};
  }
  const plan=resolveDataToVarParameters(p,baseline.input_fields),wanted=new Set(plan.fields.map(f=>f.input.name));
+ for(const f of plan.fields)if(f.aggregations.includes('concat')){
+  const message=concatSettingsDiffer(f.input.name,baseline.input_fields.find(x=>x.name===f.input.name)?.settings);
+  need(!message,message+'. No change was made.');
+ }
  const control=(s,suffix,verb='click')=>{
   const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+suffix&&e.allowed_actions.includes(verb));
   need(es.length===1,'unique wizard control is required: '+suffix);return es[0];
@@ -144,6 +157,8 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
    need(same(s.node_datatovar.node_context,owner)&&s.wizard.root_tid===first.wizard.root_tid,'wizard owner changed');
    const settings=fieldAt(s,name).settings,rebound=expected.map(x=>x.record_id===f.record_id?{...x,settings}:x);
    need(same(s.node_datatovar.input_fields.map(unchanged),rebound),'input identity or unrelated settings changed');
+   const message=(desired.mask&DATA_TO_VAR_FUNCTIONS.concat)?concatSettingsDiffer(name,settings):null;
+   need(!message,message+' after native Apply');
    expected=rebound;concatDefaults.push({name,settings:structuredClone(settings)});
   }else s=await observe('table-to-variables factors applied');
   need(fieldAt(s,name).functions===desired.mask,'applied native function bitset differs');

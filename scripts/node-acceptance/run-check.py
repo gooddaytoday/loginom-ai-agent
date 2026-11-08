@@ -1435,6 +1435,16 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
+    def cleanup_source_copy(self, folder, login, build):
+        # The separate opened source copy is a run-owned fixture in the pair's packages.
+        name = Path(self.current['source_copy']).name
+        assert re.fullmatch(r'[A-Za-z0-9_-]+-source\.lgp', name) and str(Path(self.current['source_copy']).parent) == login['package_directory'].rstrip('/'), 'SOURCE_COPY_OUTSIDE_OWNED_PACKAGES'
+        config = folder / 'source-cleanup-config.json'
+        write(config, dict(login=login, names=[name]))
+        self.phase('source-cleanup', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/d87-cleanup.mjs',
+                   build / 'resources/loginom', config, folder / 'source-cleanup'], folder, timeout=180)
+        self.current['source-cleanup'] = 'storage PASS'
+
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
@@ -2023,6 +2033,7 @@ class Runner:
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('source_package'):
+                        if spec.get('source_package_separate'): r['source_copy'] = source_package_path(spec, r['package'])
                         write(folder / 'source-config.json', dict(login=login, package=source_package_path(spec, r['package'])))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
                     base = spec['base']
@@ -2052,6 +2063,11 @@ class Runner:
                     else:
                         self.failure(r, error, folder)
                 finally:
+                    if r.get('source_copy'):
+                        try: self.cleanup_source_copy(folder, login, build)
+                        except Exception as error:
+                            r['source_cleanup_error'] = str(error)
+                            if r.get('status') != 'FAIL': self.failure(r, error, folder)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:

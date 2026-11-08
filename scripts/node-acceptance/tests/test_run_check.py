@@ -320,6 +320,47 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(runner.source_package_path(scalars, '/own/run-x.lgp'), '/own/run-x-source.lgp')
         self.assertEqual(runner.source_package_path(runner.scenario('variables-column-union'), '/own/run-x.lgp'), '/own/run-x.lgp')
 
+    def test_datatovar_scalars_prompt_opens_source_copy_and_saves_run_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+            for path in [folder, profile, workspace]: path.mkdir()
+            runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True, 'unsaved_changes_discarded': False})
+            runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+            event = {'type': 'tool_use', 'sessionID': 'own-session', 'part': {'tool': 'loginom_dock_action_run', 'state': {
+                'status': 'completed', 'output': json.dumps({'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}}
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def phase(name, command, *args, **kwargs):
+                if name == 'model': (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                elif name != 'variable-oracle': self.fail('Unexpected phase ' + name)
+            with patch.object(instance, 'phase', side_effect=phase):
+                instance.model('variables-from-table-scalars', folder, profile, workspace, '/test/run-x.lgp', {'package_directory': '/test'}, root / 'build')
+            task = (folder / 'task.md').read_text()
+            self.assertIn('копию пакета /test/run-x-source.lgp.', task)
+            self.assertTrue(task.rstrip().endswith('Сохрани пакет как /test/run-x.lgp.'))
+            self.assertNotIn('{{PACKAGE_PATH}}', task)
+            self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
+
+    def test_datatovar_source_copy_cleanup_removes_only_the_owned_copy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            instance = runner.Runner.__new__(runner.Runner)
+            calls = []
+            with patch.object(instance, 'phase', side_effect=lambda name, command, *a, **k: calls.append((name, list(map(str, command))))):
+                instance.current = {'source_copy': '/test/run-x-variables-from-table-scalars-source.lgp'}
+                instance.cleanup_source_copy(folder, {'package_directory': '/test/'}, folder / 'build')
+                for foreign in ['/other/run-x-source.lgp', '/test/run-x.lgp', '/test/../x-source.lgp']:
+                    instance.current = {'source_copy': foreign}
+                    with self.assertRaisesRegex(AssertionError, 'SOURCE_COPY_OUTSIDE_OWNED_PACKAGES'):
+                        instance.cleanup_source_copy(folder, {'package_directory': '/test'}, folder / 'build')
+            self.assertEqual([c[0] for c in calls], ['source-cleanup'])
+            self.assertTrue(calls[0][1][1].endswith('scripts/node-acceptance/d87-cleanup.mjs'))
+            self.assertEqual(runner.read(folder / 'source-cleanup-config.json')['names'], ['run-x-variables-from-table-scalars-source.lgp'])
+            source = (runner.REPO / 'scripts/node-acceptance/d87-cleanup.mjs').read_text()
+            self.assertIn('[A-Za-z0-9_-]+-source\\.lgp', source)
+            self.assertIn('loginomUrl: app', source)
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
