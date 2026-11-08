@@ -1,6 +1,9 @@
 """Independent proposed contingency tables; stdlib, no Loginom or actual output.
 
-Continuous boundaries are authored requirements, not an optimizer prediction.
+The continuous split at 7 is authored, not an optimizer prediction. LAB-1202
+observed unbounded outer limits as Variant NULL and the edited split as
+Variant/real. IncludeUpperBound=True remains a requirement: the native manual
+probe returned False, so this case is blocked, not runnable acceptance.
 Unseen->NULL and additive 0.5 smoothing are quarantined hypotheses, not native
 facts or runnable acceptance cases.
 Observations of 7.4.2, not claimed as a contract: the zero-share replacement
@@ -106,8 +109,8 @@ def expected(case):
                 ClassNumber=index, UniqueValue=None if continuous else ("A", "B")[index],
                 ClassMark=("Low", "High")[index] if continuous else ("[A]", "[B]")[index],
                 EventsCount=e, NonEventsCount=n, EventRate=e / len(group), NonEventRate=n / len(group),
-                LowerBound={"cell_type": "integer", "value": (0, 7)[index]} if continuous else None,
-                UpperBound={"cell_type": "integer", "value": (7, 14)[index]} if continuous else None,
+                LowerBound={"cell_type": "real", "value": 7} if continuous and index == 1 else None,
+                UpperBound={"cell_type": "real", "value": 7} if continuous and index == 0 else None,
                 WoE=float(woe), IV=float(iv), Weight=len(group) / len(rows),
                 IncludeUpperBound=True if continuous else None, PreQuantingApplied=False if continuous else None))
         total_iv = sum(c["IV"] for c in classes)

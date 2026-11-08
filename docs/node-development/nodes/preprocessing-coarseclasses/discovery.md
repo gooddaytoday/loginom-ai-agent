@@ -1,5 +1,58 @@
 # Конечные классы: этап 0, LAB-775
 
+## LAB-1202: представление ручных непрерывных границ
+
+08.11.2026, mas, Loginom 7.4.2, без модели, worker назначенной пары
+`01a14aa4-1756-7550-af99-b8cf2393837a`. Две строки базы цикла:
+`origin/lab-1177-kits@3b434b0cf0d721cda0d6b06fabaf26ec3da0f605`;
+`origin/v040@46ec91bc62f894b59142aee7c8ea4ca573e1b75e`.
+Для native-инструментов использованы неизменённые pinned resources CLI
+`fc66a0e23c52050bf454dac8f346c2b645c43d36` (Node 24.19.0, Chromium 1246).
+Это не сборка и не модельная приёмка реализации цикла 1.
+
+Физически подключён `continuous.csv`: RowID/X integer/continuous,
+Target string/discrete, исходные имена/метки, восемь строк.
+В `CoarseClassesWizard-1;CoarseClassesSettingsFrame` назначены X=input,
+Target=target, event=yes, RowID=unused; prequanting=false.
+Относительно `CoarseClassesWizard-2;CoarseClassesEditor`:
+
+- `btnAllowClassModifying` включает редактирование;
+  `colCoarseClassHighBorder_0` открывает
+  `grdBinning;tbl;celleditor;num`, где введён разделитель 7.
+- `colCoarseClassLowBorder_0` и последняя `colCoarseClassHighBorder_1`
+  показывают −∞/+∞; двойной клик не открыл редактор внешних границ.
+- `btnModifyOk` («Применить») обязателен. До него переход Next отказывается
+  с «Текущее разбиение содержит несохранённые изменения».
+  После него локальная запись `grdUsedColumns` показала
+  `IsLocked=true`, `IsEdited=true`, Count=2, TotalIV=ln(3).
+- При повторном открытии X имеет `ColumnPurpose=3`, пункт роли
+  `cbxColumnPurpose;boundlist;Входное_(замороженное)`.
+  Старый observer допускает только 0/1/4 и возвращает
+  `coarse_classes_field`; будущая реализация должна учитывать эту native-роль.
+
+После Done, отдельного native Train и Execute полностью прочитаны порты 0/1/2
+из свежего завершённого выполнения. На порте 1 внешние границы — Variant NULL,
+а обе границы 7 — Variant/real (native tag 5), несмотря на integer-вход X.
+Номера 0/1, частоты 3/1 и 1/3, WoE=∓ln(3), IV класса=ln(3)/2,
+общий IV=ln(3), PreQuantingApplied=false. Полные схемы и порядок совпали.
+
+**Неразрешённое расхождение:** `IncludeUpperBound=false` в обоих классах.
+Во втором native опыте после переключения X обратно в «Входное» checkbox
+`chkIncludeHighBounds;ValueControl` подтверждён как true до Next; затем
+снова применены два ручных класса с разделителем 7, Done/Train/Execute.
+Свежий типизированный порт 1 снова дал false. Причина не установлена;
+это не доказательство инверсии флага или того, куда попадёт X=7.
+В исходной fixture нет X=7, поэтому совпавшие числа этот вопрос не решают.
+
+Цикл остановлен до правки runtime и модельных прогонов по условию карточки.
+В `acceptance/modes/oracle.py` и expected предложено только исправление
+представления границ: внешние NULL, разделитель real. Нормативное
+`IncludeUpperBound=true` и бизнес-задание сохранены; кейс остаётся заблокирован.
+Нужны решение по конечным 0/14 против native NULL и отдельная проверка точки 7.
+Эти факты не подтверждают CSV/cold или готовность нового обработчика.
+
+## LAB-775: исходное исследование дискретного режима
+
 03.11.2026, mas, Linux x64, база `origin/v040@2910b8782c1ad8c016c6fc478369ddd179457e3e`.
 Стенд только `https://app.loginom.ai/app/?testable=true`, Loginom **7.4.2**,
 Node 24.19.0, Chromium 1246. После уточнения назначения использован worker пары

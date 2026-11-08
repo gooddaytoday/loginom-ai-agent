@@ -253,12 +253,9 @@
           "NonEventsCount": 1,
           "EventRate": 0.75,
           "NonEventRate": 0.25,
-          "LowerBound": {
-            "cell_type": "integer",
-            "value": 0
-          },
+          "LowerBound": null,
           "UpperBound": {
-            "cell_type": "integer",
+            "cell_type": "real",
             "value": 7
           },
           "WoE": -1.0986122886681098,
@@ -279,13 +276,10 @@
           "EventRate": 0.25,
           "NonEventRate": 0.75,
           "LowerBound": {
-            "cell_type": "integer",
+            "cell_type": "real",
             "value": 7
           },
-          "UpperBound": {
-            "cell_type": "integer",
-            "value": 14
-          },
+          "UpperBound": null,
           "WoE": 1.0986122886681098,
           "IV": 0.5493061443340549,
           "Weight": 0.5,
