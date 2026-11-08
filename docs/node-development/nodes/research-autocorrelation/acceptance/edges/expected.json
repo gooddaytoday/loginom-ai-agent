@@ -283,51 +283,22 @@
     "one": "undefined: zero variance",
     "null": "undefined without an explicit missing-data policy"
   },
-  "native_conventions": {
+  "observations_not_claimed": {
     "one": {
-      "output_node_type": "research.auto_correlation",
-      "output_port": 0,
-      "ordered": true,
-      "column_order": "exact",
-      "columns": [
-        {
-          "name": "Lag",
-          "label_any": true,
-          "type": "integer"
-        },
-        {
-          "name": "X_ACF",
-          "label_any": true,
-          "type": "real",
-          "tolerance": {
-            "abs": 1e-08,
-            "rel": 1e-10
-          }
-        },
-        {
-          "name": "X_StdErr",
-          "label_any": true,
-          "type": "real",
-          "tolerance": {
-            "abs": 1e-08,
-            "rel": 1e-10
-          }
-        },
-        {
-          "name": "X_Significant",
-          "label_any": true,
-          "type": "boolean"
-        }
-      ],
-      "rows": [
+      "status": "observation_not_claimed",
+      "accepted_output": false,
+      "observed_rows": [
         {
           "Lag": 0,
           "X_ACF": 1.0,
           "X_StdErr": 0.0,
           "X_Significant": true
         }
-      ]
-    },
+      ],
+      "reason": "One native run; mathematical coefficient undefined at N=1"
+    }
+  },
+  "native_conventions": {
     "empty": {
       "status": "platform_limitation",
       "accepted_output": false,
