@@ -27,6 +27,14 @@ test('ordinary execution alone cannot claim a trained model',()=>{
   assert.throws(()=>clusteringConfigurationReadback(input),/training on the connected source/);
  }
 });
+test('g-means readback reports observed automatic bounds and threshold without fixed k',()=>{
+ const input=candidate(),c=input.phases[1].value.configuration;
+ Object.assign(c,{mode:'g_means',min_clusters:2,max_clusters:4,threshold:1});delete c.clusters;
+ const r=clusteringConfigurationReadback(input);
+ assert.equal(r.mode,'g_means');assert.equal(r.min_clusters,2);assert.equal(r.max_clusters,4);assert.equal(r.threshold,1);
+ assert.equal(Object.hasOwn(r,'clusters'),false);
+ c.min_clusters=5;assert.throws(()=>clusteringConfigurationReadback(input),/bounds/);
+});
 test('Done commits settings without claiming training and foreign settings refuse',()=>{
  const input=candidate();input.phases.at(-1).value.mode='done';delete input.phases.at(-1).value.training;
  assert.equal(clusteringConfigurationReadback(input).training.status,'not_requested');

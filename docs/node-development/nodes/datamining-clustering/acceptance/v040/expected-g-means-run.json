@@ -1,0 +1,161 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "clustering_gmeans": {
+    "source": [
+      {
+        "RowID": 1,
+        "X": 1.0,
+        "Y": 1.0,
+        "Txn": "T1",
+        "Item": "A"
+      },
+      {
+        "RowID": 2,
+        "X": 1.2,
+        "Y": 1.2,
+        "Txn": "T1",
+        "Item": "B"
+      },
+      {
+        "RowID": 3,
+        "X": 9.0,
+        "Y": 9.0,
+        "Txn": "T2",
+        "Item": "A"
+      },
+      {
+        "RowID": 4,
+        "X": 9.2,
+        "Y": 9.2,
+        "Txn": "T2",
+        "Item": "C"
+      },
+      {
+        "RowID": 5,
+        "X": 20.0,
+        "Y": 2.0,
+        "Txn": "T3",
+        "Item": "A"
+      },
+      {
+        "RowID": 6,
+        "X": 20.2,
+        "Y": 2.2,
+        "Txn": "T3",
+        "Item": "B"
+      }
+    ],
+    "min_clusters": 2,
+    "max_clusters": 4,
+    "threshold": 1,
+    "features": [
+      "X",
+      "Y"
+    ],
+    "seed": 42
+  },
+  "outputs": [
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Distance",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Txn",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        }
+      ],
+      "rows": []
+    }
+  ]
+}

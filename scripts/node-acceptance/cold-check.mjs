@@ -1,3 +1,4 @@
+import {checkGmeansRound,observeGmeansSavedSettings} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
@@ -281,10 +282,10 @@ page = context.pages()[0]
    const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved')});
    await record({phase:'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
   }
-  if(expected.clustering_normalized){
+  if(expected.clustering_normalized||expected.clustering_gmeans){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
-   const settings=await observeClusteringSavedSettings({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
+   const settings=await (expected.clustering_gmeans?observeGmeansSavedSettings:observeClusteringSavedSettings)({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
    await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
   }
   const actual=[],ownedExecutions=[];
@@ -490,6 +491,7 @@ page = context.pages()[0]
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
+  if(expected.clustering_gmeans)checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));

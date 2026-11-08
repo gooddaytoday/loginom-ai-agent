@@ -160,6 +160,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
                     expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
+    if name == 'clustering-gmeans':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-g-means.md', data=src.parent.parent / 'fixtures/v040', base=None,
+                    input_files=['probe.csv'], export_count=2, expected_name='expected-g-means-run.json')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
         kind = name.removeprefix('clustering-scale-')
@@ -1804,6 +1808,12 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('clustering_gmeans'):
+            write(folder / 'clustering-gmeans-replies.json', [o for _, o in replies])
+            self.phase('clustering-gmeans-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-gmeans.mjs',
+                folder / 'expected.json', folder / 'clustering-gmeans-replies.json', folder / 'clustering-gmeans-resolved.json'], folder, timeout=60)
+            expected = read(folder / 'clustering-gmeans-resolved.json')
+            write(folder / 'expected.json', expected)
         if expected.get('factor_signs'):
             rounds = {}
             for _, reply in replies:

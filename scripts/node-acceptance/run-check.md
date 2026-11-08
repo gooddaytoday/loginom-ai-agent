@@ -682,3 +682,10 @@ the byte oracle for the file passed through --csv. No oracle reaches the model.
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
+Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
+Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
+Distance из независимой геометрии, точные типы/NULL/порядок, два CSV, Save,
+cold Execute с сохранёнными ролями/auto/min/max/threshold/seed и cleanup.
+Эталон геометрии из stage-0 oracle остаётся только в оснастке.
