@@ -5149,14 +5149,52 @@ function readRenderedInputMapping(observation) {
           }
           return observed;
           };
-          const readStepUi=async fresh=>{if(await deleteLostLinks(fresh))fresh=await readUi();return continueSavedJoin(fresh);};
+          let unionNextRepeated=false;
+          const continueUnionAfterLostLinks=async fresh=>{
+            const owned=s=>unionInputChange&&lostLinksDeleted&&!unionNextRepeated&&lifecycleContextMatches(s)
+              &&s.wizard.stage==='variables_column_union'&&s.wizard.root_ref===current.wizard.root_ref
+              &&s.wizard.owner_context?.status==='observed'&&same(s.wizard.owner_context,current.wizard.owner_context)
+              &&same(s.prepared_node_context,current.prepared_node_context)&&s.ui.masks.length===0;
+            if(!owned(fresh))return fresh;
+            // Native probe LAB-1107: Yes removes lost links, but validation
+            // keeps this page and changes Next to "Всё равно далее". Only this
+            // observed warning permits one new Next; never another Yes.
+            const warning=await page.evaluate(rootTid=>{
+              const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],root=exact(rootTid),errors=exact(rootTid+';btnError'),next=exact(rootTid+';btnNext');
+              if(root.length!==1||errors.length!==1||next.length!==1)return null;
+              for(const e of [root[0],errors[0],next[0]])if(!e.checkVisibility({checkVisibilityCSS:true}))return null;
+              if(!root[0].contains(errors[0])||!root[0].contains(next[0])
+                ||globalThis.Ext?.getCmp(errors[0].id)?.el?.dom!==errors[0]||globalThis.Ext?.getCmp(next[0].id)?.el?.dom!==next[0]
+                ||next[0].getAttribute('data-qtip')!=='Всё равно далее')return null;
+              const text=errors[0].getAttribute('data-qtip');if(typeof text!=='string'||text.length>40000)return null;
+              const lines=text.split(String.fromCharCode(10)),suffix=' не сопоставлена входная переменная';
+              if(!lines.length||lines.length>128||lines.some((line,i)=>{
+                const prefix=(i+1)+'. Выходной переменной ',label=line.slice(prefix.length,-suffix.length);
+                return !line.startsWith(prefix)||!line.endsWith(suffix)||label.length<1||label.length>240||label.includes(String.fromCharCode(13));
+              }))return null;
+              return {text};
+            },current.wizard.root_tid);
+            if(!warning)return fresh;
+            const checked=await readUi(),buttons=checked.ui.elements.filter(e=>e.tid===current.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+            if(!owned(checked)||!same(fresh.dom_epoch,checked.dom_epoch)||buttons.length!==1)return checked;
+            const target=await checkedHandle(buttons[0],buttons[0],'wizard_step');
+            if(!same(await boundNode(),current.prepared_node_context))fail('PREPARED_NODE_CONTEXT_CHANGED','Union owner changed before its post-question Next');
+            const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+              if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+            if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Union warning changed before its post-question Next');
+            unionNextRepeated=true;timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+            record('variables_union_next_repeated_after_lost_links',{button:buttons[0].tid,warning:warning.text,settings_applied:false});
+            return readUi();
+          };
+          const readStepUi=async fresh=>{if(await deleteLostLinks(fresh))fresh=await readUi();return continueSavedJoin(await continueUnionAfterLostLinks(fresh));};
           observed=await readStepUi(observed);
           const unchangedContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
             && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
             && same(fresh.active_identity,current.active_identity) && fresh.wizard.status==='observed'
             && fresh.wizard.root_ref===current.wizard.root_ref && same(fresh.ui.dialogs,current.ui.dialogs);
-          // Wait only for this one click. No timeout or intermediate mask can
-          // issue a second click or turn a closed wizard into an applied claim.
+          // Other steps wait only for their one click. The private union path
+          // above permits one fresh Next after its exact question and warning;
+          // a timeout never grants another gesture or an applied claim.
           for(let attempt=0;attempt<(task.opening_timeout_ms?225:24) && unchangedContext(observed)
             && (!destination(observed.wizard.stage) || observed.ui.masks.length);attempt++) {
             const calculatorValidation=current.wizard.stage==='calculator';
