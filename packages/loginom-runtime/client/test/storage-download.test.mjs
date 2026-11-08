@@ -51,6 +51,29 @@ async function sourceNavigation(t,fault,options={}) {
  return {result,records,deadlines,page,refreshed,runtime:r,native,showGraph:()=>{opened=false;}};
 }
 
+test('Import binding consumes its observed file witness after Files returns to the graph',async t=>{
+ const node={document_id:'d',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
+ const graph={complete:true,document_id:'d',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+ const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});let checked=0;
+ const f=await sourceNavigation(t,undefined,{
+  nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,reconcile:ok,activateWorkflow:async()=>({...await ok(),status:'SUCCEEDED',document_id:'d',workflow_ref:workflow})}),
+  nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:ok}]]),
+  nodeApplyDriverFactory:context=>({verifySource:async()=>{
+   f.showGraph();
+   try{
+    const source=await context.resolveBoundFileSource('/worker/full.csv');checked++;
+    assert.equal(source.verified,true);assert.equal(source.bytes,3);
+    assert.throws(()=>context.resolveBoundFileSource('/worker/other.csv'),/BINDING_SOURCE_UNVERIFIED/);
+    return ok();
+   }catch(error){error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+  },mapPorts:ok,openWizard:ok,finish:async mode=>({...await ok(),mode,settings_applied:true,execution_started:false}),waitExecution:ok,readOutput:ok,verifyContinuation:async()=>true}),
+ });
+ const request={operation_id:'bound-file',contract_revision:'1.0.0',document_id:'d',workflow_ref:workflow,target:{kind:'existing',type:'imports.text',ref:node},inputs:[],mode:'delimited',parameters:{settings:{}},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const result=await f.runtime.runNodeApply(request);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(checked,1);
+ const stale=await f.runtime.runNodeApply({...request,operation_id:'bound-file-again'});
+ assert.notEqual(stale.status,'SUCCEEDED');assert.match(stale.error.message,/BINDING_SOURCE_UNVERIFIED/);assert.equal(checked,1);
+});
+
 for(const change of ['unchanged','bytes','mtime'])test('import retry after released STALE reopens Files and rechecks the original native witness: '+change,async t=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',
   tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};

@@ -41,7 +41,19 @@ export function resolveImportBindingValue(proof,name,mapping){
  if(field)need(field.type===5&&field.source?.type===5&&field.source.id===v.id,'BINDING_SOURCE_UNVERIFIED');
  return {value:v.cell.value,variable:v,name};
 }
-export async function prepareImportBinding(options,ctx,config,{saved=false}={}){
+export async function prepareImportBinding(options,ctx,config,settings){
+ try{return await readImportBindingSource(options,ctx,config,settings);}
+ catch(error){
+  const op=options.operation,r=op.parameters;
+  if(/^BINDING_/.test(error.message)&&!op.targetPhase&&!op.transportUncertain&&op.cleanupConfirmed!==false){
+   const graph=await op.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
+   if(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id)
+    error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+  }
+  throw error;
+ }
+}
+async function readImportBindingSource(options,ctx,config,{saved=false}={}){
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
@@ -73,8 +85,8 @@ export async function prepareImportBinding(options,ctx,config,{saved=false}={}){
  const result={...resolveImportBindingValue(proof,name,mapping),proof,source,link,graph,mapping};
  // The host resolves only an observed/admitted file in its own selected input
  // directory. It never turns an arbitrary string into a storage reference.
- need(typeof options.resolveDeliveredSource==='function','BINDING_SOURCE_UNVERIFIED');
- const file=await options.resolveDeliveredSource(result.value);
+ need(typeof options.resolveBoundFileSource==='function','BINDING_SOURCE_UNVERIFIED');
+ const file=await options.resolveBoundFileSource(result.value);
  need(file?.kind==='storage'&&file.verified===true&&file.destination===result.value,'BINDING_SOURCE_UNVERIFIED');
  return {...result,file};
 }

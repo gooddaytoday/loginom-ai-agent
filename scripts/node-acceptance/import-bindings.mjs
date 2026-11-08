@@ -29,8 +29,7 @@ export function auditImportBindings(events,initial,final){
  return {status:'PASS',node:first.result.node,binding:b,initial_execution_id:first.result.execution.execution_id,final_execution_id:second.result.execution.execution_id};
 }
 export async function observeImportBindingInventory({load,graph,channelFor,expected,record}){
- const {resolveImportBindingValue,importBindingInventory}=await load('client/lib/import-bindings.mjs');
- const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs'),{closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
+ const {resolveImportBindingValue,importBindingInventory,readImportBindingField}=await load('client/lib/import-bindings.mjs');
  const result=[];
  for(const want of expected.binding_inventory){
   assert.equal(want.node.type,'imports.text');
@@ -41,10 +40,7 @@ export async function observeImportBindingInventory({load,graph,channelFor,expec
   const channel=channelFor(node,'cold-import-binding'),mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
   assert.ok(mapped.verified&&mapped.cleanup_complete&&mapped.independent_readback);
   const value=resolveImportBindingValue(proof,want.variable.name,mapped.mapping);
-  await openPreparedWizard(channel);
-  let s;
-  try{s=await channel.observe({condition:'cold saved Import binding',ready:s=>s.wizard?.stage==='text_import_file'&&s.wizard.import_source?.fields?.source_path?.status==='observed'});
-  }finally{const close=await closePreparedWizard(channel);assert.ok(close.verified&&close.cleanup_complete&&close.settings_applied===false);}
+  const s=await readImportBindingField(channel);
   const bindings=importBindingInventory(s.wizard.import_source.fields.source_path,{...value,mapping:mapped.mapping,source,link:links[0],graph},node),b=bindings[0];
   assert.equal(b.parameter,want.parameter);assert.equal(b.mode,want.mode);
   for(const [key,value] of Object.entries(want.variable))assert.deepEqual(b.variable[key],value);

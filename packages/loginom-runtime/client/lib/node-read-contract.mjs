@@ -26,7 +26,7 @@ export function isUnchangedTransformExecution(request){
 // configuration, not a new file or an upload receipt from a previous session.
 export function isUnchangedTextImportExecution(request){
  return request?.target?.type==='imports.text'&&request.target.kind==='existing'
-  &&!request.bindings?.length&&!(request.variable_inputs?.length)
+  &&!request.bindings?.length
   &&request.mode==='delimited'&&request.finish==='execute'
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0

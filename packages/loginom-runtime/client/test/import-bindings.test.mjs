@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
-import {resolveImportBindingValue,importBindingInventory} from '../lib/import-bindings.mjs';
+import {resolveImportBindingValue,importBindingInventory,readImportBindingField,readImportBindings} from '../lib/import-bindings.mjs';
 import {isUnchangedTextImportExecution} from '../lib/node-read-contract.mjs';
 
 const binding={parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'CsvPath'}};
@@ -47,4 +47,14 @@ test('independent filename inventory proves the selected caption, mapped IDs, so
  assert.equal(importBindingInventory(f.field,prepared,f.node)[0].source.variable_id,7);
  for(const field of [{...f.field,variable_mode:false},{...f.field,variable_caption:'Sentinel ( /own/a.csv )'},{...f.field,value:'/own/b.csv'}])assert.throws(()=>importBindingInventory(field,prepared,f.node),/BINDING_/);
  const bad=structuredClone(f.mapping);bad.port_guid='foreign';assert.throws(()=>importBindingInventory(f.field,{...prepared,mapping:bad},f.node),/BINDING_PORT_MISMATCH/);
+});
+for(const fault of ['observe','mapping'])test('Import readback Cancels its owned wizard after '+fault+' refusal',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'import',verified:true,tid:'N',locked:false};
+ const owner={status:'observed',node:{tid:'flow>Import',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'n',label:'Import'},{tid:'settings',label:'Settings'}]};
+ let opened=false;const actions=[];
+ const state=()=>({prepared_node_context:{...node,surface:opened?'wizard':'graph'},wizard:opened?{status:'observed',stage:'text_import_file',root_ref:'root',root_tid:'W',owner_context:owner,import_source:{fields:{source_path:{status:'observed'}}}}:{status:'absent'},
+  ui:{dialogs:[],masks:[],elements:opened?[{ref:'cancel',tid:'W;btnClose',allowed_actions:['click']}]:[{ref:'settings',tid:'N;Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]}});
+ const channel={observe:async o=>{if(fault==='observe'&&o.condition==='independent Import filename binding readback')throw Error('READ_FAILED');const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{const s=state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);actions.push(a);if(a.verb==='begin_wizard')opened=true;else if(a.ref==='cancel')opened=false;else throw Error('unexpected gesture');},readVariablePortMapping:async()=>{assert.equal(opened,false);throw Error('MAPPING_FAILED');}};
+ await assert.rejects(fault==='observe'?readImportBindingField(channel):readImportBindings(channel,{}),fault==='observe'?/READ_FAILED/:/MAPPING_FAILED/);
+ assert.equal(opened,false);assert.deepEqual(actions,[{verb:'begin_wizard',ref:'settings'},{verb:'click',ref:'cancel'}]);
 });

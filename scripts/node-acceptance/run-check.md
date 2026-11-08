@@ -1,5 +1,12 @@
 Run live acceptance without repeatedly reading live logs:
 
+`import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
+and both original CSVs. Three exports check the initial file, source-only CsvPath
+update on the same Import, and saved-package reopen. The private oracle verifies
+fresh typed rows, field order, variable identities and retained Sentinel; cold
+independently reads the filename binding and W1 mapping before execution.
+Only the business task and the two input files reach the model.
+
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
 from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the

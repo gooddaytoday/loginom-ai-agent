@@ -1708,19 +1708,6 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if(wizard.status==='observed' && wizard.stage==='done') {
       const base=wizard.root_tid+';DoneWizard;';
       const fields=Object.fromEntries(Object.entries({label:'edtDisplayName',label_mode:'cbxNodeTitleMode'}).map(([name,key])=>{
-        if(name==='source_path'){
-          const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
-          const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
-          if(sw?.pressed===true){
-            const es=(tids.get(base+'edtFileName;VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
-            const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,store=c?.getStore?.(),rows=store?.getData?.()?.items;
-            const selected=Array.isArray(rows)&&!store.isLoading?.()?rows.filter(r=>r.data.field1===c.getValue?.()):[];
-            const caption=selected.length===1?selected[0].data.field2:null,offset=typeof caption==='string'?caption.indexOf(' ( /'):-1;
-            if(c?.el?.dom!==es[0]||offset<1||!caption.endsWith(' )')||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
-            const value=caption.slice(offset+3,-2);
-            return [name,{status:'observed',variable_mode:true,variable_caption:caption,row_id:String(selected[0].internalId),value,value_length_utf16:value.length,truncated:value.length>2048,owner_ref:refOf(es[0]),enabled:enabled(es[0]),read_only:true,value_kind:'selected_variable'}];
-          }
-        }
         const owners=(tids.get(base+key)??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e));
         const inputs=owners.length===1?dom.filter(e=>{charge();return owners[0].contains(e) && e.matches('input') && visible(e) && !sensitive(e);}):[];
         if(inputs.length!==1)return [name,{status:inputs.length>1?'ambiguous':'unobserved'}];
@@ -2038,6 +2025,20 @@ function readRenderedInputMapping(observation) {
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;';
       const fields=Object.fromEntries(Object.entries({source_path:'edtFileName;ValueControl',connection:'edtConnection',
         encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl'}).map(([name,key])=>{
+        if(name==='source_path'){
+          const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+          const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
+          if(sw?.pressed===true){
+            const es=(tids.get(base+'edtFileName;VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+            const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+            const selected=Array.isArray(rows)&&!store.isLoading?.()?rows.filter(r=>r.data.field1===c.getValue?.()):[];
+            const caption=selected.length===1?selected[0].data.field2:null;
+            const pathOffset=typeof caption==='string'?caption.lastIndexOf(' ( /'):-1,offset=pathOffset>=1?pathOffset:typeof caption==='string'?caption.lastIndexOf(' ( '):-1;
+            if(c?.el?.dom!==es[0]||offset<1||caption.length>2304||!caption.endsWith(' )')||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
+            const raw=caption.slice(offset+3,-2),url=/[a-z][a-z0-9+.-]*:\/\//i.test(raw),value=url?'':raw;
+            return [name,{status:'observed',variable_mode:true,variable_caption:url?caption.slice(0,offset)+' ( [redacted] )':caption,row_id:String(selected[0].internalId),value,value_length_utf16:value.length,truncated:value.length>2048,owner_ref:refOf(es[0]),enabled:enabled(es[0]),read_only:true,value_kind:'selected_variable'}];
+          }
+        }
         const owners=(tids.get(base+key)??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e));
         const inputs=owners.length===1?dom.filter(e=>{charge();return owners[0].contains(e)
           && e.matches('input:not([type="hidden"]),textarea') && visible(e) && !sensitive(e);}):[];

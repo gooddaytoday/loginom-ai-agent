@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Page,fixtureClock} from './support/workspace-ui-fixture.mjs';
+for(const value of ['/worker/a.csv','','NULL','https://secret@example.test/data'])test('Import variable selector reads the owned selection without exposing the hidden literal: '+value.split(':')[0],async()=>{
+ const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF;ImportTextFilePreviewWizard;edtFileName';
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:20,y:50,width:900,height:700});
+ const prop=page.add('div',base,'',{x:30,y:100,width:800,height:100},wizard);
+ const sw=page.add('button',base+';SwitchButton','',{x:30,y:100,width:30,height:20},prop);sw.id='switch';
+ const literal=page.add('div',base+';ValueControl','',{x:80,y:100,width:300,height:20},prop);
+ const stale=page.add('input',null,'',{x:80,y:100,width:300,height:20},literal);stale.value='/worker/old.csv';
+ const combo=page.add('div',base+';VariableControl','',{x:80,y:130,width:300,height:20},prop);combo.id='combo';
+ const input=page.add('input',null,'',{x:80,y:130,width:300,height:20},combo);input.value='CsvPath ( '+value+' )';
+ const picker=page.add('div',base+';VariableControl;boundlist','',{x:80,y:160,width:300,height:60});
+ const option=page.add('div',base+';VariableControl;boundlist;csv','CsvPath ( '+value+' )',{x:80,y:160,width:300,height:20},picker);option.attrs['data-recordid']='v1';
+ page.add('button',base+';VariableControl;trg_picker','',{x:360,y:130,width:20,height:20},combo);
+ const record={internalId:'v1',data:{field1:0,field2:input.value}},store={getData:()=>({items:[record]}),isLoading:()=>false};
+ const native={el:{dom:combo},inputEl:{dom:input},getRawValue:()=>input.value,getValue:()=>0,getStore:()=>store};
+ native.picker={pickerField:native,el:{dom:picker},getRecord:()=>record};
+ page.context.Ext={getCmp:id=>id===sw.id?{pressed:true,el:{dom:sw}}:id===combo.id?native:null};
+ const observed=await page.observe(),f=observed.wizard.import_source.fields.source_path;
+ assert.equal(f.status,'observed');assert.equal(f.variable_mode,true);assert.notEqual(f.value,'/worker/old.csv');
+ assert.equal(f.value,value.startsWith('https:')?'':value);
+ if(value.startsWith('https:'))assert.ok(!f.variable_caption.includes('secret'));
+ const choice=observed.ui.elements.find(e=>e.tid===option.attrs['data-tid']);
+ assert.equal(choice?.import_binding?.record_id,'v1');assert.ok(choice.allowed_actions.includes('click'));
+});
