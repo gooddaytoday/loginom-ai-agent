@@ -7,10 +7,12 @@ export function elimOutlierConfigurationReadback({node,phases,operation_id}){
  need(c?.verified&&c.inventory_complete&&owner(c.node_context),'configuration owner changed');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context)&&saved.value.settings_applied===true&&finished.value.settings_applied===true,'settings not committed');
  need(finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'Train current input required before Execute');
+ const mode=c.mode??'detect',policies=mode==='edit'?['keep','mean','median','most_probable']:['keep'];
+ need(['detect','edit'].includes(mode),'unsupported mode');
  const fields=c.field_settings.filter(f=>f.used).map(f=>({name:f.name,...f.settings}));
- need(fields.length>0&&fields.every(f=>['sd','iqr'].includes(f.method)&&f.extreme_factor>=f.outlier_factor&&f.outlier_policy==='keep'&&f.extreme_policy==='keep'),'complete keep/keep settings required');
+ need(fields.length>0&&fields.every(f=>['sd','iqr'].includes(f.method)&&f.extreme_factor>=f.outlier_factor&&policies.includes(f.outlier_policy)&&policies.includes(f.extreme_policy)),'complete supported policies required');
  need(mapped.value.ports?.length===3&&mapped.value.ports.every((p,i)=>p.port===i&&p.schema.length===c.fields.length),'all output schemas required');
  return {kind:'elim_outlier',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
-  receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'detect',fields,ordered:c.ordered,training_basis:'current_input',training:structuredClone(training),
+  receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode,fields,ordered:c.ordered,training_basis:'current_input',training:structuredClone(training),
   output_mappings:mapped.value.ports.map(p=>({port:p.port,fields:p.schema.map((f,index)=>({...f,index,source_name:f.name}))})),package_persistence_verified:false};
 }

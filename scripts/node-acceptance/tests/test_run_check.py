@@ -1867,6 +1867,26 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
 
+    def test_outlier_edit_scenarios_expose_only_the_selected_fixture(self):
+        for name, task, expected_name, fixture in [
+            ('outlier-replacement-mean', 'task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
+            ('outlier-replacement-median', 'task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
+            ('outlier-replacement-most-probable', 'task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
+            ('outlier-quartile-boundaries', 'task-quartile-boundaries.md', 'expected-quartile-boundaries.json', 'quartile-boundaries.csv'),
+        ]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], [fixture])
+            self.assertEqual(case['data'].name, 'fixtures')
+            self.assertTrue((case['data'] / fixture).is_file())
+            self.assertEqual(case['export_count'], 3)
+            expected = runner.expected_for(case, '/test.lgp')
+            self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            if name == 'outlier-replacement-mean':
+                row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
+                self.assertAlmostEqual(row['X'], 19 / 7)
+
     def test_outlier_scenarios_resolve_frozen_tasks_and_all_three_ports(self):
         for name, method, counts in [('outlier-sd', 'стандартного отклонения', [22, 0, 1]),
                                      ('outlier-iqr', 'интерквартильной ширины', [22, 1, 1])]:

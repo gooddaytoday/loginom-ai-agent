@@ -27,7 +27,7 @@ const definitions = [
   ['trees.to_table','Дерево в таблицу','treetodata',0,1,false,['selected_nodes'],'processors/trees/tree-to-table.md'],
   ['preprocessing.sampling','Сэмплинг','sampling',1,1,false,['sequential','random','stratified','biased','uniform'],'processors/preprocessing/sampling.md'],
   ['preprocessing.data_partition','Разбиение на множества','partition',1,3,false,['sequential','random','stratified','biased','uniform'],'processors/preprocessing/partition.md'],
-  ['preprocessing.elim_outlier','Редактирование выбросов','elimoutlier',1,3,false,['detect'],'processors/preprocessing/eliminate-outliers.md'],
+  ['preprocessing.elim_outlier','Редактирование выбросов','elimoutlier',1,3,false,['detect','edit'],'processors/preprocessing/eliminate-outliers.md'],
   ['datamining.log_regression','Логистическая регрессия','logregression',1,2,false,['enter','forward','backward','stepwise','ridge','apply'],'processors/datamining/logistic-regression/README.md'],
   ['research.auto_correlation','Автокорреляция','autocorrelation',1,1,false,['time_domain'],'processors/scrutiny/autocorrelation.html'],
   ['research.corr_analysis','Корреляционный анализ','corranalysis',1,1,false,['pearson','spearman','kendall'],'processors/scrutiny/correlation-analysis.md'],
