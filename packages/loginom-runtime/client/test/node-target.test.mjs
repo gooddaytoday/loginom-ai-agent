@@ -41,6 +41,33 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+for(const replacement of ['source','output'])test('existing text export refuses '+replacement+' replacement without advising a second export',async()=>{
+ const f=fixture();
+ f.graph.nodes.push({ref:ref('export'),type:'exports.text',label:'CSV',inputs:[0],outputs:[]});
+ f.graph.nodes[0].outputs=[0,1];
+ f.graph.nodes.push({...structuredClone(source),ref:ref('formatted')});
+ f.graph.links.push({source:'source',output:0,target:'export',input:0});
+ const before=structuredClone(f.graph);
+ const result=await f.run({document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'exports.text',ref:ref('export')},
+  inputs:[{source:ref(replacement==='source'?'formatted':'source'),output:replacement==='output'?1:0,input:0}]});
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(result.partial_effect,false);
+ assert.match(result.error,/unowned link/);
+ assert.match(result.error,/upstream chain/);
+ assert.match(result.error,/final formatting before.*Export/);
+ assert.match(result.error,/Do not create a second Export/);
+ assert.doesNotMatch(result.error,/use a NEW exports.text target|target.kind:"new"/);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph,before);
+ const reconfigure=await prepareNodeTarget({request:{document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'exports.text',ref:ref('export')},inputs:[]},
+  operation:{id:'reconfigure',deadline:Date.now()+10000},adapter:f.adapter,record:async e=>e});
+ assert.equal(reconfigure.status,'SUCCEEDED',reconfigure.error);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph,before);
+});
 for(const kind of ['variables','control'])for(const automatic of [false,true])test('W1 creates a target with '+kind+' input and owned automatic link='+automatic,async()=>{
  const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:4,port_guid:'source-var'}];
  const mutate=f.adapter.mutate;

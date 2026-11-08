@@ -1,0 +1,99 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.smoothing"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.smoothing",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0,
+          "Tag": "a",
+          "X_S": 0.5915063509461097
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "Tag": "b",
+          "X_S": 1.1584936490538906
+        },
+        {
+          "RowID": 3,
+          "X": 2,
+          "Tag": "c",
+          "X_S": 3.4330127018922196
+        },
+        {
+          "RowID": 4,
+          "X": 6,
+          "Tag": "d",
+          "X_S": 5.250000000000001
+        },
+        {
+          "RowID": 5,
+          "X": 8,
+          "Tag": "e",
+          "X_S": 7.7834936490538915
+        },
+        {
+          "RowID": 6,
+          "X": 10,
+          "Tag": "f",
+          "X_S": 10.125
+        },
+        {
+          "RowID": 7,
+          "X": 12,
+          "Tag": "g",
+          "X_S": 11.392949192431125
+        },
+        {
+          "RowID": 8,
+          "X": 14,
+          "Tag": "h",
+          "X_S": 12.94855715851499
+        }
+      ]
+    }
+  ]
+}

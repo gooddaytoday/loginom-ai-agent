@@ -1,0 +1,39 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "type_patch": [
+    {
+      "name": "amount",
+      "label": "Сумма",
+      "type": "real",
+      "value": 7.5
+    },
+    {
+      "name": "keep",
+      "label": "Сохранить",
+      "type": "string",
+      "value": ""
+    }
+  ],
+  "identity": "same builtin, same variable IDs/order/labels and untouched values",
+  "date_only": {
+    "type": "datetime",
+    "value": "2026-01-02T00:00:00.000",
+    "timezone": "unspecified",
+    "precision": "civil_millisecond"
+  },
+  "milliseconds": {
+    "requested": "2026-01-02T03:04:05.123",
+    "outcome": "refuse_before_mutation_until_exact_writer"
+  },
+  "timezone": {
+    "requested": "2026-01-02T03:04:05+03:00",
+    "outcome": "refuse_before_mutation_until_timezone_policy"
+  },
+  "create_builtin": {
+    "outcome": "blocked_no_separate_palette_component"
+  },
+  "non_user_port": {
+    "port": 1,
+    "outcome": "blocked_no_value_editor"
+  }
+}

@@ -1,5 +1,6 @@
 # variables.column_union / append_variables
 
+<!-- mode: append_variables -->
 Для объединения двух наборов параметров используй `dock_node_apply`:
 `target.type:"variables.column_union"`, `mode:"append_variables"`.
 Это native «Соединение (переменные)» в группе «Переменные».
@@ -30,3 +31,4 @@ NULL сохраняет исходный тип и отличается от п�
 Не заменяй узел Калькулятором или JavaScript. Ручные mappings,
 преобразования типов, управляющий и третий входы пока не поддерживаются.
 После чтения сохрани пакет через `package.save_checkpoint`.
+<!-- /mode -->

@@ -5,6 +5,20 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 validates '+method+' and its body before mutation',()=>{
+ const p={...parameters(),connection:{...parameters().connection,method,...(method==='DELETE'?{}:{request_content_type:'application/json'})},...(method==='DELETE'?{}:{body_field:'Body'})};
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ assert.equal(validate(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ assert.throws(()=>validateRestRequestParameters(p,'request',{...request,inputs:[]}),/table input/);
+ for(const body_field of [null,'',42])assert.throws(()=>validateRestRequestParameters({...p,body_field},'request',request));
+ if(method!=='DELETE'){
+  const missing=structuredClone(p);delete missing.body_field;
+  assert.throws(()=>validateRestRequestParameters(missing,'request',request),/body_field/);
+  assert.throws(()=>validateRestRequestParameters({...p,body_field:'Key'},'request',request),/body.*query|query.*body/);
+ }
+ if(method==='DELETE')assert.throws(()=>validateRestRequestParameters({...p,body_field:'Body'},'request',request),/body/);
+});
 test('plain GET accepts an empty query list and no table input through schema and runtime validation',()=>{
  const p={connection:{name:'Plain',base_url:'https://httpbin.org/status/200',response_content_type:'text/html'},query_parameters:[]};
  const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);

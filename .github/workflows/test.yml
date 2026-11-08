@@ -178,7 +178,7 @@ jobs:
 
       - name: Verify Loginom workspace address and native link contracts
         working-directory: packages/loginom-runtime
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs client/test/model-schema-budget.test.mjs client/test/node-guidance.test.mjs client/test/user-profile-bridge.test.mjs'
 
       - name: Prepare runtime Chromium dependencies
         working-directory: packages/loginom-runtime/client

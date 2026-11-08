@@ -1,5 +1,6 @@
 # Качество данных — research.quality
 
+<!-- mode: profile -->
 Используй `dock_node_apply` с `target.type:"research.quality"`. Режим: `profile`;
 `parameters: {}`. Бери путь справочника из ссылки в SKILL.md буквально.
 
@@ -56,3 +57,4 @@ Readback отдаёт режим и имена/типы/виды входных 
 `dock_node_read` с `source_operation_id` успешного выполнения. Невидимые в мастере
 MaxNullsPercent и действия над пропусками/выбросами отмечай как недоступные
 для UI-readback; не выдавай известные заводские умолчания за прочитанные настройки.
+<!-- /mode -->

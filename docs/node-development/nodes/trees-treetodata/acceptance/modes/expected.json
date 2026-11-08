@@ -1,0 +1,739 @@
+{
+  "status": "PROPOSAL; owner decision and native data probes required before implementation",
+  "package_path": "{{PACKAGE_PATH}}",
+  "node": "trees-treetodata",
+  "limits": {
+    "max_nodes": 256,
+    "max_depth": 16,
+    "max_bytes": 1048576
+  },
+  "acceptance": "Existing typed main/CSV/Save/cold/cleanup standard; new comparisons require owner approval.",
+  "cases": [
+    {
+      "id": "indices",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "global_index_paths": [
+          "/items"
+        ],
+        "index_base": 0,
+        "global_index_proposal": "zero-based across all items, not reset for a new parent",
+        "global_output": {
+          "port": 0,
+          "port_kind": "table",
+          "columns": [
+            {
+              "name": "group",
+              "label_any": true,
+              "type": "string"
+            },
+            {
+              "name": "code",
+              "label_any": true,
+              "type": "string"
+            },
+            {
+              "name": "item_index",
+              "name_any": true,
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "global_index",
+              "name_any": true,
+              "label_any": true,
+              "type": "integer"
+            }
+          ],
+          "rows": [
+            {
+              "group": "A",
+              "code": "x",
+              "item_index": 0,
+              "global_index": 0
+            },
+            {
+              "group": "A",
+              "code": "z",
+              "item_index": 1,
+              "global_index": 1
+            },
+            {
+              "group": "B",
+              "code": "y",
+              "item_index": 0,
+              "global_index": 2
+            }
+          ],
+          "ordered": true
+        },
+        "index_metadata": "native generated names need readback; no UI row index substitution"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "item_index",
+            "name_any": true,
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "batch",
+            "label_any": true,
+            "type": "string"
+          },
+          {
+            "name": "code",
+            "label_any": true,
+            "type": "string"
+          },
+          {
+            "name": "qty",
+            "label_any": true,
+            "type": "integer"
+          }
+        ],
+        "rows": [
+          {
+            "item_index": 0,
+            "batch": "Бета",
+            "code": "x",
+            "qty": 2
+          },
+          {
+            "item_index": 1,
+            "batch": "Бета",
+            "code": "y",
+            "qty": 0
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "composite",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "composite_names": true,
+        "composite_labels": true,
+        "label_separator": ".",
+        "native_name_and_separator_status": "technical name spelling and inclusion of Root pending native observation"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "items_code",
+            "label": "Позиции.Код",
+            "type": "string"
+          },
+          {
+            "name": "items_qty",
+            "label": "Позиции.Количество",
+            "type": "integer"
+          }
+        ],
+        "rows": [
+          {
+            "items_code": "x",
+            "items_qty": 2
+          },
+          {
+            "items_code": "y",
+            "items_qty": 0
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "wide",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "selected_field_count": 70,
+        "tree_input": {
+          "rows": [
+            {
+              "f00": 0,
+              "f01": 1,
+              "f02": 2,
+              "f03": 3,
+              "f04": 4,
+              "f05": 5,
+              "f06": 6,
+              "f07": 7,
+              "f08": 8,
+              "f09": 9,
+              "f10": 10,
+              "f11": 11,
+              "f12": 12,
+              "f13": 13,
+              "f14": 14,
+              "f15": 15,
+              "f16": 16,
+              "f17": 17,
+              "f18": 18,
+              "f19": 19,
+              "f20": 20,
+              "f21": 21,
+              "f22": 22,
+              "f23": 23,
+              "f24": 24,
+              "f25": 25,
+              "f26": 26,
+              "f27": 27,
+              "f28": 28,
+              "f29": 29,
+              "f30": 30,
+              "f31": 31,
+              "f32": 32,
+              "f33": 33,
+              "f34": 34,
+              "f35": 35,
+              "f36": 36,
+              "f37": 37,
+              "f38": 38,
+              "f39": 39,
+              "f40": 40,
+              "f41": 41,
+              "f42": 42,
+              "f43": 43,
+              "f44": 44,
+              "f45": 45,
+              "f46": 46,
+              "f47": 47,
+              "f48": 48,
+              "f49": 49,
+              "f50": 50,
+              "f51": 51,
+              "f52": 52,
+              "f53": 53,
+              "f54": 54,
+              "f55": 55,
+              "f56": 56,
+              "f57": 57,
+              "f58": 58,
+              "f59": 59,
+              "f60": 60,
+              "f61": 61,
+              "f62": 62,
+              "f63": 63,
+              "f64": 64,
+              "f65": 65,
+              "f66": 66,
+              "f67": 67,
+              "f68": 68,
+              "f69": 69
+            }
+          ]
+        }
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "f00",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f01",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f02",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f03",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f04",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f05",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f06",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f07",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f08",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f09",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f10",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f11",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f12",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f13",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f14",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f15",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f16",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f17",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f18",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f19",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f20",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f21",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f22",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f23",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f24",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f25",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f26",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f27",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f28",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f29",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f30",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f31",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f32",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f33",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f34",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f35",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f36",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f37",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f38",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f39",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f40",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f41",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f42",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f43",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f44",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f45",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f46",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f47",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f48",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f49",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f50",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f51",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f52",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f53",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f54",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f55",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f56",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f57",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f58",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f59",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f60",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f61",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f62",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f63",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f64",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f65",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f66",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f67",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f68",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "f69",
+            "label_any": true,
+            "type": "integer"
+          }
+        ],
+        "rows": [
+          {
+            "f00": 0,
+            "f01": 1,
+            "f02": 2,
+            "f03": 3,
+            "f04": 4,
+            "f05": 5,
+            "f06": 6,
+            "f07": 7,
+            "f08": 8,
+            "f09": 9,
+            "f10": 10,
+            "f11": 11,
+            "f12": 12,
+            "f13": 13,
+            "f14": 14,
+            "f15": 15,
+            "f16": 16,
+            "f17": 17,
+            "f18": 18,
+            "f19": 19,
+            "f20": 20,
+            "f21": 21,
+            "f22": 22,
+            "f23": 23,
+            "f24": 24,
+            "f25": 25,
+            "f26": 26,
+            "f27": 27,
+            "f28": 28,
+            "f29": 29,
+            "f30": 30,
+            "f31": 31,
+            "f32": 32,
+            "f33": 33,
+            "f34": 34,
+            "f35": 35,
+            "f36": 36,
+            "f37": 37,
+            "f38": 38,
+            "f39": 39,
+            "f40": 40,
+            "f41": 41,
+            "f42": 42,
+            "f43": 43,
+            "f44": 44,
+            "f45": 45,
+            "f46": 46,
+            "f47": 47,
+            "f48": 48,
+            "f49": 49,
+            "f50": 50,
+            "f51": 51,
+            "f52": 52,
+            "f53": 53,
+            "f54": 54,
+            "f55": 55,
+            "f56": 56,
+            "f57": 57,
+            "f58": 58,
+            "f59": 59,
+            "f60": 60,
+            "f61": 61,
+            "f62": 62,
+            "f63": 63,
+            "f64": 64,
+            "f65": 65,
+            "f66": 66,
+            "f67": 67,
+            "f68": 68,
+            "f69": 69
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "siblings",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "multiplication": "cartesian, items outer / tags inner; must be confirmed in native output"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "batch",
+            "label_any": true,
+            "type": "string"
+          },
+          {
+            "name": "code",
+            "label_any": true,
+            "type": "string"
+          },
+          {
+            "name": "qty",
+            "label_any": true,
+            "type": "integer"
+          },
+          {
+            "name": "tag",
+            "label_any": true,
+            "type": "string"
+          }
+        ],
+        "rows": [
+          {
+            "batch": "Бета",
+            "code": "x",
+            "qty": 2,
+            "tag": "a"
+          },
+          {
+            "batch": "Бета",
+            "code": "x",
+            "qty": 2,
+            "tag": "b"
+          },
+          {
+            "batch": "Бета",
+            "code": "x",
+            "qty": 2,
+            "tag": "c"
+          },
+          {
+            "batch": "Бета",
+            "code": "y",
+            "qty": 0,
+            "tag": "a"
+          },
+          {
+            "batch": "Бета",
+            "code": "y",
+            "qty": 0,
+            "tag": "b"
+          },
+          {
+            "batch": "Бета",
+            "code": "y",
+            "qty": 0,
+            "tag": "c"
+          }
+        ],
+        "ordered": true
+      }
+    }
+  ]
+}

@@ -1,5 +1,9 @@
 # Квантование
 
+LAB-1055 (07.11, mas3): **checkpoint / blocked после второго разрыва**.
+[Продолжение подплана](plan.md#8-lab-1055-checkpoint) · [новые предложения и статусы](acceptance/modes/README.md).
+Новые runtime-режимы не реализованы; критерии ожидают решения владельца.
+
 ID `component.preprocessing.Binning`, slug `preprocessing-binning`.
 
 ## Текущий срез v0.4.0
@@ -11,6 +15,10 @@ ID `component.preprocessing.Binning`, slug `preprocessing-binning`.
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [binning-node.mjs](../../../../packages/loginom-runtime/client/lib/binning-node.mjs):1–52; [binning-parameters.mjs](../../../../packages/loginom-runtime/client/lib/binning-parameters.mjs):1–31; [preprocessing.binning.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.binning.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений
+
+[LAB-1046: checkpoint новых режимов](plan.md#7-lab-1046-расширения-v040-checkpoint-этапа-0) ·
+[комплект предложений и оставшиеся проверки](acceptance/modes/README.md).
+Этап 0 расширений не завершён: остановка после двух восстановлений сеанса.
 
 [Подплан](plan.md) · [discovery LAB-645](discovery.md) ·
 [критерии и задания](acceptance/task.md) · [независимый oracle](acceptance/oracle.py).

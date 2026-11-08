@@ -79,3 +79,17 @@ W2 #721 `createNativeVariantReader` принимает table source interface116
 
 Размеры модели и проверки фиксируются в discovery.md. Карточка/reference
 лежат только как предложения; runtime и установленный skill не изменены.
+
+## Расширения LAB-1038, этап 0 (07.11.2026)
+
+Актуальное предложение на базе `8943d291b046698d67828f19dcca88aab790cf2c`:
+[наблюдения](discovery-modes.md), [приёмка](acceptance/modes/README.md),
+[карточка](node-card.modes-proposal.json), [node reference](skill-modes-proposal.md),
+[байты](mode-budgets.md). Старые критерии/readback не изменены.
+Узкий положительный срез: явная смена integer→real с сохранением ID и date-only
+как полночь того же civil дня, 2 цикла. Реальный обработчик в этой базе —
+`client/lib/crosstable-variables.mjs`, не `variables-user-*.mjs`.
+Отдельного создания builtin и редакторов значений портов 1/2/3 не обнаружено:
+blocked до решения владельца. Ненулевые мс UI обрезает, timezone сдвигает civil
+время; их положительная запись не заявляется. Все расширения и новые границы
+приёмки требуют утверждения до кода; stage-0 docs не являются таким разрешением.

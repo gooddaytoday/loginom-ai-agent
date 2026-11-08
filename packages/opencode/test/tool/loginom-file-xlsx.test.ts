@@ -63,6 +63,32 @@ async function contents(path: string) {
   }
 }
 
+test("Boolean XLSX settings preserve false, true and NULL for the Excel runtime", async () => {
+  await fixture(
+    `<row r="1">${text("A", 1, "Id")}${text("B", 1, "Active")}</row>` +
+      `<row r="2">${num("A", 2, "1")}<c r="B2" t="b"><v>0</v></c></row>` +
+      `<row r="3">${num("A", 3, "2")}<c r="B3" t="b"><v>1</v></c></row>` +
+      `<row r="4">${num("A", 4, "3")}</row>`,
+    async (path, dir) => {
+      const p = await profile(path, dir)
+      expect(p.settings_complete).toBe(true)
+      expect(p.settings.excel.columns.map((c) => c.type)).toEqual(["integer", "boolean"])
+      validateExcelParameters({ source: { artifact_id: "a", upload_operation_id: "u" },
+        excel: { ...p.settings.excel, source_path: "/boolean.xlsx" } }, "xlsx",
+        { inputs: [], mappings: [], finish: "done", read: { ports: [] } })
+      expect((await scanFile(p.profile_id, dir)).records).toBe(3)
+      const sample = await sampleFile(p.profile_id, dir)
+      const xml = (await contents(sample.path))["xl/worksheets/sheet1.xml"]
+      expect(xml).toContain('<c r="B2" s="0" t="b"><v>0</v></c>')
+      expect(xml).toContain('<c r="B3" s="0" t="b"><v>1</v></c>')
+      expect(xml).not.toContain('r="B4"')
+      const again = await profile(sample.path, join(dir, "roundtrip"))
+      expect(again.settings_complete).toBe(true)
+      expect(again.settings.excel.columns).toEqual(p.settings.excel.columns)
+    },
+  )
+})
+
 test("container relationships, SST/inline, hidden sheet, settings and small XLSX sample", async () => {
   await fixture(
     header +

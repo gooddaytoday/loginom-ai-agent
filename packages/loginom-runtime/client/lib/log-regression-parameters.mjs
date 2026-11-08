@@ -3,12 +3,13 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(['enter','forward','backward','stepwise','apply'].includes(mode),'use enter, forward, backward, stepwise or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');
  need(name(p.event),'event must be an explicit nonempty category label');
  need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>=0&&p.threshold<=1,'threshold is required in 0..1; event if p >= threshold');
+ need(p.normalization===undefined||['none','standardize'].includes(p.normalization),'normalization must be none or standardize');
  const selection=p.selection;
  if(mode==='enter'||mode==='apply')need(selection===undefined,'Enter/apply does not accept selection');
  else if(selection!==undefined) {

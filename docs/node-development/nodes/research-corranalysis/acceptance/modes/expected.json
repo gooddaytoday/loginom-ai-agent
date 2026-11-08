@@ -1,0 +1,307 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "numeric_pair": {
+    "first": "X",
+    "second": "Y",
+    "spearman": 0.753702346348183,
+    "kendall_tau_b": 0.5520524474738834
+  },
+  "text_order": [
+    "high",
+    "low",
+    "medium"
+  ],
+  "categorical_pairs": {
+    "Z": {
+      "pearson": 0.909717652294684,
+      "spearman": 0.9095085938862487,
+      "kendall_tau_b": 0.8486684247915055
+    },
+    "Tag": {
+      "pearson": -0.5685735326841775,
+      "spearman": -0.5457051563317492,
+      "kendall_tau_b": -0.38575837490522974
+    }
+  },
+  "cases": {
+    "spearman": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.corr_analysis"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.corr_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColSet1",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet1_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Spearman",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Y",
+              "ColSet2_Label": "Y",
+              "Spearman": 0.753702346348183
+            }
+          ]
+        }
+      ]
+    },
+    "kendall": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.corr_analysis"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.corr_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColSet1",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet1_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "TauBKendall",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Y",
+              "ColSet2_Label": "Y",
+              "TauBKendall": 0.5520524474738834
+            }
+          ]
+        }
+      ]
+    },
+    "discrete_spearman": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.corr_analysis"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.corr_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColSet1",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet1_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Spearman",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Z",
+              "ColSet2_Label": "Z",
+              "Spearman": 0.9095085938862487
+            },
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Tag",
+              "ColSet2_Label": "Tag",
+              "Spearman": -0.5457051563317492
+            }
+          ]
+        }
+      ]
+    },
+    "discrete_kendall": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.corr_analysis"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.corr_analysis",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "ColSet1",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet1_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "ColSet2_Label",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "TauBKendall",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Z",
+              "ColSet2_Label": "Z",
+              "TauBKendall": 0.8486684247915055
+            },
+            {
+              "ColSet1": "X",
+              "ColSet1_Label": "X",
+              "ColSet2": "Tag",
+              "ColSet2_Label": "Tag",
+              "TauBKendall": -0.38575837490522974
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "lag_convention": "X[t] versus Y[t+k], overlap means and variances",
+  "lag_correlations": {
+    "-2": -0.03052338478336799,
+    "-1": 0.7219948723811553,
+    "0": 0.062136976600120006,
+    "1": 1.0,
+    "2": -0.3975573862348412
+  },
+  "unresolved": [
+    "native lag sign/range and extremum definition",
+    "text collation beyond the lowercase ASCII fixture",
+    "fresh empty-input behavior"
+  ],
+  "tolerance": {
+    "abs": 1e-08,
+    "rel": 1e-10
+  }
+}

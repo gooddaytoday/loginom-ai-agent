@@ -768,7 +768,6 @@ function xlsxReply(p: Stored, cursor = 0) {
     ...((p.scan?.missing_cached_values ?? p.missing_cached_values)
       ? ["Formulas without cached values; no formula evaluation"]
       : []),
-    ...(p.columns.some((c) => c.type === "boolean") ? ["Excel runtime does not support boolean column type"] : []),
     ...(new Set(p.columns.map((c) => c.name)).size !== p.columns.length ? ["Duplicate source headers"] : []),
     ...(p.columns.some((c) => !c.name || c.name.length > 120 || /[\x00-\x1f]/.test(c.name))
       ? ["Excel headers must be 1–120 characters without controls"]
