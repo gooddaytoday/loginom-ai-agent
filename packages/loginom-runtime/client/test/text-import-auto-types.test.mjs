@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {configureTextImportFields,configureTextImportPatch,reconcileImportColumnPatch,validateTextImportFieldsRequest,validateTextImportPatch,autoDetectLabels,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
@@ -278,4 +280,14 @@ test('a renamed source column does not inherit the output of the removed column'
  const alias=mappingFixture({names:['Id','Sum','Extra'],targetsOf:s=>[targetOf(s[0]),orphan('Custom'),targetOf(s[2])]});
  await assert.rejects(resyncOutputFields(alias.channel,alias.native,restore(alias)),/cannot attribute an output that lost its source: Custom/);
  assert.equal(alias.clicks,0);assert.deepEqual(calls,[]);
+});
+
+test('mapPorts passes the previous import schema to resynchronization of a renamed «Только новые» source',()=>{
+ // The node driver runs in a child with module mocks: browser procedures are stubbed, resyncOutputFields records its options.
+ const probe=new URL('./support/text-import-map-ports-probe.mjs',import.meta.url);
+ const child=spawnSync(process.execPath,['--experimental-test-module-mocks','--no-warnings',fileURLToPath(probe)],{encoding:'utf8',timeout:60000});
+ assert.equal(child.status,0,child.stderr);
+ const result=JSON.parse(child.stdout.trim().split('\n').at(-1));
+ assert.equal(result.stop,'probe stop');
+ assert.deepEqual(result.calls,[{previousColumns:['Id','Amount'],before_targets:['Id','Amount']}]);
 });
