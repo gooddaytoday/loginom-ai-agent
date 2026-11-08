@@ -1,0 +1,307 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Amount 1",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount_Sum",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount_Min",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_Max",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_Avg",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_StdDev",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Amount_Sum": null,
+          "Amount_Count": 1,
+          "Amount_Min": null,
+          "Amount_Max": null,
+          "Amount_Avg": null,
+          "Amount_StdDev": null
+        },
+        {
+          "Region": "North",
+          "Amount_Sum": 9.0,
+          "Amount_Count": 4,
+          "Amount_Min": 1.0,
+          "Amount_Max": 5.0,
+          "Amount_Avg": 3.0,
+          "Amount_StdDev": 1.9999999999999998
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Amount 2",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount_SumSq",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_UniqueCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount_First",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Amount_Last",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Amount_SumSq": null,
+          "Amount_UniqueCount": 0,
+          "Amount_NullCount": 1,
+          "Amount_First": null,
+          "Amount_Last": null
+        },
+        {
+          "Region": "North",
+          "Amount_SumSq": 35.0,
+          "Amount_UniqueCount": 3,
+          "Amount_NullCount": 1,
+          "Amount_First": 1.0,
+          "Amount_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Units 1",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Units_Sum",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Units_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_Min",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_Max",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_Avg",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Units_StdDev",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Units_Sum": null,
+          "Units_Count": 1,
+          "Units_Min": null,
+          "Units_Max": null,
+          "Units_Avg": null,
+          "Units_StdDev": null
+        },
+        {
+          "Region": "North",
+          "Units_Sum": 9,
+          "Units_Count": 4,
+          "Units_Min": 1,
+          "Units_Max": 5,
+          "Units_Avg": 3.0,
+          "Units_StdDev": 1.9999999999999998
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Units 2",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Units_SumSq",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Units_UniqueCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_First",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Units_Last",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Units_SumSq": null,
+          "Units_UniqueCount": 0,
+          "Units_NullCount": 1,
+          "Units_First": null,
+          "Units_Last": null
+        },
+        {
+          "Region": "North",
+          "Units_SumSq": 35,
+          "Units_UniqueCount": 3,
+          "Units_NullCount": 1,
+          "Units_First": 1,
+          "Units_Last": null
+        }
+      ]
+    }
+  ]
+}

@@ -224,3 +224,67 @@ apply модели **14539 Б**. Измеритель и правила заме
 и их тестах. Число строк до отказа не угадывается. Общая правка, новый критерий
 или перенумератор групп не предлагаются. Без оставшегося исследования этап 0
 не завершён; карточка остаётся blocked вместе с пакетом LAB-1012.
+
+## LAB-1120: typed, empty и singleton — предложение после живой проверки
+
+08.11.2026, mas2, `origin/v040@ecb11c0e2dce6972aaa00978050680145fd12b04`.
+Канонический runtime type из `node-contracts.mjs` — **research.duplicates**,
+mode mark; написание transform.duplicates в назначении не вводит новый alias.
+Текущая пара из назначения, собственный новый черновик, только
+`https://app.loginom.ai/app/?testable=true`, UI Loginom 7.4.2.
+Ни разрывов сессии, ни переподключений не было. CLI не собирался.
+
+### Свежие наблюдения
+
+Палитра `ModelForm;colVendors_Компоненты>Исследование>Дубликаты_и_противоречия;TreeText`.
+Мастер `WizrdMCF;TuneDataSourceInputPortWizard;grdTargetColumns`:
+двойной клик `colName_B/R/D/Value`, затем
+`EditTuneColumnDefForm;cbxUsageType;trg_picker` → `boundlist;Входное/Выходное`.
+Native store, привязанный к этому data-tid, подтвердил B boolean, R real,
+D datetime с UsageType=3, Value string с UsageType=4; RowID и Keep — 0.
+Boolean дискретный, real и DateTime в этом импорте непрерывные; типы при
+назначении роли не меняются. Один вход и один выход 0/0 остаются табличными.
+Добавляются только четыре служебных поля перед всеми исходными полями.
+
+| Малый вход | Наблюдённый выход Preview после Execute |
+|---|---|
+| typed-keys.csv, 6 строк | RowID 1/2: Duplicate=true, DuplicateGroup=1; 3/4 с NULL-ключом: Contradiction=true, ContradictionGroup=1; 5/6 без групп; все строки сохранены |
+| Близкий R=1.2500000000000002 | Не объединён с R=1.25; обе строки отображаются как 1.25, но группы различны |
+| Неучаствующий Keep | NULL, untouched, пустая строка, literal null, 0, last сохранены; на группу не влияют |
+| typed-empty.csv | 0 строк, полная схема 10 полей сохранена |
+| typed-singleton.csv | 1 строка с NULL B/R/D, false/NULL/false/NULL; Value=x, Keep пустой |
+
+Выходы наблюдались по
+`ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt;<имя>_<строка>`;
+для singleton ColumnInfos подтвердил порядок и типы всех десяти полей.
+Empty получен сменой источника того же импорта с сохранением явных типов;
+singleton — следующей сменой источника, без изменения ролей того же узла.
+Это подтверждение ранее предложенных случаев, а не доказательство равенства
+произвольных DateTime/subtype или автономного точного чтения. Значения с
+миллисекундами и точность real ещё должны пройти штатный CSV/cold matcher.
+
+### Критерии и оценка этапа 1
+
+Сохраняются три задания, fixtures и независимый oracle из LAB-1012:
+`acceptance/task-typed-keys.md`, `task-empty.md`, `task-singleton.md`,
+`acceptance/modes/oracle.py` и `expected*.json`. Значения ожиданий и нумерация
+не подгонялись по фактическому выводу; добавлен лишь явный null_marker=NULL,
+который уже требовали задания. Это сохраняет отличие пустой строки от NULL
+и literal null при CSV-проверке. Модели только задание и один CSV.
+После утверждения — обычные полные CSV, Save, cold/cleanup и 2/3 + 2/3
+одного SHA через run-check. Все эти автономные проверки сейчас NOT_RUN.
+Новых критериев, comparer групп или режимов фильтрации не требуется.
+
+**0 циклов handler / 0 обязательных строк**: типы и роли уже разрешены
+`duplicates-{parameters,procedure,context,readback,node}.mjs`.
+При наблюдённом автономном отказе — оценка 1 адресного red→green цикла в этих
+файлах и тестах. Отдельно нужен один аддитивный цикл регистрации трёх сценариев
+и публикации справочного текста; общего runtime-изменения сейчас не требуется.
+
+Bare-card = 2489 Б; фактическая карточка с guidance mark **2748 → 4184 Б**.
+Reference **253 → 1674 Б**, строка навыка **139 → 139 Б**;
+SKILL.md обоих предложений **28823 → 28843 Б**, apply модели **8051 Б**,
+full diagnostic schema **71306 Б**. Все бюджеты соблюдены; реальные хеши
+в proposal не записываются, используются 64 нуля. Parameter schema прежняя.
+Замер — `../transform-crosstable/fixtures/measure-proposals.mjs`;
+действующие product skill и handler в этой карточке не изменены.

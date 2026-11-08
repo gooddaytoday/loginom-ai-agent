@@ -1,0 +1,128 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Даты 1",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "When_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "When_Min",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_Max",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_Avg",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_StdDev",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "When_Count": 1,
+          "When_Min": null,
+          "When_Max": null,
+          "When_Avg": null,
+          "When_StdDev": null
+        },
+        {
+          "Region": "North",
+          "When_Count": 4,
+          "When_Min": "2026-01-01T00:00:00.000",
+          "When_Max": "2026-01-05T00:00:00.000",
+          "When_Avg": "2026-01-03T00:00:00.000",
+          "When_StdDev": 2.0000000298023224
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Даты 2",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "When_UniqueCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "When_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "When_First",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_Last",
+          "type": "datetime",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "When_UniqueCount": 0,
+          "When_NullCount": 1,
+          "When_First": null,
+          "When_Last": null
+        },
+        {
+          "Region": "North",
+          "When_UniqueCount": 3,
+          "When_NullCount": 1,
+          "When_First": "2026-01-01T00:00:00.000",
+          "When_Last": null
+        }
+      ]
+    }
+  ]
+}
