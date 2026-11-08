@@ -62,6 +62,9 @@ export function validateTextImportNodeParameters(p,mode,request) {
     'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
+  // Same refusal as deferredImportOutput, but before the format is applied.
+  requireValue(!(p.settings.format?.auto_detect_columns==='all'&&request.mappings?.length),
+    'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
   validateImportSource(p.source);
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
     ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)

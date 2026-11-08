@@ -70,6 +70,18 @@ test('new import without columns is admitted only for native type detection',()=
  assert.equal(textImportStepBudget({target:{kind:'new'},parameters:{settings:{source,format,analysis:{refresh:'all'}}},mappings:[]})>0,true);
 });
 
+test('auto_detect_columns=all with output mappings or autosync is refused before any wizard mutation',()=>{
+ const p=(target,settings)=>({source:{kind:'storage',server_source_ref:'ref'},settings});
+ const all={...format,auto_detect_columns:'all'};
+ for(const [target,settings] of [['new',{source,format:all}],['existing',{format:{auto_detect_columns:'all'}}]])
+  for(const mapping of [{direction:'output',port:0,autosync:true},{direction:'output',port:0,fields:[{name:'Custom',source:{kind:'configured_field',name:'Id'}}]}]) {
+   const request={target:{kind:target},finish:'done',inputs:[],mappings:[mapping],read:{ports:[]}};
+   assert.throws(()=>validateTextImportNodeParameters(p(target,settings),'delimited',request),/auto_detect_columns=all/,target+JSON.stringify(mapping));
+  }
+ const request={target:{kind:'existing'},finish:'done',inputs:[],mappings:[{direction:'output',port:0,autosync:true}],read:{ports:[]}};
+ validateTextImportNodeParameters(p('existing',{format:{auto_detect_columns:'new'}}),'delimited',request);
+});
+
 test('native detection adds new fields while retained manual types win by name',()=>{
  const before=native().slice(0,5).map(c=>c.name==='Amount'?{...c,type:'string'}:c);
  const parsed=native();
