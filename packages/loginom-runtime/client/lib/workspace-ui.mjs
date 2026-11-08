@@ -364,6 +364,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       })),
       ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
+      ...['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName;'+name+'"]';return [owner,owner+' input',owner+' [data-recordid]'];}),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
@@ -1707,6 +1708,19 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if(wizard.status==='observed' && wizard.stage==='done') {
       const base=wizard.root_tid+';DoneWizard;';
       const fields=Object.fromEntries(Object.entries({label:'edtDisplayName',label_mode:'cbxNodeTitleMode'}).map(([name,key])=>{
+        if(name==='source_path'){
+          const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+          const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
+          if(sw?.pressed===true){
+            const es=(tids.get(base+'edtFileName;VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+            const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+            const selected=Array.isArray(rows)&&!store.isLoading?.()?rows.filter(r=>r.data.field1===c.getValue?.()):[];
+            const caption=selected.length===1?selected[0].data.field2:null,offset=typeof caption==='string'?caption.indexOf(' ( /'):-1;
+            if(c?.el?.dom!==es[0]||offset<1||!caption.endsWith(' )')||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
+            const value=caption.slice(offset+3,-2);
+            return [name,{status:'observed',variable_mode:true,variable_caption:caption,row_id:String(selected[0].internalId),value,value_length_utf16:value.length,truncated:value.length>2048,owner_ref:refOf(es[0]),enabled:enabled(es[0]),read_only:true,value_kind:'selected_variable'}];
+          }
+        }
         const owners=(tids.get(base+key)??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e));
         const inputs=owners.length===1?dom.filter(e=>{charge();return owners[0].contains(e) && e.matches('input') && visible(e) && !sensitive(e);}):[];
         if(inputs.length!==1)return [name,{status:inputs.length>1?'ambiguous':'unobserved'}];
@@ -2668,6 +2682,16 @@ function readRenderedInputMapping(observation) {
     };
     // Filter rows and their child delete/check icons retain the native record
     // identity in their signature, even when Loginom reuses a cell test ID.
+    const importBindingCells=new Map();
+    if(wizard.stage==='text_import_file'){
+      const base=wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName';
+      const es=(tids.get(base+';VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+      const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,picker=c?.picker,rows=c?.getStore?.()?.getData?.()?.items;
+      if(c?.el?.dom===es[0]&&picker?.pickerField===c&&Array.isArray(rows)&&rows.length<=128)for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]){
+        const r=rows.find(r=>String(r.internalId)===e.getAttribute('data-recordid'));
+        if(r&&picker.getRecord(e)===r&&typeof r.data.field2==='string')importBindingCells.set(refOf(e),{caption:r.data.field2,record_id:String(r.internalId)});
+      }
+    }
     const filterCells=new Map();
     if(wizard.stage==='row_filter') {
       const base=wizard.root_tid+';FilterDataWizard;FilterDataPanel',roots=tids.get(base)??[];
@@ -3161,7 +3185,7 @@ function readRenderedInputMapping(observation) {
     };
     const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
     const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'');
-    const interesting = element => ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const interesting = element => importBindingCells.has(state.ids.get(element)) || wizard.stage==='text_import_file'&&(getTid(element)??'').startsWith(wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName;')&&/;(?:SwitchButton|trg_picker)$/.test(getTid(element)??'') || ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;(?:StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_[^;]+|BiasedMethodForm;colDisplayName_[^;]+|BiasedMethodForm;colBiasedValue_[^;]+)$/.test(getTid(element)??'')
@@ -3564,8 +3588,8 @@ function readRenderedInputMapping(observation) {
         ...(expressionCancel ? {expression_cancel:expressionCancel} : {}),
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
-        ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(smoothingCell?{smoothing_cell:smoothingCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(enrichField?{enrich_field:enrichField}:{}), ...(unionField?{union_field:unionField}:{}), ...(ungroupField?{ungroup_field:ungroupField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(datatovarField?{datatovar_field:datatovarField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        ...(filterCell?{filter_cell:filterCell}:{}),...(importBindingCells.has(state.ids.get(element))?{import_binding:importBindingCells.get(state.ids.get(element))}:{}),
+        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(smoothingCell?{smoothing_cell:smoothingCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(enrichField?{enrich_field:enrichField}:{}), ...(unionField?{union_field:unionField}:{}), ...(ungroupField?{ungroup_field:ungroupField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),...(importBindingCells.has(state.ids.get(element))?{import_binding:importBindingCells.get(state.ids.get(element))}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(datatovarField?{datatovar_field:datatovarField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.

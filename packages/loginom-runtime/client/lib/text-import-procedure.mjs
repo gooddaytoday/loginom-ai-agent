@@ -169,7 +169,7 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
 
 // The new phase ends at the configured format page. Mapping, finish and run
 // belong to the enclosing node operation; no wizard reopen occurs here.
-export const configureTextImportFields=(channel,parameters,owner)=>configureImport(channel,parameters,owner,true);
+export const configureTextImportFields=(channel,parameters,owner,{boundSource=false}={})=>configureImport(channel,parameters,owner,true,boundSource?{boundSource:true}:undefined);
 export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema});
 export const configureTextImportDraft=(channel,parameters,owner)=>configureImport(channel,parameters,owner,false);
 
@@ -313,7 +313,8 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   if(patch?.preserveSchema)requireValue(Object.keys(parameters).join(',')==='source'
     &&Object.keys(parameters.source??{}).join(',')==='source_path',
     'Full source switch changes source_path only; column and format edits are forbidden');
-  (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
+  (patch&&!patch.boundSource?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(patch?.boundSource?{...parameters,source:{...parameters.source,source_path:'/binding-validation.csv'}}:parameters);
+  if(patch?.boundSource)patch=undefined;
   parameters=structuredClone(parameters);
   if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[]};
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
@@ -398,7 +399,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   }
 
   for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title']) {
-    if(patch&&!Object.hasOwn(parameters.source,name))continue;
+    if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
     const desired = encoding ? encoding.label : name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];

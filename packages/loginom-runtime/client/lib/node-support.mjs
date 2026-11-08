@@ -1,3 +1,4 @@
+import {prepareImportBinding,importBindingChannel,readImportBindings} from './import-bindings.mjs';
 import {createVariablesReplaceNodeSupport} from './variables-replace-node.mjs';
 import {createVariablesColumnUnionNodeSupport} from './variables-coluniondatavar-node.mjs';
 import {createVariablesCalculatorNodeSupport} from './variables-calculator-node.mjs';
@@ -149,7 +150,15 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,mapPorts:async(mappings,ctx)=>{
+  return {...drivers,...(type==='imports.text'&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
+   const value=await drivers.beforeTarget?.(ctx);
+   const prepared=await prepareImportBinding(options,ctx,config,{saved:true});
+   if(prepared){
+    const channel=importBindingChannel(options,ctx,config,options.operation.parameters.target.ref);
+    options.operation.importBindingInventory=await readImportBindings(channel,prepared);
+   }
+   return value??{verified:true,cleanup_complete:true,effect_possible:false};
+  }}:{}),mapPorts:async(mappings,ctx)=>{
    const requested=mappings.filter(m=>m.kind!==undefined);if(!requested.length)return drivers.mapPorts(mappings,ctx);
    options.operation.deadline=ctx.deadline;
    const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,maxSteps:512,

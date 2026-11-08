@@ -518,6 +518,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    if(request.target.type==='imports.text'&&operation.importBindingInventory)result.configuration.bindings=structuredClone(operation.importBindingInventory);
     const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
     if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){

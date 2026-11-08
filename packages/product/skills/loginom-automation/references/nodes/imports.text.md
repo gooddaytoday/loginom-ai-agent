@@ -42,3 +42,17 @@ upload_operation_id. Defaults: UTF-8, заголовок в первой стр�
 в `settings` передай только `source:{source_path:"<полный файл>"}`, без columns/format/mappings.
 Переключай с `finish:"done"` и `read.ports:[]`, без отдельного Execute импорта.
 <!-- /mode -->
+
+<!-- mode: delimited -->
+## Путь из переменной
+
+Выбирай `imports.text`/`delimited`, без Калькулятора/JS. Задай
+`bindings:[{parameter:"/settings/source/source_path",variable:{kind:"variables",input:0,name:"CsvPath"}}]`;
+`variable_inputs`: ref `variables.user`, output 4, input 0, kind variables.
+CsvPath — непустая строка подтверждённого пути. Перед каждым Execute подтверди
+файл через `dock_storage_source`. При настройке: `parameters.source` — проверенная
+доставка/storage; `settings.source.source_path` опусти.
+Для смены файла измени только CsvPath. Тот же Import выполняй с
+`parameters:{settings:{}}`, `bindings:[]`, inputs/mappings пустые, в том числе
+после Save/reopen. Проверяй `configuration.bindings`.
+<!-- /mode -->

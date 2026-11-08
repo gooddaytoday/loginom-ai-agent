@@ -90,6 +90,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'import-bindings':
+        src = REPO / 'docs/node-development/variables/bindings'
+        return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
+                    input_files=['import-a.csv', 'import-b.csv'], export_count=3, import_initial='import/expected-initial.json',
+                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py')
     if name == 'filter-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
@@ -1367,7 +1372,8 @@ class Runner:
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
-            if spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
+            elif spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1386,6 +1392,11 @@ class Runner:
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
+        if case == 'import-bindings':
+            for output in expected['outputs']: output['column_order'] = 'exact'
+            expected['binding_inventory'] = [dict(node=dict(type='imports.text'), parameter='/settings/source/source_path',
+                mode='variable', variable=dict(kind='variables', input=0, name='CsvPath', type='string', is_null=False),
+                source=dict(type='variables.user', output=4))]
         if case == 'filter-bindings':
             for output in expected['outputs']: output['column_order'] = 'any'
             expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
@@ -1442,6 +1453,18 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if case == 'import-bindings':
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            updates = [v['value'] for e in evidence if e.get('phase') == 'node_apply_prepared'
+                       and e.get('request', {}).get('target', {}).get('type') == 'variables.user'
+                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == 'CsvPath']
+            assert updates, 'IMPORT_BINDING_SOURCE_UPDATE'
+            expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = updates[-1]
+            write(folder / 'expected.json', expected)
+            write(folder / 'binding-events.json', evidence)
+            self.phase('import-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/import-bindings.mjs',
+                src / spec['import_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if case == 'filter-bindings':
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1780,6 +1803,8 @@ class Runner:
             csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
+                            else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('import_initial')
                             else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
                             else expected['outputs'][0] if spec.get('lgd_initial')
                             else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
