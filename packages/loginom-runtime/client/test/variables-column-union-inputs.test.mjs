@@ -9,7 +9,7 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
 const inputs=()=>[0,1,2].map(input=>({kind:'variables',input,output:0,source:ref('s'+input)}));
 const request=()=>({document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'variables.column_union',ref:ref('u')},inputs:[],mappings:[],variable_inputs:inputs(),finish:'execute',read:{ports:[],variable_ports:[0]},parameters:{}});
-function graph(){return {complete:true,dom_epoch:1,document_id:'doc',workflow_ref:workflow,nodes:[...inputs().map(i=>({ref:i.source,type:'variables.calculator',label:'Source '+i.input,inputs:[],outputs:[],variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]})),{ref:ref('u'),type:'variables.column_union',label:'Union',locked:false,inputs:[],outputs:[],variable_inputs:[0,1].map(port=>({kind:'variables',port,port_guid:'in'+port})),variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]}],links:[],foreign_links:[],variable_links:inputs().slice(0,2).map(i=>({source:i.source.node_id,target:'u',kind:'variables',input:i.input,output:0,source_port_guid:'out',target_port_guid:'in'+i.input}))};}
+function graph(){return {complete:true,dom_epoch:1,document_id:'doc',workflow_ref:workflow,nodes:[...inputs().map(i=>({ref:i.source,type:'variables.calculator',label:'Source '+i.input,inputs:[],outputs:[],variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]})),{ref:ref('u'),type:'variables.column_union',label:'Union',locked:false,inputs:[],outputs:[],other_ports:['Input_Add','Input_Var-0','Input_Var-1','Output_Var-0'],variable_inputs:[0,1].map(port=>({kind:'variables',port,port_guid:'in'+port})),variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]}],links:[],foreign_links:[],variable_links:inputs().slice(0,2).map(i=>({source:i.source.node_id,target:'u',kind:'variables',input:i.input,output:0,source_port_guid:'out',target_port_guid:'in'+i.input}))};}
 test('third input accepts three ordered distinct variable sources and keeps bounded early refusals',()=>{
  validateVariablesColumnUnionParameters({},'append_variables',request());
  for(const change of [r=>r.variable_inputs[2].kind='control',r=>r.variable_inputs[2].input=3,r=>r.variable_inputs[2].source=ref('s0'),r=>r.variable_inputs.push({...r.variable_inputs[2],input:3})]){
@@ -47,7 +47,7 @@ test('production target adds only the third port, connects it and later removes 
  const g=graph(),calls=[],r=request();
  const adapter={observe:async()=>structuredClone(g),preflight:async()=>{},positionMatches:()=>true,async mutate(effect){
   calls.push(effect);const p=effect.parameters;
-  if(effect.kind==='add_variable_input')g.nodes.at(-1).variable_inputs.push({kind:'variables',port:p.input,port_guid:'in'+p.input});
+  if(effect.kind==='add_variable_input'){g.nodes.at(-1).variable_inputs.push({kind:'variables',port:p.input,port_guid:'in'+p.input,native_index:2});g.nodes.at(-1).other_ports.push('Input_Var-2');g.nodes.at(-1).other_ports.sort();}
   else if(effect.kind==='connect')g.variable_links.push({...p.edge,source_port_guid:'out',target_port_guid:'in2'});
   else if(effect.kind==='remove_link')g.variable_links=g.variable_links.filter(e=>e.input!==p.edge.input);
   else assert.fail(effect.kind);

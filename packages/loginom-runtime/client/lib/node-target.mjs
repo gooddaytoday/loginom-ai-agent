@@ -57,8 +57,9 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const ports=current.variable_inputs,old=original.variable_inputs;
     if(original.type!=='variables.column_union'||p.input!==2||old?.length!==2||ports?.length!==3
-      ||!same(ports.slice(0,2),old)||ports[2].kind!=='variables'||ports[2].port!==2||typeof ports[2].port_guid!=='string')return null;
-    return same(domainNode({...current,variable_inputs:old}),domainNode(original))
+      ||!same(ports.slice(0,2),old)||ports[2].kind!=='variables'||ports[2].port!==2||ports[2].native_index!==2||!ports[2].port_guid
+      ||!Array.isArray(original.other_ports)||!same(current.other_ports,[...original.other_ports,'Input_Var-2'].sort()))return null;
+    return same(domainNode({...current,variable_inputs:old,other_ports:original.other_ports}),domainNode(original))
       &&same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
   }
   if(kind==='reveal_control'){
