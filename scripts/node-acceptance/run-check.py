@@ -387,11 +387,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
-    if name == 'acf-nonzero':
+    if name in ['acf-nonzero', 'acf-empty', 'acf-null']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
-        return dict(source=src, prompt=src / 'task-nonzero.md',
-                    data=src / 'fixtures', base=None, autocorrelation_edge=True,
-                    input_files=['lab1144-series.csv'])
+        edge = name.removeprefix('acf-')
+        return dict(source=src, prompt=src / ('task-' + edge + '.md'),
+                    data=src / 'fixtures', base=None, autocorrelation_edge=edge,
+                    input_files=['lab1144-series.csv', *([] if edge == 'nonzero' else ['lab1144-' + edge + '.csv'])])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -718,6 +719,12 @@ def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
+        if case['autocorrelation_edge'] in ['empty', 'null']:
+            # Refusal text is fixed before runs: own guard (empty) or native Execute (null).
+            error = (read(src / 'expected-empty.json')['execution_error'] if case['autocorrelation_edge'] == 'empty'
+                     else {'text': approved['native_conventions']['null']['message']})
+            return dict(package_path=package, nodes=[{'type': t} for t in ['imports.text', 'research.auto_correlation']],
+                        outputs=[], execution_error=error)
         output = approved['series']['count12']
         return dict(package_path=package, nodes=[{'type': t} for t in
                     ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])

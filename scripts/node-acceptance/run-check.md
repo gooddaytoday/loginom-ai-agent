@@ -27,6 +27,11 @@ return all lags 0…7. The Fraction oracle stays private. Singleton is only an
 unclaimed observation and has no registered acceptance scenario.
 Exact types/field order/NULL, real abs=1e-8/rel=1e-10,
 CSV, Save, cold execution and cleanup use the stock matchers.
+`acf-empty` (series → empty) and `acf-null` (series → null) replace the file of the
+same Import and re-execute the same node. They use the stock `execution_error`
+matcher: the runtime guard text from `edges/expected-empty.json` (no native Execute
+on an empty input) or the native «Данные содержат пустые значения» from
+`expected.json`; no export or CSV, Save after the error, no cold run.
 
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
