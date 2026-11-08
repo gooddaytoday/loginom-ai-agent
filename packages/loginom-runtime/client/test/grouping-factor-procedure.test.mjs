@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureGrouping} from '../lib/grouping-procedure.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
 
 function fixture(fn,bit){
  const concat={separator:',',wrapper:'',unique:false,sort:false,direction:0};
@@ -86,3 +87,28 @@ test('Grouping concat refuses incorrect native settings after Apply',async()=>{
  f.channel.afterApply=n=>n.measures[0].concat.separator=',';
  await assert.rejects(configureGrouping(f.channel,f.parameters),/concat settings differ/);
 });
+for(const combo of ['cbxConcatSeparator','cbxConcatWrapper','fc;cbxConcatSort'])for(const fault of ['none','foreign','dialog','selection']){
+ test(`Grouping concat keeps its factor editor when ${combo} opens: ${fault}`,async()=>{
+  const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+  const base=workflow_ref.prefix+';WizrdMCF',tid=base+';FactorEditDialog',node={document_id:'doc',workflow_id:'wf',node_id:'group'};
+  const owner={...node,verified:true,surface:'wizard',tid:base},portal=(fault==='foreign'?base+';Foreign':tid+';cntCheckboxes;fs;'+combo)+';boundlist';
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:owner,scan:{complete:true},
+   wizard:{status:'observed',stage:'grouping',root_tid:base,root_ref:'wizard',factor_editor:{status:'rendered_factor_options',dialog_ref:'factor',selected_field:{status:fault==='selection'?'unobserved':'rendered_selected',field_key:'Amount'}}},
+   ui:{elements:[{tid,ref:'factor'},{tid:portal,ref:'choices'}],dialogs:[{ref:'factor',identity:{anchor_tid:fault==='dialog'?'Other;FactorEditDialog':tid}}],masks:[],truncated:{dialogs:false,masks:false}}};
+  const roots=[];let clock=1;
+  const channel=createNodeProcedure({operation:{id:'concat',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+   preparedNodeContext:{document_id:'doc',workflow_ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>clock++,wait:async()=>{clock+=1000},record:async e=>structuredClone(e),execute:async code=>{
+    if(code.includes('function readGroupingBrowser'))return {verified:true,node_context:owner};
+    const s=structuredClone(state);
+    if(!code.includes('"discover_roots":true')){
+     const root=/"root_ref":"([^"]+)"/.exec(code)?.[1];roots.push(root);
+     if(root!=='factor')s.wizard.factor_editor.status='unobserved';
+    }
+    return {status:'SUCCEEDED',output:s};
+   }});
+  const read=()=>channel.observe({condition:'owned concat popup',readGrouping:true,ready:s=>s.node_grouping?.verified===true,timeoutMs:2000});
+  if(fault==='none'){await read();await channel.observe({condition:'fresh concat precondition',ready:s=>s.wizard.factor_editor.status==='rendered_factor_options',timeoutMs:2000});assert.ok(roots.length&&roots.every(r=>r==='factor'));}
+  else await assert.rejects(read(),/blocked by a mask or dialog/);
+ });
+}
