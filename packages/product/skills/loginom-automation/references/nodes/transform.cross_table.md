@@ -1,37 +1,42 @@
 # Кросс-таблица (`transform.cross_table`)
 
 <!-- mode: pivot -->
-## Кросс-таблица
+Агрегаты: transform.cross_table, mode:pivot. Без колонок:
+columns:[], row_keys, facts с functions, category_mode:fixed,
+include_null:false, include_other:false. Колонки — дискретные;
+ключи строк — дискретных string/integer/real/boolean/datetime либо непрерывных
+integer/real. Непрерывные и дискретные ключи сочетаются в fixed и sliding.
+Не округляй real-ключи; 0 и −0 равны, NULL — отдельная группа.
+Перенастройка: полные row_keys, column/columns, facts, category_mode
+и явный вход 0. Сверяй configuration.readback.
 
-Строки × категории × агрегаты скалярных и Variant-фактов. Ключи строк допускают дискретные
-string/integer/real/boolean/datetime и непрерывные integer/real; сохраняй исходный
-вид данных. Колонки требуют дискретных полей. Равные числовые ключи, включая
-0 и −0, объединяются; разные real не округляй. NULL-ключ образует отдельную
-группу. Непрерывные и дискретные ключи сочетаются в fixed и sliding.
-Перенастройка ролей требует полного набора row_keys, column/columns, facts,
-category_mode и явного входа 0, в том числе для существующего узла.
-Настройки сверяй по configuration.readback. После Done
-или осмотра мастера выход деактивирован: перед следующим узлом или экспортом
+Числа: sum/count/min/max/avg/stddev/sum_squares/unique_count/null_count/first/last.
+Строка, Boolean, Variant: count/min/max/unique_count/null_count/first/last.
+DateTime: те же плюс avg/stddev.
+sum integer → real; счётчики → integer; min/max/first/last сохраняют тип,
+Variant — subtype. avg → real либо DateTime; stddev → real, для дат в днях.
+Count включает NULL, unique_count исключает NULL. All-NULL: счётчики n/0/n,
+остальные NULL. Нет пересечения — все NULL, включая Count.
+First/Last учитывают порядок и NULL. Variant Min включает NULL, скалярный — нет.
+Stddev выборочное; одно непустое значение → 0.
+
+После Done или осмотра мастера выход деактивирован: перед следующим узлом или экспортом
 снова выполни и прочитай ту же Кросс-таблицу через loginom_dock_node_read,
 используя source_operation_id последней успешной настройки с finish=execute.
-Если Execute ещё не было, выполни существующий узел с parameters:{} и finish=execute.
-После смены источника читай тот же узел через loginom_dock_node_read с исходным
-source_operation_id. Sliding обновляет схему и соответствие категории/факта/функции
-полю без перенастройки; Fixed сохраняет начальный состав.
-Минимум категорий резервирует пустые колонки; limit ограничивает их число.
-limit, unique_names, separator привязываются к локальным переменным через
-local_variables и bindings; меняй значения на том же узле. Собственный выход CrossTable допускает переименование,
-порядок и автосинхронизацию при finish=execute; его обязательные источники нельзя
-исключать. Для исключения добавь отдельный downstream transform.reform_columns.
-После отказа исключения Required=true исправь запрос с новым operation_id.
+Если Execute ещё не было, примени существующий узел с parameters:{} и finish=execute.
+После смены источника читай тот же узел с исходным source_operation_id:
+sliding обновляет схему и соответствие категории/факта/функции полю без
+перенастройки; fixed сохраняет начальный состав. min_values резервирует колонки,
+limit ограничивает число. limit/unique_names/separator: local_variables и bindings;
+меняй значения на том же узле. Переименование, порядок, автосинхронизация выхода —
+finish=execute. Required-источники исключать нельзя; используй downstream
+transform.reform_columns. После отказа исправь запрос с новым operation_id.
 
-Точное full-чтение: read.coverage="full", require_exact_numbers:true. Только
-проверенная статическая цепочка import→CrossTable или import→Collapse→CrossTable,
-своё завершённое исполнение, подтверждённые байты исходника, неизменные
-схема/топология/исполнение. Лимиты: 50 строк, 8 полей, 1 MiB. Клиент проверяет
-readonly protocol 321, subtype и native DateTime. Строка Variant не доказывает
-значение. Для широких скалярных отчётов — точное чтение без coverage="full":
-read:{ports:[0],sample_rows:100,
-require_exact_numbers:true}; проверяй sample_complete и полный состав схемы.
-После отказа полного native-чтения не обходи его обычным чтением Variant.
+Точное full-чтение: read.coverage="full", require_exact_numbers:true. Лимиты:
+50 строк, 8 полей, 1 MiB. Нужны своя завершённая статическая цепочка import→CrossTable
+либо import→Collapse→CrossTable, подтверждённые байты исходника, неизменные
+схема/топология/исполнение. Проверяются readonly protocol 321, subtype, native DateTime.
+Строка Variant не доказывает значение. Для широких скалярных отчётов — без coverage="full":
+read:{ports:[0],sample_rows:100,require_exact_numbers:true}; проверь sample_complete
+и весь состав схемы. После отказа full не обходи его обычным чтением Variant.
 <!-- /mode -->

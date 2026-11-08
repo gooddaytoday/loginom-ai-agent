@@ -471,6 +471,16 @@ runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
 
+`crosstable-numeric`, `crosstable-scalar`, `crosstable-datetime`, `crosstable-null-cells`:
+цикл A Кросс-таблицы, соответственно 4/2/2/1 полных отчётов. Задания —
+`transform-crosstable/acceptance/task-*-aggregates.md` и `task-null-cells.md`,
+независимые ожидания — `acceptance/modes/expected-*.json`. Модель получает ровно
+один `aggregate-values.csv` из fixtures и выбранное задание. CSV/Save/cold
+сверяют значения, типы, NULL и порядок полей. Только `crosstable-datetime`
+учитывает D76 `midnight_date`: отсутствие строго нулевого времени; потеря
+ненулевых миллисекунд не разрешена. У numeric нет выходных DateTime-полей,
+`negative_zero` не расширен. Настройки масок и ISO-ожидания прежние (#914).
+
 `crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
 ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
 `docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.

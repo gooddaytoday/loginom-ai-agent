@@ -304,6 +304,15 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name in ['crosstable-numeric', 'crosstable-scalar', 'crosstable-datetime', 'crosstable-null-cells']:
+        kind = name.removeprefix('crosstable-')
+        src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance'
+        task = kind if kind == 'null-cells' else kind + '-aggregates'
+        return dict(source=src, prompt=src / ('task-' + task + '.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-values.csv'], base=None,
+                    expected_name='modes/expected-' + kind + '.json',
+                    oracle=src / 'modes/oracle.py',
+                    export_count={'numeric': 4, 'scalar': 2, 'datetime': 2, 'null-cells': 1}[kind])
     if name == 'crosstable-real-keys':
         src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data',
@@ -947,14 +956,16 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     assert len(data_rows) == len(expected['rows']), 'CSV_ROW_COUNT'
 
     def limitation(value, col, target):
-        # Owner-approved D76 forms are code-owned and only apply to types300.
-        if scenario_name != 'types300': return None
-        if (col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
+        # LAB-1153: CrossTable permits only omission of exactly zero time.
+        # Keep types300's prior millisecond and negative-zero rules unchanged.
+        if scenario_name not in ['types300', 'crosstable-datetime']: return None
+        if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
                 and math.copysign(1, target) < 0 and value == '0'):
             return 'negative_zero'
         if col['type'] == 'datetime' and isinstance(target, str):
             goal = datetime.fromisoformat(target)
-            if (goal.hour == goal.minute == goal.second == 0 and goal.microsecond != 0
+            if (goal.hour == goal.minute == goal.second == 0
+                    and (goal.microsecond != 0 if scenario_name == 'types300' else goal.microsecond == 0)
                     and value == goal.date().isoformat()):
                 return 'midnight_date'
         return None
@@ -1045,7 +1056,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             key, value = expected['rows'][want][columns[i]['name']], data_rows[actual][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
-    if scenario_name == 'types300' and d76 is not None:
+    if scenario_name in ['types300', 'crosstable-datetime'] and d76 is not None:
         counts = dict(negative_zero=0, midnight_date=0)
         for want, actual in enumerate(pairs):
             for i, col in enumerate(columns):

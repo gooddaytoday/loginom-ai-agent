@@ -105,6 +105,11 @@ RULES = (
     ((C + 'collapse-*.mjs', 'docs/node-development/nodes/collapse-columns/acceptance/**'), ('live-ui',), ('collapse-variant', 'collapse-mixed')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
      ('live-ui',), ('crosstable-real-keys',)),
+    (('docs/node-development/nodes/transform-crosstable/acceptance/modes/**',
+      'docs/node-development/nodes/transform-crosstable/acceptance/task-*-aggregates.md',
+      'docs/node-development/nodes/transform-crosstable/acceptance/task-null-cells.md',
+      'packages/product/skills/loginom-automation/references/nodes/transform.cross_table.md'),
+     ('live-ui',), ('crosstable-numeric', 'crosstable-scalar', 'crosstable-datetime', 'crosstable-null-cells')),
 )
 UNITS = {
     'host-unit': ('(cd packages/loginom-host && bun test)', '#447: runtime/src требует полный host bun test'),
