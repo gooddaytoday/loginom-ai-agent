@@ -47,7 +47,7 @@ def expected(case):
         for number, indexes in enumerate(groups, 1):
             for index in indexes:
                 rows[index][flag], rows[index][flag + 'Group'] = True, number
-    return {'package_path': '{{PACKAGE_PATH}}',
+    return {'package_path': '{{PACKAGE_PATH}}', 'null_marker': 'NULL',
             'nodes': [{'type': t} for t in ['imports.text', 'research.duplicates', 'exports.text']],
             'outputs': [{'output_node_type': 'research.duplicates',
                          'output_node_label': 'Типизированные ключи', 'output_port': 0,
