@@ -1,0 +1,1182 @@
+{
+  "status": "proposal; owner approval required; not a runtime wire schema",
+  "root_rows": 1,
+  "mode": "auto_structure",
+  "root_mode": "auto",
+  "numeric_tolerance": {
+    "abs": 0,
+    "rel": 0
+  },
+  "mixed_leaf": {
+    "schema_type": "variant",
+    "cell_types": [
+      "integer",
+      "string",
+      "boolean",
+      "null"
+    ]
+  },
+  "cases": {
+    "nested": {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "label_any": true,
+      "schema": [
+        {
+          "path": "",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/batch",
+          "type": "string",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/id",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/details",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/details/code",
+          "type": "string",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/details/active",
+          "type": "boolean",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/parts",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/parts/sku",
+          "type": "string",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/parts/qty",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        }
+      ],
+      "source": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/batch",
+            "type": "string",
+            "value": "Бета"
+          },
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "9007199254740993"
+                  },
+                  {
+                    "path": "/items/0/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/0/details/code",
+                        "type": "string",
+                        "value": "A"
+                      },
+                      {
+                        "path": "/items/0/details/active",
+                        "type": "boolean",
+                        "value": true
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/0/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/0/parts/0/sku",
+                            "type": "string",
+                            "value": "a"
+                          },
+                          {
+                            "path": "/items/0/parts/0/qty",
+                            "type": "integer",
+                            "value": "2"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "9007199254740994"
+                  },
+                  {
+                    "path": "/items/1/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/1/details/code",
+                        "type": "string",
+                        "value": ""
+                      },
+                      {
+                        "path": "/items/1/details/active",
+                        "type": "boolean",
+                        "value": false
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/1/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/1/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/1/parts/0/sku",
+                            "type": "string",
+                            "value": "b"
+                          },
+                          {
+                            "path": "/items/1/parts/0/qty",
+                            "type": "integer",
+                            "value": "0"
+                          }
+                        ]
+                      },
+                      {
+                        "path": "/items/1/parts/1",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/1/parts/1/sku",
+                            "type": "string",
+                            "value": "c"
+                          },
+                          {
+                            "path": "/items/1/parts/1/qty",
+                            "type": "null",
+                            "value": null
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "proposed_document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/batch",
+            "type": "string",
+            "value": "Бета"
+          },
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "9007199254740993"
+                  },
+                  {
+                    "path": "/items/0/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/0/details/code",
+                        "type": "string",
+                        "value": "A"
+                      },
+                      {
+                        "path": "/items/0/details/active",
+                        "type": "boolean",
+                        "value": true
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/0/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/0/parts/0/sku",
+                            "type": "string",
+                            "value": "a"
+                          },
+                          {
+                            "path": "/items/0/parts/0/qty",
+                            "type": "integer",
+                            "value": "2"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "9007199254740994"
+                  },
+                  {
+                    "path": "/items/1/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/1/details/code",
+                        "type": "string",
+                        "value": ""
+                      },
+                      {
+                        "path": "/items/1/details/active",
+                        "type": "boolean",
+                        "value": false
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/1/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/1/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/1/parts/0/sku",
+                            "type": "string",
+                            "value": "b"
+                          },
+                          {
+                            "path": "/items/1/parts/0/qty",
+                            "type": "integer",
+                            "value": "0"
+                          }
+                        ]
+                      },
+                      {
+                        "path": "/items/1/parts/1",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/1/parts/1/sku",
+                            "type": "string",
+                            "value": "c"
+                          },
+                          {
+                            "path": "/items/1/parts/1/qty",
+                            "type": "null",
+                            "value": null
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "mixed": {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "label_any": true,
+      "schema": [
+        {
+          "path": "",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/value",
+          "type": "variant",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        }
+      ],
+      "source": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/value",
+                    "type": "integer",
+                    "value": "7"
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/value",
+                    "type": "string",
+                    "value": "семь"
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/value",
+                    "type": "boolean",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "path": "/items/3",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/3/value",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "proposed_document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/value",
+                    "type": "integer",
+                    "value": "7"
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/value",
+                    "type": "string",
+                    "value": "семь"
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/value",
+                    "type": "boolean",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "path": "/items/3",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/3/value",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "empty": {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "label_any": true,
+      "schema": [
+        {
+          "path": "",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/id",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/parts",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/parts/qty",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/details",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/details/code",
+          "type": "string",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        }
+      ],
+      "source": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/0/parts/0/qty",
+                            "type": "integer",
+                            "value": "2"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/0/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/0/details/code",
+                        "type": "string",
+                        "value": "A"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/parts",
+                    "type": "array",
+                    "children": []
+                  },
+                  {
+                    "path": "/items/1/details",
+                    "type": "object",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/2/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/2/parts/0/qty",
+                            "type": "integer",
+                            "value": "0"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/2/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/2/details/code",
+                        "type": "string",
+                        "value": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "proposed_document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/0/parts/0/qty",
+                            "type": "integer",
+                            "value": "2"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/0/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/0/details/code",
+                        "type": "string",
+                        "value": "A"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/parts",
+                    "type": "array",
+                    "children": []
+                  },
+                  {
+                    "path": "/items/1/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/1/details/code",
+                        "type": "null",
+                        "value": null
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/parts",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/2/parts/0",
+                        "type": "object",
+                        "children": [
+                          {
+                            "path": "/items/2/parts/0/qty",
+                            "type": "integer",
+                            "value": "0"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/2/details",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/items/2/details/code",
+                        "type": "string",
+                        "value": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "null": {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "label_any": true,
+      "schema": [
+        {
+          "path": "",
+          "type": "object",
+          "is_container": true,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items",
+          "type": "object",
+          "is_container": true,
+          "is_array": true,
+          "label_any": true
+        },
+        {
+          "path": "/items/id",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/note",
+          "type": "string",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/enabled",
+          "type": "boolean",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        },
+        {
+          "path": "/items/qty",
+          "type": "integer",
+          "is_container": false,
+          "is_array": false,
+          "label_any": true
+        }
+      ],
+      "source": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/note",
+                    "type": "string",
+                    "value": "x"
+                  },
+                  {
+                    "path": "/items/0/enabled",
+                    "type": "boolean",
+                    "value": true
+                  },
+                  {
+                    "path": "/items/0/qty",
+                    "type": "integer",
+                    "value": "2"
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/note",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/1/enabled",
+                    "type": "boolean",
+                    "value": false
+                  },
+                  {
+                    "path": "/items/1/qty",
+                    "type": "integer",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/note",
+                    "type": "string",
+                    "value": ""
+                  },
+                  {
+                    "path": "/items/2/enabled",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/2/qty",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              },
+              {
+                "path": "/items/3",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/3/id",
+                    "type": "integer",
+                    "value": "4"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "proposed_document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/note",
+                    "type": "string",
+                    "value": "x"
+                  },
+                  {
+                    "path": "/items/0/enabled",
+                    "type": "boolean",
+                    "value": true
+                  },
+                  {
+                    "path": "/items/0/qty",
+                    "type": "integer",
+                    "value": "2"
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/note",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/1/enabled",
+                    "type": "boolean",
+                    "value": false
+                  },
+                  {
+                    "path": "/items/1/qty",
+                    "type": "integer",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/note",
+                    "type": "string",
+                    "value": ""
+                  },
+                  {
+                    "path": "/items/2/enabled",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/2/qty",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              },
+              {
+                "path": "/items/3",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/3/id",
+                    "type": "integer",
+                    "value": "4"
+                  },
+                  {
+                    "path": "/items/3/note",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/3/enabled",
+                    "type": "null",
+                    "value": null
+                  },
+                  {
+                    "path": "/items/3/qty",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "untyped_boundary": {
+    "source": {
+      "path": "",
+      "type": "object",
+      "children": [
+        {
+          "path": "/items",
+          "type": "array",
+          "children": [
+            {
+              "path": "/items/0",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/0/id",
+                  "type": "integer",
+                  "value": "1"
+                },
+                {
+                  "path": "/items/0/emptyArray",
+                  "type": "array",
+                  "children": []
+                },
+                {
+                  "path": "/items/0/emptyObject",
+                  "type": "object",
+                  "children": []
+                },
+                {
+                  "path": "/items/0/nullOnly",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "proposed_document": {
+      "path": "",
+      "type": "object",
+      "children": [
+        {
+          "path": "/items",
+          "type": "array",
+          "children": [
+            {
+              "path": "/items/0",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/items/0/id",
+                  "type": "integer",
+                  "value": "1"
+                },
+                {
+                  "path": "/items/0/emptyArray",
+                  "type": "array",
+                  "children": []
+                },
+                {
+                  "path": "/items/0/emptyObject",
+                  "type": "object",
+                  "children": []
+                },
+                {
+                  "path": "/items/0/nullOnly",
+                  "type": "null",
+                  "value": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "schema": [
+      {
+        "path": "",
+        "type": "object",
+        "is_container": true,
+        "is_array": false,
+        "label_any": true
+      },
+      {
+        "path": "/items",
+        "type": "object",
+        "is_container": true,
+        "is_array": true,
+        "label_any": true
+      },
+      {
+        "path": "/items/id",
+        "type": "integer",
+        "is_container": false,
+        "is_array": false,
+        "label_any": true
+      },
+      {
+        "path": "/items/emptyArray",
+        "type": "variant",
+        "is_container": false,
+        "is_array": true,
+        "label_any": true
+      },
+      {
+        "path": "/items/emptyObject",
+        "type": "object",
+        "is_container": true,
+        "is_array": false,
+        "label_any": true
+      },
+      {
+        "path": "/items/nullOnly",
+        "type": "variant",
+        "is_container": false,
+        "is_array": false,
+        "label_any": true
+      }
+    ],
+    "root_rows": 1,
+    "acceptance": "proposal after native discovery; owner approval before stage 1"
+  }
+}

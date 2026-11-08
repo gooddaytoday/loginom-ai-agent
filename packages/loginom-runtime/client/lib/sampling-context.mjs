@@ -23,7 +23,7 @@ export function readSamplingBrowser(prefix){
  const method=methodControl.getRawValue();
  if(typeof method!=='string'||!method)return fail('sampling_method_value');
  const readGrid=(suffix,limit=4)=>{
-  const es=[...document.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']')].filter(e=>shell.contains(e)&&e.checkVisibility({checkVisibilityCSS:true}));
+  const es=[...document.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']')].filter(e=>shell.contains(e)&&e.checkVisibility({checkVisibilityCSS:true})&&!(suffix==='SizeGridForm;grdDataSet'&&(e.getAttribute('data-tid')??'').includes(';RandomUniformMethodForm;')));
   const element=es.length===1?es[0]:null,grid=element&&globalThis.Ext?.getCmp?.(element.id);
   const store=grid?.el?.dom===element?grid.getStore?.():null,data=store?.getData?.(),items=data?.items,source=data?.getSource?.()?.items;
   const chained=store?.$className==='Ext.data.ChainedStore'&&['StratifiedMethodForm;grdStratifiedGrid','BiasedMethodForm;grdBiasedColumns'].includes(suffix);
@@ -52,7 +52,7 @@ export function readSamplingBrowser(prefix){
  if(!sizeGrid.verified||sequenceGrid&&!sequenceGrid.verified)return fail('sampling_grid',{sizes:sizeGrid,sequence:sequenceGrid,method});
  const sizes=sizeGrid.rows,sequence=sequenceGrid?.rows??[],partition=kind==='PartitionComponentWizard';
  if(sizes.length<(partition?2:1)||sizes.length>(partition?3:2))return fail('sampling_size_count');
- const units=Array.from({length:partition?2:1},(_,index)=>{
+ const readUnits=sizeGrid=>Array.from({length:partition?2:1},(_,index)=>{
   const cells=exact(sizeGrid.base+';colSizeType_'+index).filter(e=>shell.contains(e)&&e.querySelectorAll('img[role=button]').length===1);
   if(cells.length!==1)return null;
   const icon=cells[0].querySelector('img[role=button]'),row=cells[0].closest('[data-recordid]');if(!row)return null;
@@ -72,10 +72,19 @@ export function readSamplingBrowser(prefix){
   return {index,record_id:row.getAttribute('data-recordid'),tid:cells[0].getAttribute('data-tid'),icon_ref:iconRef,absolute_size:absoluteSize,absolute_control_tid:absolute[0].getAttribute('data-tid'),unit:ad?'percent':'rows',
    text:cells[0].textContent.trim(),title:icon.getAttribute('title')??'',tooltip:icon.getAttribute('data-qtip')??'',class_name:icon.getAttribute('class')??''};
  });
+ const units=readUnits(sizeGrid);
+ const groupGrid=method==='Равномерный случайный'?readGrid('RandomUniformMethodForm;SizeGridForm;grdDataSet'):null;
+ const groupUnits=groupGrid?.verified?readUnits(groupGrid):null;
+ if(groupGrid&&(!groupGrid.verified||!groupUnits||groupUnits.some(u=>u===null)))return fail('sampling_uniform_groups',{groups:groupGrid});
  if(units.some(u=>u===null))return fail('sampling_size_units',{size_rows:sizes});
  if(sequenceGrid&&sequence.length!==(partition?3:2))return fail('sampling_group_count');
  const priority=exact(base+'cntTestPriority;cnt;chb;InputEl');
- const testPriority=priority.length===1&&typeof priority[0].checked==='boolean'?priority[0].checked:null;
+ const priorityOwner=component(base+'cntTestPriority;cnt;chb');
+ const nativePriority=priorityOwner?.getValue?.();
+ const positionControl=component(base+'pedTestPriorityPosition;ValueControl');
+ const positionLabel=positionControl?.getRawValue?.();
+ const priorityPosition=({'В начале набора':'beginning','В конце набора':'end','Определяется алгоритмом':'algorithm'})[positionLabel]??null;
+ const testPriority=method==='Равномерный случайный'&&partition?(priority.length===1&&priorityOwner?.el?.dom?.contains(priority[0])&&typeof nativePriority==='boolean'?nativePriority:null):priority.length===1&&typeof priority[0].checked==='boolean'?priority[0].checked:null;
  const seedControl=component(base+'RandSeedEdit;edtRandSeed;ValueControl');
  const rawSeed=seedControl?.getValue?.(),seed=(typeof rawSeed==='number'||typeof rawSeed==='string'&&/^\d+$/.test(rawSeed))&&Number.isSafeInteger(Number(rawSeed))?Number(rawSeed):null;
  const strata=method==='Стратифицированный'?readGrid('StratifiedMethodForm;grdStratifiedGrid',128):null;
@@ -100,5 +109,5 @@ export function readSamplingBrowser(prefix){
   row.values.Value=cells[0].textContent;row.values.Factor=row.values[factorColumn.dataIndex];
  }
  if(strata&&!strata.verified||biasFields&&!biasFields.verified||bias&&!bias.verified)return fail('sampling_method_grid',{strata,biasFields,bias});
- return {verified:true,inventory_complete:true,seed,test_priority:testPriority,strata,bias_fields:biasFields,bias,kind:partition?'data_partition':'sampling',base,sizes_base:sizeGrid.base,sequence_base:sequenceGrid?.base??null,sequence_materialized:!!sequenceGrid,method,sizes,units,sequence,settings_applied:false};
+ return {verified:true,inventory_complete:true,seed,...(groupGrid?{group_sizes:groupGrid.rows,group_units:groupUnits,groups_base:groupGrid.base,test_priority_position:priorityPosition}:{}),test_priority:testPriority,strata,bias_fields:biasFields,bias,kind:partition?'data_partition':'sampling',base,sizes_base:sizeGrid.base,sequence_base:sequenceGrid?.base??null,sequence_materialized:!!sequenceGrid,method,sizes,units,sequence,settings_applied:false};
 }

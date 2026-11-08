@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "value": 7
+    },
+    {
+      "value": "семь"
+    },
+    {
+      "value": false
+    },
+    {
+      "value": null
+    }
+  ]
+}

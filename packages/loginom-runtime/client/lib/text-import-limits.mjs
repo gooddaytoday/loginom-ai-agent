@@ -8,7 +8,7 @@ export function textImportStepBudget(request) {
   // Preview discovers the schema instead of declaring columns. Use the same
   // bounded read allowance as an existing import; all pinned limits stay fixed.
   const columns=request.target.kind==='existing'||request.parameters.preview_only===true
-    ?limits.max_columns:request.parameters.settings.columns.length;
+    ?limits.max_columns:request.parameters.settings.columns?.length??limits.max_columns;
   const mapped=request.mappings.find(m=>m.direction==='output')?.fields?.length??0;
   if(!Number.isInteger(columns)||columns<1||columns>limits.max_columns||mapped>limits.max_columns)
     throw Error('Invalid bounded text import schema');

@@ -35,14 +35,15 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     &&m.source_identity_verified===true&&typeof n.autosync==='boolean'
     &&Array.isArray(n.source_fields)&&Array.isArray(n.target_fields)
     &&n.target_fields.length<=1000,'unverified mapping inventory');
-  const output=n.target_fields.map((f,i)=>{
+  const output=m.deferred_output===true?[]:n.target_fields.map((f,i)=>{
     const matches=n.source_fields.filter(s=>s.record_id===f.source?.record_id);
     requireValue(matches.length===1&&JSON.stringify(matches[0])===JSON.stringify(f.source)
       &&f.index===i&&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k].length<=120),
       'mapping source differs');
     return {...pick(f,['index','name','label','type','data_kind']),source_name:f.source.name};
   });
-  requireValue(output.length===c.columns.filter(f=>f.used).length,'output inventory differs');
+  // Auto-detect «Все» materializes output fields only at execution; the mapping stage reports none.
+  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length),'output inventory differs');
   return {kind:'text_import',scope:'observed_before_verified_finish',node:structuredClone(node),
     receipt_ids:[configured.receipt_id,mapped.receipt_id,finished.receipt_id],
     values_are:'observed_ui_values',source,format,

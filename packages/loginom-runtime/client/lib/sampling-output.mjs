@@ -5,7 +5,7 @@ export function validateSamplingOutputMapping(c,m,port){
  // With autosync off, Loginom's unexecuted output exposes its complete literal
  // definition without a source store. Bind it to the already verified input
  // inventory and this exact port; do not claim a native source-link proof.
- need(['stratified','biased'].includes(c.mode)&&m.autosync===false&&Array.isArray(m.source_fields)&&m.source_fields.length===0
+ need(['stratified','biased','uniform'].includes(c.mode)&&m.autosync===false&&Array.isArray(m.source_fields)&&m.source_fields.length===0
   &&Array.isArray(m.target_fields)&&m.target_fields.every(f=>!f.source&&!f.excluded&&f.inherited===false),'frozen output definition required');
  const expected=samplingOutputColumns(c,port);
  need(m.target_fields.length===expected.length&&new Set(m.target_fields.map(f=>f.name)).size===expected.length

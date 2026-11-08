@@ -21,9 +21,16 @@ for name,kind,count,width in [('enrich-data-left','final',13,7),('enrich-data-co
  assert len(c['input_files'])==(4 if kind=='final' else 2)
  assert all(f.endswith('.csv') and (c['data']/f).is_file() for f in c['input_files'])
  assert c['prompt'].is_file() and 'expected' not in c['prompt'].read_text()
+for name,count,width,files in [('enrich-three-lookups',7,6,4),('enrich-four-lookups',7,7,5)]:
+ c=m.scenario(name); e=m.expected_for(c,'/own/test.lgp'); o=e['outputs'][0]
+ assert e['package_path']=='/own/test.lgp' and o['output_node_type']=='transform.enrich_data' and o['output_port']==0
+ assert len(o['rows'])==count and len(o['columns'])==width and o['ordered'] is False and o['column_order']=='exact'
+ assert len(c['input_files'])==files and all((c['data']/f).is_file() for f in c['input_files'])
+ assert c['prompt'].is_file() and 'expected' not in c['prompt'].read_text()
+ subprocess.check_call(['python3','-B',str(c['source']/'extended/oracle.py'),'--check'],stdout=subprocess.DEVNULL)
 s=importlib.util.spec_from_file_location('required',Path('scripts/node-acceptance/required-checks.py')); checks=importlib.util.module_from_spec(s);s.loader.exec_module(checks)
 for path in [checks.C+'enrich-node.mjs',checks.C+'enrich-parameters.mjs','docs/node-development/nodes/transform-enrichdata/acceptance/task.md']:
- assert {'enrich-data-left','enrich-data-composite'}<=set(checks.select([path])[1])
+ assert {'enrich-data-left','enrich-data-composite','enrich-three-lookups','enrich-four-lookups'}<=set(checks.select([path])[1])
 print('PASS')`;
  const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);

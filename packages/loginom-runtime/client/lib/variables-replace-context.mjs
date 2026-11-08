@@ -47,11 +47,11 @@ export function readVariablesReplaceBrowser(prefix){
  };
  const pairs=[],seen=new Set(),groups=new Set();for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||seen.has(id)||![0,1].includes(d?.CollectionID))return fail('variables_replace_table_record');seen.add(id);
-  if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType'))continue; // Empty group placeholder.
-  if(d.CollectionID!==0||types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type)return fail('variables_replace_unsupported_rule');
-  const from=typed(d.ValueRender,field.type),to=typed(d.ReplaceRender,field.type);
-  if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.index===d.Index))return fail('variables_replace_typed_value');
-  pairs.push({record_id:id,index:d.Index,from,to});
+  if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType')&&!Object.hasOwn(d,'RegularExpression')&&!Object.hasOwn(d,'ReplacementType'))continue; // Empty group placeholder.
+  if(d.CollectionID===0?(types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type):(field.type!=='string'||d.ReplacementType!==0||typeof d.RegularExpression!=='string'||typeof d.Replacement!=='string'))return fail('variables_replace_unsupported_rule');
+  const from=typed(d.CollectionID===1?d.RegularExpression:d.ValueRender,field.type),to=typed(d.CollectionID===1?d.Replacement:d.ReplaceRender,field.type);
+  if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.collection_id===d.CollectionID&&p.native_index===d.Index))return fail('variables_replace_typed_value');
+  pairs.push({record_id:id,collection_id:d.CollectionID,native_index:d.Index,index:rows.indexOf(r),from,to});
  }
  const otherControl=cmp('cbxReplaceOther'),caseControl=cmp('chkCaseSensitivity'),precisionControl=cmp('edPrecision');
  const mode=otherControl?.getValue?.(),caseSensitive=caseControl?.getValue?.(),precision=precisionControl?.getValue?.();

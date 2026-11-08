@@ -24,7 +24,7 @@ export function readEnrichBrowser(prefix){
  const wizard=ws.length===1?globalThis.Ext?.getCmp?.(ws[0].id)?.Controller:null;
  if(owner?.constructor?.name!=='EnrichDataWizard'||!wizard||owner.FWizardForm!==wizard||owner.FColumnsPrepared!==true)return fail('enrich_owner_or_pending');
  const joined=owner.FJoinedColumnStores,main=owner.FMainColumnStore;
- if(!Array.isArray(joined)||joined.length<1||joined.length>2||new Set([main,...joined]).size!==joined.length+1
+ if(!Array.isArray(joined)||joined.length<1||joined.length>14||new Set([main,...joined]).size!==joined.length+1
   ||cmp('grdEnrichData')?.getStore?.()!==main||cmp('grdEnrichData;grd')?.getStore?.()!==main||cmp('grdEnrichData;grd-1')?.getStore?.()!==main)return fail('enrich_stores_owner');
  const inventories=[];
  for(const [port,store] of [main,...joined].entries()){

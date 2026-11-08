@@ -8,7 +8,7 @@ import {samplingConfigurationReadback} from './sampling-readback.mjs';
 import {samplingOutputColumns,alignSamplingOutput,readSamplingOutputs,validateSamplingOutputMapping} from './sampling-output.mjs';
 export function createSamplingNodeSupport(config){return createSequentialNodeSupport(config,{type:'preprocessing.sampling',validate:validateSamplingParameters,parameterSchema:samplingParametersSchema});}
 export function createSequentialNodeSupport(config,{type,validate,parameterSchema}){return createTabularTransformNodeSupport(config,{
- type,mode:'sequential',modes:['sequential','random','stratified','biased'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
+ type,mode:'sequential',modes:['sequential','random','stratified','biased','uniform'],revision:'sequential-v1-internal-1',parameterSchema,validate,readback:samplingConfigurationReadback,
  configurationObservation:{condition:'sequential settings',readSampling:true,ready:s=>['sampling','data_partition'].includes(s.wizard?.stage)&&s.node_sampling?.verified===true},
  configure:configureSampling,
  // Reading biased categories executes inputs while the wizard is open.
@@ -23,7 +23,7 @@ export async function configureSamplingOutputs(channel,c,p,mappings,finishWizard
    await channel.openOutputPort(port);
    // Autosync retains the method's referenced fields first after Save/reopen.
    // Freeze the complete initial layout for the two new categorical modes.
-   if(c.new_node&&['stratified','biased'].includes(c.mode))await configureOutputAutosync(channel,false);
+   if(c.new_node&&['stratified','biased','uniform'].includes(c.mode))await configureOutputAutosync(channel,false);
    const s=await channel.observe({condition:'sequential output '+port+' schema',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
    const m=s.node_mapping;
    validateSamplingOutputMapping(c,m,port);

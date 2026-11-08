@@ -39,14 +39,13 @@ test('enrich supports one lookup with composite keys and different technical nam
  assert.equal(mappings[0].pairs.length,2);
 });
 
-test('enrich rejects unsupported modes, missing keys, third lookup and ambiguous declarations before effects',()=>{
+test('enrich rejects unsupported modes, missing keys, non-contiguous lookups and ambiguous declarations before effects',()=>{
  for(const edit of [
   p=>delete p.enrichment,p=>p.extra=true,p=>p.enrichment.extra=true,
   p=>p.enrichment.tables=[],p=>p.enrichment.tables[0].keys=[],
   p=>p.enrichment.tables[0].keys.push({main:'Key',lookup:'Name'}),
   p=>p.enrichment.tables[0].keys.push({main:'RowID',lookup:'Key'}),
   p=>p.enrichment.tables[0].port=2,
-  p=>p.enrichment.tables.push({port:3,keys:[{main:'Key',lookup:'Key'}]}),
   p=>delete p.enrichment.prefixes.enabled,p=>p.enrichment.prefixes.name='9bad',
   p=>p.enrichment.tables[0].keys[0].lookup='',
   p=>p.enrichment.tables[0].keys[0].expression='Key',
@@ -55,6 +54,13 @@ test('enrich rejects unsupported modes, missing keys, third lookup and ambiguous
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,inputs:[{input:0},{input:1}]}));
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,read:{ports:[1]}}));
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,mappings:[{direction:'output',port:0,changes:[]}]}));
+});
+
+test('enrich accepts fourteen lookups and rejects a fifteenth before effects',()=>{
+ const lookups=n=>({enrichment:{prefixes:{enabled:false,name:'',label:''},tables:Array.from({length:n},(_,i)=>({port:i+1,keys:[{main:'Key',lookup:'Key'}]}))}});
+ const inputs=n=>({...request,inputs:Array.from({length:n+1},(_,input)=>({input}))});
+ assert.doesNotThrow(()=>validateEnrichParameters(lookups(14),'left',inputs(14)));
+ assert.throws(()=>validateEnrichParameters(lookups(15),'left',inputs(15)),/one to 14 lookups/);
 });
 
 test('enrich requires exact names and matching key types, never implicit conversion',()=>{
@@ -82,4 +88,17 @@ test('enrich output mapping must cover every generated field and preserve unique
   {source:{kind:'configured_field',name:'Key'},name:'Alias'},
   {source:{kind:'configured_field',name:'Amount'},name:'ALIAS'},
  ]}]}));
+});
+
+test('enrich accepts three to fourteen lookups, keeps source order and rejects a fifteenth',()=>{
+ const tables=n=>Array.from({length:n},(_,i)=>({port:i+1,keys:[{main:'Key',lookup:'Key'}]}));
+ const inputs=n=>Array.from({length:n+1},(_,i)=>({input:i}));
+ const prefixes={enabled:false,name:'',label:''};
+ for(const n of [3,4,14])assert.doesNotThrow(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(n)}},'left',{...request,inputs:inputs(n)}));
+ assert.throws(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(15)}},'left',{...request,inputs:inputs(15)}));
+ assert.throws(()=>validateEnrichParameters({enrichment:{prefixes,tables:tables(3)}},'left',{...request,inputs:inputs(2)}));
+ const names=['A','B','C','D'],input_fields=[[field('RowID','integer'),field('Key','integer'),field('Note')],...names.map(n=>[field('Key','integer'),field(n)])];
+ const p={enrichment:{prefixes,tables:tables(4)}},mappings=resolveEnrichTables(p,input_fields);
+ assert.deepEqual(mappings.map(m=>[m.port,m.unmatched]),[[1,['A']],[2,['B']],[3,['C']],[4,['D']]]);
+ assert.deepEqual(enrichOutputFields({input_fields,mappings,prefixes}).map(f=>f.name),['RowID','Key','Note','A','B','C','D']);
 });

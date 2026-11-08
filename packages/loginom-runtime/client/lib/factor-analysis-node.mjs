@@ -7,7 +7,7 @@ import {factorAnalysisParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('FactorAnalysis: '+message);};
 export function createFactorAnalysisNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'research.factor_analysis',mode:'pca_fixed',revision:'factor-analysis-v1-internal-1',parameterSchema:factorAnalysisParametersSchema,
+ type:'research.factor_analysis',modes:['pca_fixed','pca_eigenvalue','pca_variance'],revision:'factor-analysis-v1-internal-2',parameterSchema:factorAnalysisParametersSchema,
  validate:validateFactorAnalysisParameters,validateInput:(p,resolved,native)=>resolveFactorAnalysisFeatures(p,resolved.fields??native.target_fields),readback:factorAnalysisConfigurationReadback,
  configurationObservation:{condition:'factor-analysis feature roles',readFactorAnalysis:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_factor_analysis?.verified===true},
  async configure(channel,p,context){

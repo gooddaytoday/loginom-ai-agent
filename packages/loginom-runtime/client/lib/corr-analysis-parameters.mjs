@@ -1,6 +1,6 @@
 const need=(v,m)=>{if(!v)throw Error('Correlation analysis: '+m);};
 export function validateCorrAnalysisParameters(p,mode,r){
- need(mode==='pearson','only pearson is supported');
+ need(['pearson','spearman','kendall'].includes(mode),'use pearson, spearman or kendall (tau-b)');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['first_set','second_set'].includes(k)),'use first_set and second_set only');
  need(r.target.kind==='existing'||p.first_set!==undefined&&p.second_set!==undefined,'new nodes require both field sets');
  for(const key of ['first_set','second_set'])if(p[key]!==undefined)need(Array.isArray(p[key])&&p[key].length>0&&p[key].length<=128&&p[key].every(n=>typeof n==='string'&&n.length>0&&n.length<=128)&&new Set(p[key]).size===p[key].length,key+' must contain distinct technical field names');

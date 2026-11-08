@@ -5,13 +5,14 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0]}};
 test('Pearson is registered with its native research identity',()=>{
  assert.equal(NODE_TYPES['research.corr_analysis'].icon_class,'bg-vendor-icon-corranalysis');
- assert.deepEqual(NODE_TYPES['research.corr_analysis'].modes,['pearson']);
+ assert.deepEqual(NODE_TYPES['research.corr_analysis'].modes,['pearson','spearman','kendall']);
 });
-test('new correlation requires both complete sets and rejects other coefficients',()=>{
+test('new correlation requires both complete sets and rejects unsupported coefficients',()=>{
  const p={first_set:['X','Y'],second_set:['Z','W']};
  assert.doesNotThrow(()=>validateCorrAnalysisParameters(p,'pearson',request));
  for(const bad of [{}, {...p,first_set:[]},{...p,first_set:['X','X']},{...p,kendall:true}])assert.throws(()=>validateCorrAnalysisParameters(bad,'pearson',request));
- assert.throws(()=>validateCorrAnalysisParameters(p,'spearman',request));
+ for(const mode of ['spearman','kendall'])assert.doesNotThrow(()=>validateCorrAnalysisParameters(p,mode,request));
+ assert.throws(()=>validateCorrAnalysisParameters(p,'extremum',request));
  assert.throws(()=>validateCorrAnalysisParameters(p,'pearson',{...request,read:{ports:[1]}}));
 });
 test('sets replace selections, retain native field order and allow overlapping fields',()=>{

@@ -27,9 +27,9 @@ def expected():
         for mapping in source['manual']:
             item = next(v for v in source[['left', 'right'][mapping['input']]] if v['name'] == mapping['source'])
             value = source['update']['value'] if updated and mapping['input'] == source['update']['input'] and item['name'] == source['update']['name'] else item['value']
-            assert item['type'] == 'integer' and type(value) is int
+            assert mapping['type'] == item['type'] == 'integer' and type(value) is int
             result.append({k: mapping[k] for k in ('name', 'label', 'type')} | {
-                'value': str(value) if mapping['type'] == 'string' else value})
+                'value': value})
         return result
 
     joined = automatic([source[k] for k in ('left', 'right', 'third')])
@@ -43,6 +43,7 @@ def expected():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--write', action='store_true')
+    parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     result = expected()
     path = HERE / 'expected.json'
@@ -50,7 +51,10 @@ if __name__ == '__main__':
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     else:
         assert json.loads(path.read_text()) == result
-        assert result['manual'][1]['value'] == '7'
+        assert result['manual'][1]['value'] == 7 and result['manual'][1]['type'] == 'integer'
         assert result['manual_updated'][0]['value'] == 23
         assert len(result['three_inputs']) == 5 and len(result['third_removed']) == 4
+        for phase,key in [('initial','manual'),('updated','manual_updated')]:
+            run = json.loads((HERE.parent / ('expected-manual-'+phase+'-run.json')).read_text())
+            assert run['variable_inventory']['outputs'][0]['variables'] == result[key]
         print('PASS: proposed manual, update, third/control input expectations')

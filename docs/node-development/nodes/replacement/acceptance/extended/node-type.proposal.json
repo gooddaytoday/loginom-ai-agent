@@ -369,7 +369,7 @@
     },
     "required": [],
     "additionalProperties": false,
-    "description": "Proposal only: existing exact/regex plus mixed internal tables, Boolean constants, result_type with other.keep (Variant), and external exact rule tables. Exact group precedes ordered regex constants. Regex remains string-to-string; group references stay literal. External tables use explicit input roles; first matching row wins and information fields append. Existing omitted fields remain unchanged. No rule-file transport or variable bindings."
+    "description": "Proposal only: existing exact/regex plus mixed internal tables, Boolean constants, result_type with other.keep (Variant), and external exact rule tables. Exact group precedes ordered regex constants. Regex remains string-to-string; group references stay literal. External tables use explicit input roles; duplicate keys fail and unmatched information is NULL. Existing omitted fields remain unchanged. No rule-file transport or variable bindings."
   },
   "session_manifest": {
     "capabilityAbi": 1,

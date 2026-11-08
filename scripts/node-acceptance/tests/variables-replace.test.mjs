@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesReplaceHistory} from '../variables-replace.mjs';
-import {matchVariableInventoryOutput} from '../expected-outputs.mjs';
+import {auditVariablesReplaceHistory,auditVariablesReplaceMatch} from '../variables-replace.mjs';
+import {matchVariableInventoryOutput,parseExpectedOutputs,parseExpectedVariableInventory} from '../expected-outputs.mjs';
 const read=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-replace/acceptance/'+name,import.meta.url)));
 const wants=['expected-initial-run.json','expected-updated-run.json','expected-run.json'].map(read);
 const rules=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-replace/fixtures/rules.json',import.meta.url))).initial.map(r=>({variable:{kind:'input_variable',name:r.name},type:r.type,pairs:r.pairs,other:'keep',...(r.type==='string'?{case_sensitive:true}:['integer','real'].includes(r.type)?{precision:0}:{})}));
+test('match fixture is accepted by the stock cold-check expected parser',()=>{
+ const expected=read('modes/expected-run.json');expected.package_path='/own/match.lgp';
+ assert.doesNotThrow(()=>parseExpectedOutputs(expected));
+ assert.deepEqual(expected.nodes.map(n=>n.type),['variables.user','variables.replace']);
+});
 function history(){
  const checkpoint=(phase)=>{const id='run'+phase,vs=wants[phase].variable_inventory.outputs[0].variables,rs=structuredClone(rules);if(phase)rs[0].pairs=[{from:2,to:8}];
   return {phase:'node_checkpoint',result:{operation_id:id,status:'SUCCEEDED',cleanup_complete:true,node:{document_id:'d',workflow_id:'w',node_id:'replacement'},execution:{status:'completed',execution_id:id},
@@ -26,4 +31,48 @@ test('replacement real output tolerance is bounded at abs/rel 1e-12',()=>{
  const output=history()[0].result.output.variable_ports[0],want=wants[0].variable_inventory.outputs[0];
  output.variables[1].cell.value+=1e-13;assert.equal(matchVariableInventoryOutput(output,want),true);
  output.variables[1].cell.value+=1e-8;assert.throws(()=>matchVariableInventoryOutput(output,want));
+});
+test('match audit requires full typed execution and observed native mode settings',()=>{
+ const expected=read('modes/expected-run.json'),final=structuredClone(expected),want=expected.variable_inventory.outputs[0];
+ final.variable_inventory.outputs[0].column_order='any';
+ const nativeRules=[{variable:{name:'Color'},case_sensitive:false},
+  {variable:{name:'Code'},regex_pairs:[{pattern:'^Ab-[0-9]+$',replacement:'matched'}]},
+  {variable:{name:'Amount'},precision:0.1},{variable:{name:'Other'},other:'null'}];
+ const event=history()[0];
+ event.result.configuration.readback={kind:'variables_replace',mode:'rules',rules:nativeRules};
+ const port=event.result.output.variable_ports[0];
+ port.variables=want.variables.map((v,index)=>({id:index,index,...v,cell:{type:v.type,is_null:v.value===null,
+  value:v.type==='integer'?String(v.value):v.value,precision:v.type==='integer'?'exact_integer':v.type==='real'?'17_significant_digits':v.type==='datetime'?'millisecond':'exact_string',...(v.type==='datetime'?{representation:'local_datetime',timezone:'unspecified'}:{})}}));
+ port.count=8;port.completeness={loaded:true,count:8,store_count:8,unique_ids:8};
+ const reopened=structuredClone(event);
+ reopened.result.configuration=undefined;reopened.result.execution.execution_id='reopened';
+ const reopenedPort=reopened.result.output.variable_ports[0];reopenedPort.execution_id='reopened';
+ reopenedPort.variables.reverse().forEach((v,index)=>v.index=index);
+ assert.equal(auditVariablesReplaceMatch([event,reopened],expected,final).status,'PASS');
+ assert.throws(()=>auditVariablesReplaceMatch([event],expected,final));
+ assert.throws(()=>auditVariablesReplaceMatch([event,event],expected,final));
+ for(const corrupt of [e=>e.result.configuration.readback.rules[0].case_sensitive=true,
+  e=>e.result.output.variable_ports[0].variables.reverse(),
+  e=>e.result.output.variable_ports[0].variables[7].cell.value='',
+  e=>e.result.output.variable_ports[0].variables[0].label='report_date Замена',
+  e=>e.result.output.variable_ports[0].execution_id='old']){
+  const changed=structuredClone(event);corrupt(changed);assert.throws(()=>auditVariablesReplaceMatch([changed,reopened],expected,final));
+ }
+});
+
+test('variable column_order any opts out of order only; initial/default stays exact',()=>{
+ const expected=read('modes/expected-run.json'),want=expected.variable_inventory.outputs[0];
+ const port=history()[0].result.output.variable_ports[0];
+ // Reuse the exact-mode fixture to cover integer, real, boolean, string and NULL.
+ const strict=wants[0].variable_inventory.outputs[0];
+ port.variables.reverse().forEach((v,index)=>v.index=index);
+ assert.throws(()=>matchVariableInventoryOutput(port,strict),/ORDER_MISMATCH/);
+ const any={...strict,column_order:'any'};
+ assert.equal(matchVariableInventoryOutput(port,any),true);
+ for(const mutate of [v=>v.label+=' changed',v=>v.type='string',v=>v.cell.value='wrong',v=>v.cell.is_null=!v.cell.is_null]){
+  const changed=structuredClone(port);mutate(changed.variables[0]);
+  assert.throws(()=>matchVariableInventoryOutput(changed,any),/VALUE_MISMATCH/);
+ }
+ want.column_order='any';assert.doesNotThrow(()=>parseExpectedVariableInventory(expected));
+ want.column_order='loose';assert.throws(()=>parseExpectedVariableInventory(expected));
 });

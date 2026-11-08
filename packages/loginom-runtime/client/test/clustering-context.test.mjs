@@ -65,3 +65,14 @@ test('foreign normalization editors and remote or ambiguous inventories cannot a
   const f=normalizationFixture();change(f);assert.equal(f.read().verified,false);
  }
 });
+
+test('native auto min/max/threshold and seed retain exact numeric types and owned controls',()=>{
+ const base='MF;TF;WizrdMCF;ClusterizationWizard;',values={pedAutoClusters:true,pedClusters:3,pedClustersMin:2,pedClustersMax:4,pedThreshold:1,'RandSeedEdit;edtRandSeed':'42'};
+ const elements=[{id:'root',tid:base.slice(0,-1),checkVisibility:()=>true},...Object.keys(values).map((key,i)=>({id:'p'+i,tid:base+key+';ValueControl'}))];
+ const components=Object.fromEntries(Object.entries(values).map(([key,value],i)=>['p'+i,{el:{dom:elements[i+1]},getValue:()=>values[key]}]));
+ const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readClusteringBrowser.toString()+')("MF;TF")',context)));
+ const r=read();assert.equal(r.verified,true);assert.equal(r.auto,true);assert.equal(r.min_clusters,2);assert.equal(r.max_clusters,4);assert.equal(r.threshold,1);assert.equal(r.seed,42);
+ for(const key of ['pedClustersMin','pedClustersMax','pedThreshold']){const old=values[key];values[key]='2';assert.equal(read().reason,'clustering_parameter_value');values[key]=old;}
+ components.p2.el.dom={};assert.equal(read().reason,'clustering_parameter_control');
+});

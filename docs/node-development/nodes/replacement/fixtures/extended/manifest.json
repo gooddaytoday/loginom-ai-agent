@@ -21,6 +21,7 @@
     },
     {
       "file": "rules.csv",
+      "purpose": "negative external duplicate-key fixture; native execution rejects it",
       "bytes": 124,
       "records": 4,
       "delimiter": ";",
@@ -31,6 +32,15 @@
         "Info",
         "Ignored"
       ]
+    },
+    {
+      "file": "rules-unique.csv",
+      "purpose": "positive external table; use with task-external.md",
+      "bytes": 99,
+      "records": 3,
+      "delimiter": ";",
+      "header": true,
+      "columns": ["Value", "Replacement", "Info", "Ignored"]
     },
     {
       "file": "rules.tsv",

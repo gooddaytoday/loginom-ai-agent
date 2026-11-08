@@ -381,8 +381,8 @@ export function parseExpectedVariableInventory(expected){
   &&(s.label===undefined||typeof s.label==='string'&&s.label.length>0);
  const ordinal=p=>Number.isInteger(p)&&p>=0&&p<100;
  for(const o of v.outputs){
-  need(o&&Object.keys(o).every(k=>['node','port','ordered','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
-   &&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
+  need(o&&Object.keys(o).every(k=>['node','port','ordered','column_order','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
+   &&(o.column_order===undefined||['exact','any'].includes(o.column_order))&&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
   for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value','tolerance'].includes(k))
    &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime'].includes(x.type)
    &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
@@ -408,8 +408,8 @@ export function matchVariableInventoryOutput(output,want){
   &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
   &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
   &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');
- if(['variables.replace','variables.calculator','variables.column_union'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
- if(want.ordered===true)need(output.variables.every((v,i)=>v.index===i&&v.name===want.variables[i].name),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(want.column_order!=='any'&&['variables.replace','variables.calculator','variables.column_union'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(want.column_order!=='any'&&want.ordered===true)need(output.variables.every((v,i)=>v.index===i&&v.name===want.variables[i].name),'COLD_VARIABLE_ORDER_MISMATCH');
  for(const x of want.variables){
   const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
   need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
