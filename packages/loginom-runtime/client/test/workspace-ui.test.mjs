@@ -1185,6 +1185,10 @@ for(const mode of ['fresh','owner','mask','persistent'])test('Files scroll 4000-
   const moved=result.output.ui.elements.find(e=>e.ref===target.ref);
   assert.deepEqual(clone(moved.scroll),{ref:root.ref,top:5000,max_top:10313});
   assert.equal(moved.horizontal_scroll,undefined);
+  // The pre-gesture snapshot cannot authorize a second scroll.
+  const replay=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+  assert.notEqual(replay.status,'SUCCEEDED');assert.equal(replay.effect_possible,false);
+  assert.equal(replay.trace.filter(e=>e.event==='ui_scroll_applied').length,0);assert.equal(table.scrollTop,5000);
  } else {
   assert.equal(result.status,'AMBIGUOUS');
   assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
