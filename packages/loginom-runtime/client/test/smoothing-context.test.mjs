@@ -41,5 +41,9 @@ test('wavelet reader owns exact family/order/depth/boundary controls and refuses
  };
  const value=fixture(wavelet);assert.equal(value.verified,true);
  assert.deepEqual(value.settings,{family:'daubechies',order:1,depth:2,boundary:'symmetric'});
+ for(const boundary of ['Антисимметричное','Симметричное без крайней точки']){
+  const result=fixture(f=>{wavelet(f);f.components['edtEdgeExtension;ValueControl'].getRawValue=()=>boundary;});
+  assert.equal(result.verified,true);assert.equal(result.settings.boundary,boundary);assert.notEqual(result.settings.boundary,'symmetric');
+ }
  for(const fault of [f=>f.components['edtWaveletOrder;SwitchButton'].pressed=true,f=>f.components['edtDecompositionLevel;ValueControl'].getValue=()=>NaN,f=>f.wizard[f.queue].IsEmpty=false])assert.equal(fixture(f=>{wavelet(f);fault(f);}).verified,false);
 });

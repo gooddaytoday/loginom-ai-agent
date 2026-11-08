@@ -21,7 +21,7 @@ export async function selectSmoothingField(channel,baseline,name){
 }
 export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_prescott'}){
  const initial=await observe(channel,'complete smoothing field inventory'),baseline=initial.node_smoothing;
-
+ if(mode==='hodrick_prescott')need(baseline.fields.every(f=>f.algorithm===0),'wavelet settings unsupported in hodrick_prescott');
  need(inputMapping?.verified&&inputMapping.inventory_complete,'verified input mapping required');
  const inputs=inputMapping.target_fields,schema=fs=>fs.map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
  need(same(schema(inputs.filter(f=>['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный')),schema(baseline.fields)),'smoothing input schema differs');
@@ -47,7 +47,7 @@ export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_p
     const cell=one(s,e=>e.smoothing_cell?.record_id===field.record_id&&e.smoothing_cell.part==='algorithm'&&e.allowed_actions.includes('double_click'),'exact algorithm cell unavailable');
     await channel.perform({condition:'open smoothing algorithm',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'double_click',ref:cell.ref})});
     s=await observe(channel,'smoothing algorithm editor');
-    const label=algorithm===1?'Вейвлет-сглаживание':'Фильтр_Ходрика-Прескотта';
+    const label='Вейвлет-сглаживание';
     const optionMatches=e=>e.tid===s.wizard.root_tid+';SmoothingWizard;grdColumnsSettings;tbl;celleditor;cbx;boundlist;'+label&&e.allowed_actions.includes('click');
     // Native double click can open the list directly and occlude its picker.
     if(!s.ui.elements.some(optionMatches)){await act(s,'grdColumnsSettings;tbl;celleditor;cbx;trg_picker',{verb:'click'});s=await observe(channel,'smoothing algorithm options');}

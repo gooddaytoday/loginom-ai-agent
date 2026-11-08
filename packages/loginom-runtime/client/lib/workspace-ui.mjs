@@ -3007,7 +3007,7 @@ function readRenderedInputMapping(observation) {
         for(const row of grid.querySelectorAll('table.x-grid-item')){
           const index=Number(row.getAttribute('data-recordindex')),r=records[index],d=r?.data;
           if(!Number.isSafeInteger(index)||index<0||!r?.isModel||typeof d?.Name!=='string'||typeof d.ChkUsable!=='boolean'||row.getAttribute('data-recordid')!==String(r.internalId)||row.getAttribute('data-boundview')!==grid.id)continue;
-          for(const [column,part] of [['colDisplayName_','field'],['colUsable_','used'],['colAlgorithm_','algorithm']]){
+          for(const [column,part] of [['colDisplayName_','field'],['colUsable_','used']]){
             const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(getTid(e)??'').startsWith(base+column));
             const targets=part==='used'&&cells.length===1?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:cells;
             if(targets.length!==1||!visible(targets[0])||sensitive(targets[0])||part==='used'&&targets[0].classList.contains('x-grid-checkcolumn-checked')!==d.ChkUsable)continue;

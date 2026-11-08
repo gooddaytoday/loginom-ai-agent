@@ -19,3 +19,18 @@ test('smoothing checkbox binds exact cached Usable flag and row ownership',async
   if(fault==='valid'){assert.equal(flags[0].smoothing_cell.record_id,'x');assert.ok(flags[0].allowed_actions.includes('click'));const algorithm=s.ui.elements.find(e=>e.smoothing_cell?.part==='algorithm');assert.ok(algorithm.allowed_actions.includes('double_click'));}
  }
 });
+
+test('smoothing algorithm exposure does not extend to ElimOutlierWizard',async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;ElimOutlierWizard;';page.context.innerWidth=1000;page.context.innerHeight=800;
+ const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:950,height:600});
+ const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:900,height:500},form);
+ const grid=page.add('div',base+'grdColumnsSettings;tbl','',{x:30,y:100,width:800,height:400},root);grid.id='outlier-grid';grid.attrs.id=grid.id;
+ const row=page.add('table',null,'',{x:35,y:120,width:700,height:30},grid);Object.assign(row.attrs,{class:'x-grid-item','data-recordindex':'0','data-recordid':'x','data-boundview':grid.id});
+ page.add('td',base+'colDisplayName_X','X',{x:40,y:120,width:100,height:30},row);
+ page.add('td',base+'colAlgorithm_X','unsupported',{x:280,y:120,width:150,height:30},row);
+ const record={isModel:true,internalId:'x',data:{Name:'X',ChkUsable:false}};
+ page.context.Ext={getCmp:id=>id===grid.id?{el:{dom:grid},getStore:()=>({$className:'Ext.data.Store',isLoading:()=>false,getData:()=>({items:[record]})})}:undefined};
+ const s=await page.observe();assert.equal(s.wizard.stage,'elim_outlier');
+ assert.ok(s.ui.elements.some(e=>e.elim_outlier_cell?.part==='field'));
+ assert.equal(s.ui.elements.some(e=>e.elim_outlier_cell?.part==='algorithm'),false);
+});
