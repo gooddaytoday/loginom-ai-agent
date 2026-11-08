@@ -12,6 +12,16 @@ export function validateColUnionGraphInputs(request,graph){
   need(matches.length===1&&matches[0].outputs.includes(input.output),'Exact union source output is absent from the current graph');
  }
 }
+export function colUnionInputPorts(request,existing,graph){
+ const count=Math.max(existing?.inputs.length??0,...request.inputs.map(i=>i.input+1));
+ need([2,3].includes(count),'ColUnion requires two or three inputs');
+ const ports=Array.from({length:count},(_,i)=>i);
+ need(!existing||existing.inputs.every((p,i)=>p===i),'ColUnion input inventory must be contiguous');
+ need(ports.every(port=>request.inputs.some(i=>i.input===port)||existing&&graph.links.filter(e=>e.target===existing.ref.node_id&&e.input===port).length===1),'Every ColUnion input requires a source before mutation');
+ need(request.mappings.every(m=>m.direction!=='input'||ports.includes(m.port)),'Input mapping requires a connected source');
+ need(request.parameters.col_union?.determining_input!=='third'||count===3,'Third determining input requires input 2');
+ return ports;
+}
 export function colUnionInputSchemaOrigin(existing,graph,port){
  // An allocated port can still be free. Its empty mapping wizard has no
  // upstream schema; inspect the requested source before making the new link.
@@ -20,16 +30,16 @@ export function colUnionInputSchemaOrigin(existing,graph,port){
 export async function preflightColUnion(options,ctx,config){
  const {operation,execute,onRecord,now,receiptOptions}=options,request=operation.parameters;
  if(request.finish==='close')return {verified:true,not_applicable:true};
- const count=2,schemas=[],proofs=[];
+ const schemas=[],proofs=[];let ports;
  const graph=await createNodeTargetBrowserAdapter({execute,origin:config.targetOrigin,build:config.targetBuild}).observe(request,ctx.deadline);
  const existing=request.target.kind==='existing'?graph.nodes.find(n=>n.ref.node_id===request.target.ref.node_id):null;
  try{
   validateColUnionGraphInputs(request,graph);
   if(request.target.kind==='existing')need(existing?.type==='transform.col_union_data','Existing union identity required');
   need(!existing||existing.locked===false,'ColUnion input preflight requires a writable node');
-  need(!existing||existing.inputs.length<=count,'Removing an existing union input requires explicit separate intent');
+  ports=colUnionInputPorts(request,existing,graph);
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
- for(let port=0;port<count;port++){
+ for(const port of ports){
   if(colUnionInputSchemaOrigin(existing,graph,port)==='requested_source'){
    proofs.push(await preflightTabularSource(options,ctx,config,{required:true,inputPort:port,existingSource:true,label:'col_union_input_'+port,resolve:(p,fields)=>{schemas[port]=fields;}}));
   }else{
@@ -44,5 +54,6 @@ export async function preflightColUnion(options,ctx,config){
   }
  }
  try{validateColUnionSchemas(request,schemas);}catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+ operation.colUnionInputCount=ports.length;
  return {verified:true,proofs};
 }

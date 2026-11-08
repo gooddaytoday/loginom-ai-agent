@@ -856,3 +856,9 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
+
+`colunion-third-repeat`: утверждённый `transform-coluniondata/acceptance/v040/task-third.md`,
+три CSV из `acceptance/v040/fixtures`, maximum/repeat, полный mapping семи полей.
+Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
+Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
+`colunion-repeat`, `union-auto-match`.
