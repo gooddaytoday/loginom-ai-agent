@@ -2891,7 +2891,7 @@ function readRenderedInputMapping(observation) {
           if(!Number.isSafeInteger(index)||index<0||!r?.isModel||typeof d?.Name!=='string'||!d.Name||row.getAttribute('data-recordid')!==String(r.internalId)||row.getAttribute('data-boundview')!==grid.id)continue;
           for(const cell of row.querySelectorAll('[data-tid]')){
             const tid=getTid(cell),match=/;normalHeaderCt;(chk|col)([1-9][0-9]*)_/.exec(tid??'');
-            if(!match||tid!==base+'normalHeaderCt;'+match[1]+match[2]+'_'+d.Name||Number(match[2])>2||!visible(cell)||sensitive(cell))continue;
+            if(!match||tid!==base+'normalHeaderCt;'+match[1]+match[2]+'_'+d.Name||Number(match[2])>14||!visible(cell)||sensitive(cell))continue;
             enrichCells.set(refOf(cell),{part:match[1]==='chk'?'check':'field',port:Number(match[2]),field_key:d.Name,record_id:String(r.internalId),row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
           }
         }

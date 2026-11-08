@@ -473,13 +473,13 @@ export interface FactorAnalysisModesConfigurationReadback extends Omit<FactorAna
 
 export interface TreeConversionConfigurationReadback { kind: "table_to_tree" | "tree_to_json"; mode: "manual_structure" | "serialize"; scope: "observed_before_verified_finish"; values_are: "observed_ui_values"; node: NodeRef; receipt_ids: string[]; package_persistence_verified: false; input_port: 0; output_port: 0; nodes?: {path:string;name:string;label:string;type:"object"|"integer"|"real"|"string"|"boolean";is_array:boolean;source_field?:string}[]; exclude_root?: true; pretty?: false; keys?: "names"; multi_row?: false; datetime?: "iso8601" }
 
-export interface EnrichParameters {enrichment?: {tables:Array<{port:1|2;keys:Array<{main:string;lookup:string}>}>;
+export interface EnrichParameters {enrichment?: {tables:Array<{port:number;keys:Array<{main:string;lookup:string}>}>;
   prefixes:{enabled:boolean;name:string;label:string}}}
 export interface EnrichConfigurationReadback {
   kind:'enrich';scope:'observed_before_verified_finish';node:NodeRef;
   receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
   prefixes:{enabled:boolean;name:string;label:string};
-  tables:Array<{port:1|2;native_index:number;keys:Array<{main:string;lookup:string}>}>;
+  tables:Array<{port:number;native_index:number;keys:Array<{main:string;lookup:string}>}>;
   input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
     autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
   output_mapping:GroupingConfigurationReadback['output_mapping'];

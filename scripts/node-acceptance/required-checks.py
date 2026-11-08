@@ -35,7 +35,7 @@ RULES = (
     ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns', 'variables-rows')),
     ((C + 'missing-values-*.mjs', 'docs/node-development/nodes/missing-values/acceptance/modes/**'), ('live-ui',),
      ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean', 'missing-median-mode', 'missing-previous', 'missing-delete')),
-    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
+    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite', 'enrich-three-lookups', 'enrich-four-lookups')),
     ((C + 'join-*.mjs', 'docs/node-development/nodes/join/acceptance/**'), ('live-ui',), ('join-right', 'join-full', 'join-difference', 'join-full-no-keys', 'join-cross')),
     ((C + 'reform-*.mjs', 'docs/node-development/nodes/field-parameters/acceptance/v040/**'), ('live-ui',), ('s3', 'reform-rename-lossy')),
     ((C + 'replacement-*.mjs',), ('live-ui',), ('replace-boolean', 'replace-mixed', 'regex-add', 'regex-replace', 's3')),

@@ -158,3 +158,46 @@ test('an empty native mapping is deferred to execution only for auto-detect all 
  input.phases[1].value.deferred_output=false;
  assert.throws(()=>textImportConfigurationReadback(input));
 });
+
+const fieldOf=(name,id)=>({record_id:'s'+id,field_id:String(id),name,label:name,type:'string'});
+const targetOf=(source,name=source.name)=>({name,label:name,type:'string',source:{record_id:source.record_id,field_id:source.field_id}});
+function mappingFixture({targetsOf,autosync=false,reset=false}) {
+ const sources=['Id','Amount','Extra'].map((n,i)=>fieldOf(n,i));
+ let on=autosync,targets=targetsOf(sources),clicks=0;
+ const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:true,autosync:on,source_fields:sources,target_fields:structuredClone(targets)});
+ const state=()=>({wizard:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'wizard',output_columns:{auto_sync:{status:'observed',value:on,ref:'sync'}}},
+  node_mapping:mapping(),ui:{elements:[{tid:'wizard;ColumnsMappingEngineOutputPortWizard;btnAutoSyncThroughColumns',ref:'sync',allowed_actions:['click']}]}});
+ let epoch=0;
+ const channel={observe:async options=>{const s=state();if(options.readMappings)epoch++;s.epoch=epoch;if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
+  perform:async o=>{if(o.initialObservation.epoch!==epoch)throw Error('Initial bound observation is no longer current or ready');assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
+   clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source.record_id===s.record_id))||targetOf(s));}};
+ return {sources,channel,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
+}
+
+test('«Только новые» adds the outputs of new source fields natively and restores autosync',async()=>{
+ const {outputsOutOfSync,resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const {shouldResyncNewOutputs}=await import('../lib/text-import-node.mjs');
+ const f=mappingFixture({targetsOf:s=>[targetOf(s[0]),targetOf(s[1])]});
+ assert.equal(outputsOutOfSync(f.native),true);
+ const configured=mode=>({format:{fields:{auto_detect_columns:{value:mode}}}});
+ assert.equal(shouldResyncNewOutputs(configured('Только новые'),f.native),true);
+ for(const other of ['Нет','Все'])assert.equal(shouldResyncNewOutputs(configured(other),f.native),false);
+ assert.equal(shouldResyncNewOutputs(configured('Только новые'),{...f.native,autosync:true}),false);
+ const result=await resyncOutputFields(f.channel,f.native);
+ assert.equal(f.clicks,2);assert.equal(f.autosync,false);assert.equal(result.added_outputs,1);
+ assert.deepEqual(result.native_mapping.target_fields.map(t=>t.name),['Id','Amount','Extra']);
+ assert.equal(outputsOutOfSync(result.native_mapping),false);
+});
+
+test('a synchronized or disconnected output mapping is classified without touching autosync',async()=>{
+ const {outputsOutOfSync,resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const full=mappingFixture({targetsOf:s=>s.map(x=>targetOf(x))});
+ assert.equal(outputsOutOfSync(full.native),false);
+ const stale=mappingFixture({targetsOf:s=>s.map(x=>({...targetOf(x),source:{record_id:'old'+x.record_id,field_id:x.field_id}}))});
+ assert.equal(outputsOutOfSync(stale.native),true);
+ const on=mappingFixture({targetsOf:s=>[targetOf(s[0])],autosync:true});
+ await assert.rejects(resyncOutputFields(on.channel,on.native),/requires autosync to be off/);
+ assert.equal(on.clicks,0);
+ const renamed=mappingFixture({targetsOf:s=>[targetOf(s[0],'Custom'),targetOf(s[1])],reset:true});
+ await assert.rejects(resyncOutputFields(renamed.channel,renamed.native),/changed an existing output field: Id/);
+});
