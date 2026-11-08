@@ -448,3 +448,20 @@ test('empty output socket mapping reports actual empty inventories without inven
   }
  }
 });
+
+test('auto-detected text import output mapping admits its native disabled delete-column mask only inside the import wizard',()=>{
+ for(const variant of ['import','other','enabled','duplicate-mask']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant!=='other')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:variant!=='enabled'};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  const result=f.read();
+  assert.equal(result.verified,variant==='import',variant+': '+result.reason);
+  if(variant!=='import')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});

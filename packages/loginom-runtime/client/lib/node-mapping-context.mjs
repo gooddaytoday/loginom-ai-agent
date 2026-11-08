@@ -74,13 +74,17 @@ export function readMappingBrowser(request) {
         &&selected[0].getAttribute('data-recordid')===editor.record_id&&selected[0].getAttribute('data-boundview')===grids[0].id)
         return false;
     }
-    return !(form==='DataSetOutputSocketWizard'&&e.classList?.contains('x-mask')
+    // «Автоопределение столбцов: Все» fixes the imported schema, so the same
+    // native disabled delete-all column also appears in the text import's own
+    // generic output mapping form. Other nodes keep the stricter admission.
+    const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1;
+    return !((form==='DataSetOutputSocketWizard'||importMapping)&&e.classList?.contains('x-mask')
       &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
       &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
       &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1&&root.contains(parent)
       &&wizard.length===1&&model?.FView?.el?.dom===wizard[0]&&wizard[0].contains(root)
       &&column?.el?.dom===parent&&column.disabled===true&&masks.filter(mask=>mask.parentElement===parent).length===1);
-  }))return {...fail('mapping_mask'),mask_detail:masks.slice(0,4).map(e=>{
+  }))return {...fail('mapping_mask'),form,import_pages:exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length,mask_detail:masks.slice(0,4).map(e=>{
     try{return {cls:String(e.className??'').slice(0,80),role:e.getAttribute('role'),parent_tid:e.parentElement?.getAttribute('data-tid')??null,
       parent_cls:String(e.parentElement?.className??'').slice(0,80),text:String(e.textContent??'').trim().slice(0,40)};}catch{return null;}})};
   const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>exact(base+s));
