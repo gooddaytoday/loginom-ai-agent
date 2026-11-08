@@ -345,8 +345,10 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
       let cell;
       try{cell=await nativeReader.read(row,column);}
       catch(error){
-       // Diagnostic only: scan the rest of the table so the refusal names every cell and its ordinary value kind.
-       let kind;try{const raw=await dataSource.AsVariant(row,column);kind=raw===null||raw===undefined?'null':typeof raw;}catch{kind='unread';}
+       // Guard, transport and deadline failures keep their exact cause and stop at once.
+       if(error?.message?.startsWith('Variant read:')||nativeReader.unsettled||Date.now()>=o.deadline)throw error;
+       // Diagnostic only, for decoder refusals: scan the rest so the refusal names every cell and its ordinary value kind.
+       let kind;try{live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();kind=raw===null||raw===undefined?'null':typeof raw;}catch(cause){if(reason!=='read_failed')throw cause;kind='unread';}
        variantFailures.push('r'+row+'c'+column+' '+kind+' '+String(error?.message).slice(0,48));rawValues.push(null);continue;
       }
       nativeCells[column]=adaptNative(cell,schema[column],{dateProfile:'loginom-7.4.2-native-oadate',civilTime:cell.civilTime},nativeDecode);
