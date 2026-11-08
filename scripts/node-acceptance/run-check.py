@@ -536,6 +536,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-calculator-modes':
+        src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-datetime-intermediate.md', data=src.parent / 'fixtures', base=None,
+                    expected_name='expected-modes-run.json', variable_initial='expected-modes-initial-run.json',
+                    variable_only=True, variable_read_path='execution', variable_audit='variables-calculator-modes',
+                    oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
     if name == 'variables-user-real-date':
         src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
         # mas3 R2: 1803s minus 26s upload recovery still exceeds 1500s.

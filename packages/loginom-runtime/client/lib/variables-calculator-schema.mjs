@@ -1,7 +1,7 @@
 // Stage-1 parameter schema; variable ports are supplied by the shared W1 contract.
 export const variablesCalculatorParametersSchema={
   "type": "object",
-  "description": "Create or update scalar variables; stage 1 excludes intermediate, replacement, cache and reorder controls.",
+  "description": "Create or update scalar variables, including civil datetime and intermediate expressions. Variant, replacement, cache and reorder are unsupported.",
   "additionalProperties": false,
   "properties": {
     "expressions": {
@@ -86,7 +86,8 @@ export const variablesCalculatorParametersSchema={
               "integer",
               "real",
               "string",
-              "boolean"
+              "boolean",
+              "datetime"
             ]
           },
           "formula": {
@@ -104,6 +105,10 @@ export const variablesCalculatorParametersSchema={
                 }
               }
             ]
+          },
+          "intermediate": {
+            "type": "boolean",
+            "description": "Use in later expressions without emitting an output variable. New default false; existing omission preserves the saved flag."
           },
           "description": {
             "type": "string",

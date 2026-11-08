@@ -782,3 +782,10 @@ typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
 аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
 свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.
+
+`variables-calculator-modes` uses the approved three-expression datetime/intermediate
+`task-datetime-intermediate.md`. Only the task reaches the model; modes/oracle.py
+supplies the private initial/final W1 expectations. Two typed execution variables
+retain civil milliseconds, IDs, types and order; native configuration retains
+three expressions, intermediate base and every property except base formula 2→4.
+Save, independent cold execution and confirmed package close/logout are required.

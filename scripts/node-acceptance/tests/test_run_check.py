@@ -22,6 +22,22 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_calculator_modes_use_three_expressions_and_two_execution_outputs(self):
+        case = runner.scenario('variables-calculator-modes')
+        self.assertTrue(case['variable_only'])
+        self.assertEqual(case['variable_read_path'], 'execution')
+        self.assertEqual(case['variable_audit'], 'variables-calculator-modes')
+        self.assertEqual(case['prompt'].name, 'task-datetime-intermediate.md')
+        self.assertNotIn('input_files', case)
+        before = runner.read(case['source'] / case['variable_initial'])
+        after = runner.expected_for(case, '/own/modes.lgp')
+        for expected, total in [(before, 3), (after, 5)]:
+            variables = expected['variable_inventory']['outputs'][0]['variables']
+            self.assertEqual([v['name'] for v in variables], ['report_date', 'total'])
+            self.assertEqual([v['type'] for v in variables], ['datetime', 'integer'])
+            self.assertEqual(variables[0]['value'], '2026-11-07T23:59:58.123')
+            self.assertEqual(variables[1]['value'], total)
+
     def test_variables_replace_match_order_policy(self):
         case = runner.scenario('variables-replace-match')
         initial = runner.read(case['source'] / case['variable_initial'])

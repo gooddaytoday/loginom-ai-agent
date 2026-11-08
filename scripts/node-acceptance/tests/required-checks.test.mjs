@@ -71,7 +71,7 @@ for(const [path,scenario] of [
  const r=repo(t);r.commit(path);const text=r.list();
  assert.ok(ids(text).includes('live-ui'));assert.match(text,/run-check.py start/);
  assert.ok(text.includes(scenario));
- if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator --pair/);
+ if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator,variables-calculator-modes --pair/);
  assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });

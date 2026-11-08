@@ -42,6 +42,22 @@ replacement = next(v for v in expected['consumer_output']['variables']
 replacement['value'] += consumer['increment']
 replacement['label'] = consumer['expression']['label']
 text = json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+
+
+def modes_run(base):
+    # Approved slice A excludes mixed/Variant; base remains intermediate.
+    variables = [v for v in output(base)['variables'] if v['name'] != 'mixed']
+    assert [v['name'] for v in variables] == ['report_date', 'total']
+    return {'package_path': '{{PACKAGE_PATH}}',
+            'nodes': [{'type': 'variables.calculator'}], 'outputs': [],
+            'variable_inventory': {'outputs': [
+                {'node': {'type': 'variables.calculator'}, 'port': 0,
+                 'variables': variables}]}}
+
+
+files = {'expected.json': text,
+         'expected-modes-initial-run.json': json.dumps(modes_run(source['base']), ensure_ascii=False, indent=2, allow_nan=False) + '\n',
+         'expected-modes-run.json': json.dumps(modes_run(source['updated_base']), ensure_ascii=False, indent=2, allow_nan=False) + '\n'}
 if __name__ == '__main__':
     assert [v['name'] for v in expected['initial']['variables']] == ['report_date', 'mixed', 'total']
     assert expected['initial']['variables'][-1]['value'] == 3
@@ -50,7 +66,9 @@ if __name__ == '__main__':
     assert expected['consumer_output']['variables'][2]['value'] == 15
     assert len(expected['consumer_output']['variables']) == 8
     if '--check' in sys.argv:
-        assert (HERE / 'expected.json').read_text(encoding='utf-8') == text, 'expected differs from oracle'
+        for name, content in files.items():
+            assert (HERE / name).read_text(encoding='utf-8') == content, name + ' differs from oracle'
         print('modes oracle: PASS')
     else:
-        (HERE / 'expected.json').write_text(text, encoding='utf-8')
+        for name, content in files.items():
+            (HERE / name).write_text(content, encoding='utf-8')
