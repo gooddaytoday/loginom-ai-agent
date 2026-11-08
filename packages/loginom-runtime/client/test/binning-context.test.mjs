@@ -64,8 +64,8 @@ test('Binning field and method cells are actionable only on their own wizard pag
  for(const own of [true,false]){
   const page=new Page(),base='MF;TF-1;WizrdMCF',root=page.add('div',base,'',{x:0,y:70,width:900,height:600});
   page.add('div',base+(own?';MethodSettingsWizard-1;grdColumns':';CalcDataWizard;btnAddExpression'),'',{x:0,y:75,width:400,height:300},root);
-  for(const [i,name] of ['colDisplayName_1','colMethodType_1'].entries())page.add('td',base+';MethodSettingsWizard-1;'+name,'X',{x:50+i*150,y:120,width:100,height:25},root);
-  const r=await page.observe(),cells=r.ui.elements.filter(e=>/;col(?:DisplayName|MethodType)_1$/.test(e.tid??''));
-  assert.equal(cells.length,own?2:0);for(const cell of cells)assert.ok(cell.allowed_actions.includes('double_click'));
+  for(const [i,name] of ['colDisplayName_1','colMethodType_1','colUpperBoundValue_0','colBinLabel_0'].entries())page.add('td',base+';MethodSettingsWizard-1;'+name,'X',{x:50+i*150,y:120,width:100,height:25},root);
+  const r=await page.observe(),cells=r.ui.elements.filter(e=>/;col(?:DisplayName_1|MethodType_1|UpperBoundValue_0|BinLabel_0)$/.test(e.tid??''));
+  assert.equal(cells.length,own?4:0);for(const cell of cells)assert.ok(cell.allowed_actions.includes('double_click'));
  }
 });

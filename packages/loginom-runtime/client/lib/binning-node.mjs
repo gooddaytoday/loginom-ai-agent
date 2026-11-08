@@ -43,7 +43,7 @@ export function createBinningNodeSupport(config){
  return {...support,nodeApplyDriverFactory:options=>{
   const drivers=support.nodeApplyDriverFactory(options);
   const applying=options.operation.parameters.mode==='apply';
-  if(!applying&&options.operation.nodeApply.request.parameters.binning?.method!=='manual')return drivers;
+  if(!applying&&options.operation.parameters.parameters?.binning?.method!=='manual')return drivers;
   return {...drivers,
    async mapPorts(mappings,ctx){if(ctx.receipt_id===options.operation.id+':input_mapping')return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false};return drivers.mapPorts(mappings,ctx);},
    async finish(mode,ctx){return drivers.finish(applying?'close':mode,ctx);},

@@ -3,12 +3,20 @@ import assert from 'node:assert/strict';
 import {validateBinningParameters,resolveBinningField} from '../lib/binning-parameters.mjs';
 import {binningOutputColumns,readBinningOutputs} from '../lib/binning-output.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {binningBeforeGraphExecute} from '../lib/binning-node.mjs';
+import {binningBeforeGraphExecute,createBinningNodeSupport} from '../lib/binning-node.mjs';
 import {binningConfigurationReadback} from '../lib/binning-readback.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const parameters={binning:{field:'X',method:'count',size:2,limits:[0,20]}};
 const fields=[{name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный'},{name:'X',label:'X',type:'real',data_kind:'Непрерывный'},{name:'Note',label:'Note',type:'string',data_kind:'Дискретный'}];
+test('production driver is created before nodeApply state is initialized',()=>{
+ const support=createBinningNodeSupport({});
+ for(const [mode,p] of [['internal',parameters],['internal',{binning:{field:'When',method:'manual',intervals:[]}}],['apply',{}]]){
+  const operation={parameters:{mode,parameters:p}};
+  assert.doesNotThrow(()=>support.nodeApplyDriverFactory({operation}));
+  assert.equal(operation.nodeApply,undefined);
+ }
+});
 test('DateTime count and existing manual edits use civil milliseconds without training',async()=>{
  const limits=['2026-01-01T00:00:00.000','2026-01-04T00:00:00.000'];
  const date={binning:{field:'When',method:'count',size:2,limits}};
