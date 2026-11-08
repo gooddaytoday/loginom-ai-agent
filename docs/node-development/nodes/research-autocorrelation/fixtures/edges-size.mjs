@@ -27,12 +27,12 @@ try {
  const baseline=(await loader.describeNodes(description.node_types,['time_domain']))[0];
  const original=await readFile(new URL('../../../../../packages/product/skills/loginom-automation/references/nodes/research.auto_correlation.md',import.meta.url),'utf8');
  const beforeInput='Поддержан ряд из минимум двух конечных непустых значений с положительной\nдисперсией.';
- const afterInput='Допустим конечный ряд без пропусков с положительной дисперсией; одна строка\nдаёт lag=0, ACF=1, StdErr=0, Significant=true по соглашению Loginom.';
- const addition='\nВ Loginom 7.4.2 нет начала диапазона, шага или списка лагов: lag_count даёт\n0…min(lag_count,N)−1. Не выдавай это за выбор ненулевого диапазона. Пустой\nвход имеет native Access violation и не принят; не экспортируй старый результат.\n';
+ const afterInput=beforeInput;
+ const addition='\nВ Loginom 7.4.2 нет начала диапазона, шага или списка лагов: lag_count даёт\n0…min(lag_count,N)−1. Не выдавай это за выбор ненулевого диапазона. Пустой\nвход не поддержан; при ошибке покажи её и не экспортируй старый результат.\n';
  const reference=original.replace(beforeInput,afterInput).replace('<!-- /mode -->',addition+'<!-- /mode -->');
  const proposed=structuredClone(baseline);
  proposed.semantics=proposed.semantics.replace('Acceptance: at least two finite nonmissing values with positive variance.',
-  'Acceptance proposal: finite nonmissing values with positive variance, or one row with native lag0=1/error=0/significant=true. No start/step/list controls exist; empty input has native Access violation and is not accepted.');
+  'Acceptance: at least two finite nonmissing values with positive variance. No start/step/list controls exist; empty input is unsupported.');
  // Keep this proposal scoped to the observed time_domain slice, not LAB-1022 modes.
  assert.ok(baseline.guidance.includes(beforeInput));
  proposed.guidance=baseline.guidance.replace(beforeInput,afterInput);
