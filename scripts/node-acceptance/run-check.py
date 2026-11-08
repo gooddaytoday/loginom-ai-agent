@@ -449,6 +449,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'linreg-lasso':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        return dict(source=REPO / 'scripts/node-acceptance/scenarios/linreg-lasso',
+                    prompt=node / 'acceptance/penalty/task-lasso.md',
+                    data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
     if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')
