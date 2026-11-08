@@ -141,6 +141,7 @@ export interface SortingParameters {
   /** Full replacement, or omitted to preserve existing keys. */
   keys?: Array<{field: {kind: 'input_field'; name: string}; direction: 'ASC' | 'DESC'; case_sensitive?: boolean}>;
   compare_with_locale?: boolean;
+  max_threads?: 0 | 1 | 2 | 4 | 8 | 16 | 32;
 }
 export interface SortingConfigurationReadback {
   kind: 'sorting'; scope: 'observed_before_verified_finish'; node: NodeRef;

@@ -1,3 +1,4 @@
+import {observeSortingSaved} from './sorting-modes.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
@@ -276,6 +277,12 @@ page = context.pages()[0]
     if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
+  }
+  if(expected.sorting_mode){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.sorting');
+   if(nodes.length!==1)throw Error('SORTING_MODES_ONE_SAVED_NODE');
+   const settings=await observeSortingSaved({load,channel:channelFor(nodes[0].ref,'sorting-saved'),mode:expected.sorting_mode});
+   await record({phase:'sorting_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.logreg_normalization){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');

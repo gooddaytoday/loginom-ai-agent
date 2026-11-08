@@ -423,11 +423,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
-    if name == 'sorting-locale':
+    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto']:
         node = REPO / 'docs/node-development/nodes/sorting'
         src = node / 'acceptance/modes'
-        return dict(source=src, prompt=src / 'task-locale.md', data=node / 'fixtures', base=None,
-                    input_files=['modes.csv'], export_count=2, sorting_case='locale')
+        return dict(source=src, prompt=src / ('task-' + name.removeprefix('sorting-') + '.md'), data=node / 'fixtures', base=None,
+                    input_files=['modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -607,7 +607,7 @@ def expected_for(case, package, cold=False):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
-                    outputs=[sorting_stages(case)[-1]])
+                    outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
     if case.get('excel_xls_refusal'):
         return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
     if case.get('excel_mode'):
@@ -1876,6 +1876,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('sorting_mode'):
+            write(folder / 'sorting-replies.json', [o for _, o in replies])
+            self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',
+                folder / 'expected.json', folder / 'sorting-replies.json', folder / 'sorting-proof.json'], folder, timeout=60)
         if expected.get('logreg_normalization'):
             write(folder / 'logreg-replies.json', [o for _, o in replies])
             self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',

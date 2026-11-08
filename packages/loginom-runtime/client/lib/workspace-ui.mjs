@@ -2171,6 +2171,18 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    if(wizard.status==='observed'&&wizard.stage==='sorting'){
+      const ownerTid=wizard.root_tid+';SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl';
+      const owners=tids.get(ownerTid)??[],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
+      if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(owners[0])&&!sensitive(inputs[0])){
+        const value=String(inputs[0].value??'');
+        if(value.length<=256){
+          const owner_ref=refOf(owners[0]),input_ref=refOf(inputs[0]);
+          wizardCombos.set(ownerTid,{name:'max_threads',scope:'sorting',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+          wizard.settings={status:'draft_ui_values',applied_verified:false,fields:{max_threads:{status:'observed',value,value_length_utf16:value.length,truncated:false,owner_ref,input_ref,enabled:true,read_only:inputs[0].readOnly===true}}};
+        }
+      }
+    }
     if(wizard.status==='observed'&&wizard.stage==='col_union'){
       const fields={};
       for(const [name,key] of [['padding','pedRowsPaddingType'],['row_count','pedTailsAlignType']]){

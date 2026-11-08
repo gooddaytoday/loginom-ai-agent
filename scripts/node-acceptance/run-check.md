@@ -682,3 +682,10 @@ the byte oracle for the file passed through --csv. No oracle reaches the model.
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`sorting-case`, `sorting-threads`, `sorting-auto`: утверждённые задания
+`sorting/acceptance/modes/task-*.md` и modes.csv. Независимый oracle проверяет
+оба полных CSV и оба typed-результата на одном узле, порядок, NULL/пустую строку.
+Case меняет регистр true→false; threads — максимум 1→2; auto — 2→0.
+Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
+затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.

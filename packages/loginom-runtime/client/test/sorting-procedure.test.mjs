@@ -38,19 +38,23 @@ test('lost Sorting initial Next reply is never replayed',async()=>{
 
 function fixture({newNode=false,locale=true}={}) {
  const fields=[{name:'Amount',label:'Сумма',type:'real'},{name:'Name',label:'Имя',type:'string'}];
- const configuration={verified:true,input_fields:fields,keys:[{...fields[0],record_id:'a',order:0,direction:'ASC'}],selections:{selected:[]},options:{chkLocaleAware:{value:locale,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0}}};
+ const configuration={verified:true,input_fields:fields,keys:[{...fields[0],record_id:'a',order:0,direction:'ASC'}],selections:{selected:[]},options:{chkLocaleAware:{value:locale,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0,switch_pressed:false}}};
  const gestures=[];const flags={};
  const snapshot=()=>({wizard:{stage:'sorting',root_tid:'root'},node_sorting:structuredClone(configuration),ui:{elements:[
-  ...configuration.keys.flatMap(k=>['field','direction','delete'].map(part=>({ref:k.name+':'+part,tid:part,sorting_field:{field_key:k.name,record_id:k.record_id,role:'selected',part},allowed_actions:['click']}))),
+  ...configuration.keys.flatMap(k=>['field','direction','delete',...(k.type==='string'?['case']:[])].map(part=>({ref:k.name+':'+part,tid:part,sorting_field:{field_key:k.name,record_id:k.record_id,role:'selected',part},allowed_actions:['click']}))),
   ...configuration.input_fields.filter(f=>!configuration.keys.some(k=>k.name===f.name)).map(f=>({ref:f.name+':available',tid:'available',sorting_field:{field_key:f.name,record_id:'input-'+f.name,role:'available',part:'field'},allowed_actions:['click']})),
+  {ref:'threads',tid:'root;SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl;trg_picker',allowed_actions:['click']},
+  ...[0,1,2,4,8,16,32].map(n=>({ref:'threads:'+n,tid:'root;SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl;boundlist;'+(n||'Автоопределение'),label:n?String(n):'Автоопределение',wizard_combo:{kind:'option',field:{scope:'sorting',name:'max_threads'}},allowed_actions:['select_wizard_option']})),
   {ref:'locale',tid:'root;SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl',allowed_actions:['set_checked']}
  ]}});
  const channel={observe:async()=>snapshot(),perform:async spec=>{
   const action=spec.resolve(snapshot());gestures.push(action);
   if(flags.failBeforeGesture)throw Error('ownership changed before gesture');
+  if(action.ref.startsWith('threads:')&&!flags.lostThreads)configuration.options.cbxMaxThreadCount.value=Number(action.ref.split(':')[1]);
   if(action.ref==='locale')configuration.options.chkLocaleAware.value=action.checked;
   const key=configuration.keys.find(k=>action.ref.startsWith(k.name+':'));
   if(action.ref===key?.name+':field')configuration.selections.selected=[key.record_id];
+  if(action.ref===key?.name+':case')key.case_sensitive=!key.case_sensitive;
   if(action.ref===key?.name+':direction'&&!flags.lostChange)key.direction=key.direction==='ASC'?'DESC':'ASC';
   if(action.ref===key?.name+':delete'&&!flags.lostRemoval){configuration.keys=configuration.keys.filter(k=>k!==key);configuration.keys.forEach((k,i)=>k.order=i);configuration.selections.selected=configuration.selections.selected.filter(id=>id!==key.record_id);}
   const available=configuration.input_fields.find(f=>action.ref===f.name+':available');
@@ -100,4 +104,30 @@ test('foreign ownership and changes to unrelated options cannot succeed',async()
 test('new node uses explicit locale default and variable-driven locale fails closed',async()=>{
  const f=fixture({newNode:true,locale:false});await f.run({});assert.equal(f.gestures[0].checked,true);
  const g=fixture();g.configuration.options.chkLocaleAware.switch_pressed=true;await assert.rejects(g.run({}),/Variable-driven/);assert.deepEqual(g.gestures,[]);
+});
+
+test('sorting changes the maximum on the same node and explicitly selects zero-auto',async()=>{
+ const f=fixture();
+ for(const max_threads of [1,2,0]){
+  const r=await f.run({max_threads});assert.equal(r.configuration.options.cbxMaxThreadCount.value,max_threads);
+  assert.equal(r.configuration.options.chkLocaleAware.value,true);assert.equal(r.configuration.options.chkBufferWhole.value,false);
+ }
+ assert.deepEqual(f.gestures.map(a=>a.ref),['threads','threads:1','threads','threads:2','threads','threads:0']);
+ await f.run({max_threads:0});assert.equal(f.gestures.length,6);
+});
+test('sorting refuses variable-driven or unconfirmed maximum without blind retries',async()=>{
+ const f=fixture();f.configuration.options.cbxMaxThreadCount.switch_pressed=true;
+ await assert.rejects(f.run({max_threads:2}),/Variable-driven/);assert.deepEqual(f.gestures,[]);
+ const g=fixture();g.flags.lostThreads=true;await assert.rejects(g.run({max_threads:2}),/maximum|threads/i);assert.equal(g.gestures.length,2);
+});
+test('sorting toggles case on the same string key while retaining secondary key and literal options',async()=>{
+ const f=fixture();f.configuration.keys.unshift({...f.configuration.input_fields[1],record_id:'name',order:0,direction:'ASC',case_sensitive:false});f.configuration.keys[1].order=1;
+ // The production gesture is bound to the native per-key case icon.
+ const base=f.configuration.options.cbxMaxThreadCount.value;
+ for(const case_sensitive of [true,false]){
+  // The fixture handles case below alongside direction; no replacement key.
+  const r=await f.run({keys:[{field:{kind:'input_field',name:'Name'},direction:'ASC',case_sensitive},{field:{kind:'input_field',name:'Amount'},direction:'ASC'}]});
+  assert.equal(r.configuration.keys[0].case_sensitive,case_sensitive);assert.equal(r.configuration.options.cbxMaxThreadCount.value,base);
+ }
+ assert.equal(f.gestures.filter(a=>a.ref==='Name:case').length,2);
 });

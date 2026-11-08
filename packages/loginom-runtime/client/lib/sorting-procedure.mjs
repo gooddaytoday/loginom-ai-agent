@@ -22,6 +22,7 @@ export async function configureSorting(channel,p,{newNode=false}={}){
  const ready=s=>s.wizard?.stage==='sorting'&&s.node_sorting?.verified===true;
  const observe=condition=>channel.observe({condition,readSorting:true,ready});
  const initial=await observe('complete sorting configuration'),baseline=initial.node_sorting;
+ need(p.max_threads===undefined||baseline.options.cbxMaxThreadCount.switch_pressed===false,'Variable-driven sorting maximum unsupported');
  need(p.keys!==undefined||baseline.keys.every(k=>!k.missing_input),'Existing sorting contains missing input keys; provide complete replacement keys');
  const plan=p.keys===undefined?baseline.keys:resolveSortingParameters(p,baseline.input_fields);
  need(plan.length>0,'Existing sorting requires nonempty keys');
@@ -67,9 +68,26 @@ export async function configureSorting(channel,p,{newNode=false}={}){
  if(s.node_sorting.options.chkLocaleAware.value!==locale){
   await channel.perform({condition:'set sorting locale explicitly',initialObservation:s,ready,identity:()=>({locale}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl'&&e.allowed_actions.includes('set_checked'));need(es.length===1,'Sorting locale control unavailable');return {verb:'set_checked',ref:es[0].ref,checked:locale};}});
  }
+ if(p.max_threads!==undefined){
+  s=await observe('sorting maximum before change');
+  need(s.node_sorting.options.cbxMaxThreadCount.switch_pressed===false,'Variable-driven sorting maximum unsupported');
+  if(s.node_sorting.options.cbxMaxThreadCount.value!==p.max_threads){
+   const tid=s.wizard.root_tid+';SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl';
+   await channel.perform({condition:'open sorting maximum choices',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click'));need(es.length===1,'Sorting maximum picker unavailable');return {verb:'click',ref:es[0].ref};}});
+   const label=p.max_threads===0?'Автоопределение':String(p.max_threads);
+   const choice=s=>s.ui.elements.filter(e=>e.tid===tid+';boundlist;'+label&&e.wizard_combo?.kind==='option'
+    &&e.wizard_combo.field.scope==='sorting'&&e.wizard_combo.field.name==='max_threads'&&e.label===label&&e.allowed_actions.includes('select_wizard_option'));
+   const opened=await channel.observe({condition:'sorting maximum choices',readSorting:true,ready:s=>ready(s)&&choice(s).length===1});
+   await channel.perform({condition:'select sorting literal maximum',initialObservation:opened,ready:s=>ready(s)&&choice(s).length===1,
+    identity:()=>({max_threads:p.max_threads}),resolve:s=>({verb:'select_wizard_option',ref:choice(s)[0].ref})});
+   s=await observe('sorting maximum applied');
+   need(s.node_sorting.options.cbxMaxThreadCount.value===p.max_threads&&s.node_sorting.options.cbxMaxThreadCount.switch_pressed===false,'Sorting maximum threads differs');
+  }
+ }
  const after=(await observe('complete final sorting configuration')).node_sorting;
  need(same(after.keys.map(k=>k.name),plan.map(k=>k.name))&&after.keys.every((k,i)=>!k.missing_input&&k.direction===plan[i].direction&&(plan[i].case_sensitive===undefined||k.case_sensitive===plan[i].case_sensitive)),'Final sorting keys differ');
- need(same(after.input_fields,baseline.input_fields)&&same(after.options.chkBufferWhole,baseline.options.chkBufferWhole)&&same(after.options.cbxMaxThreadCount,baseline.options.cbxMaxThreadCount),'Unrequested sorting settings changed');
+ need(same(after.input_fields,baseline.input_fields)&&same(after.options.chkBufferWhole,baseline.options.chkBufferWhole)&&(p.max_threads===undefined?same(after.options.cbxMaxThreadCount,baseline.options.cbxMaxThreadCount):after.options.cbxMaxThreadCount.value===p.max_threads&&after.options.cbxMaxThreadCount.switch_pressed===false),'Unrequested sorting settings changed');
  need(after.options.chkLocaleAware.value===locale,'Sorting locale differs');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,cache:true,threads:true}};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,cache:true,threads:p.max_threads===undefined}};
 }
