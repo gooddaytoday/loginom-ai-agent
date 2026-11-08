@@ -31,6 +31,15 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(output['column_order'], 'any')
             self.assertEqual(output['variables'], initial['variable_inventory']['outputs'][0]['variables'])
 
+    def test_uniform_export_plans_cover_each_requested_stage_and_port(self):
+        for name, count, ports in [('sampling-uniform', 2, 1), ('partition-uniform', 3, 3), ('partition-test-priority', 6, 3)]:
+            case = runner.scenario(name)
+            self.assertEqual(case.get('export_count'), count)
+            expected = runner.expected_for(case, '/own/uniform.lgp')
+            self.assertEqual(len(expected['outputs']), ports)
+            self.assertEqual(expected['sampling_modes']['mode'], 'uniform')
+            self.assertEqual(expected['sampling_modes']['group_size_rows'], [1] * (2 if ports == 3 else 1))
+
     def test_rest_c1_single_method_scenarios(self):
         for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
                              ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:
