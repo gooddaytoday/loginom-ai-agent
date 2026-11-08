@@ -13,6 +13,18 @@ test('uniform readback publishes observed group sizes and native test priority',
   const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
  }
 });
+test('Grouping readback admits concat settings while retaining legacy measures',()=>{
+ const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const field={index:0,name:'Region',label:'Region',type:'string',data_kind:'Дискретный',source_name:'Region'};
+ const readback={kind:'grouping',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node,
+  receipt_ids:['i','c','s','m','f'],mode:'aggregate',group_by:[{name:'Region',label:'Region',type:'string',order:0}],
+  measures:[{name:'Amount',label:'Amount',type:'integer',order:0,functions:8192,concat:{separator:'|',wrapper:'',unique:true,sort:true,direction:1}}],
+  options:{pedDimCache:{value:true,switch_pressed:false},pedSortResult:{value:false,switch_pressed:false}},
+  input_mapping:{port:0,autosync:true,fields:[field]},output_mapping:{port:0,autosync:true,fields:[{...field,excluded:false}]},package_persistence_verified:false};
+ r.configuration={status:'applied',readback};assert.equal(validate(r).valid,true);
+ readback.measures[0].concat.unique=1;assert.equal(validate(r).valid,false);
+ delete readback.measures[0].concat;readback.measures[0].functions=1024;assert.equal(validate(r).valid,true);
+});
 test('REST readback admits optional observed response Content-Type without changing legacy results',()=>{
  const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
  const connection={name:'Status',base_url:'https://httpbin.org/status/200',method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:['RequestId'],reference_node_id:'connection'};

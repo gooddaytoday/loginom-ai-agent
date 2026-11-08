@@ -49,6 +49,26 @@ export function readGroupingBrowser(prefix){
   if(!c||c.el?.dom!==es[0]||!s||s.el?.dom!==switches[0]||typeof c.getValue?.()!=='boolean')return fail('grouping_option');
   options[k]={value:c.getValue(),switch_pressed:s.pressed===true};
  }
+ const factorRoots=exact(prefix+';WizrdMCF;FactorEditDialog');
+ const concatChecks=exact(prefix+';WizrdMCF;FactorEditDialog;grpFactors;chb-13');
+ let factor_concat;
+ if(factorRoots.length===1&&visible(factorRoots[0])&&concatChecks.length===1&&factorRoots[0].contains(concatChecks[0])&&concatChecks[0].classList.contains('x-form-cb-checked')){
+  const factorBase=prefix+';WizrdMCF;FactorEditDialog;cntCheckboxes;fs;';
+  const controls={};
+  for(const [key,suffix] of [['separator','cbxConcatSeparator'],['wrapper','cbxConcatWrapper'],['order','fc;cbxConcatSort']]){
+   const es=exact(factorBase+suffix),c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);
+   if(!c||c.el?.dom!==es[0]||!factorRoots[0].contains(es[0]))return fail('grouping_concat_control');
+   const store=c.getStore?.(),items=store?.getData?.()?.items;
+   if(!Array.isArray(items)||items.length>64||store.isLoading?.()||store.getCount?.()!==items.length)return fail('grouping_concat_options');
+   const choices=items.map(r=>({value:r?.data?.[c.valueField],label:r?.data?.[c.displayField]}));
+   if(choices.some(o=>!['string','number'].includes(typeof o.value)||typeof o.label!=='string'||o.label.length>256)
+    ||new Set(choices.map(o=>o.value)).size!==choices.length)return fail('grouping_concat_choices');
+   const value=c.getValue?.();
+   if(!['string','number'].includes(typeof value))return fail('grouping_concat_value');
+   controls[key]={tid:factorBase+suffix,value,choices,editable:c.editable===true};
+  }
+  factor_concat=controls;
+ }
  return {verified:true,inventory_complete:true,state_source:'cached_grouping_source_store',input_fields:fields,keys,measures,
-  selected_records:selected.map(r=>String(r.internalId)),options,settings_applied:false};
+  selected_records:selected.map(r=>String(r.internalId)),options,...(factor_concat?{factor_concat}:{}),settings_applied:false};
 }

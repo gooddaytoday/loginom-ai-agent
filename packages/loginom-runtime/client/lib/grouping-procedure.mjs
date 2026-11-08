@@ -51,7 +51,10 @@ export async function configureGrouping(channel,p){
  }
  for(const desired of plan.functions){
   let s=await select(desired.name,'measure'),field=s.node_grouping.input_fields.find(f=>f.name===desired.name);
-  if(field.functions===desired.mask)continue;
+  const concat=plan.measures.find(m=>m.input.name===desired.name&&m.function==='concat')?.concat;
+  const concatMatches=f=>!concat||f.concat.separator===concat.separator&&f.concat.wrapper===concat.wrapper&&f.concat.unique===concat.unique
+   &&f.concat.sort===(concat.order!=='none')&&(concat.order==='none'||f.concat.direction===(concat.order==='ASC'?0:1));
+  if(field.functions===desired.mask&&concatMatches(field))continue;
   await channel.perform({condition:'open exact grouping factor editor',initialObservation:s,ready,identity:()=>({name:field.name,record_id:field.record_id}),resolve:s=>{
    const e=s.ui.elements.find(e=>e.grouping_field?.role==='measure'&&e.grouping_field.field_key===field.name&&e.allowed_actions.includes('double_click'));need(e,'Measure editor unavailable');return {verb:'double_click',ref:e.ref};}});
   const editorReady=s=>ready(s)&&s.wizard.factor_editor?.status==='rendered_factor_options'&&s.wizard.factor_editor.selected_field?.field_key===field.name
@@ -64,15 +67,48 @@ export async function configureGrouping(channel,p){
    if(option.checked===wanted)continue;need(option.enabled,'Requested aggregation is disabled');
    await channel.perform({condition:'set exact aggregation '+aggregation,initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,aggregation,value:wanted}),resolve:()=>({verb:'set_checked',ref:option.display_ref,checked:wanted})});
   }
+  if(concat){
+   for(const [key,value] of [['separator',concat.separator],['wrapper',concat.wrapper],['order',concat.order]]){
+    s=await channel.observe({condition:'bound native concat '+key,readGrouping:true,ready:editorReady});
+    const c=s.node_grouping.factor_concat?.[key];need(c,'Native concat control is unavailable: '+key);
+    const choices=key==='order'?c.choices.filter(o=>({none:/без сортиров|не сортир/i,ASC:/возрастан/i,DESC:/убыван/i})[value].test(o.label)):c.choices.filter(o=>o.value===value);
+    need(choices.length===1||key==='separator'&&choices.length===0&&c.editable,'Requested concat option is unavailable: '+key);
+    const wanted=choices[0]?.value??value;if(c.value===wanted)continue;
+    const element=state=>{const es=state.ui.elements.filter(e=>(e.tid===c.tid||e.identity?.anchor_tid===c.tid)&&e.role==='combobox');need(es.length===1,'Unique concat input required');return es[0];};
+    if(key==='separator'&&c.editable){
+     await channel.perform({condition:'set concat separator',initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>{
+      const e=element(state);need(e.allowed_actions.includes('fill'),'Concat separator is not editable');return {verb:'fill',ref:e.ref,text:value};}});
+     s=await channel.observe({condition:'concat separator edited',readGrouping:true,ready:editorReady});
+     await channel.perform({condition:'commit concat separator',initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:'Tab'})});
+    }else{
+     const index=c.choices.findIndex(o=>o.value===wanted),current=c.choices.findIndex(o=>o.value===c.value);
+     need(current>=0,'Current concat option is unavailable: '+key);
+     await channel.perform({condition:'open concat '+key,initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:'ArrowDown'})});
+     for(const keypress of [...Array(Math.abs(index-current)).fill(index>current?'ArrowDown':'ArrowUp'),'Enter']){
+      s=await channel.observe({condition:'select native concat '+key,readGrouping:true,ready:editorReady});
+      await channel.perform({condition:'choose concat '+key,initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:keypress})});
+     }
+    }
+    s=await channel.observe({condition:'verify native concat '+key,readGrouping:true,ready:editorReady});
+    need(s.node_grouping.factor_concat?.[key]?.value===wanted,'Concat option did not apply: '+key);
+   }
+   s=await channel.observe({condition:'bound concat uniqueness',readGrouping:true,ready:editorReady});
+   const tid=s.wizard.root_tid+';FactorEditDialog;cntCheckboxes;fs;fc;chkConcatUniqueOnly;DisplayEl';
+   const es=s.ui.elements.filter(e=>e.tid===tid);need(es.length===1&&typeof es[0].check_state?.checked==='boolean','Concat uniqueness is unavailable');
+   if(es[0].check_state.checked!==concat.unique)await channel.perform({condition:'set concat uniqueness',initialObservation:s,ready:editorReady,
+    identity:()=>({record_id:field.record_id,unique:concat.unique}),resolve:()=>({verb:'set_checked',ref:es[0].ref,checked:concat.unique})});
+  }
   s=await channel.observe({condition:'complete requested factor set',readGrouping:true,ready:editorReady});
   need(s.wizard.factor_editor.options.every((o,i)=>o.checked===((desired.mask&(1<<i))!==0)),'Factor set differs before Apply');
   await channel.perform({condition:'apply grouping factor to bound measure',initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,mask:desired.mask}),resolve:s=>({verb:'click',ref:control(s,';FactorEditDialog;btnApply').ref})});
   s=await observe('grouping factor applied');need(s.node_grouping.measures.find(f=>f.name===field.name)?.functions===desired.mask,'Applied aggregation bitset differs');
+  need(concatMatches(s.node_grouping.measures.find(f=>f.name===field.name)),'Applied concat settings differ');
  }
  const after=(await observe('complete final grouping configuration')).node_grouping;
  need(same(after.keys.map(f=>f.name),plan.keys.map(f=>f.name))&&same(after.measures.map(f=>({name:f.name,mask:f.functions})),plan.functions),'Final grouping lists differ');
  need(same(after.options,baseline.options),'Unrequested grouping options changed');
- const untouched=f=>({record_id:f.record_id,name:f.name,label:f.label,type:f.type,concat:f.concat});
+ const untouched=f=>({record_id:f.record_id,name:f.name,label:f.label,type:f.type,
+  concat:plan.measures.some(m=>m.input.name===f.name&&m.function==='concat')?undefined:f.concat});
  need(same(after.input_fields.map(untouched),baseline.input_fields.map(untouched)),'Grouping changed input identity or unrelated options');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,concat_options:true,node_options:true},requested_output:plan.measures.map(m=>({field:m.input.name,function:m.function,name:m.name,label:m.label}))};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,concat_options:!plan.measures.some(m=>m.function==='concat'),node_options:true},requested_output:plan.measures.map(m=>({field:m.input.name,function:m.function,name:m.name,label:m.label}))};
 }

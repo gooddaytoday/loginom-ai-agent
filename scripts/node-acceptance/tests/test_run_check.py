@@ -548,6 +548,19 @@ class RunCheckTests(unittest.TestCase):
                     sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
                 self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
 
+    def test_grouping_cycle_three_uses_approved_tasks_and_exact_stages(self):
+        for mode in ['first', 'last', 'only', 'concat']:
+            case = runner.scenario('grouping-' + mode)
+            self.assertEqual(case['prompt'].name, 'task-' + mode + '.md')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            expected = runner.expected_for(case, '/test/lists.lgp')
+            stages = json.loads(subprocess.check_output([
+                sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages']
+            self.assertEqual(expected['outputs'], stages)
+            self.assertEqual(len(stages), 3 if mode == 'concat' else 1)
+            cold = runner.expected_for(case, '/test/lists.lgp', cold=True)
+            self.assertEqual(cold['outputs'], [stages[-1]])
+
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')
         self.assertEqual(case['prompt'].name, 'task.md')
