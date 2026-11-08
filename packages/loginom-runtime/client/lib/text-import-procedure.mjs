@@ -215,6 +215,15 @@ export class ImportColumnBindingError extends Error {
   }
 }
 
+// Refused after read-only observations of the existing «Все» node's format page.
+export class ImportAllModeColumnsError extends ImportColumnBindingError {
+  constructor() {
+    super(null,[],[]);
+    this.name='ImportAllModeColumnsError';
+    this.message=allModeColumns;
+  }
+}
+
 // Only a complete, owned native definition may produce this binding refusal.
 export class ImportColumnCountError extends ImportColumnBindingError {
   constructor(requestedCount,observed) {
@@ -395,9 +404,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     await read('text_import_format','existing file parsing completed',state=>
       state.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout');
     formatBaseline=(await read('text_import_format')).wizard.settings;
-    // An existing «Все» node owns its schema natively; refuse before any settings gesture.
-    requireValue(!(parameters.columns?.length&&parameters.format.auto_detect_columns===undefined
-      &&formatBaseline.fields.auto_detect_columns?.value===autoDetectLabels.all),allModeColumns);
+    // An existing «Все» node owns its schema natively; refuse before any settings
+    // gesture as a binding refusal, so the configure phase discards this draft.
+    if(parameters.columns?.length&&parameters.format.auto_detect_columns===undefined
+      &&formatBaseline.fields.auto_detect_columns?.value===autoDetectLabels.all)throw new ImportAllModeColumnsError();
     columnBaseline=await readImportDefinitionPages(channel,{ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
   };
   // Read the existing schema before changing parsing options: Loginom may

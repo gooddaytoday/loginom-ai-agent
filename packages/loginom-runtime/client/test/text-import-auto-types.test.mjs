@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureTextImportFields,configureTextImportPatch,reconcileImportColumnPatch,validateTextImportFieldsRequest,validateTextImportPatch,autoDetectLabels} from '../lib/text-import-procedure.mjs';
+import {configureTextImportFields,configureTextImportPatch,reconcileImportColumnPatch,validateTextImportFieldsRequest,validateTextImportPatch,autoDetectLabels,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
@@ -85,7 +85,9 @@ test('auto_detect_columns=all with output mappings or autosync is refused before
 test('a column patch of an existing «Все» import without an explicit mode is refused before any settings gesture',async()=>{
  for(const patch of [{columns:[{name:'Amount',type:'string'}]},{source:{rows_to_skip:1},columns:[{name:'Amount',type:'string'}]}]) {
   const f=fixture({initialMode:'Все'});
-  await assert.rejects(configureTextImportPatch(f.channel,patch,f.owner,'/test/typed.csv'),/auto_detect_columns=all/);
+  // The configure catch closes this class as text_import_binding_draft_discarded (no draft, no pending phase).
+  await assert.rejects(configureTextImportPatch(f.channel,patch,f.owner,'/test/typed.csv'),
+   error=>error instanceof ImportColumnBindingError&&/auto_detect_columns=all/.test(error.message));
   assert.deepEqual(f.gestures.filter(g=>g.verb!=='wizard_step'),[],JSON.stringify(patch));
  }
  // An explicit new mode passes this guard (the fixture has no column editor, so it fails later).
