@@ -45,7 +45,7 @@ export async function preflightBooleanBindings(options,ctx,config){
  if(links.length!==1)throw Error('BINDING_PORT_MISMATCH');
  const sources=graph.nodes.filter(n=>n.ref.node_id===(links[0].source?.node_id??links[0].source));
  if(sources.length!==1)throw Error('BINDING_SOURCE_UNVERIFIED');
- if(sources[0].type==='variables.user')op.variableBindingSource=await preflightBuiltinBindings(options,ctx,config,sources[0].ref);
+ if(sources[0].type==='variables.user')op.variableBindingSource=await preflightBuiltinBindings(options,ctx,config,sources[0]);
 }
 export async function prepareBooleanBindingInput(options,ctx,{channel}){
  const r=options.operation.nodeApply.request;

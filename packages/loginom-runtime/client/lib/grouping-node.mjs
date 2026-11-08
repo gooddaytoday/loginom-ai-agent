@@ -21,7 +21,9 @@ export function createGroupingNodeSupport(config){return createTabularTransformN
  async afterDone(channel,request,configured,{readGraph,options,ctx}){
   if(!request.bindings?.length)return;
   const proof=options.operation.variableBindingSource;
-  const sourceProof=proof?await preflightBuiltinBindings(options,ctx,config,proof.source):undefined;
+  const source=proof?(await readGraph()).nodes.find(n=>n.type==='variables.user'&&n.ref.node_id===proof.source.node_id):undefined;
+  if(proof&&!source)throw Error('BINDING_SOURCE_UNVERIFIED');
+  const sourceProof=source?await preflightBuiltinBindings(options,ctx,config,source):undefined;
   const bindings=await readBooleanBindings(channel,{type:'transform.group_data',node:ctx.node,readGraph,sourceProof});
   if(bindings.length!==request.bindings.length||bindings.some((b,i)=>b.parameter!==request.bindings[i].parameter||b.variable.name!==request.bindings[i].variable.name))throw Error('BINDING_SOURCE_UNVERIFIED');
   return bindings;
