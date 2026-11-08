@@ -42,7 +42,7 @@ test('match audit requires full typed execution and observed native mode setting
  for(const corrupt of [e=>e.result.configuration.readback.rules[0].case_sensitive=true,
   e=>e.result.output.variable_ports[0].variables.reverse(),
   e=>e.result.output.variable_ports[0].variables[7].cell.value='',
-  e=>e.result.output.variable_ports[0].variables[0].label='report_date',
+  e=>e.result.output.variable_ports[0].variables[0].label='report_date Замена',
   e=>e.result.output.variable_ports[0].execution_id='old']){
   const changed=structuredClone(event);corrupt(changed);assert.throws(()=>auditVariablesReplaceMatch([changed],expected));
  }
