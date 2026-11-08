@@ -2687,8 +2687,8 @@ function readRenderedInputMapping(observation) {
     if(wizard.stage==='text_import_file'){
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName';
       const es=(tids.get(base+';VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
-      const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,picker=c?.picker,rows=c?.getStore?.()?.getData?.()?.items;
-      if(c?.el?.dom===es[0]&&picker?.pickerField===c&&Array.isArray(rows)&&rows.length<=128)for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]){
+      const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,picker=c?.picker,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+      if(c?.el?.dom===es[0]&&picker?.pickerField===c&&!store.isLoading?.()&&Array.isArray(rows)&&rows.length<=128)for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]){
         const r=rows.find(r=>String(r.internalId)===e.getAttribute('data-recordid'));
         if(r&&picker.getRecord(e)===r&&typeof r.data.field2==='string')importBindingCells.set(refOf(e),{caption:r.data.field2,record_id:String(r.internalId)});
       }

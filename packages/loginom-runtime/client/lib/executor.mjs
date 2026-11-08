@@ -2944,6 +2944,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
           const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
           auxiliary.get(id).sourceObservation=structuredClone(state);
+          auxiliary.get(id).sourceSequence=operations.size;
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
           await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
@@ -3700,11 +3701,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               // Hand the original native Files witness to this one Import
               // request. Its later graph preflight must not navigate Files or
               // inspect an inactive storage view while holding the node gate.
-              const entry=[...auxiliary.values()].findLast(e=>e.signature==='storage.source:'+path&&e.outcome?.status==='SUCCEEDED');
-              if(request.target.type!=='imports.text'||!entry?.sourceObservation
+              const entry=[...auxiliary.values()].findLast(e=>e.signature==='storage.source:'+path);
+              if(request.target.type!=='imports.text'||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
                 ||entry.boundImportOperation&&entry.boundImportOperation!==operation.id)
                 throw Error('BINDING_SOURCE_UNVERIFIED: observe the current input file with dock_storage_source before Execute');
               const ref=entry.outcome.output.source.server_source_ref;
+              const laterUpload=[...operations.values()].slice(entry.sourceSequence).some(o=>o.action.capability==='artifact.upload'&&o.parameters.destination===path
+                &&!(o.outcome?.status==='NOT_APPLIED'&&o.outcome.effect_possible===false));
+              if(laterUpload||serverSources.referenceForPath(path)!==ref)throw Error('BINDING_SOURCE_UNVERIFIED: input file witness changed');
               const source=serverSources.resolve(ref,{status:'SUCCEEDED',output:entry.sourceObservation});
               if(source.document_id!==request.document_id)throw Error('BINDING_SOURCE_UNVERIFIED: file document changed');
               entry.boundImportOperation=operation.id;return source;

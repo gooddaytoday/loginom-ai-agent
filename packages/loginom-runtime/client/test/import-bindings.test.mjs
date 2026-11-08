@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
-import {resolveImportBindingValue,importBindingInventory,readImportBindingField,readImportBindings} from '../lib/import-bindings.mjs';
+import {resolveImportBindingValue,importBindingInventory,readImportBindingField,readImportBindings,configureImportBinding,resolveImportBindingSourceReadback} from '../lib/import-bindings.mjs';
 import {isUnchangedTextImportExecution} from '../lib/node-read-contract.mjs';
 
 const binding={parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'CsvPath'}};
@@ -36,6 +36,7 @@ function fixture(){
 }
 test('fresh source values reject typed NULL, empty, URL, unsafe paths and another mapped ID',()=>{
  const f=fixture();assert.equal(resolveImportBindingValue(f.proof,'CsvPath',f.mapping).value,'/own/a.csv');
+ assert.throws(()=>resolveImportBindingValue(f.proof,'CsvPath',f.mapping,'/own/b.csv'),/BINDING_SOURCE_UNVERIFIED/);
  for(const value of ['',null,'https://example.test/a.csv','/own/../a.csv','/own/*.csv']){
   const proof=structuredClone(f.proof);proof.variables[0].cell.value=value;proof.variables[0].cell.is_null=value===null;
   assert.throws(()=>resolveImportBindingValue(proof,'CsvPath',f.mapping),/BINDING_/);
@@ -47,6 +48,42 @@ test('independent filename inventory proves the selected caption, mapped IDs, so
  assert.equal(importBindingInventory(f.field,prepared,f.node)[0].source.variable_id,7);
  for(const field of [{...f.field,variable_mode:false},{...f.field,variable_caption:'Sentinel ( /own/a.csv )'},{...f.field,value:'/own/b.csv'}])assert.throws(()=>importBindingInventory(field,prepared,f.node),/BINDING_/);
  const bad=structuredClone(f.mapping);bad.port_guid='foreign';assert.throws(()=>importBindingInventory(f.field,{...prepared,mapping:bad},f.node),/BINDING_PORT_MISMATCH/);
+});
+test('pending input cache retains variable identity while the fresh builtin source authorizes its current file',()=>{
+ for(const cached of [null,'/own/old.csv']){
+  const f=fixture();Object.assign(f.mapping.fields[0],{is_null:cached===null,value:cached});
+  Object.assign(f.field,{value:cached??'',variable_caption:'CsvPath ( '+(cached??'')+' )'});
+  const prepared={...resolveImportBindingValue(f.proof,'CsvPath',f.mapping),...f,link:f.graph.variable_links[0]};
+  const [b]=importBindingInventory(f.field,prepared,f.node);
+  assert.equal(b.variable.id,9);assert.equal(b.variable.is_null,false);assert.equal(b.source.variable_id,7);
+  assert.equal(resolveImportBindingSourceReadback({fields:{source_path:f.field}},prepared,f.node).fields.source_path.value,'/own/a.csv');
+  assert.equal(f.field.value,cached??'');
+ }
+});
+test('the Import adapter supplies its verified file-stage gate to the common variable gesture',async()=>{
+ const f=fixture(),base='W;ImportTextFilePreviewWizard;edtFileName';
+ const s={wizard:{root_ref:'owned',root_tid:'W',stage:'text_import_file'},prepared_node_context:{verified:true},ui:{elements:[{tid:base+';VariableControl;trg_picker',ref:'trigger',allowed_actions:['click']}]}};
+ const channel={observe:async o=>{assert.ok(o.ready(s));return s;},perform:async o=>{
+  assert.equal(o.ready({...s,wizard:{...s.wizard,stage:'foreign'}}),false);
+  assert.equal(o.ready({...s,prepared_node_context:{verified:false}}),false);
+  assert.equal(o.ready(s),true);throw Error('OWNED_FILE_GATE');
+ }};
+ await assert.rejects(configureImportBinding(channel,{...resolveImportBindingValue(f.proof,'CsvPath',f.mapping),mapping:f.mapping,proof:f.proof}),/OWNED_FILE_GATE/);
+});
+test('the Import writer uses the common switch, exact picker, selection and commit without writing a literal',async()=>{
+ const f=fixture(),base='W;ImportTextFilePreviewWizard;edtFileName',caption='CsvPath ( /own/a.csv )';
+ let phase=0;const actions=[];
+ const element=(tid,ref,allowed_actions,extra={})=>({tid,ref,allowed_actions,signature:{tag:'button'},...extra});
+ const state=()=>({wizard:{root_ref:'owned',root_tid:'W',stage:'text_import_file',import_source:{fields:{source_path:{status:'observed',variable_mode:phase>=3,variable_caption:phase>=3?caption:undefined}}}},prepared_node_context:{verified:true},ui:{elements:phase===0?[element(base+';SwitchButton','switch',['click'])]:[
+  element(base+';VariableControl;trg_picker','trigger',['click']),
+  element(null,'input',['press'],{signature:{tag:'input'},identity:{anchor_tid:base+';VariableControl'}}),
+  ...(phase===2?[element('option','option',['click'],{import_binding:{caption}})]:[])]}});
+ const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
+  const s=state();assert.ok(o.ready(s),o.condition);const action=o.resolve(s);actions.push(action);
+  if(action.ref==='switch')phase=1;else if(action.ref==='trigger')phase=2;else if(action.ref==='option')phase=3;else if(action.ref==='input'&&action.key==='Tab')phase=4;else assert.fail('unexpected write');
+ }};
+ await configureImportBinding(channel,{...resolveImportBindingValue(f.proof,'CsvPath',f.mapping),mapping:f.mapping,proof:f.proof});
+ assert.equal(phase,4);assert.deepEqual(actions.map(a=>[a.verb,a.ref]),[['click','switch'],['click','trigger'],['click','option'],['press','input']]);
 });
 for(const fault of ['observe','mapping'])test('Import readback Cancels its owned wizard after '+fault+' refusal',async()=>{
  const node={document_id:'doc',workflow_id:'wf',node_id:'import',verified:true,tid:'N',locked:false};

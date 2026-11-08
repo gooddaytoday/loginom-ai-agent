@@ -1,4 +1,4 @@
-import {importBindingSchema,resolveImportBindingParameters,prepareImportBinding,configureImportBinding,readImportBindings} from './import-bindings.mjs';
+import {importBindingSchema,resolveImportBindingParameters,prepareImportBinding,configureImportBinding,readImportBindings,resolveImportBindingSourceReadback} from './import-bindings.mjs';
 import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
@@ -271,9 +271,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     return {
       ...(operation.parameters?.bindings?.length?{async beforeTarget(ctx){
         if(operation.parameters?.bindings?.length){
-          operation.importBinding=await prepareImportBinding(options,ctx,{targetOrigin,targetBuild});
+          operation.importBinding=await prepareImportBinding(options,ctx,{targetOrigin,targetBuild},{expectedPath:sourceReceipt?.source.destination});
           sourceReceipt??=verified({source:operation.importBinding.file});
-          requireValue(operation.importBinding.value===sourceReceipt.source.destination,'BINDING_SOURCE_UNVERIFIED: /settings/source/source_path');
         }
         return verified();
       }}:{}),
@@ -314,6 +313,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           const mapped=await channel.mapVariablePort({direction:'input',kind:'variables',port:0});
           requireValue(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');
           operation.importBinding.mapping=mapped.mapping;
+          operation.importBinding.graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
         }
         if(operation.nodeApply.request.finish==='execute') {
           executionDriver=createNodeExecutionProcedure(channel,{document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id});
@@ -391,6 +391,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           configured=operation.nodeApply.request.target.kind==='existing'
             ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
             :await configureTextImportFields(channel,p.settings,owner,{boundSource:!!operation.importBinding});
+          if(operation.importBinding)configured={...configured,source:resolveImportBindingSourceReadback(configured.source,operation.importBinding,ctx.node)};
           requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
           return configured;
         } catch(error) {
@@ -497,7 +498,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
         return verified({effect_possible:true,mode,execution_started:executeRequested,settings_applied:true,
           ...(execution?{execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface}:{}),
-          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:false});
+          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:!!operation.importBinding});
       },
       async waitExecution(ctx) {
         enter(ctx);requireValue(executionDriver,'Execution driver is unavailable');

@@ -29,7 +29,7 @@ export function importBindingChannel(options,ctx,config,node){
   preparedNodeContext:{document_id:operation.parameters.document_id,workflow_ref:operation.parameters.workflow_ref,node},
   wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
 }
-export function resolveImportBindingValue(proof,name,mapping){
+export function resolveImportBindingValue(proof,name,mapping,expectedPath){
  need(proof?.verified===true&&proof.cleanup_complete===true&&proof.independent_readback===true,'BINDING_SOURCE_UNVERIFIED');
  const field=mapping?.fields?.find(f=>f.name===name),sourceName=field?.source?.name??name;
  const variables=proof.variables?.filter(v=>v.name===sourceName);
@@ -38,6 +38,7 @@ export function resolveImportBindingValue(proof,name,mapping){
  need(v.cell.is_null===false,'BINDING_NULL_UNSUPPORTED');
  need(typeof v.cell.value==='string'&&v.cell.value.length>0,'BINDING_VALUE_INVALID');
  try{validateTextImportPatch({source:{source_path:v.cell.value}});}catch{need(false,'BINDING_VALUE_INVALID');}
+ if(expectedPath!==undefined)need(v.cell.value===expectedPath,'BINDING_SOURCE_UNVERIFIED');
  if(field)need(field.type===5&&field.source?.type===5&&field.source.id===v.id,'BINDING_SOURCE_UNVERIFIED');
  return {value:v.cell.value,variable:v,name};
 }
@@ -53,7 +54,7 @@ export async function prepareImportBinding(options,ctx,config,settings){
   throw error;
  }
 }
-async function readImportBindingSource(options,ctx,config,{saved=false}={}){
+async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath}={}){
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
@@ -82,7 +83,7 @@ async function readImportBindingSource(options,ctx,config,{saved=false}={}){
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
  const proof=await channel.configureUserVariables([],'close');
- const result={...resolveImportBindingValue(proof,name,mapping),proof,source,link,graph,mapping};
+ const result={...resolveImportBindingValue(proof,name,mapping,expectedPath),proof,source,link,graph,mapping};
  // The host resolves only an observed/admitted file in its own selected input
  // directory. It never turns an arbitrary string into a storage reference.
  need(typeof options.resolveBoundFileSource==='function','BINDING_SOURCE_UNVERIFIED');
@@ -91,27 +92,42 @@ async function readImportBindingSource(options,ctx,config,{saved=false}={}){
  return {...result,file};
 }
 export function importBindingInventory(field,prepared,node){
- const {mapping,source,link,graph,name,value,variable}=prepared;
+ const {mapping,source,link,graph,name,variable}=prepared;
  need(field?.status==='observed'&&field.variable_mode===true&&field.truncated===false,'BINDING_SOURCE_UNVERIFIED');
  need(mapping?.kind==='variables'&&mapping.port===0&&typeof mapping.port_guid==='string','BINDING_PORT_MISMATCH');
  const fields=mapping.fields.filter(v=>v.name===name);need(fields.length===1,'BINDING_VARIABLE_MISSING');
  const f=fields[0];
- need(f.type===5&&f.source?.id===variable.id&&f.source.type===5&&field.variable_caption===f.label+' ( '+value+' )','BINDING_SOURCE_UNVERIFIED');
+ need(f.type===5&&f.source?.id===variable.id&&f.source.type===5
+  &&mapping.fields.filter(x=>x.label===f.label).length===1
+  &&field.variable_caption===f.label+' ( '+field.value+' )','BINDING_SOURCE_UNVERIFIED');
  const links=(graph.variable_links??[]).filter(l=>l.target===node.node_id&&l.kind==='variables'&&l.input===0);
  need(links.length===1&&links[0].source===source.ref.node_id&&links[0].target_port_guid===mapping.port_guid,'BINDING_PORT_MISMATCH');
- need(field.value===value&&typeof field.row_id==='string','BINDING_SOURCE_UNVERIFIED');
+ // The selector identifies the mapped variable; an inactive input can retain
+ // NULL/old cached text. The independently read source, not that cache,
+ // authorizes the current file. Execute receipts prove the actual output.
+ need(typeof field.row_id==='string','BINDING_SOURCE_UNVERIFIED');
  return [{parameter,mode:'variable',row_id:field.row_id,variable:{kind:'variables',input:0,id:f.id,name:f.name,type:'string',is_null:false},
   source:{ref:source.ref,type:source.type,output:link.output,variable_id:variable.id},input_port_guid:mapping.port_guid,connected:true,verified:true}];
 }
 export async function configureImportBinding(channel,prepared){
  const f=prepared.mapping.fields.filter(f=>f.name===prepared.name);need(f.length===1,'BINDING_VARIABLE_MISSING');
  need(resolveImportBindingValue(prepared.proof,prepared.name,prepared.mapping).value===prepared.value,'BINDING_SOURCE_UNVERIFIED');
- const caption=f[0].label+' ( '+prepared.value+' )';
- const observe=(condition,ready=()=>true)=>channel.observe({condition,ready:s=>s.wizard?.stage==='text_import_file'&&ready(s)});
+ need(prepared.mapping.fields.filter(x=>x.label===f[0].label).length===1,'BINDING_VARIABLE_MISSING');
+ const chosen=caption=>typeof caption==='string'&&caption.startsWith(f[0].label+' ( ')&&caption.endsWith(' )');
+ const ready=s=>s.wizard?.stage==='text_import_file'&&s.prepared_node_context?.verified===true;
+ const observe=(condition,predicate=()=>true)=>channel.observe({condition,ready:s=>ready(s)&&predicate(s)});
  const state=await observe('owned Import binding editor');
- return configureVariableBinding({channel,observe,state,base:state.wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName',identity:s=>s.prepared_node_context,
-  option:e=>e.import_binding?.caption===caption,
-  committed:s=>s.wizard.import_source?.fields?.source_path?.variable_caption===caption});
+ return configureVariableBinding({channel,observe,ready,state,base:state.wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName',identity:s=>s.prepared_node_context,
+  option:e=>chosen(e.import_binding?.caption),
+  committed:s=>{const field=s.wizard.import_source?.fields?.source_path;return field?.status==='observed'&&field.variable_mode===true&&chosen(field.variable_caption);}});
+}
+export function resolveImportBindingSourceReadback(source,prepared,node){
+ const field=source.fields.source_path;
+ importBindingInventory(field,prepared,node);
+ // Same W1 rule as scalar bindings: the independently observed source is
+ // authoritative while the native input cache is inactive. No literal write.
+ return {...source,fields:{...source.fields,source_path:{...field,value:prepared.value,
+  value_length_utf16:prepared.value.length,truncated:false,value_kind:'independent_variable_source'}}};
 }
 export async function readImportBindingField(channel){
  await openPreparedWizard(channel);

@@ -69,6 +69,12 @@ test('Import binding consumes its observed file witness after Files returns to t
   },mapPorts:ok,openWizard:ok,finish:async mode=>({...await ok(),mode,settings_applied:true,execution_started:false}),waitExecution:ok,readOutput:ok,verifyContinuation:async()=>true}),
  });
  const request={operation_id:'bound-file',contract_revision:'1.0.0',document_id:'d',workflow_ref:workflow,target:{kind:'existing',type:'imports.text',ref:node},inputs:[],mode:'delimited',parameters:{settings:{}},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const evaluate=f.page.evaluate;f.page.evaluate=async()=>{throw Error('SOURCE_UNAVAILABLE');};
+ assert.notEqual((await f.runtime.serverDownload({operation_id:'failed-location',path:'/worker/full.csv'},'dock_storage_source')).status,'SUCCEEDED');
+ f.page.evaluate=evaluate;
+ const unknown=await f.runtime.runNodeApply({...request,operation_id:'bound-file-after-failed-location'});
+ assert.notEqual(unknown.status,'SUCCEEDED');assert.equal(checked,0,'a failed current lookup cannot authorize an older witness');
+ assert.equal((await f.runtime.serverDownload({operation_id:'fresh-location',path:'/worker/full.csv'},'dock_storage_source')).status,'SUCCEEDED');
  const result=await f.runtime.runNodeApply(request);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(checked,1);
  const stale=await f.runtime.runNodeApply({...request,operation_id:'bound-file-again'});
  assert.notEqual(stale.status,'SUCCEEDED');assert.match(stale.error.message,/BINDING_SOURCE_UNVERIFIED/);assert.equal(checked,1);
