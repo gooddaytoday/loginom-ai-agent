@@ -291,7 +291,9 @@ page = context.pages()[0]
    await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.sampling_modes?.mode==='uniform'){
-   const target=graph.nodes.find(n=>n.type===expected.sampling_modes.node_type);
+   const nodes=graph.nodes.filter(n=>n.type===expected.sampling_modes.node_type);
+   if(nodes.length!==1)throw Error('SAMPLING_UNIFORM_ONE_SAVED_NODE');
+   const target=nodes[0];
    const settings=await observeSamplingSavedSettings({load,channel:channelFor(target.ref,'uniform-saved'),expected});
    await record({phase:'sampling_saved_settings',node:target.ref,...settings});
   }

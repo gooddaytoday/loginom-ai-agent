@@ -16,7 +16,7 @@ test('zero readback requires native enum 11 and omits constant value',()=>{
  for(const code of [1,2,3,4,5,6,7,8,12]){field.method_code=code;assert.throws(()=>readback(f),/enum differs/);}
 });
 test('v0.4.0 readback binds each mode to its native enum and ordered flag',()=>{
- for(const [method,code,type,kind,ordered] of [['median',4,'real','Непрерывный',false],['most_probable',5,'string','Дискретный',false],['delete',2,'real','Непрерывный',false],['previous',12,'real','Непрерывный',true]]){
+ for(const [method,code,type,kind,ordered] of [['median',4,'real','Непрерывный',false],['most_probable',5,'string','Дискретный',false],['delete',2,'real','Непрерывный',false],['previous',12,'real','Непрерывный',true],['random',7,'real','Непрерывный',false],['linear',8,'real','Непрерывный',true]]){
   const f=fixture(),c=f.phases[1].value.configuration,field=c.fields[0];Object.assign(field,{type,data_kind:kind,method,method_code:code});c.input_fields[0]={...c.input_fields[0],type,data_kind:kind};
   c.ordered=ordered;c.options.pedOrderedSample.value=ordered;f.phases[0].value.native_mapping.target_fields[0]={...f.phases[0].value.native_mapping.target_fields[0],type,data_kind:kind};
   const r=readback(f);assert.equal(r.fields[0].method,method);assert.equal(r.ordered,ordered);assert.equal(Object.hasOwn(r.fields[0],'value'),false);
@@ -32,9 +32,9 @@ test('published diagnostic job schema admits completed Missing Values readback a
  const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
  const {nodeApiTools}=await import('../lib/node-api.mjs');
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApiTools.find(t=>t.name==='dock_node_status').outputSchema);
- for(const method of ['mean','zero','median','most_probable','previous','delete'])for(const finish of ['done','execute']){
+ for(const method of ['mean','zero','median','most_probable','previous','delete','random','linear'])for(const finish of ['done','execute']){
   const f=fixture();f.phases.at(-1).value.mode=finish;
-  const code={mean:3,zero:11,median:4,most_probable:5,previous:12,delete:2}[method],c0=f.phases[1].value.configuration,ordered=method==='previous';
+  const code={mean:3,zero:11,median:4,most_probable:5,previous:12,delete:2,random:7,linear:8}[method],c0=f.phases[1].value.configuration,ordered=method==='previous'||method==='linear';
   Object.assign(c0.fields[0],{method,method_code:code,...(method==='most_probable'?{type:'string',data_kind:'Дискретный'}:{})});
   if(method==='most_probable')Object.assign(c0.input_fields[0],{type:'string',data_kind:'Дискретный'}),Object.assign(f.phases[0].value.native_mapping.target_fields[0],{type:'string',data_kind:'Дискретный'});
   c0.ordered=ordered;c0.options.pedOrderedSample.value=ordered;
@@ -45,7 +45,7 @@ test('published diagnostic job schema admits completed Missing Values readback a
   const job={operation_id:'op',attempt:1,state:'settled',cancel_requested:false,server_stop_requested:false,progress:null,error:null,
    outcome:{status:'SUCCEEDED',action_key:'node.apply',action_revision:'1.0.0',operation_id:'op',phase:'node_ready',effect_possible:true,cleanup_complete:true,output,error:null,trace:[]}};
   assert.equal(validate(job).valid,true,validate(job).errorMessage);
-  for(const change of [r=>r.node={},r=>r.fields[0].method='linear',r=>r.max_nulls_percent=101,r=>r.options.pedMaxNullsPercent.value=1.5,
+  for(const change of [r=>r.node={},r=>r.fields[0].method='cubic',r=>r.max_nulls_percent=101,r=>r.options.pedMaxNullsPercent.value=1.5,
    r=>r.options.pedUseQuality.switch_pressed=true,r=>r.fields[0].value='unexpected',r=>r.fields[0].used=false,r=>r.extra=true]){
    const bad=structuredClone(job);change(bad.outcome.output.configuration.readback);assert.equal(validate(bad).valid,false);
   }

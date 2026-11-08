@@ -1,0 +1,89 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Пустые пересечения",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "C_1_Amount_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "C_2_Amount_NullCount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_1_Amount_NullCount": null,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": 1,
+          "C_2_Amount_NullCount": 1
+        },
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4,
+          "C_1_Amount_NullCount": 1,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null,
+          "C_2_Amount_NullCount": null
+        }
+      ]
+    }
+  ]
+}

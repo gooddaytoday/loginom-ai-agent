@@ -33,8 +33,9 @@ Exact не поддерживает regex, нечувствительность 
 <!-- mode: rules -->
 Для regex, сравнения без учёта регистра, числового допуска и остальных в NULL
 выбирай `variables.replace`, mode `rules`; не заменяй этот узел Калькулятором или JS.
-Параметры узла — в `dock_action_describe`. Один variables input 0; inputs=[], mappings=[], read={ports:[],variable_ports:[0]},
-finish="execute". parameters.rules адресует точные технические имена.
+Параметры узла — в `dock_action_describe`. Источник — только через `variable_inputs`
+(kind variables, input 0), без табличных `inputs` и `mappings`: inputs=[], mappings=[],
+read={ports:[],variable_ports:[0]}, finish="execute". parameters.rules адресует точные технические имена.
 Типы integer/real/string/boolean сохраняются. Строкам обязательно case_sensitive,
 числам конечная неотрицательная precision. case_sensitive:false игнорирует регистр
 (проверен ASCII). precision — допуск поиска, не округление: 1.25 по ключу 1.2

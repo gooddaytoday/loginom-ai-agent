@@ -544,7 +544,9 @@ class RunCheckTests(unittest.TestCase):
                        check=True, capture_output=True)
         for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
                                                   ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
-                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3),
+                                                  ('missing-linear', 'task-linear.md', 'ordered.csv', 5, 3),
+                                                  ('missing-random', 'task-random.md', 'random-single-value.csv', 4, 3)]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['input_files'], [csv_name])
@@ -585,6 +587,19 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
                     sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
                 self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
+
+    def test_grouping_cycle_three_uses_approved_tasks_and_exact_stages(self):
+        for mode in ['first', 'last', 'only', 'concat']:
+            case = runner.scenario('grouping-' + mode)
+            self.assertEqual(case['prompt'].name, 'task-' + mode + '.md')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            expected = runner.expected_for(case, '/test/lists.lgp')
+            stages = json.loads(subprocess.check_output([
+                sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages']
+            self.assertEqual(expected['outputs'], stages)
+            self.assertEqual(len(stages), 3 if mode == 'concat' else 1)
+            cold = runner.expected_for(case, '/test/lists.lgp', cold=True)
+            self.assertEqual(cold['outputs'], [stages[-1]])
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')

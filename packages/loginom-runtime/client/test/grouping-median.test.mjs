@@ -21,7 +21,7 @@ test('Grouping median is advertised and resolves integer input to mask 32',()=>{
  for(const type of ['string','real','boolean','datetime','variant']){
   assert.throws(()=>resolveGroupingParameters(parameters,fields.map(f=>f.name==='Amount'?{...f,type}:f)),/incompatible/);
  }
- for(const fn of ['concat','first','last','only']){
+ for(const fn of ['concat','unknown']){
   assert.throws(()=>validateGroupingParameters({...parameters,measures:[measure('Amount',fn,'Bad')]},'aggregate',request));
  }
 });
@@ -39,10 +39,10 @@ test('Grouping median output is real and binds the Median source',()=>{
  assert.throws(()=>resolveGroupingOutput(configuration,parameters,wrong));
 });
 
-test('Grouping preserves a saved median mask and still refuses other new bits and types',async()=>{
+test('Grouping preserves a saved median mask and still refuses unknown bits and incompatible types',async()=>{
  const channel=c=>({observe:async options=>{const s={wizard:{stage:'grouping'},node_grouping:{...c,verified:true}};assert.ok(options.ready(s));return s;},perform:()=>assert.fail('preservation must not mutate')});
  assert.equal((await configureGrouping(channel(configuration),{})).preservation.unchanged,true);
- for(const bit of [1024,2048,4096,8192]){
+ for(const bit of [16384,32768]){
   const c=structuredClone(configuration);c.measures[0].functions|=bit;
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);

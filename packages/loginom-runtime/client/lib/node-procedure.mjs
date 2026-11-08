@@ -30,6 +30,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
+import {makeVariablesColumnUnionConfigureCode} from './variables-column-union-procedure.mjs';
 import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
@@ -373,6 +374,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async readVariablePortMapping(mapping){return crossTableOwnedStep('variable_mapping_read',{mapping,read_only:true},makeVariablePortMappingCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
+    async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
@@ -642,7 +644,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const normPortal=(readClustering||readLogRegression)&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
         const treeEditor=readTrees&&wizard?.stage==='table_tree'?(roots.output.ui?.elements??[]).find(e=>e.tid==='EditDataTreeNodeDefForm')?.ref:undefined;
         const treeQuestion=readTrees&&wizard?.stage==='table_tree'&&roots.output.ui?.dialogs?.length===1?roots.output.ui.dialogs[0].ref:undefined;
-        const root = (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? calculatorModeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        // Concat pickers are portal siblings of their factor dialog. Keep the
+        // dialog's complete selected-field/option proof for keyboard selection.
+        const groupingConcatPortal=wizard?.stage==='grouping'&&expressionEditors.length===1
+          &&['cbxConcatSeparator','cbxConcatWrapper','fc;cbxConcatSort'].some(k=>portals[0]?.tid===wizard.root_tid+';FactorEditDialog;cntCheckboxes;fs;'+k+';boundlist')?expressionEditors[0].ref:undefined;
+        const root = groupingConcatPortal ?? (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? calculatorModeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
