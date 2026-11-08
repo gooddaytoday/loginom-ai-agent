@@ -501,3 +501,11 @@ test('shared ordinary output refuses reordered fields and cells even when every 
  await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),
   /Output field order differs from the configured output/);
 });
+
+test('typedVariants read failure names its real cause while ordinary reads keep the generic reason',async()=>{
+ const rows=[['x']],typed=fixture({rows,types:[6]}),plain=fixture({rows,types:[6]});
+ const bad=await typed.run({port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true});
+ assert.equal(bad.verified,false);assert.match(bad.reason,/^read_failed: \w+: .+/);assert.ok(bad.reason.length<=220);
+ const ordinary=await plain.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
+ assert.equal(ordinary.verified,true);
+});

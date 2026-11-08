@@ -370,7 +370,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
+  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;if(reason==='read_failed'&&q.typedVariants===true){const text=error?.message??error?.get_message?.();reason='read_failed: '+String(error?.name??'Error').slice(0,40)+': '+String(text).slice(0,160);}readDiagnostic=error?.treeReadDiagnostic;result=undefined;
   }finally{
    // A timed-out fixed321 request still owns its buffers. Retain its source
    // handles until the owning browser is closed; never claim native cancel.
