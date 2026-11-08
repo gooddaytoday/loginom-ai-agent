@@ -630,6 +630,12 @@ k-means с нативной нормировкой [-1;1], [0;1] и max-abs со
 порядок полей, типы, CSV/Save/cold и сохранённый NormType проверяются.
 Допуски real abs=1e-8/rel=1e-10. Каждый метод меняет raw-разбиение.
 
+`coarse-classes-continuous-manual`: integer/continuous X, ручной разделитель 7,
+предварительное квантование выключено, разбиение сохранено без автопересчёта.
+Вход `fixtures/continuous.csv` включает X=7; независимый `modes/expected.json`
+проверяет его класс 0, все три выхода, типы Variant NULL/real, CSV, Save/cold/cleanup.
+IncludeUpperBound — наблюдаемое нативное false, не заявленный параметр.
+
 `coarse-classes-train` и `coarse-classes-apply`: один дискретный Segment,
 бинарная Target, автоматические конечные классы. Приёмочный комплект —
 `preprocessing-coarseclasses/acceptance`; три CSV в порядке портов 0/1/2,
@@ -853,3 +859,9 @@ Save, independent cold execution and confirmed package close/logout are required
 immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
 `fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
 real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
+
+`variant-reader-collapse` — task-collapse.md + mixed.csv общего Variant reader;
+expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Values
+сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
+порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
+проверяется принятым `replace-keep-variant`.

@@ -2,6 +2,10 @@
 // never an expected result or inferred category combinations.
 // This private port path is selected explicitly by the cold runner. Every
 // dispatch uses the production reader, including its exactness and cleanup.
+export function readColdNativeOutput(channel,{type,port,execution}){
+ return channel.readOutputPort({port,execution,sampleRows:100,requireExactNumbers:true,
+  ...(type==='preprocessing.coarse_classes'&&port===1?{typedVariants:true}:{})});
+}
 export async function readColdPortWindows(channel,{node,execution,port,rowCount}) {
  const need=ok=>{if(!ok)throw Error('COLD_PORT_WINDOW_BINDING_OR_COVERAGE_CHANGED');};
  need(Number.isSafeInteger(rowCount)&&rowCount>=0&&rowCount<=100);

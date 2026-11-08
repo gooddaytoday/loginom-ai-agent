@@ -38,7 +38,7 @@ export async function configureCoarseClassesOutputs(channel,c,p,mappings){
 export async function readCoarseClassesOutputs(channel,read,ctx,mapped){
  need(JSON.stringify(read.ports)==='[0,1,2]','all three output ports required');const ports=[];
  for(const port of read.ports){
-  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers,...(port===1?{typedVariants:true}:{})});
   const expected=mapped.ports.find(p=>p.port===port)?.schema;
   need(expected&&output.schema.length===expected.length&&output.schema.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type&&(expected[i].label===undefined||f.label===expected[i].label)),'schema/order differs from coarse classes output');
   ports.push(output);
